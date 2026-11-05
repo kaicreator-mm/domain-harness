@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/intelligence-unit.schema.json",
+  "title": "DIS 0.1.0 Intelligence Unit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "revision", "role", "purpose", "scope", "owner", "authority", "qualification", "evidence", "failure"],
+  "properties": {
+    "schemaVersion": { "const": "dis.unit/0.1.0" },
+    "id": { "type": "string", "minLength": 3, "pattern": "^[a-z][a-z0-9._-]*$" },
+    "revision": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "role": { "enum": ["knowledge", "recognizer", "decision", "procedure", "tool", "workflow", "validator"] },
+    "purpose": { "type": "string", "minLength": 8 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "appliesTo", "excludes"],
+      "properties": {
+        "domain": { "type": "string", "minLength": 1 },
+        "appliesTo": { "type": "array", "items": { "type": "string" } },
+        "excludes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "owner": { "type": "string", "minLength": 1 },
+    "authority": { "enum": ["FROZEN", "CONTROLLED", "REFERENCE", "EXAMPLE", "DERIVED"] },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage"],
+      "properties": {
+        "stage": { "enum": ["OBSERVED", "CANDIDATE", "VALIDATED", "PROMOTED", "SELECTED", "EXECUTED", "REJECTED", "WITHDRAWN", "EXPIRED", "SUPERSEDED"] },
+        "limitations": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "input": { "$ref": "#/$defs/ioContract" },
+    "output": { "$ref": "#/$defs/ioContract" },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requires": { "type": "array", "items": { "$ref": "#/$defs/capabilityRef" } },
+        "provides": { "type": "array", "items": { "$ref": "#/$defs/capabilityRef" } }
+      }
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy"],
+      "properties": {
+        "strategy": { "enum": ["declarative", "function", "parser", "model", "hybrid", "tool-operation", "workflow-graph"] },
+        "ref": { "type": "string", "minLength": 1 },
+        "exposure": { "enum": ["private", "semantic", "tool"] }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sources", "absenceReason"],
+      "properties": {
+        "sources": { "type": "array", "items": { "$ref": "#/$defs/sourceRef" } },
+        "absenceReason": { "type": ["string", "null"] }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supported", "handling"],
+      "properties": {
+        "supported": { "type": "array", "uniqueItems": true, "items": { "enum": ["UNKNOWN", "AMBIGUOUS", "CONFLICT", "OUT_OF_SCOPE", "INVALID_INPUT", "PARTIAL", "FAILED", "NEEDS_INPUT", "NEEDS_REVIEW"] } },
+        "handling": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "casesRef"],
+      "properties": {
+        "profile": { "type": "string", "minLength": 1 },
+        "casesRef": { "type": "string", "minLength": 1 },
+        "lastResult": { "enum": ["PASS", "PARTIAL", "FAIL", "NOT_RUN"] }
+      }
+    }
+  },
+  "$defs": {
+    "ioContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaRef"],
+      "properties": {
+        "schemaRef": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" }
+      }
+    },
+    "capabilityRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilityId", "version"],
+      "properties": {
+        "capabilityId": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" }
+      }
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "kind", "ref"],
+      "properties": {
+        "sourceId": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["authority", "reference", "example", "observation", "validation", "adjudication"] },
+        "ref": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "claim": { "type": "string" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "role": { "enum": ["recognizer", "decision", "procedure", "tool", "workflow", "validator"] } }, "required": ["role"] },
+      "then": { "required": ["input", "output", "implementation"] }
+    },
+    {
+      "if": { "properties": { "role": { "const": "tool" } }, "required": ["role"] },
+      "then": { "properties": { "implementation": { "properties": { "exposure": { "const": "tool" }, "strategy": { "const": "tool-operation" } }, "required": ["exposure", "strategy"] } } }
+    },
+    {
+      "if": { "properties": { "role": { "const": "procedure" } }, "required": ["role"] },
+      "then": { "properties": { "implementation": { "properties": { "exposure": { "const": "private" } }, "required": ["exposure"] } } }
+    }
+  ]
+}
