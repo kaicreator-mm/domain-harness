@@ -166,6 +166,8 @@ Static Graph validation must ensure unique Node IDs, entry/terminal existence, e
 
 At runtime, only outputs from executed Nodes are available; missing sources do not become null/default success; each branch selects exactly one control Edge; zero or multiple matches are errors; Data/Evidence Edges do not trigger Nodes; Node inputs, outputs, selected paths and Evidence associations remain inspectable; terminal Outcomes conform to Graph Output Schema and Validator rules.
 
+For control conditions, the root pointer addresses the complete output object. A non-root pointer must resolve to a declared output property; optional properties are permitted. equals matches only a present equal value, notEquals matches an absent or unequal value, and exists matches only a present value.
+
 Static validation does not replace runtime validation; runtime error detection does not replace static Graph qualification.
 
 ## 7. Package Resource Closure / Exact Identity
@@ -214,7 +216,7 @@ At minimum test known/ambiguous/unknown/invalid/out-of-scope, missing input, dup
 
 DIS version is independent of DomainHarness SDK version. Unit, Graph, Definition, Package revisions and content digests are distinct identities. The same logical ID does not imply the same Artifact. Compatibility is declared by explicit Contract/Profile and validation, not inferred from SemVer alone. Breaking changes require a new version/migration description; installed Packages retain exact pins. Adding an optional Profile does not make an older Consumer assume support.
 
-## 11. Canonical L2 review ledger and R2 candidate status
+## 11. Canonical L2 review ledger and R3 candidate status
 
 The canonical L2 review identifiers are DIS-L2-F001..F012. They are distinct from the initial Demo findings DIS-F-001..F006:
 
@@ -231,9 +233,9 @@ The canonical L2 review identifiers are DIS-L2-F001..F012. They are distinct fro
 - **F011 (P2):** EXECUTED is an occurrence/evidence fact, not a Unit qualification stage.
 - **F012 (P2):** A second materially different Domain Profile is required before Release Qualification; xDownload alone is not a generality proof.
 
-R2 code repairs are recorded in commits 3ca5f9d and f842fac. The independent Python Conformance Suite now checks Definition cross-references, exact closure paths, Graph static path semantics, and actual Trace data/evidence/control assembly. The Reference Consumer rejects unsafe provenance schemes and accepts only the declared external provenance URI forms.
+R2 code repairs are recorded in commits 3ca5f9d and f842fac. R3 additionally aligns optional control-condition semantics across the Reference Consumer, independent Python Conformance, and normative text; unsupported condition operators now fail during Graph validation. The Chinese architecture text now includes the Workflow / Pipeline / Composition Graph contract present in English.
 
-F001-F011 have candidate contract/implementation coverage, but they are not marked finally closed until exact-HEAD Node/Python execution and Fresh Independent Exact-SHA review pass. F012 remains a pre-release qualification gate. The historical Demo PASS at d8c516e does not validate the current R2 candidate.
+F001-F011 have candidate contract/implementation coverage, but they are not marked finally closed until exact-HEAD Node/Python execution and Fresh Independent Exact-SHA review pass. F012 remains a pre-release qualification gate. The historical Demo PASS at d8c516e does not validate the current R3 candidate.
 
 
 ## 12. L2 Freeze Gate

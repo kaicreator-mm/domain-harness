@@ -1,6 +1,6 @@
 # Domain Intelligence Standard (DIS) 0.1.0 — Demo-Revised Candidate
 
-Status: L2_STANDARD_CANDIDATE_R2 / NOT_FROZEN
+Status: L2_STANDARD_CANDIDATE_R3 / NOT_FROZEN
 Branch: dis/0.1.0-l2-candidate
 L2 Issue: #1481
 Frozen Product/L1: #1477 @ b8135aa801eb38fcae2fa1fce3bada541178d5b9
@@ -111,7 +111,7 @@ Every Edge has exactly one kind:
 
 One Edge cannot combine control and data. Implicit whole-output pass-through is forbidden. Data and evidence Edges do not trigger Nodes.
 
-control.when uses bounded declarative comparisons (equals, notEquals, exists) against the source Node output; arbitrary code evaluation is forbidden. At runtime exactly one control Edge must match. Zero or multiple matches are errors.
+control.when uses bounded declarative comparisons (equals, notEquals, exists) against the source Node output; arbitrary code evaluation is forbidden. The root pointer addresses the complete output object. A non-root pointer must resolve to a declared output property; optional properties are permitted. equals matches only when the value is present and equal, notEquals matches when the value is absent or unequal, and exists matches only when the value is present. At runtime exactly one control Edge must match. Zero or multiple matches are errors.
 
 Data Edge source and target JSON Pointers must be valid. Every required target input must have a valid binding. Multi-source aggregation must be declared by the target contract and cannot rely on implicit merging. An evidence Edge target slot must be declared in the Unit's evidence.consumes and does not affect control reachability.
 
@@ -180,7 +180,7 @@ The reference Demo is xDownload Player Recognition: PageObservation → Recogniz
 
 Initial Demo findings are DIS-F-001 (P1: control/data coupling) and DIS-F-002 (P2: unresolved Schema references). The Demo revision separates control/data/evidence Edges, removes implicit pass-through, and adds Package Resource Closure and SHA-256 pinning. Later Demo findings DIS-F-003..F-006 are recorded separately in the revision log.
 
-Initial and final historical validation records remain separate. The existing PASS report at d8c516e validates that historical Demo revision only; it is not a validation claim for the current R2 L2 candidate.
+Initial and final historical validation records remain separate. The existing PASS report at d8c516e validates that historical Demo revision only; it is not a validation claim for the current R3 L2 candidate.
 
 ## 11. Superior authority
 
@@ -209,4 +209,4 @@ The corresponding fixes and historical test evidence are recorded in validation/
 
 ### 12.4. Canonical L2 review findings
 
-DIS-L2-F001..F012 are the L2 architecture review ledger and are distinct from the initial Demo findings DIS-F-001..F006. The canonical order is: F001 two connected lifecycle planes; F002 frozen Kernel/Microkernel and Host/Effect authority boundary; F003 actual Consumer trace; F004 Definition/Workflow/Graph/Unit closure; F005 complete Package Resource Closure; F006 trusted implementation binding; F007 path-sensitive required-input binding; F008 symlink containment; F009 DAG-only control graph; F010 provenance and Dynamic Form authority; F011 EXECUTED as occurrence; F012 second materially different Domain Profile before Release Qualification. R2 candidate repair and review status is recorded in L2_ARCHITECTURE and REVISION_LOG. DIS remains NOT_FROZEN until exact-HEAD evidence, independent Exact-SHA review, and the Controller Freeze Checkpoint are complete.
+DIS-L2-F001..F012 are the L2 architecture review ledger and are distinct from the initial Demo findings DIS-F-001..F006. The canonical order is: F001 two connected lifecycle planes; F002 frozen Kernel/Microkernel and Host/Effect authority boundary; F003 actual Consumer trace; F004 Definition/Workflow/Graph/Unit closure; F005 complete Package Resource Closure; F006 trusted implementation binding; F007 path-sensitive required-input binding; F008 symlink containment; F009 DAG-only control graph; F010 provenance and Dynamic Form authority; F011 EXECUTED as occurrence; F012 second materially different Domain Profile before Release Qualification. R3 candidate repair and review status is recorded in L2_ARCHITECTURE and REVISION_LOG. DIS remains NOT_FROZEN until exact-HEAD evidence, independent Exact-SHA review, and the Controller Freeze Checkpoint are complete.

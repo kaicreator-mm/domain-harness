@@ -240,3 +240,25 @@ test('private data-only Units need not declare an implementation exposure', asyn
   definition.privateUnits.push({ id: knowledge.id, revision: knowledge.revision });
   assert.equal(validateDefinition(definition, units, loaded.graph, 'domain/player-recognition.graph.json'), true);
 });
+
+ 
+test('exists control conditions may inspect declared optional output properties', async () => {
+  const loaded = await loadedPromise;
+  const graph = structuredClone(loaded.graph);
+  const decisionUnit = loaded.unitsById.get('xdownload.player.route-decision');
+  const schemas = new Map(loaded.schemas);
+  const outputSchema = structuredClone(schemas.get(decisionUnit.output.schemaRef));
+  outputSchema.properties.optionalSignal = { type: 'boolean' };
+  schemas.set(decisionUnit.output.schemaRef, outputSchema);
+  const edge = graph.edges.find((item) => item.kind === 'control' && item.from === 'decide' && item.when);
+  edge.when = { path: '/optionalSignal', operator: 'exists' };
+  assert.equal(validateGraph(graph, loaded.unitsById, schemas), true);
+});
+
+test('unsupported control condition operators fail during Graph validation', async () => {
+  const loaded = await loadedPromise;
+  const graph = structuredClone(loaded.graph);
+  const edge = graph.edges.find((item) => item.kind === 'control' && item.from === 'decide' && item.when);
+  edge.when.operator = 'contains';
+  assert.throws(() => validateGraph(graph, loaded.unitsById, loaded.schemas), hasCode('UNSUPPORTED_CONDITION_OPERATOR'));
+});

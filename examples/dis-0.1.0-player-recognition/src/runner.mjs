@@ -288,13 +288,13 @@ export function validateGraph(graph, unitsById, schemas) {
   for (const edge of controls) {
     if (!nodesById.has(edge.from) || !nodesById.has(edge.to)) throw new DisExecutionError('UNKNOWN_CONTROL_NODE', edge.from + '->' + edge.to);
     if (edge.when) {
+      if (!['equals', 'notEquals', 'exists'].includes(edge.when.operator)) throw new DisExecutionError('UNSUPPORTED_CONDITION_OPERATOR', String(edge.when.operator));
       if (!isTopLevelPointer(edge.when.path, true)) throw new DisExecutionError('INVALID_CONDITION_POINTER', edge.when.path);
       const sourceUnit = unitsById.get(nodesById.get(edge.from).unitRef.id);
       const sourceSchema = schemas.get(sourceUnit.output.schemaRef);
       if (edge.when.path !== '') {
         const conditionProperty = pointerProperty(edge.when.path);
         if (!sourceSchema?.properties?.[conditionProperty]) throw new DisExecutionError('UNKNOWN_CONDITION_OUTPUT_POINTER', edge.from + edge.when.path);
-        if (!requiredProperties(sourceSchema).includes(conditionProperty)) throw new DisExecutionError('CONDITION_SOURCE_NOT_REQUIRED', edge.from + edge.when.path);
       }
       if (['equals', 'notEquals'].includes(edge.when.operator) && !Object.hasOwn(edge.when, 'value')) throw new DisExecutionError('CONDITION_VALUE_REQUIRED', edge.from);
       if (edge.when.operator === 'exists' && Object.hasOwn(edge.when, 'value')) throw new DisExecutionError('EXISTS_CONDITION_FORBIDS_VALUE', edge.from);

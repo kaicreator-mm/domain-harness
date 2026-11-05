@@ -291,8 +291,6 @@ def validate_graph_contract(graph: dict, units_by_id: dict, schemas: dict):
                 property_name = pointer_key(pointer)
                 if property_name not in source_schema.get("properties", {}):
                     fail("control condition references unknown output property")
-                if property_name not in source_schema.get("required", []):
-                    fail("control condition output property must be required")
         adjacency[edge["from"]].append(edge["to"])
 
     data_keys = set()
@@ -477,7 +475,21 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
         fail(f"terminal outcome differs from final trace output: {result.get('label')}")
 
 
+def validate_condition_semantics():
+    cases = [
+        ({"optionalFlag": True}, {"path": "/optionalFlag", "operator": "exists"}, True),
+        ({}, {"path": "/optionalFlag", "operator": "exists"}, False),
+        ({"optionalFlag": True}, {"path": "/optionalFlag", "operator": "equals", "value": True}, True),
+        ({}, {"path": "/optionalFlag", "operator": "equals", "value": True}, False),
+        ({}, {"path": "/optionalFlag", "operator": "notEquals", "value": True}, True),
+    ]
+    for output, condition, expected in cases:
+        if condition_matches(output, condition) is not expected:
+            fail(f"control condition semantics mismatch: {condition}")
+
+
 def main():
+    validate_condition_semantics()
     standard_schemas = {}
     for schema_path in sorted(STANDARD_SCHEMA_DIR.glob("*.schema.json")):
         schema = read_json(schema_path)

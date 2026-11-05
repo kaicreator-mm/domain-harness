@@ -104,7 +104,7 @@ Graph 必须声明精确身份/revision、entry Node、Graph Input/Output Schema
 
 禁止单条 Edge 同时表达控制和数据传递；禁止隐式 whole-output pass-through；data/evidence Edge 不得触发 Node。
 
-control.when 只能读取来源 Node 输出，使用受限声明式比较（equals、notEquals、exists）。任意代码求值不允许。每次分支必须恰好匹配一条路径；零条或多条匹配均是错误。
+control.when 只能读取来源 Node 输出，使用受限声明式比较（equals、notEquals、exists），禁止任意代码求值。根指针读取完整输出对象；非根指针必须解析到 Output Schema 中已声明的属性，允许读取 optional 属性。equals 仅在属性存在且值相等时匹配；notEquals 在属性缺失或值不等时匹配；exists 仅在属性存在时匹配。每次分支必须恰好匹配一条路径；零条或多条匹配均是错误。
 
 data Edge 的源/目标 JSON Pointer 必须有效；目标必需输入必须获得有效绑定。多源聚合必须由目标 Schema 明确声明，不得依赖隐式合并。evidence Edge 的目标 slot 必须在 Unit 的 evidence.consumes 中声明，并且不参与控制可达性。
 
@@ -204,4 +204,4 @@ Demo 修订后 Decision 只输出 route，Procedure 只输出 resolution；Recog
 
 ### 12.4 Canonical L2 Review Findings
 
-DIS-L2-F001..F012 是 L2 架构审核台账，与初始 Demo 缺陷 DIS-F-001..F006 完全分开。统一编号顺序为：F001 两个相连的生命周期平面；F002 冻结的 Kernel/Microkernel 与 Host/Effect 权威边界；F003 实际 Consumer Trace；F004 Definition/Workflow/Graph/Unit 引用闭包；F005 完整 Package Resource Closure；F006 可信 Implementation Binding；F007 按路径验证 required input；F008 符号链接 containment；F009 DAG-only 控制图；F010 Provenance 与 Dynamic Form 权限边界；F011 EXECUTED 是运行发生记录；F012 Release Qualification 前使用第二个实质不同的 Domain Profile。R2 候选修复和审核状态记录在 L2_ARCHITECTURE 与 REVISION_LOG 中。exact-HEAD 证据、独立 Exact-SHA 审核和 Controller Freeze Checkpoint 完成前，DIS 仍为 NOT_FROZEN。
+DIS-L2-F001..F012 是 L2 架构审核台账，与初始 Demo 缺陷 DIS-F-001..F006 完全分开。统一编号顺序为：F001 两个相连的生命周期平面；F002 冻结的 Kernel/Microkernel 与 Host/Effect 权威边界；F003 实际 Consumer Trace；F004 Definition/Workflow/Graph/Unit 引用闭包；F005 完整 Package Resource Closure；F006 可信 Implementation Binding；F007 按路径验证 required input；F008 符号链接 containment；F009 DAG-only 控制图；F010 Provenance 与 Dynamic Form 权限边界；F011 EXECUTED 是运行发生记录；F012 Release Qualification 前使用第二个实质不同的 Domain Profile。R3 候选修复和审核状态记录在 L2_ARCHITECTURE 与 REVISION_LOG 中。exact-HEAD 证据、独立 Exact-SHA 审核和 Controller Freeze Checkpoint 完成前，DIS 仍为 NOT_FROZEN。

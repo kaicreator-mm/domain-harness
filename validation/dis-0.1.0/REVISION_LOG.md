@@ -107,3 +107,17 @@ The independent Conformance path now checks:
 Provenance references are distinct from Package resources: HTTPS, DOI, and URN may remain descriptive external references; they are never implicitly fetched or included in Resource Closure. Local consumed resources remain digest-pinned.
 
 R2 remains a candidate refinement. Exact-HEAD Node/Python execution, Woodpecker completion, fresh independent Exact-SHA review, and the L2 Freeze Checkpoint remain mandatory. The historical PASS report at d8c516e is not evidence for these R2 commits.
+
+
+## DIS 0.1.0 L2 candidate refinement R3 — condition semantics and bilingual closure
+
+Base candidate: `ed29f95bd2c2389c3226b9dfc3d71bfde9366bcf`.
+
+Independent review identified two bounded inconsistencies:
+
+- **P2 — optional control-condition semantics:** the Graph schema and runtime condition operators supported `exists`, but JS/Python static validation rejected any non-root condition property not listed as required. This made `exists` unusable for its intended optional-property case. Static validation now requires the property to be declared, not required. Semantics are explicit: `equals` matches present/equal; `notEquals` matches absent/unequal; `exists` matches present. Unsupported operators are rejected during JS Graph validation.
+- **P1 — bilingual architecture gap:** the Chinese L2 architecture omitted the English `Workflow / Pipeline / Composition Graph` contract section. The Chinese section is now added, and the duplicated Chinese Graph rule is removed.
+
+R3 adds two Node regression tests and an independent Python condition-semantics self-test. The Python Graph validator, JS Reference Consumer, English/Chinese normative text, and English/Chinese L2 architecture are synchronized. Resource Closure SHA-256 entries and the enclosing Package descriptor digest are recalculated.
+
+R3 remains a candidate repair, not a validation claim. Exact-HEAD `npm test`, `npm run demo`, `npm run validate`, repository Woodpecker checks, and Fresh Independent Exact-SHA review remain mandatory. Historical Demo PASS at d8c516e does not validate R3.

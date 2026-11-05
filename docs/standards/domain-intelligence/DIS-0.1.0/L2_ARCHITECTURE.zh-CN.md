@@ -115,6 +115,15 @@ Unit 是可描述、可引用、可资格确认和可组合的逻辑单元，不
 
 一个 Unit 可不暴露为 Component；一个 Component 可由多个 Unit 实现。Workflow Unit 是逻辑能力描述，Composition Graph 是其组合实现，二者必须通过精确引用绑定。
 
+### 3.3.1 Workflow / Pipeline / Composition Graph
+
+- Workflow 是可复用的领域解决能力描述，定义目标、适用范围、输入/输出、失败语义和证据要求。
+- Pipeline 是该 Workflow 的具体执行组织，描述节点、顺序、分支和终态。
+- Composition Graph 是 DIS 对 Pipeline 的结构化、可验证表示。
+- Workflow Unit 可暴露为 Semantic Component；Graph 是其实现/组合制品，二者通过精确引用绑定。
+- Pipeline 不是 Scheduler；Node 执行仍由冻结的 DomainHarness v0.7 Kernel/Microkernel、Domain Runtime 和 Host/Effect 契约管理。#1480 KDP 尚未冻结，对 DIS 0.1.0 不具规范效力。
+- Workflow 可组合 Procedure、Tool、Recognizer、Decision 和 Validator，不因此创建新的 Component family。
+
 ### 3.4 Identity / Qualification / Execution
 
 必须分离 Unit stable ID、semantic revision、materialized artifact digest、asset authority、intelligence qualification/maturity、selected Package pin 和 runtime execution occurrence。
@@ -158,13 +167,14 @@ Edge 只能有且只有一种 kind：
 - Edge 的 Node / Pointer / Slot 有效；
 - 每个 required input 在每条可达执行路径上恰好有一个有效绑定；必须计算路径上的最小/最大绑定数量，不能只检查边是否存在；
 - 每条 data/evidence 来源必须是目标节点的严格控制流祖先；拒绝同一次源节点执行产生的重复绑定；
-- 拒绝重复绑定；
 - data source 在目标执行前可用，并在所有适用控制路径上可达；否则必须声明 optional/conditional binding；
 - evidence slot 已声明；
 - 控制图从 entry 可达，所有路径到 terminal 或显式 wait/failure；
 - 拒绝未声明循环、无界 retry 和无法判定的分支。
 
 运行时只使用已执行 Node 输出；缺失来源不得转成 null/默认成功；每次控制分支必须恰好选择一条 Edge；0 或多条匹配均为错误；Data/Evidence Edge 不得触发 Node；保留 Node 输入、输出、选择路径和 Evidence 关联；终态符合 Graph Output Schema 和 Validator 规则。
+
+控制条件的根指针读取完整输出对象；非根指针必须解析到已声明的输出属性，允许读取 optional 属性。equals 仅在属性存在且值相等时匹配；notEquals 在属性缺失或值不等时匹配；exists 仅在属性存在时匹配。
 
 静态验证不能替代运行验证；运行时错误检测也不能替代静态 Graph 资格检查。
 
@@ -214,7 +224,7 @@ Conformance Suite 不得只验证 Reference Consumer 的硬编码路径。Consum
 
 DIS standard version 独立于 DomainHarness SDK version。Unit、Graph、Definition、Package revision 和 content digest 是不同身份维度。相同逻辑 ID 不代表相同 Artifact。兼容性必须由显式 Contract/Profile 和验证结果声明，不得仅根据 SemVer 推断。Breaking change 必须有新版本/迁移说明；已安装 Package 保持精确 pin。新增可选 Profile 不得让旧 Consumer 默认支持。
 
-## 11. Canonical L2 Review Findings 与 R2 候选状态
+## 11. Canonical L2 Review Findings 与 R3 候选状态
 
 DIS-L2-F001..F012 是统一的 L2 架构审核编号，与初始 Demo 的 DIS-F-001..F006 不同：
 
@@ -231,9 +241,9 @@ DIS-L2-F001..F012 是统一的 L2 架构审核编号，与初始 Demo 的 DIS-F-
 - **F011（P2）：** EXECUTED 是运行发生记录/证据事实，不是 Unit qualification stage。
 - **F012（P2）：** Release Qualification 前必须由第二个实质不同的 Domain Profile 验证泛化能力；xDownload 单独不足以证明泛化。
 
-R2 代码修复记录在 commit 3ca5f9d 和 f842fac。独立 Python Conformance Suite 已增加 Definition 交叉引用、精确 Closure 路径、Graph 静态路径语义，以及真实 Trace data/evidence/control 组装核对。Reference Consumer 拒绝不安全的 provenance scheme，并只接受规范声明的外部 Provenance URI 类型。
+R2 代码修复记录在 commit 3ca5f9d 和 f842fac。R3 进一步统一 Reference Consumer、独立 Python Conformance 与规范文本中的 optional control-condition 语义，并在 Graph 静态验证阶段拒绝不支持的 operator。中文架构文档已补齐英文版中的 Workflow / Pipeline / Composition Graph 契约。
 
-F001-F011 已有候选契约/实现覆盖，但必须等待 exact-HEAD Node/Python 执行和 Fresh Independent Exact-SHA 审核通过后才能最终关闭。F012 仍是 Release Qualification 前置门禁。历史 Demo commit d8c516e 的 PASS 不代表当前 R2 候选通过。
+F001-F011 已有候选契约/实现覆盖，但必须等待 exact-HEAD Node/Python 执行和 Fresh Independent Exact-SHA 审核通过后才能最终关闭。F012 仍是 Release Qualification 前置门禁。历史 Demo commit d8c516e 的 PASS 不代表当前 R3 候选通过。
 
 
 ## 12. L2 Freeze Gate
