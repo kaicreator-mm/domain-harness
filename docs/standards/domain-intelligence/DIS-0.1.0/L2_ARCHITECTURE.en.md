@@ -121,7 +121,7 @@ A Unit need not be exposed as a Component; one Component may be implemented by s
 - Pipeline is the concrete execution organization of that Workflow: nodes, ordering, branches and terminal outcomes.
 - Composition Graph is DIS's structured, verifiable representation of a Pipeline.
 - A Workflow Unit may be exposed as a Semantic Component; the Graph is its implementation/composition artifact. They are bound by exact references.
-- Pipeline is not a Scheduler; Node execution remains managed by the existing Runtime/KDP.
+- Pipeline is not a Scheduler; Node execution remains managed by the frozen DomainHarness v0.7 Kernel/Microkernel, Domain Runtime and Host/Effect contracts. The #1480 KDP proposal is not frozen and is non-normative for DIS 0.1.0.
 - A Workflow may compose Procedures, Tools, Recognizers, Decisions and Validators without creating a new Component family.
 
 ### 3.4 Identity / Qualification / Execution

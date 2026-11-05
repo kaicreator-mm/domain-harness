@@ -214,19 +214,24 @@ Conformance Suite 不得只验证 Reference Consumer 的硬编码路径。Consum
 
 DIS standard version 独立于 DomainHarness SDK version。Unit、Graph、Definition、Package revision 和 content digest 是不同身份维度。相同逻辑 ID 不代表相同 Artifact。兼容性必须由显式 Contract/Profile 和验证结果声明，不得仅根据 SemVer 推断。Breaking change 必须有新版本/迁移说明；已安装 Package 保持精确 pin。新增可选 Profile 不得让旧 Consumer 默认支持。
 
-## 11. 当前候选缺口（L2 冻结前必须处理）
+## 11. R1 候选修订与发现关闭状态
 
-基于当前 xDownload Demo 的实物检查，记录待关闭项：
+原 DIS-L2-F001..F007 已由 R1 规范契约和 Reference Consumer/Conformance 修订覆盖；这些是候选关闭结论，仍须 exact-HEAD 本地验证和独立审核：
 
-- DIS-L2-F001（P1）：Resource Closure 目前只闭合 Schema；Unit、Graph、Definition、Fixture 和实现绑定的完整资源身份尚未统一。
-- DIS-L2-F002（P1）：Python Conformance 验证器按 Demo Node 名称手工重建输入，必须改为使用 Consumer 真实执行 Trace/Graph Edge 结果。
-- DIS-L2-F003（P1）：Graph required input 只验证绑定存在，尚未完整验证恰好一个且在路径上可用。
-- DIS-L2-F004（P2）：Workflow Unit / Graph 身份绑定需要明确。
-- DIS-L2-F005（P2）：Implementation binding 的可信边界需要明确，禁止任意字符串动态导入。
-- DIS-L2-F006（P2）：EXECUTED 是执行事实，不得修改不可变 Unit qualification。
-- DIS-L2-F007（P2）：Dynamic Form Profile 必须保留用户确认、系统观察、模型推导和缺失字段的区别。
+- F001（P1）：完整 Resource Closure 固定 Unit、Graph、Definition、Schema、Fixture、实现制品和 Conformance 资源；Package descriptor 固定 Manifest SHA-256。
+- F002（P1）：Consumer Trace 输出每个实际 Node 的 input/evidence/output；Python Conformance 直接验证 Trace，不再按 Demo Node 名称重建输入。
+- F003（P1）：required input 按控制路径验证恰好一个来源；拒绝重复绑定和非祖先来源。
+- F004（P2）：Definition 同时固定 Workflow Unit 与 Graph identity/revision/path。
+- F005（P2）：implementation.ref 使用 typed registry/graph/tool binding key；禁止任意动态导入。
+- F006（P2）：EXECUTED 是运行发生记录，不是 Unit qualification stage。
+- F007（P2）：Recognizer provenance 与可选 Dynamic Form 保留已确认、观察、推导、候选和未知状态。
+- F008（P2）：增加 realpath 符号链接 containment 和逃逸负例。
+- F009（P2）：DIS 0.1.0 严格 DAG-only，循环、迭代和重试推迟到后续标准版本。
+- F010（P2）：模型置信度不能升级来源权威；澄清不授予 Effect 权限。
+- F011（P2）：运行使用不得修改不可变 Unit qualification。
+- F012（P2）：Release Qualification 前必须由第二个实质不同的 Domain Profile 验证泛化能力；xDownload Demo 单独不足以证明泛化。
 
-以上是 L2 设计/验证发现，不代表已经完成修复。
+#1480 KDP 仍是未冻结的 Product/L1 候选，不构成 DIS 0.1.0 的执行权威。DIS 仅继承冻结的 v0.7 Kernel/Microkernel、Domain Runtime 和 Host/Effect 契约。
 
 ## 12. L2 Freeze Gate
 

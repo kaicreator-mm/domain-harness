@@ -115,7 +115,7 @@ data Edge 的源/目标 JSON Pointer 必须有效；目标必需输入必须获�
 - required input 必须按控制路径验证：到达目标的每条路径上恰好有一个来源已经执行；拒绝同一执行源重复绑定和非祖先来源；
 - 每条控制路径到达终态或显式 wait/failure；
 - data/evidence 引用的 Node、Pointer、Slot 必须存在；
-- 非入口 Node 的必需输入必须有有效绑定或明确默认值；
+- 非入口 Node 的 required input 必须在每条可达控制路径上恰好绑定一次；DIS 0.1.0 不定义隐式默认值；
 - 证据槽位必须声明，且终态验证不能丢失所需证据。
 
 ## 6. Schema 与 Package Resource Closure
@@ -149,7 +149,7 @@ Dynamic Form 是 UX 呈现的 UI-agnostic 结构化交互契约。Package 声明
 - Asset Authority；
 - Intelligence Maturity；
 - Runtime Resolver Precedence；
-- Execution Authority（由现有 KDP/Runtime/Host 决定）。
+- Execution Authority（由冻结的 v0.7 Kernel/Microkernel、Domain Runtime 和 Host/Effect 契约决定；#1480 KDP 尚未冻结且不具规范效力）。
 
 Simulator 验证成功不自动 Promotion；Promotion、Selection、Activation 必须显式治理。LLM 生成内容默认为 Candidate。运行结果形成 Evidence/Candidate，不直接修改活动 Definition 或 Package。
 
