@@ -331,7 +331,21 @@
         },
         "ref": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "anyOf": [
+            {
+              "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+            },
+            {
+              "pattern": "^https://\\S+$"
+            },
+            {
+              "pattern": "^doi:10\\.[0-9]{4,9}/\\S+$"
+            },
+            {
+              "pattern": "^urn:[A-Za-z0-9][A-Za-z0-9-]{0,31}:\\S+$"
+            }
+          ]
         },
         "digest": {
           "type": "string",

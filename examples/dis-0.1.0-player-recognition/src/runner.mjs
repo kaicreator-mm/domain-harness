@@ -20,6 +20,13 @@ export function isSafePackageRelativeRef(ref) {
   return !ref.split('/').some((segment) => segment === '..' || segment === '' || segment === '.');
 }
 
+export function isExternalProvenanceRef(ref) {
+  if (typeof ref !== 'string' || /\s/.test(ref)) return false;
+  return /^https:\/\/[^\s]+$/i.test(ref) ||
+    /^doi:10\.[0-9]{4,9}\/[^\s]+$/i.test(ref) ||
+    /^urn:[A-Za-z0-9][A-Za-z0-9-]{0,31}:[^\s]+$/i.test(ref);
+}
+
 export async function assertInsidePackage(root, absolutePath) {
   let rootReal;
   let targetReal;
@@ -57,6 +64,12 @@ export function validateUnit(unit) {
   if (!unit.scope?.domain || !Array.isArray(unit.scope.appliesTo) || !Array.isArray(unit.scope.excludes)) throw new DisExecutionError('INVALID_SCOPE', unit.id);
   if (!['FROZEN', 'CONTROLLED', 'REFERENCE', 'EXAMPLE', 'DERIVED'].includes(unit.authority)) throw new DisExecutionError('INVALID_AUTHORITY', unit.id);
   if (!Array.isArray(unit.evidence?.sources) || !('absenceReason' in unit.evidence)) throw new DisExecutionError('INVALID_EVIDENCE', unit.id);
+  for (const source of unit.evidence.sources) {
+    if (!source || typeof source.ref !== 'string' ||
+        (!isSafePackageRelativeRef(source.ref) && !isExternalProvenanceRef(source.ref))) {
+      throw new DisExecutionError('UNSAFE_PROVENANCE_REF', unit.id);
+    }
+  }
   const executable = ['recognizer', 'decision', 'procedure', 'tool', 'workflow', 'validator'].includes(unit.role);
   if (executable) {
     if (!isSafePackageRelativeRef(unit.input?.schemaRef) || !isSafePackageRelativeRef(unit.output?.schemaRef) || !unit.implementation?.strategy || !unit.implementation?.ref) {
@@ -388,7 +401,7 @@ export function validateDefinition(definition, unitsById, graph, graphPath) {
   for (const ref of definition.privateUnits) {
     const unit = unitsById.get(ref.id);
     if (!unit || unit.revision !== ref.revision) throw new DisExecutionError('UNRESOLVED_PRIVATE_UNIT', ref.id);
-    if (unit.implementation.exposure !== 'private') throw new DisExecutionError('PRIVATE_UNIT_EXPOSED', ref.id);
+    if (unit.implementation?.exposure && unit.implementation.exposure !== 'private') throw new DisExecutionError('PRIVATE_UNIT_EXPOSED', ref.id);
     if (declared.has(unit.id)) throw new DisExecutionError('PRIVATE_COMPONENT_OVERLAP', ref.id);
     declared.set(unit.id, { revision: unit.revision, family: 'private' });
   }
@@ -542,7 +555,11 @@ export async function loadDemo() {
     if (unit.output) refs.push(unit.output.schemaRef);
     if (unit.implementation?.artifactRef && !resourceEntries.has(unit.implementation.artifactRef)) throw new DisExecutionError('IMPLEMENTATION_ARTIFACT_NOT_CLOSED', unit.implementation.artifactRef);
     for (const source of unit.evidence.sources || []) {
-      if (isSafePackageRelativeRef(source.ref) && !resourceEntries.has(source.ref)) throw new DisExecutionError('EVIDENCE_SOURCE_NOT_CLOSED', source.ref);
+      if (isSafePackageRelativeRef(source.ref)) {
+        if (!resourceEntries.has(source.ref)) throw new DisExecutionError('EVIDENCE_SOURCE_NOT_CLOSED', source.ref);
+      } else if (!isExternalProvenanceRef(source.ref)) {
+        throw new DisExecutionError('UNSAFE_PROVENANCE_REF', source.ref);
+      }
     }
     if (unit.validation?.casesRef && isSafePackageRelativeRef(unit.validation.casesRef) && !resourceEntries.has(unit.validation.casesRef)) throw new DisExecutionError('VALIDATION_CASES_NOT_CLOSED', unit.validation.casesRef);
   }
@@ -570,6 +587,7 @@ export async function loadDemo() {
     if (unit.implementation?.artifactRef) expectResource(unit.implementation.artifactRef, unit.role === 'workflow' ? 'graph' : 'implementation', unit.id);
     for (const source of unit.evidence.sources || []) {
       const sourcePath = source.ref;
+      if (isExternalProvenanceRef(sourcePath)) continue;
       if (!isSafePackageRelativeRef(sourcePath)) throw new DisExecutionError('UNSAFE_EVIDENCE_SOURCE_REF', sourcePath);
       const sourceKind = expectedResources.get(sourcePath)?.kind ||
         (sourcePath.startsWith('fixtures/') ? 'fixture' :

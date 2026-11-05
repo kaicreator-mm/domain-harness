@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, assertInsidePackage, DisExecutionError } from '../src/runner.mjs';
+import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, assertInsidePackage, DisExecutionError } from '../src/runner.mjs';
 import { loadVerifiedDemo, verifyResourceClosure } from '../src/verified-loader.mjs';
 
 const loadedPromise = loadVerifiedDemo();
@@ -175,4 +175,68 @@ test('symlinks cannot escape the Package root', async () => {
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });
   }
+});
+
+
+test('external provenance URIs remain descriptive and are not package resources', async () => {
+  const loaded = await loadedPromise;
+  const unit = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
+  unit.evidence.sources.push({
+    sourceId: 'external-standard-reference',
+    kind: 'reference',
+    ref: 'https://example.test/domain-standard',
+    claim: 'External provenance is descriptive and is not fetched into the Package.',
+  });
+  assert.equal(validateUnit(unit), true);
+});
+
+test('unsupported provenance URI schemes fail closed', async () => {
+  const loaded = await loadedPromise;
+  const unit = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
+  unit.evidence.sources[0].ref = 'file:///etc/passwd';
+  assert.throws(() => validateUnit(unit), hasCode('UNSAFE_PROVENANCE_REF'));
+});
+
+test('Definition must declare every Graph Node Unit exactly once', async () => {
+  const loaded = await loadedPromise;
+  const definition = structuredClone(loaded.definition);
+  definition.components = definition.components.filter(
+    (component) => component.unitRef.id !== 'xdownload.player.recognizer',
+  );
+  assert.throws(
+    () => validateDefinition(definition, loaded.unitsById, loaded.graph, 'domain/player-recognition.graph.json'),
+    hasCode('UNDECLARED_GRAPH_UNIT'),
+  );
+});
+
+test('Definition Workflow reference must pin the exact Graph identity and path', async () => {
+  const loaded = await loadedPromise;
+  const definition = structuredClone(loaded.definition);
+  definition.workflowRef.graphRef.revision = '2.0.0';
+  assert.throws(
+    () => validateDefinition(definition, loaded.unitsById, loaded.graph, 'domain/player-recognition.graph.json'),
+    hasCode('WORKFLOW_GRAPH_REF_MISMATCH'),
+  );
+});
+
+test('private data-only Units need not declare an implementation exposure', async () => {
+  const loaded = await loadedPromise;
+  const definition = structuredClone(loaded.definition);
+  const units = new Map(loaded.unitsById);
+  const knowledge = {
+    schemaVersion: 'dis.unit/0.1.0',
+    id: 'xdownload.private.reference-knowledge',
+    revision: '1.0.0',
+    role: 'knowledge',
+    purpose: 'Private reference knowledge used only inside this Definition.',
+    scope: { domain: 'web-media', appliesTo: ['player-recognition'], excludes: [] },
+    owner: 'xdownload-demo',
+    authority: 'REFERENCE',
+    qualification: { stage: 'CANDIDATE' },
+    evidence: { sources: [], absenceReason: 'No separate source is required for this demo fixture.' },
+    failure: { supported: ['UNKNOWN'], handling: { UNKNOWN: 'preserve-unknown' } },
+  };
+  units.set(knowledge.id, knowledge);
+  definition.privateUnits.push({ id: knowledge.id, revision: knowledge.revision });
+  assert.equal(validateDefinition(definition, units, loaded.graph, 'domain/player-recognition.graph.json'), true);
 });
