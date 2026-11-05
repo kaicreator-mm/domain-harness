@@ -1,0 +1,26 @@
+{
+  "reportId":"DIS-0.1.0-INITIAL-PLAYER-RECOGNITION",
+  "standard":{"version":"0.1.0","revision":"98e1e5066b6f6db8b850851655d007878e43f73b"},
+  "demo":{"id":"xdownload.player-recognition","revision":"1.0.0","commit":"ea3b01e94b35a9a3ad26f70e2e0c62de38cfa546"},
+  "environment":{"runtime":"Node.js v22.16.0; npm 10.9.2; Python 3.13.5; jsonschema 4.26.0","platform":"Linux x86_64 container"},
+  "command":"npm test && npm run demo; Python Draft 2020-12 schema self-validation and demo Unit/Graph validation",
+  "result":"PASS_WITH_FINDINGS",
+  "tests":[
+    {"id":"SCHEMA-SELF-VALIDATION","result":"PASS","detail":"Three DIS schemas passed Draft 2020-12 schema validation."},
+    {"id":"UNIT-STRUCTURE","result":"PASS","detail":"Six demo Unit descriptors validated."},
+    {"id":"GRAPH-STRUCTURE","result":"PASS","detail":"Initial graph validated structurally."},
+    {"id":"KNOWN-PLAYER","result":"PASS","detail":"Recognized player reached READY through the declared path."},
+    {"id":"AMBIGUOUS-PLAYER","result":"PASS","detail":"Multiple candidates returned NEEDS_INPUT."},
+    {"id":"UNKNOWN-PLAYER","result":"PASS","detail":"No candidate returned NEEDS_REVIEW."},
+    {"id":"INVALID-INPUT","result":"PASS","detail":"Invalid URL scheme was rejected."},
+    {"id":"EVIDENCE-RETENTION","result":"PASS","detail":"Evidence was retained in the terminal outcome."},
+    {"id":"PRIVATE-PROCEDURE","result":"PASS","detail":"Private procedure was not reclassified as a Tool."},
+    {"id":"CONTROL-DATA-COUPLING","result":"EXPECTED_GAP","detail":"Initial edge model requires upstream output pass-through."},
+    {"id":"SCHEMA-REF-CLOSURE","result":"EXPECTED_GAP","detail":"Missing schemaRef is accepted as an arbitrary non-empty string."}
+  ],
+  "findings":[
+    {"id":"DIS-F-001","severity":"P1","description":"One Edge combines control routing and data mapping, preventing independent data/evidence dependencies.","resolution":"Replace with typed control, data and evidence edges; prohibit implicit output pass-through."},
+    {"id":"DIS-F-002","severity":"P2","description":"Schema references are strings only and are not resolved as package resource dependencies.","resolution":"Require safe package-relative references and exact build-time resource closure/digest validation."}
+  ],
+  "validatedAt":"2026-11-05T09:51:50Z"
+}

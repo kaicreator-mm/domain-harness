@@ -1,0 +1,11 @@
+{
+  "schemaVersion":"dis.unit/0.1.0","id":"xdownload.player.route-decision","revision":"1.0.0","role":"decision",
+  "purpose":"Choose the deterministic resolution path for a recognition result.",
+  "scope":{"domain":"web-media","appliesTo":["player-recognition-result"],"excludes":["download-execution","external-side-effects"]},
+  "owner":"xdownload-demo","authority":"CONTROLLED","qualification":{"stage":"CANDIDATE","limitations":["Deterministic routing for the three demo statuses."]},
+  "input":{"schemaRef":"domain/schemas/decision-input.schema.json"},"output":{"schemaRef":"domain/schemas/decision-output.schema.json"},
+  "implementation":{"strategy":"declarative","ref":"src/runner.mjs#routeRecognition","exposure":"semantic"},
+  "evidence":{"sources":[{"sourceId":"recognition-status-contract","kind":"authority","ref":"domain/units/recognizer.json","claim":"Only one recognized candidate enters the known-player procedure."}],"absenceReason":null},
+  "failure":{"supported":["UNKNOWN","AMBIGUOUS","INVALID_INPUT"],"handling":{"UNKNOWN":"route-to-bounded-fallback","AMBIGUOUS":"route-to-clarification","INVALID_INPUT":"reject"}},
+  "validation":{"profile":"player-route-conformance/0.1.0","casesRef":"test/runner.test.mjs","lastResult":"NOT_RUN"}
+}

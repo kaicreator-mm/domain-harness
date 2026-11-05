@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json",
+  "title": "DIS 0.1.0 Validation Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reportId",
+    "standard",
+    "demo",
+    "environment",
+    "command",
+    "result",
+    "tests",
+    "findings",
+    "validatedAt"
+  ],
+  "properties": {
+    "reportId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "standard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "revision"
+      ],
+      "properties": {
+        "version": {
+          "const": "0.1.0"
+        },
+        "revision": {
+          "type": "string"
+        }
+      }
+    },
+    "demo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime",
+        "platform"
+      ],
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        }
+      }
+    },
+    "command": {
+      "type": "string"
+    },
+    "result": {
+      "enum": [
+        "PASS",
+        "PASS_WITH_FINDINGS",
+        "BLOCK",
+        "NOT_RUN"
+      ]
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "result"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "EXPECTED_GAP",
+              "NOT_RUN"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "severity",
+          "description",
+          "resolution"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "resolution": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "validatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

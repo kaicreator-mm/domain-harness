@@ -1,0 +1,14 @@
+{
+  "schemaVersion":"dis.definition/0.1.0","domainId":"xdownload.web-media","revision":"1.0.0",
+  "components":[
+    {"family":"semantic","componentId":"xdownload.player.recognizer","unitRef":{"id":"xdownload.player.recognizer","revision":"1.0.0"}},
+    {"family":"semantic","componentId":"xdownload.player.route-decision","unitRef":{"id":"xdownload.player.route-decision","revision":"1.0.0"}},
+    {"family":"semantic","componentId":"xdownload.player-recognition.workflow","unitRef":{"id":"xdownload.player-recognition.workflow","revision":"1.0.0"}},
+    {"family":"semantic","componentId":"xdownload.player.outcome-validator","unitRef":{"id":"xdownload.player.outcome-validator","revision":"1.0.0"}}
+  ],
+  "privateUnits":[
+    {"id":"xdownload.player.resolve-procedure","revision":"1.0.0"},
+    {"id":"xdownload.player.bounded-fallback","revision":"1.0.0"}
+  ],
+  "workflowRef":{"id":"xdownload.player-recognition","revision":"1.0.0","path":"domain/player-recognition.graph.json"}
+}

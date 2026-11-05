@@ -1,0 +1,11 @@
+{
+  "schemaVersion":"dis.unit/0.1.0","id":"xdownload.player.bounded-fallback","revision":"1.0.0","role":"procedure",
+  "purpose":"Return a bounded clarification or review outcome when recognition is ambiguous or unknown.",
+  "scope":{"domain":"web-media","appliesTo":["ambiguous-or-unknown-player-recognition"],"excludes":["automatic-player-guessing","download-execution"]},
+  "owner":"xdownload-demo","authority":"CONTROLLED","qualification":{"stage":"CANDIDATE","limitations":["No LLM call; emits a bounded handoff."]},
+  "input":{"schemaRef":"domain/schemas/resolve-input.schema.json"},"output":{"schemaRef":"domain/schemas/resolution.schema.json"},
+  "implementation":{"strategy":"function","ref":"src/runner.mjs#boundedFallback","exposure":"private"},
+  "evidence":{"sources":[{"sourceId":"fallback-policy","kind":"authority","ref":"domain/units/decision.json","claim":"Unknown and ambiguous recognition must not be silently promoted."}],"absenceReason":null},
+  "failure":{"supported":["UNKNOWN","AMBIGUOUS","NEEDS_INPUT","NEEDS_REVIEW"],"handling":{"AMBIGUOUS":"return-needs-input","UNKNOWN":"return-needs-review"}},
+  "validation":{"profile":"player-fallback-conformance/0.1.0","casesRef":"test/runner.test.mjs","lastResult":"NOT_RUN"}
+}

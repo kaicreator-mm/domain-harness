@@ -1,0 +1,10 @@
+{
+  "name": "dis-0.1.0-player-recognition-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test ./test/*.test.mjs",
+    "demo": "node ./src/run-demo.mjs",
+    "validate": "python ./scripts/validate.py"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "catalogId":"xdownload.player-strategies","revision":"1.0.0",
+  "strategies":{"jwplayer":"jwplayer.extract.v1","videojs":"videojs.extract.v1","hlsjs":"hlsjs.extract.v1"}
+}

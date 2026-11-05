@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "dis.resource-closure/0.1.0",
+  "packageId": "xdownload.web-media",
+  "resources": [
+    {
+      "path": "domain/schemas/decision-input.schema.json",
+      "sha256": "a31b8198ed991ba1c12ae07023b0bf64d8a74adc3cb2f3976d4e97605577a7f9"
+    },
+    {
+      "path": "domain/schemas/decision-output.schema.json",
+      "sha256": "3536c5c6152ccc8ca921aee675595b524b99e240889dcea58c690c421a4f7c33"
+    },
+    {
+      "path": "domain/schemas/domain-definition.schema.json",
+      "sha256": "429202e450af2b12528c3ef2a1c862cff07be3c1bf105021ed3f4809f0f66bae"
+    },
+    {
+      "path": "domain/schemas/outcome.schema.json",
+      "sha256": "4bb3242846847234628d2112a7690c05dc6b80817cccf0ac8ae71ea6ad7aa7a0"
+    },
+    {
+      "path": "domain/schemas/page-observation.schema.json",
+      "sha256": "21d4866967caf6c8df7d8760845e51f73b99814fad45c4b2c9e6030bfa99efbb"
+    },
+    {
+      "path": "domain/schemas/recognition-result.schema.json",
+      "sha256": "583738178c74dc94749b8eca37344c8eebd817b1c095b849be25b0d40c8ba153"
+    },
+    {
+      "path": "domain/schemas/resolution.schema.json",
+      "sha256": "0d589454161afb8fd6eefaf15b3c22b7c8f044f75aed2dbaa142248685bb0b17"
+    },
+    {
+      "path": "domain/schemas/resolve-input.schema.json",
+      "sha256": "a31b8198ed991ba1c12ae07023b0bf64d8a74adc3cb2f3976d4e97605577a7f9"
+    },
+    {
+      "path": "domain/schemas/validator-input.schema.json",
+      "sha256": "96dfaaee6a401d7bd3b76061b7bb0a134fdf13699c4fb15708b19aaa2cd424eb"
+    }
+  ]
+}

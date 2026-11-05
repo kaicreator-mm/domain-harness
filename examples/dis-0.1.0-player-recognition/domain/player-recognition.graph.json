@@ -1,0 +1,29 @@
+{
+  "schemaVersion":"dis.graph/0.1.0",
+  "id":"xdownload.player-recognition",
+  "revision":"1.0.0",
+  "inputSchemaRef":"domain/schemas/page-observation.schema.json",
+  "outputSchemaRef":"domain/schemas/outcome.schema.json",
+  "entryNode":"recognize",
+  "nodes":[
+    {"nodeId":"recognize","unitRef":{"id":"xdownload.player.recognizer","revision":"1.0.0"}},
+    {"nodeId":"decide","unitRef":{"id":"xdownload.player.route-decision","revision":"1.0.0"}},
+    {"nodeId":"resolve-known","unitRef":{"id":"xdownload.player.resolve-procedure","revision":"1.0.0"}},
+    {"nodeId":"bounded-fallback","unitRef":{"id":"xdownload.player.bounded-fallback","revision":"1.0.0"}},
+    {"nodeId":"validate","unitRef":{"id":"xdownload.player.outcome-validator","revision":"1.0.0"}}
+  ],
+  "edges":[
+    {"kind":"control","from":"recognize","to":"decide"},
+    {"kind":"control","from":"decide","to":"resolve-known","when":{"path":"/route","operator":"equals","value":"KNOWN"}},
+    {"kind":"control","from":"decide","to":"bounded-fallback","when":{"path":"/route","operator":"equals","value":"REVIEW"}},
+    {"kind":"control","from":"resolve-known","to":"validate"},
+    {"kind":"control","from":"bounded-fallback","to":"validate"},
+    {"kind":"data","from":{"node":"recognize","pointer":""},"to":{"node":"decide","pointer":"/recognition"}},
+    {"kind":"data","from":{"node":"recognize","pointer":""},"to":{"node":"resolve-known","pointer":"/recognition"}},
+    {"kind":"data","from":{"node":"recognize","pointer":""},"to":{"node":"bounded-fallback","pointer":"/recognition"}},
+    {"kind":"data","from":{"node":"resolve-known","pointer":""},"to":{"node":"validate","pointer":"/resolution"}},
+    {"kind":"data","from":{"node":"bounded-fallback","pointer":""},"to":{"node":"validate","pointer":"/resolution"}},
+    {"kind":"evidence","from":{"node":"recognize","pointer":"/evidence"},"to":{"node":"validate","slot":"recognitionEvidence"}}
+  ],
+  "terminalNodes":["validate"]
+}
