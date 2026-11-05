@@ -28,3 +28,28 @@ Initial schemaRef was validated only as a string. Revised to safe Package-root-r
 - KDP remains the single Runtime/State/Effect authority.
 - No SDK source, public ABI, Manifest/BUILD ABI, v0.10.3 tag, release, deployment or main branch was modified.
 - This remains a standards experiment and does not claim the current DomainHarness Runtime consumes DIS.
+
+
+## Final conformance refinement
+
+The demo-revised candidate was further checked against its own machine-readable contracts. The final pass found and corrected four additional gaps:
+
+### DIS-F-003 (P1) — Unit I/O Schema mismatch
+
+The no-pass-through Decision emitted only `route`, but its output Schema required `recognition`; the private Procedure emitted a resolution without evidence, but the Resolution Schema required evidence. Updated both output Schemas to match the actual separated data/evidence model. Added validation of every executed Node input and output against the declared Unit Schema.
+
+### DIS-F-004 (P1) — malformed Validation Report Schema
+
+The Validation Report Schema was not valid JSON. Corrected the syntax and included it in the five-schema Draft 2020-12 self-validation suite.
+
+### DIS-F-005 (P2) — unsafe path regex edge cases
+
+The initial safe-path regex rejected traversal but accepted empty and dot path segments. Aligned Unit schemaRef, Graph schema refs, Definition workflowRef and Resource Closure path validation; added negative checks.
+
+### DIS-F-006 (P2) — evidence fixture was not the runtime source
+
+Unit evidence referenced player signature and strategy fixtures while the demo had duplicated hard-coded values. The runner now loads and consumes both fixture catalogs; a fixture-backed HLS path proves the source reference is operational.
+
+The 0.1.0 Graph Pointer Profile is explicitly limited to root output or one top-level property pointers. Nested pointers are rejected, not partially supported. This is a deliberate version boundary and a candidate for a future revision.
+
+Final verification is recorded separately in `FINAL_VALIDATION.md` and `final-validation.json`.

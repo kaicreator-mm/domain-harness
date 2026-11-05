@@ -271,19 +271,17 @@ export function validateDefinition(definition, unitsById, graph) {
   return true;
 }
 
-export function recognizePlayer(input) {
+export function recognizePlayer(input, context) {
   if (!input || typeof input.url !== 'string' || !/^https?:\/\//.test(input.url) || !Array.isArray(input.signals) || input.signals.some((item) => typeof item !== 'string')) {
     throw new DisExecutionError('INVALID_INPUT', 'PageObservation requires an http(s) url and string signals[]');
   }
+  const patterns = context?.catalogs?.signatures?.patterns;
+  if (!Array.isArray(patterns)) throw new DisExecutionError('MISSING_SIGNATURE_CATALOG', 'player-signatures catalog is required');
   const haystack = (input.url + '\n' + input.signals.join('\n')).toLowerCase();
-  const patterns = [
-    { id: 'jwplayer', markers: ['jwplayer'] },
-    { id: 'videojs', markers: ['videojs', 'video.js'] },
-    { id: 'hlsjs', markers: ['hls.js', 'hlsjs'] },
-  ];
   const matches = patterns.flatMap((pattern) => {
-    const marker = pattern.markers.find((candidate) => haystack.includes(candidate));
-    return marker ? [{ playerId: pattern.id, marker }] : [];
+    if (typeof pattern.playerId !== 'string' || !Array.isArray(pattern.markers)) throw new DisExecutionError('INVALID_SIGNATURE_CATALOG', 'each pattern needs playerId and markers[]');
+    const marker = pattern.markers.find((candidate) => haystack.includes(candidate.toLowerCase()));
+    return marker ? [{ playerId: pattern.playerId, marker }] : [];
   });
   const status = matches.length === 1 ? 'recognized' : matches.length > 1 ? 'ambiguous' : 'unknown';
   const evidence = matches.length
@@ -298,11 +296,13 @@ export function routeRecognition(input) {
   return { route: recognition.status === 'recognized' ? 'KNOWN' : 'REVIEW' };
 }
 
-export function resolvePlayer(input) {
+export function resolvePlayer(input, context) {
   const recognition = input?.recognition;
   if (recognition?.status !== 'recognized' || recognition.candidates?.length !== 1) throw new DisExecutionError('INVALID_INPUT', 'resolve procedure requires exactly one recognized candidate');
   const playerId = recognition.candidates[0];
-  return { status: 'READY', playerId, strategyId: playerId + '.extract.v1' };
+  const strategyId = context?.catalogs?.strategies?.strategies?.[playerId];
+  if (typeof strategyId !== 'string' || strategyId.length === 0) throw new DisExecutionError('UNKNOWN_PLAYER_STRATEGY', playerId);
+  return { status: 'READY', playerId, strategyId };
 }
 
 export function boundedFallback(input) {
@@ -347,10 +347,14 @@ export async function loadDemo() {
     if (unit.output) refs.push(unit.output.schemaRef);
   }
   const closure = await resolveSchemaClosure(packageRoot, refs);
+  const catalogs = {
+    signatures: JSON.parse(await fs.readFile(path.join(packageRoot, 'fixtures', 'player-signatures.json'), 'utf8')),
+    strategies: JSON.parse(await fs.readFile(path.join(packageRoot, 'fixtures', 'player-strategies.json'), 'utf8')),
+  };
   const unitsById = new Map(units.map((unit) => [unit.id, unit]));
   validateGraph(graph, unitsById, closure.schemas);
   validateDefinition(definition, unitsById, graph);
-  return { graph, definition, unitsById, schemas: closure.schemas, resources: closure.resources };
+  return { graph, definition, unitsById, schemas: closure.schemas, resources: closure.resources, catalogs };
 }
 
 export async function runPipeline(input, loaded) {
@@ -386,7 +390,7 @@ export async function runPipeline(input, loaded) {
       const value = pointerGet(outputs.get(edge.from.node), edge.from.pointer);
       evidence[edge.to.slot] = [...(evidence[edge.to.slot] || []), ...(Array.isArray(value) ? value : [value])];
     }
-    const output = handler(nodeInput, { evidence });
+    const output = handler(nodeInput, { evidence, catalogs: loaded.catalogs });
     outputs.set(nodeId, output);
     trace.push({ nodeId, unitId: unit.id, output });
     if (graph.terminalNodes.includes(nodeId)) return { outcome: output, trace };

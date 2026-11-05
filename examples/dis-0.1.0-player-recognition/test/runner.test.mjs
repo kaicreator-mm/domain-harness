@@ -23,6 +23,16 @@ test('known player follows control path while data arrives through an independen
   assert.equal(result.trace.find((item) => item.nodeId === 'resolve-known').output.evidence, undefined);
 });
 
+test('recognizer and resolver consume the package catalogs referenced by their Units', async () => {
+  const loaded = await loadedPromise;
+  const result = await runPipeline({ url: 'https://example.test/watch', signals: ['hls.js'] }, loaded);
+  assert.equal(result.outcome.status, 'READY');
+  assert.equal(result.outcome.playerId, 'hlsjs');
+  assert.equal(result.outcome.strategyId, 'hlsjs.extract.v1');
+  assert.equal(loaded.catalogs.signatures.catalogId, 'xdownload.player-signatures');
+  assert.equal(loaded.catalogs.strategies.catalogId, 'xdownload.player-strategies');
+});
+
 test('ambiguous recognition asks for input instead of guessing', async () => {
   const loaded = await loadedPromise;
   const result = await runPipeline({ url: 'https://example.test/watch', signals: ['jwplayer', 'videojs'] }, loaded);
@@ -67,6 +77,14 @@ test('data edge alone does not schedule a node', async () => {
   const graph = structuredClone(loaded.graph);
   graph.edges = graph.edges.filter((edge) => !(edge.kind === 'control' && edge.from === 'decide' && edge.to === 'resolve-known'));
   assert.throws(() => validateGraph(graph, loaded.unitsById, loaded.schemas), hasCode('UNREACHABLE_CONTROL_NODE'));
+});
+
+test('nested data pointers are rejected by the 0.1.0 top-level pointer profile', async () => {
+  const loaded = await loadedPromise;
+  const graph = structuredClone(loaded.graph);
+  const edge = graph.edges.find((item) => item.kind === 'data' && item.to.node === 'decide');
+  edge.to.pointer = '/recognition/status';
+  assert.throws(() => validateGraph(graph, loaded.unitsById, loaded.schemas), hasCode('UNKNOWN_TARGET_INPUT_POINTER'));
 });
 
 test('required input without a data binding is rejected', async () => {

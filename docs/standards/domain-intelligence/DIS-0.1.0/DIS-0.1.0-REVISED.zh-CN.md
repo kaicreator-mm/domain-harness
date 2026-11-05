@@ -145,3 +145,23 @@ Package Build Validity、Intelligence Qualification、End-to-End App Validation 
 ## 11. 上位约束
 
 DIS 必须服从已冻结 Product/L1、L2、ABI 和已发布 SDK 契约。参考入口：DomainHarness #1477、#1478、#1480、#1476、#1361、#1304、#1305、#1465，以及 Domain Data 六类资产规范。若冲突，以上位权威为准并修订 DIS。
+
+
+## 12. 0.1.0 最终一致性补充
+
+### 12.1 JSON Pointer 范围
+
+DIS 0.1.0 的 Graph Pointer Profile 只支持根输出对象 `""` 或单层属性指针（例如 `/status`、`/evidence`）。data Edge 的目标指针必须是单层非根属性；evidence Edge 的来源指针必须是单层非根属性。control 条件也只读取单层输出属性。嵌套 JSON Pointer 在 0.1.0 中明确拒绝，不允许实现只校验第一层却声称支持任意深度。后续版本可在具备递归 Schema Pointer Resolver 和完整输入绑定验证后扩展。
+
+### 12.2 Unit I/O Schema 必须与真实输出一致
+
+Demo 修订后 Decision 只输出 route，Procedure 只输出 resolution；Recognizer 的 evidence 通过独立 evidence Edge 传给 Validator。相应地，Decision Output Schema 不得要求回传 recognition，Resolution Schema 不得要求 Procedure 再复制 evidence。每个 Demo Node 的实际输入和输出都必须按其 Unit Schema 验证。
+
+### 12.3 最终验证新增发现及修正
+
+- DIS-F-003（P1）：旧 Decision/Procedure Output Schema 与拆分后的 data/evidence 语义不一致。已修正 Schema，并增加逐 Node I/O 验证。
+- DIS-F-004（P1）：Validation Report Schema 存在 JSON 语法错误。已修复并纳入 Draft 2020-12 自检。
+- DIS-F-005（P2）：旧路径正则未拒绝空路径段和 `.` 路径段。已统一 Unit、Graph、Definition 和 Resource Closure 的安全路径约束。
+- DIS-F-006（P2）：Unit Evidence 引用的签名/策略 Fixture 最初未被 Demo 运行代码实际消费。现已改为加载并消费 Package Fixture，并增加回归测试。
+
+最终验证包括 Node 行为测试、Demo 三类分支及 Fixture 路径、五个标准 Schema 自检、六个 Unit、Graph、Definition、Resource Closure，以及每个实际执行 Node 的输入/输出 Schema 校验。详细证据见 `validation/dis-0.1.0/FINAL_VALIDATION.md`。

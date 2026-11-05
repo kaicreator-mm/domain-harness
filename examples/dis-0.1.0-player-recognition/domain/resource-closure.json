@@ -8,7 +8,7 @@
     },
     {
       "path": "domain/schemas/decision-output.schema.json",
-      "sha256": "2daa8da3b3deb42893a2b7a227672e6cb2ab6b366dbab362227ee6ae6e63ca71"
+      "sha256": "3536c5c6152ccc8ca921aee675595b524b99e240889dcea58c690c421a4f7c33"
     },
     {
       "path": "domain/schemas/domain-definition.schema.json",
@@ -28,7 +28,7 @@
     },
     {
       "path": "domain/schemas/resolution.schema.json",
-      "sha256": "62b49a5fa0a0a1baa1d6431047df60c1220c226ca6c121e469b9939574aad162"
+      "sha256": "0d589454161afb8fd6eefaf15b3c22b7c8f044f75aed2dbaa142248685bb0b17"
     },
     {
       "path": "domain/schemas/resolve-input.schema.json",

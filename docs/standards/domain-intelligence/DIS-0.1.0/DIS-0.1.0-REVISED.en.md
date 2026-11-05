@@ -66,3 +66,23 @@ The reference demo is xDownload Player Recognition: PageObservation → Recogniz
 Initial findings were DIS-F-001 (P1: control/data coupling) and DIS-F-002 (P2: unresolved schema references). This revision adds typed control/data/evidence edges, removes implicit pass-through, and adds package resource closure and SHA-256 pinning. Initial and final validation records remain separate.
 
 If DIS conflicts with frozen Product/L1, L2, ABI or released SDK authority, the superior authority prevails and DIS is revised.
+
+
+## 9. 0.1.0 Final Conformance Addendum
+
+### 9.1 JSON Pointer profile
+
+DIS 0.1.0 Graph pointers are intentionally limited to the root output object (`""`) or one top-level property (for example `/status` or `/evidence`). A data-edge target must be a non-root top-level property; an evidence-edge source must be a non-root top-level property. Control conditions read one top-level output property. Nested JSON Pointers are rejected in 0.1.0 rather than partially validated. A later revision may expand this after a recursive Schema Pointer Resolver and complete nested required-input validation exist.
+
+### 9.2 Unit I/O Schema alignment
+
+The revised demo Decision emits only its route and Procedures emit only their resolution. Recognizer evidence reaches Validator through an independent evidence edge. Accordingly, Decision Output Schema must not require an echoed recognition object, and Resolution Schema must not require Procedures to copy evidence. Every executed Demo Node input and output is validated against its declared Unit Schema.
+
+### 9.3 Final validation findings and corrections
+
+- DIS-F-003 (P1): Decision/Procedure output Schemas contradicted the separated data/evidence model. Corrected and covered by per-node I/O validation.
+- DIS-F-004 (P1): the Validation Report Schema contained invalid JSON. Corrected and added to Draft 2020-12 self-validation.
+- DIS-F-005 (P2): previous path patterns accepted empty and dot path segments. Unit, Graph, Definition and Resource Closure path constraints are now aligned.
+- DIS-F-006 (P2): Unit evidence referenced fixture catalogs that the demo runner did not actually consume. The runner now loads and consumes the package fixtures, with regression coverage.
+
+Final verification includes Node behavioral tests, known/ambiguous/unknown and fixture-backed paths, self-validation of all five standard Schemas, six Unit descriptors, Graph, Definition, Resource Closure, and input/output Schema validation for every executed Node. See `validation/dis-0.1.0/FINAL_VALIDATION.md`.
