@@ -104,7 +104,7 @@ Graph 必须声明精确身份/revision、entry Node、Graph Input/Output Schema
 
 禁止单条 Edge 同时表达控制和数据传递；禁止隐式 whole-output pass-through；data/evidence Edge 不得触发 Node。
 
-control.when 只能读取来源 Node 输出，使用受限声明式比较（equals、notEquals、exists），禁止任意代码求值。根指针读取完整输出对象；非根指针必须解析到 Output Schema 中已声明的属性，允许读取 optional 属性。equals 仅在属性存在且值相等时匹配；notEquals 在属性缺失或值不等时匹配；exists 仅在属性存在时匹配。每次分支必须恰好匹配一条路径；零条或多条匹配均是错误。 比较必须遵循 JSON 值相等语义：缺失与 null 不同；布尔值与数字不同；数字按 ECMAScript Number（IEEE-754 binary64）语义比较；字符串精确比较；数组按顺序逐项比较；对象按成员名称及递归值比较，成员顺序不影响结果。JavaScript 与非 JavaScript Consumer 必须得到相同结果。
+control.when 只能读取来源 Node 输出，使用受限声明式比较（equals、notEquals、exists），禁止任意代码求值。根指针读取完整输出对象；非根指针必须解析到 Output Schema 中已声明的属性，允许读取 optional 属性。equals 仅在属性存在且值相等时匹配；notEquals 在属性缺失或值不等时匹配；exists 仅在属性存在时匹配。每次分支必须恰好匹配一条路径；零条或多条匹配均是错误。比较必须遵循 JSON 值相等语义：缺失与 null 不同；布尔值与数字不同；数字按 ECMAScript Number（IEEE-754 binary64）语义比较；字符串精确比较；数组按顺序逐项比较；对象按成员名称及递归值比较，成员顺序不影响结果。JavaScript 与非 JavaScript Consumer 必须得到相同结果。
 
 data Edge 的源/目标 JSON Pointer 必须有效；目标必需输入必须获得有效绑定。多源聚合必须由目标 Schema 明确声明，不得依赖隐式合并。evidence Edge 的目标 slot 必须在 Unit 的 evidence.consumes 中声明，并且不参与控制可达性。
 
