@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, assertInsidePackage, DisExecutionError } from '../src/runner.mjs';
+import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, assertInsidePackage, conditionMatches, DisExecutionError } from '../src/runner.mjs';
 import { loadVerifiedDemo, verifyResourceClosure } from '../src/verified-loader.mjs';
 
 const loadedPromise = loadVerifiedDemo();
@@ -86,7 +86,7 @@ test('nested data pointers are rejected by the 0.1.0 top-level pointer profile',
   const graph = structuredClone(loaded.graph);
   const edge = graph.edges.find((item) => item.kind === 'data' && item.to.node === 'decide');
   edge.to.pointer = '/recognition/status';
-  assert.throws(() => validateGraph(graph, loaded.unitsById, loaded.schemas), hasCode('UNKNOWN_TARGET_INPUT_POINTER'));
+  assert.throws(() => validateGraph(graph, loaded.unitsById, loaded.schemas), hasCode('INVALID_DATA_POINTER'));
 });
 
 test('required input without a data binding is rejected', async () => {
@@ -162,7 +162,7 @@ test('evidence source must be a required output property', async () => {
   assert.throws(() => validateGraph(loaded.graph, loaded.unitsById, schemas), hasCode('EVIDENCE_SOURCE_NOT_REQUIRED'));
 });
 
-test('symlinks cannot escape the Package root', async () => {
+test('symlinks cannot escape the Package root', async (t) => {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'dis-path-safety-'));
   const root = path.join(temporary, 'package');
   const outside = path.join(temporary, 'outside.txt');
@@ -170,7 +170,15 @@ test('symlinks cannot escape the Package root', async () => {
   try {
     await fs.mkdir(root);
     await fs.writeFile(outside, 'outside');
-    await fs.symlink(outside, link);
+    try {
+      await fs.symlink(outside, link);
+    } catch (error) {
+      if (['EPERM', 'ENOTSUP', 'EACCES'].includes(error?.code)) {
+        t.skip('the current platform does not permit creating symlinks for this test');
+        return;
+      }
+      throw error;
+    }
     await assert.rejects(() => assertInsidePackage(root, link), hasCode('RESOURCE_PATH_ESCAPE'));
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });
@@ -253,6 +261,28 @@ test('exists control conditions may inspect declared optional output properties'
   const edge = graph.edges.find((item) => item.kind === 'control' && item.from === 'decide' && item.when);
   edge.when = { path: '/optionalSignal', operator: 'exists' };
   assert.equal(validateGraph(graph, loaded.unitsById, schemas), true);
+});
+
+
+test('control conditions use the same structural JSON value semantics as Python', () => {
+  const cases = [
+    [{ optionalFlag: true }, { path: '/optionalFlag', operator: 'equals', value: true }, true],
+    [{ optionalFlag: 1 }, { path: '/optionalFlag', operator: 'equals', value: true }, false],
+    [{ optionalFlag: 1 }, { path: '/optionalFlag', operator: 'notEquals', value: true }, true],
+    [{ optionalFlag: true }, { path: '/optionalFlag', operator: 'notEquals', value: 1 }, true],
+    [{}, { path: '/optionalFlag', operator: 'equals', value: null }, false],
+    [{}, { path: '/optionalFlag', operator: 'notEquals', value: null }, true],
+    [{ optionalFlag: null }, { path: '/optionalFlag', operator: 'exists' }, true],
+    [{}, { path: '/optionalFlag', operator: 'exists' }, false],
+    [{ optionalFlag: { a: 1, b: [true, null] } }, { path: '/optionalFlag', operator: 'equals', value: { b: [true, null], a: 1 } }, true],
+    [{ optionalFlag: [1, 'x'] }, { path: '/optionalFlag', operator: 'equals', value: [1, 'x'] }, true],
+    [{ optionalFlag: [1, 'x'] }, { path: '/optionalFlag', operator: 'equals', value: ['x', 1] }, false],
+    [{ optionalFlag: 9007199254740992 }, { path: '/optionalFlag', operator: 'equals', value: 9007199254740993 }, true],
+    [{ actual: { value: 1 } }, { path: '', operator: 'equals', value: { actual: { value: 1 } } }, true],
+  ];
+  for (const [output, condition, expected] of cases) {
+    assert.equal(conditionMatches(output, condition), expected, JSON.stringify(condition));
+  }
 });
 
 test('unsupported control condition operators fail during Graph validation', async () => {

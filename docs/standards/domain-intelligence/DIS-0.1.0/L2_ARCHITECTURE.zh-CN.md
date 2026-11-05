@@ -174,7 +174,7 @@ Edge 只能有且只有一种 kind：
 
 运行时只使用已执行 Node 输出；缺失来源不得转成 null/默认成功；每次控制分支必须恰好选择一条 Edge；0 或多条匹配均为错误；Data/Evidence Edge 不得触发 Node；保留 Node 输入、输出、选择路径和 Evidence 关联；终态符合 Graph Output Schema 和 Validator 规则。
 
-控制条件的根指针读取完整输出对象；非根指针必须解析到已声明的输出属性，允许读取 optional 属性。equals 仅在属性存在且值相等时匹配；notEquals 在属性缺失或值不等时匹配；exists 仅在属性存在时匹配。
+控制条件的根指针读取完整输出对象；非根指针必须解析到已声明的输出属性，允许读取 optional 属性。equals 仅在属性存在且值相等时匹配；notEquals 在属性缺失或值不等时匹配；exists 仅在属性存在时匹配。 相等判断遵循 JSON 值语义：缺失不同于 null；布尔值不同于数字；数字按 ECMAScript Number（IEEE-754 binary64）语义比较；字符串精确比较；数组按顺序比较；对象按成员名称递归比较且不受成员顺序影响。JavaScript 与非 JavaScript Consumer 必须保持一致。
 
 静态验证不能替代运行验证；运行时错误检测也不能替代静态 Graph 资格检查。
 

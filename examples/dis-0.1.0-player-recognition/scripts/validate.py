@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import subprocess
 from pathlib import Path, PurePosixPath
@@ -194,15 +195,43 @@ def pointer_set(target: dict, pointer: str, value):
     target[key] = value
 
 
+def _ecmascript_number(value):
+    try:
+        return float(value)
+    except OverflowError:
+        return math.inf if value > 0 else -math.inf
+
+
+def json_value_equal(left, right):
+    """Compare JSON values using ECMAScript Number and structural JSON semantics."""
+    if isinstance(left, bool) or isinstance(right, bool):
+        return isinstance(left, bool) and isinstance(right, bool) and left is right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return _ecmascript_number(left) == _ecmascript_number(right)
+    if left is None or right is None:
+        return left is None and right is None
+    if isinstance(left, str) or isinstance(right, str):
+        return isinstance(left, str) and isinstance(right, str) and left == right
+    if isinstance(left, list) or isinstance(right, list):
+        return isinstance(left, list) and isinstance(right, list) and len(left) == len(right) and all(
+            json_value_equal(a, b) for a, b in zip(left, right)
+        )
+    if isinstance(left, dict) or isinstance(right, dict):
+        return isinstance(left, dict) and isinstance(right, dict) and left.keys() == right.keys() and all(
+            json_value_equal(left[key], right[key]) for key in left
+        )
+    return False
+
+
 def condition_matches(output, condition):
     if condition is None:
         return True
     actual = pointer_get(output, condition["path"])
     operator = condition["operator"]
     if operator == "equals":
-        return actual is not MISSING and actual == condition.get("value")
+        return actual is not MISSING and json_value_equal(actual, condition.get("value"))
     if operator == "notEquals":
-        return actual is MISSING or actual != condition.get("value")
+        return actual is MISSING or not json_value_equal(actual, condition.get("value"))
     if operator == "exists":
         return actual is not MISSING
     fail(f"unsupported control condition operator: {operator}")
@@ -440,7 +469,7 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
                 if value is MISSING:
                     fail(f"trace data source value missing: {source_node}->{node_id}")
                 pointer_set(expected_input, edge["to"]["pointer"], value)
-        if entry.get("input") != expected_input:
+        if not json_value_equal(entry.get("input"), expected_input):
             fail(f"trace input is not the Graph-assembled payload: {node_id}")
         expected_evidence = {}
         for edge in graph["edges"]:
@@ -454,7 +483,7 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
                 fail(f"trace evidence source value missing: {source_node}->{node_id}")
             bucket = expected_evidence.setdefault(edge["to"]["slot"], [])
             bucket.extend(value if isinstance(value, list) else [value])
-        if entry.get("evidence", {}) != expected_evidence:
+        if not json_value_equal(entry.get("evidence", {}), expected_evidence):
             fail(f"trace evidence is not the Graph-assembled payload: {node_id}")
         outputs[node_id] = entry.get("output")
         is_terminal = node_id in graph["terminalNodes"]
@@ -471,7 +500,7 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
                 fail(f"trace does not follow exactly one selected control Edge: {node_id}")
         elif not is_terminal:
             fail(f"trace ended before a terminal Node: {node_id}")
-    if result.get("outcome") != trace[-1].get("output"):
+    if not json_value_equal(result.get("outcome"), trace[-1].get("output")):
         fail(f"terminal outcome differs from final trace output: {result.get('label')}")
 
 
@@ -479,9 +508,17 @@ def validate_condition_semantics():
     cases = [
         ({"optionalFlag": True}, {"path": "/optionalFlag", "operator": "exists"}, True),
         ({}, {"path": "/optionalFlag", "operator": "exists"}, False),
+        ({"optionalFlag": None}, {"path": "/optionalFlag", "operator": "exists"}, True),
         ({"optionalFlag": True}, {"path": "/optionalFlag", "operator": "equals", "value": True}, True),
-        ({}, {"path": "/optionalFlag", "operator": "equals", "value": True}, False),
-        ({}, {"path": "/optionalFlag", "operator": "notEquals", "value": True}, True),
+        ({"optionalFlag": 1}, {"path": "/optionalFlag", "operator": "equals", "value": True}, False),
+        ({"optionalFlag": 1}, {"path": "/optionalFlag", "operator": "notEquals", "value": True}, True),
+        ({"optionalFlag": True}, {"path": "/optionalFlag", "operator": "notEquals", "value": 1}, True),
+        ({}, {"path": "/optionalFlag", "operator": "equals", "value": None}, False),
+        ({}, {"path": "/optionalFlag", "operator": "notEquals", "value": None}, True),
+        ({"optionalFlag": {"a": 1, "b": [True, None]}}, {"path": "/optionalFlag", "operator": "equals", "value": {"b": [True, None], "a": 1}}, True),
+        ({"optionalFlag": [1, "x"]}, {"path": "/optionalFlag", "operator": "equals", "value": [1, "x"]}, True),
+        ({"optionalFlag": [1, "x"]}, {"path": "/optionalFlag", "operator": "equals", "value": ["x", 1]}, False),
+        ({"optionalFlag": 9007199254740993}, {"path": "/optionalFlag", "operator": "equals", "value": 9007199254740992}, True),
     ]
     for output, condition, expected in cases:
         if condition_matches(output, condition) is not expected:
@@ -660,7 +697,7 @@ def main():
     for result in results:
         validate_trace_assembly(result, graph, units_by_id, nodes_by_id)
         trace = result["trace"]
-        if not trace or result["outcome"] != trace[-1]["output"]:
+        if not trace or not json_value_equal(result["outcome"], trace[-1]["output"]):
             fail(f"terminal outcome differs from last trace output: {result['label']}")
         if trace[-1]["nodeId"] not in graph["terminalNodes"]:
             fail(f"trace did not end at a declared terminal: {result['label']}")

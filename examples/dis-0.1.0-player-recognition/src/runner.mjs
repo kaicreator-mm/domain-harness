@@ -108,7 +108,15 @@ export async function resolveSchemaClosure(root, refs) {
     if (!isSafePackageRelativeRef(filePart)) throw new DisExecutionError('UNSAFE_SCHEMA_REF', ref);
     if (fragment && !fragment.startsWith('/')) throw new DisExecutionError('INVALID_SCHEMA_FRAGMENT', ref);
     const absolute = path.resolve(baseDir, filePart);
-    const realPath = await assertInsidePackage(root, absolute);
+    let realPath;
+    try {
+      realPath = await assertInsidePackage(root, absolute);
+    } catch (error) {
+      if (error instanceof DisExecutionError && error.code === 'MISSING_PACKAGE_RESOURCE') {
+        throw new DisExecutionError('MISSING_SCHEMA_RESOURCE', path.relative(root, absolute).split(path.sep).join('/'));
+      }
+      throw error;
+    }
     const relative = path.relative(root, absolute).split(path.sep).join('/');
     if (active.has(relative)) throw new DisExecutionError('SCHEMA_REFERENCE_CYCLE', relative);
     if (schemas.has(relative)) {
@@ -196,11 +204,28 @@ function pointerProperty(pointer) {
   return pointer.slice(1).replaceAll('~1', '/').replaceAll('~0', '~');
 }
 
-function conditionMatches(output, condition) {
+function jsonValueEqual(left, right) {
+  if (left === right) return true;
+  if (typeof left !== typeof right || left === null || right === null) return false;
+  if (typeof left === 'number') return left === right;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length &&
+      left.every((value, index) => jsonValueEqual(value, right[index]));
+  }
+  if (typeof left === 'object') {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    return leftKeys.length === rightKeys.length &&
+      leftKeys.every((key) => Object.hasOwn(right, key) && jsonValueEqual(left[key], right[key]));
+  }
+  return false;
+}
+
+export function conditionMatches(output, condition) {
   if (!condition) return true;
   const actual = pointerGet(output, condition.path);
-  if (condition.operator === 'equals') return actual === condition.value;
-  if (condition.operator === 'notEquals') return actual !== condition.value;
+  if (condition.operator === 'equals') return actual !== undefined && jsonValueEqual(actual, condition.value);
+  if (condition.operator === 'notEquals') return actual === undefined || !jsonValueEqual(actual, condition.value);
   if (condition.operator === 'exists') return actual !== undefined;
   throw new DisExecutionError('UNSUPPORTED_CONDITION_OPERATOR', condition.operator);
 }

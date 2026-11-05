@@ -166,7 +166,7 @@ Static Graph validation must ensure unique Node IDs, entry/terminal existence, e
 
 At runtime, only outputs from executed Nodes are available; missing sources do not become null/default success; each branch selects exactly one control Edge; zero or multiple matches are errors; Data/Evidence Edges do not trigger Nodes; Node inputs, outputs, selected paths and Evidence associations remain inspectable; terminal Outcomes conform to Graph Output Schema and Validator rules.
 
-For control conditions, the root pointer addresses the complete output object. A non-root pointer must resolve to a declared output property; optional properties are permitted. equals matches only a present equal value, notEquals matches an absent or unequal value, and exists matches only a present value.
+For control conditions, the root pointer addresses the complete output object. A non-root pointer must resolve to a declared output property; optional properties are permitted. equals matches only a present equal value, notEquals matches an absent or unequal value, and exists matches only a present value. Equality follows JSON value semantics: missing differs from null; booleans differ from numbers; numbers use ECMAScript Number (IEEE-754 binary64) semantics; strings compare exactly; arrays compare in order; objects compare recursively by member names regardless of member order. JavaScript and non-JavaScript Consumers MUST agree.
 
 Static validation does not replace runtime validation; runtime error detection does not replace static Graph qualification.
 
