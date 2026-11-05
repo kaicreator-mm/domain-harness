@@ -1,6 +1,6 @@
 # Domain Intelligence Standard (DIS) 0.1.0
 
-Status: L2_ARCHITECTURE_CANDIDATE / NOT_FROZEN
+Status: L2_ARCHITECTURE_CANDIDATE_R1 / NOT_FROZEN
 Branch: dis/0.1.0-l2-candidate
 L2 Issue: https://github.com/kaicreator-mm/domain-harness/issues/1481
 Frozen Product/L1: https://github.com/kaicreator-mm/domain-harness/issues/1477

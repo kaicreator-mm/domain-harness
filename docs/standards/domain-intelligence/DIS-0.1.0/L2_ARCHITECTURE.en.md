@@ -218,7 +218,7 @@ DIS version is independent of DomainHarness SDK version. Unit, Graph, Definition
 
 Based on inspection of the xDownload Demo:
 
-The original DIS-L2-F001..F007 findings are closed by the R1 refinement contract and executable reference-consumer/conformance changes:
+The original DIS-L2-F001..F007 findings are closed by the R1 refinement contract and executable reference-consumer/conformance changes, subject to exact-HEAD test evidence and independent review:
 
 - F001: full resource closure pins Unit, Graph, Definition, Schema, fixture, implementation and conformance resources; the package descriptor pins the manifest digest.
 - F002: the Consumer trace now carries the actual Node input/evidence/output; Python validates those values directly.
@@ -228,7 +228,7 @@ The original DIS-L2-F001..F007 findings are closed by the R1 refinement contract
 - F006: EXECUTED is an occurrence, not a Unit qualification stage.
 - F007: Recognizer provenance and optional Dynamic Form contracts preserve confirmed, observed, inferred, candidate and unknown distinctions.
 
-R1 also adds realpath-based symlink containment and makes DIS 0.1.0 strictly DAG-only. These are candidate closure claims; exact-HEAD CI and independent review remain evidence gates.
+R1 also adds realpath-based symlink containment and makes DIS 0.1.0 strictly DAG-only. These are candidate closure claims; exact-HEAD CI and independent review remain evidence gates. A second materially different Domain Profile remains mandatory before Release Qualification.
 
 ## 12. L2 Freeze Gate
 

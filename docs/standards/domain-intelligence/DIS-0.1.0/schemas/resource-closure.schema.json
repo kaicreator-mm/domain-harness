@@ -24,7 +24,7 @@
     },
     "packageRevision": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)$"
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
     },
     "standardVersion": {
       "const": "0.1.0"
@@ -40,7 +40,8 @@
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/unitPathRef"
-      }
+      },
+      "uniqueItems": true
     },
     "resources": {
       "type": "array",
@@ -53,7 +54,7 @@
   "$defs": {
     "packageRelativePath": {
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\\\.|\\\\.\\\\.)(?:/|$))(?!.*//)(?!.*\\\\\\\\)[A-Za-z0-9._/-]+$"
+      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
     },
     "identityPathRef": {
       "type": "object",
@@ -70,7 +71,7 @@
         },
         "revision": {
           "type": "string",
-          "pattern": "^(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)$"
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
         },
         "path": {
           "$ref": "#/$defs/packageRelativePath"
@@ -92,7 +93,7 @@
         },
         "revision": {
           "type": "string",
-          "pattern": "^(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)$"
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
         },
         "path": {
           "$ref": "#/$defs/packageRelativePath"
@@ -134,7 +135,8 @@
           "items": {
             "type": "string",
             "minLength": 1
-          }
+          },
+          "minItems": 1
         },
         "required": {
           "type": "boolean"
