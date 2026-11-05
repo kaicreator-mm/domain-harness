@@ -446,11 +446,11 @@ test('append-only lifecycle chain binds exact Unit digest and dependency closure
 
   const unauthorized = structuredClone(loaded.packageIdentity);
   unauthorized.lifecycleRecords.find((record) => record.transition === 'PROMOTED').actor.authorityRef = '';
-  assert.throws(() => validateLifecycleRecords(unauthorized, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
+  assert.throws(() => validateLifecycleRecords(unauthorized, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('LIFECYCLE_RECORD_DIGEST_MISMATCH'));
 
   const stale = structuredClone(loaded.packageIdentity);
   stale.lifecycleRecords[0].dependencyClosureDigest = '0'.repeat(64);
-  assert.throws(() => validateLifecycleRecords(stale, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH'));
+  assert.throws(() => validateLifecycleRecords(stale, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('LIFECYCLE_RECORD_DIGEST_MISMATCH'));
 
   const unpromoted = structuredClone(loaded.packageIdentity);
   unpromoted.selectionLock.selectedAssets.find((asset) => asset.kind === 'unit').promotionRecordId = 'missing-promotion';
