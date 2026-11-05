@@ -1,0 +1,11 @@
+{
+  "schemaVersion":"dis.unit/0.1.0","id":"xdownload.player.outcome-validator","revision":"1.0.0","role":"validator",
+  "purpose":"Validate that the final player-recognition outcome is consistent with evidence and resolution.",
+  "scope":{"domain":"web-media","appliesTo":["player-recognition-outcome"],"excludes":["download-result-validation"]},
+  "owner":"xdownload-demo","authority":"CONTROLLED","qualification":{"stage":"CANDIDATE","limitations":["Validates the demo result contract, not a production catalog."]},
+  "input":{"schemaRef":"schemas/validator-input.schema.json"},"output":{"schemaRef":"schemas/outcome.schema.json"},
+  "implementation":{"strategy":"function","ref":"src/runner.mjs#validateOutcome","exposure":"semantic"},
+  "evidence":{"sources":[{"sourceId":"recognition-evidence-contract","kind":"authority","ref":"domain/units/recognizer.json","claim":"Recognized results retain matched evidence."}],"absenceReason":null},
+  "failure":{"supported":["INVALID_INPUT","CONFLICT","FAILED"],"handling":{"INVALID_INPUT":"reject","CONFLICT":"reject","FAILED":"reject"}},
+  "validation":{"profile":"player-outcome-conformance/0.1.0","casesRef":"test/runner.test.mjs","lastResult":"NOT_RUN"}
+}

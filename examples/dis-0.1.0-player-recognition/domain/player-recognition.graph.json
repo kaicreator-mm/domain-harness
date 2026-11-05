@@ -1,0 +1,18 @@
+{
+  "schemaVersion":"dis.graph/0.1.0","id":"xdownload.player-recognition","revision":"1.0.0","entryNode":"recognize",
+  "nodes":[
+    {"nodeId":"recognize","unitRef":{"id":"xdownload.player.recognizer","revision":"1.0.0"}},
+    {"nodeId":"decide","unitRef":{"id":"xdownload.player.route-decision","revision":"1.0.0"}},
+    {"nodeId":"resolve-known","unitRef":{"id":"xdownload.player.resolve-procedure","revision":"1.0.0"}},
+    {"nodeId":"bounded-fallback","unitRef":{"id":"xdownload.player.bounded-fallback","revision":"1.0.0"}},
+    {"nodeId":"validate","unitRef":{"id":"xdownload.player.outcome-validator","revision":"1.0.0"}}
+  ],
+  "edges":[
+    {"from":"recognize","to":"decide","map":[{"from":"","to":"/recognition"}]},
+    {"from":"decide","to":"resolve-known","when":{"path":"/route","operator":"equals","value":"KNOWN"},"map":[{"from":"/recognition","to":"/recognition"}]},
+    {"from":"decide","to":"bounded-fallback","when":{"path":"/route","operator":"notEquals","value":"KNOWN"},"map":[{"from":"/recognition","to":"/recognition"}]},
+    {"from":"resolve-known","to":"validate","map":[{"from":"","to":""}]},
+    {"from":"bounded-fallback","to":"validate","map":[{"from":"","to":""}]}
+  ],
+  "terminalNodes":["validate"]
+}
