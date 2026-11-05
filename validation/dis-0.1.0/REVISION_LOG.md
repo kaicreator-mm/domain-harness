@@ -53,3 +53,15 @@ Unit evidence referenced player signature and strategy fixtures while the demo h
 The 0.1.0 Graph Pointer Profile is explicitly limited to root output or one top-level property pointers. Nested pointers are rejected, not partially supported. This is a deliberate version boundary and a candidate for a future revision.
 
 Final verification is recorded separately in `FINAL_VALIDATION.md` and `final-validation.json`.
+
+
+## Final verification evidence
+
+- Demo/standard conformance commit: `d8c516e7b564db8572631d2d2d435491b8f43b33`.
+- Final validation result: PASS.
+- Node tests: 15/15; demo paths: known, ambiguous, unknown, fixture-backed HLS all passed.
+- Standard schemas: 5/5 self-validated; six Units, Graph, Definition and Resource Closure validated.
+- Per-node contract checks: 16 executed Node inputs and 16 outputs validated against their Unit Schemas.
+- Final machine report: `validation/dis-0.1.0/final-validation.json`.
+- Human-readable report: `validation/dis-0.1.0/FINAL_VALIDATION.md`.
+- Validation commit: this commit, immediately following the tested demo/standard conformance commit above.
