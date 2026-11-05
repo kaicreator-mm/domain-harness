@@ -1,9 +1,9 @@
 # DIS 0.1.0 — L2 Architecture & Conformance Model
 
-Status: L2_ARCHITECTURE_CANDIDATE / NOT_FROZEN  
-L2 Issue: #1481  
-Product/L1: #1477 — FROZEN  
-Product Freeze Commit: b8135aa801eb38fcae2fa1fce3bada541178d5b9  
+Status: L2_ARCHITECTURE_CANDIDATE / NOT_FROZEN\
+L2 Issue: #1481\
+Product/L1: #1477 — FROZEN\
+Product Freeze Commit: b8135aa801eb38fcae2fa1fce3bada541178d5b9\
 Candidate branch: dis/0.1.0-l2-candidate
 
 This document turns the frozen Domain Intelligence Product/L1 into standard boundaries, logical contracts, machine-readable descriptions, Consumer semantics and conformance requirements. It is not an SDK ABI, Manifest/BUILD ABI, Runtime API or implementation design for DomainForge/DomainHarness. DIS preserves the frozen v0.7 Kernel/Microkernel, single Domain Runtime and Host/Effect contracts. The KDP architecture proposal in #1480 is not frozen and is non-normative for DIS 0.1.0.
