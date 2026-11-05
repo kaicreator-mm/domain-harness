@@ -10,6 +10,6 @@ const cases = [
 ];
 const results = [];
 for (const item of cases) {
-  results.push({ label: item.label, input: item.input, ...(await runPipeline(item.input, loaded)) });
+  results.push({ label: item.label, input: item.input, packageIdentity: loaded.packageIdentity, ...(await runPipeline(item.input, loaded)) });
 }
 console.log(JSON.stringify(results));

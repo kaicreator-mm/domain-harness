@@ -1,10 +1,4 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { loadDemo, DisExecutionError } from './runner.mjs';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const packageRoot = path.resolve(here, '..');
 
 export function verifyResourceClosure(closure, manifest) {
   if (manifest.schemaVersion !== 'dis.resource-closure/0.1.0') throw new DisExecutionError('UNSUPPORTED_RESOURCE_CLOSURE', manifest.schemaVersion);
@@ -19,7 +13,6 @@ export function verifyResourceClosure(closure, manifest) {
 
 export async function loadVerifiedDemo() {
   const loaded = await loadDemo();
-  const manifest = JSON.parse(await fs.readFile(path.join(packageRoot, 'domain', 'resource-closure.json'), 'utf8'));
-  verifyResourceClosure({ resources: loaded.resources }, manifest);
-  return { ...loaded, closureManifest: manifest };
+  verifyResourceClosure({ resources: loaded.resources }, loaded.closureManifest);
+  return loaded;
 }

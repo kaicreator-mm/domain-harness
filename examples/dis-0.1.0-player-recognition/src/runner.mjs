@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(here, '..');
-const unitDir = path.join(packageRoot, 'domain', 'units');
 
 export class DisExecutionError extends Error {
   constructor(code, message) {
@@ -15,16 +14,37 @@ export class DisExecutionError extends Error {
   }
 }
 
-function isSafePackageRelativeRef(ref) {
+export function isSafePackageRelativeRef(ref) {
   if (typeof ref !== 'string' || ref.length === 0) return false;
   if (ref.startsWith('/') || ref.includes('\\') || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(ref)) return false;
-  const segments = ref.split('/');
-  return !segments.some((segment) => segment === '..' || segment === '' || segment === '.');
+  return !ref.split('/').some((segment) => segment === '..' || segment === '' || segment === '.');
 }
 
-function assertInsidePackage(root, absolutePath) {
-  const relative = path.relative(root, absolutePath);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) throw new DisExecutionError('RESOURCE_PATH_ESCAPE', absolutePath);
+export async function assertInsidePackage(root, absolutePath) {
+  let rootReal;
+  let targetReal;
+  try {
+    rootReal = await fs.realpath(root);
+    targetReal = await fs.realpath(absolutePath);
+  } catch {
+    throw new DisExecutionError('MISSING_PACKAGE_RESOURCE', absolutePath);
+  }
+  const relative = path.relative(rootReal, targetReal);
+  if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+    throw new DisExecutionError('RESOURCE_PATH_ESCAPE', absolutePath);
+  }
+  return targetReal;
+}
+
+async function readPackageResource(root, relativePath) {
+  if (!isSafePackageRelativeRef(relativePath)) throw new DisExecutionError('UNSAFE_PACKAGE_RESOURCE_PATH', String(relativePath));
+  const absolute = path.resolve(root, relativePath);
+  const realPath = await assertInsidePackage(root, absolute);
+  return fs.readFile(realPath);
+}
+
+function sha256(content) {
+  return createHash('sha256').update(content).digest('hex');
 }
 
 export function validateUnit(unit) {
@@ -33,15 +53,30 @@ export function validateUnit(unit) {
   if (unit.schemaVersion !== 'dis.unit/0.1.0') throw new DisExecutionError('UNSUPPORTED_UNIT_SCHEMA', unit.schemaVersion);
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(unit.revision)) throw new DisExecutionError('INVALID_REVISION', unit.revision);
   if (!['knowledge', 'recognizer', 'decision', 'procedure', 'tool', 'workflow', 'validator'].includes(unit.role)) throw new DisExecutionError('INVALID_ROLE', unit.role);
+  if (unit.qualification?.stage === 'EXECUTED') throw new DisExecutionError('EXECUTED_IS_NOT_QUALIFICATION_STAGE', unit.id);
   if (!unit.scope?.domain || !Array.isArray(unit.scope.appliesTo) || !Array.isArray(unit.scope.excludes)) throw new DisExecutionError('INVALID_SCOPE', unit.id);
   if (!['FROZEN', 'CONTROLLED', 'REFERENCE', 'EXAMPLE', 'DERIVED'].includes(unit.authority)) throw new DisExecutionError('INVALID_AUTHORITY', unit.id);
   if (!Array.isArray(unit.evidence?.sources) || !('absenceReason' in unit.evidence)) throw new DisExecutionError('INVALID_EVIDENCE', unit.id);
   const executable = ['recognizer', 'decision', 'procedure', 'tool', 'workflow', 'validator'].includes(unit.role);
-  if (executable && (!isSafePackageRelativeRef(unit.input?.schemaRef) || !isSafePackageRelativeRef(unit.output?.schemaRef) || !unit.implementation?.strategy)) {
-    throw new DisExecutionError('MISSING_EXECUTABLE_CONTRACT', unit.id);
+  if (executable) {
+    if (!isSafePackageRelativeRef(unit.input?.schemaRef) || !isSafePackageRelativeRef(unit.output?.schemaRef) || !unit.implementation?.strategy || !unit.implementation?.ref) {
+      throw new DisExecutionError('MISSING_EXECUTABLE_CONTRACT', unit.id);
+    }
+    if (unit.role === 'workflow') {
+      if (unit.implementation.strategy !== 'workflow-graph' || !unit.implementation.ref.startsWith('graph:') || !isSafePackageRelativeRef(unit.implementation.artifactRef)) {
+        throw new DisExecutionError('INVALID_WORKFLOW_BINDING', unit.id);
+      }
+    } else if (unit.role === 'tool') {
+      if (unit.implementation.exposure !== 'tool' || unit.implementation.strategy !== 'tool-operation' || !unit.implementation.ref.startsWith('tool:')) {
+        throw new DisExecutionError('INVALID_TOOL_EXPOSURE', unit.id);
+      }
+    } else {
+      if (unit.implementation.exposure === 'tool' || unit.implementation.ref !== 'registry:' + unit.id + '@' + unit.revision || !isSafePackageRelativeRef(unit.implementation.artifactRef)) {
+        throw new DisExecutionError('UNTRUSTED_IMPLEMENTATION_BINDING', unit.id);
+      }
+    }
   }
   if (unit.role === 'procedure' && unit.implementation.exposure !== 'private') throw new DisExecutionError('PRIVATE_PROCEDURE_EXPOSURE_REQUIRED', unit.id);
-  if (unit.role === 'tool' && (unit.implementation.exposure !== 'tool' || unit.implementation.strategy !== 'tool-operation')) throw new DisExecutionError('INVALID_TOOL_EXPOSURE', unit.id);
   if (unit.evidence.consumes !== undefined && (!Array.isArray(unit.evidence.consumes) || new Set(unit.evidence.consumes).size !== unit.evidence.consumes.length)) {
     throw new DisExecutionError('INVALID_EVIDENCE_SLOTS', unit.id);
   }
@@ -56,13 +91,11 @@ export async function resolveSchemaClosure(root, refs) {
   async function visit(ref, baseDir = root) {
     if (typeof ref !== 'string' || ref.length === 0) throw new DisExecutionError('INVALID_SCHEMA_REF', String(ref));
     if (ref.startsWith('#')) return null;
-    if (ref.includes('\\') || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(ref) || ref.startsWith('/') || ref.split('#', 1)[0].split('/').some((segment) => segment === '..' || segment === '' || segment === '.')) {
-      throw new DisExecutionError('UNSAFE_SCHEMA_REF', ref);
-    }
     const [filePart, fragment] = ref.split('#', 2);
+    if (!isSafePackageRelativeRef(filePart)) throw new DisExecutionError('UNSAFE_SCHEMA_REF', ref);
     if (fragment && !fragment.startsWith('/')) throw new DisExecutionError('INVALID_SCHEMA_FRAGMENT', ref);
     const absolute = path.resolve(baseDir, filePart);
-    assertInsidePackage(root, absolute);
+    const realPath = await assertInsidePackage(root, absolute);
     const relative = path.relative(root, absolute).split(path.sep).join('/');
     if (active.has(relative)) throw new DisExecutionError('SCHEMA_REFERENCE_CYCLE', relative);
     if (schemas.has(relative)) {
@@ -76,7 +109,7 @@ export async function resolveSchemaClosure(root, refs) {
     active.add(relative);
     let content;
     try {
-      content = await fs.readFile(absolute, 'utf8');
+      content = await fs.readFile(realPath, 'utf8');
     } catch {
       throw new DisExecutionError('MISSING_SCHEMA_RESOURCE', relative);
     }
@@ -88,7 +121,7 @@ export async function resolveSchemaClosure(root, refs) {
     }
     if (schema.$schema !== 'https://json-schema.org/draft/2020-12/schema') throw new DisExecutionError('UNSUPPORTED_SCHEMA_DIALECT', relative);
     schemas.set(relative, schema);
-    resources.set(relative, createHash('sha256').update(content).digest('hex'));
+    resources.set(relative, sha256(content));
 
     async function scan(value) {
       if (Array.isArray(value)) {
@@ -97,9 +130,9 @@ export async function resolveSchemaClosure(root, refs) {
         for (const [key, child] of Object.entries(value)) {
           if (key === '$ref' && typeof child === 'string') {
             if (child.startsWith('#')) {
-              const fragment = child.slice(1);
-              if (fragment) {
-                const target = fragment.split('/').slice(1).map((part) => part.replaceAll('~1', '/').replaceAll('~0', '~')).reduce((current, part) => current?.[part], schema);
+              const localFragment = child.slice(1);
+              if (localFragment) {
+                const target = localFragment.split('/').slice(1).map((part) => part.replaceAll('~1', '/').replaceAll('~0', '~')).reduce((current, part) => current?.[part], schema);
                 if (target === undefined) throw new DisExecutionError('UNRESOLVED_SCHEMA_FRAGMENT', relative + child);
               }
             } else {
@@ -140,6 +173,16 @@ function pointerSet(target, pointer, value) {
   return target;
 }
 
+function isTopLevelPointer(pointer, allowRoot = false) {
+  if (allowRoot && pointer === '') return true;
+  return typeof pointer === 'string' && /^\/(?:[^~/]|~[01])+$/.test(pointer);
+}
+
+function pointerProperty(pointer) {
+  if (!isTopLevelPointer(pointer, false)) throw new DisExecutionError('INVALID_TOP_LEVEL_POINTER', String(pointer));
+  return pointer.slice(1).replaceAll('~1', '/').replaceAll('~0', '~');
+}
+
 function conditionMatches(output, condition) {
   if (!condition) return true;
   const actual = pointerGet(output, condition.path);
@@ -153,9 +196,61 @@ function requiredProperties(schema) {
   return Array.isArray(schema?.required) ? schema.required : [];
 }
 
+function canReach(from, to, adjacency) {
+  if (from === to) return false;
+  const pending = [from];
+  const seen = new Set();
+  while (pending.length) {
+    const current = pending.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    for (const next of adjacency.get(current) || []) {
+      if (next === to) return true;
+      pending.push(next);
+    }
+  }
+  return false;
+}
+
+function topologicalOrder(nodeIds, adjacency) {
+  const indegree = new Map(nodeIds.map((id) => [id, 0]));
+  for (const from of nodeIds) for (const to of adjacency.get(from) || []) indegree.set(to, indegree.get(to) + 1);
+  const pending = nodeIds.filter((id) => indegree.get(id) === 0);
+  const order = [];
+  while (pending.length) {
+    const current = pending.shift();
+    order.push(current);
+    for (const next of adjacency.get(current) || []) {
+      indegree.set(next, indegree.get(next) - 1);
+      if (indegree.get(next) === 0) pending.push(next);
+    }
+  }
+  if (order.length !== nodeIds.length) throw new DisExecutionError('CONTROL_CYCLE', 'DIS 0.1.0 graphs are DAG-only');
+  return order;
+}
+
+function pathBindingRange(entryNode, targetNode, sourceNodes, order, adjacency) {
+  const minimum = new Map(order.map((id) => [id, Number.POSITIVE_INFINITY]));
+  const maximum = new Map(order.map((id) => [id, Number.NEGATIVE_INFINITY]));
+  const initial = sourceNodes.has(entryNode) ? 1 : 0;
+  minimum.set(entryNode, initial);
+  maximum.set(entryNode, initial);
+  for (const current of order) {
+    if (!Number.isFinite(minimum.get(current))) continue;
+    for (const next of adjacency.get(current) || []) {
+      const increment = sourceNodes.has(next) ? 1 : 0;
+      minimum.set(next, Math.min(minimum.get(next), minimum.get(current) + increment));
+      maximum.set(next, Math.max(maximum.get(next), maximum.get(current) + increment));
+    }
+  }
+  return { minimum: minimum.get(targetNode), maximum: maximum.get(targetNode) };
+}
+
 export function validateGraph(graph, unitsById, schemas) {
   if (graph.schemaVersion !== 'dis.graph/0.1.0') throw new DisExecutionError('UNSUPPORTED_GRAPH_SCHEMA', graph.schemaVersion);
+  if (graph.cyclePolicy !== 'DAG_ONLY') throw new DisExecutionError('UNSUPPORTED_CYCLE_POLICY', String(graph.cyclePolicy));
   const nodeIds = graph.nodes.map((node) => node.nodeId);
+  const nodesById = new Map(graph.nodes.map((node) => [node.nodeId, node]));
   if (new Set(nodeIds).size !== nodeIds.length) throw new DisExecutionError('DUPLICATE_NODE_ID', 'node IDs must be unique');
   if (!nodeIds.includes(graph.entryNode)) throw new DisExecutionError('MISSING_ENTRY_NODE', graph.entryNode);
   for (const terminal of graph.terminalNodes) if (!nodeIds.includes(terminal)) throw new DisExecutionError('UNKNOWN_TERMINAL_NODE', terminal);
@@ -164,11 +259,10 @@ export function validateGraph(graph, unitsById, schemas) {
     const unit = unitsById.get(node.unitRef.id);
     if (!unit || unit.revision !== node.unitRef.revision) throw new DisExecutionError('UNRESOLVED_EXACT_UNIT_REF', node.unitRef.id);
   }
-  const entryUnit = unitsById.get(graph.nodes.find((node) => node.nodeId === graph.entryNode).unitRef.id);
+  const entryUnit = unitsById.get(nodesById.get(graph.entryNode).unitRef.id);
   if (entryUnit.input.schemaRef !== graph.inputSchemaRef) throw new DisExecutionError('GRAPH_ENTRY_INPUT_MISMATCH', graph.inputSchemaRef);
   for (const terminalId of graph.terminalNodes) {
-    const terminalNode = graph.nodes.find((node) => node.nodeId === terminalId);
-    const terminalUnit = unitsById.get(terminalNode.unitRef.id);
+    const terminalUnit = unitsById.get(nodesById.get(terminalId).unitRef.id);
     if (terminalUnit.output.schemaRef !== graph.outputSchemaRef) throw new DisExecutionError('GRAPH_TERMINAL_OUTPUT_MISMATCH', terminalId);
   }
 
@@ -179,64 +273,86 @@ export function validateGraph(graph, unitsById, schemas) {
 
   const adjacency = new Map(nodeIds.map((id) => [id, []]));
   for (const edge of controls) {
-    if (!nodeIds.includes(edge.from) || !nodeIds.includes(edge.to)) throw new DisExecutionError('UNKNOWN_CONTROL_NODE', edge.from + '->' + edge.to);
+    if (!nodesById.has(edge.from) || !nodesById.has(edge.to)) throw new DisExecutionError('UNKNOWN_CONTROL_NODE', edge.from + '->' + edge.to);
     if (edge.when) {
-      if (typeof edge.when.path !== 'string' || (edge.when.path !== '' && !edge.when.path.startsWith('/'))) throw new DisExecutionError('INVALID_CONDITION_POINTER', edge.when.path);
-      const sourceNode = graph.nodes.find((node) => node.nodeId === edge.from);
-      const sourceUnit = unitsById.get(sourceNode.unitRef.id);
+      if (!isTopLevelPointer(edge.when.path, true)) throw new DisExecutionError('INVALID_CONDITION_POINTER', edge.when.path);
+      const sourceUnit = unitsById.get(nodesById.get(edge.from).unitRef.id);
       const sourceSchema = schemas.get(sourceUnit.output.schemaRef);
-      if (edge.when.path !== '' && !sourceSchema?.properties?.[edge.when.path.slice(1)]) throw new DisExecutionError('UNKNOWN_CONDITION_OUTPUT_POINTER', edge.from + edge.when.path);
+      if (edge.when.path !== '' && !sourceSchema?.properties?.[pointerProperty(edge.when.path)]) throw new DisExecutionError('UNKNOWN_CONDITION_OUTPUT_POINTER', edge.from + edge.when.path);
+      if (['equals', 'notEquals'].includes(edge.when.operator) && !Object.hasOwn(edge.when, 'value')) throw new DisExecutionError('CONDITION_VALUE_REQUIRED', edge.from);
+      if (edge.when.operator === 'exists' && Object.hasOwn(edge.when, 'value')) throw new DisExecutionError('EXISTS_CONDITION_FORBIDS_VALUE', edge.from);
     }
     adjacency.get(edge.from).push(edge.to);
   }
+
+  const dataEdgeKeys = new Set();
   for (const edge of data) {
-    if (!nodeIds.includes(edge.from.node) || !nodeIds.includes(edge.to.node)) throw new DisExecutionError('UNKNOWN_DATA_NODE', edge.from.node + '->' + edge.to.node);
-    if (typeof edge.from.pointer !== 'string' || typeof edge.to.pointer !== 'string' || edge.to.pointer === '') throw new DisExecutionError('INVALID_DATA_POINTER', 'data edges require a source pointer and non-root target pointer');
-    const sourceNode = graph.nodes.find((node) => node.nodeId === edge.from.node);
-    const sourceUnit = unitsById.get(sourceNode.unitRef.id);
+    if (!nodesById.has(edge.from.node) || !nodesById.has(edge.to.node)) throw new DisExecutionError('UNKNOWN_DATA_NODE', edge.from.node + '->' + edge.to.node);
+    if (!isTopLevelPointer(edge.from.pointer, true) || !isTopLevelPointer(edge.to.pointer, false)) throw new DisExecutionError('INVALID_DATA_POINTER', edge.from.node + '->' + edge.to.node);
+    const sourceUnit = unitsById.get(nodesById.get(edge.from.node).unitRef.id);
     const sourceSchema = schemas.get(sourceUnit.output.schemaRef);
-    if (edge.from.pointer !== '' && (!edge.from.pointer.startsWith('/') || !sourceSchema?.properties?.[edge.from.pointer.slice(1)])) throw new DisExecutionError('UNKNOWN_SOURCE_OUTPUT_POINTER', edge.from.node + edge.from.pointer);
-    const targetNode = graph.nodes.find((node) => node.nodeId === edge.to.node);
-    const targetUnit = unitsById.get(targetNode.unitRef.id);
+    if (edge.from.pointer !== '' && !sourceSchema?.properties?.[pointerProperty(edge.from.pointer)]) throw new DisExecutionError('UNKNOWN_SOURCE_OUTPUT_POINTER', edge.from.node + edge.from.pointer);
+    const targetUnit = unitsById.get(nodesById.get(edge.to.node).unitRef.id);
     const targetSchema = schemas.get(targetUnit.input.schemaRef);
-    if (!edge.to.pointer.startsWith('/') || !targetSchema?.properties?.[edge.to.pointer.slice(1)]) throw new DisExecutionError('UNKNOWN_TARGET_INPUT_POINTER', edge.to.node + edge.to.pointer);
+    if (!targetSchema?.properties?.[pointerProperty(edge.to.pointer)]) throw new DisExecutionError('UNKNOWN_TARGET_INPUT_POINTER', edge.to.node + edge.to.pointer);
+    if (edge.to.node === graph.entryNode) throw new DisExecutionError('ENTRY_NODE_CANNOT_RECEIVE_DATA_EDGE', edge.to.node);
+    const duplicateKey = edge.to.node + '|' + edge.to.pointer + '|' + edge.from.node;
+    if (dataEdgeKeys.has(duplicateKey)) throw new DisExecutionError('DUPLICATE_DATA_BINDING', duplicateKey);
+    dataEdgeKeys.add(duplicateKey);
   }
+
   for (const edge of evidence) {
-    if (!nodeIds.includes(edge.from.node) || !nodeIds.includes(edge.to.node)) throw new DisExecutionError('UNKNOWN_EVIDENCE_NODE', edge.from.node + '->' + edge.to.node);
-    const sourceUnit = unitsById.get(graph.nodes.find((node) => node.nodeId === edge.from.node).unitRef.id);
+    if (!nodesById.has(edge.from.node) || !nodesById.has(edge.to.node)) throw new DisExecutionError('UNKNOWN_EVIDENCE_NODE', edge.from.node + '->' + edge.to.node);
+    if (!isTopLevelPointer(edge.from.pointer, false)) throw new DisExecutionError('INVALID_EVIDENCE_SOURCE_POINTER', edge.from.pointer);
+    const sourceUnit = unitsById.get(nodesById.get(edge.from.node).unitRef.id);
     const sourceSchema = schemas.get(sourceUnit.output.schemaRef);
-    if (!sourceSchema?.properties?.[edge.from.pointer.slice(1)]) throw new DisExecutionError('UNKNOWN_EVIDENCE_SOURCE_POINTER', edge.from.node + edge.from.pointer);
-    const targetUnit = unitsById.get(graph.nodes.find((node) => node.nodeId === edge.to.node).unitRef.id);
+    if (!sourceSchema?.properties?.[pointerProperty(edge.from.pointer)]) throw new DisExecutionError('UNKNOWN_EVIDENCE_SOURCE_POINTER', edge.from.node + edge.from.pointer);
+    const targetUnit = unitsById.get(nodesById.get(edge.to.node).unitRef.id);
     if (!(targetUnit.evidence.consumes || []).includes(edge.to.slot)) throw new DisExecutionError('UNDECLARED_EVIDENCE_SLOT', edge.to.slot);
   }
 
+  const order = topologicalOrder(nodeIds, adjacency);
+  const reachable = new Set([graph.entryNode]);
+  const queue = [graph.entryNode];
+  while (queue.length) {
+    const current = queue.shift();
+    for (const next of adjacency.get(current)) if (!reachable.has(next)) { reachable.add(next); queue.push(next); }
+  }
+  if (reachable.size !== nodeIds.length) throw new DisExecutionError('UNREACHABLE_CONTROL_NODE', nodeIds.filter((id) => !reachable.has(id)).join(','));
+
   for (const node of graph.nodes) {
-    if (node.nodeId === graph.entryNode) continue;
     const unit = unitsById.get(node.unitRef.id);
     const schema = schemas.get(unit.input.schemaRef);
-    for (const property of requiredProperties(schema)) {
-      const targetPointer = '/' + property.replaceAll('~', '~0').replaceAll('/', '~1');
-      if (!data.some((edge) => edge.to.node === node.nodeId && edge.to.pointer === targetPointer)) {
-        throw new DisExecutionError('MISSING_REQUIRED_DATA_BINDING', node.nodeId + targetPointer);
+    if (node.nodeId !== graph.entryNode) {
+      for (const property of requiredProperties(schema)) {
+        const targetPointer = '/' + property.replaceAll('~', '~0').replaceAll('/', '~1');
+        const bindings = data.filter((edge) => edge.to.node === node.nodeId && edge.to.pointer === targetPointer);
+        if (bindings.length === 0) throw new DisExecutionError('MISSING_REQUIRED_DATA_BINDING', node.nodeId + targetPointer);
+        const sources = new Set(bindings.map((edge) => edge.from.node));
+        for (const source of sources) if (!canReach(source, node.nodeId, adjacency)) throw new DisExecutionError('DATA_SOURCE_NOT_BEFORE_TARGET', source + '->' + node.nodeId);
+        const range = pathBindingRange(graph.entryNode, node.nodeId, sources, order, adjacency);
+        if (range.minimum !== 1 || range.maximum !== 1) throw new DisExecutionError('REQUIRED_INPUT_BINDING_NOT_EXACTLY_ONE_ON_EVERY_PATH', node.nodeId + targetPointer + ' min=' + range.minimum + ' max=' + range.maximum);
+      }
+      for (const edge of data.filter((item) => item.to.node === node.nodeId)) {
+        const property = pointerProperty(edge.to.pointer);
+        if (!requiredProperties(schema).includes(property)) {
+          if (!canReach(edge.from.node, node.nodeId, adjacency)) throw new DisExecutionError('DATA_SOURCE_NOT_BEFORE_TARGET', edge.from.node + '->' + node.nodeId);
+          const sources = new Set(data.filter((item) => item.to.node === node.nodeId && item.to.pointer === edge.to.pointer).map((item) => item.from.node));
+          const range = pathBindingRange(graph.entryNode, node.nodeId, sources, order, adjacency);
+          if (range.maximum > 1) throw new DisExecutionError('OPTIONAL_INPUT_DUPLICATE_BINDING_ON_PATH', node.nodeId + edge.to.pointer);
+        }
       }
     }
     for (const slot of unit.evidence.consumes || []) {
-      if (!evidence.some((edge) => edge.to.node === node.nodeId && edge.to.slot === slot)) throw new DisExecutionError('MISSING_EVIDENCE_BINDING', node.nodeId + ':' + slot);
+      const slotEdges = evidence.filter((edge) => edge.to.node === node.nodeId && edge.to.slot === slot);
+      if (slotEdges.length === 0) throw new DisExecutionError('MISSING_EVIDENCE_BINDING', node.nodeId + ':' + slot);
+      const sources = new Set(slotEdges.map((edge) => edge.from.node));
+      for (const source of sources) if (!canReach(source, node.nodeId, adjacency)) throw new DisExecutionError('EVIDENCE_SOURCE_NOT_BEFORE_TARGET', source + '->' + node.nodeId);
+      const range = pathBindingRange(graph.entryNode, node.nodeId, sources, order, adjacency);
+      if (range.minimum < 1) throw new DisExecutionError('EVIDENCE_NOT_AVAILABLE_ON_EVERY_PATH', node.nodeId + ':' + slot);
     }
   }
 
-  const visiting = new Set();
-  const visited = new Set();
-  function visit(id) {
-    if (visiting.has(id)) throw new DisExecutionError('CONTROL_CYCLE', id);
-    if (visited.has(id)) return;
-    visiting.add(id);
-    for (const next of adjacency.get(id)) visit(next);
-    visiting.delete(id);
-    visited.add(id);
-  }
-  visit(graph.entryNode);
-  if (visited.size !== nodeIds.length) throw new DisExecutionError('UNREACHABLE_CONTROL_NODE', nodeIds.filter((id) => !visited.has(id)).join(','));
   for (const nodeId of nodeIds) {
     if (!graph.terminalNodes.includes(nodeId) && adjacency.get(nodeId).length === 0) throw new DisExecutionError('PATH_WITHOUT_TERMINAL', nodeId);
     if (graph.terminalNodes.includes(nodeId) && adjacency.get(nodeId).length > 0) throw new DisExecutionError('TERMINAL_HAS_CONTROL_EDGE', nodeId);
@@ -244,30 +360,39 @@ export function validateGraph(graph, unitsById, schemas) {
   return true;
 }
 
-export function validateDefinition(definition, unitsById, graph) {
+export function validateDefinition(definition, unitsById, graph, graphPath) {
   if (definition.schemaVersion !== 'dis.definition/0.1.0') throw new DisExecutionError('UNSUPPORTED_DEFINITION_SCHEMA', definition.schemaVersion);
   const componentIds = new Set();
-  const componentUnitIds = new Set();
+  const declared = new Map();
   for (const component of definition.components) {
     if (!['semantic', 'tool'].includes(component.family)) throw new DisExecutionError('INVALID_COMPONENT_FAMILY', component.family);
     if (componentIds.has(component.componentId)) throw new DisExecutionError('DUPLICATE_COMPONENT_ID', component.componentId);
     componentIds.add(component.componentId);
     const unit = unitsById.get(component.unitRef.id);
     if (!unit || unit.revision !== component.unitRef.revision) throw new DisExecutionError('UNRESOLVED_COMPONENT_UNIT', component.unitRef.id);
+    if (declared.has(unit.id)) throw new DisExecutionError('DUPLICATE_DECLARED_UNIT', unit.id);
     if (component.family === 'tool' && (unit.role !== 'tool' || unit.implementation.exposure !== 'tool')) throw new DisExecutionError('INVALID_TOOL_COMPONENT_BINDING', component.componentId);
-    if (component.family === 'semantic' && unit.implementation.exposure !== 'semantic') throw new DisExecutionError('INVALID_SEMANTIC_COMPONENT_BINDING', component.componentId);
-    componentUnitIds.add(unit.id);
+    if (component.family === 'semantic' && (unit.role === 'tool' || unit.implementation.exposure !== 'semantic')) throw new DisExecutionError('INVALID_SEMANTIC_COMPONENT_BINDING', component.componentId);
+    declared.set(unit.id, { revision: unit.revision, family: component.family });
   }
-  const privateIds = new Set();
   for (const ref of definition.privateUnits) {
     const unit = unitsById.get(ref.id);
     if (!unit || unit.revision !== ref.revision) throw new DisExecutionError('UNRESOLVED_PRIVATE_UNIT', ref.id);
     if (unit.implementation.exposure !== 'private') throw new DisExecutionError('PRIVATE_UNIT_EXPOSED', ref.id);
-    if (componentUnitIds.has(unit.id) || privateIds.has(unit.id)) throw new DisExecutionError('PRIVATE_COMPONENT_OVERLAP', ref.id);
-    privateIds.add(unit.id);
+    if (declared.has(unit.id)) throw new DisExecutionError('PRIVATE_COMPONENT_OVERLAP', ref.id);
+    declared.set(unit.id, { revision: unit.revision, family: 'private' });
   }
-  if (definition.workflowRef.id !== graph.id || definition.workflowRef.revision !== graph.revision) throw new DisExecutionError('WORKFLOW_REF_MISMATCH', definition.workflowRef.id);
-  if (!isSafePackageRelativeRef(definition.workflowRef.path)) throw new DisExecutionError('UNSAFE_WORKFLOW_REF', definition.workflowRef.path);
+  for (const node of graph.nodes) {
+    const declaredRef = declared.get(node.unitRef.id);
+    if (!declaredRef || declaredRef.revision !== node.unitRef.revision) throw new DisExecutionError('UNDECLARED_GRAPH_UNIT', node.unitRef.id + '@' + node.unitRef.revision);
+  }
+  const workflowUnitRef = definition.workflowRef?.unitRef;
+  const graphRef = definition.workflowRef?.graphRef;
+  const workflowUnit = workflowUnitRef && unitsById.get(workflowUnitRef.id);
+  if (!workflowUnit || workflowUnit.revision !== workflowUnitRef.revision || workflowUnit.role !== 'workflow') throw new DisExecutionError('WORKFLOW_UNIT_REF_MISMATCH', workflowUnitRef?.id || 'missing');
+  if (declared.get(workflowUnit.id)?.family !== 'semantic') throw new DisExecutionError('WORKFLOW_UNIT_NOT_SEMANTIC_COMPONENT', workflowUnit.id);
+  if (!graphRef || graphRef.id !== graph.id || graphRef.revision !== graph.revision || graphRef.path !== graphPath) throw new DisExecutionError('WORKFLOW_GRAPH_REF_MISMATCH', graphRef?.id || 'missing');
+  if (workflowUnit.implementation.ref !== 'graph:' + graph.id + '@' + graph.revision || workflowUnit.implementation.artifactRef !== graphPath) throw new DisExecutionError('WORKFLOW_IMPLEMENTATION_BINDING_MISMATCH', workflowUnit.id);
   return true;
 }
 
@@ -325,36 +450,90 @@ export function validateOutcome(input, context) {
 }
 
 export const handlers = {
-  'xdownload.player.recognizer': recognizePlayer,
-  'xdownload.player.route-decision': routeRecognition,
-  'xdownload.player.resolve-procedure': resolvePlayer,
-  'xdownload.player.bounded-fallback': boundedFallback,
-  'xdownload.player.outcome-validator': validateOutcome,
+  'registry:xdownload.player.recognizer@1.0.0': recognizePlayer,
+  'registry:xdownload.player.route-decision@1.0.0': routeRecognition,
+  'registry:xdownload.player.resolve-procedure@1.0.0': resolvePlayer,
+  'registry:xdownload.player.bounded-fallback@1.0.0': boundedFallback,
+  'registry:xdownload.player.outcome-validator@1.0.0': validateOutcome,
 };
 
 export async function loadDemo() {
-  const unitFiles = await fs.readdir(unitDir);
-  const units = await Promise.all(unitFiles.filter((name) => name.endsWith('.json')).map(async (name) => {
-    const unit = JSON.parse(await fs.readFile(path.join(unitDir, name), 'utf8'));
+  const descriptor = JSON.parse(await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8'));
+  const packageIdentity = descriptor.dis;
+  if (!packageIdentity || packageIdentity.standardVersion !== '0.1.0' || !isSafePackageRelativeRef(packageIdentity.resourceClosurePath)) {
+    throw new DisExecutionError('INVALID_PACKAGE_DESCRIPTOR', 'DIS package identity and closure binding are required');
+  }
+  const manifestBytes = await readPackageResource(packageRoot, packageIdentity.resourceClosurePath);
+  const manifestDigest = sha256(manifestBytes);
+  if (manifestDigest !== packageIdentity.resourceClosureSha256) throw new DisExecutionError('RESOURCE_MANIFEST_DIGEST_MISMATCH', packageIdentity.resourceClosurePath);
+  const manifest = JSON.parse(manifestBytes.toString('utf8'));
+  if (manifest.schemaVersion !== 'dis.resource-closure/0.1.0' || manifest.packageId !== packageIdentity.packageId || manifest.packageRevision !== packageIdentity.revision || manifest.standardVersion !== packageIdentity.standardVersion) {
+    throw new DisExecutionError('PACKAGE_MANIFEST_IDENTITY_MISMATCH', packageIdentity.packageId);
+  }
+
+  const resourceEntries = new Map();
+  const resourceContents = new Map();
+  const resources = new Map();
+  for (const item of manifest.resources) {
+    if (!isSafePackageRelativeRef(item.path)) throw new DisExecutionError('UNSAFE_PACKAGE_RESOURCE_PATH', item.path);
+    if (resourceEntries.has(item.path)) throw new DisExecutionError('DUPLICATE_RESOURCE_CLOSURE_ENTRY', item.path);
+    const bytes = await readPackageResource(packageRoot, item.path);
+    const digest = sha256(bytes);
+    if (digest !== item.sha256) throw new DisExecutionError('RESOURCE_DIGEST_MISMATCH', item.path);
+    resourceEntries.set(item.path, item);
+    resourceContents.set(item.path, bytes.toString('utf8'));
+    resources.set(item.path, digest);
+  }
+
+  const units = manifest.units.map((ref) => {
+    const resource = resourceEntries.get(ref.path);
+    if (!resource || resource.kind !== 'unit') throw new DisExecutionError('UNIT_RESOURCE_NOT_CLOSED', ref.path);
+    const unit = JSON.parse(resourceContents.get(ref.path));
     validateUnit(unit);
+    if (unit.id !== ref.id || unit.revision !== ref.revision) throw new DisExecutionError('UNIT_RESOURCE_IDENTITY_MISMATCH', ref.id);
     return unit;
-  }));
-  const graph = JSON.parse(await fs.readFile(path.join(packageRoot, 'domain', 'player-recognition.graph.json'), 'utf8'));
-  const definition = JSON.parse(await fs.readFile(path.join(packageRoot, 'domain', 'definition.json'), 'utf8'));
-  const refs = [graph.inputSchemaRef, graph.outputSchemaRef, 'domain/schemas/domain-definition.schema.json'];
+  });
+  const unitsById = new Map(units.map((unit) => [unit.id, unit]));
+  if (unitsById.size !== units.length) throw new DisExecutionError('DUPLICATE_UNIT_ID', 'Unit IDs must be unique');
+
+  const graphResource = resourceEntries.get(manifest.graphRef.path);
+  const definitionResource = resourceEntries.get(manifest.definitionRef.path);
+  if (!graphResource || graphResource.kind !== 'graph' || !definitionResource || definitionResource.kind !== 'definition') {
+    throw new DisExecutionError('PACKAGE_ROOT_RESOURCE_NOT_CLOSED', 'Graph and Definition must be in Resource Closure');
+  }
+  const graph = JSON.parse(resourceContents.get(manifest.graphRef.path));
+  const definition = JSON.parse(resourceContents.get(manifest.definitionRef.path));
+  if (graph.id !== manifest.graphRef.id || graph.revision !== manifest.graphRef.revision || definition.domainId !== manifest.definitionRef.id || definition.revision !== manifest.definitionRef.revision) {
+    throw new DisExecutionError('PACKAGE_ROOT_RESOURCE_IDENTITY_MISMATCH', packageIdentity.packageId);
+  }
+
+  const refs = [graph.inputSchemaRef, graph.outputSchemaRef];
   for (const unit of units) {
     if (unit.input) refs.push(unit.input.schemaRef);
     if (unit.output) refs.push(unit.output.schemaRef);
+    if (unit.implementation?.artifactRef && !resourceEntries.has(unit.implementation.artifactRef)) throw new DisExecutionError('IMPLEMENTATION_ARTIFACT_NOT_CLOSED', unit.implementation.artifactRef);
+    for (const source of unit.evidence.sources || []) {
+      if (isSafePackageRelativeRef(source.ref) && !resourceEntries.has(source.ref)) throw new DisExecutionError('EVIDENCE_SOURCE_NOT_CLOSED', source.ref);
+    }
+    if (unit.validation?.casesRef && isSafePackageRelativeRef(unit.validation.casesRef) && !resourceEntries.has(unit.validation.casesRef)) throw new DisExecutionError('VALIDATION_CASES_NOT_CLOSED', unit.validation.casesRef);
   }
-  const closure = await resolveSchemaClosure(packageRoot, refs);
+  const schemaClosure = await resolveSchemaClosure(packageRoot, refs);
+  for (const [relative, digest] of schemaClosure.resources) {
+    if (!resourceEntries.has(relative) || resourceEntries.get(relative).kind !== 'schema' || resourceEntries.get(relative).sha256 !== digest) {
+      throw new DisExecutionError('SCHEMA_RESOURCE_NOT_CLOSED', relative);
+    }
+  }
+  const schemas = schemaClosure.schemas;
+  const signaturesPath = 'fixtures/player-signatures.json';
+  const strategiesPath = 'fixtures/player-strategies.json';
+  if (!resourceEntries.has(signaturesPath) || !resourceEntries.has(strategiesPath)) throw new DisExecutionError('FIXTURE_RESOURCE_NOT_CLOSED', 'signature and strategy catalogs are required');
   const catalogs = {
-    signatures: JSON.parse(await fs.readFile(path.join(packageRoot, 'fixtures', 'player-signatures.json'), 'utf8')),
-    strategies: JSON.parse(await fs.readFile(path.join(packageRoot, 'fixtures', 'player-strategies.json'), 'utf8')),
+    signatures: JSON.parse(resourceContents.get(signaturesPath)),
+    strategies: JSON.parse(resourceContents.get(strategiesPath)),
   };
-  const unitsById = new Map(units.map((unit) => [unit.id, unit]));
-  validateGraph(graph, unitsById, closure.schemas);
-  validateDefinition(definition, unitsById, graph);
-  return { graph, definition, unitsById, schemas: closure.schemas, resources: closure.resources, catalogs };
+  validateGraph(graph, unitsById, schemas);
+  validateDefinition(definition, unitsById, graph, manifest.graphRef.path);
+  return { graph, definition, unitsById, schemas, resources, catalogs, closureManifest: manifest, packageIdentity: { ...packageIdentity, resourceClosureSha256: manifestDigest } };
 }
 
 export async function runPipeline(input, loaded) {
@@ -365,17 +544,19 @@ export async function runPipeline(input, loaded) {
   for (let step = 0; step <= graph.nodes.length; step += 1) {
     const node = graph.nodes.find((item) => item.nodeId === nodeId);
     const unit = unitsById.get(node.unitRef.id);
-    const handler = handlers[unit.id];
-    if (!handler) throw new DisExecutionError('NO_IMPLEMENTATION', unit.id);
+    const handler = handlers[unit.implementation.ref];
+    if (!handler) throw new DisExecutionError('NO_TRUSTED_IMPLEMENTATION_BINDING', unit.implementation.ref);
 
-    let nodeInput = nodeId === graph.entryNode ? input : {};
+    let nodeInput = nodeId === graph.entryNode ? structuredClone(input) : {};
     const incomingData = graph.edges.filter((edge) => edge.kind === 'data' && edge.to.node === nodeId);
     const boundPointers = new Set();
     for (const edge of incomingData) {
       if (!outputs.has(edge.from.node)) continue;
       if (boundPointers.has(edge.to.pointer)) throw new DisExecutionError('DUPLICATE_RUNTIME_DATA_BINDING', nodeId + edge.to.pointer);
       boundPointers.add(edge.to.pointer);
-      nodeInput = pointerSet(nodeInput, edge.to.pointer, pointerGet(outputs.get(edge.from.node), edge.from.pointer));
+      const value = pointerGet(outputs.get(edge.from.node), edge.from.pointer);
+      if (value === undefined) throw new DisExecutionError('MISSING_RUNTIME_DATA_VALUE', edge.from.node + edge.from.pointer);
+      nodeInput = pointerSet(nodeInput, edge.to.pointer, structuredClone(value));
     }
     if (nodeId !== graph.entryNode) {
       const inputSchema = schemas.get(unit.input.schemaRef);
@@ -388,12 +569,13 @@ export async function runPipeline(input, loaded) {
     for (const edge of incomingEvidence) {
       if (!outputs.has(edge.from.node)) continue;
       const value = pointerGet(outputs.get(edge.from.node), edge.from.pointer);
-      evidence[edge.to.slot] = [...(evidence[edge.to.slot] || []), ...(Array.isArray(value) ? value : [value])];
+      if (value === undefined) throw new DisExecutionError('MISSING_RUNTIME_EVIDENCE_VALUE', edge.from.node + edge.from.pointer);
+      evidence[edge.to.slot] = [...(evidence[edge.to.slot] || []), ...(Array.isArray(value) ? structuredClone(value) : [structuredClone(value)])];
     }
     const output = handler(nodeInput, { evidence, catalogs: loaded.catalogs });
     outputs.set(nodeId, output);
-    trace.push({ nodeId, unitId: unit.id, output });
-    if (graph.terminalNodes.includes(nodeId)) return { outcome: output, trace };
+    trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: unit.implementation.ref, input: structuredClone(nodeInput), evidence: structuredClone(evidence), output: structuredClone(output) });
+    if (graph.terminalNodes.includes(nodeId)) return { outcome: output, trace, packageIdentity: loaded.packageIdentity };
     const candidates = graph.edges.filter((edge) => edge.kind === 'control' && edge.from === nodeId && conditionMatches(output, edge.when));
     if (candidates.length !== 1) throw new DisExecutionError('AMBIGUOUS_CONTROL_FLOW', nodeId + ' selected ' + candidates.length + ' control edges');
     nodeId = candidates[0].to;

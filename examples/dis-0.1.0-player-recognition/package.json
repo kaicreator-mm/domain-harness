@@ -6,5 +6,12 @@
     "test": "node --test ./test/*.test.mjs",
     "demo": "node ./src/run-demo.mjs",
     "validate": "python ./scripts/validate.py"
+  },
+  "dis": {
+    "packageId": "xdownload.web-media",
+    "revision": "1.0.0",
+    "standardVersion": "0.1.0",
+    "resourceClosurePath": "domain/resource-closure.json",
+    "resourceClosureSha256": "PENDING"
   }
 }
