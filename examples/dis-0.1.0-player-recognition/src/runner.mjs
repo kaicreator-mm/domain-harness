@@ -559,7 +559,7 @@ function recognizePlayerWithMode(input, context, normalize) {
   if (!input || typeof input.url !== 'string' || !/^https?:\/\//.test(input.url) || !Array.isArray(input.signals) || input.signals.some((item) => typeof item !== 'string')) {
     throw new DisExecutionError('INVALID_INPUT', 'PageObservation requires an http(s) url and string signals[]');
   }
-  const patterns = context?.knowledge?.['xdownload.player-signature-rules']?.patterns || context?.catalogs?.signatures?.patterns;
+  const patterns = context?.knowledge?.['xdownload.player-signatures']?.patterns || context?.catalogs?.signatures?.patterns;
   if (!Array.isArray(patterns)) throw new DisExecutionError('MISSING_SIGNATURE_CATALOG', 'player-signatures knowledgeRef is required');
   const rawHaystack = input.url + '\n' + input.signals.join('\n');
   const haystack = normalize ? rawHaystack.toLowerCase() : rawHaystack;
@@ -780,10 +780,10 @@ export async function loadDemo() {
     }
   }
   const catalogs = {
-    signatures: knowledge['xdownload.player-signature-rules'],
+    signatures: knowledge['xdownload.player-signatures'],
     strategies: JSON.parse(resourceContents.get(strategiesPath)),
   };
-  if (!catalogs.signatures) throw new DisExecutionError('MISSING_SELECTED_KNOWLEDGE', 'xdownload.player-signature-rules');
+  if (!catalogs.signatures) throw new DisExecutionError('MISSING_SELECTED_KNOWLEDGE', 'xdownload.player-signatures');
   validateGraph(graph, unitsById, schemas);
   validateDefinition(definition, unitsById, graph, manifest.graphRef.path);
   return { graph, definition, unitsById, schemas, resources, catalogs, knowledge, selectedProviders, closureManifest: manifest, packageIdentity: { ...packageIdentity, resourceClosureSha256: manifestDigest } };

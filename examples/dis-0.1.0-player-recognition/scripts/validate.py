@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -487,6 +488,16 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
             fail(f"trace Unit identity mismatch: {node_id}")
         if entry.get("implementationRef") != unit.get("implementation", {}).get("ref"):
             fail(f"trace implementation binding mismatch: {node_id}")
+        selected_candidate = entry.get("implementationCandidateId")
+        expected_candidate = next(
+            (item.get("candidateId") for item in unit.get("implementation", {}).get("candidates", [])
+             if item.get("candidateId") == selected_candidate),
+            None,
+        )
+        if unit.get("implementation", {}).get("candidates") and expected_candidate is None:
+            fail(f"trace implementation candidate is not declared: {node_id}")
+        if not unit.get("implementation", {}).get("candidates") and selected_candidate is not None:
+            fail(f"trace carries an undeclared implementation candidate: {node_id}")
         if index == 0:
             expected_input = result.get("input")
         else:
@@ -534,6 +545,257 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
             fail(f"trace ended before a terminal Node: {node_id}")
     if not json_value_equal(result.get("outcome"), trace[-1].get("output")):
         fail(f"terminal outcome differs from final trace output: {result.get('label')}")
+
+
+
+
+FAILURE_STATUSES = {
+    "UNKNOWN", "AMBIGUOUS", "CONFLICT", "OUT_OF_SCOPE", "INVALID_INPUT",
+    "PARTIAL", "FAILED", "NEEDS_INPUT", "NEEDS_REVIEW",
+}
+HANDLING_ACTIONS = {
+    "REJECT", "PRESERVE_UNKNOWN", "CLARIFY", "WAIT", "REVIEW",
+    "BOUNDED_FALLBACK", "BOUNDED_RETRY", "ESCALATE", "RETURN_PARTIAL", "FAIL",
+}
+
+
+def validate_preconditions(unit: dict, payload):
+    profile = unit.get("preconditions")
+    if not profile:
+        return
+    if profile.get("inputSchemaRef") != unit.get("input", {}).get("schemaRef"):
+        fail(f"precondition input Schema mismatch: {unit['id']}")
+    for condition in profile.get("all", []):
+        actual = pointer_get(payload, condition["path"])
+        operator = condition["operator"]
+        if operator == "exists":
+            matched = actual is not MISSING
+        elif operator == "equals":
+            matched = actual is not MISSING and json_value_equal(actual, condition["value"])
+        elif operator == "notEquals":
+            matched = actual is MISSING or not json_value_equal(actual, condition["value"])
+        else:
+            fail(f"unsupported precondition operator: {operator}")
+        if not matched:
+            fail(f"precondition failed: {unit['id']}:{condition['path']}")
+
+
+def validate_capability_contracts(units_by_id: dict):
+    providers = []
+    for unit in units_by_id.values():
+        for contract in unit.get("capabilities", {}).get("provides", []):
+            providers.append((unit, contract))
+    for unit in units_by_id.values():
+        for requirement in unit.get("capabilities", {}).get("requires", []):
+            candidates = [contract for _provider, contract in providers
+                          if contract.get("capabilityId") == requirement.get("capabilityId")]
+            if not candidates:
+                fail(f"missing Capability provider: {requirement['capabilityId']}")
+            if len(candidates) != 1:
+                fail(f"ambiguous Capability provider: {requirement['capabilityId']}")
+            provider = candidates[0]
+            same_identity = all(
+                provider.get(key) == requirement.get(key)
+                for key in ("owner", "authorityRef", "inputSchemaRef", "inputSchemaDigest",
+                            "outputSchemaRef", "outputSchemaDigest")
+            )
+            compatibility = requirement.get("compatibility", {})
+            accepted = compatibility.get("accepted", [])
+            accepted_match = any(
+                item.get("version") == provider.get("version")
+                and item.get("contractDigest") == provider.get("contractDigest")
+                for item in accepted
+            )
+            if compatibility.get("policy") == "EXACT":
+                compatible = (
+                    provider.get("version") == requirement.get("version")
+                    and provider.get("contractDigest") == requirement.get("contractDigest")
+                    and accepted_match
+                )
+            elif compatibility.get("policy") == "EXPLICIT_ALLOWLIST":
+                compatible = accepted_match
+            else:
+                compatible = False
+            if not same_identity or not compatible:
+                fail(f"incompatible Capability provider: {requirement['capabilityId']}")
+
+
+def resolve_provider_selection(unit: dict, selection_lock: dict, target: str, resources: dict):
+    capability = (unit.get("capabilities", {}).get("provides") or [{}])[0]
+    matches = [
+        item for item in selection_lock.get("selectedCapabilities", [])
+        if item.get("capabilityId") == capability.get("capabilityId")
+        and item.get("provider", {}).get("unitId") == unit.get("id")
+    ]
+    if not matches:
+        fail(f"missing Package provider selection: {unit['id']}")
+    if len(matches) != 1:
+        fail(f"ambiguous Package provider selection: {unit['id']}")
+    lock = matches[0]
+    provider = lock.get("provider", {})
+    candidates = unit.get("implementation", {}).get("candidates", [])
+    found = [candidate for candidate in candidates if candidate.get("candidateId") == provider.get("candidateId")]
+    if not found:
+        fail(f"missing implementation provider: {provider.get('candidateId')}")
+    if len(found) != 1:
+        fail(f"ambiguous implementation provider: {provider.get('candidateId')}")
+    candidate = found[0]
+    if target != provider.get("target") or candidate.get("target") != target:
+        fail(f"incompatible provider target: {provider.get('candidateId')}")
+    if candidate.get("contractDigest") != lock.get("contractDigest") or provider.get("contractDigest") != candidate.get("contractDigest"):
+        fail(f"incompatible provider contract: {provider.get('candidateId')}")
+    for field, unit_field in (
+        ("unitRevision", "revision"), ("implementationRef", "ref"),
+        ("artifactRef", "artifactRef"), ("artifactDigest", "artifactDigest"),
+    ):
+        expected = unit.get("implementation", {}).get(unit_field) if unit_field in ("ref", "artifactRef") else unit.get(unit_field)
+        if provider.get(field) != candidate.get({"unitRevision":"revision","implementationRef":"ref","artifactRef":"artifactRef","artifactDigest":"artifactDigest"}[field]):
+            fail(f"Package provider pin mismatch: {provider.get('candidateId')}:{field}")
+    implementation = unit.get("implementation", {})
+    if any(implementation.get(field) != candidate.get(field) for field in ("ref", "artifactRef", "strategy", "exposure")):
+        fail(f"Unit provider binding mismatch: {provider.get('candidateId')}")
+    if resources.get(candidate.get("artifactRef")) != candidate.get("artifactDigest"):
+        fail(f"provider artifact digest mismatch: {candidate.get('artifactRef')}")
+    return candidate
+
+
+def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_paths: dict, resources: dict, closure_digest: str):
+    records = package_identity.get("lifecycleRecords")
+    selection = package_identity.get("selectionLock")
+    if not isinstance(records, list) or len(records) < 3 or not isinstance(selection, dict):
+        fail("missing lifecycle records or Package selection lock")
+    if (
+        selection.get("packageId") != package_identity.get("packageId")
+        or selection.get("packageRevision") != package_identity.get("revision")
+        or selection.get("standardVersion") != package_identity.get("standardVersion")
+    ):
+        fail("Package selection identity mismatch")
+    if not selection.get("consumerProfile", {}).get("id") or not selection.get("consumerProfile", {}).get("revision"):
+        fail("Package selection Consumer Profile missing")
+    if not selection.get("target") or not isinstance(selection.get("selectedAssets"), list) or not isinstance(selection.get("selectedCapabilities"), list):
+        fail("invalid Package selection lock")
+    by_id = {}
+    for record in records:
+        record_id = record.get("recordId")
+        transition = record.get("transition")
+        if not record_id or record_id in by_id or transition not in {
+            "CANDIDATE", "VALIDATED", "PROMOTED", "REJECTED", "WITHDRAWN", "EXPIRED", "SUPERSEDED"
+        }:
+            fail(f"invalid lifecycle record: {record_id}")
+        if record.get("dependencyClosureDigest") != closure_digest:
+            fail(f"stale lifecycle dependency closure: {record_id}")
+        if not record.get("subject", {}).get("id") or not re.fullmatch(r"[a-f0-9]{64}", record.get("subject", {}).get("sha256", "")):
+            fail(f"invalid lifecycle subject digest: {record_id}")
+        by_id[record_id] = record
+
+    unit_asset = next((asset for asset in selection["selectedAssets"]
+                       if asset.get("kind") == "unit" and asset.get("id") == "xdownload.player.recognizer"), None)
+    if not unit_asset:
+        fail("selected Recognizer Unit missing from Package lock")
+    unit = units_by_id.get(unit_asset["id"])
+    unit_path = unit_paths.get(unit_asset["id"])
+    if not unit or unit.get("revision") != unit_asset.get("revision") or resources.get(unit_path) != unit_asset.get("sha256"):
+        fail("selected Unit digest/revision mismatch")
+    chain = [
+        record for record in records
+        if record.get("subject", {}).get("id") == unit["id"]
+        and record.get("subject", {}).get("revision") == unit["revision"]
+        and record.get("subject", {}).get("sha256") == unit_asset["sha256"]
+    ]
+    candidate = next((record for record in chain if record.get("transition") == "CANDIDATE"), None)
+    validated = next((record for record in chain if record.get("transition") == "VALIDATED"), None)
+    promoted = next((record for record in chain if record.get("transition") == "PROMOTED"), None)
+    if not candidate or not validated or not promoted:
+        fail("incomplete Candidate → Validation → Promotion lifecycle chain")
+    if validated.get("previousRecordId") != candidate.get("recordId") or promoted.get("previousRecordId") != validated.get("recordId"):
+        fail("lifecycle transition predecessor mismatch")
+    validation = validated.get("validation", {})
+    if (
+        validation.get("result") != "PASS"
+        or validation.get("subjectDigest") != unit_asset["sha256"]
+        or validation.get("dependencyClosureDigest") != closure_digest
+        or not validation.get("profile", {}).get("id")
+        or not validation.get("profile", {}).get("revision")
+        or not validation.get("validator", {}).get("id")
+        or not validation.get("validator", {}).get("version")
+        or not validation.get("baseline", {}).get("sha256")
+    ):
+        fail("lifecycle Validation record is incomplete or stale")
+    coverage = validation.get("coverage", {})
+    if any(not isinstance(coverage.get(key), int) or coverage[key] < 0 for key in ("positive", "negative", "boundary", "heldOut")):
+        fail("lifecycle Validation coverage is invalid")
+    for evidence in validation.get("evidenceRefs", []):
+        if resources.get(evidence.get("path")) != evidence.get("sha256"):
+            fail(f"lifecycle evidence digest mismatch: {evidence.get('path')}")
+    promotion = promoted.get("promotion", {})
+    actor = promoted.get("actor", {})
+    if (
+        promotion.get("decision") != "PROMOTE"
+        or promotion.get("validationRecordId") != validated.get("recordId")
+        or not actor.get("id")
+        or not actor.get("authorityRef")
+        or not promotion.get("policy", {}).get("id")
+        or not promotion.get("policy", {}).get("revision")
+    ):
+        fail("Promotion Decision is missing explicit authority/evidence")
+    if unit_asset.get("promotionRecordId") != promoted.get("recordId") or unit_asset.get("validationRecordId") != validated.get("recordId"):
+        fail("Package lock Promotion/Validation pin mismatch")
+    for asset in selection["selectedAssets"]:
+        if asset.get("kind") == "rule":
+            if not any(
+                ref.get("id") == asset.get("id") and ref.get("revision") == asset.get("revision")
+                and ref.get("path") == asset.get("path") and ref.get("sha256") == asset.get("sha256")
+                for ref in unit.get("knowledgeRefs", [])
+            ):
+                fail(f"selected Knowledge pin mismatch: {asset.get('id')}")
+            if (
+                asset.get("promotionRecordId") != promoted.get("recordId")
+                or asset.get("validationRecordId") != validated.get("recordId")
+                or resources.get(asset.get("path")) != asset.get("sha256")
+            ):
+                fail(f"selected Knowledge is not pinned to promoted subject: {asset.get('id')}")
+    for capability in selection["selectedCapabilities"]:
+        if capability.get("promotionRecordId") != promoted.get("recordId") or capability.get("validationRecordId") != validated.get("recordId"):
+            fail(f"selected Capability lifecycle pin mismatch: {capability.get('capabilityId')}")
+    return True
+
+
+def expect_rejection(callback, label: str):
+    try:
+        callback()
+    except SystemExit:
+        return
+    fail(f"adversarial negative was accepted: {label}")
+
+
+def validate_lifecycle_negatives(package_identity: dict, units_by_id: dict, unit_paths: dict, resources: dict, closure_digest: str):
+    missing = copy.deepcopy(package_identity)
+    missing["lifecycleRecords"] = [item for item in missing["lifecycleRecords"] if item.get("transition") != "VALIDATED"]
+    expect_rejection(lambda: validate_lifecycle_records(missing, units_by_id, unit_paths, resources, closure_digest), "missing validation")
+
+    unauthorized = copy.deepcopy(package_identity)
+    next(item for item in unauthorized["lifecycleRecords"] if item.get("transition") == "PROMOTED")["actor"]["authorityRef"] = ""
+    expect_rejection(lambda: validate_lifecycle_records(unauthorized, units_by_id, unit_paths, resources, closure_digest), "unauthorized promotion")
+
+    stale = copy.deepcopy(package_identity)
+    stale["lifecycleRecords"][0]["dependencyClosureDigest"] = "0" * 64
+    expect_rejection(lambda: validate_lifecycle_records(stale, units_by_id, unit_paths, resources, closure_digest), "stale dependency closure")
+
+    unpromoted = copy.deepcopy(package_identity)
+    next(item for item in unpromoted["selectionLock"]["selectedAssets"] if item.get("kind") == "unit")["promotionRecordId"] = "missing-promotion"
+    expect_rejection(lambda: validate_lifecycle_records(unpromoted, units_by_id, unit_paths, resources, closure_digest), "unpromoted selection")
+
+
+def validate_failure_profile_negatives(unit_schema: dict, unit: dict):
+    invalid = copy.deepcopy(unit)
+    invalid["qualification"]["stage"] = "PROMOTED"
+    expect_rejection(lambda: Draft202012Validator(unit_schema).validate(invalid), "mutable qualification stage")
+    invalid = copy.deepcopy(unit)
+    invalid["failure"]["supported"] = ["UNKNOWN"]
+    expect_rejection(lambda: Draft202012Validator(unit_schema).validate(invalid), "parallel failure.supported")
+    invalid = copy.deepcopy(unit)
+    invalid["failure"]["handling"]["UNKNOWN"] = {}
+    expect_rejection(lambda: Draft202012Validator(unit_schema).validate(invalid), "missing failure handling action")
 
 
 def validate_condition_semantics():
@@ -674,6 +936,8 @@ def main():
             add_expected(expected, source_ref, kind, unit["id"])
         if unit.get("validation", {}).get("casesRef"):
             add_expected(expected, unit["validation"]["casesRef"], "conformance", unit["id"])
+        for knowledge_ref in unit.get("knowledgeRefs", []):
+            add_expected(expected, knowledge_ref["path"], "fixture", unit["id"])
         for key in ("input", "output"):
             schema_ref = unit.get(key, {}).get("schemaRef")
             if schema_ref:
@@ -707,6 +971,33 @@ def main():
     for relative, item in declared.items():
         if item["required"] and relative not in expected:
             fail(f"unreferenced required resource: {relative}")
+
+    resources = {relative: item["sha256"] for relative, item in declared.items()}
+    unit_paths = {item["id"]: item["path"] for item in closure["units"]}
+    validate_capability_contracts(units_by_id)
+    selected_providers = {}
+    for unit in units:
+        if unit.get("capabilities", {}).get("provides"):
+            selected_providers[unit["id"]] = resolve_provider_selection(
+                unit, package_identity["selectionLock"], package_identity["selectionLock"]["target"], resources
+            )
+    validate_lifecycle_records(package_identity, units_by_id, unit_paths, resources, manifest_digest)
+    validate_lifecycle_negatives(package_identity, units_by_id, unit_paths, resources, manifest_digest)
+    validate_failure_profile_negatives(unit_schema, units[0])
+
+    knowledge = {}
+    for unit in units:
+        for knowledge_ref in unit.get("knowledgeRefs", []):
+            relative = safe_relative(knowledge_ref["path"])
+            if resources.get(relative) != knowledge_ref["sha256"]:
+                fail(f"Knowledge/Rule resource digest mismatch: {relative}")
+            value = read_json(resolve_inside(relative))
+            if value.get("catalogId") != knowledge_ref["id"] or value.get("revision") != knowledge_ref["revision"]:
+                fail(f"Knowledge/Rule resource identity mismatch: {knowledge_ref['id']}")
+            knowledge[knowledge_ref["id"]] = value
+    if "xdownload.player-signatures" not in knowledge:
+        fail("selected player signature Knowledge was not loaded by the Consumer")
+
 
     schema_paths = sorted(path for path, item in declared.items() if item["kind"] == "schema")
     registry = Registry()
@@ -742,6 +1033,7 @@ def main():
             if not node or node["unitRef"]["id"] != entry["unitId"] or node["unitRef"]["revision"] != entry["unitRevision"]:
                 fail(f"trace Unit identity mismatch: {entry['nodeId']}")
             unit = units_by_id[entry["unitId"]]
+            validate_preconditions(unit, entry["input"])
             input_schema = demo_schemas[unit["input"]["schemaRef"]]
             output_schema = demo_schemas[unit["output"]["schemaRef"]]
             Draft202012Validator(input_schema, registry=registry, format_checker=FormatChecker()).validate(entry["input"])
@@ -770,6 +1062,12 @@ def main():
         "resourceClosureDigest": manifest_digest,
         "independentGraphValidation": "PASS",
         "definitionBindingValidation": "PASS",
+        "capabilityContractValidation": "PASS",
+        "providerSelectionValidation": "PASS",
+        "preconditionValidation": "PASS",
+        "knowledgeReferenceValidation": "PASS",
+        "lifecycleValidation": "PASS",
+        "lifecycleNegativeCases": 4,
     }, indent=2))
 
 
