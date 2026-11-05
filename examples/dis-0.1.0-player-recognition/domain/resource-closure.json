@@ -227,7 +227,7 @@
     },
     {
       "path": "scripts/validate.py",
-      "sha256": "80365beb8894aa910ea42d3dfc2b9da0fe55eb0699317d98db6408e69402c058",
+      "sha256": "db351e65b1d8087d4a198a7dc1f87c8a9e1cb96556f1d21faeb0a1aa2d695251",
       "kind": "conformance",
       "owners": [
         "xdownload.web-media"
@@ -277,7 +277,7 @@
     },
     {
       "path": "test/runner.test.mjs",
-      "sha256": "9a651e57926076559c33c1ada3e2246750070e8abd0e247b37841d952bf6c6b1",
+      "sha256": "8ef1396c561fe5b9016b3ffe1f16dc7cc925ef7f34210db47e169bbad017abfd",
       "kind": "conformance",
       "owners": [
         "xdownload.player-recognition.workflow",
