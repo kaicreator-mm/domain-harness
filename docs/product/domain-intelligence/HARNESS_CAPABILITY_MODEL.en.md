@@ -1,12 +1,13 @@
 # DomainHarness — Domain-Bounded Harness Capability Model (Product/L1)
 
-**Status: PRODUCT_L1_ANALYSIS_CANDIDATE / NOT_FROZEN**  
-**Analysis entry:** [Issue #1478](https://github.com/kaicreator-mm/domain-harness/issues/1478)  
-**Parent Product baseline:** [#1477 Product/L1 Freeze](https://github.com/kaicreator-mm/domain-harness/issues/1477)  
-**Current Product/L1 frozen identity:** main@b8135aa801eb38fcae2fa1fce3bada541178d5b9 / tree 4363139334ba5b7e83f888e2dc6ffa7e93445da7  
+**Status: PRODUCT_L1_ANALYSIS_CANDIDATE / NOT_FROZEN**\
+**Analysis entry:** [Issue #1478](https://github.com/kaicreator-mm/domain-harness/issues/1478)\
+**Parent Product baseline:** [#1477 Product/L1 Freeze](https://github.com/kaicreator-mm/domain-harness/issues/1477)\
+**Current Product/L1 frozen identity:** main@b8135aa801eb38fcae2fa1fce3bada541178d5b9 / tree 4363139334ba5b7e83f888e2dc6ffa7e93445da7\
+**In-development successor Product/L1 authority:** #1484 Boot → KDP Primary checkpoint @ commit `0a5f7ba0eb8361ff4c8e2ff17abc25de04f2e8bc` (successor only; no v0.10.3 Runtime adoption claim)
 **v0.10.3 public source baseline:** [v0.10.3+source-repair.1](https://github.com/kaicreator-mm/domain-harness/releases/tag/v0.10.3%2Bsource-repair.1) — commit 896efbcec64132377e05fca7b3f7f6ff6b3c900b / tree 533f46fa07c809c827e2b0c3d902a4e1beaf47df
 
-> This is a Product/L1 capability model and current-state gap assessment, not an SDK implementation design. It does not change the frozen v0.7 Domain App / Component / Kernel authority, introduce a second Runtime, second Scheduler or generic Agent platform, or authorize ABI, source, L2, Task DAG, version, release or deployment work.
+> This is a Product/L1 capability model and current-state gap assessment, not an SDK implementation design. It does not change the frozen v0.7 authority for the v0.10.3 public source baseline, introduce a second Runtime, second Scheduler or generic Agent platform, or authorize ABI, source, L2, Task DAG, version, release or deployment work. The in-development successor follows the separate Boot → KDP Primary Product/L1 checkpoint #1484; this assessment does not claim v0.10.3 Runtime adoption of that successor architecture.
 
 ## 1. Product conclusion
 
@@ -20,11 +21,11 @@ v0.10.3 already contains many useful building blocks, but **it does not yet form
 
 This analysis binds the actual four-package GitHub SDK Tarball release rather than inferring capabilities from monorepo module names:
 
-- Original immutable v0.10.3 tag: commit 061376f4a023070f215f9feffad5c24d96d503cb.
+- Original v0.10.3 tag currently resolves to commit 061376f4a023070f215f9feffad5c24d96d503cb. The commit signature is verified; this assessment does not establish protected-tag immutability.
 - Distribution-repair tag v0.10.3+source-repair.1: commit 896efbcec64132377e05fca7b3f7f6ff6b3c900b, tree 533f46fa07c809c827e2b0c3d902a4e1beaf47df.
 - The Source Repair release distributes GitHub Release attachments only; it is not an npm Registry publication. Package version remains 0.10.3.
 - Four public packages: Contracts, Microkernel, BUILD and Host-Node. Node.js >=24 is required.
-- The 12 paths changed between the original tag and Source Repair are package manifests, lockfile, distribution scripts, docs and distribution tests; no Runtime source files changed. The Source Repair tag is therefore the public distribution identity while the original tag remains immutable historical identity.
+- The 12 paths changed between the original tag and Source Repair are package manifests, lockfile, distribution scripts, docs and distribution tests; no Runtime source files changed. The Source Repair tag is therefore the public distribution identity while the original tag is retained as a historical identity; tag-protection/immutability is not established by this assessment.
 - The monorepo's internal @kaicreator/domain-harness package remains private at version 0.2.0 and is not one of the four public Tarballs. Its internal HarnessMachine source cannot be counted as a delivered public SDK capability.
 - The Release explicitly records that the Windows full npm test previously exited with EXIT=1 (#1471). It claims lint, typecheck, build and tarball-inventory gates passed. This document cites test files as traceable verification evidence; the existence of test files is not treated as proof that every test passed.
 
@@ -130,7 +131,7 @@ Evaluation is not equivalent to “JSON parses” or “the LLM returned complet
 
 ### 3.8 Model / Provider Utilization
 
-Models are optional bounded fallbacks, not Harness control authorities. Provider Host owns credentials, endpoints, model allowlists, deadlines, protocol adaptation, error classification and UNKNOWN semantics. Domain Intelligence and Business Policy should not depend on provider-private fields.
+Models are optional bounded fallbacks, not Harness control authorities. Provider Host owns credentials, endpoints, model allowlists, deadlines, protocol adaptation, error classification and remote-outcome uncertainty classification/reporting. Kernel owns authoritative UNKNOWN state, Journal/Fence, and recovery/reconciliation semantics. Domain Intelligence and Business Policy should not depend on provider-private fields.
 
 Provider connectivity, structured output, Tool Proposal, streaming, provider fallback and token/cost budgets are distinct capabilities that must be verified individually. Current Providers make one non-streaming request; OpenAI supports JSON object but refuses outputSchemaRef, while Anthropic currently refuses JSON, temperature and outputSchemaRef. Neither provides implicit Provider Fallback. Semantic Decision permits a declared maxModelCalls value of 0..4, but one resolve invocation currently performs at most one fallback; this does not implement a multi-round model loop. An LLM adapter does not prove complete Harness Reasoning.
 
@@ -231,10 +232,10 @@ UX / Caller
 
 Authority split:
 
-- **Domain Definition / Package:** Domain Scope, semantics, rules, Procedures, Workflows, Tool/Capability declarations, input/output contracts, Context source requirements, Evaluation criteria and selected versions.
+- **Domain Definition:** the abstract Domain App Semantic/Tool Component Graph and exact component relationships; it is not a synonym for selected intelligence or Package materialization.\n- **Selected Domain Intelligence:** qualified, scoped domain concepts, facts, rules, decision criteria, Recognizers, Procedures/Workflows, Tool-selection knowledge and evaluation semantics, with provenance/currentness and qualification evidence.\n- **Domain Package:** the versioned consumer-specific materialization/distribution carrier for the Definition, selected Intelligence, contracts, dependencies, implementation artifacts and exact pins; it is not the ontological parent of Domain Definition.
 - **Harness:** generic consumption and coordination; intelligence selection, context assembly, bounded reasoning, capability proposal/validation, observation coordination and result evaluation.
 - **Business / Domain Machine:** business control flow, intent and policy; remains the sole business control-flow owner.
-- **Kernel / Microkernel:** sole authority for Admission, State, Transition, Effect, Journal, UNKNOWN and Replay/Recovery.
+- **Kernel / Microkernel:** for the v0.10.3 public source baseline, the existing Kernel/Microkernel remains the sole authority for Admission, State, Transition, Effect, Journal, UNKNOWN and Replay/Recovery. For the in-development successor, the Boot → KDP Primary model formally checkpointed by #1484 assigns those same single-authority responsibilities to KDP Kernel Core. The former Microkernel is not a separate required successor layer; historical v0.7 artifacts remain unchanged. This successor direction does not claim current v0.10.3 Runtime adoption.
 - **Host:** real Providers, credentials, Memory/Data Stores, external Tools, CAS, Durable Controls, Evidence Sink and environment authorization.
 - **Domain-Forge / Simulator:** design-time knowledge production, simulation, qualification and candidate improvement; no automatic mutation of active Runtime instances.
 - **DIS:** defines exchangeable Intelligence Units, Recognizer, Decision, Procedure, Workflow, Graph, resource closure, qualification and conformance; the Harness consumes selected outputs without duplicating DIS ontology.
@@ -275,8 +276,8 @@ P0/P1 are gaps that the Product/L1 model must define; they do not mean the SDK s
 
 - **#1477:** the frozen overall Domain Intelligence Product/L1, Domain App, Component, Kernel and self-bootstrap boundaries; this document does not reopen them.
 - **#1476:** Domain Package Semantic Knowledge identity, query/access and optional data-resource contract; this document defines only how the Harness consumes Host/Package-provided context.
-- **#1480:** Domain Package structure, K/S/B, Primary/Extension, Dependency, Hook, Boot/KDP candidate model; this document does not redefine Package ontology. The #1480 KDP migration proposal is not frozen authority; Harness remains within the existing Microkernel boundary from #1477.
-- **#1481 DIS 0.1.0:** specifies Intelligence Units, Recognizer, Decision, Procedure, Workflow, Composition Graph, resource closure, qualification and conformance; this document defines Harness consumption capability without duplicating DIS Schema or Graph specifications.
+- **#1480 / #1484:** #1480 records the original Boot/KDP successor direction. The bilingual successor Product/L1 amendment is now formally checkpointed under #1484 at commit `0a5f7ba0eb8361ff4c8e2ff17abc25de04f2e8bc`; it applies only to the in-development successor and does not change the v0.10.3 public source baseline. This document does not redefine Package ontology.
+- **#1481 DIS 0.1.0:** the current L2 candidate defines Intelligence Units, Recognizer, Decision, Procedure, Workflow, Composition Graph, resource closure, qualification and conformance. These contracts become normative only after exact-HEAD validation, independent Exact-SHA review and the formal L2 Freeze Checkpoint. This document defines Harness consumption capability without duplicating DIS Schema or Graph specifications.
 - **#1398:** preserves original v0.3 four-source decision order and separates Task/Meta evolution.
 - **#1395:** supplies a concrete pre-generated-first, LLM-on-demand, dynamic-step and recovery consumer scenario; it is not the generic Harness product model.
 

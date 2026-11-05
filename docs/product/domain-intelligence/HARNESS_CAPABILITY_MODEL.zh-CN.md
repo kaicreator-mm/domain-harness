@@ -1,12 +1,13 @@
 # DomainHarness — Domain-Bounded Harness Capability Model（Product/L1）
 
-**状态：PRODUCT_L1_ANALYSIS_CANDIDATE / NOT_FROZEN**  
-**分析入口：** [Issue #1478](https://github.com/kaicreator-mm/domain-harness/issues/1478)  
-**父级产品基线：** [#1477 Product/L1 Freeze](https://github.com/kaicreator-mm/domain-harness/issues/1477)  
-**当前 Product/L1 冻结身份：** main@b8135aa801eb38fcae2fa1fce3bada541178d5b9 / tree 4363139334ba5b7e83f888e2dc6ffa7e93445da7  
+**状态：PRODUCT_L1_ANALYSIS_CANDIDATE / NOT_FROZEN**\
+**分析入口：** [Issue #1478](https://github.com/kaicreator-mm/domain-harness/issues/1478)\
+**父级产品基线：** [#1477 Product/L1 Freeze](https://github.com/kaicreator-mm/domain-harness/issues/1477)\
+**当前 Product/L1 冻结身份：** main@b8135aa801eb38fcae2fa1fce3bada541178d5b9 / tree 4363139334ba5b7e83f888e2dc6ffa7e93445da7\
+**在研后继 Product/L1 权威：** #1484 Boot → KDP Primary Checkpoint @ commit `0a5f7ba0eb8361ff4c8e2ff17abc25de04f2e8bc`（仅适用于后继架构；不代表 v0.10.3 Runtime 已采用）
 **v0.10.3 对外源码基线：** [v0.10.3+source-repair.1](https://github.com/kaicreator-mm/domain-harness/releases/tag/v0.10.3%2Bsource-repair.1) — commit 896efbcec64132377e05fca7b3f7f6ff6b3c900b / tree 533f46fa07c809c827e2b0c3d902a4e1beaf47df
 
-> 本文是 Harness 产品能力模型与现状差距分析，不是 SDK 实施设计。它不改变 v0.7 冻结的 Domain App / Component / Kernel 权威，不引入第二 Runtime、第二 Scheduler 或通用 Agent 平台，不授权 ABI、源码、L2、Task DAG、版本、发布或部署。
+> 本文是 Harness 产品能力模型与现状差距分析，不是 SDK 实施设计。它不改变 v0.10.3 公开源码基线所遵循的 v0.7 冻结权威，不引入第二 Runtime、第二 Scheduler 或通用 Agent 平台，不授权 ABI、源码、L2、Task DAG、版本、发布或部署。在研后继架构遵循独立的 Boot → KDP Primary Product/L1 Checkpoint #1484；本文不声称 v0.10.3 Runtime 已采用该后继架构。
 
 ## 1. 产品结论
 
@@ -20,11 +21,11 @@ v0.10.3 已有相当多的基础构件，但**尚未形成完整、公开、端�
 
 本分析绑定实际对外的四包 GitHub SDK Tarball 发布，而不是仅凭仓库内模块名称推断能力：
 
-- 原始不可变 Tag v0.10.3：commit 061376f4a023070f215f9feffad5c24d96d503cb。
+- 原始 v0.10.3 Tag 当前解析到 commit 061376f4a023070f215f9feffad5c24d96d503cb；该 commit 的签名已验证，但本文未证明 Tag 受到保护或不可变。
 - 修复分发的 Tag v0.10.3+source-repair.1：commit 896efbcec64132377e05fca7b3f7f6ff6b3c900b，tree 533f46fa07c809c827e2b0c3d902a4e1beaf47df。
 - Source Repair Release 仅分发 GitHub Release 附件，不是 npm Registry 发布；包版本仍为 0.10.3。
 - 四个公开包：Contracts、Microkernel、BUILD、Host-Node。要求 Node.js >=24。
-- 从原始 Tag 到 Source Repair 的 12 个差异路径属于 package manifest、lockfile、分发脚本、文档和分发测试；没有修改 Runtime 源码。因此可使用 Source Repair Tag 作为公开消费身份，同时将原始 Tag 保留为不可变历史身份。
+- 从原始 Tag 到 Source Repair 的 12 个差异路径属于 package manifest、lockfile、分发脚本、文档和分发测试；没有修改 Runtime 源码。因此可使用 Source Repair Tag 作为公开消费身份，同时将原始 Tag 保留为历史身份；本文未证明 Tag 保护或不可变性。
 - Monorepo 内部的 @kaicreator/domain-harness 包仍为 private、版本 0.2.0，不属于上述四个公开 Tarball。其内部 HarnessMachine 源码不能被当作公开 SDK 已交付能力。
 - Release 明确记录 Windows 全量 npm test 曾 EXIT=1（#1471）；Release 只声明 lint、typecheck、build 和 tarball inventory gate 通过。本文引用测试文件作为可追溯验证证据，不把测试文件存在等同于所有测试已通过。
 
@@ -130,7 +131,7 @@ Evaluation 不等于“JSON 可解析”或“LLM 返回 completed”。Harness 
 
 ### 3.8 Model / Provider Utilization — 模型使用
 
-模型是可选的有界后备，不是 Harness 的控制权威。Provider Host 负责凭据、Endpoint、Model Allowlist、Deadline、协议适配、错误分类和 UNKNOWN 语义。Domain Intelligence 与 Business Policy 不应依赖某个 Provider 私有字段。
+模型是可选的有界后备，不是 Harness 的控制权威。Provider Host 负责凭据、Endpoint、Model Allowlist、Deadline、协议适配、错误分类以及远端结果不确定性的分类/报告；Kernel 才拥有权威 UNKNOWN 状态、Journal/Fence 和恢复/对账语义。Domain Intelligence 与 Business Policy 不应依赖某个 Provider 私有字段。
 
 Provider Connectivity、Structured Output、Tool Proposal、Streaming、Provider Fallback、Token/Cost Budget 是不同能力，必须逐项核验。当前 Provider 为非流式单次请求；OpenAI 只支持 JSON object 而拒绝 outputSchemaRef，Anthropic 当前拒绝 JSON、temperature 和 outputSchemaRef；两者均不提供隐式 Provider Fallback。Semantic Decision 虽允许声明 maxModelCalls 0..4，但一次 resolve 调用当前最多执行一次 fallback，不能据此推断多轮模型循环。不能因为存在 LLM Adapter 就宣称 Harness Reasoning 完整。
 
@@ -231,10 +232,10 @@ UX / Caller
 
 权威分工：
 
-- **Domain Definition / Package：** Domain Scope、语义、规则、Procedure、Workflow、Tool/Capability 声明、输入输出契约、Context 来源要求、Evaluation 标准和已选版本。
+- **Domain Definition：** Domain App 的抽象 Semantic/Tool Component Graph 及精确 Component 关系；它不等同于已选智能或 Package 物化。\n- **已选 Domain Intelligence：** 带有来源/当前性和资格证据、范围明确且已资格确认的领域概念、事实、规则、决策标准、Recognizer、Procedure/Workflow、Tool 选择知识和结果评价语义。\n- **Domain Package：** 面向特定 Consumer、对 Definition、已选 Intelligence、契约、依赖、实现制品和精确 Pin 进行版本化物化/分发的载体；它不是 Domain Definition 的本体父级。
 - **Harness：** 通用消费与协调能力；选择智能、组装上下文、运行有界推理、提出并校验能力调用、协调观察和结果评价。
 - **Business / Domain Machine：** 业务控制流、业务意图和业务策略；仍是唯一业务控制流所有者。
-- **Kernel / Microkernel：** 唯一 Admission、状态、转移、Effect、Journal、UNKNOWN、Replay/Recovery 权威。
+- **Kernel / Microkernel：** 对 v0.10.3 公开源码基线，现有 Kernel/Microkernel 仍是 Admission、State、Transition、Effect、Journal、UNKNOWN、Replay/Recovery 的唯一权威。对于在研后继架构，#1484 正式 Checkpoint 的 Boot → KDP Primary 模型将相同的单一权威职责分配给 KDP Kernel Core。原 Microkernel 不再是后继架构必须独立存在的层；历史 v0.7 制品保持不变。该后继方向不代表当前 v0.10.3 Runtime 已实现 KDP。
 - **Host：** 真实 Provider、Credential、Memory/Data Store、外部 Tool、CAS、Durable Control、Evidence Sink 和环境授权。
 - **Domain-Forge / Simulator：** 设计时知识生产、模拟、资格验证和候选改进；不在 Runtime 自动修改活动实例。
 - **DIS：** 定义可交换的 Intelligence Unit、Recognizer、Decision、Procedure、Workflow、Graph、资源闭包和 Conformance；Harness 消费其已选结果，不重复定义 DIS 本体。
@@ -275,8 +276,8 @@ P0/P1 是 Product/L1 能力模型必须定义的缺口，不表示应立刻改 S
 
 - **#1477：** 已冻结的总体 Domain Intelligence Product/L1、Domain App、Component、Kernel 和自举边界；本文不得重开。
 - **#1476：** Domain Package Semantic Knowledge 身份、查询/访问和可选数据资源合同；本文只定义 Harness 如何消费 Host/Package 提供的上下文。
-- **#1480：** Domain Package 结构、K/S/B、Primary/Extension、Dependency、Hook、Boot/KDP 候选模型；本文不重定义 Package 本体。#1480 的 KDP 迁移提案尚非冻结权威，Harness 仍服从 #1477 的现有 Microkernel 边界。
-- **#1481 DIS 0.1.0：** 规范 Intelligence Unit、Recognizer、Decision、Procedure、Workflow、Composition Graph、资源闭包、资格与 Conformance；本文定义 Harness 的消费能力，不复制 DIS Schema 或 Graph 规范。
+- **#1480 / #1484：** #1480 记录最初的 Boot/KDP 后继方向。双语后继 Product/L1 修订现已通过 #1484 正式 Checkpoint，commit 为 `0a5f7ba0eb8361ff4c8e2ff17abc25de04f2e8bc`；它仅适用于在研后继架构，不改变 v0.10.3 公开源码基线。本文不重定义 Package 本体。
+- **#1481 DIS 0.1.0：** 当前 L2 候选定义 Intelligence Unit、Recognizer、Decision、Procedure、Workflow、Composition Graph、资源闭包、资格和 Conformance。只有在精确 HEAD 验证、独立 Exact-SHA 审核和正式 L2 Freeze Checkpoint 完成后，这些契约才成为规范。本文定义 Harness 的消费能力，不复制 DIS Schema 或 Graph 规范。
 - **#1398：** 保留原始 v0.3 四来源决策顺序和 Task/Meta 演进分离。
 - **#1395：** 作为预生成优先、按需 LLM、动态步骤与恢复的具体 Consumer 场景，不等于通用 Harness 产品模型。
 
