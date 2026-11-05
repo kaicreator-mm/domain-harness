@@ -690,7 +690,7 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         fail("Package selection Consumer Profile missing")
     if not selection.get("target") or not isinstance(selection.get("selectedAssets"), list) or not isinstance(selection.get("selectedCapabilities"), list):
         fail("invalid Package selection lock")
-    if len(selection.get("selectedCapabilities", [])) != 1 or len(selection.get("selectedAssets", [])) != 2:
+    if len(selection["selectedCapabilities"]) != 1 or len(selection["selectedAssets"]) != 2:
         fail("Package selection cardinality is invalid")
     by_id = {}
     for record in records:
@@ -700,10 +700,15 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
             "CANDIDATE", "VALIDATED", "PROMOTED", "REJECTED", "WITHDRAWN", "EXPIRED", "SUPERSEDED"
         }:
             fail(f"invalid lifecycle record: {record_id}")
-        if record.get("dependencyClosureDigest") != closure_digest:
-            fail(f"stale lifecycle dependency closure: {record_id}")
-        if not record.get("subject", {}).get("id") or not re.fullmatch(r"[a-f0-9]{64}", record.get("subject", {}).get("sha256", "")):
-            fail(f"invalid lifecycle subject digest: {record_id}")
+        subject = record.get("subject", {})
+        if (
+            record.get("dependencyClosureDigest") != closure_digest
+            or subject.get("kind") != "unit"
+            or not subject.get("id")
+            or not subject.get("revision")
+            or not re.fullmatch(r"[a-f0-9]{64}", subject.get("sha256", ""))
+        ):
+            fail(f"lifecycle subject/closure mismatch: {record_id}")
         by_id[record_id] = record
 
     unit_asset = next((asset for asset in selection["selectedAssets"]
@@ -714,7 +719,10 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     unit_path = unit_paths.get(unit_asset["id"])
     if not unit or unit.get("revision") != unit_asset.get("revision") or resources.get(unit_path) != unit_asset.get("sha256"):
         fail("selected Unit digest/revision mismatch")
-    if selection["consumerProfile"].get("id") != unit.get("implementation", {}).get("selectionPolicy", {}).get("consumerProfileId") or selection.get("target") != unit.get("implementation", {}).get("selectionPolicy", {}).get("target"):
+    if (
+        selection["consumerProfile"].get("id") != unit.get("implementation", {}).get("selectionPolicy", {}).get("consumerProfileId")
+        or selection.get("target") != unit.get("implementation", {}).get("selectionPolicy", {}).get("target")
+    ):
         fail("Package Consumer Profile/target mismatch")
     chain = [
         record for record in records
@@ -725,17 +733,27 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     candidate = next((record for record in chain if record.get("transition") == "CANDIDATE"), None)
     validated = next((record for record in chain if record.get("transition") == "VALIDATED"), None)
     promoted = next((record for record in chain if record.get("transition") == "PROMOTED"), None)
-    if len(chain) != 3:
-        fail("unexpected duplicate or extra lifecycle transitions for selected Unit")
-    if not candidate.get("actor", {}).get("id") or not candidate.get("actor", {}).get("role") or not candidate.get("policy", {}).get("id"):
-        fail("Candidate record actor/policy identity missing")
-    if not validated.get("actor", {}).get("id") or not validated.get("actor", {}).get("role"):
-        fail("Validation record actor identity missing")
-
-    if not candidate or not validated or not promoted:
+    if (
+        not candidate or not validated or not promoted or len(chain) != 3
+        or candidate.get("previousRecordId") is not None
+        or validated.get("previousRecordId") != candidate.get("recordId")
+        or validated.get("previousRecordDigest") != candidate.get("recordDigest")
+        or promoted.get("previousRecordId") != validated.get("recordId")
+        or promoted.get("previousRecordDigest") != validated.get("recordDigest")
+    ):
         fail("incomplete Candidate → Validation → Promotion lifecycle chain")
-    if validated.get("previousRecordId") != candidate.get("recordId") or promoted.get("previousRecordId") != validated.get("recordId"):
-        fail("lifecycle transition predecessor mismatch")
+    if (
+        not candidate.get("actor", {}).get("id")
+        or not candidate.get("actor", {}).get("role")
+        or not candidate.get("policy", {}).get("id")
+        or not candidate.get("policy", {}).get("revision")
+        or not validated.get("actor", {}).get("id")
+        or not validated.get("actor", {}).get("role")
+    ):
+        fail("Candidate/Validation actor or policy identity missing")
+    for evidence in candidate.get("evidenceRefs", []):
+        if resources.get(evidence.get("path")) != evidence.get("sha256"):
+            fail(f"Candidate evidence digest mismatch: {evidence.get('path')}")
     validation = validated.get("validation", {})
     if (
         validation.get("result") != "PASS"
@@ -745,14 +763,22 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         or not validation.get("profile", {}).get("revision")
         or not validation.get("validator", {}).get("id")
         or not validation.get("validator", {}).get("version")
+        or not validation.get("baseline", {}).get("id")
+        or not validation.get("baseline", {}).get("path")
         or not validation.get("baseline", {}).get("sha256")
         or not validation.get("evidenceRefs")
     ):
         fail("lifecycle Validation record is incomplete or stale")
+    baseline = validation["baseline"]
+    if resources.get(baseline["path"]) != baseline["sha256"] or not any(
+        item.get("path") == baseline["path"] and item.get("sha256") == baseline["sha256"]
+        for item in validation["evidenceRefs"]
+    ):
+        fail("Validation baseline pin mismatch")
     coverage = validation.get("coverage", {})
     if any(not isinstance(coverage.get(key), int) or coverage[key] < 0 for key in ("positive", "negative", "boundary", "heldOut")):
         fail("lifecycle Validation coverage is invalid")
-    for evidence in validation.get("evidenceRefs", []):
+    for evidence in validation["evidenceRefs"]:
         if resources.get(evidence.get("path")) != evidence.get("sha256"):
             fail(f"lifecycle evidence digest mismatch: {evidence.get('path')}")
     promotion = promoted.get("promotion", {})
@@ -760,13 +786,19 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     if (
         promotion.get("decision") != "PROMOTE"
         or promotion.get("validationRecordId") != validated.get("recordId")
+        or promotion.get("validationRecordDigest") != validated.get("recordDigest")
         or not actor.get("id")
         or not actor.get("authorityRef")
         or not promotion.get("policy", {}).get("id")
         or not promotion.get("policy", {}).get("revision")
     ):
         fail("Promotion Decision is missing explicit authority/evidence")
-    if unit_asset.get("promotionRecordId") != promoted.get("recordId") or unit_asset.get("validationRecordId") != validated.get("recordId"):
+    if (
+        unit_asset.get("promotionRecordId") != promoted.get("recordId")
+        or unit_asset.get("promotionRecordDigest") != promoted.get("recordDigest")
+        or unit_asset.get("validationRecordId") != validated.get("recordId")
+        or unit_asset.get("validationRecordDigest") != validated.get("recordDigest")
+    ):
         fail("Package lock Promotion/Validation pin mismatch")
     selected_capabilities = [
         item for item in selection["selectedCapabilities"]
@@ -776,7 +808,12 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     if len(selected_capabilities) != 1:
         fail("selected Capability provider is missing or ambiguous")
     capability_lock = selected_capabilities[0]
-    if capability_lock.get("promotionRecordId") != promoted.get("recordId") or capability_lock.get("validationRecordId") != validated.get("recordId"):
+    if (
+        capability_lock.get("promotionRecordId") != promoted.get("recordId")
+        or capability_lock.get("promotionRecordDigest") != promoted.get("recordDigest")
+        or capability_lock.get("validationRecordId") != validated.get("recordId")
+        or capability_lock.get("validationRecordDigest") != validated.get("recordDigest")
+    ):
         fail("selected Capability Promotion/Validation pin mismatch")
     provided_contract = (unit.get("capabilities", {}).get("provides") or [{}])[0]
     if any(capability_lock.get(key) != provided_contract.get(key) for key in ("owner", "authorityRef", "version", "contractDigest")):
@@ -796,12 +833,19 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
                 fail(f"selected Knowledge pin mismatch: {asset.get('id')}")
             if (
                 asset.get("promotionRecordId") != promoted.get("recordId")
+                or asset.get("promotionRecordDigest") != promoted.get("recordDigest")
                 or asset.get("validationRecordId") != validated.get("recordId")
+                or asset.get("validationRecordDigest") != validated.get("recordDigest")
                 or resources.get(asset.get("path")) != asset.get("sha256")
             ):
                 fail(f"selected Knowledge is not pinned to promoted subject: {asset.get('id')}")
     for capability in selection["selectedCapabilities"]:
-        if capability.get("promotionRecordId") != promoted.get("recordId") or capability.get("validationRecordId") != validated.get("recordId"):
+        if (
+            capability.get("promotionRecordId") != promoted.get("recordId")
+            or capability.get("promotionRecordDigest") != promoted.get("recordDigest")
+            or capability.get("validationRecordId") != validated.get("recordId")
+            or capability.get("validationRecordDigest") != validated.get("recordDigest")
+        ):
             fail(f"selected Capability lifecycle pin mismatch: {capability.get('capabilityId')}")
     return True
 

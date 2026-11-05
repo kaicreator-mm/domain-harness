@@ -192,41 +192,65 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   const byId = new Map();
   for (const record of records) {
     if (!record.recordId || byId.has(record.recordId) || !['CANDIDATE', 'VALIDATED', 'PROMOTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'].includes(record.transition)) throw new DisExecutionError('INVALID_LIFECYCLE_RECORD', record.recordId || 'missing');
-    if (record.dependencyClosureDigest !== closureDigest || !record.subject?.id || !/^[a-f0-9]{64}$/.test(record.subject.sha256 || '')) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+    if (record.dependencyClosureDigest !== closureDigest || record.subject?.kind !== 'unit' || !record.subject?.id || !record.subject?.revision || !/^[a-f0-9]{64}$/.test(record.subject.sha256 || '')) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
     byId.set(record.recordId, record);
   }
   const unitAsset = selection.selectedAssets.find((asset) => asset.kind === 'unit' && asset.id === 'xdownload.player.recognizer');
   if (!unitAsset) throw new DisExecutionError('SELECTED_RECOGNIZER_ASSET_MISSING', packageIdentity.packageId);
   const unit = unitsById.get(unitAsset.id), unitPath = unitPaths.get(unitAsset.id);
-  if (selection.consumerProfile.id !== unit.implementation?.selectionPolicy?.consumerProfileId || selection.target !== unit.implementation?.selectionPolicy?.target) throw new DisExecutionError('PACKAGE_CONSUMER_PROFILE_OR_TARGET_MISMATCH', unit.id);
   if (!unit || unit.revision !== unitAsset.revision || resources.get(unitPath) !== unitAsset.sha256) throw new DisExecutionError('SELECTED_ASSET_DIGEST_MISMATCH', unitAsset.id);
+  if (selection.consumerProfile.id !== unit.implementation?.selectionPolicy?.consumerProfileId || selection.target !== unit.implementation?.selectionPolicy?.target) throw new DisExecutionError('PACKAGE_CONSUMER_PROFILE_OR_TARGET_MISMATCH', unit.id);
   const chain = records.filter((record) => record.subject.id === unit.id && record.subject.revision === unit.revision && record.subject.sha256 === unitAsset.sha256);
   const candidate = chain.find((record) => record.transition === 'CANDIDATE');
   const validated = chain.find((record) => record.transition === 'VALIDATED');
   const promoted = chain.find((record) => record.transition === 'PROMOTED');
-  if (!candidate || !validated || !promoted || validated.previousRecordId !== candidate.recordId || promoted.previousRecordId !== validated.recordId) throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', unit.id);
-  if (chain.some((record) => record.dependencyClosureDigest !== closureDigest)) throw new DisExecutionError('STALE_LIFECYCLE_DEPENDENCY_CLOSURE', unit.id);
+  if (!candidate || !validated || !promoted || chain.length !== 3 || candidate.previousRecordId != null ||
+      validated.previousRecordId !== candidate.recordId || validated.previousRecordDigest !== candidate.recordDigest ||
+      promoted.previousRecordId !== validated.recordId || promoted.previousRecordDigest !== validated.recordDigest) {
+    throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', unit.id);
+  }
+  if (!candidate.actor?.id || !candidate.actor?.role || !candidate.policy?.id || !candidate.policy?.revision ||
+      !validated.actor?.id || !validated.actor?.role) throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_POLICY', unit.id);
+  for (const evidence of candidate.evidenceRefs || []) if (resources.get(evidence.path) !== evidence.sha256) throw new DisExecutionError('CANDIDATE_EVIDENCE_DIGEST_MISMATCH', evidence.path);
   const validation = validated.validation;
-  if (!validation || validation.result !== 'PASS' || validation.subjectDigest !== unitAsset.sha256 || validation.dependencyClosureDigest !== closureDigest || !validation.profile?.id || !validation.profile?.revision || !validation.validator?.id || !validation.validator?.version || !validation.baseline?.sha256 || !Array.isArray(validation.evidenceRefs) || validation.evidenceRefs.length === 0 || !validation.coverage) throw new DisExecutionError('INVALID_LIFECYCLE_VALIDATION', validated.recordId);
+  if (!validation || validation.result !== 'PASS' || validation.subjectDigest !== unitAsset.sha256 || validation.dependencyClosureDigest !== closureDigest ||
+      !validation.profile?.id || !validation.profile?.revision || !validation.validator?.id || !validation.validator?.version ||
+      !validation.baseline?.id || !validation.baseline?.path || !validation.baseline?.sha256 ||
+      !Array.isArray(validation.evidenceRefs) || validation.evidenceRefs.length === 0 || !validation.coverage) {
+    throw new DisExecutionError('INVALID_LIFECYCLE_VALIDATION', validated.recordId);
+  }
+  if (resources.get(validation.baseline.path) !== validation.baseline.sha256 ||
+      !validation.evidenceRefs.some((evidence) => evidence.path === validation.baseline.path && evidence.sha256 === validation.baseline.sha256)) {
+    throw new DisExecutionError('VALIDATION_BASELINE_PIN_MISMATCH', validated.recordId);
+  }
   for (const key of ['positive', 'negative', 'boundary', 'heldOut']) if (!Number.isInteger(validation.coverage[key]) || validation.coverage[key] < 0) throw new DisExecutionError('INVALID_LIFECYCLE_COVERAGE', validated.recordId);
-  for (const evidence of validation.evidenceRefs || []) if (resources.get(evidence.path) !== evidence.sha256) throw new DisExecutionError('LIFECYCLE_EVIDENCE_DIGEST_MISMATCH', evidence.path);
+  for (const evidence of validation.evidenceRefs) if (resources.get(evidence.path) !== evidence.sha256) throw new DisExecutionError('LIFECYCLE_EVIDENCE_DIGEST_MISMATCH', evidence.path);
   const promotion = promoted.promotion;
-  if (!promotion || promotion.decision !== 'PROMOTE' || promotion.validationRecordId !== validated.recordId || !promoted.actor?.id || !promoted.actor?.authorityRef || !promotion.policy?.id || !promotion.policy?.revision) throw new DisExecutionError('UNAUTHORIZED_PROMOTION_RECORD', promoted.recordId);
-  if (unitAsset.promotionRecordId !== promoted.recordId || unitAsset.validationRecordId !== validated.recordId) throw new DisExecutionError('PACKAGE_PROMOTION_PIN_MISMATCH', unit.id);
-  if (chain.length !== 3 || !candidate.actor?.id || !candidate.actor?.role || !candidate.policy?.id || !validated.actor?.id || !validated.actor?.role) throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_DUPLICATE', unit.id);
+  if (!promotion || promotion.decision !== 'PROMOTE' || promotion.validationRecordId !== validated.recordId ||
+      promotion.validationRecordDigest !== validated.recordDigest || !promoted.actor?.id || !promoted.actor?.authorityRef ||
+      !promotion.policy?.id || !promotion.policy?.revision) throw new DisExecutionError('UNAUTHORIZED_PROMOTION_RECORD', promoted.recordId);
+  if (unitAsset.promotionRecordId !== promoted.recordId || unitAsset.promotionRecordDigest !== promoted.recordDigest ||
+      unitAsset.validationRecordId !== validated.recordId || unitAsset.validationRecordDigest !== validated.recordDigest) {
+    throw new DisExecutionError('PACKAGE_PROMOTION_PIN_MISMATCH', unit.id);
+  }
   const selectedCapabilities = selection.selectedCapabilities.filter((item) => item.capabilityId === unit.capabilities?.provides?.[0]?.capabilityId && item.provider?.unitId === unit.id);
   if (selectedCapabilities.length !== 1) throw new DisExecutionError('SELECTED_CAPABILITY_PROVIDER_MISSING_OR_AMBIGUOUS', unit.id);
   const selectedCapability = selectedCapabilities[0];
-  if (selectedCapability.promotionRecordId !== promoted.recordId || selectedCapability.validationRecordId !== validated.recordId) throw new DisExecutionError('SELECTED_CAPABILITY_LIFECYCLE_PIN_MISMATCH', unit.id);
+  if (selectedCapability.promotionRecordId !== promoted.recordId || selectedCapability.promotionRecordDigest !== promoted.recordDigest ||
+      selectedCapability.validationRecordId !== validated.recordId || selectedCapability.validationRecordDigest !== validated.recordDigest) {
+    throw new DisExecutionError('SELECTED_CAPABILITY_LIFECYCLE_PIN_MISMATCH', unit.id);
+  }
   const providedContract = unit.capabilities?.provides?.[0];
-  if (!providedContract || ['owner','authorityRef','version','contractDigest'].some((key) => selectedCapability[key] !== providedContract[key])) throw new DisExecutionError('SELECTED_CAPABILITY_CONTRACT_PIN_MISMATCH', unit.id);
+  if (!providedContract || ['owner', 'authorityRef', 'version', 'contractDigest'].some((key) => selectedCapability[key] !== providedContract[key])) throw new DisExecutionError('SELECTED_CAPABILITY_CONTRACT_PIN_MISMATCH', unit.id);
   resolveProviderSelection(unit, selection, selection.target, resources);
   const selectedRuleAssets = selection.selectedAssets.filter((asset) => asset.kind === 'rule');
   if (selectedRuleAssets.length !== 1) throw new DisExecutionError('SELECTED_KNOWLEDGE_ASSET_MISSING_OR_AMBIGUOUS', unit.id);
   for (const asset of selection.selectedAssets) {
     if (asset.kind === 'rule') {
       if (!unit.knowledgeRefs?.some((ref) => ref.id === asset.id && ref.revision === asset.revision && ref.path === asset.path && ref.sha256 === asset.sha256)) throw new DisExecutionError('SELECTED_KNOWLEDGE_PIN_MISMATCH', asset.id);
-      if (asset.promotionRecordId !== promoted.recordId || asset.validationRecordId !== validated.recordId || resources.get(asset.path) !== asset.sha256) throw new DisExecutionError('SELECTED_KNOWLEDGE_NOT_PROMOTED', asset.id);
+      if (asset.promotionRecordId !== promoted.recordId || asset.promotionRecordDigest !== promoted.recordDigest ||
+          asset.validationRecordId !== validated.recordId || asset.validationRecordDigest !== validated.recordDigest ||
+          resources.get(asset.path) !== asset.sha256) throw new DisExecutionError('SELECTED_KNOWLEDGE_NOT_PROMOTED', asset.id);
     }
   }
   return true;
