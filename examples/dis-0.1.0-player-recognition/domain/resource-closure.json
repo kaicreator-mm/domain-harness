@@ -140,7 +140,7 @@
     },
     {
       "path": "domain/units/decision.json",
-      "sha256": "94a292f9b5dcdd58b3dbf0c7a8c8a4c598a0c91aa002302d87804f52067dbe79",
+      "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5",
       "kind": "unit",
       "owners": [
         "xdownload.player.bounded-fallback",
@@ -150,7 +150,7 @@
     },
     {
       "path": "domain/units/fallback-procedure.json",
-      "sha256": "3aff623e9c4db7a9fb7ab16c235ba8ffd00512909aa666dead34054adde1c656",
+      "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c",
       "kind": "unit",
       "owners": [
         "xdownload.player.bounded-fallback"
@@ -159,7 +159,7 @@
     },
     {
       "path": "domain/units/recognizer.json",
-      "sha256": "7aca7be6daf851be47d28bc1b8631b895a7f710659a76ab64cfe49e5a7b87114",
+      "sha256": "e8ed2f27e9ff82344c2def510eefee7696f46af433d2c566c9bc4fdc90670513",
       "kind": "unit",
       "owners": [
         "xdownload.player-recognition.workflow",
@@ -171,7 +171,7 @@
     },
     {
       "path": "domain/units/resolve-procedure.json",
-      "sha256": "706360dd2e4f12c893e6dfb43441880aa42655887936d04f645d221cb78c68a2",
+      "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb",
       "kind": "unit",
       "owners": [
         "xdownload.player.resolve-procedure"
@@ -180,7 +180,7 @@
     },
     {
       "path": "domain/units/validator.json",
-      "sha256": "f821ce07a35c8a5ce0e8cab0b2f03614f880fdba04a48111bf51b76960b6d80a",
+      "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55",
       "kind": "unit",
       "owners": [
         "xdownload.player.outcome-validator"
@@ -189,7 +189,7 @@
     },
     {
       "path": "domain/units/workflow.json",
-      "sha256": "67b753d80a395b4c933a891306fa99d189848d974e89dd2c08bfc0fcde581302",
+      "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5",
       "kind": "unit",
       "owners": [
         "xdownload.player-recognition.workflow"
@@ -227,7 +227,7 @@
     },
     {
       "path": "scripts/validate.py",
-      "sha256": "db351e65b1d8087d4a198a7dc1f87c8a9e1cb96556f1d21faeb0a1aa2d695251",
+      "sha256": "b6a4f5d589226533951eb3ef8150e82e445215d98d8d0a0e06e12f5e93b4e9a7",
       "kind": "conformance",
       "owners": [
         "xdownload.web-media"
@@ -254,7 +254,7 @@
     },
     {
       "path": "src/runner.mjs",
-      "sha256": "9e85d310baa129d1b2c5b4a4d059cc9785022bc5d6be6e9fb923489eb08180bd",
+      "sha256": "384fdd8f06b1d967db55442817c17554c00024f9594a4976d2d51ad0ac58927d",
       "kind": "implementation",
       "owners": [
         "xdownload.player.bounded-fallback",
@@ -277,7 +277,7 @@
     },
     {
       "path": "test/runner.test.mjs",
-      "sha256": "8ef1396c561fe5b9016b3ffe1f16dc7cc925ef7f34210db47e169bbad017abfd",
+      "sha256": "5606fac7b5a0f706d6ea2f74e8a775d9597a44f43ea01faa099cb116bad695a8",
       "kind": "conformance",
       "owners": [
         "xdownload.player-recognition.workflow",

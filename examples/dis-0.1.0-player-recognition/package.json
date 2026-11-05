@@ -12,7 +12,7 @@
     "revision": "1.0.0",
     "standardVersion": "0.1.0",
     "resourceClosurePath": "domain/resource-closure.json",
-    "resourceClosureSha256": "0aea563079323087aff8b12f9c3cfbd962c7d9c7c2e96edb340436818f06f033",
+    "resourceClosureSha256": "ea26a21ce7cdd38b96ae83ed77d777a2844fcf8a9e4bcb2c940a6e42c4fbe06d",
     "conformanceResources": [
       "src/verified-loader.mjs",
       "src/emit-conformance-traces.mjs",
@@ -20,6 +20,198 @@
       "scripts/validate.py",
       "test/runner.test.mjs",
       "requirements-validation.txt"
-    ]
+    ],
+    "lifecycleRecords": [
+      {
+        "recordId": "xdownload.player.recognizer.candidate.1",
+        "transition": "CANDIDATE",
+        "subject": {
+          "kind": "unit",
+          "id": "xdownload.player.recognizer",
+          "revision": "1.0.0",
+          "sha256": "e8ed2f27e9ff82344c2def510eefee7696f46af433d2c566c9bc4fdc90670513"
+        },
+        "dependencyClosureDigest": "ea26a21ce7cdd38b96ae83ed77d777a2844fcf8a9e4bcb2c940a6e42c4fbe06d",
+        "previousRecordId": null,
+        "previousRecordDigest": null,
+        "actor": {
+          "id": "xdownload-domain-forge-reference",
+          "role": "candidate-producer",
+          "authorityRef": "xdownload-demo/domain-authority@1.0.0"
+        },
+        "policy": {
+          "id": "xdownload-demo/candidate-policy",
+          "revision": "1.0.0"
+        },
+        "evidenceRefs": [
+          {
+            "path": "fixtures/player-signatures.json",
+            "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+          }
+        ],
+        "recordedAt": "2026-11-06T00:00:00Z",
+        "scope": "REFERENCE_DEMO_ONLY",
+        "recordDigest": "753cd4cfbe65d82ff7f08e8d9160a36da91c8db0e2cd221812fe2cb688d6998a"
+      },
+      {
+        "recordId": "xdownload.player.recognizer.validation.1",
+        "transition": "VALIDATED",
+        "subject": {
+          "kind": "unit",
+          "id": "xdownload.player.recognizer",
+          "revision": "1.0.0",
+          "sha256": "e8ed2f27e9ff82344c2def510eefee7696f46af433d2c566c9bc4fdc90670513"
+        },
+        "dependencyClosureDigest": "ea26a21ce7cdd38b96ae83ed77d777a2844fcf8a9e4bcb2c940a6e42c4fbe06d",
+        "previousRecordId": "xdownload.player.recognizer.candidate.1",
+        "previousRecordDigest": "753cd4cfbe65d82ff7f08e8d9160a36da91c8db0e2cd221812fe2cb688d6998a",
+        "actor": {
+          "id": "xdownload-dis-independent-conformance",
+          "role": "validator"
+        },
+        "policy": {
+          "id": "xdownload-demo/validation-profile",
+          "revision": "0.1.0"
+        },
+        "validation": {
+          "result": "PASS",
+          "subjectDigest": "e8ed2f27e9ff82344c2def510eefee7696f46af433d2c566c9bc4fdc90670513",
+          "dependencyClosureDigest": "ea26a21ce7cdd38b96ae83ed77d777a2844fcf8a9e4bcb2c940a6e42c4fbe06d",
+          "profile": {
+            "id": "xdownload.player-recognition.reference-validation",
+            "revision": "0.1.0"
+          },
+          "validator": {
+            "id": "xdownload-dis-independent-conformance",
+            "version": "0.1.0"
+          },
+          "baseline": {
+            "id": "xdownload.player-signatures",
+            "path": "fixtures/player-signatures.json",
+            "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+          },
+          "coverage": {
+            "positive": 4,
+            "negative": 7,
+            "boundary": 2,
+            "heldOut": 0
+          },
+          "evidenceRefs": [
+            {
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            {
+              "path": "src/runner.mjs",
+              "sha256": "384fdd8f06b1d967db55442817c17554c00024f9594a4976d2d51ad0ac58927d"
+            },
+            {
+              "path": "scripts/validate.py",
+              "sha256": "b6a4f5d589226533951eb3ef8150e82e445215d98d8d0a0e06e12f5e93b4e9a7"
+            },
+            {
+              "path": "test/runner.test.mjs",
+              "sha256": "5606fac7b5a0f706d6ea2f74e8a775d9597a44f43ea01faa099cb116bad695a8"
+            }
+          ],
+          "limitations": [
+            "REFERENCE_DEMO_ONLY",
+            "not production governance evidence"
+          ]
+        },
+        "recordedAt": "2026-11-06T00:00:00Z",
+        "scope": "REFERENCE_DEMO_ONLY",
+        "recordDigest": "1413aae88ee93b5bb66a37be99cb08891f02672a7c1fd58290c0f47df3357870"
+      },
+      {
+        "recordId": "xdownload.player.recognizer.promotion.1",
+        "transition": "PROMOTED",
+        "subject": {
+          "kind": "unit",
+          "id": "xdownload.player.recognizer",
+          "revision": "1.0.0",
+          "sha256": "e8ed2f27e9ff82344c2def510eefee7696f46af433d2c566c9bc4fdc90670513"
+        },
+        "dependencyClosureDigest": "ea26a21ce7cdd38b96ae83ed77d777a2844fcf8a9e4bcb2c940a6e42c4fbe06d",
+        "previousRecordId": "xdownload.player.recognizer.validation.1",
+        "previousRecordDigest": "1413aae88ee93b5bb66a37be99cb08891f02672a7c1fd58290c0f47df3357870",
+        "actor": {
+          "id": "xdownload-demo-governance",
+          "role": "promotion-authority",
+          "authorityRef": "xdownload-demo/domain-authority@1.0.0"
+        },
+        "promotion": {
+          "decision": "PROMOTE",
+          "validationRecordId": "xdownload.player.recognizer.validation.1",
+          "validationRecordDigest": "1413aae88ee93b5bb66a37be99cb08891f02672a7c1fd58290c0f47df3357870",
+          "policy": {
+            "id": "xdownload-demo/promotion-policy",
+            "revision": "1.0.0"
+          },
+          "scope": "REFERENCE_DEMO_ONLY",
+          "rationale": "Promote this exact reference recognizer and its pinned rule dependency for the isolated conformance demo only."
+        },
+        "recordedAt": "2026-11-06T00:00:00Z",
+        "scope": "REFERENCE_DEMO_ONLY",
+        "recordDigest": "079ec832bfa3b6489e897b42c1eadfa3bac9fbedbfd4bdba52ee8f8296c8149e"
+      }
+    ],
+    "selectionLock": {
+      "lockId": "xdownload.player-recognition.selection/1.0.0",
+      "packageId": "xdownload.web-media",
+      "packageRevision": "1.0.0",
+      "standardVersion": "0.1.0",
+      "consumerProfile": {
+        "id": "xdownload.player-recognition/1.0.0",
+        "revision": "1.0.0"
+      },
+      "target": "node24",
+      "selectedAssets": [
+        {
+          "kind": "unit",
+          "id": "xdownload.player.recognizer",
+          "revision": "1.0.0",
+          "sha256": "e8ed2f27e9ff82344c2def510eefee7696f46af433d2c566c9bc4fdc90670513",
+          "promotionRecordId": "xdownload.player.recognizer.promotion.1",
+          "promotionRecordDigest": "079ec832bfa3b6489e897b42c1eadfa3bac9fbedbfd4bdba52ee8f8296c8149e",
+          "validationRecordId": "xdownload.player.recognizer.validation.1",
+          "validationRecordDigest": "1413aae88ee93b5bb66a37be99cb08891f02672a7c1fd58290c0f47df3357870"
+        },
+        {
+          "kind": "rule",
+          "id": "xdownload.player-signatures",
+          "revision": "1.0.0",
+          "path": "fixtures/player-signatures.json",
+          "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
+          "promotionRecordId": "xdownload.player.recognizer.promotion.1",
+          "promotionRecordDigest": "079ec832bfa3b6489e897b42c1eadfa3bac9fbedbfd4bdba52ee8f8296c8149e",
+          "validationRecordId": "xdownload.player.recognizer.validation.1",
+          "validationRecordDigest": "1413aae88ee93b5bb66a37be99cb08891f02672a7c1fd58290c0f47df3357870"
+        }
+      ],
+      "selectedCapabilities": [
+        {
+          "capabilityId": "xdownload.player.recognition",
+          "owner": "xdownload-demo",
+          "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+          "version": "1.0.0",
+          "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7",
+          "provider": {
+            "unitId": "xdownload.player.recognizer",
+            "unitRevision": "1.0.0",
+            "candidateId": "signature-exact-v1",
+            "implementationRef": "registry:xdownload.player.recognizer@1.0.0",
+            "artifactRef": "src/runner.mjs",
+            "artifactDigest": "384fdd8f06b1d967db55442817c17554c00024f9594a4976d2d51ad0ac58927d",
+            "target": "node24",
+            "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
+          },
+          "promotionRecordId": "xdownload.player.recognizer.promotion.1",
+          "promotionRecordDigest": "079ec832bfa3b6489e897b42c1eadfa3bac9fbedbfd4bdba52ee8f8296c8149e",
+          "validationRecordId": "xdownload.player.recognizer.validation.1",
+          "validationRecordDigest": "1413aae88ee93b5bb66a37be99cb08891f02672a7c1fd58290c0f47df3357870"
+        }
+      ]
+    }
   }
 }
