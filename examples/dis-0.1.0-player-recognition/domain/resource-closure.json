@@ -277,7 +277,7 @@
     },
     {
       "path": "test/runner.test.mjs",
-      "sha256": "5b7bece5f4330280deccb8ebe6d910e2bc2dc9a7cc5d880d4b21d92d0ee21f75",
+      "sha256": "f50dc8b336bd4b587317a689017b59fe80f80eebbecf0a4628855a2e913b4c7e",
       "kind": "conformance",
       "owners": [
         "xdownload.player-recognition.workflow",
