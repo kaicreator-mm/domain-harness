@@ -60,38 +60,149 @@ export function validateUnit(unit) {
   if (unit.schemaVersion !== 'dis.unit/0.1.0') throw new DisExecutionError('UNSUPPORTED_UNIT_SCHEMA', unit.schemaVersion);
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(unit.revision)) throw new DisExecutionError('INVALID_REVISION', unit.revision);
   if (!['knowledge', 'recognizer', 'decision', 'procedure', 'tool', 'workflow', 'validator'].includes(unit.role)) throw new DisExecutionError('INVALID_ROLE', unit.role);
-  if (unit.qualification?.stage === 'EXECUTED') throw new DisExecutionError('EXECUTED_IS_NOT_QUALIFICATION_STAGE', unit.id);
   if (!unit.scope?.domain || !Array.isArray(unit.scope.appliesTo) || !Array.isArray(unit.scope.excludes)) throw new DisExecutionError('INVALID_SCOPE', unit.id);
   if (!['FROZEN', 'CONTROLLED', 'REFERENCE', 'EXAMPLE', 'DERIVED'].includes(unit.authority)) throw new DisExecutionError('INVALID_AUTHORITY', unit.id);
+  if (!unit.qualification || typeof unit.qualification.profile !== 'string' || 'stage' in unit.qualification) throw new DisExecutionError('MUTABLE_QUALIFICATION_STAGE_FORBIDDEN', unit.id);
+  if ('supported' in (unit.failure || {}) || !unit.failure?.handling || typeof unit.failure.handling !== 'object' || Array.isArray(unit.failure.handling)) throw new DisExecutionError('INVALID_FAILURE_PROFILE', unit.id);
+  const failureStatuses = new Set(['UNKNOWN', 'AMBIGUOUS', 'CONFLICT', 'OUT_OF_SCOPE', 'INVALID_INPUT', 'PARTIAL', 'FAILED', 'NEEDS_INPUT', 'NEEDS_REVIEW']);
+  const handlingActions = new Set(['REJECT', 'PRESERVE_UNKNOWN', 'CLARIFY', 'WAIT', 'REVIEW', 'BOUNDED_FALLBACK', 'BOUNDED_RETRY', 'ESCALATE', 'RETURN_PARTIAL', 'FAIL']);
+  for (const [status, policy] of Object.entries(unit.failure.handling)) {
+    if (!failureStatuses.has(status) || !policy || typeof policy !== 'object' || !handlingActions.has(policy.action)) throw new DisExecutionError('INVALID_FAILURE_HANDLING_POLICY', unit.id + ':' + status);
+    if (policy.action === 'BOUNDED_RETRY' && (!Number.isInteger(policy.retryLimit) || policy.retryLimit < 0 || policy.retryLimit > 3)) throw new DisExecutionError('INVALID_FAILURE_RETRY_LIMIT', unit.id + ':' + status);
+  }
   if (!Array.isArray(unit.evidence?.sources) || !('absenceReason' in unit.evidence)) throw new DisExecutionError('INVALID_EVIDENCE', unit.id);
   for (const source of unit.evidence.sources) {
-    if (!source || typeof source.ref !== 'string' ||
-        (!isSafePackageRelativeRef(source.ref) && !isExternalProvenanceRef(source.ref))) {
-      throw new DisExecutionError('UNSAFE_PROVENANCE_REF', unit.id);
-    }
+    if (!source || typeof source.ref !== 'string' || (!isSafePackageRelativeRef(source.ref) && !isExternalProvenanceRef(source.ref))) throw new DisExecutionError('UNSAFE_PROVENANCE_REF', unit.id);
   }
+  if (!unit.validation || typeof unit.validation.profile !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(unit.validation.profileRevision || '') || !unit.validation.validator?.id || !unit.validation.validator?.version || 'lastResult' in unit.validation) throw new DisExecutionError('INVALID_VALIDATION_REQUIREMENT', unit.id);
   const executable = ['recognizer', 'decision', 'procedure', 'tool', 'workflow', 'validator'].includes(unit.role);
   if (executable) {
-    if (!isSafePackageRelativeRef(unit.input?.schemaRef) || !isSafePackageRelativeRef(unit.output?.schemaRef) || !unit.implementation?.strategy || !unit.implementation?.ref) {
-      throw new DisExecutionError('MISSING_EXECUTABLE_CONTRACT', unit.id);
-    }
+    if (!isSafePackageRelativeRef(unit.input?.schemaRef) || !isSafePackageRelativeRef(unit.output?.schemaRef) || !unit.implementation?.strategy || !unit.implementation?.ref) throw new DisExecutionError('MISSING_EXECUTABLE_CONTRACT', unit.id);
     if (unit.role === 'workflow') {
-      if (unit.implementation.strategy !== 'workflow-graph' || !unit.implementation.ref.startsWith('graph:') || !isSafePackageRelativeRef(unit.implementation.artifactRef)) {
-        throw new DisExecutionError('INVALID_WORKFLOW_BINDING', unit.id);
-      }
+      if (unit.implementation.strategy !== 'workflow-graph' || !unit.implementation.ref.startsWith('graph:') || !isSafePackageRelativeRef(unit.implementation.artifactRef)) throw new DisExecutionError('INVALID_WORKFLOW_BINDING', unit.id);
     } else if (unit.role === 'tool') {
-      if (unit.implementation.exposure !== 'tool' || unit.implementation.strategy !== 'tool-operation' || !unit.implementation.ref.startsWith('tool:')) {
-        throw new DisExecutionError('INVALID_TOOL_EXPOSURE', unit.id);
-      }
-    } else {
-      if (unit.implementation.exposure === 'tool' || unit.implementation.ref !== 'registry:' + unit.id + '@' + unit.revision || !isSafePackageRelativeRef(unit.implementation.artifactRef)) {
-        throw new DisExecutionError('UNTRUSTED_IMPLEMENTATION_BINDING', unit.id);
-      }
+      if (unit.implementation.exposure !== 'tool' || unit.implementation.strategy !== 'tool-operation' || !unit.implementation.ref.startsWith('tool:')) throw new DisExecutionError('INVALID_TOOL_EXPOSURE', unit.id);
+    } else if (unit.implementation.exposure === 'tool' || !isSafePackageRelativeRef(unit.implementation.artifactRef)) {
+      throw new DisExecutionError('UNTRUSTED_IMPLEMENTATION_BINDING', unit.id);
     }
   }
   if (unit.role === 'procedure' && unit.implementation.exposure !== 'private') throw new DisExecutionError('PRIVATE_PROCEDURE_EXPOSURE_REQUIRED', unit.id);
-  if (unit.evidence.consumes !== undefined && (!Array.isArray(unit.evidence.consumes) || new Set(unit.evidence.consumes).size !== unit.evidence.consumes.length)) {
-    throw new DisExecutionError('INVALID_EVIDENCE_SLOTS', unit.id);
+  if (unit.implementation?.candidates !== undefined) {
+    const candidates = unit.implementation.candidates;
+    if (!Array.isArray(candidates) || candidates.length < 1 || unit.implementation.selectionPolicy?.mode !== 'PACKAGE_LOCK_EXACT') throw new DisExecutionError('INVALID_IMPLEMENTATION_CANDIDATES', unit.id);
+    const ids = candidates.map((candidate) => candidate.candidateId);
+    if (new Set(ids).size !== ids.length) throw new DisExecutionError('DUPLICATE_IMPLEMENTATION_CANDIDATE', unit.id);
+    for (const candidate of candidates) {
+      if (!candidate.candidateId || !candidate.ref || !isSafePackageRelativeRef(candidate.artifactRef) || !/^[a-f0-9]{64}$/.test(candidate.artifactDigest || '') || !candidate.target || !/^[a-f0-9]{64}$/.test(candidate.contractDigest || '')) throw new DisExecutionError('INVALID_IMPLEMENTATION_CANDIDATE', unit.id);
+    }
+  }
+  if (unit.preconditions) {
+    if (unit.preconditions.inputSchemaRef !== unit.input?.schemaRef || !Array.isArray(unit.preconditions.all) || unit.preconditions.all.length === 0) throw new DisExecutionError('INVALID_PRECONDITIONS_PROFILE', unit.id);
+    for (const condition of unit.preconditions.all) {
+      if (!['exists', 'equals', 'notEquals'].includes(condition.operator) || typeof condition.path !== 'string' || (condition.operator === 'exists' && Object.hasOwn(condition, 'value')) || (condition.operator !== 'exists' && !Object.hasOwn(condition, 'value'))) throw new DisExecutionError('INVALID_PRECONDITION', unit.id);
+      if (condition.path !== '' && !/^\/[A-Za-z0-9_~-]+$/.test(condition.path)) throw new DisExecutionError('INVALID_PRECONDITION_POINTER', unit.id);
+    }
+  }
+  if (unit.knowledgeRefs !== undefined) {
+    if (!Array.isArray(unit.knowledgeRefs)) throw new DisExecutionError('INVALID_KNOWLEDGE_REFS', unit.id);
+    for (const ref of unit.knowledgeRefs) {
+      if (!ref.id || !ref.revision || !ref.kind || !isSafePackageRelativeRef(ref.path) || !/^[a-f0-9]{64}$/.test(ref.sha256 || '')) throw new DisExecutionError('INVALID_KNOWLEDGE_REF', unit.id);
+    }
+  }
+  if (unit.evidence.consumes !== undefined && (!Array.isArray(unit.evidence.consumes) || new Set(unit.evidence.consumes).size !== unit.evidence.consumes.length)) throw new DisExecutionError('INVALID_EVIDENCE_SLOTS', unit.id);
+  return true;
+}
+
+export function validatePreconditions(unit, input) {
+  for (const condition of unit.preconditions?.all || []) {
+    const actual = pointerGet(input, condition.path);
+    const matches = condition.operator === 'exists'
+      ? actual !== MISSING
+      : condition.operator === 'equals'
+        ? actual !== MISSING && jsonValueEqual(actual, condition.value)
+        : actual === MISSING || !jsonValueEqual(actual, condition.value);
+    if (!matches) throw new DisExecutionError('PRECONDITION_FAILED', unit.id + ':' + condition.path);
+  }
+  return true;
+}
+
+export function validateCapabilityContracts(unitsById) {
+  const providers = [];
+  for (const unit of unitsById.values()) {
+    for (const contract of unit.capabilities?.provides || []) providers.push({ unit, contract });
+  }
+  for (const unit of unitsById.values()) {
+    for (const requirement of unit.capabilities?.requires || []) {
+      const candidates = providers.filter(({ contract }) => contract.capabilityId === requirement.capabilityId);
+      if (candidates.length === 0) throw new DisExecutionError('MISSING_CAPABILITY_PROVIDER', requirement.capabilityId);
+      if (candidates.length !== 1) throw new DisExecutionError('AMBIGUOUS_CAPABILITY_PROVIDER', requirement.capabilityId);
+      const provider = candidates[0].contract;
+      const sameIdentity = provider.owner === requirement.owner && provider.authorityRef === requirement.authorityRef &&
+        provider.inputSchemaRef === requirement.inputSchemaRef && provider.inputSchemaDigest === requirement.inputSchemaDigest &&
+        provider.outputSchemaRef === requirement.outputSchemaRef && provider.outputSchemaDigest === requirement.outputSchemaDigest;
+      const accepted = requirement.compatibility?.accepted || [];
+      const exactAccepted = accepted.some((item) => item.version === provider.version && item.contractDigest === provider.contractDigest);
+      const compatible = requirement.compatibility?.policy === 'EXACT'
+        ? provider.version === requirement.version && provider.contractDigest === requirement.contractDigest && exactAccepted
+        : requirement.compatibility?.policy === 'EXPLICIT_ALLOWLIST' && exactAccepted;
+      if (!sameIdentity || !compatible) throw new DisExecutionError('INCOMPATIBLE_CAPABILITY_PROVIDER', requirement.capabilityId);
+    }
+  }
+  return true;
+}
+
+export function resolveProviderSelection(unit, selectionLock, target, resources) {
+  const matches = (selectionLock?.selectedCapabilities || []).filter((item) => item.capabilityId === unit.capabilities?.provides?.[0]?.capabilityId && item.provider?.unitId === unit.id);
+  if (matches.length === 0) throw new DisExecutionError('MISSING_PACKAGE_PROVIDER_SELECTION', unit.id);
+  if (matches.length !== 1) throw new DisExecutionError('AMBIGUOUS_PACKAGE_PROVIDER_SELECTION', unit.id);
+  const lock = matches[0], provider = lock.provider;
+  const candidates = unit.implementation?.candidates || [];
+  const found = candidates.filter((candidate) => candidate.candidateId === provider.candidateId);
+  if (found.length === 0) throw new DisExecutionError('MISSING_IMPLEMENTATION_PROVIDER', provider.candidateId);
+  if (found.length !== 1) throw new DisExecutionError('AMBIGUOUS_IMPLEMENTATION_PROVIDER', provider.candidateId);
+  const candidate = found[0];
+  if (provider.target !== target || candidate.target !== target || provider.target !== candidate.target) throw new DisExecutionError('INCOMPATIBLE_PROVIDER_TARGET', provider.candidateId);
+  if (candidate.contractDigest !== lock.contractDigest || provider.contractDigest !== candidate.contractDigest) throw new DisExecutionError('INCOMPATIBLE_PROVIDER_CONTRACT', provider.candidateId);
+  if (provider.unitRevision !== unit.revision || provider.implementationRef !== candidate.ref || provider.artifactRef !== candidate.artifactRef || provider.artifactDigest !== candidate.artifactDigest) throw new DisExecutionError('PACKAGE_PROVIDER_PIN_MISMATCH', provider.candidateId);
+  if (unit.implementation.ref !== candidate.ref || unit.implementation.artifactRef !== candidate.artifactRef || unit.implementation.strategy !== candidate.strategy || unit.implementation.exposure !== candidate.exposure) throw new DisExecutionError('UNIT_PROVIDER_BINDING_MISMATCH', provider.candidateId);
+  if (resources.get(candidate.artifactRef) !== candidate.artifactDigest) throw new DisExecutionError('PROVIDER_ARTIFACT_DIGEST_MISMATCH', candidate.artifactRef);
+  return { candidate, lock };
+}
+
+export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, resources, closureDigest) {
+  const records = packageIdentity.lifecycleRecords;
+  const selection = packageIdentity.selectionLock;
+  if (!Array.isArray(records) || records.length < 3 || !selection) throw new DisExecutionError('MISSING_LIFECYCLE_OR_SELECTION_LOCK', packageIdentity.packageId);
+  if (selection.packageId !== packageIdentity.packageId || selection.packageRevision !== packageIdentity.revision || selection.standardVersion !== packageIdentity.standardVersion) throw new DisExecutionError('SELECTION_PACKAGE_IDENTITY_MISMATCH', packageIdentity.packageId);
+  if (!selection.consumerProfile?.id || !selection.consumerProfile?.revision || !selection.target || !Array.isArray(selection.selectedAssets) || !Array.isArray(selection.selectedCapabilities)) throw new DisExecutionError('INVALID_PACKAGE_SELECTION_LOCK', packageIdentity.packageId);
+  const byId = new Map();
+  for (const record of records) {
+    if (!record.recordId || byId.has(record.recordId) || !['CANDIDATE', 'VALIDATED', 'PROMOTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'].includes(record.transition)) throw new DisExecutionError('INVALID_LIFECYCLE_RECORD', record.recordId || 'missing');
+    if (record.dependencyClosureDigest !== closureDigest || !record.subject?.id || !/^[a-f0-9]{64}$/.test(record.subject.sha256 || '')) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+    byId.set(record.recordId, record);
+  }
+  const unitAsset = selection.selectedAssets.find((asset) => asset.kind === 'unit' && asset.id === 'xdownload.player.recognizer');
+  if (!unitAsset) throw new DisExecutionError('SELECTED_RECOGNIZER_ASSET_MISSING', packageIdentity.packageId);
+  const unit = unitsById.get(unitAsset.id), unitPath = unitPaths.get(unitAsset.id);
+  if (!unit || unit.revision !== unitAsset.revision || resources.get(unitPath) !== unitAsset.sha256) throw new DisExecutionError('SELECTED_ASSET_DIGEST_MISMATCH', unitAsset.id);
+  const chain = records.filter((record) => record.subject.id === unit.id && record.subject.revision === unit.revision && record.subject.sha256 === unitAsset.sha256);
+  const candidate = chain.find((record) => record.transition === 'CANDIDATE');
+  const validated = chain.find((record) => record.transition === 'VALIDATED');
+  const promoted = chain.find((record) => record.transition === 'PROMOTED');
+  if (!candidate || !validated || !promoted || validated.previousRecordId !== candidate.recordId || promoted.previousRecordId !== validated.recordId) throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', unit.id);
+  if (chain.some((record) => record.dependencyClosureDigest !== closureDigest)) throw new DisExecutionError('STALE_LIFECYCLE_DEPENDENCY_CLOSURE', unit.id);
+  const validation = validated.validation;
+  if (!validation || validation.result !== 'PASS' || validation.subjectDigest !== unitAsset.sha256 || validation.dependencyClosureDigest !== closureDigest || !validation.profile?.id || !validation.profile?.revision || !validation.validator?.id || !validation.validator?.version || !validation.baseline?.sha256 || !validation.coverage) throw new DisExecutionError('INVALID_LIFECYCLE_VALIDATION', validated.recordId);
+  for (const key of ['positive', 'negative', 'boundary', 'heldOut']) if (!Number.isInteger(validation.coverage[key]) || validation.coverage[key] < 0) throw new DisExecutionError('INVALID_LIFECYCLE_COVERAGE', validated.recordId);
+  for (const evidence of validation.evidenceRefs || []) if (resources.get(evidence.path) !== evidence.sha256) throw new DisExecutionError('LIFECYCLE_EVIDENCE_DIGEST_MISMATCH', evidence.path);
+  const promotion = promoted.promotion;
+  if (!promotion || promotion.decision !== 'PROMOTE' || promotion.validationRecordId !== validated.recordId || !promoted.actor?.id || !promoted.actor?.authorityRef || !promotion.policy?.id || !promotion.policy?.revision) throw new DisExecutionError('UNAUTHORIZED_PROMOTION_RECORD', promoted.recordId);
+  if (unitAsset.promotionRecordId !== promoted.recordId || unitAsset.validationRecordId !== validated.recordId) throw new DisExecutionError('PACKAGE_PROMOTION_PIN_MISMATCH', unit.id);
+  for (const asset of selection.selectedAssets) {
+    if (asset.kind === 'rule') {
+      if (!unit.knowledgeRefs?.some((ref) => ref.id === asset.id && ref.revision === asset.revision && ref.path === asset.path && ref.sha256 === asset.sha256)) throw new DisExecutionError('SELECTED_KNOWLEDGE_PIN_MISMATCH', asset.id);
+      if (asset.promotionRecordId !== promoted.recordId || asset.validationRecordId !== validated.recordId || resources.get(asset.path) !== asset.sha256) throw new DisExecutionError('SELECTED_KNOWLEDGE_NOT_PROMOTED', asset.id);
+    }
   }
   return true;
 }
@@ -444,16 +555,17 @@ export function validateDefinition(definition, unitsById, graph, graphPath) {
   return true;
 }
 
-export function recognizePlayer(input, context) {
+function recognizePlayerWithMode(input, context, normalize) {
   if (!input || typeof input.url !== 'string' || !/^https?:\/\//.test(input.url) || !Array.isArray(input.signals) || input.signals.some((item) => typeof item !== 'string')) {
     throw new DisExecutionError('INVALID_INPUT', 'PageObservation requires an http(s) url and string signals[]');
   }
-  const patterns = context?.catalogs?.signatures?.patterns;
-  if (!Array.isArray(patterns)) throw new DisExecutionError('MISSING_SIGNATURE_CATALOG', 'player-signatures catalog is required');
-  const haystack = (input.url + '\n' + input.signals.join('\n')).toLowerCase();
+  const patterns = context?.knowledge?.['xdownload.player-signature-rules']?.patterns || context?.catalogs?.signatures?.patterns;
+  if (!Array.isArray(patterns)) throw new DisExecutionError('MISSING_SIGNATURE_CATALOG', 'player-signatures knowledgeRef is required');
+  const rawHaystack = input.url + '\n' + input.signals.join('\n');
+  const haystack = normalize ? rawHaystack.toLowerCase() : rawHaystack;
   const matches = patterns.flatMap((pattern) => {
     if (typeof pattern.playerId !== 'string' || !Array.isArray(pattern.markers)) throw new DisExecutionError('INVALID_SIGNATURE_CATALOG', 'each pattern needs playerId and markers[]');
-    const marker = pattern.markers.find((candidate) => haystack.includes(candidate.toLowerCase()));
+    const marker = pattern.markers.find((candidate) => haystack.includes(normalize ? candidate.toLowerCase() : candidate));
     return marker ? [{ playerId: pattern.playerId, marker }] : [];
   });
   const candidates = [...new Set(matches.map((match) => match.playerId))];
@@ -477,6 +589,14 @@ export function recognizePlayer(input, context) {
       reason: status === 'recognized' ? 'one supported deterministic signature matched' : status === 'ambiguous' ? 'multiple supported player identities matched' : 'no supported player signature matched',
     },
   };
+}
+
+export function recognizePlayer(input, context) {
+  return recognizePlayerWithMode(input, context, false);
+}
+
+export function recognizePlayerNormalized(input, context) {
+  return recognizePlayerWithMode(input, context, true);
 }
 
 export function routeRecognition(input) {
@@ -515,6 +635,7 @@ export function validateOutcome(input, context) {
 
 export const handlers = {
   'registry:xdownload.player.recognizer@1.0.0': recognizePlayer,
+  'registry:xdownload.player.recognizer-normalized@1.0.0': recognizePlayerNormalized,
   'registry:xdownload.player.route-decision@1.0.0': routeRecognition,
   'registry:xdownload.player.resolve-procedure@1.0.0': resolvePlayer,
   'registry:xdownload.player.bounded-fallback@1.0.0': boundedFallback,
@@ -562,6 +683,8 @@ export async function loadDemo() {
   });
   const unitsById = new Map(units.map((unit) => [unit.id, unit]));
   if (unitsById.size !== units.length) throw new DisExecutionError('DUPLICATE_UNIT_ID', 'Unit IDs must be unique');
+  validateCapabilityContracts(unitsById);
+  const unitPaths = new Map(manifest.units.map((item) => [item.id, item.path]));
 
   const graphResource = resourceEntries.get(manifest.graphRef.path);
   const definitionResource = resourceEntries.get(manifest.definitionRef.path);
@@ -621,6 +744,7 @@ export async function loadDemo() {
       expectResource(sourcePath, sourceKind, unit.id);
     }
     if (unit.validation?.casesRef) expectResource(unit.validation.casesRef, 'conformance', unit.id);
+    for (const ref of unit.knowledgeRefs || []) expectResource(ref.path, 'fixture', unit.id);
   }
   if (!Array.isArray(packageIdentity.conformanceResources)) throw new DisExecutionError('MISSING_CONFORMANCE_RESOURCE_DECLARATIONS', packageIdentity.packageId);
   for (const resourcePath of packageIdentity.conformanceResources) expectResource(resourcePath, 'conformance', packageIdentity.packageId);
@@ -637,13 +761,32 @@ export async function loadDemo() {
   for (const entry of manifest.resources) {
     if (entry.required && !expectedResources.has(entry.path)) throw new DisExecutionError('RESOURCE_CLOSURE_HAS_UNREFERENCED_REQUIRED_RESOURCE', entry.path);
   }
+  const knowledge = {};
+  for (const unit of units) {
+    for (const ref of unit.knowledgeRefs || []) {
+      const resource = resourceEntries.get(ref.path);
+      if (!resource || resource.kind !== 'fixture' || resource.sha256 !== ref.sha256) throw new DisExecutionError('KNOWLEDGE_RESOURCE_PIN_MISMATCH', ref.path);
+      const value = JSON.parse(resourceContents.get(ref.path));
+      if (value.catalogId !== ref.id || value.revision !== ref.revision) throw new DisExecutionError('KNOWLEDGE_RESOURCE_IDENTITY_MISMATCH', ref.id);
+      knowledge[ref.id] = value;
+    }
+  }
+  validateLifecycleRecords(packageIdentity, unitsById, unitPaths, resources, manifestDigest);
+  const selectedProviders = new Map();
+  for (const unit of units) {
+    if (unit.capabilities?.provides?.length) {
+      const selected = resolveProviderSelection(unit, packageIdentity.selectionLock, packageIdentity.selectionLock.target, resources);
+      selectedProviders.set(unit.id, selected.candidate);
+    }
+  }
   const catalogs = {
-    signatures: JSON.parse(resourceContents.get(signaturesPath)),
+    signatures: knowledge['xdownload.player-signature-rules'],
     strategies: JSON.parse(resourceContents.get(strategiesPath)),
   };
+  if (!catalogs.signatures) throw new DisExecutionError('MISSING_SELECTED_KNOWLEDGE', 'xdownload.player-signature-rules');
   validateGraph(graph, unitsById, schemas);
   validateDefinition(definition, unitsById, graph, manifest.graphRef.path);
-  return { graph, definition, unitsById, schemas, resources, catalogs, closureManifest: manifest, packageIdentity: { ...packageIdentity, resourceClosureSha256: manifestDigest } };
+  return { graph, definition, unitsById, schemas, resources, catalogs, knowledge, selectedProviders, closureManifest: manifest, packageIdentity: { ...packageIdentity, resourceClosureSha256: manifestDigest } };
 }
 
 export async function runPipeline(input, loaded) {
@@ -655,6 +798,7 @@ export async function runPipeline(input, loaded) {
     const node = graph.nodes.find((item) => item.nodeId === nodeId);
     const unit = unitsById.get(node.unitRef.id);
     const handler = handlers[unit.implementation.ref];
+    validatePreconditions(unit, nodeId === graph.entryNode ? input : (() => { const value = {}; for (const edge of graph.edges.filter((item) => item.kind === 'data' && item.to.node === nodeId)) { if (outputs.has(edge.from.node)) pointerSet(value, edge.to.pointer, pointerGet(outputs.get(edge.from.node), edge.from.pointer)); } return value; })());
     if (!handler) throw new DisExecutionError('NO_TRUSTED_IMPLEMENTATION_BINDING', unit.implementation.ref);
 
     let nodeInput = nodeId === graph.entryNode ? structuredClone(input) : {};
@@ -682,9 +826,9 @@ export async function runPipeline(input, loaded) {
       if (value === undefined) throw new DisExecutionError('MISSING_RUNTIME_EVIDENCE_VALUE', edge.from.node + edge.from.pointer);
       evidence[edge.to.slot] = [...(evidence[edge.to.slot] || []), ...(Array.isArray(value) ? structuredClone(value) : [structuredClone(value)])];
     }
-    const output = handler(nodeInput, { evidence, catalogs: loaded.catalogs });
+    const output = handler(nodeInput, { evidence, catalogs: loaded.catalogs, knowledge: loaded.knowledge });
     outputs.set(nodeId, output);
-    trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: unit.implementation.ref, input: structuredClone(nodeInput), evidence: structuredClone(evidence), output: structuredClone(output) });
+    trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: unit.implementation.ref, implementationCandidateId: loaded.selectedProviders.get(unit.id)?.candidateId || null, input: structuredClone(nodeInput), evidence: structuredClone(evidence), output: structuredClone(output) });
     if (graph.terminalNodes.includes(nodeId)) return { outcome: output, trace, packageIdentity: loaded.packageIdentity };
     const candidates = graph.edges.filter((edge) => edge.kind === 'control' && edge.from === nodeId && conditionMatches(output, edge.when));
     if (candidates.length !== 1) throw new DisExecutionError('AMBIGUOUS_CONTROL_FLOW', nodeId + ' selected ' + candidates.length + ' control edges');
