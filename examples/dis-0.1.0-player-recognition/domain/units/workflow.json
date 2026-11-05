@@ -16,7 +16,7 @@
   "owner": "xdownload-demo",
   "authority": "CONTROLLED",
   "qualification": {
-    "stage": "CANDIDATE",
+    "profile": "xdownload.player-recognition.workflow.qualification/0.1.0",
     "limitations": [
       "Uses typed control/data/evidence edges from demo-revised DIS 0.1.0."
     ]
@@ -45,23 +45,45 @@
     "absenceReason": null
   },
   "failure": {
-    "supported": [
-      "UNKNOWN",
-      "AMBIGUOUS",
-      "INVALID_INPUT",
-      "NEEDS_INPUT",
-      "NEEDS_REVIEW",
-      "FAILED"
-    ],
     "handling": {
-      "UNKNOWN": "bounded-review",
-      "AMBIGUOUS": "request-clarification",
-      "INVALID_INPUT": "reject"
+      "UNKNOWN": {
+        "action": "REVIEW",
+        "reason": "Declared UNKNOWN handling for the reference Consumer."
+      },
+      "AMBIGUOUS": {
+        "action": "CLARIFY",
+        "reason": "Declared AMBIGUOUS handling for the reference Consumer."
+      },
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Declared INVALID_INPUT handling for the reference Consumer."
+      },
+      "NEEDS_INPUT": {
+        "action": "WAIT",
+        "reason": "Declared NEEDS_INPUT handling for the reference Consumer."
+      },
+      "NEEDS_REVIEW": {
+        "action": "REVIEW",
+        "reason": "Declared NEEDS_REVIEW handling for the reference Consumer."
+      },
+      "FAILED": {
+        "action": "FAIL",
+        "reason": "Declared FAILED handling for the reference Consumer."
+      }
     }
   },
   "validation": {
     "profile": "player-recognition-workflow/0.1.0",
+    "profileRevision": "0.1.0",
     "casesRef": "test/runner.test.mjs",
-    "lastResult": "NOT_RUN"
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
   }
 }

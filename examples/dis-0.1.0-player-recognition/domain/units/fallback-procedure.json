@@ -17,7 +17,7 @@
   "owner": "xdownload-demo",
   "authority": "CONTROLLED",
   "qualification": {
-    "stage": "CANDIDATE",
+    "profile": "xdownload.player.bounded-fallback.qualification/0.1.0",
     "limitations": [
       "No LLM call; emits a bounded handoff."
     ]
@@ -46,20 +46,37 @@
     "absenceReason": null
   },
   "failure": {
-    "supported": [
-      "UNKNOWN",
-      "AMBIGUOUS",
-      "NEEDS_INPUT",
-      "NEEDS_REVIEW"
-    ],
     "handling": {
-      "AMBIGUOUS": "return-needs-input",
-      "UNKNOWN": "return-needs-review"
+      "AMBIGUOUS": {
+        "action": "WAIT",
+        "reason": "Declared AMBIGUOUS handling for the reference Consumer."
+      },
+      "UNKNOWN": {
+        "action": "REVIEW",
+        "reason": "Declared UNKNOWN handling for the reference Consumer."
+      },
+      "NEEDS_INPUT": {
+        "action": "WAIT",
+        "reason": "Declared NEEDS_INPUT handling for the reference Consumer."
+      },
+      "NEEDS_REVIEW": {
+        "action": "REVIEW",
+        "reason": "Declared NEEDS_REVIEW handling for the reference Consumer."
+      }
     }
   },
   "validation": {
     "profile": "player-fallback-conformance/0.1.0",
+    "profileRevision": "0.1.0",
     "casesRef": "test/runner.test.mjs",
-    "lastResult": "NOT_RUN"
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
   }
 }

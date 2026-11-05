@@ -18,7 +18,7 @@
   "owner": "xdownload-demo",
   "authority": "CONTROLLED",
   "qualification": {
-    "stage": "CANDIDATE",
+    "profile": "xdownload.player.resolve-procedure.qualification/0.1.0",
     "limitations": [
       "Returns a strategy descriptor only."
     ]
@@ -47,18 +47,29 @@
     "absenceReason": null
   },
   "failure": {
-    "supported": [
-      "INVALID_INPUT",
-      "UNKNOWN"
-    ],
     "handling": {
-      "INVALID_INPUT": "reject",
-      "UNKNOWN": "reject"
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Declared INVALID_INPUT handling for the reference Consumer."
+      },
+      "UNKNOWN": {
+        "action": "REJECT",
+        "reason": "Declared UNKNOWN handling for the reference Consumer."
+      }
     }
   },
   "validation": {
     "profile": "player-resolution-conformance/0.1.0",
+    "profileRevision": "0.1.0",
     "casesRef": "test/runner.test.mjs",
-    "lastResult": "NOT_RUN"
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
   }
 }

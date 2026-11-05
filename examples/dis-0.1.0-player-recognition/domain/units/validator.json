@@ -16,7 +16,7 @@
   "owner": "xdownload-demo",
   "authority": "CONTROLLED",
   "qualification": {
-    "stage": "CANDIDATE",
+    "profile": "xdownload.player.outcome-validator.qualification/0.1.0",
     "limitations": [
       "Validates the demo result contract, not a production catalog."
     ]
@@ -48,20 +48,33 @@
     ]
   },
   "failure": {
-    "supported": [
-      "INVALID_INPUT",
-      "CONFLICT",
-      "FAILED"
-    ],
     "handling": {
-      "INVALID_INPUT": "reject",
-      "CONFLICT": "reject",
-      "FAILED": "reject"
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Declared INVALID_INPUT handling for the reference Consumer."
+      },
+      "CONFLICT": {
+        "action": "REVIEW",
+        "reason": "Declared CONFLICT handling for the reference Consumer."
+      },
+      "FAILED": {
+        "action": "FAIL",
+        "reason": "Declared FAILED handling for the reference Consumer."
+      }
     }
   },
   "validation": {
     "profile": "player-outcome-conformance/0.1.0",
+    "profileRevision": "0.1.0",
     "casesRef": "test/runner.test.mjs",
-    "lastResult": "NOT_RUN"
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
   }
 }

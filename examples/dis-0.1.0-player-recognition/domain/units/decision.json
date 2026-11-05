@@ -17,7 +17,7 @@
   "owner": "xdownload-demo",
   "authority": "CONTROLLED",
   "qualification": {
-    "stage": "CANDIDATE",
+    "profile": "xdownload.player.route-decision.qualification/0.1.0",
     "limitations": [
       "Deterministic routing for the three demo statuses."
     ]
@@ -46,20 +46,66 @@
     "absenceReason": null
   },
   "failure": {
-    "supported": [
-      "UNKNOWN",
-      "AMBIGUOUS",
-      "INVALID_INPUT"
-    ],
     "handling": {
-      "UNKNOWN": "route-to-bounded-fallback",
-      "AMBIGUOUS": "route-to-clarification",
-      "INVALID_INPUT": "reject"
+      "UNKNOWN": {
+        "action": "BOUNDED_FALLBACK",
+        "reason": "Declared UNKNOWN handling for the reference Consumer."
+      },
+      "AMBIGUOUS": {
+        "action": "CLARIFY",
+        "reason": "Declared AMBIGUOUS handling for the reference Consumer."
+      },
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Declared INVALID_INPUT handling for the reference Consumer."
+      }
     }
   },
   "validation": {
     "profile": "player-route-conformance/0.1.0",
+    "profileRevision": "0.1.0",
     "casesRef": "test/runner.test.mjs",
-    "lastResult": "NOT_RUN"
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
+  },
+  "capabilities": {
+    "requires": [
+      {
+        "capabilityId": "xdownload.player.recognition",
+        "owner": "xdownload-demo",
+        "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+        "version": "1.0.0",
+        "inputSchemaRef": "domain/schemas/page-observation.schema.json",
+        "inputSchemaDigest": "21d4866967caf6c8df7d8760845e51f73b99814fad45c4b2c9e6030bfa99efbb",
+        "outputSchemaRef": "domain/schemas/recognition-result.schema.json",
+        "outputSchemaDigest": "af1ec4586ab0de89630642d03b52e379b245976a6758c5962244a2dfce5cd285",
+        "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7",
+        "compatibility": {
+          "policy": "EXACT",
+          "accepted": [
+            {
+              "version": "1.0.0",
+              "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "preconditions": {
+    "inputSchemaRef": "domain/schemas/decision-input.schema.json",
+    "all": [
+      {
+        "path": "/recognition",
+        "operator": "exists"
+      }
+    ]
   }
 }

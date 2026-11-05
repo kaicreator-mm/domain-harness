@@ -89,21 +89,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "stage"
+        "profile"
       ],
       "properties": {
-        "stage": {
-          "enum": [
-            "OBSERVED",
-            "CANDIDATE",
-            "VALIDATED",
-            "PROMOTED",
-            "SELECTED",
-            "REJECTED",
-            "WITHDRAWN",
-            "EXPIRED",
-            "SUPERSEDED"
-          ]
+        "profile": {
+          "type": "string",
+          "minLength": 1
         },
         "limitations": {
           "type": "array",
@@ -126,13 +117,13 @@
         "requires": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/capabilityRef"
+            "$ref": "#/$defs/capabilityRequirement"
           }
         },
         "provides": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/capabilityRef"
+            "$ref": "#/$defs/capabilityProvision"
           }
         }
       }
@@ -169,8 +160,54 @@
         "artifactRef": {
           "type": "string",
           "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/implementationCandidate"
+          }
+        },
+        "selectionPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "consumerProfileId",
+            "target"
+          ],
+          "properties": {
+            "mode": {
+              "const": "PACKAGE_LOCK_EXACT"
+            },
+            "consumerProfileId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "candidates"
+            ]
+          },
+          "then": {
+            "required": [
+              "ref",
+              "artifactRef",
+              "selectionPolicy"
+            ]
+          }
+        }
+      ]
     },
     "evidence": {
       "type": "object",
@@ -206,14 +243,13 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "supported",
         "handling"
       ],
       "properties": {
-        "supported": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
+        "handling": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
             "enum": [
               "UNKNOWN",
               "AMBIGUOUS",
@@ -225,12 +261,9 @@
               "NEEDS_INPUT",
               "NEEDS_REVIEW"
             ]
-          }
-        },
-        "handling": {
-          "type": "object",
+          },
           "additionalProperties": {
-            "type": "string"
+            "$ref": "#/$defs/handlingPolicy"
           }
         }
       }
@@ -240,24 +273,52 @@
       "additionalProperties": false,
       "required": [
         "profile",
-        "casesRef"
+        "profileRevision",
+        "casesRef",
+        "validator"
       ],
       "properties": {
         "profile": {
           "type": "string",
           "minLength": 1
         },
+        "profileRevision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
         "casesRef": {
           "type": "string",
           "minLength": 1
         },
-        "lastResult": {
-          "enum": [
-            "PASS",
-            "PARTIAL",
-            "FAIL",
-            "NOT_RUN"
-          ]
+        "validator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+            }
+          }
+        },
+        "requiredCoverage": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "positive",
+              "negative",
+              "boundary",
+              "heldOut"
+            ]
+          }
         }
       }
     },
@@ -268,6 +329,33 @@
         "dynamicForm": {
           "$ref": "#/$defs/dynamicFormProfile"
         }
+      }
+    },
+    "preconditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputSchemaRef",
+        "all"
+      ],
+      "properties": {
+        "inputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "all": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/precondition"
+          }
+        }
+      }
+    },
+    "knowledgeRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/knowledgeRef"
       }
     }
   },
@@ -285,24 +373,6 @@
         },
         "description": {
           "type": "string"
-        }
-      }
-    },
-    "capabilityRef": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "capabilityId",
-        "version"
-      ],
-      "properties": {
-        "capabilityId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "version": {
-          "type": "string",
-          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
         }
       }
     },
@@ -448,6 +518,345 @@
     "packageRelativeSchemaRef": {
       "type": "string",
       "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+\\.schema\\.json$"
+    },
+    "capabilityProvision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityId",
+        "owner",
+        "authorityRef",
+        "version",
+        "contractDigest",
+        "inputSchemaRef",
+        "inputSchemaDigest",
+        "outputSchemaRef",
+        "outputSchemaDigest"
+      ],
+      "properties": {
+        "capabilityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorityRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "contractDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "inputSchemaDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "outputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "outputSchemaDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "capabilityRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityId",
+        "owner",
+        "authorityRef",
+        "version",
+        "contractDigest",
+        "inputSchemaRef",
+        "inputSchemaDigest",
+        "outputSchemaRef",
+        "outputSchemaDigest",
+        "compatibility"
+      ],
+      "properties": {
+        "capabilityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorityRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "contractDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "inputSchemaDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "outputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "outputSchemaDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy",
+            "accepted"
+          ],
+          "properties": {
+            "policy": {
+              "enum": [
+                "EXACT",
+                "EXPLICIT_ALLOWLIST"
+              ]
+            },
+            "accepted": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version",
+                  "contractDigest"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+                  },
+                  "contractDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "implementationCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "strategy",
+        "ref",
+        "exposure",
+        "artifactRef",
+        "artifactDigest",
+        "target",
+        "contractDigest"
+      ],
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strategy": {
+          "enum": [
+            "declarative",
+            "function",
+            "parser",
+            "model",
+            "hybrid",
+            "tool-operation",
+            "workflow-graph"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^(?:(?:registry|graph|tool):[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))$"
+        },
+        "exposure": {
+          "enum": [
+            "private",
+            "semantic",
+            "tool"
+          ]
+        },
+        "artifactRef": {
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+        },
+        "artifactDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contractDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "precondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "operator"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?:|/[A-Za-z0-9_~-]+)$"
+        },
+        "operator": {
+          "enum": [
+            "exists",
+            "equals",
+            "notEquals"
+          ]
+        },
+        "value": {}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "operator": {
+              "const": "exists"
+            }
+          },
+          "not": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "operator": {
+              "enum": [
+                "equals",
+                "notEquals"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "knowledgeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision",
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "kind": {
+          "enum": [
+            "knowledge",
+            "rule-set",
+            "taxonomy",
+            "lookup",
+            "pattern-set",
+            "reference"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "handlingPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "REJECT",
+            "PRESERVE_UNKNOWN",
+            "CLARIFY",
+            "WAIT",
+            "REVIEW",
+            "BOUNDED_FALLBACK",
+            "BOUNDED_RETRY",
+            "ESCALATE",
+            "RETURN_PARTIAL",
+            "FAIL"
+          ]
+        },
+        "retryLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "BOUNDED_RETRY"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "retryLimit"
+            ]
+          }
+        }
+      ]
     }
   },
   "allOf": [
