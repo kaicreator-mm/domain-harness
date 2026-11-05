@@ -6,7 +6,7 @@ Product/L1: #1477 — FROZEN
 Product Freeze Commit: b8135aa801eb38fcae2fa1fce3bada541178d5b9  
 Candidate branch: dis/0.1.0-l2-candidate
 
-This document turns the frozen Domain Intelligence Product/L1 into standard boundaries, logical contracts, machine-readable descriptions, Consumer semantics and conformance requirements. It is not an SDK ABI, Manifest/BUILD ABI, KDP/Runtime API or implementation design for DomainForge/DomainHarness. All implementation bindings remain subject to existing Kernel, Host, Tool, Semantic, Package and Runtime authority.
+This document turns the frozen Domain Intelligence Product/L1 into standard boundaries, logical contracts, machine-readable descriptions, Consumer semantics and conformance requirements. It is not an SDK ABI, Manifest/BUILD ABI, Runtime API or implementation design for DomainForge/DomainHarness. DIS preserves the frozen v0.7 Kernel/Microkernel, single Domain Runtime and Host/Effect contracts. The KDP architecture proposal in #1480 is not frozen and is non-normative for DIS 0.1.0.
 
 ## 1. Standard purpose
 
@@ -71,7 +71,7 @@ Requirements:
 - Workflow/Graph describes domain solving, not a second Scheduler.
 - Procedure is private; Tool is an explicit cross-boundary Operation.
 - UNKNOWN, AMBIGUOUS, CONFLICT, OUT_OF_SCOPE, NEEDS_INPUT, NEEDS_REVIEW, PARTIAL and FAILED are not silently converted into success.
-- State transitions, persistence and external Effects remain under the single existing Runtime/KDP/Host authority.
+- State transitions, persistence and external Effects remain under the single existing DomainHarness Runtime and its frozen Kernel/Microkernel and Host/Effect contracts. DIS does not create a second authority; #1480 remains a non-normative architecture candidate until separately frozen.
 
 ### 2.3 Fixed resolver precedence
 
@@ -128,7 +128,7 @@ A Unit need not be exposed as a Component; one Component may be implemented by s
 
 Keep separate: Unit stable ID, semantic revision, materialized artifact digest, asset authority, intelligence qualification/maturity, selected Package pin and runtime execution occurrence.
 
-In the Product/L1 lifecycle, EXECUTED means that selected intelligence was used in a specific execution context. It does not mutate the qualification declaration of an immutable Unit. Execution facts belong in runtime evidence, Journal or Outcome.
+In the Product/L1 lifecycle, EXECUTED means that selected intelligence was used in a specific execution context. It is an execution occurrence, not a Unit qualification/maturity stage, and it does not mutate an immutable Unit. Execution facts belong in runtime evidence, Journal or Outcome.
 
 ## 4. Component and implementation binding
 
@@ -138,14 +138,14 @@ A Procedure is private processing by default and has no external Effect authorit
 
 ### 4.1 Implementation Binding
 
-implementation.ref is a logical reference. It must not be interpreted as an arbitrary executable path, module import or remote code address.
+implementation.ref is a typed logical binding key, never a source path or arbitrary executable URI. A `registry:<unit-id>@<revision>` key resolves only through a host-owned allow-listed registry; the Unit's `artifactRef` names the exact package-local implementation artifact and is digest-pinned by Resource Closure. A `graph:<graph-id>@<revision>` key binds a Workflow Unit to its exact Composition Graph. A `tool:<capability-id>@<version>` key identifies an existing Tool/Host contract and does not itself grant invocation or Effect authority.
 
 A Consumer must use one explicit trusted binding:
 1. Trusted Registry Binding: Unit ID/revision maps to a Handler registered by the host.
 2. Verified Package Artifact Binding: references a Package Artifact that passed closure, digest and existing execution admission.
 3. Existing Semantic / Tool Binding: reuses existing Component / Tool / Host binding.
 
-Do not dynamically import from an unverified Unit string, let model output specify executable paths, treat function existence as Tool declaration, or bypass KDP/Host admission, Effect Permit or existing Tool contracts. A Reference Consumer may use an allow-listed handler registry but must record the map and must not claim arbitrary production Package code-loading capability.
+Do not dynamically import from an unverified Unit string, let model output specify executable paths, treat function existence as Tool declaration, or bypass frozen Kernel/Host admission, Effect Permit or existing Tool contracts. A Reference Consumer may use an allow-listed handler registry but must record the map and must not claim arbitrary production Package code-loading capability.
 
 ## 5. Recognizer / Dynamic Form Profile
 
@@ -155,14 +155,14 @@ Dynamic Form is a UI-agnostic Interaction Contract, not a new Component family o
 
 ## 6. Composition Graph semantics
 
-A Graph is a Workflow composition definition, not a Scheduler or UI flow. It declares stable ID/revision, entry Node, input/output Schema, Nodes, typed Edges, terminal Nodes and optional bounded iteration Profile. DIS 0.1.0 disallows implicit cycles by default.
+A Graph is a Workflow composition definition, not a Scheduler or UI flow. It declares stable ID/revision, entry Node, input/output Schema, Nodes, typed Edges, terminal Nodes and a `DAG_ONLY` cycle policy. DIS 0.1.0 rejects all control cycles, iterations and retries; a later standard version may define a bounded iteration profile.
 
 Each Edge has exactly one kind:
 - control: selects the next Node and triggers execution;
 - data: binds source output to target input and does not trigger execution;
 - evidence: adds source evidence to a declared Evidence Slot and does not trigger execution.
 
-Static Graph validation must ensure unique Node IDs, entry/terminal existence, exact Unit revision resolution, Graph I/O compatibility, valid Edge references, exactly one required-input binding on every reachable execution path, duplicate-binding rejection, data-source availability before target execution, declared evidence slots, control reachability and terminal/wait/failure closure. Undeclared cycles, unbounded retries and indeterminate branches are rejected.
+Static Graph validation must ensure unique Node IDs, entry/terminal existence, exact Unit revision resolution, Graph I/O compatibility, valid Edge references, exactly one required-input binding on every reachable execution path (using path-sensitive minimum/maximum counts), duplicate-binding rejection, strict control-flow ancestry of every data/evidence source, declared evidence slots, control reachability and terminal/wait/failure closure. Undeclared cycles, unbounded retries and indeterminate branches are rejected.
 
 At runtime, only outputs from executed Nodes are available; missing sources do not become null/default success; each branch selects exactly one control Edge; zero or multiple matches are errors; Data/Evidence Edges do not trigger Nodes; Node inputs, outputs, selected paths and Evidence associations remain inspectable; terminal Outcomes conform to Graph Output Schema and Validator rules.
 
@@ -174,7 +174,7 @@ Package Resource Closure is not Schema Closure. It covers all required resources
 
 External sources may remain Provenance references but are not implicitly downloaded and treated as authoritative Package resources.
 
-Resource Manifest records normalized package-relative path, resource kind, content digest, owner references and required/optional status. Reject absolute paths, traversal, empty/dot segments, backslashes, unauthorized remote URIs, duplicate paths, missing resources, digest mismatch and undeclared required references.
+Resource Manifest records normalized package-relative path, resource kind, content digest, owner references and required/optional status. Closure MUST include every required Unit descriptor, Graph, Definition, input/output/nested Schema, fixture/reference resource, implementation artifact and referenced conformance resource. Reject absolute paths, traversal, empty/dot segments, backslashes, unauthorized remote URIs, duplicate paths, missing resources, digest mismatch, undeclared required references and symlink-resolved paths outside the Package root. The enclosing Package descriptor/lock MUST pin the exact SHA-256 of the Resource Manifest; the manifest does not recursively include its own digest.
 
 Package materialization pins DIS version, Package identity/revision, Definition identity/revision/digest, selected Unit identity/revision/artifact digest, Graph identity/revision/artifact digest, all required resource paths/digests, trusted implementation bindings and required Capability Contracts. Existing Manifest/BUILD/lock artifacts may carry this logical lock; DIS does not create a parallel Package Manifest or replace ABI.
 
@@ -206,7 +206,7 @@ Three independent levels:
 2. Behavioral Conformance: positive, negative, boundary, unknown, ambiguous, conflict, out-of-scope, failure and recovery semantics match declarations.
 3. Consumer Conformance: a real Consumer consumes selected intelligence without bypassing Runtime/Host/Effect authority.
 
-The Conformance Suite must not validate only a hard-coded Reference Consumer path. It must derive/check test inputs from the actual Graph, execution Trace and resource closure.
+The Conformance Suite must not validate only a hard-coded Reference Consumer path. The Consumer MUST emit the exact input payload actually assembled for each executed Node, together with its Unit identity, evidence inputs and output. The independent Conformance Suite validates those trace payloads against the declared Unit Schemas; it MUST NOT reconstruct inputs from Demo Node names.
 
 At minimum test known/ambiguous/unknown/invalid/out-of-scope, missing input, duplicate binding, unavailable data source, zero/multiple control-edge matches, missing/tampered/undeclared resources, wrong Unit revision/digest, untrusted implementation binding, missing/lost evidence, no implicit pass-through, no private Procedure → Tool escalation and no automatic promotion/activation.
 
@@ -218,15 +218,17 @@ DIS version is independent of DomainHarness SDK version. Unit, Graph, Definition
 
 Based on inspection of the xDownload Demo:
 
-- DIS-L2-F001 (P1): Resource Closure currently closes Schema resources only; Unit, Graph, Definition, Fixture and implementation binding identities are not unified.
-- DIS-L2-F002 (P1): the Python Conformance validator reconstructs inputs by Demo Node names; it must use the Consumer's actual execution Trace/Graph Edge results.
-- DIS-L2-F003 (P1): required-input validation checks binding existence but not fully exactly-one and path availability.
-- DIS-L2-F004 (P2): Workflow Unit / Graph identity binding needs clarification.
-- DIS-L2-F005 (P2): trusted implementation-binding boundary needs clarification; arbitrary string-based dynamic import is prohibited.
-- DIS-L2-F006 (P2): EXECUTED is an execution fact and must not mutate immutable Unit qualification.
-- DIS-L2-F007 (P2): Dynamic Form Profile must preserve user confirmation, system observation, model inference and missing-field distinctions.
+The original DIS-L2-F001..F007 findings are closed by the R1 refinement contract and executable reference-consumer/conformance changes:
 
-These are L2 design/validation findings, not claims that fixes are complete.
+- F001: full resource closure pins Unit, Graph, Definition, Schema, fixture, implementation and conformance resources; the package descriptor pins the manifest digest.
+- F002: the Consumer trace now carries the actual Node input/evidence/output; Python validates those values directly.
+- F003: static validation enforces exactly-one required input binding on every control path, rejects duplicate same-execution bindings and rejects non-ancestor sources.
+- F004: Definition binds both Workflow Unit identity and Graph identity/revision/path.
+- F005: implementation refs use typed trusted registry / graph / Tool binding keys; arbitrary dynamic import is prohibited.
+- F006: EXECUTED is an occurrence, not a Unit qualification stage.
+- F007: Recognizer provenance and optional Dynamic Form contracts preserve confirmed, observed, inferred, candidate and unknown distinctions.
+
+R1 also adds realpath-based symlink containment and makes DIS 0.1.0 strictly DAG-only. These are candidate closure claims; exact-HEAD CI and independent review remain evidence gates.
 
 ## 12. L2 Freeze Gate
 

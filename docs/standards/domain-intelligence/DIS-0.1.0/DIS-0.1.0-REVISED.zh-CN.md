@@ -1,7 +1,9 @@
 # Domain Intelligence Standard（DIS）0.1.0 — Demo Revised Candidate
 
-状态：EXPERIMENTAL_STANDARD_CANDIDATE / DEMO_REVISED
-分支：dis-0.1.0
+状态：L2_STANDARD_CANDIDATE / NOT_FROZEN
+分支：dis/0.1.0-l2-candidate
+L2 Issue：#1481
+冻结 Product/L1：#1477 @ b8135aa801eb38fcae2fa1fce3bada541178d5b9
 修订依据：初始 Demo 验证 eb8b4d3836d6c8ef318d2b3af7e46e04fa57eba4
 
 本文是实验性标准候选，不是已冻结的 Product/L1、L2、SDK ABI 或 Runtime API。它不修改 v0.10.3，不授权将候选 Schema 接入现有 Runtime，也不构成发布/部署授权。初始草案、初始 Demo、初始发现和本修订版通过 Git 历史分别保留。
@@ -28,10 +30,22 @@ DIS 不定义新 Component family、新 Runtime、新 Scheduler、新 KDP、通�
 4. 六类 Domain Data 保持不变：Authority、Executable Harness、Knowledge/Reference、Pattern/Recipe、Example/Counterexample、Validation/Evidence。
 5. Understanding、Decision、Solving/Evaluation 是质量评价维度，不是新资产分类。
 6. requires/provides 表示 Capability Contract，不等于数据流、控制流或 Package dependency。
-7. KDP 保留唯一 Runtime、State、Admission、Effect、Journal、Replay 和 UNKNOWN 权威。
+7. 唯一既有 DomainHarness Runtime 仍在冻结的 Kernel/Microkernel 与 Host/Effect 契约下保持权威；Hook 仅遵循既有受限契约。#1480 的 KDP 架构候选尚未冻结，在 DIS 0.1.0 中不具规范效力。
 8. Hook 仅按现有明确支持的受限契约使用，不由 DIS 推导通用 Event Bus。
 9. Workflow/Pipeline 是领域解决过程，不是 Scheduler，也不创建第二个状态权威。
 10. 保持既有 resolver precedence：确定性编译智能 → 精确语义结果复用 → 适用的已晋升 Subworkflow → 有界 HarnessMachine/LLM Fallback。
+
+## 2.1 Design-time Production / Compilation
+
+DIS 定义设计期智能生产/资格确认平面，但不规定 DomainForge 内部实现：
+
+`Domain Scope + Consumer Profile → 有来源的 Knowledge Corpus → Candidate Units → 结构/语义/行为资格验证 → 裁定与显式 Promotion → 面向 Consumer 的选择/投影 → 精确资源闭合与 Digest → Domain Package 物化`。
+
+Corpus 可以包含缺口、未知、冲突和候选材料，不自动等于生产智能。Authoring、Validation、Qualification、Adjudication、Promotion、Selection 和 Package Build 是独立门禁。LLM 生成内容默认是 Candidate。Package 携带消费者选定的智能及必需资源，不要求携带完整 Corpus。
+
+## 2.2 Runtime Consumption
+
+运行期 Consumer 规范化输入，经 Recognizer/可选澄清理解输入，选择 Decision 和 Workflow/Procedure/Tool/Validator Unit，执行 typed Composition Graph，并输出带结构化证据的终态。Consumer 只消费精确、已选择且兼容的 Package identity。未知、歧义、冲突、越界、部分成功和失败必须显式保留。状态转移、持久化和外部 Effect 权威仍由唯一既有 DomainHarness Runtime 及冻结 Kernel/Microkernel、Host/Effect 契约掌握；DIS 不增加 Scheduler 或权威。
 
 ## 3. Intelligence Unit
 
@@ -49,11 +63,17 @@ Intelligence Unit 是逻辑描述和组合单元，不是新的 Runtime primitiv
 
 每个 Unit 的公共 Envelope 必须包含：schemaVersion、稳定 id、精确 revision、role、purpose、scope、owner、authority、qualification、evidence 和 failure。可执行 Profile 还必须声明类型化 input/output Schema；按需声明 capabilities、implementation 和 validation。
 
-Authority 与 Qualification 独立。OBSERVED/CANDIDATE/VALIDATED/PROMOTED/SELECTED/EXECUTED 不得与 FROZEN/CONTROLLED/REFERENCE/EXAMPLE/DERIVED 混为一谈。
+Authority 与 Qualification 独立。OBSERVED/CANDIDATE/VALIDATED/PROMOTED/SELECTED 是资格/成熟度阶段；EXECUTED 是一次运行发生记录，不是 Unit qualification stage。它不得修改不可变 Unit 的资格。FROZEN/CONTROLLED/REFERENCE/EXAMPLE/DERIVED 是资产权威类别，不能与上述阶段混为一谈。
 
-可执行 Unit 必须表达输入输出语义。Recognizer 需要区分已知、推导、候选、缺失、歧义、冲突和未知，并保留来源；LLM 推测不得伪装成用户确认事实。运行观察不自动成为可复用知识。
+可执行 Unit 必须表达输入输出语义。Recognizer 需要区分已知、推导、候选、缺失、歧义、冲突和未知，并保留来源。每个值必须分别记录来源（`USER_CONFIRMED`、`SYSTEM_OBSERVED`、`MODEL_INFERRED`、`DERIVED`）和状态（`CONFIRMED`、`INFERRED`、`CANDIDATE`、`UNKNOWN`）；模型置信度不能升级来源权威。运行观察不自动成为可复用知识。
 
 Unit failure profile 至少考虑 UNKNOWN、AMBIGUOUS、CONFLICT、OUT_OF_SCOPE、INVALID_INPUT、PARTIAL、FAILED、NEEDS_INPUT、NEEDS_REVIEW；不适用的结果应显式标明，不得静默折叠为成功。
+
+## 3.1 Trusted implementation 与 Workflow 绑定
+
+`implementation.ref` 是有类型的逻辑绑定键，不是可执行路径。`registry:<unit-id>@<revision>` 只能解析到 Host 自身维护的 allow-list registry，并配对由 Digest 固定的 `artifactRef`；`graph:<graph-id>@<revision>` 将 Workflow Unit 绑定到 Graph；`tool:<capability-id>@<version>` 标识既有 Tool/Host 契约，但不授予权限。禁止任意动态导入。Domain Definition 同时绑定 `workflowRef.unitRef` 与 `workflowRef.graphRef`（ID、revision、package-relative path），并且必须与 Workflow Unit 和加载的 Graph 一致。
+
+每个 Graph Node 的精确 Unit ID/revision MUST 在 Definition 的 Semantic/Tool Component 集合或 private Unit 集合中恰好声明一次。未声明、revision 不匹配或同时出现在 component/private 集合中的 Node Unit 均无效。
 
 ## 4. Component 和 Capability 映射
 
@@ -91,13 +111,16 @@ data Edge 的源/目标 JSON Pointer 必须有效；目标必需输入必须获�
 ### 5.2 Graph Validity
 
 - Node ID 唯一，入口/终态存在；
-- 控制图从入口可达、无隐式循环，重复执行必须有界；
+- DIS 0.1.0 控制图严格为 DAG；拒绝所有循环、迭代和重试。后续标准版本才可定义机器可验证的有界迭代 Profile；
+- required input 必须按控制路径验证：到达目标的每条路径上恰好有一个来源已经执行；拒绝同一执行源重复绑定和非祖先来源；
 - 每条控制路径到达终态或显式 wait/failure；
 - data/evidence 引用的 Node、Pointer、Slot 必须存在；
 - 非入口 Node 的必需输入必须有有效绑定或明确默认值；
 - 证据槽位必须声明，且终态验证不能丢失所需证据。
 
 ## 6. Schema 与 Package Resource Closure
+
+Resource Closure 覆盖所有必需的本地引用资源，而不仅是 Schema：Unit descriptor、Graph、Definition、嵌套 Schema、Fixture/参考资产、实现制品及引用的符合性资源。每项记录规范化 Package-relative path、kind、owner、required/optional 和 SHA-256。外层 Package descriptor/lock 固定 Resource Manifest 的精确 Digest；Manifest 不自引用。解析资源时必须解析符号链接，并拒绝 realpath 逃出 Package 根目录的路径。
 
 Unit 的 input/output schemaRef 和 Graph 的 I/O schemaRef 必须是 Package-root-relative 本地路径。禁止绝对路径、网络/协议 URI、反斜线、空路径段和 .. traversal。
 
@@ -112,11 +135,15 @@ Resource Closure Contract 使用 schemas/resource-closure.schema.json。相同�
 
 ## 7. Dynamic Form、Knowledge 和存储
 
+Dynamic Form Profile 是可选的 UI-agnostic 契约。它绑定 form ID/revision 与目标 input Schema，并声明问题、目标字段、响应类型、required/optional、options/constraints、适用条件、澄清原因和完成/取消结果。它不授予 Tool、状态转移或 Effect 权限。用户确认、系统观察、模型推导和 Derived 值在澄清/重识别过程中必须保持不同。
+
 Dynamic Form 是 UX 呈现的 UI-agnostic 结构化交互契约。Package 声明 Schema、问题/选项目录、适用条件和 StepSpec/StepOutcome；UX 负责渲染，Harness 协调澄清与重识别。显示表单不授予 Effect 权限。
 
 保持 files-first 和六类 Domain Data。SQLite、图数据库、向量索引均为可选资源实现。派生数据库/索引必须声明来源、生成器、Digest 和可再生成性，不得成为未声明的第二权威。Package 只携带消费者所需且合格的智能资产，不要求完整 Corpus。
 
 ## 8. Qualification、消费和演进
+
+`EXECUTED` 是运行发生记录/证据事实，不是 Unit qualification 或 maturity stage。运行使用不得改变不可变 Unit 的资格；执行事实进入 Journal/Outcome/Evidence。
 
 保持四条独立轴：
 - Asset Authority；
@@ -129,6 +156,8 @@ Simulator 验证成功不自动 Promotion；Promotion、Selection、Activation �
 Package Build Validity、Intelligence Qualification、End-to-End App Validation 是三个独立门禁。安装后的 Definition/Assembly 必须精确 pin，不得静默替换。
 
 ## 9. Conformance
+
+Consumer Trace MUST 记录每个实际执行 Node 的精确 Unit identity、真实组装的 input payload、evidence inputs 和 output。独立符合性验证直接消费这些 Trace 值，不得按 Demo Node 名称手工重建输入。
 
 分为 Structural、Behavioral、Consumer 三层。至少验证：known/ambiguous/unknown/invalid 输入；Decision 分支；control/data/evidence 独立性；必需输入绑定；Schema Closure 和嵌套引用；路径穿越/缺失资源拒绝；Digest tampering；私有 Procedure 不成为 Tool；精确 Unit/Package pins；未知必需语义 Fail-Closed。
 

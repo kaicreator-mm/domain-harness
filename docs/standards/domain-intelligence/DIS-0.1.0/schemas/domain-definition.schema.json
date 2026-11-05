@@ -61,19 +61,34 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "id",
-        "revision",
-        "path"
+        "unitRef",
+        "graphRef"
       ],
       "properties": {
-        "id": {
-          "type": "string"
+        "unitRef": {
+          "$ref": "#/$defs/unitRef"
         },
-        "revision": {
-          "type": "string"
-        },
-        "path": {
-          "$ref": "#/$defs/packageRelativePath"
+        "graphRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision",
+            "path"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)$"
+            },
+            "path": {
+              "$ref": "#/$defs/packageRelativePath"
+            }
+          }
         }
       }
     }

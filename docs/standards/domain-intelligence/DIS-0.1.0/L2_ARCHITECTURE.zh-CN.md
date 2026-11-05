@@ -6,7 +6,7 @@ Product/L1：#1477 — FROZEN
 Product Freeze Commit：b8135aa801eb38fcae2fa1fce3bada541178d5b9  
 候选分支：dis/0.1.0-l2-candidate
 
-本文将冻结的 Domain Intelligence Product/L1 转换为标准边界、逻辑契约、机器可读描述、Consumer 语义和符合性要求。它不是 SDK ABI、Manifest/BUILD ABI、KDP/Runtime API 或 DomainForge/DomainHarness 的具体实现设计。所有实现绑定仍受既有 Kernel、Host、Tool、Semantic、Package 和 Runtime 权威约束。
+本文将冻结的 Domain Intelligence Product/L1 转换为标准边界、逻辑契约、机器可读描述、Consumer 语义和符合性要求。它不是 SDK ABI、Manifest/BUILD ABI、Runtime API 或 DomainForge/DomainHarness 的具体实现设计。DIS 保留已冻结的 v0.7 Kernel/Microkernel、唯一 Domain Runtime 以及 Host/Effect 契约。#1480 中的 KDP 架构提案尚未冻结，在 DIS 0.1.0 中仅作为非规范性背景。
 
 ## 1. 标准定位
 
@@ -71,7 +71,7 @@ User / System Input
 - Workflow/Graph 描述领域解决过程，不成为第二个 Scheduler。
 - Procedure 是私有处理单元；Tool 是明确跨边界 Operation。
 - UNKNOWN、AMBIGUOUS、CONFLICT、OUT_OF_SCOPE、NEEDS_INPUT、NEEDS_REVIEW、PARTIAL 和 FAILED 不得静默变成成功。
-- 状态转移、持久化和外部 Effect 仍由唯一 Runtime/KDP/Host 权威执行。
+- 状态转移、持久化和外部 Effect 仍由既有唯一 DomainHarness Runtime 及其冻结的 Kernel/Microkernel、Host/Effect 契约执行。DIS 不创建第二套权威；#1480 在独立冻结前仍是非规范性架构候选。
 
 ### 2.3 固定 Resolver Precedence
 
@@ -119,7 +119,7 @@ Unit 是可描述、可引用、可资格确认和可组合的逻辑单元，不
 
 必须分离 Unit stable ID、semantic revision、materialized artifact digest、asset authority、intelligence qualification/maturity、selected Package pin 和 runtime execution occurrence。
 
-Product/L1 生命周期中的 EXECUTED 表示某个选定智能曾在具体执行上下文中被使用，不得通过执行行为修改不可变 Unit 的资格声明。执行事实记录在运行证据、Journal 或 Outcome 中。
+Product/L1 生命周期中的 EXECUTED 表示某个选定智能曾在具体执行上下文中被使用。它是执行发生记录，不是 Unit 的资格/成熟度阶段，也不得通过执行行为修改不可变 Unit 的资格声明。执行事实记录在运行证据、Journal 或 Outcome 中。
 
 ## 4. Component 与实现绑定
 
@@ -129,12 +129,12 @@ Procedure 默认是无外部 Effect 的私有处理单元；如需跨 Host/Packa
 
 ### 4.1 Implementation Binding
 
-implementation.ref 是逻辑引用，不得解释为可直接执行的任意路径、任意模块导入或远程代码地址。Consumer 必须使用明确可信的绑定方式：
+implementation.ref 是有类型的逻辑绑定键，不是源码路径或任意可执行 URI。`registry:<unit-id>@<revision>` 只能解析到 Host 自身维护的 allow-list registry；Unit 的 `artifactRef` 指向 Package 内的精确实现制品，并由 Resource Closure 固定 Digest。`graph:<graph-id>@<revision>` 将 Workflow Unit 绑定到精确 Composition Graph。`tool:<capability-id>@<version>` 只标识既有 Tool/Host 契约，本身不授予调用或 Effect 权限。Consumer 必须使用明确可信的绑定方式：
 1. Trusted Registry Binding：Unit ID/revision 对应宿主明确登记的 Handler。
 2. Verified Package Artifact Binding：引用经过闭合、Digest 验证并满足既有执行准入契约的 Package Artifact。
 3. Existing Semantic / Tool Binding：复用现有 Component / Tool / Host binding。
 
-禁止根据未经验证的 Unit 字符串执行动态 import；禁止模型输出直接指定可执行路径；禁止绕过 KDP/Host admission、Effect Permit 或既有 Tool 契约。Reference Consumer 可使用 allow-listed handler registry，但必须记录映射，不能宣称它证明生产 Package 任意代码加载能力。
+禁止根据未经验证的 Unit 字符串执行动态 import；禁止模型输出直接指定可执行路径；禁止绕过冻结的 Kernel/Host admission、Effect Permit 或既有 Tool 契约。Reference Consumer 可使用 allow-listed handler registry，但必须记录映射，不能宣称它证明生产 Package 任意代码加载能力。
 
 ## 5. Recognizer / Dynamic Form Profile
 
@@ -144,7 +144,7 @@ Dynamic Form 是 UI-agnostic Interaction Contract，不是新的 Component famil
 
 ## 6. Composition Graph 语义
 
-Graph 是 Workflow 的组合定义，不是 Scheduler 或 UI 流程。Graph 声明 stable ID/revision、entry Node、input/output Schema、Nodes、typed Edges、terminal Nodes 和可选的有界迭代 Profile。0.1.0 默认不允许隐式循环。
+Graph 是 Workflow 的组合定义，不是 Scheduler 或 UI 流程。Graph 声明 stable ID/revision、entry Node、input/output Schema、Nodes、typed Edges、terminal Nodes 和 `cyclePolicy=DAG_ONLY`。DIS 0.1.0 拒绝所有控制环、迭代和重试；有界重复执行推迟到后续标准版本。
 
 Edge 只能有且只有一种 kind：
 - control：选择下一 Node，触发执行；
@@ -156,7 +156,8 @@ Edge 只能有且只有一种 kind：
 - 每个 Node 的 Unit revision 精确解析；
 - Graph I/O 与入口/终态 Unit Schema 兼容；
 - Edge 的 Node / Pointer / Slot 有效；
-- 每个 required input 在每条可达执行路径上恰好有一个有效绑定；
+- 每个 required input 在每条可达执行路径上恰好有一个有效绑定；必须计算路径上的最小/最大绑定数量，不能只检查边是否存在；
+- 每条 data/evidence 来源必须是目标节点的严格控制流祖先；拒绝同一次源节点执行产生的重复绑定；
 - 拒绝重复绑定；
 - data source 在目标执行前可用，并在所有适用控制路径上可达；否则必须声明 optional/conditional binding；
 - evidence slot 已声明；
@@ -173,7 +174,7 @@ Package Resource Closure 不等于 Schema Closure。闭合范围覆盖选定智�
 
 外部来源可作为 Provenance 引用，但不得在构建或运行时被隐式下载并作为权威 Package 资源。
 
-Resource Manifest 至少记录 package-relative normalized path、resource kind、content digest、owner references 和 required/optional status。必须拒绝绝对路径、路径穿越、空段、点段、反斜线、未授权远程 URI、重复路径、缺失资源、Digest 不匹配和未声明的必需引用。
+Resource Manifest 至少记录 package-relative normalized path、resource kind、content digest、owner references 和 required/optional status。闭合范围 MUST 覆盖全部必需 Unit descriptor、Graph、Definition、输入/输出/嵌套 Schema、Fixture/参考资源、实现制品及被引用的符合性资源。必须拒绝绝对路径、路径穿越、空段、点段、反斜线、未授权远程 URI、重复路径、缺失资源、Digest 不匹配、未声明的必需引用，以及 realpath 解析后逃出 Package 根目录的符号链接。外层 Package descriptor/lock MUST 固定 Resource Manifest 的精确 SHA-256；Manifest 不递归包含自身 Digest。
 
 Package materialization 必须精确 pin DIS standard version、Package identity/revision、Definition identity/revision/digest、selected Unit identity/revision/artifact digest、Graph identity/revision/artifact digest、全部必需资源路径/digest、trusted implementation binding 和 required Capability Contract。该逻辑锁定可由现有 Manifest/BUILD/lock artifact 承载；DIS 不创建平行 Package Manifest 或替换 ABI。
 
@@ -205,7 +206,7 @@ LLM 仅在已选确定性智能、精确语义结果复用和适用已晋升 Sub
 2. Behavioral Conformance：正向、负向、边界、未知、歧义、冲突、越界、失败和恢复语义符合声明。
 3. Consumer Conformance：真实 Consumer 按标准解析和消费选定智能，且不绕过 Runtime/Host/Effect 权威。
 
-Conformance Suite 不得只验证 Reference Consumer 的硬编码路径。必须从真实 Graph、真实执行 Trace 和真实资源闭合生成/检查测试输入。
+Conformance Suite 不得只验证 Reference Consumer 的硬编码路径。Consumer MUST 为每个实际执行 Node 输出其真实组装的输入 payload、Unit identity、evidence inputs 和 output；独立 Conformance Suite 直接校验这些 Trace payload 与 Unit Schema，不得按 Demo Node 名称重建输入。
 
 至少测试 known/ambiguous/unknown/invalid/out-of-scope、missing input、duplicate binding、unavailable data source、zero/multiple control-edge match、missing/tampered/undeclared resource、wrong Unit revision/digest、untrusted implementation binding、missing/lost evidence、no implicit pass-through、no private Procedure → Tool escalation 和 no automatic promotion/activation。
 

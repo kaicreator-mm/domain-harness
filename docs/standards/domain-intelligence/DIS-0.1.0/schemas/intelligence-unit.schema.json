@@ -99,7 +99,6 @@
             "VALIDATED",
             "PROMOTED",
             "SELECTED",
-            "EXECUTED",
             "REJECTED",
             "WITHDRAWN",
             "EXPIRED",
@@ -158,7 +157,7 @@
         },
         "ref": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^(?:(?:registry|graph|tool):[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*))$"
         },
         "exposure": {
           "enum": [
@@ -166,6 +165,10 @@
             "semantic",
             "tool"
           ]
+        },
+        "artifactRef": {
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\\\.|\\\\.\\\\.)(?:/|$))(?!.*//)(?!.*\\\\\\\\)[A-Za-z0-9._/-]+$"
         }
       }
     },
@@ -257,6 +260,15 @@
           ]
         }
       }
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dynamicForm": {
+          "$ref": "#/$defs/dynamicFormProfile"
+        }
+      }
     }
   },
   "$defs": {
@@ -329,6 +341,99 @@
           "type": "string"
         }
       }
+    },
+    "dynamicFormProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision",
+        "targetSchemaRef",
+        "questions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)$"
+        },
+        "targetSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "applicability": {
+          "type": "string"
+        },
+        "clarificationReason": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "questionId",
+              "targetField",
+              "prompt",
+              "responseType",
+              "required"
+            ],
+            "properties": {
+              "questionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "targetField": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "responseType": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "single-choice",
+                  "multi-choice",
+                  "date",
+                  "structured"
+                ]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "options": {
+                "type": "array",
+                "items": {}
+              },
+              "constraints": {
+                "type": "object"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "completionStatus": {
+          "enum": [
+            "COMPLETED",
+            "CANCELLED",
+            "NEEDS_REVIEW"
+          ]
+        }
+      }
+    },
+    "packageRelativeSchemaRef": {
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\\\.|\\\\.\\\\.)(?:/|$))(?!.*//)(?!.*\\\\\\\\)[A-Za-z0-9._/-]+\\\\.schema\\\\.json$"
     }
   },
   "allOf": [
@@ -408,6 +513,106 @@
               }
             },
             "required": [
+              "exposure"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "workflow"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "implementation": {
+            "properties": {
+              "strategy": {
+                "const": "workflow-graph"
+              },
+              "ref": {
+                "pattern": "^graph:[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)$"
+              },
+              "artifactRef": {
+                "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\\\.|\\\\.\\\\.)(?:/|$))(?!.*//)(?!.*\\\\\\\\)[A-Za-z0-9._/-]+$"
+              }
+            },
+            "required": [
+              "strategy",
+              "ref",
+              "artifactRef",
+              "exposure"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "enum": [
+              "recognizer",
+              "decision",
+              "procedure",
+              "validator"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "implementation": {
+            "properties": {
+              "ref": {
+                "pattern": "^registry:[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)$"
+              },
+              "artifactRef": {
+                "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\\\.|\\\\.\\\\.)(?:/|$))(?!.*//)(?!.*\\\\\\\\)[A-Za-z0-9._/-]+$"
+              }
+            },
+            "required": [
+              "strategy",
+              "ref",
+              "artifactRef",
+              "exposure"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "tool"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "implementation": {
+            "properties": {
+              "ref": {
+                "pattern": "^tool:[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)$"
+              }
+            },
+            "required": [
+              "strategy",
+              "ref",
               "exposure"
             ]
           }

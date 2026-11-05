@@ -13,7 +13,8 @@
     "entryNode",
     "nodes",
     "edges",
-    "terminalNodes"
+    "terminalNodes",
+    "cyclePolicy"
   ],
   "properties": {
     "schemaVersion": {
@@ -98,6 +99,9 @@
       "items": {
         "type": "string"
       }
+    },
+    "cyclePolicy": {
+      "const": "DAG_ONLY"
     }
   },
   "$defs": {
@@ -125,7 +129,48 @@
           ]
         },
         "value": {}
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operator": {
+                "enum": [
+                  "equals",
+                  "notEquals"
+                ]
+              }
+            },
+            "required": [
+              "operator"
+            ]
+          },
+          "then": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operator": {
+                "const": "exists"
+              }
+            },
+            "required": [
+              "operator"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "value"
+              ]
+            }
+          }
+        }
+      ]
     },
     "controlEdge": {
       "type": "object",
