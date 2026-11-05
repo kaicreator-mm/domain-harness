@@ -2,14 +2,41 @@
   "schemaVersion": "dis.resource-closure/0.1.0",
   "packageId": "xdownload.web-media",
   "resources": [
-    {"path":"domain/schemas/decision-input.schema.json","sha256":"4c6acad2cfef8097c9c70aab0fc64c6c91bb4b974b57c89556fb7daa2d5e69f6"},
-    {"path":"domain/schemas/decision-output.schema.json","sha256":"a59cf16f1052af45745ba612c047ccbe500ad3c075140978bb5bb0d1a766e47c"},
-    {"path":"domain/schemas/domain-definition.schema.json","sha256":"5c3c5a894b29c45834f62e2e0ffc83192beec751236c05bf0d6eb47c056e107c"},
-    {"path":"domain/schemas/outcome.schema.json","sha256":"cda13326c990929852984cde37dc570a9275b0344e6a2d357b3ad801bfa4062c"},
-    {"path":"domain/schemas/page-observation.schema.json","sha256":"d5b6bf18f1f203dadf9f8941e2ca4297307875525b74ebfd5000aa1f0416f263"},
-    {"path":"domain/schemas/recognition-result.schema.json","sha256":"efebac16bee6c7610d267b16f93ce2f61de5d5b7d91d34824c30c8e3d991469b"},
-    {"path":"domain/schemas/resolution.schema.json","sha256":"10f183fa8f423b02d5cd348419698c16b336e915f9de5a89ac24c577ca718c22"},
-    {"path":"domain/schemas/resolve-input.schema.json","sha256":"4c6acad2cfef8097c9c70aab0fc64c6c91bb4b974b57c89556fb7daa2d5e69f6"},
-    {"path":"domain/schemas/validator-input.schema.json","sha256":"1c8d34a6eb552973877cfd5fb23847a7aae0fcfbd868ed5187a678975b4e708b"}
+    {
+      "path": "domain/schemas/decision-input.schema.json",
+      "sha256": "a31b8198ed991ba1c12ae07023b0bf64d8a74adc3cb2f3976d4e97605577a7f9"
+    },
+    {
+      "path": "domain/schemas/decision-output.schema.json",
+      "sha256": "2daa8da3b3deb42893a2b7a227672e6cb2ab6b366dbab362227ee6ae6e63ca71"
+    },
+    {
+      "path": "domain/schemas/domain-definition.schema.json",
+      "sha256": "429202e450af2b12528c3ef2a1c862cff07be3c1bf105021ed3f4809f0f66bae"
+    },
+    {
+      "path": "domain/schemas/outcome.schema.json",
+      "sha256": "4bb3242846847234628d2112a7690c05dc6b80817cccf0ac8ae71ea6ad7aa7a0"
+    },
+    {
+      "path": "domain/schemas/page-observation.schema.json",
+      "sha256": "21d4866967caf6c8df7d8760845e51f73b99814fad45c4b2c9e6030bfa99efbb"
+    },
+    {
+      "path": "domain/schemas/recognition-result.schema.json",
+      "sha256": "583738178c74dc94749b8eca37344c8eebd817b1c095b849be25b0d40c8ba153"
+    },
+    {
+      "path": "domain/schemas/resolution.schema.json",
+      "sha256": "62b49a5fa0a0a1baa1d6431047df60c1220c226ca6c121e469b9939574aad162"
+    },
+    {
+      "path": "domain/schemas/resolve-input.schema.json",
+      "sha256": "a31b8198ed991ba1c12ae07023b0bf64d8a74adc3cb2f3976d4e97605577a7f9"
+    },
+    {
+      "path": "domain/schemas/validator-input.schema.json",
+      "sha256": "96dfaaee6a401d7bd3b76061b7bb0a134fdf13699c4fb15708b19aaa2cd424eb"
+    }
   ]
 }
