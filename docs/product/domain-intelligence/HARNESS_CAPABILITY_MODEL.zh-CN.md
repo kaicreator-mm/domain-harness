@@ -62,7 +62,7 @@ Harness 必须在选定 Domain Scope 和 Consumer Profile 内处理请求，明�
 3. Applicable Promoted Reusable Subworkflow；
 4. Bounded HarnessMachine / LLM Fallback。
 
-Exact Reuse 不得被 Promoted Subworkflow 交换到后面或前面。适用性、Schema/Revision/Provenance 和精确版本不匹配时不得模糊命中。没有合格智能时可以返回 unavailable、clarification、refusal 或 bounded fallback；不能为“有回答”而强制调用 LLM。
+Exact Reuse 不得被 Promoted Subworkflow 交换到后面或前面。适用性、Schema/Revision/Provenance 和精确版本不匹配时不得模糊命中。现有 Semantic Decision 对 Procedure 做 exact id/revision pin，但该 Pin 本身不证明 Procedure 已 Promotion；被选 Registry / Consumer 必须保证它确实是适用且已晋升的资产。没有合格智能时可以返回 unavailable、clarification、refusal 或 bounded fallback；不能为“有回答”而强制调用 LLM。
 
 ### 3.3 Context Engine — 上下文计划、获取与组装
 
@@ -74,7 +74,7 @@ Context Engine 将已授权的来源观察组织为当前决策所需的最小�
 - 在新观察到达后有界刷新上下文，而不是无界累积历史；
 - 对敏感内容执行最小化，不把完整私有历史或隐藏 Chain-of-Thought 作为必要输入。
 
-检索和物理读取由 Host / 已声明 Tool 执行；Context Feature 不得伪装成 Host 授权或实际 Memory 读取。存储技术不在本 Product/L1 指定。
+检索和物理读取由 Host / 已声明 Tool 执行；Context Feature 不得伪装成 Host 授权或实际 Memory 读取。现有 Feature 按 observation id 排序而非语义相关性排序；Host Memory 的 search 是授权的 key-prefix 搜索，不是语义检索。存储技术不在本 Product/L1 指定。
 
 ### 3.4 Bounded Reasoning Episode — 有界推理过程
 
@@ -132,7 +132,7 @@ Evaluation 不等于“JSON 可解析”或“LLM 返回 completed”。Harness 
 
 模型是可选的有界后备，不是 Harness 的控制权威。Provider Host 负责凭据、Endpoint、Model Allowlist、Deadline、协议适配、错误分类和 UNKNOWN 语义。Domain Intelligence 与 Business Policy 不应依赖某个 Provider 私有字段。
 
-Provider Connectivity、Structured Output、Tool Proposal、Streaming、Provider Fallback、Token/Cost Budget 是不同能力，必须逐项核验；不能因为存在 LLM Adapter 就宣称 Harness Reasoning 完整。
+Provider Connectivity、Structured Output、Tool Proposal、Streaming、Provider Fallback、Token/Cost Budget 是不同能力，必须逐项核验。当前 Provider 为非流式单次请求；OpenAI 只支持 JSON object 而拒绝 outputSchemaRef，Anthropic 当前拒绝 JSON、temperature 和 outputSchemaRef；两者均不提供隐式 Provider Fallback。Semantic Decision 虽允许声明 maxModelCalls 0..4，但一次 resolve 调用当前最多执行一次 fallback，不能据此推断多轮模型循环。不能因为存在 LLM Adapter 就宣称 Harness Reasoning 完整。
 
 ### 3.9 Evidence / Meta Feedback — 执行证据与改进候选
 
@@ -147,9 +147,9 @@ Harness 应产生可检查的结构化事实：选中的智能来源及版本、
 | 能力 | 当前分类 | v0.10.3 事实与边界 |
 |---|---|---|
 | Domain / Goal Understanding | MISSING（通用公共 Harness 能力）；CONSUMER_OWNED（业务意图） | 公开 SDK 没有通用自然语言 Goal/Domain Recognizer 产品接口；Business Intent、Domain Scope 和领域语义由消费者提供。 |
-| Context Assembly | PARTIAL | selected Context Assembly 只处理调用方传入的 observations；做 Scope 校验、Provenance 结构、排序和预算。它不读取 Memory/Tool/Model，不证明 Host 授权，verification 标为 caller-reported。 |
-| Scoped Memory | SUPPORTED（Host-owned） | Host-Node 提供按 deployment/tenant/app/B/agent/thread 隔离的 put/get/search/delete、Host authorize、Provenance、TTL 和 CAS；它没有自动接入 Context Assembly 的检索/刷新闭环。 |
-| Semantic Decision | PARTIAL | selected Feature 支持 Rule → Exact Reuse → exact-pinned Procedure → 单次 Model/Tool fallback；具有步数/调用/deadline 限制和 authority-field 拒绝。它不是通用多轮 Reasoning Runtime。 |
+| Context Assembly | PARTIAL | selected Context Assembly 只处理调用方传入的 observations；做 Scope 校验、Provenance 结构、按 ID 排序和预算，不做语义相关性检索。它不读取 Memory/Tool/Model，不证明 Host 授权，verification 标为 caller-reported。 |
+| Scoped Memory | SUPPORTED（Host-owned） | Host-Node 提供按 deployment/tenant/app/B/agent/thread 隔离的 put/get/search/delete、Host authorize、Provenance、TTL 和 CAS；search 是 key-prefix 搜索，没有自动接入 Context Assembly 的语义检索/刷新闭环。 |
+| Semantic Decision | PARTIAL | selected Feature 支持 Rule → Exact Reuse → exact-pinned Procedure → 单次 Model/Tool fallback；具有步数/调用/deadline 限制和 authority-field 拒绝。Procedure 的 exact pin 不自行证明 Promotion，且一次调用最多一个 fallback；它不是通用多轮 Reasoning Runtime。 |
 | Public multi-round HarnessMachine | MISSING（公开消费路径） | Monorepo private package 有 HarnessMachine 源码，可在有限步数内循环 Model + 预绑定 read-only Query Capability；Mutation Capability 被拒绝。该包 private 且不在四个公开 Tarball 中，不能计为已发布公共能力。 |
 | Tool Proposal | SUPPORTED（数据契约） | OpenAI / Anthropic Host 可以返回受限 Tool Proposal 数据；Proposal 本身没有 Permit 或执行权。 |
 | Proposal → Tool → Observation → Model loop | MISSING（通用公共闭环） | Provider C 仅将单次 Host 结果包装为 K External Effect Terminal；不自动执行模型提出的 Tool，不把 Tool 结果重新送入模型。 |
@@ -157,7 +157,7 @@ Harness 应产生可检查的结构化事实：选中的智能来源及版本、
 | Workflow / WAIT / RESUME / Child | PARTIAL | Workflow Control 是纯 Proposal Planner；Host Durable Controls + K 提供 CAS、Callback/Deadline、Child、Replay/Recovery。它是业务流程连续性，不是通用 Reasoning Loop Scheduler。 |
 | Outcome Evaluation | PARTIAL / CONSUMER_OWNED | Schema、Feature Guards、B Policy、K Invariants 能验证结构与业务转移；证据充分性、领域正确性和最终接受标准仍由 Domain Consumer 声明。 |
 | State / Effect / Journal / Replay | KERNEL_OWNED | 单一 K/Microkernel 权威；不得在 Harness、Feature、Host 或 LLM 中复制。 |
-| Provider Transport | SUPPORTED（Node Host） | OpenAI-compatible 与 Anthropic Messages Host 子路径、neutral LLM DTO、selected C route 和 K Effect 路径存在；Node >=24，非流式单次请求，无隐式 Provider Fallback。 |
+| Provider Transport | SUPPORTED（Node Host） | OpenAI-compatible 与 Anthropic Messages Host 子路径、neutral LLM DTO、selected C route 和 K Effect 路径存在；Node >=24，非流式单次请求。OpenAI/Anthropic 的结构化输出能力不同，Schema Ref 当前不支持；无隐式 Provider Fallback。 |
 | Context/Provider Cost Policy | PARTIAL | DTO/Host 有 deadline、token usage 和错误类别；通用成本策略、动态模型选择、跨 Provider 自动降级和 streaming 未构成统一 Harness 产品能力。 |
 | Decision Evidence | SUPPORTED（Host bridge） | DecisionEvidenceObserver 可调用 selected Semantic Feature、读取真实 K Receipt、Host 计数 Model/Tool 调用并输出不可变 Trace；不是通用领域结果评估器。 |
 | Meta Feedback | SUPPORTED（proposal-only） | Host Workflow 读取有界 Evidence/Candidate/Shadow，调用 selected Feature 生成有限 Proposal，并以 CAS/稳定消息身份写入 Ledger；没有自动批准、Promotion、Activation 或 Effect。 |
