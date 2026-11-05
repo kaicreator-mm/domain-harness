@@ -241,7 +241,7 @@ test('private data-only Units need not declare an implementation exposure', asyn
   assert.equal(validateDefinition(definition, units, loaded.graph, 'domain/player-recognition.graph.json'), true);
 });
 
- 
+
 test('exists control conditions may inspect declared optional output properties', async () => {
   const loaded = await loadedPromise;
   const graph = structuredClone(loaded.graph);
