@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, DisExecutionError } from '../src/runner.mjs';
+import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, assertInsidePackage, DisExecutionError } from '../src/runner.mjs';
 import { loadVerifiedDemo, verifyResourceClosure } from '../src/verified-loader.mjs';
 
 const loadedPromise = loadVerifiedDemo();
@@ -121,4 +123,56 @@ test('resource closure manifest pins every resolved schema digest', async () => 
   const tampered = structuredClone(loaded.closureManifest);
   tampered.resources[0].sha256 = '0'.repeat(64);
   assert.throws(() => verifyResourceClosure({ resources: loaded.resources }, tampered), hasCode('RESOURCE_DIGEST_MISMATCH'));
+});
+
+
+test('recognizer preserves value provenance and uncertainty independently', async () => {
+  const loaded = await loadedPromise;
+  const known = await runPipeline({ url: 'https://example.test/watch', signals: ['jwplayer'] }, loaded);
+  const recognized = known.trace.find((entry) => entry.unitId === 'xdownload.player.recognizer').output;
+  assert.deepEqual(recognized.values.playerId, {
+    value: 'jwplayer', source: 'DERIVED', status: 'INFERRED', evidence: ['page-observation'],
+  });
+  const unknown = await runPipeline({ url: 'https://example.test/watch', signals: ['unknown-player'] }, loaded);
+  const unknownValue = unknown.trace.find((entry) => entry.unitId === 'xdownload.player.recognizer').output.values.playerId;
+  assert.equal(unknownValue.source, 'SYSTEM_OBSERVED');
+  assert.equal(unknownValue.status, 'UNKNOWN');
+});
+
+test('required input has exactly one source on every control-flow path', async () => {
+  const loaded = await loadedPromise;
+  const graph = structuredClone(loaded.graph);
+  graph.edges.push({ kind: 'data', from: { node: 'decide', pointer: '' }, to: { node: 'resolve-known', pointer: '/recognition' } });
+  assert.throws(() => validateGraph(graph, loaded.unitsById, loaded.schemas), hasCode('REQUIRED_INPUT_BINDING_NOT_EXACTLY_ONE_ON_EVERY_PATH'));
+});
+
+test('control cycles are rejected under DAG_ONLY', async () => {
+  const loaded = await loadedPromise;
+  const graph = structuredClone(loaded.graph);
+  graph.edges.push({ kind: 'control', from: 'validate', to: 'recognize' });
+  assert.throws(() => validateGraph(graph, loaded.unitsById, loaded.schemas), hasCode('CONTROL_CYCLE'));
+});
+
+test('evidence source must be a required output property', async () => {
+  const loaded = await loadedPromise;
+  const schemas = new Map(loaded.schemas);
+  const altered = structuredClone(schemas.get('domain/schemas/recognition-result.schema.json'));
+  altered.required = altered.required.filter((field) => field !== 'evidence');
+  schemas.set('domain/schemas/recognition-result.schema.json', altered);
+  assert.throws(() => validateGraph(loaded.graph, loaded.unitsById, schemas), hasCode('EVIDENCE_SOURCE_NOT_REQUIRED'));
+});
+
+test('symlinks cannot escape the Package root', async () => {
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'dis-path-safety-'));
+  const root = path.join(temporary, 'package');
+  const outside = path.join(temporary, 'outside.txt');
+  const link = path.join(root, 'escape.txt');
+  try {
+    await fs.mkdir(root);
+    await fs.writeFile(outside, 'outside');
+    await fs.symlink(outside, link);
+    await assert.rejects(() => assertInsidePackage(root, link), hasCode('RESOURCE_PATH_ESCAPE'));
+  } finally {
+    await fs.rm(temporary, { recursive: true, force: true });
+  }
 });

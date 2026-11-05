@@ -25,7 +25,7 @@ Initial schemaRef was validated only as a string. Revised to safe Package-root-r
 
 - Existing Semantic/Tool Component families remain unchanged.
 - Private Procedure remains private; no new Tool or Hook semantics are introduced.
-- KDP remains the single Runtime/State/Effect authority.
+- The frozen v0.7 Kernel/Microkernel, Domain Runtime and Host/Effect contracts remain the only execution authority. #1480 KDP is a non-frozen Product/L1 candidate and is non-normative for DIS 0.1.0.
 - No SDK source, public ABI, Manifest/BUILD ABI, v0.10.3 tag, release, deployment or main branch was modified.
 - This remains a standards experiment and does not claim the current DomainHarness Runtime consumes DIS.
 
@@ -65,3 +65,23 @@ Final verification is recorded separately in `FINAL_VALIDATION.md` and `final-va
 - Final machine report: `validation/dis-0.1.0/final-validation.json`.
 - Human-readable report: `validation/dis-0.1.0/FINAL_VALIDATION.md`.
 - Validation commit: this commit, immediately following the tested demo/standard conformance commit above.
+
+
+## DIS 0.1.0 L2 candidate refinement R1
+
+The L2 review identified F001–F007 plus six additional clarifications. The candidate refinement records:
+
+- **F001 (P1):** Design-time production/qualification and runtime consumption are separate, connected lifecycle planes; DomainForge internals are not prescribed.
+- **F002 (P1):** #1480 KDP is explicitly non-frozen; DIS inherits the frozen v0.7 Kernel/Microkernel, Domain Runtime and Host/Effect contracts.
+- **F003 (P1):** Reference Consumer emits actual per-Node input/evidence/output traces; Python Conformance validates those exact payloads instead of reconstructing inputs by Demo node names.
+- **F004 (P1):** Definition pins Workflow Unit and Graph identities; every Graph Node Unit must be declared exactly once in the Definition.
+- **F005 (P1):** Complete Resource Closure includes Units, Graph, Definition, Schemas, fixtures, implementation artifacts and conformance assets. Package descriptor pins the exact manifest SHA-256.
+- **F006 (P1):** Typed registry/graph/tool implementation references are explicit; arbitrary dynamic imports are rejected.
+- **F007 (P1):** Required input bindings are checked path-sensitively for exactly one source on every path; output/evidence sources must be required properties.
+- **F008 (P2):** Realpath containment and a symlink-escape negative test supplement lexical path checks.
+- **F009 (P2):** DIS 0.1.0 is strictly DAG-only; loops/retries are deferred.
+- **F010 (P2):** Recognizer values preserve source provenance separately from status and uncertainty; Dynamic Form remains optional and grants no authority.
+- **F011 (P2):** EXECUTED is an occurrence/evidence fact, not Unit qualification mutation.
+- **F012 (P2):** A second materially different Domain Profile remains a pre-release-qualification gate; xDownload alone is not a generality proof.
+
+This revision is a candidate refinement, not a final validation claim. Exact-HEAD Node/Python execution, Woodpecker status, bilingual review and independent Exact-SHA review are required before an L2 Freeze Checkpoint.

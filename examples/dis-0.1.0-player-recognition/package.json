@@ -12,6 +12,14 @@
     "revision": "1.0.0",
     "standardVersion": "0.1.0",
     "resourceClosurePath": "domain/resource-closure.json",
-    "resourceClosureSha256": "PENDING"
+    "resourceClosureSha256": "PENDING",
+    "conformanceResources": [
+      "src/verified-loader.mjs",
+      "src/emit-conformance-traces.mjs",
+      "src/run-demo.mjs",
+      "scripts/validate.py",
+      "test/runner.test.mjs",
+      "requirements-validation.txt"
+    ]
   }
 }

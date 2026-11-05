@@ -9,13 +9,13 @@ The demo proves:
 - Control edges select execution paths; data edges bind values without scheduling nodes; evidence edges preserve provenance independently.
 - The known-player route resolves through a private Procedure; ambiguous/unknown cases go to bounded clarification/review.
 - Required inputs and evidence slots must be bound.
-- Schema references and nested local references are resolved inside the package resource closure and receive SHA-256 digests.
-- Missing resources and path traversal are rejected.
+- All required Unit, Graph, Definition, Schema, fixture, implementation and conformance resources are closed by path, kind, owner and SHA-256; the Package descriptor pins the exact manifest digest. Symlink escapes are rejected.
+- Missing resources, path traversal and symlink escapes are rejected.
 - Private Procedures remain private and are not wrapped or reclassified as Tools.
 
 The first iteration and its findings remain in Git history and validation/dis-0.1.0/INITIAL_VALIDATION.md. The revised 15-test suite, five-schema self-validation, six Unit checks, Graph/Definition/resource closure checks, and all 16 node input/output contract checks are recorded in `validation/dis-0.1.0/FINAL_VALIDATION.md`.
 
-This is a standards proof, not a production xDownload implementation and not evidence that the current DomainHarness Runtime already consumes DIS. The runner is a small reference consumer for the DIS model, not a replacement Runtime or KDP.
+This is a standards proof, not a production xDownload implementation and not evidence that the current DomainHarness Runtime already consumes DIS. The runner is a small reference consumer for the DIS model, not a replacement for the frozen DomainHarness v0.7 Kernel/Microkernel, Domain Runtime or Host/Effect contracts. The #1480 KDP proposal is not frozen and is non-normative here.
 
 
 The signature and strategy catalogs under `fixtures/` are the actual sources consumed by Recognizer and Procedure; Unit evidence references these package resources. The 0.1.0 Graph pointer profile intentionally supports only the root output object or one top-level property pointer. Nested JSON Pointers are rejected rather than partially validated.

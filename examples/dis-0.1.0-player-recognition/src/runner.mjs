@@ -278,7 +278,11 @@ export function validateGraph(graph, unitsById, schemas) {
       if (!isTopLevelPointer(edge.when.path, true)) throw new DisExecutionError('INVALID_CONDITION_POINTER', edge.when.path);
       const sourceUnit = unitsById.get(nodesById.get(edge.from).unitRef.id);
       const sourceSchema = schemas.get(sourceUnit.output.schemaRef);
-      if (edge.when.path !== '' && !sourceSchema?.properties?.[pointerProperty(edge.when.path)]) throw new DisExecutionError('UNKNOWN_CONDITION_OUTPUT_POINTER', edge.from + edge.when.path);
+      if (edge.when.path !== '') {
+        const conditionProperty = pointerProperty(edge.when.path);
+        if (!sourceSchema?.properties?.[conditionProperty]) throw new DisExecutionError('UNKNOWN_CONDITION_OUTPUT_POINTER', edge.from + edge.when.path);
+        if (!requiredProperties(sourceSchema).includes(conditionProperty)) throw new DisExecutionError('CONDITION_SOURCE_NOT_REQUIRED', edge.from + edge.when.path);
+      }
       if (['equals', 'notEquals'].includes(edge.when.operator) && !Object.hasOwn(edge.when, 'value')) throw new DisExecutionError('CONDITION_VALUE_REQUIRED', edge.from);
       if (edge.when.operator === 'exists' && Object.hasOwn(edge.when, 'value')) throw new DisExecutionError('EXISTS_CONDITION_FORBIDS_VALUE', edge.from);
     }
@@ -291,7 +295,11 @@ export function validateGraph(graph, unitsById, schemas) {
     if (!isTopLevelPointer(edge.from.pointer, true) || !isTopLevelPointer(edge.to.pointer, false)) throw new DisExecutionError('INVALID_DATA_POINTER', edge.from.node + '->' + edge.to.node);
     const sourceUnit = unitsById.get(nodesById.get(edge.from.node).unitRef.id);
     const sourceSchema = schemas.get(sourceUnit.output.schemaRef);
-    if (edge.from.pointer !== '' && !sourceSchema?.properties?.[pointerProperty(edge.from.pointer)]) throw new DisExecutionError('UNKNOWN_SOURCE_OUTPUT_POINTER', edge.from.node + edge.from.pointer);
+    if (edge.from.pointer !== '') {
+      const sourceProperty = pointerProperty(edge.from.pointer);
+      if (!sourceSchema?.properties?.[sourceProperty]) throw new DisExecutionError('UNKNOWN_SOURCE_OUTPUT_POINTER', edge.from.node + edge.from.pointer);
+      if (!requiredProperties(sourceSchema).includes(sourceProperty)) throw new DisExecutionError('SOURCE_OUTPUT_NOT_REQUIRED', edge.from.node + edge.from.pointer);
+    }
     const targetUnit = unitsById.get(nodesById.get(edge.to.node).unitRef.id);
     const targetSchema = schemas.get(targetUnit.input.schemaRef);
     if (!targetSchema?.properties?.[pointerProperty(edge.to.pointer)]) throw new DisExecutionError('UNKNOWN_TARGET_INPUT_POINTER', edge.to.node + edge.to.pointer);
@@ -306,7 +314,9 @@ export function validateGraph(graph, unitsById, schemas) {
     if (!isTopLevelPointer(edge.from.pointer, false)) throw new DisExecutionError('INVALID_EVIDENCE_SOURCE_POINTER', edge.from.pointer);
     const sourceUnit = unitsById.get(nodesById.get(edge.from.node).unitRef.id);
     const sourceSchema = schemas.get(sourceUnit.output.schemaRef);
-    if (!sourceSchema?.properties?.[pointerProperty(edge.from.pointer)]) throw new DisExecutionError('UNKNOWN_EVIDENCE_SOURCE_POINTER', edge.from.node + edge.from.pointer);
+    const evidenceProperty = pointerProperty(edge.from.pointer);
+    if (!sourceSchema?.properties?.[evidenceProperty]) throw new DisExecutionError('UNKNOWN_EVIDENCE_SOURCE_POINTER', edge.from.node + edge.from.pointer);
+    if (!requiredProperties(sourceSchema).includes(evidenceProperty)) throw new DisExecutionError('EVIDENCE_SOURCE_NOT_REQUIRED', edge.from.node + edge.from.pointer);
     const targetUnit = unitsById.get(nodesById.get(edge.to.node).unitRef.id);
     if (!(targetUnit.evidence.consumes || []).includes(edge.to.slot)) throw new DisExecutionError('UNDECLARED_EVIDENCE_SLOT', edge.to.slot);
   }
@@ -408,11 +418,27 @@ export function recognizePlayer(input, context) {
     const marker = pattern.markers.find((candidate) => haystack.includes(candidate.toLowerCase()));
     return marker ? [{ playerId: pattern.playerId, marker }] : [];
   });
-  const status = matches.length === 1 ? 'recognized' : matches.length > 1 ? 'ambiguous' : 'unknown';
+  const candidates = [...new Set(matches.map((match) => match.playerId))];
+  const status = candidates.length === 1 ? 'recognized' : candidates.length > 1 ? 'ambiguous' : 'unknown';
   const evidence = matches.length
     ? matches.map((match) => ({ sourceId: 'page-observation', kind: 'observation', ref: input.url, claim: 'matched marker ' + match.marker }))
     : [{ sourceId: 'page-observation', kind: 'observation', ref: input.url, claim: 'no supported player marker found' }];
-  return { status, candidates: matches.map((match) => match.playerId), evidence, sourceUrl: input.url };
+  const evidenceRefs = evidence.map((item) => item.sourceId);
+  const values = status === 'recognized'
+    ? { playerId: { value: candidates[0], source: 'DERIVED', status: 'INFERRED', evidence: evidenceRefs } }
+    : status === 'ambiguous'
+      ? { playerCandidates: { value: candidates, source: 'DERIVED', status: 'CANDIDATE', evidence: evidenceRefs } }
+      : { playerId: { value: null, source: 'SYSTEM_OBSERVED', status: 'UNKNOWN', evidence: evidenceRefs } };
+  return {
+    status, candidates, evidence, sourceUrl: input.url, values,
+    missingFields: status === 'recognized' ? [] : ['playerId'],
+    ambiguities: status === 'ambiguous' ? [{ field: 'playerId', candidates }] : [],
+    conflicts: [],
+    uncertainty: {
+      level: status === 'recognized' ? 'LOW' : status === 'ambiguous' ? 'HIGH' : 'UNKNOWN',
+      reason: status === 'recognized' ? 'one supported deterministic signature matched' : status === 'ambiguous' ? 'multiple supported player identities matched' : 'no supported player signature matched',
+    },
+  };
 }
 
 export function routeRecognition(input) {
@@ -460,7 +486,10 @@ export const handlers = {
 export async function loadDemo() {
   const descriptor = JSON.parse(await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8'));
   const packageIdentity = descriptor.dis;
-  if (!packageIdentity || packageIdentity.standardVersion !== '0.1.0' || !isSafePackageRelativeRef(packageIdentity.resourceClosurePath)) {
+  if (!packageIdentity || packageIdentity.standardVersion !== '0.1.0' ||
+      !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(packageIdentity.revision || '') ||
+      !/^[a-f0-9]{64}$/.test(packageIdentity.resourceClosureSha256 || '') ||
+      !isSafePackageRelativeRef(packageIdentity.resourceClosurePath)) {
     throw new DisExecutionError('INVALID_PACKAGE_DESCRIPTOR', 'DIS package identity and closure binding are required');
   }
   const manifestBytes = await readPackageResource(packageRoot, packageIdentity.resourceClosurePath);
@@ -524,9 +553,47 @@ export async function loadDemo() {
     }
   }
   const schemas = schemaClosure.schemas;
+  const expectedResources = new Map();
+  function expectResource(resourcePath, kind, owner) {
+    if (!isSafePackageRelativeRef(resourcePath)) throw new DisExecutionError('UNSAFE_PACKAGE_RESOURCE_PATH', String(resourcePath));
+    const existing = expectedResources.get(resourcePath);
+    if (existing && existing.kind !== kind) throw new DisExecutionError('RESOURCE_KIND_CONFLICT', resourcePath);
+    const owners = new Set(existing?.owners || []);
+    owners.add(owner || packageIdentity.packageId);
+    expectedResources.set(resourcePath, { kind, owners });
+  }
+  expectResource(manifest.definitionRef.path, 'definition', definition.domainId);
+  expectResource(manifest.graphRef.path, 'graph', graph.id);
+  for (const unitRef of manifest.units) expectResource(unitRef.path, 'unit', unitRef.id);
+  for (const resourcePath of schemaClosure.resources.keys()) expectResource(resourcePath, 'schema', packageIdentity.packageId);
+  for (const unit of units) {
+    if (unit.implementation?.artifactRef) expectResource(unit.implementation.artifactRef, unit.role === 'workflow' ? 'graph' : 'implementation', unit.id);
+    for (const source of unit.evidence.sources || []) {
+      const sourcePath = source.ref;
+      if (!isSafePackageRelativeRef(sourcePath)) throw new DisExecutionError('UNSAFE_EVIDENCE_SOURCE_REF', sourcePath);
+      const sourceKind = expectedResources.get(sourcePath)?.kind ||
+        (sourcePath.startsWith('fixtures/') ? 'fixture' :
+          sourcePath.startsWith('domain/schemas/') ? 'schema' :
+            sourcePath.startsWith('domain/units/') ? 'unit' : 'conformance');
+      expectResource(sourcePath, sourceKind, unit.id);
+    }
+    if (unit.validation?.casesRef) expectResource(unit.validation.casesRef, 'conformance', unit.id);
+  }
+  if (!Array.isArray(packageIdentity.conformanceResources)) throw new DisExecutionError('MISSING_CONFORMANCE_RESOURCE_DECLARATIONS', packageIdentity.packageId);
+  for (const resourcePath of packageIdentity.conformanceResources) expectResource(resourcePath, 'conformance', packageIdentity.packageId);
   const signaturesPath = 'fixtures/player-signatures.json';
   const strategiesPath = 'fixtures/player-strategies.json';
-  if (!resourceEntries.has(signaturesPath) || !resourceEntries.has(strategiesPath)) throw new DisExecutionError('FIXTURE_RESOURCE_NOT_CLOSED', 'signature and strategy catalogs are required');
+  expectResource(signaturesPath, 'fixture', packageIdentity.packageId);
+  expectResource(strategiesPath, 'fixture', packageIdentity.packageId);
+  for (const [resourcePath, expected] of expectedResources) {
+    const entry = resourceEntries.get(resourcePath);
+    if (!entry) throw new DisExecutionError('RESOURCE_CLOSURE_MISSING_REQUIRED_RESOURCE', resourcePath);
+    if (entry.kind !== expected.kind || entry.required !== true) throw new DisExecutionError('RESOURCE_CLOSURE_KIND_OR_REQUIRED_MISMATCH', resourcePath);
+    for (const owner of expected.owners) if (!entry.owners.includes(owner)) throw new DisExecutionError('RESOURCE_CLOSURE_OWNER_MISMATCH', resourcePath + ':' + owner);
+  }
+  for (const entry of manifest.resources) {
+    if (entry.required && !expectedResources.has(entry.path)) throw new DisExecutionError('RESOURCE_CLOSURE_HAS_UNREFERENCED_REQUIRED_RESOURCE', entry.path);
+  }
   const catalogs = {
     signatures: JSON.parse(resourceContents.get(signaturesPath)),
     strategies: JSON.parse(resourceContents.get(strategiesPath)),
