@@ -12,7 +12,7 @@
     "revision": "1.0.0",
     "standardVersion": "0.1.0",
     "resourceClosurePath": "domain/resource-closure.json",
-    "resourceClosureSha256": "cf73b6129c9a6de3592a9520002a3a5cb2a6cc4c0f5e901f5bd0aa42dc9a32d0",
+    "resourceClosureSha256": "4e8963268dd0db4f58f0c133ba31e26b252c6a01d73f6731a37018f3774b88c6",
     "conformanceResources": [
       "src/verified-loader.mjs",
       "src/emit-conformance-traces.mjs",

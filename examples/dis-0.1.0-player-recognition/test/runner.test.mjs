@@ -280,6 +280,20 @@ test('optional input data binding may be absent on paths where its source does n
   });
   assert.equal(validateGraph(graph, loaded.unitsById, schemas), true);
 
+  const known = await runPipeline(
+    { url: 'https://example.test/watch', signals: ['jwplayer.setup({})'] },
+    { ...loaded, graph, schemas },
+  );
+  const knownValidatorInput = known.trace.find((entry) => entry.nodeId === 'validate').input;
+  assert.equal(knownValidatorInput.optionalStatus, 'READY');
+
+  const unknown = await runPipeline(
+    { url: 'https://example.test/watch', signals: ['custom-player'] },
+    { ...loaded, graph, schemas },
+  );
+  const unknownValidatorInput = unknown.trace.find((entry) => entry.nodeId === 'validate').input;
+  assert.equal(Object.hasOwn(unknownValidatorInput, 'optionalStatus'), false);
+
   const duplicate = structuredClone(graph);
   duplicate.edges.push({
     kind: 'data',
