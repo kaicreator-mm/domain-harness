@@ -1,42 +1,294 @@
 {
   "schemaVersion": "dis.resource-closure/0.1.0",
   "packageId": "xdownload.web-media",
+  "packageRevision": "1.0.0",
+  "standardVersion": "0.1.0",
+  "definitionRef": {
+    "id": "xdownload.web-media",
+    "revision": "1.0.0",
+    "path": "domain/definition.json"
+  },
+  "graphRef": {
+    "id": "xdownload.player-recognition",
+    "revision": "1.0.0",
+    "path": "domain/player-recognition.graph.json"
+  },
+  "units": [
+    {
+      "id": "xdownload.player.recognizer",
+      "revision": "1.0.0",
+      "path": "domain/units/recognizer.json"
+    },
+    {
+      "id": "xdownload.player.route-decision",
+      "revision": "1.0.0",
+      "path": "domain/units/decision.json"
+    },
+    {
+      "id": "xdownload.player.resolve-procedure",
+      "revision": "1.0.0",
+      "path": "domain/units/resolve-procedure.json"
+    },
+    {
+      "id": "xdownload.player.bounded-fallback",
+      "revision": "1.0.0",
+      "path": "domain/units/fallback-procedure.json"
+    },
+    {
+      "id": "xdownload.player.outcome-validator",
+      "revision": "1.0.0",
+      "path": "domain/units/validator.json"
+    },
+    {
+      "id": "xdownload.player-recognition.workflow",
+      "revision": "1.0.0",
+      "path": "domain/units/workflow.json"
+    }
+  ],
   "resources": [
     {
+      "path": "domain/definition.json",
+      "sha256": "c7212aff7b1ef1dc276a29e74a90748acac7a2dff039d29aebd3315ba42b4840",
+      "kind": "definition",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/player-recognition.graph.json",
+      "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e",
+      "kind": "graph",
+      "owners": [
+        "xdownload.player-recognition",
+        "xdownload.player-recognition.workflow",
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
       "path": "domain/schemas/decision-input.schema.json",
-      "sha256": "a31b8198ed991ba1c12ae07023b0bf64d8a74adc3cb2f3976d4e97605577a7f9"
+      "sha256": "a31b8198ed991ba1c12ae07023b0bf64d8a74adc3cb2f3976d4e97605577a7f9",
+      "kind": "schema",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
     },
     {
       "path": "domain/schemas/decision-output.schema.json",
-      "sha256": "3536c5c6152ccc8ca921aee675595b524b99e240889dcea58c690c421a4f7c33"
-    },
-    {
-      "path": "domain/schemas/domain-definition.schema.json",
-      "sha256": "429202e450af2b12528c3ef2a1c862cff07be3c1bf105021ed3f4809f0f66bae"
+      "sha256": "3536c5c6152ccc8ca921aee675595b524b99e240889dcea58c690c421a4f7c33",
+      "kind": "schema",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
     },
     {
       "path": "domain/schemas/outcome.schema.json",
-      "sha256": "4bb3242846847234628d2112a7690c05dc6b80817cccf0ac8ae71ea6ad7aa7a0"
+      "sha256": "4bb3242846847234628d2112a7690c05dc6b80817cccf0ac8ae71ea6ad7aa7a0",
+      "kind": "schema",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
     },
     {
       "path": "domain/schemas/page-observation.schema.json",
-      "sha256": "21d4866967caf6c8df7d8760845e51f73b99814fad45c4b2c9e6030bfa99efbb"
+      "sha256": "21d4866967caf6c8df7d8760845e51f73b99814fad45c4b2c9e6030bfa99efbb",
+      "kind": "schema",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
     },
     {
       "path": "domain/schemas/recognition-result.schema.json",
-      "sha256": "583738178c74dc94749b8eca37344c8eebd817b1c095b849be25b0d40c8ba153"
+      "sha256": "af1ec4586ab0de89630642d03b52e379b245976a6758c5962244a2dfce5cd285",
+      "kind": "schema",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
     },
     {
       "path": "domain/schemas/resolution.schema.json",
-      "sha256": "0d589454161afb8fd6eefaf15b3c22b7c8f044f75aed2dbaa142248685bb0b17"
+      "sha256": "0d589454161afb8fd6eefaf15b3c22b7c8f044f75aed2dbaa142248685bb0b17",
+      "kind": "schema",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
     },
     {
       "path": "domain/schemas/resolve-input.schema.json",
-      "sha256": "a31b8198ed991ba1c12ae07023b0bf64d8a74adc3cb2f3976d4e97605577a7f9"
+      "sha256": "a31b8198ed991ba1c12ae07023b0bf64d8a74adc3cb2f3976d4e97605577a7f9",
+      "kind": "schema",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
     },
     {
       "path": "domain/schemas/validator-input.schema.json",
-      "sha256": "96dfaaee6a401d7bd3b76061b7bb0a134fdf13699c4fb15708b19aaa2cd424eb"
+      "sha256": "96dfaaee6a401d7bd3b76061b7bb0a134fdf13699c4fb15708b19aaa2cd424eb",
+      "kind": "schema",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/decision.json",
+      "sha256": "94a292f9b5dcdd58b3dbf0c7a8c8a4c598a0c91aa002302d87804f52067dbe79",
+      "kind": "unit",
+      "owners": [
+        "xdownload.player.bounded-fallback",
+        "xdownload.player.route-decision"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/fallback-procedure.json",
+      "sha256": "3aff623e9c4db7a9fb7ab16c235ba8ffd00512909aa666dead34054adde1c656",
+      "kind": "unit",
+      "owners": [
+        "xdownload.player.bounded-fallback"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/recognizer.json",
+      "sha256": "7aca7be6daf851be47d28bc1b8631b895a7f710659a76ab64cfe49e5a7b87114",
+      "kind": "unit",
+      "owners": [
+        "xdownload.player-recognition.workflow",
+        "xdownload.player.outcome-validator",
+        "xdownload.player.recognizer",
+        "xdownload.player.route-decision"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/resolve-procedure.json",
+      "sha256": "706360dd2e4f12c893e6dfb43441880aa42655887936d04f645d221cb78c68a2",
+      "kind": "unit",
+      "owners": [
+        "xdownload.player.resolve-procedure"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/validator.json",
+      "sha256": "f821ce07a35c8a5ce0e8cab0b2f03614f880fdba04a48111bf51b76960b6d80a",
+      "kind": "unit",
+      "owners": [
+        "xdownload.player.outcome-validator"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/workflow.json",
+      "sha256": "67b753d80a395b4c933a891306fa99d189848d974e89dd2c08bfc0fcde581302",
+      "kind": "unit",
+      "owners": [
+        "xdownload.player-recognition.workflow"
+      ],
+      "required": true
+    },
+    {
+      "path": "fixtures/player-signatures.json",
+      "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
+      "kind": "fixture",
+      "owners": [
+        "xdownload.player.recognizer",
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "fixtures/player-strategies.json",
+      "sha256": "5f227b702fc2978ab82237b27b8650084265dc2578367dfbf5f74bb7b9949281",
+      "kind": "fixture",
+      "owners": [
+        "xdownload.player.resolve-procedure",
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "requirements-validation.txt",
+      "sha256": "756cc9e506ae4ee1a6f6c0507088b5cfc0dc8ba350fb2d2d46f1ffa72033adb6",
+      "kind": "conformance",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "scripts/validate.py",
+      "sha256": "686ef2907d5e57221e52baa7025371ffd461c2d478420dc3f66b85f70d1ccee1",
+      "kind": "conformance",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "src/emit-conformance-traces.mjs",
+      "sha256": "ee67eaabf9d2eb9d960c868aeefdd23508789fe717828dcdc02c67e5993520b6",
+      "kind": "conformance",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "src/run-demo.mjs",
+      "sha256": "e458bff6bdccbbaf84ddc2faa7ae397a0c0b5940f87f4babfd51c04362f72c4a",
+      "kind": "conformance",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "src/runner.mjs",
+      "sha256": "c8793aa5695c60479649a253e6faa9404832c2c5a7ad62a66c3df95addc00268",
+      "kind": "implementation",
+      "owners": [
+        "xdownload.player.bounded-fallback",
+        "xdownload.player.outcome-validator",
+        "xdownload.player.recognizer",
+        "xdownload.player.resolve-procedure",
+        "xdownload.player.route-decision",
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "src/verified-loader.mjs",
+      "sha256": "874aec5f05867297aebda82312ff615a75288e831b1efbdd80ece0956ce3db7f",
+      "kind": "conformance",
+      "owners": [
+        "xdownload.web-media"
+      ],
+      "required": true
+    },
+    {
+      "path": "test/runner.test.mjs",
+      "sha256": "02475712fc981bbfaedacdaada5cf06b9f7d9d9d62870435a260b9a451542cc2",
+      "kind": "conformance",
+      "owners": [
+        "xdownload.player-recognition.workflow",
+        "xdownload.player.bounded-fallback",
+        "xdownload.player.outcome-validator",
+        "xdownload.player.recognizer",
+        "xdownload.player.resolve-procedure",
+        "xdownload.player.route-decision",
+        "xdownload.web-media"
+      ],
+      "required": true
     }
   ]
 }
