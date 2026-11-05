@@ -340,7 +340,7 @@ test('unsupported control condition operators fail during Graph validation', asy
 
 test('selected Knowledge/Rule reference is digest-pinned and consumed by the Recognizer', async () => {
   const loaded = await loadedPromise;
-  const knowledge = loaded.knowledge['xdownload.player-signature-rules'];
+  const knowledge = loaded.knowledge['xdownload.player-signatures'];
   assert.equal(knowledge.catalogId, 'xdownload.player-signatures');
   assert.equal(knowledge.revision, '1.0.0');
   const result = await runPipeline({ url: 'https://example.test/watch', signals: ['jwplayer'] }, loaded);

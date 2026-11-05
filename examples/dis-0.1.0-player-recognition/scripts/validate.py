@@ -580,7 +580,7 @@ def validate_preconditions(unit: dict, payload):
             fail(f"precondition failed: {unit['id']}:{condition['path']}")
 
 
-def validate_capability_contracts(units_by_id: dict):
+def validate_capability_contracts(units_by_id: dict, resources: dict | None = None):
     providers = []
     for unit in units_by_id.values():
         for contract in unit.get("capabilities", {}).get("provides", []):
@@ -594,6 +594,8 @@ def validate_capability_contracts(units_by_id: dict):
             if len(candidates) != 1:
                 fail(f"ambiguous Capability provider: {requirement['capabilityId']}")
             provider = candidates[0]
+            if resources is not None and (resources.get(provider.get("inputSchemaRef")) != provider.get("inputSchemaDigest") or resources.get(provider.get("outputSchemaRef")) != provider.get("outputSchemaDigest")):
+                fail(f"Capability Schema digest mismatch: {requirement['capabilityId']}")
             same_identity = all(
                 provider.get(key) == requirement.get(key)
                 for key in ("owner", "authorityRef", "inputSchemaRef", "inputSchemaDigest",
@@ -644,12 +646,11 @@ def resolve_provider_selection(unit: dict, selection_lock: dict, target: str, re
         fail(f"incompatible provider target: {provider.get('candidateId')}")
     if candidate.get("contractDigest") != lock.get("contractDigest") or provider.get("contractDigest") != candidate.get("contractDigest"):
         fail(f"incompatible provider contract: {provider.get('candidateId')}")
-    for field, unit_field in (
-        ("unitRevision", "revision"), ("implementationRef", "ref"),
-        ("artifactRef", "artifactRef"), ("artifactDigest", "artifactDigest"),
-    ):
-        expected = unit.get("implementation", {}).get(unit_field) if unit_field in ("ref", "artifactRef") else unit.get(unit_field)
-        if provider.get(field) != candidate.get({"unitRevision":"revision","implementationRef":"ref","artifactRef":"artifactRef","artifactDigest":"artifactDigest"}[field]):
+    if provider.get("unitRevision") != unit.get("revision"):
+        fail(f"Package provider Unit revision mismatch: {provider.get('candidateId')}")
+    for field in ("implementationRef", "artifactRef", "artifactDigest"):
+        candidate_field = {"implementationRef": "ref", "artifactRef": "artifactRef", "artifactDigest": "artifactDigest"}[field]
+        if provider.get(field) != candidate.get(candidate_field):
             fail(f"Package provider pin mismatch: {provider.get('candidateId')}:{field}")
     implementation = unit.get("implementation", {})
     if any(implementation.get(field) != candidate.get(field) for field in ("ref", "artifactRef", "strategy", "exposure")):
@@ -705,6 +706,13 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     candidate = next((record for record in chain if record.get("transition") == "CANDIDATE"), None)
     validated = next((record for record in chain if record.get("transition") == "VALIDATED"), None)
     promoted = next((record for record in chain if record.get("transition") == "PROMOTED"), None)
+    if len(chain) != 3:
+        fail("unexpected duplicate or extra lifecycle transitions for selected Unit")
+    if not candidate.get("actor", {}).get("id") or not candidate.get("actor", {}).get("role") or not candidate.get("policy", {}).get("id"):
+        fail("Candidate record actor/policy identity missing")
+    if not validated.get("actor", {}).get("id") or not validated.get("actor", {}).get("role"):
+        fail("Validation record actor identity missing")
+
     if not candidate or not validated or not promoted:
         fail("incomplete Candidate → Validation → Promotion lifecycle chain")
     if validated.get("previousRecordId") != candidate.get("recordId") or promoted.get("previousRecordId") != validated.get("recordId"):
@@ -719,6 +727,7 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         or not validation.get("validator", {}).get("id")
         or not validation.get("validator", {}).get("version")
         or not validation.get("baseline", {}).get("sha256")
+        or not validation.get("evidenceRefs")
     ):
         fail("lifecycle Validation record is incomplete or stale")
     coverage = validation.get("coverage", {})
@@ -740,6 +749,18 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         fail("Promotion Decision is missing explicit authority/evidence")
     if unit_asset.get("promotionRecordId") != promoted.get("recordId") or unit_asset.get("validationRecordId") != validated.get("recordId"):
         fail("Package lock Promotion/Validation pin mismatch")
+    selected_capabilities = [
+        item for item in selection["selectedCapabilities"]
+        if item.get("capabilityId") == unit.get("capabilities", {}).get("provides", [{}])[0].get("capabilityId")
+        and item.get("provider", {}).get("unitId") == unit["id"]
+    ]
+    if len(selected_capabilities) != 1:
+        fail("selected Capability provider is missing or ambiguous")
+    capability_lock = selected_capabilities[0]
+    if capability_lock.get("promotionRecordId") != promoted.get("recordId") or capability_lock.get("validationRecordId") != validated.get("recordId"):
+        fail("selected Capability Promotion/Validation pin mismatch")
+    resolve_provider_selection(unit, selection, selection.get("target"), resources)
+
     for asset in selection["selectedAssets"]:
         if asset.get("kind") == "rule":
             if not any(
@@ -974,7 +995,7 @@ def main():
 
     resources = {relative: item["sha256"] for relative, item in declared.items()}
     unit_paths = {item["id"]: item["path"] for item in closure["units"]}
-    validate_capability_contracts(units_by_id)
+    validate_capability_contracts(units_by_id, resources)
     selected_providers = {}
     for unit in units:
         if unit.get("capabilities", {}).get("provides"):
@@ -995,6 +1016,8 @@ def main():
             if value.get("catalogId") != knowledge_ref["id"] or value.get("revision") != knowledge_ref["revision"]:
                 fail(f"Knowledge/Rule resource identity mismatch: {knowledge_ref['id']}")
             knowledge[knowledge_ref["id"]] = value
+            if not isinstance(value.get("patterns"), list) or not value["patterns"]:
+                fail(f"Knowledge/Rule content is not consumable: {knowledge_ref['id']}")
     if "xdownload.player-signatures" not in knowledge:
         fail("selected player signature Knowledge was not loaded by the Consumer")
 

@@ -126,7 +126,7 @@ export function validatePreconditions(unit, input) {
   return true;
 }
 
-export function validateCapabilityContracts(unitsById) {
+export function validateCapabilityContracts(unitsById, resources = null) {
   const providers = [];
   for (const unit of unitsById.values()) {
     for (const contract of unit.capabilities?.provides || []) providers.push({ unit, contract });
@@ -137,6 +137,7 @@ export function validateCapabilityContracts(unitsById) {
       if (candidates.length === 0) throw new DisExecutionError('MISSING_CAPABILITY_PROVIDER', requirement.capabilityId);
       if (candidates.length !== 1) throw new DisExecutionError('AMBIGUOUS_CAPABILITY_PROVIDER', requirement.capabilityId);
       const provider = candidates[0].contract;
+      if (resources && (resources.get(provider.inputSchemaRef) !== provider.inputSchemaDigest || resources.get(provider.outputSchemaRef) !== provider.outputSchemaDigest)) throw new DisExecutionError('CAPABILITY_SCHEMA_DIGEST_MISMATCH', requirement.capabilityId);
       const sameIdentity = provider.owner === requirement.owner && provider.authorityRef === requirement.authorityRef &&
         provider.inputSchemaRef === requirement.inputSchemaRef && provider.inputSchemaDigest === requirement.inputSchemaDigest &&
         provider.outputSchemaRef === requirement.outputSchemaRef && provider.outputSchemaDigest === requirement.outputSchemaDigest;
@@ -192,12 +193,18 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   if (!candidate || !validated || !promoted || validated.previousRecordId !== candidate.recordId || promoted.previousRecordId !== validated.recordId) throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', unit.id);
   if (chain.some((record) => record.dependencyClosureDigest !== closureDigest)) throw new DisExecutionError('STALE_LIFECYCLE_DEPENDENCY_CLOSURE', unit.id);
   const validation = validated.validation;
-  if (!validation || validation.result !== 'PASS' || validation.subjectDigest !== unitAsset.sha256 || validation.dependencyClosureDigest !== closureDigest || !validation.profile?.id || !validation.profile?.revision || !validation.validator?.id || !validation.validator?.version || !validation.baseline?.sha256 || !validation.coverage) throw new DisExecutionError('INVALID_LIFECYCLE_VALIDATION', validated.recordId);
+  if (!validation || validation.result !== 'PASS' || validation.subjectDigest !== unitAsset.sha256 || validation.dependencyClosureDigest !== closureDigest || !validation.profile?.id || !validation.profile?.revision || !validation.validator?.id || !validation.validator?.version || !validation.baseline?.sha256 || !Array.isArray(validation.evidenceRefs) || validation.evidenceRefs.length === 0 || !validation.coverage) throw new DisExecutionError('INVALID_LIFECYCLE_VALIDATION', validated.recordId);
   for (const key of ['positive', 'negative', 'boundary', 'heldOut']) if (!Number.isInteger(validation.coverage[key]) || validation.coverage[key] < 0) throw new DisExecutionError('INVALID_LIFECYCLE_COVERAGE', validated.recordId);
   for (const evidence of validation.evidenceRefs || []) if (resources.get(evidence.path) !== evidence.sha256) throw new DisExecutionError('LIFECYCLE_EVIDENCE_DIGEST_MISMATCH', evidence.path);
   const promotion = promoted.promotion;
   if (!promotion || promotion.decision !== 'PROMOTE' || promotion.validationRecordId !== validated.recordId || !promoted.actor?.id || !promoted.actor?.authorityRef || !promotion.policy?.id || !promotion.policy?.revision) throw new DisExecutionError('UNAUTHORIZED_PROMOTION_RECORD', promoted.recordId);
   if (unitAsset.promotionRecordId !== promoted.recordId || unitAsset.validationRecordId !== validated.recordId) throw new DisExecutionError('PACKAGE_PROMOTION_PIN_MISMATCH', unit.id);
+  if (chain.length !== 3 || !candidate.actor?.id || !candidate.actor?.role || !candidate.policy?.id || !validated.actor?.id || !validated.actor?.role) throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_DUPLICATE', unit.id);
+  const selectedCapabilities = selection.selectedCapabilities.filter((item) => item.capabilityId === unit.capabilities?.provides?.[0]?.capabilityId && item.provider?.unitId === unit.id);
+  if (selectedCapabilities.length !== 1) throw new DisExecutionError('SELECTED_CAPABILITY_PROVIDER_MISSING_OR_AMBIGUOUS', unit.id);
+  const selectedCapability = selectedCapabilities[0];
+  if (selectedCapability.promotionRecordId !== promoted.recordId || selectedCapability.validationRecordId !== validated.recordId) throw new DisExecutionError('SELECTED_CAPABILITY_LIFECYCLE_PIN_MISMATCH', unit.id);
+  resolveProviderSelection(unit, selection, selection.target, resources);
   for (const asset of selection.selectedAssets) {
     if (asset.kind === 'rule') {
       if (!unit.knowledgeRefs?.some((ref) => ref.id === asset.id && ref.revision === asset.revision && ref.path === asset.path && ref.sha256 === asset.sha256)) throw new DisExecutionError('SELECTED_KNOWLEDGE_PIN_MISMATCH', asset.id);
@@ -683,7 +690,7 @@ export async function loadDemo() {
   });
   const unitsById = new Map(units.map((unit) => [unit.id, unit]));
   if (unitsById.size !== units.length) throw new DisExecutionError('DUPLICATE_UNIT_ID', 'Unit IDs must be unique');
-  validateCapabilityContracts(unitsById);
+  validateCapabilityContracts(unitsById, resources);
   const unitPaths = new Map(manifest.units.map((item) => [item.id, item.path]));
 
   const graphResource = resourceEntries.get(manifest.graphRef.path);
