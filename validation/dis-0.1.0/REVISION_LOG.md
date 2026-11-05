@@ -85,3 +85,25 @@ The L2 review identified F001–F007 plus six additional clarifications. The can
 - **F012 (P2):** A second materially different Domain Profile remains a pre-release-qualification gate; xDownload alone is not a generality proof.
 
 This revision is a candidate refinement, not a final validation claim. Exact-HEAD Node/Python execution, Woodpecker status, bilingual review and independent Exact-SHA review are required before an L2 Freeze Checkpoint.
+
+
+## DIS 0.1.0 L2 candidate refinement R2 — independent review repairs
+
+Base candidate reviewed: 50136d6961c71b3f9d4175c2d88f7fa3bd533474.
+
+Code repair commits:
+- 3ca5f9d7d17c7fedbf276b03f786c4de2526d802 — independent Definition/Workflow/Graph/Unit cross-reference validation; actual Trace input/evidence/control-path verification; explicit HTTPS/DOI/URN external provenance support; private data-only Unit handling; five regression tests; synchronized Unit Schema, Resource Closure SHA-256 entries, and Package descriptor lock.
+- f842fac498c5d34398b8a51963d7b6d5681b26db — independent Python Graph static conformance checks; load Unit, Graph, and Definition through exact Resource Closure paths; validate root identities and path inventory; synchronize validator digest and Package Resource Closure pin.
+
+The independent Conformance path now checks:
+1. exact Unit/Definition/Workflow/Graph references;
+2. exact Package closure paths and digests;
+3. DAG, reachability, terminal closure, ancestor constraints, and path-sensitive required-input/evidence binding;
+4. actual executed Trace input assembly from Data Edges;
+5. actual evidence assembly from Evidence Edges;
+6. selected control transitions from source outputs;
+7. every executed Node input/output against its declared Unit Schema.
+
+Provenance references are distinct from Package resources: HTTPS, DOI, and URN may remain descriptive external references; they are never implicitly fetched or included in Resource Closure. Local consumed resources remain digest-pinned.
+
+R2 remains a candidate refinement. Exact-HEAD Node/Python execution, Woodpecker completion, fresh independent Exact-SHA review, and the L2 Freeze Checkpoint remain mandatory. The historical PASS report at d8c516e is not evidence for these R2 commits.

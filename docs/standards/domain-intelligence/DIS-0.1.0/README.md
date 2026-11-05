@@ -1,6 +1,6 @@
 # Domain Intelligence Standard (DIS) 0.1.0
 
-Status: L2_ARCHITECTURE_CANDIDATE_R1 / NOT_FROZEN
+Status: L2_ARCHITECTURE_CANDIDATE_R2 / NOT_FROZEN
 Branch: dis/0.1.0-l2-candidate
 L2 Issue: https://github.com/kaicreator-mm/domain-harness/issues/1481
 Frozen Product/L1: https://github.com/kaicreator-mm/domain-harness/issues/1477
@@ -28,6 +28,8 @@ Frozen Product/L1: https://github.com/kaicreator-mm/domain-harness/issues/1477
 - Demo: examples/dis-0.1.0-player-recognition/
 - Initial validation: validation/dis-0.1.0/INITIAL_VALIDATION.md
 - Revision log: validation/dis-0.1.0/REVISION_LOG.md
-- Final validation: validation/dis-0.1.0/FINAL_VALIDATION.md
+- Historical Demo validation (tested commit d8c516e): validation/dis-0.1.0/FINAL_VALIDATION.md
+
+Active L2 candidate PR: #1482 (Draft). R2 code review commits: 3ca5f9d and f842fac. The historical Demo validation report applies only to its recorded d8c516e artifact and does not qualify the current R2 candidate.
 
 This branch carries the original experiment as historical evidence and the current L2 architecture candidate. Product/L1 is frozen separately by #1477. DIS L2 remains NOT_FROZEN; no v0.10.3 ABI, SDK implementation, release or tag is authorized.

@@ -133,6 +133,10 @@ BUILD / Qualification 必须递归解析所有必需 Schema 和嵌套 $ref：
 
 Resource Closure Contract 使用 schemas/resource-closure.schema.json。相同路径但不同内容必须视为不同资源身份。
 
+### 6.1 Provenance 引用与 Package Resource 的区别
+
+Unit Evidence 的 sourceRef.ref 可以指向本地 Package-relative resource，也可以是外部 Provenance URI。DIS 0.1.0 允许 HTTPS、DOI 和 URN 作为外部来源标识。这些外部引用仅是描述性元数据，不得被隐式下载、执行、视为可信内容或加入 Package Resource Closure。本地引用若被作为 Package 资源消费，则必须存在于 Resource Closure 并固定 Digest。若运行期确实需要外部内容，必须先物化为本地 Package resource，或通过单独声明的既有 Tool/Host 契约访问。file:、data:、javascript: 和其它未声明 scheme 必须拒绝。
+
 ## 7. Dynamic Form、Knowledge 和存储
 
 Dynamic Form Profile 是可选的 UI-agnostic 契约。它绑定 form ID/revision 与目标 input Schema，并声明问题、目标字段、响应类型、required/optional、options/constraints、适用条件、澄清原因和完成/取消结果。它不授予 Tool、状态转移或 Effect 权限。用户确认、系统观察、模型推导和 Derived 值在澄清/重识别过程中必须保持不同。
@@ -158,6 +162,8 @@ Package Build Validity、Intelligence Qualification、End-to-End App Validation 
 ## 9. Conformance
 
 Consumer Trace MUST 记录每个实际执行 Node 的精确 Unit identity、真实组装的 input payload、evidence inputs 和 output。独立符合性验证直接消费这些 Trace 值，不得按 Demo Node 名称手工重建输入。
+
+独立 Conformance Suite 还必须将 Trace 与 Graph 对照：从实际执行的 Data Edge 重算每个 Node 的输入，从实际执行的 Evidence Edge 重算 evidence inputs，并根据源 Node 输出核对实际控制路径；同时独立验证 Graph 静态路径绑定以及 Definition/Unit/Workflow 引用。必须按 Unit Schema 验证 Trace 的输入/输出，不得把 Reference Consumer 内部校验结果直接当作符合性证明。
 
 分为 Structural、Behavioral、Consumer 三层。至少验证：known/ambiguous/unknown/invalid 输入；Decision 分支；control/data/evidence 独立性；必需输入绑定；Schema Closure 和嵌套引用；路径穿越/缺失资源拒绝；Digest tampering；私有 Procedure 不成为 Tool；精确 Unit/Package pins；未知必需语义 Fail-Closed。
 
@@ -194,3 +200,8 @@ Demo 修订后 Decision 只输出 route，Procedure 只输出 resolution；Recog
 - DIS-F-006（P2）：Unit Evidence 引用的签名/策略 Fixture 最初未被 Demo 运行代码实际消费。现已改为加载并消费 Package Fixture，并增加回归测试。
 
 最终验证包括 Node 行为测试、Demo 三类分支及 Fixture 路径、五个标准 Schema 自检、六个 Unit、Graph、Definition、Resource Closure，以及每个实际执行 Node 的输入/输出 Schema 校验。详细证据见 `validation/dis-0.1.0/FINAL_VALIDATION.md`。
+
+
+### 12.4 Canonical L2 Review Findings
+
+DIS-L2-F001..F012 是 L2 架构审核台账，与初始 Demo 缺陷 DIS-F-001..F006 完全分开。统一编号顺序为：F001 两个相连的生命周期平面；F002 冻结的 Kernel/Microkernel 与 Host/Effect 权威边界；F003 实际 Consumer Trace；F004 Definition/Workflow/Graph/Unit 引用闭包；F005 完整 Package Resource Closure；F006 可信 Implementation Binding；F007 按路径验证 required input；F008 符号链接 containment；F009 DAG-only 控制图；F010 Provenance 与 Dynamic Form 权限边界；F011 EXECUTED 是运行发生记录；F012 Release Qualification 前使用第二个实质不同的 Domain Profile。R2 候选修复和审核状态记录在 L2_ARCHITECTURE 与 REVISION_LOG 中。exact-HEAD 证据、独立 Exact-SHA 审核和 Controller Freeze Checkpoint 完成前，DIS 仍为 NOT_FROZEN。

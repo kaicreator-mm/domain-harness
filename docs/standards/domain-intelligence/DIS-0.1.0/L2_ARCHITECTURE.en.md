@@ -172,7 +172,7 @@ Static validation does not replace runtime validation; runtime error detection d
 
 Package Resource Closure is not Schema Closure. It covers all required resources actually referenced by selected intelligence, including Unit descriptors, Composition Graph, Domain Definition, input/output/nested Schemas, fixture/reference data, implementation artifacts and other explicitly referenced local resources.
 
-External sources may remain Provenance references but are not implicitly downloaded and treated as authoritative Package resources.
+External sources may remain Provenance references but are not implicitly downloaded and treated as authoritative Package resources. DIS 0.1.0 permits HTTPS, DOI, and URN forms for descriptive external provenance only; such references are not fetched, executed, or included in Resource Closure. Runtime-required content must be materialized as a local digest-pinned Package resource or accessed through a separately declared existing Tool/Host contract. file:, data:, javascript:, and undeclared schemes are rejected.
 
 Resource Manifest records normalized package-relative path, resource kind, content digest, owner references and required/optional status. Closure MUST include every required Unit descriptor, Graph, Definition, input/output/nested Schema, fixture/reference resource, implementation artifact and referenced conformance resource. Reject absolute paths, traversal, empty/dot segments, backslashes, unauthorized remote URIs, duplicate paths, missing resources, digest mismatch, undeclared required references and symlink-resolved paths outside the Package root. The enclosing Package descriptor/lock MUST pin the exact SHA-256 of the Resource Manifest; the manifest does not recursively include its own digest.
 
@@ -206,7 +206,7 @@ Three independent levels:
 2. Behavioral Conformance: positive, negative, boundary, unknown, ambiguous, conflict, out-of-scope, failure and recovery semantics match declarations.
 3. Consumer Conformance: a real Consumer consumes selected intelligence without bypassing Runtime/Host/Effect authority.
 
-The Conformance Suite must not validate only a hard-coded Reference Consumer path. The Consumer MUST emit the exact input payload actually assembled for each executed Node, together with its Unit identity, evidence inputs and output. The independent Conformance Suite validates those trace payloads against the declared Unit Schemas; it MUST NOT reconstruct inputs from Demo Node names.
+The Conformance Suite must not validate only a hard-coded Reference Consumer path. The Consumer MUST emit the exact input payload actually assembled for each executed Node, together with its Unit identity, evidence inputs and output. The independent Suite reconstructs each input from executed Data Edges, each evidence payload from executed Evidence Edges, and the control path from source outputs. It independently validates Graph path semantics and Definition/Unit/Workflow cross-references, then validates trace payloads against declared Unit Schemas. It MUST NOT reconstruct inputs from Demo Node names or treat the Reference Consumer's own validation result as proof of Conformance.
 
 At minimum test known/ambiguous/unknown/invalid/out-of-scope, missing input, duplicate binding, unavailable data source, zero/multiple control-edge matches, missing/tampered/undeclared resources, wrong Unit revision/digest, untrusted implementation binding, missing/lost evidence, no implicit pass-through, no private Procedure → Tool escalation and no automatic promotion/activation.
 
@@ -214,21 +214,27 @@ At minimum test known/ambiguous/unknown/invalid/out-of-scope, missing input, dup
 
 DIS version is independent of DomainHarness SDK version. Unit, Graph, Definition, Package revisions and content digests are distinct identities. The same logical ID does not imply the same Artifact. Compatibility is declared by explicit Contract/Profile and validation, not inferred from SemVer alone. Breaking changes require a new version/migration description; installed Packages retain exact pins. Adding an optional Profile does not make an older Consumer assume support.
 
-## 11. Current candidate gaps (must be resolved before L2 freeze)
+## 11. Canonical L2 review ledger and R2 candidate status
 
-Based on inspection of the xDownload Demo:
+The canonical L2 review identifiers are DIS-L2-F001..F012. They are distinct from the initial Demo findings DIS-F-001..F006:
 
-The original DIS-L2-F001..F007 findings are closed by the R1 refinement contract and executable reference-consumer/conformance changes, subject to exact-HEAD test evidence and independent review:
+- **F001 (P1):** Two connected lifecycle planes: design-time production/qualification and runtime consumption.
+- **F002 (P1):** Preserve the frozen v0.7 Kernel/Microkernel, single Domain Runtime, and Host/Effect authority. #1480 KDP remains a non-frozen, non-normative candidate.
+- **F003 (P1):** Consumer Trace carries the actual Node input, evidence, and output; independent Conformance reconstructs and checks them against Graph Edges and the selected control path.
+- **F004 (P1):** Definition binds Workflow Unit and Graph identity/revision/path; every Graph Node Unit is declared exactly once.
+- **F005 (P1):** Complete Package Resource Closure covers Units, Graph, Definition, Schemas, fixtures, implementation artifacts, and conformance assets; Package descriptor pins the Manifest digest.
+- **F006 (P1):** Typed trusted registry/graph/Tool implementation binding; no arbitrary dynamic import.
+- **F007 (P1):** Required input bindings are checked path-sensitively for exactly one available source on every path; reject duplicate bindings and non-ancestor sources.
+- **F008 (P2):** Realpath containment rejects symlink escape.
+- **F009 (P2):** DIS 0.1.0 is DAG-only; cycles, iterations, and retries are deferred.
+- **F010 (P2):** Recognizer provenance remains separate from value status; Dynamic Form is optional and grants no authority. External provenance URIs are descriptive only and are not Package resources.
+- **F011 (P2):** EXECUTED is an occurrence/evidence fact, not a Unit qualification stage.
+- **F012 (P2):** A second materially different Domain Profile is required before Release Qualification; xDownload alone is not a generality proof.
 
-- F001: full resource closure pins Unit, Graph, Definition, Schema, fixture, implementation and conformance resources; the package descriptor pins the manifest digest.
-- F002: the Consumer trace now carries the actual Node input/evidence/output; Python validates those values directly.
-- F003: static validation enforces exactly-one required input binding on every control path, rejects duplicate same-execution bindings and rejects non-ancestor sources.
-- F004: Definition binds both Workflow Unit identity and Graph identity/revision/path.
-- F005: implementation refs use typed trusted registry / graph / Tool binding keys; arbitrary dynamic import is prohibited.
-- F006: EXECUTED is an occurrence, not a Unit qualification stage.
-- F007: Recognizer provenance and optional Dynamic Form contracts preserve confirmed, observed, inferred, candidate and unknown distinctions.
+R2 code repairs are recorded in commits 3ca5f9d and f842fac. The independent Python Conformance Suite now checks Definition cross-references, exact closure paths, Graph static path semantics, and actual Trace data/evidence/control assembly. The Reference Consumer rejects unsafe provenance schemes and accepts only the declared external provenance URI forms.
 
-R1 also adds realpath-based symlink containment and makes DIS 0.1.0 strictly DAG-only. These are candidate closure claims; exact-HEAD CI and independent review remain evidence gates. A second materially different Domain Profile remains mandatory before Release Qualification.
+F001-F011 have candidate contract/implementation coverage, but they are not marked finally closed until exact-HEAD Node/Python execution and Fresh Independent Exact-SHA review pass. F012 remains a pre-release qualification gate. The historical Demo PASS at d8c516e does not validate the current R2 candidate.
+
 
 ## 12. L2 Freeze Gate
 

@@ -172,7 +172,7 @@ Edge 只能有且只有一种 kind：
 
 Package Resource Closure 不等于 Schema Closure。闭合范围覆盖选定智能实际引用的所有必需资源，例如 Unit descriptors、Composition Graph、Domain Definition、input/output/nested Schema、fixture/reference data、implementation artifacts，以及其他被明确引用的本地资源。
 
-外部来源可作为 Provenance 引用，但不得在构建或运行时被隐式下载并作为权威 Package 资源。
+外部来源可作为 Provenance 引用，但不得在构建或运行时被隐式下载并作为权威 Package 资源。DIS 0.1.0 仅允许 HTTPS、DOI 和 URN 作为描述性外部引用；不得隐式获取、执行或纳入 Resource Closure。运行期需要的内容必须先物化为本地且 Digest 固定的 Package resource，或通过单独声明的既有 Tool/Host 契约访问。file:、data:、javascript: 和未声明 scheme 必须拒绝。
 
 Resource Manifest 至少记录 package-relative normalized path、resource kind、content digest、owner references 和 required/optional status。闭合范围 MUST 覆盖全部必需 Unit descriptor、Graph、Definition、输入/输出/嵌套 Schema、Fixture/参考资源、实现制品及被引用的符合性资源。必须拒绝绝对路径、路径穿越、空段、点段、反斜线、未授权远程 URI、重复路径、缺失资源、Digest 不匹配、未声明的必需引用，以及 realpath 解析后逃出 Package 根目录的符号链接。外层 Package descriptor/lock MUST 固定 Resource Manifest 的精确 SHA-256；Manifest 不递归包含自身 Digest。
 
@@ -206,7 +206,7 @@ LLM 仅在已选确定性智能、精确语义结果复用和适用已晋升 Sub
 2. Behavioral Conformance：正向、负向、边界、未知、歧义、冲突、越界、失败和恢复语义符合声明。
 3. Consumer Conformance：真实 Consumer 按标准解析和消费选定智能，且不绕过 Runtime/Host/Effect 权威。
 
-Conformance Suite 不得只验证 Reference Consumer 的硬编码路径。Consumer MUST 为每个实际执行 Node 输出其真实组装的输入 payload、Unit identity、evidence inputs 和 output；独立 Conformance Suite 直接校验这些 Trace payload 与 Unit Schema，不得按 Demo Node 名称重建输入。
+Conformance Suite 不得只验证 Reference Consumer 的硬编码路径。Consumer MUST 为每个实际执行 Node 输出其真实组装的输入 payload、Unit identity、evidence inputs 和 output；独立 Conformance Suite 从实际执行的 Data Edge 重算输入、从 Evidence Edge 重算 evidence，并从源 Node 输出核对控制路径。它还必须独立验证 Graph 路径语义和 Definition/Unit/Workflow 交叉引用，再按 Unit Schema 校验 Trace payload。不得按 Demo Node 名称重建输入，也不得把 Reference Consumer 自身的验证结果直接当作符合性证明。
 
 至少测试 known/ambiguous/unknown/invalid/out-of-scope、missing input、duplicate binding、unavailable data source、zero/multiple control-edge match、missing/tampered/undeclared resource、wrong Unit revision/digest、untrusted implementation binding、missing/lost evidence、no implicit pass-through、no private Procedure → Tool escalation 和 no automatic promotion/activation。
 
@@ -214,24 +214,27 @@ Conformance Suite 不得只验证 Reference Consumer 的硬编码路径。Consum
 
 DIS standard version 独立于 DomainHarness SDK version。Unit、Graph、Definition、Package revision 和 content digest 是不同身份维度。相同逻辑 ID 不代表相同 Artifact。兼容性必须由显式 Contract/Profile 和验证结果声明，不得仅根据 SemVer 推断。Breaking change 必须有新版本/迁移说明；已安装 Package 保持精确 pin。新增可选 Profile 不得让旧 Consumer 默认支持。
 
-## 11. R1 候选修订与发现关闭状态
+## 11. Canonical L2 Review Findings 与 R2 候选状态
 
-原 DIS-L2-F001..F007 已由 R1 规范契约和 Reference Consumer/Conformance 修订覆盖；这些是候选关闭结论，仍须 exact-HEAD 本地验证和独立审核：
+DIS-L2-F001..F012 是统一的 L2 架构审核编号，与初始 Demo 的 DIS-F-001..F006 不同：
 
-- F001（P1）：完整 Resource Closure 固定 Unit、Graph、Definition、Schema、Fixture、实现制品和 Conformance 资源；Package descriptor 固定 Manifest SHA-256。
-- F002（P1）：Consumer Trace 输出每个实际 Node 的 input/evidence/output；Python Conformance 直接验证 Trace，不再按 Demo Node 名称重建输入。
-- F003（P1）：required input 按控制路径验证恰好一个来源；拒绝重复绑定和非祖先来源。
-- F004（P2）：Definition 同时固定 Workflow Unit 与 Graph identity/revision/path。
-- F005（P2）：implementation.ref 使用 typed registry/graph/tool binding key；禁止任意动态导入。
-- F006（P2）：EXECUTED 是运行发生记录，不是 Unit qualification stage。
-- F007（P2）：Recognizer provenance 与可选 Dynamic Form 保留已确认、观察、推导、候选和未知状态。
-- F008（P2）：增加 realpath 符号链接 containment 和逃逸负例。
-- F009（P2）：DIS 0.1.0 严格 DAG-only，循环、迭代和重试推迟到后续标准版本。
-- F010（P2）：模型置信度不能升级来源权威；澄清不授予 Effect 权限。
-- F011（P2）：运行使用不得修改不可变 Unit qualification。
-- F012（P2）：Release Qualification 前必须由第二个实质不同的 Domain Profile 验证泛化能力；xDownload Demo 单独不足以证明泛化。
+- **F001（P1）：** 两个相连的生命周期平面：设计期生产/资格确认与运行期消费。
+- **F002（P1）：** 保留冻结的 v0.7 Kernel/Microkernel、唯一 Domain Runtime 和 Host/Effect 权威；#1480 KDP 仍是未冻结、非规范性候选。
+- **F003（P1）：** Consumer Trace 携带每个实际 Node 的输入、证据和输出；独立 Conformance 根据 Graph Edge 和实际控制路径重算并核对。
+- **F004（P1）：** Definition 固定 Workflow Unit 与 Graph 的 identity/revision/path；每个 Graph Node Unit 必须恰好声明一次。
+- **F005（P1）：** 完整 Package Resource Closure 覆盖 Unit、Graph、Definition、Schema、Fixture、实现制品和 Conformance 资源；Package descriptor 固定 Manifest Digest。
+- **F006（P1）：** typed trusted registry/graph/Tool Implementation Binding；禁止任意动态导入。
+- **F007（P1）：** 按控制路径验证 required input 在每条路径上恰好有一个可用来源；拒绝重复绑定和非祖先来源。
+- **F008（P2）：** realpath containment 拒绝符号链接逃逸。
+- **F009（P2）：** DIS 0.1.0 严格 DAG-only；循环、迭代和重试推迟到后续版本。
+- **F010（P2）：** Recognizer provenance 与 value status 分离；Dynamic Form 可选且不授予权限。外部 Provenance URI 仅为描述性引用，不属于 Package resource。
+- **F011（P2）：** EXECUTED 是运行发生记录/证据事实，不是 Unit qualification stage。
+- **F012（P2）：** Release Qualification 前必须由第二个实质不同的 Domain Profile 验证泛化能力；xDownload 单独不足以证明泛化。
 
-#1480 KDP 仍是未冻结的 Product/L1 候选，不构成 DIS 0.1.0 的执行权威。DIS 仅继承冻结的 v0.7 Kernel/Microkernel、Domain Runtime 和 Host/Effect 契约。
+R2 代码修复记录在 commit 3ca5f9d 和 f842fac。独立 Python Conformance Suite 已增加 Definition 交叉引用、精确 Closure 路径、Graph 静态路径语义，以及真实 Trace data/evidence/control 组装核对。Reference Consumer 拒绝不安全的 provenance scheme，并只接受规范声明的外部 Provenance URI 类型。
+
+F001-F011 已有候选契约/实现覆盖，但必须等待 exact-HEAD Node/Python 执行和 Fresh Independent Exact-SHA 审核通过后才能最终关闭。F012 仍是 Release Qualification 前置门禁。历史 Demo commit d8c516e 的 PASS 不代表当前 R2 候选通过。
+
 
 ## 12. L2 Freeze Gate
 

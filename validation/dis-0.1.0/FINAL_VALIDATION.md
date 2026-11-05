@@ -1,6 +1,8 @@
-# DIS 0.1.0 — Final Demo Validation
+# DIS 0.1.0 — Historical Demo Validation (PASS at d8c516e)
 
 <badge>PASS</badge>
+
+**Historical scope only:** this report validates the Demo/standard artifact recorded below at commit d8c516e. It does not validate the later L2 R1/R2 candidate, does not qualify PR #1482, and does not establish current DomainHarness Runtime/SDK support for DIS.
 
 - Branch: `dis-0.1.0`
 - Tested standard/demo commit: `d8c516e7b564db8572631d2d2d435491b8f43b33`
