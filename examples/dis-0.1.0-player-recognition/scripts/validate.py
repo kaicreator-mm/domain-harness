@@ -1251,7 +1251,7 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     if not all(('unit', unit_id) in asset_keys for unit_id in units_by_id) or ('rule', 'xdownload.player-signatures') not in asset_keys or ('graph', 'xdownload.player-recognition') not in asset_keys:
         fail('Package lock lacks required selected asset')
     selected_graph = next(item for item in selection['selectedAssets'] if item['kind'] == 'graph' and item['id'] == 'xdownload.player-recognition')
-    if selected_graph.get('path') != 'domain/player-recognition.graph.json' or selected_graph.get('revision') != '1.0.0':
+    if selected_graph.get('path') != 'domain/player-recognition.graph.json' or not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', selected_graph.get('revision', '')):
         fail('selected Graph identity mismatch')
     for capability in selection["selectedCapabilities"]:
         if (
@@ -2122,6 +2122,90 @@ def main():
     del missing_intake['intake']
     expect_rejection(lambda: Draft202012Validator(unit_schema['$defs']['runtimeFeedbackEnvelope']).validate(missing_intake), 'feedback intake missing')
     expect_rejection(lambda: validate_reference_feedback(missing_intake, trusted), 'feedback intake missing')
+    # Construct the authorised successor independently from the original, externally
+    # pinned fixture and the explicit revision/provider changes in this test.
+    expected_raw = {item['path']:resolve_inside(item['path']).read_bytes() for item in closure['resources']}
+    expected_objects = {path:json.loads(expected_raw[path]) for path in ('domain/units/recognizer.json', 'domain/units/workflow.json', 'domain/player-recognition.graph.json', 'domain/definition.json')}
+    expected_recognizer = expected_objects['domain/units/recognizer.json']
+    expected_workflow = expected_objects['domain/units/workflow.json']
+    expected_graph = expected_objects['domain/player-recognition.graph.json']
+    expected_definition = expected_objects['domain/definition.json']
+    expected_recognizer['revision'] = expected_workflow['revision'] = expected_graph['revision'] = expected_definition['revision'] = '2.0.0'
+    next(node for node in expected_graph['nodes'] if node['unitRef']['id'] == expected_recognizer['id'])['unitRef']['revision'] = '2.0.0'
+    expected_workflow['implementation']['ref'] = 'graph:' + expected_graph['id'] + '@2.0.0'
+    for component in expected_definition['components']:
+        if component.get('unitRef', {}).get('id') in (expected_recognizer['id'], expected_workflow['id']):
+            component['unitRef']['revision'] = '2.0.0'
+    expected_definition['workflowRef']['unitRef']['revision'] = '2.0.0'
+    expected_definition['workflowRef']['graphRef']['revision'] = '2.0.0'
+    for path, obj in expected_objects.items():
+        expected_raw[path] = (json.dumps(obj, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+    expected_manifest = copy.deepcopy(closure)
+    expected_manifest['packageRevision'] = expected_manifest['definitionRef']['revision'] = expected_manifest['graphRef']['revision'] = '2.0.0'
+    for ref in expected_manifest['units']:
+        if ref['id'] in (expected_recognizer['id'], expected_workflow['id']):
+            ref['revision'] = '2.0.0'
+    for entry in expected_manifest['resources']:
+        entry['sha256'] = sha256(expected_raw[entry['path']])
+    expected_manifest_bytes = (json.dumps(expected_manifest, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+    expected_closure_digest = sha256(expected_manifest_bytes)
+    expected_resources = {path:sha256(raw) for path, raw in expected_raw.items()}
+    expected_lock = copy.deepcopy(package_identity['selectionLock'])
+    expected_lock['packageRevision'] = '2.0.0'
+    changed_ids = {expected_recognizer['id'], expected_workflow['id'], expected_graph['id']}
+    changed_bytes = {entry['path']:base64.b64encode(resolve_inside(entry['path']).read_bytes()).decode('ascii') for entry in closure['resources'] if entry['sha256'] != expected_resources[entry['path']]}
+    expected_lock['historicalClosures'] = [{'sha256':manifest_digest, 'manifestJson':manifest_bytes.decode('utf-8'), 'resourceBase64':changed_bytes}]
+    provider_candidate = next(item for item in expected_recognizer['implementation']['candidates'] if item['candidateId'] == 'signature-normalized-v1')
+    expected_lock['selectedCapabilities'][0]['provider'].update({'unitRevision':'2.0.0', 'candidateId':provider_candidate['candidateId'], 'implementationRef':provider_candidate['ref'], 'artifactRef':provider_candidate['artifactRef'], 'artifactDigest':provider_candidate['artifactDigest']})
+    for asset in expected_lock['selectedAssets']:
+        if asset['id'] in changed_ids:
+            asset['revision'] = '2.0.0'
+        asset['sha256'] = expected_resources[asset['path']]
+    expected_new, previous_by_subject = [], {}
+    for original in package_identity['lifecycleRecords']:
+        record = copy.deepcopy(original)
+        asset = next(item for item in expected_lock['selectedAssets'] if item['kind'] == record['subject']['kind'] and item['id'] == record['subject']['id'])
+        old_history = [item for item in package_identity['lifecycleRecords'] if item['subject']['id'] == asset['id']]
+        changed = asset['id'] in changed_ids
+        if not changed and record['transition'] == 'CANDIDATE':
+            previous_by_subject[asset['id']] = old_history[2]
+            continue
+        record['recordId'] += '.successor'
+        if changed:
+            record['subject']['revision'] = '2.0.0'
+        if changed and record['transition'] == 'CANDIDATE':
+            record['candidateProvenance']['parent'] = {'kind':'SUBJECT', 'subject':copy.deepcopy(old_history[0]['subject'])}
+        if record['transition'] == 'PROMOTED':
+            record['promotion']['priorPromotedBaseline'] = {'kind':'PROMOTED', 'recordId':old_history[2]['recordId'], 'recordDigest':old_history[2]['recordDigest']}
+        record['subject']['sha256'] = expected_resources[asset['path']]
+        record['subjectJson'] = expected_raw[asset['path']].decode('utf-8')
+        record['dependencyClosureDigest'] = expected_closure_digest
+        if record['transition'] == 'CANDIDATE':
+            record['candidateProvenance']['sourceClosureSha256'] = expected_closure_digest
+        previous = previous_by_subject.get(asset['id'])
+        record['previousRecordId'] = previous['recordId'] if previous else None
+        record['previousRecordDigest'] = previous['recordDigest'] if previous else None
+        if record['transition'] == 'VALIDATED':
+            record['validation']['subjectDigest'] = record['subject']['sha256']
+            record['validation']['dependencyClosureDigest'] = expected_closure_digest
+            record['validation']['report']['subject'] = copy.deepcopy(record['subject'])
+            record['validation']['report']['dependencyClosure']['sha256'] = expected_closure_digest
+            record['validation']['reportSha256'] = sha256(canonical_lifecycle_bytes(record['validation']['report']))
+        if record['transition'] == 'PROMOTED':
+            record['promotion']['validationRecordId'] = previous['recordId']
+            record['promotion']['validationRecordDigest'] = previous['recordDigest']
+        record['recordDigest'] = lifecycle_record_digest(record)
+        previous_by_subject[asset['id']] = record
+        expected_new.append(record)
+    for asset in expected_lock['selectedAssets']:
+        history = [record for record in expected_new if record['subject']['id'] == asset['id']]
+        validation = next(record for record in history if record['transition'] == 'VALIDATED')
+        promotion = next(record for record in history if record['transition'] == 'PROMOTED')
+        asset.update({'validationRecordId':validation['recordId'], 'validationRecordDigest':validation['recordDigest'], 'promotionRecordId':promotion['recordId'], 'promotionRecordDigest':promotion['recordDigest']})
+    selected = next(asset for asset in expected_lock['selectedAssets'] if asset['id'] == expected_recognizer['id'])
+    for key in ('validationRecordId', 'validationRecordDigest', 'promotionRecordId', 'promotionRecordDigest'):
+        expected_lock['selectedCapabilities'][0][key] = selected[key]
+    expected_future_pin = sha256(canonical_lifecycle_bytes(expected_lock))
     future_env = dict(os.environ)
     future_env['DIS_EMIT_FUTURE_PROBE'] = '1'
     future_script = subprocess.run(['node', '--test', '--test-name-pattern=feedback retains provenance and cannot change an already-pinned execution', 'test/runner.test.mjs'], cwd=PACKAGE_ROOT, env=future_env, check=True, capture_output=True, text=True, encoding='utf-8')
@@ -2129,17 +2213,83 @@ def main():
     if len(future_lines) != 1:
         fail('missing actual successor Package probe')
     future = json.loads(future_lines[0])
-    future_units, future_resources = dict(future['units']), dict(future['resources'])
-    future_paths = {item['id']:item['path'] for item in future['manifest']['units']}
-    future_identity = future['identity']
-    validate_lifecycle_records(future_identity, future_units, future_paths, future_resources, future_identity['resourceClosureSha256'], future_identity['selectionLockSha256'])
-    future_recognizer = future_units['xdownload.player.recognizer']
-    future_providers = {future_recognizer['id']:resolve_provider_selection(future_recognizer, future_identity['selectionLock'], future_identity['selectionLock']['target'], future_resources)}
-    future_result = dict(future['result'], input=future['input'])
-    future_nodes = {node['nodeId']:node for node in future['graph']['nodes']}
-    validate_trace_assembly(future_result, future['graph'], future_units, future_nodes, future_providers, demo_schemas, registry)
-    if (future_result['trace'][0]['unitRevision'] != '2.0.0' or future['oldBefore']['trace'][0]['unitRevision'] != '1.0.0' or not json_value_equal(future['oldBefore'], future['oldAfter']) or future['oldLock'] == future_identity['selectionLockSha256']):
-        fail('successor Package execution changed old pinned execution')
+    def validate_future_fixture(evidence):
+        manifest_bytes = base64.b64decode(evidence['manifestBytes'], validate=True)
+        descriptor = json.loads(base64.b64decode(evidence['descriptorBytes'], validate=True))
+        future_identity = descriptor['dis']
+        future_manifest = json.loads(manifest_bytes)
+        Draft202012Validator(closure_schema).validate(future_manifest)
+        if manifest_bytes != expected_manifest_bytes or sha256(manifest_bytes) != future_identity['resourceClosureSha256']:
+            fail('successor manifest bytes mismatch')
+        raw_resources = {safe_relative(path):base64.b64decode(value, validate=True) for path, value in evidence['resourceBytes'].items()}
+        declared_future = {safe_relative(item['path']):item['sha256'] for item in future_manifest['resources']}
+        if len(declared_future) != len(future_manifest['resources']) or set(raw_resources) != set(declared_future) or raw_resources != expected_raw or any(sha256(data) != declared_future[path] for path, data in raw_resources.items()):
+            fail('successor resource bytes mismatch')
+        future_resources = {path:sha256(data) for path, data in raw_resources.items()}
+        future_graph = json.loads(raw_resources[future_manifest['graphRef']['path']])
+        future_definition = json.loads(raw_resources[future_manifest['definitionRef']['path']])
+        future_units = {ref['id']:json.loads(raw_resources[ref['path']]) for ref in future_manifest['units']}
+        future_paths = {ref['id']:ref['path'] for ref in future_manifest['units']}
+        Draft202012Validator(graph_schema).validate(future_graph)
+        Draft202012Validator(definition_schema).validate(future_definition)
+        for unit in future_units.values():
+            Draft202012Validator(unit_schema).validate(unit)
+        for record in future_identity['lifecycleRecords']:
+            Draft202012Validator(record_schema).validate(record)
+        validate_definition_binding(future_definition, future_units, future_graph, future_manifest['graphRef']['path'])
+        validate_selected_graph(future_identity['selectionLock'], future_manifest['graphRef'], future_graph, future_resources, sha256(raw_resources[future_manifest['graphRef']['path']]))
+        if not json_value_equal(future_identity['selectionLock'], expected_lock) or future_identity['selectionLockSha256'] != expected_future_pin or not json_value_equal(future_identity['lifecycleRecords'], package_identity['lifecycleRecords'] + expected_new):
+            fail('successor lock or append-only history differs from independently authorised fixture')
+        validate_lifecycle_records(future_identity, future_units, future_paths, future_resources, sha256(manifest_bytes), expected_future_pin)
+        for original in package_identity['lifecycleRecords']:
+            matches = [item for item in future_identity['lifecycleRecords'] if item['recordId'] == original['recordId']]
+            if len(matches) != 1 or not json_value_equal(matches[0], original):
+                fail('successor rewrote prior lifecycle history')
+        future_schemas, future_registry = {}, Registry()
+        for path in demo_schemas:
+            schema = json.loads(raw_resources[path])
+            uri = 'https://demo.invalid/' + path
+            schema['$id'] = uri
+            future_schemas[path] = schema
+            future_registry = future_registry.with_resource(uri, Resource.from_contents(schema))
+        validate_graph_contract(future_graph, future_units, future_schemas)
+        validate_capability_contracts(future_units, future_resources)
+        future_recognizer = future_units['xdownload.player.recognizer']
+        future_providers = {future_recognizer['id']:resolve_provider_selection(future_recognizer, future_identity['selectionLock'], future_identity['selectionLock']['target'], future_resources)}
+        future_result = dict(evidence['result'], input=evidence['input'])
+        if not json_value_equal(future_result.get('packageIdentity'), future_identity):
+            fail('successor execution Package identity differs from verified descriptor')
+        validate_trace_assembly(future_result, future_graph, future_units, {node['nodeId']:node for node in future_graph['nodes']}, future_providers, future_schemas, future_registry)
+        old_input = {'url':'https://example.test', 'signals':['jwplayer']}
+        for old_result in (evidence['oldBefore'], evidence['oldAfter']):
+            if not json_value_equal(old_result.get('packageIdentity'), package_identity):
+                fail('old execution Package identity differs from trusted descriptor')
+            validate_trace_assembly(dict(old_result, input=old_input), graph, units_by_id, nodes_by_id, selected_providers, demo_schemas, registry)
+        if (future_result['trace'][0]['unitRevision'] != '2.0.0' or future_graph['revision'] != '2.0.0' or evidence['oldBefore']['trace'][0]['unitRevision'] != '1.0.0' or not json_value_equal(evidence['oldBefore'], evidence['oldAfter']) or evidence['oldLock'] != package_identity['selectionLockSha256'] or evidence['oldLock'] == expected_future_pin):
+            fail('successor Package execution changed old pinned execution')
+    validate_future_fixture(future)
+    forged_future = copy.deepcopy(future)
+    forged_unit = json.loads(base64.b64decode(forged_future['resourceBytes']['domain/units/recognizer.json']))
+    forged_unit['scope']['domain'] = 'forged-other-domain'
+    forged_future['resourceBytes']['domain/units/recognizer.json'] = base64.b64encode(json.dumps(forged_unit).encode('utf-8')).decode('ascii')
+    expect_rejection(lambda: validate_future_fixture(forged_future), 'successor execution context does not match closure bytes')
+    forged_identity = copy.deepcopy(future)
+    forged_identity['result']['packageIdentity']['selectionLockSha256'] = '0' * 64
+    expect_rejection(lambda: validate_future_fixture(forged_identity), 'successor trace carries a different Package identity')
+    substituted = copy.deepcopy(future)
+    substituted_descriptor = json.loads(base64.b64decode(substituted['descriptorBytes']))
+    substituted_identity = substituted_descriptor['dis']
+    exact_candidate = next(item for item in expected_recognizer['implementation']['candidates'] if item['candidateId'] == 'signature-exact-v1')
+    substituted_identity['selectionLock']['selectedCapabilities'][0]['provider'].update({'candidateId':exact_candidate['candidateId'], 'implementationRef':exact_candidate['ref'], 'artifactRef':exact_candidate['artifactRef'], 'artifactDigest':exact_candidate['artifactDigest']})
+    substituted_identity['selectionLockSha256'] = sha256(canonical_lifecycle_bytes(substituted_identity['selectionLock']))
+    substituted['trustedPin'] = substituted_identity['selectionLockSha256']
+    substituted['result']['packageIdentity'] = copy.deepcopy(substituted_identity)
+    substituted['descriptorBytes'] = base64.b64encode(json.dumps(substituted_descriptor).encode('utf-8')).decode('ascii')
+    expect_rejection(lambda: validate_future_fixture(substituted), 'self-signed successor lock substitutes a different provider')
+    forged_old = copy.deepcopy(future)
+    forged_old['oldBefore'] = forged_old['oldAfter'] = {'trace':[{'unitRevision':'1.0.0'}]}
+    forged_old['oldLock'] = 'fake'
+    expect_rejection(lambda: validate_future_fixture(forged_old), 'forged old Package execution')
     new_lock = copy.deepcopy(old_lock)
     new_lock['packageRevision'] = '2.0.0'
     if package_identity['selectionLock'] != old_lock or json_value_equal(new_lock, old_lock):

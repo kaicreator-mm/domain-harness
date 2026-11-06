@@ -91,10 +91,18 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
   if (options.successorRevision) {
     unit.revision = options.successorRevision;
     const graph = await read('domain/player-recognition.graph.json');
+    graph.revision = options.successorRevision;
     graph.nodes.find((node) => node.unitRef.id === unit.id).unitRef.revision = unit.revision;
     await write('domain/player-recognition.graph.json', graph);
+    const workflow = await read('domain/units/workflow.json');
+    workflow.revision = options.successorRevision;
+    workflow.implementation.ref = 'graph:' + graph.id + '@' + graph.revision;
+    await write('domain/units/workflow.json', workflow);
     const definition = await read('domain/definition.json');
-    for (const component of definition.components) if (component.unitRef?.id === unit.id) component.unitRef.revision = unit.revision;
+    definition.revision = options.successorRevision;
+    for (const component of definition.components) if ([unit.id, workflow.id].includes(component.unitRef?.id)) component.unitRef.revision = options.successorRevision;
+    definition.workflowRef.unitRef.revision = workflow.revision;
+    definition.workflowRef.graphRef.revision = graph.revision;
     await write('domain/definition.json', definition);
   }
   for (const [status, action] of Object.entries(changes)) unit.failure.handling[status].action = action;
@@ -112,13 +120,18 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
   }
   const manifest = await read('domain/resource-closure.json');
   if (options.packageRevision) manifest.packageRevision = options.packageRevision;
-  if (options.successorRevision) manifest.units.find((ref) => ref.id === unit.id).revision = unit.revision;
+  if (options.successorRevision) {
+    manifest.definitionRef.revision = options.successorRevision;
+    manifest.graphRef.revision = options.successorRevision;
+    for (const ref of manifest.units) if ([unit.id, 'xdownload.player-recognition.workflow'].includes(ref.id)) ref.revision = options.successorRevision;
+  }
   for (const entry of manifest.resources) entry.sha256 = createHash('sha256').update(await fs.readFile(path.join(root, entry.path))).digest('hex');
   await write('domain/resource-closure.json', manifest);
   const closureDigest = createHash('sha256').update(await fs.readFile(path.join(root, 'domain/resource-closure.json'))).digest('hex');
   const resources = new Map(manifest.resources.map((entry) => [entry.path, entry.sha256]));
   const descriptor = await read('package.json'), identity = descriptor.dis;
-  const oldHistory = originalDescriptor?.dis.lifecycleRecords.filter((record) => record.subject.id === unit.id);
+  const changedSubjects = [unit.id, 'xdownload.player-recognition.workflow', 'xdownload.player-recognition'];
+  const oldHistories = originalDescriptor?.dis.lifecycleRecords;
   if (options.packageRevision) {
     identity.revision = options.packageRevision;
     identity.selectionLock.packageRevision = options.packageRevision;
@@ -132,16 +145,23 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
     const changed = {};
     for (const entry of manifest.resources) if (originalManifest.resources.find((item) => item.path === entry.path).sha256 !== entry.sha256) changed[entry.path] = originalBytes.get(entry.path).toString('base64');
     identity.selectionLock.historicalClosures = [{ sha256: originalDescriptor.dis.resourceClosureSha256, manifestJson: originalManifestJson, resourceBase64: changed }];
-    identity.selectionLock.selectedAssets.find((asset) => asset.id === unit.id).revision = unit.revision;
+    for (const asset of identity.selectionLock.selectedAssets) if (changedSubjects.includes(asset.id)) asset.revision = options.successorRevision;
     identity.selectionLock.selectedCapabilities[0].provider.unitRevision = unit.revision;
   }
   const priorBySubject = new Map();
+  const nextRecords = [];
   for (const record of identity.lifecycleRecords) {
     const asset = identity.selectionLock.selectedAssets.find((item) => item.kind === record.subject.kind && item.id === record.subject.id);
-    if (options.successorRevision && asset.id === unit.id) {
+    if (options.successorRevision) {
+      const oldHistory = oldHistories.filter((old) => old.subject.id === asset.id);
+      const changed = changedSubjects.includes(asset.id);
+      if (!changed && record.transition === 'CANDIDATE') {
+        priorBySubject.set(asset.id, oldHistory[2]);
+        continue;
+      }
       record.recordId += '.successor';
-      record.subject.revision = unit.revision;
-      if (record.transition === 'CANDIDATE') record.candidateProvenance.parent = { kind: 'SUBJECT', subject: structuredClone(oldHistory[0].subject) };
+      if (changed) record.subject.revision = options.successorRevision;
+      if (changed && record.transition === 'CANDIDATE') record.candidateProvenance.parent = { kind: 'SUBJECT', subject: structuredClone(oldHistory[0].subject) };
       if (record.transition === 'PROMOTED') record.promotion.priorPromotedBaseline = { kind: 'PROMOTED', recordId: oldHistory[2].recordId, recordDigest: oldHistory[2].recordDigest };
     }
     record.subject.sha256 = resources.get(asset.path);
@@ -164,7 +184,9 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
     }
     refreshRecord(record);
     priorBySubject.set(asset.id, record);
+    nextRecords.push(record);
   }
+  identity.lifecycleRecords = nextRecords;
   for (const asset of identity.selectionLock.selectedAssets) {
     asset.sha256 = resources.get(asset.path);
     const history = identity.lifecycleRecords.filter((record) => record.subject.id === asset.id);
@@ -175,12 +197,12 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
   const selected = identity.selectionLock.selectedAssets.find((asset) => asset.id === unit.id);
   const capability = identity.selectionLock.selectedCapabilities[0];
   for (const key of ['validationRecordId', 'validationRecordDigest', 'promotionRecordId', 'promotionRecordDigest']) capability[key] = selected[key];
-  if (oldHistory) identity.lifecycleRecords.unshift(...oldHistory);
+  if (oldHistories) identity.lifecycleRecords.unshift(...oldHistories);
   refreshLock(identity);
   await write('package.json', descriptor);
   const isolated = await import(pathToFileURL(path.join(root, 'src/runner.mjs')).href);
   const loaded = await isolated.loadDemo({ expectedSelectionLockSha256: identity.selectionLockSha256 });
-  return { isolated, loaded };
+  return { isolated, loaded, root, trustedPin: identity.selectionLockSha256 };
 }
 
 test('known player follows control path while data arrives through an independent edge', async () => {
@@ -740,13 +762,18 @@ test('feedback retains provenance and cannot change an already-pinned execution'
     const futureResult = await future.isolated.runPipeline({ url: 'https://example.test', signals: ['JWPLAYER'] }, future.loaded);
     assert.equal(futureResult.trace[0].unitRevision, '2.0.0');
     assert.equal(future.loaded.packageIdentity.selectionLock.selectedAssets.find((item) => item.id === pin.id).revision, '2.0.0');
+    assert.equal(future.loaded.packageIdentity.selectionLock.selectedAssets.find((item) => item.kind === 'graph').revision, '2.0.0');
+    for (const original of loaded.packageIdentity.lifecycleRecords) assert.deepEqual(future.loaded.packageIdentity.lifecycleRecords.find((item) => item.recordId === original.recordId), original);
     assert.equal(before.trace[0].unitRevision, '1.0.0');
     assert.equal(futureResult.trace[0].implementationCandidateId, 'signature-normalized-v1');
     assert.equal(hashRecord(loaded.packageIdentity.selectionLock), beforeLock);
     assert.equal(JSON.stringify([...loaded.unitsById]), beforeUnits);
     const after = await runPipeline(input, loaded);
     assert.deepEqual(after.outcome, before.outcome);
-    if (process.env.DIS_EMIT_FUTURE_PROBE === '1') console.log('DIS_FUTURE_PROBE=' + JSON.stringify({ input: { url: 'https://example.test', signals: ['JWPLAYER'] }, result: futureResult, identity: future.loaded.packageIdentity, units: [...future.loaded.unitsById], resources: [...future.loaded.resources], manifest: future.loaded.closureManifest, graph: future.loaded.graph, oldLock: beforeLock, oldBefore: before, oldAfter: after }));
+    if (process.env.DIS_EMIT_FUTURE_PROBE === '1') {
+      const resourceBytes = Object.fromEntries(await Promise.all(future.loaded.closureManifest.resources.map(async (entry) => [entry.path, (await fs.readFile(path.join(future.root, entry.path))).toString('base64')])));
+      console.log('DIS_FUTURE_PROBE=' + JSON.stringify({ input: { url: 'https://example.test', signals: ['JWPLAYER'] }, result: futureResult, trustedPin: future.trustedPin, manifestBytes: (await fs.readFile(path.join(future.root, 'domain/resource-closure.json'))).toString('base64'), descriptorBytes: (await fs.readFile(path.join(future.root, 'package.json'))).toString('base64'), resourceBytes, oldLock: beforeLock, oldBefore: before, oldAfter: after }));
+    }
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });
   }

@@ -496,7 +496,7 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   for (const id of unitsById.keys()) if (!assetKeys.has('unit:' + id)) throw new DisExecutionError('SELECTED_UNIT_MISSING', id);
   if (!assetKeys.has('rule:xdownload.player-signatures') || !assetKeys.has('graph:xdownload.player-recognition')) throw new DisExecutionError('SELECTED_GRAPH_OR_RULE_MISSING', packageIdentity.packageId);
   const selectedGraph = selection.selectedAssets.find((asset) => asset.kind === 'graph' && asset.id === 'xdownload.player-recognition');
-  if (selectedGraph.path !== 'domain/player-recognition.graph.json' || selectedGraph.revision !== '1.0.0') throw new DisExecutionError('SELECTED_GRAPH_IDENTITY_MISMATCH', selectedGraph.id);
+  if (selectedGraph.path !== 'domain/player-recognition.graph.json' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(selectedGraph.revision || '')) throw new DisExecutionError('SELECTED_GRAPH_IDENTITY_MISMATCH', selectedGraph.id);
   return true;
 }
 
