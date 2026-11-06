@@ -12,7 +12,7 @@
     "revision": "1.0.0",
     "standardVersion": "0.1.0",
     "resourceClosurePath": "domain/resource-closure.json",
-    "resourceClosureSha256": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+    "resourceClosureSha256": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
     "conformanceResources": [
       "src/verified-loader.mjs",
       "src/emit-conformance-traces.mjs",
@@ -29,9 +29,9 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "396dc037969d4f29ef98767cc56da849ce38dfb24a4ab92d873987cc97cd3fee"
+          "sha256": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -51,7 +51,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "2994616cd9f7b0adb5ed56d3c479710b76e690906551b02ac3de13b07f8dd458"
+        "recordDigest": "d47a080fc85eb698433592748cab1bd1dfaca07694bc642848e4e25b0a0cc810"
       },
       {
         "recordId": "xdownload.player.recognizer.unit.validated.1",
@@ -60,11 +60,11 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "396dc037969d4f29ef98767cc56da849ce38dfb24a4ab92d873987cc97cd3fee"
+          "sha256": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.recognizer.unit.candidate.1",
-        "previousRecordDigest": "2994616cd9f7b0adb5ed56d3c479710b76e690906551b02ac3de13b07f8dd458",
+        "previousRecordDigest": "d47a080fc85eb698433592748cab1bd1dfaca07694bc642848e4e25b0a0cc810",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -75,8 +75,8 @@
         },
         "validation": {
           "result": "PASS",
-          "subjectDigest": "396dc037969d4f29ef98767cc56da849ce38dfb24a4ab92d873987cc97cd3fee",
-          "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+          "subjectDigest": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2",
+          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
           "profile": {
             "id": "player-recognition-conformance/0.1.0",
             "revision": "0.1.0"
@@ -103,15 +103,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0"
+              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "2cb50839b33cbbbb92a22fed1e99bbf777fa5b242915ad3d89a547d2acf718d5"
+              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "7aa9c13f4073ff4d63b91cd2a12519d254b78220ae642873a7c52aa8f5c844c1"
+              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
             }
           ],
           "limitations": [
@@ -121,7 +121,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "94f9625fe64ef6a945bc296a9e7473885920632a1c25c12b01d7f3e9ab7125a7"
+        "recordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675"
       },
       {
         "recordId": "xdownload.player.recognizer.unit.promoted.1",
@@ -130,11 +130,11 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "396dc037969d4f29ef98767cc56da849ce38dfb24a4ab92d873987cc97cd3fee"
+          "sha256": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.recognizer.unit.validated.1",
-        "previousRecordDigest": "94f9625fe64ef6a945bc296a9e7473885920632a1c25c12b01d7f3e9ab7125a7",
+        "previousRecordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -143,7 +143,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "94f9625fe64ef6a945bc296a9e7473885920632a1c25c12b01d7f3e9ab7125a7",
+          "validationRecordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -153,7 +153,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "89bfd61b5e2ce78d920e126e297cd3fc2eacc76076e1df858a27d2268d9244ba"
+        "recordDigest": "3f104c3fe15b9bdff6267ee19bbd09f0f78aea168e48020aec0b31beedb1324d"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.candidate.1",
@@ -164,7 +164,7 @@
           "revision": "1.0.0",
           "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -184,7 +184,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "984d8cd862e737ccc3696cea1eefc3e1417e8e89b0103a0bb467724cade38fd0"
+        "recordDigest": "bec538e3ba682947141d05512b3834985837c3842ef5b8c9b7313f8d83af40b3"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.validated.1",
@@ -195,9 +195,9 @@
           "revision": "1.0.0",
           "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.route-decision.unit.candidate.1",
-        "previousRecordDigest": "984d8cd862e737ccc3696cea1eefc3e1417e8e89b0103a0bb467724cade38fd0",
+        "previousRecordDigest": "bec538e3ba682947141d05512b3834985837c3842ef5b8c9b7313f8d83af40b3",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -209,7 +209,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5",
-          "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
           "profile": {
             "id": "player-route-conformance/0.1.0",
             "revision": "0.1.0"
@@ -236,15 +236,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0"
+              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "2cb50839b33cbbbb92a22fed1e99bbf777fa5b242915ad3d89a547d2acf718d5"
+              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "7aa9c13f4073ff4d63b91cd2a12519d254b78220ae642873a7c52aa8f5c844c1"
+              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
             }
           ],
           "limitations": [
@@ -254,7 +254,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "b6175e2d6c9b3146bbbbe0e097a0c71a6c9012c9188af629dbcd8184e4a6c08f"
+        "recordDigest": "0e07afe7fd0c02c40762f5f2e4d4ef9c5d63e979fe953b33db724963f021d62b"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.promoted.1",
@@ -265,9 +265,9 @@
           "revision": "1.0.0",
           "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.route-decision.unit.validated.1",
-        "previousRecordDigest": "b6175e2d6c9b3146bbbbe0e097a0c71a6c9012c9188af629dbcd8184e4a6c08f",
+        "previousRecordDigest": "0e07afe7fd0c02c40762f5f2e4d4ef9c5d63e979fe953b33db724963f021d62b",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -276,7 +276,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.route-decision.unit.validated.1",
-          "validationRecordDigest": "b6175e2d6c9b3146bbbbe0e097a0c71a6c9012c9188af629dbcd8184e4a6c08f",
+          "validationRecordDigest": "0e07afe7fd0c02c40762f5f2e4d4ef9c5d63e979fe953b33db724963f021d62b",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -286,7 +286,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "1f1a87f80bcd510669e4625f79e42f8094dc7c4dfccd69896ae5cf05714ee493"
+        "recordDigest": "a7279d2b7c911f457302a04ceae4c03106fd09b2bf501e70cf3a6bd4b6fa571a"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.candidate.1",
@@ -297,7 +297,7 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -317,7 +317,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "1894508a9100b5120a423c83f73d0d29be872f8e33ba044853d92d1d1752bdb0"
+        "recordDigest": "db5ce5f5c41f2edd5447c0e000b9e4943d49c35f78518be7ba67e59988153a93"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.validated.1",
@@ -328,9 +328,9 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.resolve-procedure.unit.candidate.1",
-        "previousRecordDigest": "1894508a9100b5120a423c83f73d0d29be872f8e33ba044853d92d1d1752bdb0",
+        "previousRecordDigest": "db5ce5f5c41f2edd5447c0e000b9e4943d49c35f78518be7ba67e59988153a93",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -342,7 +342,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb",
-          "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
           "profile": {
             "id": "player-resolution-conformance/0.1.0",
             "revision": "0.1.0"
@@ -369,15 +369,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0"
+              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "2cb50839b33cbbbb92a22fed1e99bbf777fa5b242915ad3d89a547d2acf718d5"
+              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "7aa9c13f4073ff4d63b91cd2a12519d254b78220ae642873a7c52aa8f5c844c1"
+              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
             }
           ],
           "limitations": [
@@ -387,7 +387,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "b56c9edac0ae7ebf93a9443389e1f2e5197f499c61fc7a6eae9f6eeb3a23e564"
+        "recordDigest": "2ae19fe6ca23a9c1d5a9b4dcb54e3a192f33fa3b512e1ebaf05f8a2bce8ab958"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.promoted.1",
@@ -398,9 +398,9 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-        "previousRecordDigest": "b56c9edac0ae7ebf93a9443389e1f2e5197f499c61fc7a6eae9f6eeb3a23e564",
+        "previousRecordDigest": "2ae19fe6ca23a9c1d5a9b4dcb54e3a192f33fa3b512e1ebaf05f8a2bce8ab958",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -409,7 +409,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-          "validationRecordDigest": "b56c9edac0ae7ebf93a9443389e1f2e5197f499c61fc7a6eae9f6eeb3a23e564",
+          "validationRecordDigest": "2ae19fe6ca23a9c1d5a9b4dcb54e3a192f33fa3b512e1ebaf05f8a2bce8ab958",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -419,7 +419,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "f1d03d5ed9226bc796e128dd4b5cd0909e8b46ddac13b9380ad580a9ee0e135d"
+        "recordDigest": "4bcb0ab22c8b67f6c05373b9eeec84913a223a5d2d48dbf74006c32b2f4429ce"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.candidate.1",
@@ -430,7 +430,7 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -450,7 +450,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "fd4db1174454e590bac9a6233ae1130904204b0e64a2e4b131acd8d39767e463"
+        "recordDigest": "46ab90d3b08dacd1f11b1d724afe5821650e17f7b22a42e169e0c47a22cda7b4"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.validated.1",
@@ -461,9 +461,9 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.bounded-fallback.unit.candidate.1",
-        "previousRecordDigest": "fd4db1174454e590bac9a6233ae1130904204b0e64a2e4b131acd8d39767e463",
+        "previousRecordDigest": "46ab90d3b08dacd1f11b1d724afe5821650e17f7b22a42e169e0c47a22cda7b4",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -475,7 +475,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c",
-          "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
           "profile": {
             "id": "player-fallback-conformance/0.1.0",
             "revision": "0.1.0"
@@ -502,15 +502,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0"
+              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "2cb50839b33cbbbb92a22fed1e99bbf777fa5b242915ad3d89a547d2acf718d5"
+              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "7aa9c13f4073ff4d63b91cd2a12519d254b78220ae642873a7c52aa8f5c844c1"
+              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
             }
           ],
           "limitations": [
@@ -520,7 +520,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "d0882ec746e55ac42cf6f0b13affc1fc608396856f00707ac533ca3d13d8b66c"
+        "recordDigest": "75c61ea398e04385de79aa64a34fc3cf3f173a4ce38845536d64a1a06a1db412"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.promoted.1",
@@ -531,9 +531,9 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-        "previousRecordDigest": "d0882ec746e55ac42cf6f0b13affc1fc608396856f00707ac533ca3d13d8b66c",
+        "previousRecordDigest": "75c61ea398e04385de79aa64a34fc3cf3f173a4ce38845536d64a1a06a1db412",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -542,7 +542,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-          "validationRecordDigest": "d0882ec746e55ac42cf6f0b13affc1fc608396856f00707ac533ca3d13d8b66c",
+          "validationRecordDigest": "75c61ea398e04385de79aa64a34fc3cf3f173a4ce38845536d64a1a06a1db412",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -552,7 +552,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "bc806b81b1c1471a2bf4cb7d06d4d6cb02959022d01fa04195582d7a42bfa062"
+        "recordDigest": "462ad9b35c0e985f883f025a48f05de281b8e3818b21941ad2178b6f1edd7f74"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.candidate.1",
@@ -563,7 +563,7 @@
           "revision": "1.0.0",
           "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -583,7 +583,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "e57121b81cd95cf3322f1eb46f0beb2fc449321374e670d5eb5a669bbe2ec171"
+        "recordDigest": "7140260003d9a494883d80e59c2959af44799b1141641ea4551b843a5b1d1423"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.validated.1",
@@ -594,9 +594,9 @@
           "revision": "1.0.0",
           "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.outcome-validator.unit.candidate.1",
-        "previousRecordDigest": "e57121b81cd95cf3322f1eb46f0beb2fc449321374e670d5eb5a669bbe2ec171",
+        "previousRecordDigest": "7140260003d9a494883d80e59c2959af44799b1141641ea4551b843a5b1d1423",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -608,7 +608,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55",
-          "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
           "profile": {
             "id": "player-outcome-conformance/0.1.0",
             "revision": "0.1.0"
@@ -635,15 +635,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0"
+              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "2cb50839b33cbbbb92a22fed1e99bbf777fa5b242915ad3d89a547d2acf718d5"
+              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "7aa9c13f4073ff4d63b91cd2a12519d254b78220ae642873a7c52aa8f5c844c1"
+              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
             }
           ],
           "limitations": [
@@ -653,7 +653,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "2f1bf40f2678e1a8ceb27b4d39ff941ec0d15c3db04bc464db0f7a32787ad620"
+        "recordDigest": "ca2335fa236516abf4274f142d0dc2ec678f9ec37a85644ea04832cb66323913"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.promoted.1",
@@ -664,9 +664,9 @@
           "revision": "1.0.0",
           "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-        "previousRecordDigest": "2f1bf40f2678e1a8ceb27b4d39ff941ec0d15c3db04bc464db0f7a32787ad620",
+        "previousRecordDigest": "ca2335fa236516abf4274f142d0dc2ec678f9ec37a85644ea04832cb66323913",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -675,7 +675,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-          "validationRecordDigest": "2f1bf40f2678e1a8ceb27b4d39ff941ec0d15c3db04bc464db0f7a32787ad620",
+          "validationRecordDigest": "ca2335fa236516abf4274f142d0dc2ec678f9ec37a85644ea04832cb66323913",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -685,7 +685,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "326440f4cc0778549f01001492c177379628baace4fc9468e8e8ac60c0a73af1"
+        "recordDigest": "1427263127bc027869c1d0b401a5e55f3635fa8e6e40953649913a539e382def"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.candidate.1",
@@ -696,7 +696,7 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -716,7 +716,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "2cc167b7ca83aa7d6adb8ff3b483326e27b0b1cb8e8251c7b60d73b20c7fb0b3"
+        "recordDigest": "1c797f754f9e6e9ee153b8faf73de41d6f4450c14d5aa5e34a90a59147a70fc8"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.validated.1",
@@ -727,9 +727,9 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player-recognition.workflow.unit.candidate.1",
-        "previousRecordDigest": "2cc167b7ca83aa7d6adb8ff3b483326e27b0b1cb8e8251c7b60d73b20c7fb0b3",
+        "previousRecordDigest": "1c797f754f9e6e9ee153b8faf73de41d6f4450c14d5aa5e34a90a59147a70fc8",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -741,7 +741,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5",
-          "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
           "profile": {
             "id": "player-recognition-workflow/0.1.0",
             "revision": "0.1.0"
@@ -768,15 +768,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0"
+              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "2cb50839b33cbbbb92a22fed1e99bbf777fa5b242915ad3d89a547d2acf718d5"
+              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "7aa9c13f4073ff4d63b91cd2a12519d254b78220ae642873a7c52aa8f5c844c1"
+              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
             }
           ],
           "limitations": [
@@ -786,7 +786,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "1958e28cf9db0fdd7ea23841a6b0d720b59b929687c24c6330fe38b76ab8e14a"
+        "recordDigest": "a898aeabcaf9566877dbbe1f27636da591ab1db35ca5558661965eb665f122d5"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.promoted.1",
@@ -797,9 +797,9 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-        "previousRecordDigest": "1958e28cf9db0fdd7ea23841a6b0d720b59b929687c24c6330fe38b76ab8e14a",
+        "previousRecordDigest": "a898aeabcaf9566877dbbe1f27636da591ab1db35ca5558661965eb665f122d5",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -808,7 +808,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-          "validationRecordDigest": "1958e28cf9db0fdd7ea23841a6b0d720b59b929687c24c6330fe38b76ab8e14a",
+          "validationRecordDigest": "a898aeabcaf9566877dbbe1f27636da591ab1db35ca5558661965eb665f122d5",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -818,7 +818,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "cb7d0975639c2b4c5cce945f9872f7ac91624919b6f5ed34d0f0f367d170bb67"
+        "recordDigest": "2a35dae4302c9657822c48e076e80c947034a1f7ab3e069a1f1d4b3ca492b8ee"
       },
       {
         "recordId": "xdownload.player-signatures.rule.candidate.1",
@@ -829,7 +829,7 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -849,7 +849,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "f72b4cfc8bda1b43e043a037cd26a2217f915460d030082264705d50bc367acc"
+        "recordDigest": "872e6f59fb2e5f57e83530bb605c166d59d0f8d81c26147551fce682dda14b4e"
       },
       {
         "recordId": "xdownload.player-signatures.rule.validated.1",
@@ -860,9 +860,9 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player-signatures.rule.candidate.1",
-        "previousRecordDigest": "f72b4cfc8bda1b43e043a037cd26a2217f915460d030082264705d50bc367acc",
+        "previousRecordDigest": "872e6f59fb2e5f57e83530bb605c166d59d0f8d81c26147551fce682dda14b4e",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -874,7 +874,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
-          "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
           "profile": {
             "id": "player-recognition-conformance/0.1.0",
             "revision": "0.1.0"
@@ -901,15 +901,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0"
+              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "2cb50839b33cbbbb92a22fed1e99bbf777fa5b242915ad3d89a547d2acf718d5"
+              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "7aa9c13f4073ff4d63b91cd2a12519d254b78220ae642873a7c52aa8f5c844c1"
+              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
             }
           ],
           "limitations": [
@@ -919,7 +919,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "b6c3f5bb8ce2dc02b7fa046370b25f0a01d9bc683d4c1b813eee1fec8922b30c"
+        "recordDigest": "b5cefdec5bbb961fba100ddfc99849999798721a240ce0dcb1047ba9c85e78f0"
       },
       {
         "recordId": "xdownload.player-signatures.rule.promoted.1",
@@ -930,9 +930,9 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player-signatures.rule.validated.1",
-        "previousRecordDigest": "b6c3f5bb8ce2dc02b7fa046370b25f0a01d9bc683d4c1b813eee1fec8922b30c",
+        "previousRecordDigest": "b5cefdec5bbb961fba100ddfc99849999798721a240ce0dcb1047ba9c85e78f0",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -941,7 +941,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-signatures.rule.validated.1",
-          "validationRecordDigest": "b6c3f5bb8ce2dc02b7fa046370b25f0a01d9bc683d4c1b813eee1fec8922b30c",
+          "validationRecordDigest": "b5cefdec5bbb961fba100ddfc99849999798721a240ce0dcb1047ba9c85e78f0",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -951,7 +951,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "d5c7548baad6ed6cf7773680bce5b1232106baebee1b3675881ea3a784d20600"
+        "recordDigest": "8ca606fe549ddac32f8449fee49ebfed9f31b14e422766d9c6ae4577037c8597"
       },
       {
         "recordId": "xdownload.player-recognition.graph.candidate.1",
@@ -962,7 +962,7 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -982,7 +982,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "050721e5243ba66979c03bc60401b846de980bb52d313f1c526829ebcf799591"
+        "recordDigest": "7fa4d0e991261aa107ea3db5590d6931f6b011b9961879ffde22a0592038dd5e"
       },
       {
         "recordId": "xdownload.player-recognition.graph.validated.1",
@@ -993,9 +993,9 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player-recognition.graph.candidate.1",
-        "previousRecordDigest": "050721e5243ba66979c03bc60401b846de980bb52d313f1c526829ebcf799591",
+        "previousRecordDigest": "7fa4d0e991261aa107ea3db5590d6931f6b011b9961879ffde22a0592038dd5e",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -1007,7 +1007,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e",
-          "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
           "profile": {
             "id": "player-recognition-workflow/0.1.0",
             "revision": "0.1.0"
@@ -1034,15 +1034,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0"
+              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "2cb50839b33cbbbb92a22fed1e99bbf777fa5b242915ad3d89a547d2acf718d5"
+              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "7aa9c13f4073ff4d63b91cd2a12519d254b78220ae642873a7c52aa8f5c844c1"
+              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
             }
           ],
           "limitations": [
@@ -1052,7 +1052,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "41693c5acab45b711959f7f8a9ee88ce1b4e0beb019dd063a7ab7428679471db"
+        "recordDigest": "baa27522c510d872f38f3c49d6f66e5ea47e630444a92c62889d8276fd3edbdd"
       },
       {
         "recordId": "xdownload.player-recognition.graph.promoted.1",
@@ -1063,9 +1063,9 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "9e7e5d90de5113f64d52d98ab3bd900c89ea3dd6b21565bcdb2401b984827f41",
+        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
         "previousRecordId": "xdownload.player-recognition.graph.validated.1",
-        "previousRecordDigest": "41693c5acab45b711959f7f8a9ee88ce1b4e0beb019dd063a7ab7428679471db",
+        "previousRecordDigest": "baa27522c510d872f38f3c49d6f66e5ea47e630444a92c62889d8276fd3edbdd",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -1074,7 +1074,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-recognition.graph.validated.1",
-          "validationRecordDigest": "41693c5acab45b711959f7f8a9ee88ce1b4e0beb019dd063a7ab7428679471db",
+          "validationRecordDigest": "baa27522c510d872f38f3c49d6f66e5ea47e630444a92c62889d8276fd3edbdd",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -1084,7 +1084,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "ea97673b4901782bf3d229f029efe125c5671bd78182ee6127bd6783494ce40e"
+        "recordDigest": "df5fd003fb2671151da5b2907db59ff1919658e6b60dbf2f881bce2a3b18263d"
       }
     ],
     "selectionLock": {
@@ -1103,11 +1103,11 @@
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
           "path": "domain/units/recognizer.json",
-          "sha256": "396dc037969d4f29ef98767cc56da849ce38dfb24a4ab92d873987cc97cd3fee",
+          "sha256": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2",
           "promotionRecordId": "xdownload.player.recognizer.unit.promoted.1",
-          "promotionRecordDigest": "89bfd61b5e2ce78d920e126e297cd3fc2eacc76076e1df858a27d2268d9244ba",
+          "promotionRecordDigest": "3f104c3fe15b9bdff6267ee19bbd09f0f78aea168e48020aec0b31beedb1324d",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "94f9625fe64ef6a945bc296a9e7473885920632a1c25c12b01d7f3e9ab7125a7"
+          "validationRecordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675"
         },
         {
           "kind": "unit",
@@ -1116,9 +1116,9 @@
           "path": "domain/units/decision.json",
           "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5",
           "promotionRecordId": "xdownload.player.route-decision.unit.promoted.1",
-          "promotionRecordDigest": "1f1a87f80bcd510669e4625f79e42f8094dc7c4dfccd69896ae5cf05714ee493",
+          "promotionRecordDigest": "a7279d2b7c911f457302a04ceae4c03106fd09b2bf501e70cf3a6bd4b6fa571a",
           "validationRecordId": "xdownload.player.route-decision.unit.validated.1",
-          "validationRecordDigest": "b6175e2d6c9b3146bbbbe0e097a0c71a6c9012c9188af629dbcd8184e4a6c08f"
+          "validationRecordDigest": "0e07afe7fd0c02c40762f5f2e4d4ef9c5d63e979fe953b33db724963f021d62b"
         },
         {
           "kind": "unit",
@@ -1127,9 +1127,9 @@
           "path": "domain/units/resolve-procedure.json",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb",
           "promotionRecordId": "xdownload.player.resolve-procedure.unit.promoted.1",
-          "promotionRecordDigest": "f1d03d5ed9226bc796e128dd4b5cd0909e8b46ddac13b9380ad580a9ee0e135d",
+          "promotionRecordDigest": "4bcb0ab22c8b67f6c05373b9eeec84913a223a5d2d48dbf74006c32b2f4429ce",
           "validationRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-          "validationRecordDigest": "b56c9edac0ae7ebf93a9443389e1f2e5197f499c61fc7a6eae9f6eeb3a23e564"
+          "validationRecordDigest": "2ae19fe6ca23a9c1d5a9b4dcb54e3a192f33fa3b512e1ebaf05f8a2bce8ab958"
         },
         {
           "kind": "unit",
@@ -1138,9 +1138,9 @@
           "path": "domain/units/fallback-procedure.json",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c",
           "promotionRecordId": "xdownload.player.bounded-fallback.unit.promoted.1",
-          "promotionRecordDigest": "bc806b81b1c1471a2bf4cb7d06d4d6cb02959022d01fa04195582d7a42bfa062",
+          "promotionRecordDigest": "462ad9b35c0e985f883f025a48f05de281b8e3818b21941ad2178b6f1edd7f74",
           "validationRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-          "validationRecordDigest": "d0882ec746e55ac42cf6f0b13affc1fc608396856f00707ac533ca3d13d8b66c"
+          "validationRecordDigest": "75c61ea398e04385de79aa64a34fc3cf3f173a4ce38845536d64a1a06a1db412"
         },
         {
           "kind": "unit",
@@ -1149,9 +1149,9 @@
           "path": "domain/units/validator.json",
           "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55",
           "promotionRecordId": "xdownload.player.outcome-validator.unit.promoted.1",
-          "promotionRecordDigest": "326440f4cc0778549f01001492c177379628baace4fc9468e8e8ac60c0a73af1",
+          "promotionRecordDigest": "1427263127bc027869c1d0b401a5e55f3635fa8e6e40953649913a539e382def",
           "validationRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-          "validationRecordDigest": "2f1bf40f2678e1a8ceb27b4d39ff941ec0d15c3db04bc464db0f7a32787ad620"
+          "validationRecordDigest": "ca2335fa236516abf4274f142d0dc2ec678f9ec37a85644ea04832cb66323913"
         },
         {
           "kind": "unit",
@@ -1160,9 +1160,9 @@
           "path": "domain/units/workflow.json",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5",
           "promotionRecordId": "xdownload.player-recognition.workflow.unit.promoted.1",
-          "promotionRecordDigest": "cb7d0975639c2b4c5cce945f9872f7ac91624919b6f5ed34d0f0f367d170bb67",
+          "promotionRecordDigest": "2a35dae4302c9657822c48e076e80c947034a1f7ab3e069a1f1d4b3ca492b8ee",
           "validationRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-          "validationRecordDigest": "1958e28cf9db0fdd7ea23841a6b0d720b59b929687c24c6330fe38b76ab8e14a"
+          "validationRecordDigest": "a898aeabcaf9566877dbbe1f27636da591ab1db35ca5558661965eb665f122d5"
         },
         {
           "kind": "rule",
@@ -1171,9 +1171,9 @@
           "path": "fixtures/player-signatures.json",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
           "promotionRecordId": "xdownload.player-signatures.rule.promoted.1",
-          "promotionRecordDigest": "d5c7548baad6ed6cf7773680bce5b1232106baebee1b3675881ea3a784d20600",
+          "promotionRecordDigest": "8ca606fe549ddac32f8449fee49ebfed9f31b14e422766d9c6ae4577037c8597",
           "validationRecordId": "xdownload.player-signatures.rule.validated.1",
-          "validationRecordDigest": "b6c3f5bb8ce2dc02b7fa046370b25f0a01d9bc683d4c1b813eee1fec8922b30c"
+          "validationRecordDigest": "b5cefdec5bbb961fba100ddfc99849999798721a240ce0dcb1047ba9c85e78f0"
         },
         {
           "kind": "graph",
@@ -1182,9 +1182,9 @@
           "path": "domain/player-recognition.graph.json",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e",
           "promotionRecordId": "xdownload.player-recognition.graph.promoted.1",
-          "promotionRecordDigest": "ea97673b4901782bf3d229f029efe125c5671bd78182ee6127bd6783494ce40e",
+          "promotionRecordDigest": "df5fd003fb2671151da5b2907db59ff1919658e6b60dbf2f881bce2a3b18263d",
           "validationRecordId": "xdownload.player-recognition.graph.validated.1",
-          "validationRecordDigest": "41693c5acab45b711959f7f8a9ee88ce1b4e0beb019dd063a7ab7428679471db"
+          "validationRecordDigest": "baa27522c510d872f38f3c49d6f66e5ea47e630444a92c62889d8276fd3edbdd"
         }
       ],
       "selectedCapabilities": [
@@ -1200,17 +1200,17 @@
             "candidateId": "signature-exact-v1",
             "implementationRef": "registry:xdownload.player.recognizer@1.0.0",
             "artifactRef": "src/runner.mjs",
-            "artifactDigest": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0",
+            "artifactDigest": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6",
             "target": "node24",
             "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
           },
           "promotionRecordId": "xdownload.player.recognizer.unit.promoted.1",
-          "promotionRecordDigest": "89bfd61b5e2ce78d920e126e297cd3fc2eacc76076e1df858a27d2268d9244ba",
+          "promotionRecordDigest": "3f104c3fe15b9bdff6267ee19bbd09f0f78aea168e48020aec0b31beedb1324d",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "94f9625fe64ef6a945bc296a9e7473885920632a1c25c12b01d7f3e9ab7125a7"
+          "validationRecordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675"
         }
       ]
     },
-    "selectionLockSha256": "afd4ad4ef9795cc357da9b7f94b4e74a5039dc2416775c8edbe8c15b456c00ad"
+    "selectionLockSha256": "1214a9cce7a9b8e94f9efaf11da474135530575c8ca85667d16c58709b4c4b09"
   }
 }

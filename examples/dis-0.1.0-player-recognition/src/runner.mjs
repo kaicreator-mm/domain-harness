@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(here, '..');
+const lockedProviders = new WeakMap();
 
 export class DisExecutionError extends Error {
   constructor(code, message) {
@@ -63,7 +64,7 @@ export function validateUnit(unit) {
   if (!unit.scope?.domain || !Array.isArray(unit.scope.appliesTo) || !Array.isArray(unit.scope.excludes)) throw new DisExecutionError('INVALID_SCOPE', unit.id);
   if (!['FROZEN', 'CONTROLLED', 'REFERENCE', 'EXAMPLE', 'DERIVED'].includes(unit.authority)) throw new DisExecutionError('INVALID_AUTHORITY', unit.id);
   if (!unit.qualification || typeof unit.qualification.profile !== 'string' || 'stage' in unit.qualification) throw new DisExecutionError('MUTABLE_QUALIFICATION_STAGE_FORBIDDEN', unit.id);
-  if ('supported' in (unit.failure || {}) || !unit.failure?.handling || typeof unit.failure.handling !== 'object' || Array.isArray(unit.failure.handling)) throw new DisExecutionError('INVALID_FAILURE_PROFILE', unit.id);
+  if ('supported' in (unit.failure || {}) || !unit.failure?.handling || typeof unit.failure.handling !== 'object' || Array.isArray(unit.failure.handling) || Object.keys(unit.failure.handling).length === 0) throw new DisExecutionError('INVALID_FAILURE_PROFILE', unit.id);
   const failureStatuses = new Set(['UNKNOWN', 'AMBIGUOUS', 'CONFLICT', 'OUT_OF_SCOPE', 'INVALID_INPUT', 'PARTIAL', 'FAILED', 'NEEDS_INPUT', 'NEEDS_REVIEW']);
   const handlingActions = new Set(['REJECT', 'PRESERVE_UNKNOWN', 'CLARIFY', 'WAIT', 'REVIEW', 'BOUNDED_FALLBACK', 'BOUNDED_RETRY', 'ESCALATE', 'RETURN_PARTIAL', 'FAIL']);
   for (const [status, policy] of Object.entries(unit.failure.handling)) {
@@ -196,7 +197,7 @@ function lifecycleRecordDigest(record) {
   return sha256(Buffer.from(JSON.stringify(canonicalLifecycleValue(payload)), 'utf8'));
 }
 
-export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, resources, closureDigest) {
+export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, resources, closureDigest, expectedSelectionLockSha256) {
   const records = packageIdentity.lifecycleRecords;
   const selection = packageIdentity.selectionLock;
   if (!Array.isArray(records) || !selection) throw new DisExecutionError('MISSING_LIFECYCLE_OR_SELECTION_LOCK', packageIdentity.packageId);
@@ -204,7 +205,7 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   if (!selection.consumerProfile?.id || !selection.consumerProfile?.revision || !selection.target || !Array.isArray(selection.selectedAssets) || !Array.isArray(selection.selectedCapabilities)) throw new DisExecutionError('INVALID_PACKAGE_SELECTION_LOCK', packageIdentity.packageId);
   if (selection.selectedCapabilities.length !== 1 || selection.selectedAssets.length !== unitsById.size + 2) throw new DisExecutionError('PACKAGE_SELECTION_CARDINALITY_INVALID', packageIdentity.packageId);
   const selectionDigest = sha256(Buffer.from(JSON.stringify(canonicalLifecycleValue(selection)), 'utf8'));
-  if (selectionDigest !== packageIdentity.selectionLockSha256) throw new DisExecutionError('PACKAGE_SELECTION_DIGEST_MISMATCH', packageIdentity.packageId);
+  if (!/^[a-f0-9]{64}$/.test(expectedSelectionLockSha256 || '') || selectionDigest !== expectedSelectionLockSha256 || selectionDigest !== packageIdentity.selectionLockSha256) throw new DisExecutionError('PACKAGE_SELECTION_DIGEST_MISMATCH', packageIdentity.packageId);
   const byId = new Map();
   for (const record of records) {
     if (!record.recordId || byId.has(record.recordId) || !['CANDIDATE', 'VALIDATED', 'PROMOTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'].includes(record.transition)) throw new DisExecutionError('INVALID_LIFECYCLE_RECORD', record.recordId || 'missing');
@@ -241,7 +242,7 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
       !validation.evidenceRefs.some((evidence) => evidence.path === validation.baseline.path && evidence.sha256 === validation.baseline.sha256)) {
     throw new DisExecutionError('VALIDATION_BASELINE_PIN_MISMATCH', validated.recordId);
   }
-  for (const key of ['positive', 'negative', 'boundary', 'heldOut']) if (!Number.isInteger(validation.coverage[key]) || validation.coverage[key] < 0) throw new DisExecutionError('INVALID_LIFECYCLE_COVERAGE', validated.recordId);
+  for (const key of ['positive', 'negative', 'boundary', 'heldOut']) if (!Number.isInteger(validation.coverage[key]) || validation.coverage[key] < (key === 'heldOut' ? 0 : 1)) throw new DisExecutionError('INVALID_LIFECYCLE_COVERAGE', validated.recordId);
   for (const evidence of validation.evidenceRefs) if (resources.get(evidence.path) !== evidence.sha256) throw new DisExecutionError('LIFECYCLE_EVIDENCE_DIGEST_MISMATCH', evidence.path);
   const promotion = promoted.promotion;
   if (!promotion || promotion.decision !== 'PROMOTE' || promotion.validationRecordId !== validated.recordId ||
@@ -283,8 +284,10 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
     const history = records.filter((item) => item.subject.kind === asset.kind && item.subject.id === asset.id && item.subject.revision === asset.revision && item.subject.sha256 === asset.sha256);
     const c = history.find((item) => item.transition === 'CANDIDATE'), v = history.find((item) => item.transition === 'VALIDATED'), p = history.find((item) => item.transition === 'PROMOTED');
     if (history.length !== 3 || !c || !v || !p || c.previousRecordId != null || v.previousRecordId !== c.recordId || v.previousRecordDigest !== c.recordDigest || p.previousRecordId !== v.recordId || p.previousRecordDigest !== v.recordDigest) throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', key);
+    if (!c.actor?.id || c.actor.role !== 'candidate-producer' || !c.actor.authorityRef || !c.policy?.id || !c.policy?.revision || !Array.isArray(c.evidenceRefs) || !c.evidenceRefs.length || c.evidenceRefs.some((item) => resources.get(item.path) !== item.sha256) || !v.actor?.id || v.actor.role !== 'validator') throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_POLICY', key);
     if (p.actor?.id !== 'xdownload-demo-governance' || p.actor?.role !== 'promotion-authority' || p.actor?.authorityRef !== 'xdownload-demo/domain-authority@1.0.0' || p.actor.id === c.actor?.id || p.actor.id === v.actor?.id || p.promotion?.decision !== 'PROMOTE' || p.promotion.validationRecordId !== v.recordId || p.promotion.validationRecordDigest !== v.recordDigest) throw new DisExecutionError('UNAUTHORIZED_PROMOTION_RECORD', key);
     if (v.validation?.result !== 'PASS' || v.validation.subjectDigest !== asset.sha256 || v.validation.dependencyClosureDigest !== closureDigest || !v.validation.profile?.id || !v.validation.profile?.revision || !v.validation.validator?.id || !v.validation.validator?.version || !Array.isArray(v.validation.evidenceRefs)) throw new DisExecutionError('INVALID_LIFECYCLE_VALIDATION', key);
+    for (const name of ['positive', 'negative', 'boundary', 'heldOut']) if (!Number.isInteger(v.validation.coverage?.[name]) || v.validation.coverage[name] < (name === 'heldOut' ? 0 : 1)) throw new DisExecutionError('INVALID_LIFECYCLE_COVERAGE', key);
     for (const path of ['test/runner.test.mjs', 'scripts/validate.py', 'src/runner.mjs']) if (!v.validation.evidenceRefs.some((item) => item.path === path && item.sha256 === resources.get(path))) throw new DisExecutionError('VALIDATION_EVIDENCE_INCOMPLETE', key);
     if (selectedUnit && (v.validation.profile.id !== selectedUnit.validation.profile || v.validation.profile.revision !== selectedUnit.validation.profileRevision || v.validation.validator.id !== selectedUnit.validation.validator.id || v.validation.validator.version !== selectedUnit.validation.validator.version)) throw new DisExecutionError('VALIDATION_PROFILE_MISMATCH', key);
     if (asset.promotionRecordId !== p.recordId || asset.promotionRecordDigest !== p.recordDigest || asset.validationRecordId !== v.recordId || asset.validationRecordDigest !== v.recordDigest) throw new DisExecutionError('PACKAGE_PROMOTION_PIN_MISMATCH', key);
@@ -734,7 +737,7 @@ export const handlers = {
 export async function loadDemo({ expectedSelectionLockSha256 } = {}) {
   const descriptor = JSON.parse(await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8'));
   const packageIdentity = descriptor.dis;
-  if (expectedSelectionLockSha256 !== undefined && expectedSelectionLockSha256 !== packageIdentity?.selectionLockSha256) throw new DisExecutionError('EXTERNAL_SELECTION_PIN_MISMATCH', 'descriptor does not match caller pin');
+  if (!/^[a-f0-9]{64}$/.test(expectedSelectionLockSha256 || '') || expectedSelectionLockSha256 !== packageIdentity?.selectionLockSha256) throw new DisExecutionError('EXTERNAL_SELECTION_PIN_MISMATCH', 'a caller-supplied trusted lock pin is required');
   if (!packageIdentity || packageIdentity.standardVersion !== '0.1.0' ||
       !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(packageIdentity.revision || '') ||
       !/^[a-f0-9]{64}$/.test(packageIdentity.resourceClosureSha256 || '') ||
@@ -863,7 +866,7 @@ export async function loadDemo({ expectedSelectionLockSha256 } = {}) {
       knowledge[ref.id] = value;
     }
   }
-  validateLifecycleRecords(packageIdentity, unitsById, unitPaths, resources, manifestDigest);
+  validateLifecycleRecords(packageIdentity, unitsById, unitPaths, resources, manifestDigest, expectedSelectionLockSha256);
   const selectedProviders = new Map();
   for (const unit of units) {
     if (unit.capabilities?.provides?.length) {
@@ -871,6 +874,7 @@ export async function loadDemo({ expectedSelectionLockSha256 } = {}) {
       selectedProviders.set(unit.id, selected.candidate);
     }
   }
+  lockedProviders.set(selectedProviders, new Map(units.map((unit) => [unit.id, { ref: unit.implementation.ref, revision: unit.revision, candidateId: selectedProviders.get(unit.id)?.candidateId || null }])));
   const catalogs = {
     signatures: knowledge['xdownload.player-signatures'],
     strategies: JSON.parse(resourceContents.get(strategiesPath)),
@@ -889,8 +893,10 @@ export async function runPipeline(input, loaded) {
   for (let step = 0; step <= graph.nodes.length; step += 1) {
     const node = graph.nodes.find((item) => item.nodeId === nodeId);
     const unit = unitsById.get(node.unitRef.id);
-    const handler = handlers[unit.implementation.ref];
-    if (!handler) throw new DisExecutionError('NO_TRUSTED_IMPLEMENTATION_BINDING', unit.implementation.ref);
+    const binding = lockedProviders.get(loaded.selectedProviders)?.get(unit?.id);
+    if (!binding || binding.revision !== unit.revision || binding.ref !== unit.implementation?.ref) throw new DisExecutionError('SELECTED_IMPLEMENTATION_CHANGED', unit?.id || nodeId);
+    const handler = handlers[binding.ref];
+    if (!handler) throw new DisExecutionError('NO_TRUSTED_IMPLEMENTATION_BINDING', binding.ref);
 
     let nodeInput = nodeId === graph.entryNode ? structuredClone(input) : {};
     const incomingData = graph.edges.filter((edge) => edge.kind === 'data' && edge.to.node === nodeId);
@@ -920,7 +926,7 @@ export async function runPipeline(input, loaded) {
     }
     const output = handler(nodeInput, { evidence, catalogs: loaded.catalogs, knowledge: loaded.knowledge });
     outputs.set(nodeId, output);
-    trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: unit.implementation.ref, implementationCandidateId: loaded.selectedProviders.get(unit.id)?.candidateId || null, input: structuredClone(nodeInput), evidence: structuredClone(evidence), output: structuredClone(output) });
+    trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: binding.ref, implementationCandidateId: binding.candidateId, input: structuredClone(nodeInput), evidence: structuredClone(evidence), output: structuredClone(output) });
     if (graph.terminalNodes.includes(nodeId)) return { outcome: output, trace, packageIdentity: loaded.packageIdentity };
     const candidates = graph.edges.filter((edge) => edge.kind === 'control' && edge.from === nodeId && conditionMatches(output, edge.when));
     if (candidates.length !== 1) throw new DisExecutionError('AMBIGUOUS_CONTROL_FLOW', nodeId + ' selected ' + candidates.length + ' control edges');

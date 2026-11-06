@@ -11,8 +11,8 @@ export function verifyResourceClosure(closure, manifest) {
   return true;
 }
 
-export async function loadVerifiedDemo() {
-  const loaded = await loadDemo();
+export async function loadVerifiedDemo(expectedSelectionLockSha256 = process.env.DIS_EXPECTED_SELECTION_LOCK_SHA256) {
+  const loaded = await loadDemo({ expectedSelectionLockSha256 });
   verifyResourceClosure({ resources: loaded.resources }, loaded.closureManifest);
   return loaded;
 }

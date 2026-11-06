@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import math
+import os
 import re
 import subprocess
 from pathlib import Path, PurePosixPath
@@ -681,7 +682,7 @@ def lifecycle_record_digest(record: dict) -> str:
     return sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
 
 
-def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_paths: dict, resources: dict, closure_digest: str):
+def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_paths: dict, resources: dict, closure_digest: str, expected_selection_lock_sha256: str):
     records = package_identity.get("lifecycleRecords")
     selection = package_identity.get("selectionLock")
     if not isinstance(records, list) or len(records) < 3 or not isinstance(selection, dict):
@@ -699,7 +700,7 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     if len(selection["selectedCapabilities"]) != 1 or len(selection["selectedAssets"]) != len(units_by_id) + 2:
         fail("Package selection cardinality is invalid")
     selection_digest = sha256(json.dumps(selection, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode('utf-8'))
-    if selection_digest != package_identity.get('selectionLockSha256'):
+    if not re.fullmatch(r'[a-f0-9]{64}', expected_selection_lock_sha256 or '') or selection_digest != expected_selection_lock_sha256 or selection_digest != package_identity.get('selectionLockSha256'):
         fail('Package selection lock digest mismatch')
     by_id = {}
     for record in records:
@@ -790,7 +791,7 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     ):
         fail("Validation baseline pin mismatch")
     coverage = validation.get("coverage", {})
-    if any(not isinstance(coverage.get(key), int) or coverage[key] < 0 for key in ("positive", "negative", "boundary", "heldOut")):
+    if any(type(coverage.get(key)) is not int or coverage[key] < (0 if key == 'heldOut' else 1) for key in ("positive", "negative", "boundary", "heldOut")):
         fail("lifecycle Validation coverage is invalid")
     for evidence in validation["evidenceRefs"]:
         if resources.get(evidence.get("path")) != evidence.get("sha256"):
@@ -870,12 +871,17 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         p = next((item for item in history if item['transition'] == 'PROMOTED'), None)
         if len(history) != 3 or not c or not v or not p or c.get('previousRecordId') is not None or v.get('previousRecordId') != c['recordId'] or v.get('previousRecordDigest') != c['recordDigest'] or p.get('previousRecordId') != v['recordId'] or p.get('previousRecordDigest') != v['recordDigest']:
             fail('incomplete asset lifecycle chain')
+        if not c.get('actor', {}).get('id') or c['actor'].get('role') != 'candidate-producer' or not c['actor'].get('authorityRef') or not c.get('policy', {}).get('id') or not c['policy'].get('revision') or not isinstance(c.get('evidenceRefs'), list) or not c['evidenceRefs'] or any(resources.get(item.get('path')) != item.get('sha256') for item in c['evidenceRefs']) or not v.get('actor', {}).get('id') or v['actor'].get('role') != 'validator':
+            fail('invalid Candidate or Validation actor/policy/evidence')
         pa = p.get('actor', {})
         if pa.get('id') != 'xdownload-demo-governance' or pa.get('role') != 'promotion-authority' or pa.get('authorityRef') != 'xdownload-demo/domain-authority@1.0.0' or pa.get('id') in (c.get('actor', {}).get('id'), v.get('actor', {}).get('id')) or p.get('promotion', {}).get('decision') != 'PROMOTE' or p['promotion'].get('validationRecordId') != v['recordId'] or p['promotion'].get('validationRecordDigest') != v['recordDigest']:
             fail('unauthorized asset promotion')
         val = v.get('validation', {})
         if val.get('result') != 'PASS' or val.get('subjectDigest') != asset['sha256'] or val.get('dependencyClosureDigest') != closure_digest or not val.get('profile', {}).get('id') or not val.get('profile', {}).get('revision') or not val.get('validator', {}).get('id') or not val.get('validator', {}).get('version'):
             fail('invalid asset validation')
+        coverage = val.get('coverage', {})
+        if any(type(coverage.get(name)) is not int or coverage[name] < (0 if name == 'heldOut' else 1) for name in ('positive', 'negative', 'boundary', 'heldOut')):
+            fail('invalid asset Validation coverage')
         for path in ('test/runner.test.mjs', 'scripts/validate.py', 'src/runner.mjs'):
             if not any(item.get('path') == path and item.get('sha256') == resources.get(path) for item in val.get('evidenceRefs', [])):
                 fail('asset Validation evidence incomplete')
@@ -943,25 +949,25 @@ def validate_precondition_negatives(unit: dict):
 def validate_lifecycle_negatives(package_identity: dict, units_by_id: dict, unit_paths: dict, resources: dict, closure_digest: str):
     missing = copy.deepcopy(package_identity)
     missing["lifecycleRecords"] = [item for item in missing["lifecycleRecords"] if item.get("transition") != "VALIDATED"]
-    expect_rejection(lambda: validate_lifecycle_records(missing, units_by_id, unit_paths, resources, closure_digest), "missing validation")
+    expect_rejection(lambda: validate_lifecycle_records(missing, units_by_id, unit_paths, resources, closure_digest, package_identity['selectionLockSha256']), "missing validation")
 
     unauthorized = copy.deepcopy(package_identity)
     next(item for item in unauthorized["lifecycleRecords"] if item.get("transition") == "PROMOTED")["actor"]["authorityRef"] = ""
-    expect_rejection(lambda: validate_lifecycle_records(unauthorized, units_by_id, unit_paths, resources, closure_digest), "unauthorized promotion")
+    expect_rejection(lambda: validate_lifecycle_records(unauthorized, units_by_id, unit_paths, resources, closure_digest, package_identity['selectionLockSha256']), "unauthorized promotion")
 
     stale = copy.deepcopy(package_identity)
     stale["lifecycleRecords"][0]["dependencyClosureDigest"] = "0" * 64
-    expect_rejection(lambda: validate_lifecycle_records(stale, units_by_id, unit_paths, resources, closure_digest), "stale dependency closure")
+    expect_rejection(lambda: validate_lifecycle_records(stale, units_by_id, unit_paths, resources, closure_digest, package_identity['selectionLockSha256']), "stale dependency closure")
 
     unpromoted = copy.deepcopy(package_identity)
     next(item for item in unpromoted["selectionLock"]["selectedAssets"] if item.get("kind") == "unit")["promotionRecordId"] = "missing-promotion"
-    expect_rejection(lambda: validate_lifecycle_records(unpromoted, units_by_id, unit_paths, resources, closure_digest), "unpromoted selection")
+    expect_rejection(lambda: validate_lifecycle_records(unpromoted, units_by_id, unit_paths, resources, closure_digest, package_identity['selectionLockSha256']), "unpromoted selection")
 
     self_promote = copy.deepcopy(package_identity)
     promote = next(item for item in self_promote['lifecycleRecords'] if item['transition'] == 'PROMOTED')
     promote['actor']['id'] = next(item for item in self_promote['lifecycleRecords'] if item['transition'] == 'CANDIDATE')['actor']['id']
     promote['recordDigest'] = lifecycle_record_digest(promote)
-    expect_rejection(lambda: validate_lifecycle_records(self_promote, units_by_id, unit_paths, resources, closure_digest), 'self-promotion with valid record hash')
+    expect_rejection(lambda: validate_lifecycle_records(self_promote, units_by_id, unit_paths, resources, closure_digest, package_identity['selectionLockSha256']), 'self-promotion with valid record hash')
 
     incomplete = copy.deepcopy(package_identity)
     validated = next(item for item in incomplete['lifecycleRecords'] if item['transition'] == 'VALIDATED')
@@ -976,12 +982,47 @@ def validate_lifecycle_negatives(package_identity: dict, units_by_id: dict, unit
         item['validationRecordDigest'] = validated['recordDigest']
         item['promotionRecordDigest'] = promoted['recordDigest']
     incomplete['selectionLockSha256'] = sha256(json.dumps(incomplete['selectionLock'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
-    expect_rejection(lambda: validate_lifecycle_records(incomplete, units_by_id, unit_paths, resources, closure_digest), 'fixture-only validation with recomputed pins')
+    expect_rejection(lambda: validate_lifecycle_records(incomplete, units_by_id, unit_paths, resources, closure_digest, incomplete['selectionLockSha256']), 'fixture-only validation with recomputed pins')
 
     missing_unit = copy.deepcopy(package_identity)
     missing_unit['selectionLock']['selectedAssets'] = [item for item in missing_unit['selectionLock']['selectedAssets'] if item.get('id') != 'xdownload.player.route-decision']
     missing_unit['selectionLockSha256'] = sha256(json.dumps(missing_unit['selectionLock'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
-    expect_rejection(lambda: validate_lifecycle_records(missing_unit, units_by_id, unit_paths, resources, closure_digest), 'unselected executed Unit')
+    expect_rejection(lambda: validate_lifecycle_records(missing_unit, units_by_id, unit_paths, resources, closure_digest, missing_unit['selectionLockSha256']), 'unselected executed Unit')
+
+    def rechain(identity, subject_id):
+        history = [item for item in identity['lifecycleRecords'] if item['subject']['id'] == subject_id]
+        c = next(item for item in history if item['transition'] == 'CANDIDATE')
+        v = next(item for item in history if item['transition'] == 'VALIDATED')
+        p = next(item for item in history if item['transition'] == 'PROMOTED')
+        c['recordDigest'] = lifecycle_record_digest(c)
+        v['previousRecordDigest'] = c['recordDigest']
+        v['recordDigest'] = lifecycle_record_digest(v)
+        p['previousRecordDigest'] = v['recordDigest']
+        p['promotion']['validationRecordDigest'] = v['recordDigest']
+        p['recordDigest'] = lifecycle_record_digest(p)
+        items = [item for item in identity['selectionLock']['selectedAssets'] if item['id'] == subject_id]
+        items += [item for item in identity['selectionLock']['selectedCapabilities'] if item['provider']['unitId'] == subject_id]
+        for item in items:
+            item['validationRecordDigest'] = v['recordDigest']
+            item['promotionRecordDigest'] = p['recordDigest']
+        identity['selectionLockSha256'] = sha256(json.dumps(identity['selectionLock'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
+
+    no_coverage = copy.deepcopy(package_identity)
+    validation = next(item for item in no_coverage['lifecycleRecords'] if item['subject']['id'] == 'xdownload.player.recognizer' and item['transition'] == 'VALIDATED')
+    validation['validation']['coverage'].update({'positive':0, 'negative':0, 'boundary':0})
+    rechain(no_coverage, 'xdownload.player.recognizer')
+    expect_rejection(lambda: validate_lifecycle_records(no_coverage, units_by_id, unit_paths, resources, closure_digest, no_coverage['selectionLockSha256']), 'zero validation coverage')
+
+    no_candidate = copy.deepcopy(package_identity)
+    candidate = next(item for item in no_candidate['lifecycleRecords'] if item['subject']['id'] == 'xdownload.player.route-decision' and item['transition'] == 'CANDIDATE')
+    candidate.update({'actor':{}, 'policy':{}, 'evidenceRefs':[]})
+    rechain(no_candidate, 'xdownload.player.route-decision')
+    expect_rejection(lambda: validate_lifecycle_records(no_candidate, units_by_id, unit_paths, resources, closure_digest, no_candidate['selectionLockSha256']), 'Candidate without authority or evidence')
+
+    replaced_lock = copy.deepcopy(package_identity)
+    replaced_lock['selectionLock']['lockId'] = 'untrusted-replacement'
+    replaced_lock['selectionLockSha256'] = sha256(json.dumps(replaced_lock['selectionLock'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
+    expect_rejection(lambda: validate_lifecycle_records(replaced_lock, units_by_id, unit_paths, resources, closure_digest, package_identity['selectionLockSha256']), 'replacement conflicts with external trusted lock pin')
 
 
 def validate_failure_profile_negatives(unit_schema: dict, unit: dict):
@@ -1185,7 +1226,7 @@ def main():
             selected_providers[unit["id"]] = resolve_provider_selection(
                 unit, package_identity["selectionLock"], package_identity["selectionLock"]["target"], resources
             )
-    validate_lifecycle_records(package_identity, units_by_id, unit_paths, resources, manifest_digest)
+    validate_lifecycle_records(package_identity, units_by_id, unit_paths, resources, manifest_digest, os.environ.get('DIS_EXPECTED_SELECTION_LOCK_SHA256', ''))
     validate_lifecycle_negatives(package_identity, units_by_id, unit_paths, resources, manifest_digest)
     validate_failure_profile_negatives(unit_schema, units[0])
     validate_capability_negatives(units_by_id, package_identity, resources)
@@ -1275,7 +1316,7 @@ def main():
         "preconditionValidation": "PASS",
         "knowledgeReferenceValidation": "PASS",
         "lifecycleValidation": "PASS",
-        "lifecycleNegativeCases": 7,
+        "lifecycleNegativeCases": 10,
     }, indent=2))
 
 

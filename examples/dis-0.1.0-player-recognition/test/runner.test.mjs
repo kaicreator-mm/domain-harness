@@ -31,6 +31,23 @@ function refreshRecord(record) {
 function refreshLock(identity) {
   identity.selectionLockSha256 = hashRecord(identity.selectionLock);
 }
+function refreshChain(identity, subjectId) {
+  const history = identity.lifecycleRecords.filter((item) => item.subject.id === subjectId);
+  const candidate = history.find((item) => item.transition === 'CANDIDATE');
+  const validated = history.find((item) => item.transition === 'VALIDATED');
+  const promoted = history.find((item) => item.transition === 'PROMOTED');
+  refreshRecord(candidate);
+  validated.previousRecordDigest = candidate.recordDigest;
+  refreshRecord(validated);
+  promoted.previousRecordDigest = validated.recordDigest;
+  promoted.promotion.validationRecordDigest = validated.recordDigest;
+  refreshRecord(promoted);
+  for (const item of [...identity.selectionLock.selectedAssets.filter((asset) => asset.id === subjectId), ...identity.selectionLock.selectedCapabilities.filter((cap) => cap.provider.unitId === subjectId)]) {
+    item.validationRecordDigest = validated.recordDigest;
+    item.promotionRecordDigest = promoted.recordDigest;
+  }
+  refreshLock(identity);
+}
 
 test('known player follows control path while data arrives through an independent edge', async () => {
   const loaded = await loadedPromise;
@@ -456,30 +473,30 @@ test('Unit failure profile has one canonical handling map and rejects malformed 
 test('append-only lifecycle chain binds exact Unit digest and dependency closure', async () => {
   const loaded = await loadedPromise;
   const unitPaths = new Map(loaded.closureManifest.units.map((item) => [item.id, item.path]));
-  assert.equal(validateLifecycleRecords(loaded.packageIdentity, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), true);
+  assert.equal(validateLifecycleRecords(loaded.packageIdentity, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, loaded.packageIdentity.selectionLockSha256), true);
 
   const missingValidation = structuredClone(loaded.packageIdentity);
   missingValidation.lifecycleRecords = missingValidation.lifecycleRecords.filter((record) => record.transition !== 'VALIDATED');
-  assert.throws(() => validateLifecycleRecords(missingValidation, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('INCOMPLETE_LIFECYCLE_CHAIN'));
+  assert.throws(() => validateLifecycleRecords(missingValidation, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, loaded.packageIdentity.selectionLockSha256), hasCode('INCOMPLETE_LIFECYCLE_CHAIN'));
 
   const unauthorized = structuredClone(loaded.packageIdentity);
   unauthorized.lifecycleRecords.find((record) => record.transition === 'PROMOTED').actor.authorityRef = '';
-  assert.throws(() => validateLifecycleRecords(unauthorized, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('LIFECYCLE_RECORD_DIGEST_MISMATCH'));
+  assert.throws(() => validateLifecycleRecords(unauthorized, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, loaded.packageIdentity.selectionLockSha256), hasCode('LIFECYCLE_RECORD_DIGEST_MISMATCH'));
 
   const stale = structuredClone(loaded.packageIdentity);
   stale.lifecycleRecords[0].dependencyClosureDigest = '0'.repeat(64);
-  assert.throws(() => validateLifecycleRecords(stale, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('LIFECYCLE_RECORD_DIGEST_MISMATCH'));
+  assert.throws(() => validateLifecycleRecords(stale, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, loaded.packageIdentity.selectionLockSha256), hasCode('LIFECYCLE_RECORD_DIGEST_MISMATCH'));
 
   const unpromoted = structuredClone(loaded.packageIdentity);
   unpromoted.selectionLock.selectedAssets.find((asset) => asset.kind === 'unit').promotionRecordId = 'missing-promotion';
   refreshLock(unpromoted);
-  assert.throws(() => validateLifecycleRecords(unpromoted, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('PACKAGE_PROMOTION_PIN_MISMATCH'));
+  assert.throws(() => validateLifecycleRecords(unpromoted, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, unpromoted.selectionLockSha256), hasCode('PACKAGE_PROMOTION_PIN_MISMATCH'));
 });
 
 test('Package locks bind all executed assets, profile and independent promotion authority', async () => {
   const loaded = await loadedPromise;
   const unitPaths = new Map(loaded.closureManifest.units.map((item) => [item.id, item.path]));
-  const verify = (identity) => validateLifecycleRecords(identity, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256);
+  const verify = (identity, expected = identity.selectionLockSha256) => validateLifecycleRecords(identity, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, expected);
   const missing = structuredClone(loaded.packageIdentity);
   missing.selectionLock.selectedAssets = missing.selectionLock.selectedAssets.filter((asset) => asset.id !== 'xdownload.player.route-decision');
   refreshLock(missing);
@@ -496,6 +513,9 @@ test('Package locks bind all executed assets, profile and independent promotion 
   const altered = structuredClone(loaded.packageIdentity);
   altered.selectionLock.consumerProfile.revision = '9.9.9';
   assert.throws(() => verify(altered), hasCode('PACKAGE_SELECTION_DIGEST_MISMATCH'));
+  refreshLock(altered);
+  assert.throws(() => verify(altered, loaded.packageIdentity.selectionLockSha256), hasCode('PACKAGE_SELECTION_DIGEST_MISMATCH'));
+  await assert.rejects(() => loadDemo(), hasCode('EXTERNAL_SELECTION_PIN_MISMATCH'));
   await assert.rejects(() => loadDemo({ expectedSelectionLockSha256: '0'.repeat(64) }), hasCode('EXTERNAL_SELECTION_PIN_MISMATCH'));
 });
 
@@ -517,5 +537,33 @@ test('fixture-only evidence cannot support a rehashed validation and promotion c
     item.promotionRecordDigest = promoted.recordDigest;
   }
   refreshLock(identity);
-  assert.throws(() => validateLifecycleRecords(identity, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('VALIDATION_EVIDENCE_INCOMPLETE'));
+  assert.throws(() => validateLifecycleRecords(identity, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, identity.selectionLockSha256), hasCode('VALIDATION_EVIDENCE_INCOMPLETE'));
+});
+
+test('recomputed lifecycle records still require coverage and every Candidate authority', async () => {
+  const loaded = await loadedPromise;
+  const paths = new Map(loaded.closureManifest.units.map((item) => [item.id, item.path]));
+  const verify = (identity) => validateLifecycleRecords(identity, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, identity.selectionLockSha256);
+  const noCoverage = structuredClone(loaded.packageIdentity);
+  const validated = noCoverage.lifecycleRecords.find((record) => record.subject.id === 'xdownload.player.recognizer' && record.transition === 'VALIDATED');
+  Object.assign(validated.validation.coverage, { positive: 0, negative: 0, boundary: 0 });
+  refreshChain(noCoverage, 'xdownload.player.recognizer');
+  assert.throws(() => verify(noCoverage), hasCode('INVALID_LIFECYCLE_COVERAGE'));
+  const noCandidate = structuredClone(loaded.packageIdentity);
+  const candidate = noCandidate.lifecycleRecords.find((record) => record.subject.id === 'xdownload.player.route-decision' && record.transition === 'CANDIDATE');
+  candidate.actor = {};
+  candidate.policy = {};
+  candidate.evidenceRefs = [];
+  refreshChain(noCandidate, 'xdownload.player.route-decision');
+  assert.throws(() => verify(noCandidate), hasCode('INVALID_LIFECYCLE_ACTOR_OR_POLICY'));
+});
+
+test('post-load implementation changes cannot bypass the pinned provider', async () => {
+  const loaded = await loadedPromise;
+  const changedUnits = new Map([...loaded.unitsById].map(([id, unit]) => [id, structuredClone(unit)]));
+  changedUnits.get('xdownload.player.recognizer').implementation.ref = 'registry:xdownload.player.recognizer-normalized@1.0.0';
+  await assert.rejects(() => runPipeline({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, { ...loaded, unitsById: changedUnits }), hasCode('SELECTED_IMPLEMENTATION_CHANGED'));
+  const unit = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
+  unit.failure.handling = {};
+  assert.throws(() => validateUnit(unit), hasCode('INVALID_FAILURE_PROFILE'));
 });
