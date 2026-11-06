@@ -6,6 +6,19 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(here, '..');
 const lockedProviders = new WeakMap();
+const lockedExecutionResources = new WeakMap();
+
+function executionResources(loaded) {
+  return JSON.stringify({
+    graph: loaded.graph,
+    units: [...loaded.unitsById],
+    schemas: [...loaded.schemas],
+    catalogs: loaded.catalogs,
+    knowledge: loaded.knowledge,
+    selectedProviders: [...loaded.selectedProviders],
+    packageIdentity: loaded.packageIdentity,
+  });
+}
 
 export class DisExecutionError extends Error {
   constructor(code, message) {
@@ -882,10 +895,30 @@ export async function loadDemo({ expectedSelectionLockSha256 } = {}) {
   if (!catalogs.signatures) throw new DisExecutionError('MISSING_SELECTED_KNOWLEDGE', 'xdownload.player-signatures');
   validateGraph(graph, unitsById, schemas);
   validateDefinition(definition, unitsById, graph, manifest.graphRef.path);
-  return { graph, definition, unitsById, schemas, resources, catalogs, knowledge, selectedProviders, closureManifest: manifest, packageIdentity: { ...packageIdentity, resourceClosureSha256: manifestDigest } };
+  const loaded = { graph, definition, unitsById, schemas, resources, catalogs, knowledge, selectedProviders, closureManifest: manifest, packageIdentity: { ...packageIdentity, resourceClosureSha256: manifestDigest } };
+  lockedExecutionResources.set(selectedProviders, executionResources(loaded));
+  return loaded;
+}
+
+export function bindAvailableData(graph, outputs, nodeId, initialInput) {
+  let nodeInput = initialInput;
+  const incomingData = graph.edges.filter((edge) => edge.kind === 'data' && edge.to.node === nodeId);
+  const boundPointers = new Set();
+  for (const edge of incomingData) {
+    if (!outputs.has(edge.from.node)) continue;
+    if (boundPointers.has(edge.to.pointer)) throw new DisExecutionError('DUPLICATE_RUNTIME_DATA_BINDING', nodeId + edge.to.pointer);
+    boundPointers.add(edge.to.pointer);
+    const value = pointerGet(outputs.get(edge.from.node), edge.from.pointer);
+    if (value === undefined) throw new DisExecutionError('MISSING_RUNTIME_DATA_VALUE', edge.from.node + edge.from.pointer);
+    nodeInput = pointerSet(nodeInput, edge.to.pointer, structuredClone(value));
+  }
+  return nodeInput;
 }
 
 export async function runPipeline(input, loaded) {
+  let currentResources;
+  try { currentResources = executionResources(loaded); } catch { throw new DisExecutionError('SELECTED_RESOURCE_CHANGED', 'invalid execution resources'); }
+  if (lockedExecutionResources.get(loaded.selectedProviders) !== currentResources) throw new DisExecutionError('SELECTED_RESOURCE_CHANGED', 'execution resources differ from the verified selection');
   const { graph, unitsById, schemas } = loaded;
   const outputs = new Map();
   let nodeId = graph.entryNode;
@@ -899,16 +932,7 @@ export async function runPipeline(input, loaded) {
     if (!handler) throw new DisExecutionError('NO_TRUSTED_IMPLEMENTATION_BINDING', binding.ref);
 
     let nodeInput = nodeId === graph.entryNode ? structuredClone(input) : {};
-    const incomingData = graph.edges.filter((edge) => edge.kind === 'data' && edge.to.node === nodeId);
-    const boundPointers = new Set();
-    for (const edge of incomingData) {
-      if (!outputs.has(edge.from.node)) continue;
-      if (boundPointers.has(edge.to.pointer)) throw new DisExecutionError('DUPLICATE_RUNTIME_DATA_BINDING', nodeId + edge.to.pointer);
-      boundPointers.add(edge.to.pointer);
-      const value = pointerGet(outputs.get(edge.from.node), edge.from.pointer);
-      if (value === undefined) throw new DisExecutionError('MISSING_RUNTIME_DATA_VALUE', edge.from.node + edge.from.pointer);
-      nodeInput = pointerSet(nodeInput, edge.to.pointer, structuredClone(value));
-    }
+    nodeInput = bindAvailableData(graph, outputs, nodeId, nodeInput);
     if (nodeId !== graph.entryNode) {
       const inputSchema = schemas.get(unit.input.schemaRef);
       for (const property of requiredProperties(inputSchema)) {

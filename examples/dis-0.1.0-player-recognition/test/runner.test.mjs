@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, validatePreconditions, validateCapabilityContracts, resolveProviderSelection, validateLifecycleRecords, recognizePlayerNormalized, handlers, assertInsidePackage, conditionMatches, DisExecutionError } from '../src/runner.mjs';
+import { loadDemo, runPipeline, bindAvailableData, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, validatePreconditions, validateCapabilityContracts, resolveProviderSelection, validateLifecycleRecords, recognizePlayerNormalized, handlers, assertInsidePackage, conditionMatches, DisExecutionError } from '../src/runner.mjs';
 import { loadVerifiedDemo, verifyResourceClosure } from '../src/verified-loader.mjs';
 
 const loadedPromise = loadVerifiedDemo();
@@ -317,16 +317,16 @@ test('optional input data binding may be absent on paths where its source does n
 
   const known = await runPipeline(
     { url: 'https://example.test/watch', signals: ['jwplayer.setup({})'] },
-    { ...loaded, graph, schemas },
+    loaded,
   );
-  const knownValidatorInput = known.trace.find((entry) => entry.nodeId === 'validate').input;
+  const knownValidatorInput = bindAvailableData(graph, new Map(known.trace.map((entry) => [entry.nodeId, entry.output])), 'validate', {});
   assert.equal(knownValidatorInput.optionalStatus, 'READY');
 
   const unknown = await runPipeline(
     { url: 'https://example.test/watch', signals: ['custom-player'] },
-    { ...loaded, graph, schemas },
+    loaded,
   );
-  const unknownValidatorInput = unknown.trace.find((entry) => entry.nodeId === 'validate').input;
+  const unknownValidatorInput = bindAvailableData(graph, new Map(unknown.trace.map((entry) => [entry.nodeId, entry.output])), 'validate', {});
   assert.equal(Object.hasOwn(unknownValidatorInput, 'optionalStatus'), false);
 
   const duplicate = structuredClone(graph);
@@ -562,10 +562,37 @@ test('post-load implementation changes cannot bypass the pinned provider', async
   const loaded = await loadedPromise;
   const changedUnits = new Map([...loaded.unitsById].map(([id, unit]) => [id, structuredClone(unit)]));
   changedUnits.get('xdownload.player.recognizer').implementation.ref = 'registry:xdownload.player.recognizer-normalized@1.0.0';
-  await assert.rejects(() => runPipeline({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, { ...loaded, unitsById: changedUnits }), hasCode('SELECTED_IMPLEMENTATION_CHANGED'));
+  await assert.rejects(() => runPipeline({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, { ...loaded, unitsById: changedUnits }), hasCode('SELECTED_RESOURCE_CHANGED'));
   assert.equal(Object.isFrozen(handlers), true);
   assert.throws(() => { handlers['registry:xdownload.player.recognizer@1.0.0'] = handlers['registry:xdownload.player.recognizer-normalized@1.0.0']; }, TypeError);
   const unit = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
   unit.failure.handling = {};
   assert.throws(() => validateUnit(unit), hasCode('INVALID_FAILURE_PROFILE'));
+});
+
+test('verified execution rejects changes to graph, schemas, rules, catalogs and selection', async () => {
+  const loaded = await loadedPromise;
+  const input = { url: 'https://example.test/watch', signals: ['jwplayer'] };
+  const graph = structuredClone(loaded.graph);
+  graph.entryNode = 'validate';
+  const schemas = structuredClone(loaded.schemas);
+  schemas.clear();
+  const knowledge = structuredClone(loaded.knowledge);
+  knowledge['xdownload.player-signatures'].patterns = [];
+  const catalogs = structuredClone(loaded.catalogs);
+  catalogs.strategies.strategies.jwplayer = 'unselected-strategy';
+  const selectedProviders = structuredClone(loaded.selectedProviders);
+  const packageIdentity = structuredClone(loaded.packageIdentity);
+  packageIdentity.packageId = 'unselected-package';
+  for (const change of [{ graph }, { schemas }, { knowledge }, { catalogs }, { selectedProviders }, { packageIdentity }]) {
+    await assert.rejects(() => runPipeline(input, { ...loaded, ...change }), hasCode('SELECTED_RESOURCE_CHANGED'));
+  }
+  const patterns = loaded.knowledge['xdownload.player-signatures'].patterns;
+  loaded.knowledge['xdownload.player-signatures'].patterns = [];
+  try {
+    await assert.rejects(() => runPipeline(input, loaded), hasCode('SELECTED_RESOURCE_CHANGED'));
+  } finally {
+    loaded.knowledge['xdownload.player-signatures'].patterns = patterns;
+  }
+  assert.equal((await runPipeline(input, loaded)).outcome.status, 'READY');
 });
