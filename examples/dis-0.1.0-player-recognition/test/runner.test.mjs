@@ -82,7 +82,21 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
   await fs.cp(packageRoot, root, { recursive: true });
   const read = async (relative) => JSON.parse(await fs.readFile(path.join(root, relative), 'utf8'));
   const write = async (relative, value) => fs.writeFile(path.join(root, relative), JSON.stringify(value, null, 2) + '\n');
+  const originalDescriptor = options.successorRevision ? await read('package.json') : null;
+  const originalManifestJson = options.successorRevision ? await fs.readFile(path.join(root, 'domain/resource-closure.json'), 'utf8') : null;
+  const originalManifest = originalManifestJson ? JSON.parse(originalManifestJson) : null;
+  const originalBytes = new Map();
+  if (originalManifest) for (const entry of originalManifest.resources) originalBytes.set(entry.path, await fs.readFile(path.join(root, entry.path)));
   const unit = await read('domain/units/recognizer.json');
+  if (options.successorRevision) {
+    unit.revision = options.successorRevision;
+    const graph = await read('domain/player-recognition.graph.json');
+    graph.nodes.find((node) => node.unitRef.id === unit.id).unitRef.revision = unit.revision;
+    await write('domain/player-recognition.graph.json', graph);
+    const definition = await read('domain/definition.json');
+    for (const component of definition.components) if (component.unitRef?.id === unit.id) component.unitRef.revision = unit.revision;
+    await write('domain/definition.json', definition);
+  }
   for (const [status, action] of Object.entries(changes)) unit.failure.handling[status].action = action;
   await write('domain/units/recognizer.json', unit);
   if (options.validatorPreconditions) {
@@ -98,11 +112,13 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
   }
   const manifest = await read('domain/resource-closure.json');
   if (options.packageRevision) manifest.packageRevision = options.packageRevision;
+  if (options.successorRevision) manifest.units.find((ref) => ref.id === unit.id).revision = unit.revision;
   for (const entry of manifest.resources) entry.sha256 = createHash('sha256').update(await fs.readFile(path.join(root, entry.path))).digest('hex');
   await write('domain/resource-closure.json', manifest);
   const closureDigest = createHash('sha256').update(await fs.readFile(path.join(root, 'domain/resource-closure.json'))).digest('hex');
   const resources = new Map(manifest.resources.map((entry) => [entry.path, entry.sha256]));
   const descriptor = await read('package.json'), identity = descriptor.dis;
+  const oldHistory = originalDescriptor?.dis.lifecycleRecords.filter((record) => record.subject.id === unit.id);
   if (options.packageRevision) {
     identity.revision = options.packageRevision;
     identity.selectionLock.packageRevision = options.packageRevision;
@@ -112,12 +128,26 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
     Object.assign(identity.selectionLock.selectedCapabilities[0].provider, { candidateId: candidate.candidateId, implementationRef: candidate.ref, artifactRef: candidate.artifactRef, artifactDigest: candidate.artifactDigest });
   }
   identity.resourceClosureSha256 = closureDigest;
+  if (options.successorRevision) {
+    const changed = {};
+    for (const entry of manifest.resources) if (originalManifest.resources.find((item) => item.path === entry.path).sha256 !== entry.sha256) changed[entry.path] = originalBytes.get(entry.path).toString('base64');
+    identity.selectionLock.historicalClosures = [{ sha256: originalDescriptor.dis.resourceClosureSha256, manifestJson: originalManifestJson, resourceBase64: changed }];
+    identity.selectionLock.selectedAssets.find((asset) => asset.id === unit.id).revision = unit.revision;
+    identity.selectionLock.selectedCapabilities[0].provider.unitRevision = unit.revision;
+  }
   const priorBySubject = new Map();
   for (const record of identity.lifecycleRecords) {
     const asset = identity.selectionLock.selectedAssets.find((item) => item.kind === record.subject.kind && item.id === record.subject.id);
+    if (options.successorRevision && asset.id === unit.id) {
+      record.recordId += '.successor';
+      record.subject.revision = unit.revision;
+      if (record.transition === 'CANDIDATE') record.candidateProvenance.parent = { kind: 'SUBJECT', subject: structuredClone(oldHistory[0].subject) };
+      if (record.transition === 'PROMOTED') record.promotion.priorPromotedBaseline = { kind: 'PROMOTED', recordId: oldHistory[2].recordId, recordDigest: oldHistory[2].recordDigest };
+    }
     record.subject.sha256 = resources.get(asset.path);
     record.subjectJson = await fs.readFile(path.join(root, asset.path), 'utf8');
     record.dependencyClosureDigest = closureDigest;
+    if (record.transition === 'CANDIDATE') record.candidateProvenance.sourceClosureSha256 = closureDigest;
     const previous = priorBySubject.get(asset.id);
     record.previousRecordId = previous?.recordId || null;
     record.previousRecordDigest = previous?.recordDigest || null;
@@ -145,6 +175,7 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
   const selected = identity.selectionLock.selectedAssets.find((asset) => asset.id === unit.id);
   const capability = identity.selectionLock.selectedCapabilities[0];
   for (const key of ['validationRecordId', 'validationRecordDigest', 'promotionRecordId', 'promotionRecordDigest']) capability[key] = selected[key];
+  if (oldHistory) identity.lifecycleRecords.unshift(...oldHistory);
   refreshLock(identity);
   await write('package.json', descriptor);
   const isolated = await import(pathToFileURL(path.join(root, 'src/runner.mjs')).href);
@@ -693,19 +724,29 @@ test('feedback retains provenance and cannot change an already-pinned execution'
   const beforeUnits = JSON.stringify([...loaded.unitsById]);
   const input = { url: 'https://example.test', signals: ['jwplayer'] };
   const before = await runPipeline(input, loaded);
-  const feedback = { traceId: 'synthetic-trace-1', packageLockSha256: beforeLock, provenance: 'MODEL_INFERRED', claimedProvenance: 'MODEL_INFERRED', finding: 'possible alternative marker', disposition: 'PROPOSAL_ONLY' };
-  assert.deepEqual(validateReferenceFeedback(feedback, beforeLock), feedback);
-  assert.throws(() => validateReferenceFeedback({ ...feedback, claimedProvenance: 'SYSTEM_OBSERVED' }, beforeLock), hasCode('INVALID_RUNTIME_FEEDBACK'));
+  const pin = loaded.packageIdentity.lifecycleRecords[0].subject;
+  const feedback = { sourceRuntime: 'reference-runtime', executionId: 'synthetic-execution', journalId: 'synthetic-journal', traceId: 'synthetic-trace-1', packageLockSha256: beforeLock, intelligencePins: [pin], evidenceProvenance: ['synthetic observation'], redaction: 'reference-only', retention: 'reference-only', outcome: before.outcome.status, validationStatus: 'UNVERIFIED', provenance: 'MODEL_INFERRED', claimedProvenance: 'MODEL_INFERRED', uncertainty: 'unverified', scope: 'reference-demo', limitations: ['synthetic'], intake: { status: 'PENDING', consent: 'NOT_ASSERTED', policy: 'reference-only' }, finding: 'possible alternative marker', disposition: 'PROPOSAL_ONLY' };
+  const trusted = Object.fromEntries(Object.entries(feedback).filter(([key]) => !['finding', 'disposition', 'claimedProvenance'].includes(key)).map(([key, value]) => [key, structuredClone(value)]));
+  assert.deepEqual(validateReferenceFeedback(feedback, trusted), feedback);
+  assert.throws(() => validateReferenceFeedback({ ...feedback, claimedProvenance: 'SYSTEM_OBSERVED' }, trusted), hasCode('INVALID_RUNTIME_FEEDBACK'));
+  assert.throws(() => validateReferenceFeedback({ ...feedback, provenance: 'USER_CONFIRMED', claimedProvenance: 'USER_CONFIRMED' }, trusted), hasCode('INVALID_RUNTIME_FEEDBACK'));
+  assert.throws(() => validateReferenceFeedback({ ...feedback, executionId: 'forged' }, trusted), hasCode('INVALID_RUNTIME_FEEDBACK'));
+  assert.throws(() => validateReferenceFeedback({ ...feedback, outcome: 'FORGED' }, trusted), hasCode('INVALID_RUNTIME_FEEDBACK'));
+  assert.throws(() => validateReferenceFeedback({ ...feedback, evidenceProvenance: ['forged source'] }, trusted), hasCode('INVALID_RUNTIME_FEEDBACK'));
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'dis-future-package-'));
   try {
-    const future = await copyWithRecognizerPolicy(temporary, {}, { packageRevision: '2.0.0', candidateId: 'signature-normalized-v1' });
+    const future = await copyWithRecognizerPolicy(temporary, {}, { packageRevision: '2.0.0', successorRevision: '2.0.0', candidateId: 'signature-normalized-v1' });
     assert.notEqual(hashRecord(future.loaded.packageIdentity.selectionLock), beforeLock);
     const futureResult = await future.isolated.runPipeline({ url: 'https://example.test', signals: ['JWPLAYER'] }, future.loaded);
+    assert.equal(futureResult.trace[0].unitRevision, '2.0.0');
+    assert.equal(future.loaded.packageIdentity.selectionLock.selectedAssets.find((item) => item.id === pin.id).revision, '2.0.0');
+    assert.equal(before.trace[0].unitRevision, '1.0.0');
     assert.equal(futureResult.trace[0].implementationCandidateId, 'signature-normalized-v1');
     assert.equal(hashRecord(loaded.packageIdentity.selectionLock), beforeLock);
     assert.equal(JSON.stringify([...loaded.unitsById]), beforeUnits);
     const after = await runPipeline(input, loaded);
     assert.deepEqual(after.outcome, before.outcome);
+    if (process.env.DIS_EMIT_FUTURE_PROBE === '1') console.log('DIS_FUTURE_PROBE=' + JSON.stringify({ input: { url: 'https://example.test', signals: ['JWPLAYER'] }, result: futureResult, identity: future.loaded.packageIdentity, units: [...future.loaded.unitsById], resources: [...future.loaded.resources], manifest: future.loaded.closureManifest, graph: future.loaded.graph, oldLock: beforeLock, oldBefore: before, oldAfter: after }));
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });
   }
@@ -826,6 +867,9 @@ test('independent lifecycle negative vectors remain rejected after record hashes
     ['stale closure', (h) => { h[1].dependencyClosureDigest = '0'.repeat(64); }],
     ['self promotion', (h) => { h[2].actor.id = h[0].actor.id; }],
     ['missing candidate actor', (h) => { h[0].actor = {}; }],
+    ['missing candidate provenance', (h) => { delete h[0].candidateProvenance; }],
+    ['candidate source closure mismatch', (h) => { h[0].candidateProvenance.sourceClosureSha256 = '0'.repeat(64); }],
+    ['candidate parent not in history', (h) => { h[0].candidateProvenance.parent = { kind: 'SUBJECT', subject: { ...h[0].subject, revision: '9.0.0' } }; }],
     ['missing validation policy', (h) => { h[1].policy = {}; }],
     ['unknown transition', (h) => { h[1].transition = 'SELECTED'; }],
     ['duplicate id', (h) => { h[1].recordId = h[0].recordId; }],
@@ -983,7 +1027,11 @@ test('historical closure remains auditable while a changed closure requires fres
   const history = identity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer');
   for (const record of history) {
     record.dependencyClosureDigest = oldDigest;
-    if (record.transition === 'CANDIDATE') record.evidenceRefs.find((item) => item.path === 'fixtures/player-signatures.json').sha256 = oldFixtureDigest;
+    if (record.transition === 'CANDIDATE') {
+      record.evidenceRefs.find((item) => item.path === 'fixtures/player-signatures.json').sha256 = oldFixtureDigest;
+      record.candidateProvenance.sourceClosureSha256 = oldDigest;
+      record.candidateProvenance.sourceRefs = structuredClone(record.evidenceRefs);
+    }
     if (record.transition === 'VALIDATED') {
       record.validation.dependencyClosureDigest = oldDigest;
       record.validation.baseline.sha256 = oldFixtureDigest;

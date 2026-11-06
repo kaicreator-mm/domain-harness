@@ -365,6 +365,169 @@
     }
   },
   "$defs": {
+    "runtimeFeedbackEnvelope": {
+      "type": "object",
+      "required": [
+        "sourceRuntime",
+        "executionId",
+        "journalId",
+        "traceId",
+        "packageLockSha256",
+        "intelligencePins",
+        "evidenceProvenance",
+        "redaction",
+        "retention",
+        "outcome",
+        "validationStatus",
+        "provenance",
+        "claimedProvenance",
+        "uncertainty",
+        "scope",
+        "limitations",
+        "intake",
+        "finding",
+        "disposition"
+      ],
+      "properties": {
+        "sourceRuntime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "journalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "packageLockSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "intelligencePins": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "id",
+              "revision",
+              "sha256"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "evidenceProvenance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "redaction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retention": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validationStatus": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "enum": [
+            "SYSTEM_OBSERVED",
+            "USER_CONFIRMED",
+            "MODEL_INFERRED"
+          ]
+        },
+        "claimedProvenance": {
+          "enum": [
+            "SYSTEM_OBSERVED",
+            "USER_CONFIRMED",
+            "MODEL_INFERRED"
+          ]
+        },
+        "uncertainty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "intake": {
+          "type": "object",
+          "required": [
+            "status",
+            "consent",
+            "policy"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "consent": {
+              "type": "string",
+              "minLength": 1
+            },
+            "policy": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "finding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "const": "PROPOSAL_ONLY"
+        }
+      },
+      "additionalProperties": false
+    },
     "lifecycleRecord": {
       "type": "object",
       "required": ["recordId", "recordDigest", "transition", "subject", "subjectPath", "dependencyClosureDigest", "previousRecordId", "previousRecordDigest", "actor", "recordedAt"],
@@ -392,6 +555,158 @@
         "policy": { "type": "object", "required": ["id", "revision"], "properties": { "id": { "type": "string", "minLength": 1 }, "revision": { "type": "string", "minLength": 1 } } },
         "recordedAt": { "type": "string", "format": "date-time" },
         "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["path", "sha256"], "properties": { "path": { "type": "string", "minLength": 1 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } } },
+        "candidateProvenance": {
+          "type": "object",
+          "required": [
+            "sourceClosureSha256",
+            "sourceRefs",
+            "schemaRevision",
+            "method",
+            "target",
+            "profile",
+            "parent",
+            "changeRef"
+          ],
+          "properties": {
+            "sourceClosureSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "sourceRefs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "path",
+                  "sha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "schemaRevision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "method": {
+              "type": "object",
+              "required": [
+                "id",
+                "toolchain"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "toolchain": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profile": {
+              "type": "object",
+              "required": [
+                "id",
+                "revision"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "revision": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "parent": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "reason"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "GENESIS"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "subject"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "SUBJECT"
+                    },
+                    "subject": {
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "id",
+                        "revision",
+                        "sha256"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "revision": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "changeRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
         "validation": { "type": "object", "required": ["result", "subjectDigest", "dependencyClosureDigest", "profile", "validator", "evidenceRefs", "reportSchema", "report", "reportSha256"] },
         "promotion": { "type": "object", "required": ["decision", "validationRecordId", "validationRecordDigest", "policy", "priorPromotedBaseline", "authorizationEvidence", "authorizationEvidenceSha256", "scope", "rationale", "limitations"], "properties": { "scope": { "type": "string", "minLength": 1 }, "rationale": { "type": "string", "minLength": 1 }, "limitations": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } } } }
       },
@@ -400,7 +715,8 @@
         { "if": { "properties": { "transition": { "enum": ["OBSERVED", "CANDIDATE", "REJECTED", "WITHDRAWN", "EXPIRED", "SUPERSEDED"] } }, "required": ["transition"] }, "then": { "required": ["policy", "evidenceRefs"] } },
         { "if": { "properties": { "transition": { "const": "VALIDATED" } }, "required": ["transition"] }, "then": { "required": ["policy", "validation"] } },
         { "if": { "properties": { "transition": { "const": "PROMOTED" } }, "required": ["transition"] }, "then": { "required": ["promotion"] } },
-        { "if": { "properties": { "transition": { "const": "SUPERSEDED" } }, "required": ["transition"] }, "then": { "required": ["successor"] } }
+        { "if": { "properties": { "transition": { "const": "SUPERSEDED" } }, "required": ["transition"] }, "then": { "required": ["successor"] } },
+        { "if": { "properties": { "transition": { "const": "CANDIDATE" } }, "required": ["transition"] }, "then": { "required": ["candidateProvenance"] } }
       ]
     },
     "ioContract": {

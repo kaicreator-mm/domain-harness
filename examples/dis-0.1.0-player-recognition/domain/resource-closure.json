@@ -159,7 +159,7 @@
     },
     {
       "path": "domain/units/recognizer.json",
-      "sha256": "df118f430d69950e734155b35366fdcc97f5e68acc0fc1871c6494f42804ab4c",
+      "sha256": "390f6ab9a0dac4e7dce52c0ecec6ef0417bc12a0e3c4f95200bc7971d8d0750a",
       "kind": "unit",
       "owners": [
         "xdownload.player-recognition.workflow",
@@ -227,7 +227,7 @@
     },
     {
       "path": "scripts/validate.py",
-      "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad",
+      "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee",
       "kind": "conformance",
       "owners": [
         "xdownload.web-media"
@@ -254,7 +254,7 @@
     },
     {
       "path": "src/runner.mjs",
-      "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6",
+      "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906",
       "kind": "implementation",
       "owners": [
         "xdownload.player.bounded-fallback",
@@ -277,7 +277,7 @@
     },
     {
       "path": "test/runner.test.mjs",
-      "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8",
+      "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877",
       "kind": "conformance",
       "owners": [
         "xdownload.player-recognition.workflow",

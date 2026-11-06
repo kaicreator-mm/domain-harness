@@ -277,3 +277,9 @@ Before L2 freeze:
 14. The checkpoint states whether Task DAG creation is authorized and which Runtime/ABI implementation remains prohibited.
 
 L2 Freeze does not mean DomainHarness v0.10.3 Runtime already implements DIS, does not imply SDK ABI change, and does not authorize Release/Deployment.
+
+## Candidate and runtime feedback exchange
+
+A Candidate exchange MUST bind its exact subject and source/provenance closure, schema revision, production method and toolchain, target and profile, parent subject or explicit genesis, and change or requirement. Source references identify evidence in the declared closure. Generation does not grant validation or promotion authority.
+
+A Runtime feedback envelope MUST preserve source Runtime, execution/Journal/trace identity, selected Package lock and exact intelligence pins, input/evidence provenance, redaction and retention constraints, actual outcome and validation status, observed/inferred/user-confirmed provenance, uncertainty, scope, limitations, and intake/consent/policy status. Consumers bind source identity and provenance to independently trusted originating evidence; two self-reported labels do not establish provenance. Feedback is a proposal for a future governed cycle and cannot modify the active Package or lock.

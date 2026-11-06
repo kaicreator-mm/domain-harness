@@ -234,3 +234,9 @@ Demo 修订后 Decision 只输出 route，Procedure 只输出 resolution；Recog
 ### 12.4 Canonical L2 Review Findings
 
 DIS-L2-F001..F012 是 L2 架构审核台账，与初始 Demo 缺陷 DIS-F-001..F006 完全分开。统一编号顺序为：F001 两个相连的生命周期平面；F002 后继 Boot/KDP 唯一 Kernel 与 Host/Effect 权威边界；F003 实际 Consumer Trace；F004 Definition/Workflow/Graph/Unit 引用闭包；F005 完整 Package Resource Closure；F006 可信 Implementation Binding；F007 按路径验证 required input；F008 符号链接 containment；F009 DAG-only 控制图；F010 Provenance 与 Dynamic Form 权限边界；F011 EXECUTED 是运行发生记录；F012 Release Qualification 前使用第二个实质不同的 Domain Profile。R3 候选修复和审核状态记录在 L2_ARCHITECTURE 与 REVISION_LOG 中。exact-HEAD 证据、独立 Exact-SHA 审核和 Controller Freeze Checkpoint 完成前，DIS 仍为 NOT_FROZEN。
+
+## Candidate 与 Runtime feedback 交换
+
+Candidate 交换记录必须绑定精确主体、来源和 provenance 闭包、schema 修订、生产方法及工具链、目标和 profile、父主体或明确 genesis，以及对应变更或需求。来源引用必须标识声明闭包中的证据；生成不授予验证或晋升权力。
+
+Runtime feedback envelope 必须保留来源 Runtime、execution/Journal/trace 身份、选定 Package 锁与精确智能 pins、输入及证据来源、脱敏和保留约束、实际结果与验证状态、观察/推断/用户确认来源、不确定性、范围、局限和 intake/consent/policy 状态。消费者必须将来源身份及 provenance 绑定到独立可信的原始证据；两个自报标签不能证明来源。反馈是未来治理周期的提案，不能修改活动 Package 或锁。

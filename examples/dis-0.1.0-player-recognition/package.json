@@ -12,7 +12,7 @@
     "revision": "1.0.0",
     "standardVersion": "0.1.0",
     "resourceClosurePath": "domain/resource-closure.json",
-    "resourceClosureSha256": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+    "resourceClosureSha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
     "conformanceResources": [
       "src/verified-loader.mjs",
       "src/emit-conformance-traces.mjs",
@@ -29,9 +29,9 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "df118f430d69950e734155b35366fdcc97f5e68acc0fc1871c6494f42804ab4c"
+          "sha256": "390f6ab9a0dac4e7dce52c0ecec6ef0417bc12a0e3c4f95200bc7971d8d0750a"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -52,8 +52,32 @@
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/recognizer.json",
-        "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.recognizer\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"recognizer\",\n  \"purpose\": \"Recognize a supported media player from a bounded page observation and retain match evidence.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"http-or-https-page-observation\"\n    ],\n    \"excludes\": [\n      \"encrypted-player-decryption\",\n      \"unsupported-player-families\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.recognizer.qualification/0.1.0\",\n    \"limitations\": [\n      \"Small demo signature catalog.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/page-observation.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/recognition-result.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\",\n    \"candidates\": [\n      {\n        \"candidateId\": \"signature-exact-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      },\n      {\n        \"candidateId\": \"signature-normalized-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer-normalized@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ],\n    \"selectionPolicy\": {\n      \"mode\": \"PACKAGE_LOCK_EXACT\",\n      \"consumerProfileId\": \"xdownload.player-recognition/1.0.0\",\n      \"target\": \"node24\",\n      \"consumerProfileRevision\": \"1.0.0\"\n    }\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"player-signature-fixture\",\n        \"kind\": \"reference\",\n        \"ref\": \"fixtures/player-signatures.json\",\n        \"claim\": \"Known markers identify supported player families.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"PRESERVE_UNKNOWN\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Conflicting observations require clarification.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"OUT_OF_SCOPE\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared OUT_OF_SCOPE handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-recognition-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  },\n  \"capabilities\": {\n    \"provides\": [\n      {\n        \"capabilityId\": \"xdownload.player.recognition\",\n        \"owner\": \"xdownload-demo\",\n        \"authorityRef\": \"xdownload-demo/domain-authority@1.0.0\",\n        \"version\": \"1.0.0\",\n        \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n        \"inputSchemaDigest\": \"cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8\",\n        \"outputSchemaRef\": \"domain/schemas/recognition-result.schema.json\",\n        \"outputSchemaDigest\": \"53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ]\n  },\n  \"preconditions\": {\n    \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n    \"all\": [\n      {\n        \"path\": \"/url\",\n        \"operator\": \"exists\"\n      },\n      {\n        \"path\": \"/signals\",\n        \"operator\": \"exists\"\n      }\n    ]\n  },\n  \"knowledgeRefs\": [\n    {\n      \"id\": \"xdownload.player-signatures\",\n      \"revision\": \"1.0.0\",\n      \"kind\": \"rule-set\",\n      \"path\": \"fixtures/player-signatures.json\",\n      \"sha256\": \"3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168\"\n    }\n  ]\n}\n",
-        "recordDigest": "bf1b58fbfafe705452a1780d16fc5440725df4d6272663d9e2bcfea6ff721878"
+        "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.recognizer\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"recognizer\",\n  \"purpose\": \"Recognize a supported media player from a bounded page observation and retain match evidence.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"http-or-https-page-observation\"\n    ],\n    \"excludes\": [\n      \"encrypted-player-decryption\",\n      \"unsupported-player-families\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.recognizer.qualification/0.1.0\",\n    \"limitations\": [\n      \"Small demo signature catalog.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/page-observation.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/recognition-result.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\",\n    \"candidates\": [\n      {\n        \"candidateId\": \"signature-exact-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      },\n      {\n        \"candidateId\": \"signature-normalized-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer-normalized@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ],\n    \"selectionPolicy\": {\n      \"mode\": \"PACKAGE_LOCK_EXACT\",\n      \"consumerProfileId\": \"xdownload.player-recognition/1.0.0\",\n      \"target\": \"node24\",\n      \"consumerProfileRevision\": \"1.0.0\"\n    }\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"player-signature-fixture\",\n        \"kind\": \"reference\",\n        \"ref\": \"fixtures/player-signatures.json\",\n        \"claim\": \"Known markers identify supported player families.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"PRESERVE_UNKNOWN\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Conflicting observations require clarification.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"OUT_OF_SCOPE\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared OUT_OF_SCOPE handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-recognition-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  },\n  \"capabilities\": {\n    \"provides\": [\n      {\n        \"capabilityId\": \"xdownload.player.recognition\",\n        \"owner\": \"xdownload-demo\",\n        \"authorityRef\": \"xdownload-demo/domain-authority@1.0.0\",\n        \"version\": \"1.0.0\",\n        \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n        \"inputSchemaDigest\": \"cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8\",\n        \"outputSchemaRef\": \"domain/schemas/recognition-result.schema.json\",\n        \"outputSchemaDigest\": \"53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ]\n  },\n  \"preconditions\": {\n    \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n    \"all\": [\n      {\n        \"path\": \"/url\",\n        \"operator\": \"exists\"\n      },\n      {\n        \"path\": \"/signals\",\n        \"operator\": \"exists\"\n      }\n    ]\n  },\n  \"knowledgeRefs\": [\n    {\n      \"id\": \"xdownload.player-signatures\",\n      \"revision\": \"1.0.0\",\n      \"kind\": \"rule-set\",\n      \"path\": \"fixtures/player-signatures.json\",\n      \"sha256\": \"3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168\"\n    }\n  ]\n}\n",
+        "candidateProvenance": {
+          "sourceClosureSha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
+          "sourceRefs": [
+            {
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            }
+          ],
+          "schemaRevision": "0.1.0",
+          "method": {
+            "id": "synthetic-reference-fixture",
+            "toolchain": "reference-fixture-generator"
+          },
+          "target": "node24",
+          "profile": {
+            "id": "xdownload-reference-demo",
+            "revision": "1.0.0"
+          },
+          "parent": {
+            "kind": "GENESIS",
+            "reason": "synthetic reference fixture"
+          },
+          "changeRef": "issue:1481#reference-demo"
+        },
+        "recordDigest": "d4fd15b6215b445443b09910c3c42c39ba811daac5006f48afa93c2a3fbfd194"
       },
       {
         "recordId": "xdownload.player.recognizer.unit.validated.1",
@@ -62,11 +86,11 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "df118f430d69950e734155b35366fdcc97f5e68acc0fc1871c6494f42804ab4c"
+          "sha256": "390f6ab9a0dac4e7dce52c0ecec6ef0417bc12a0e3c4f95200bc7971d8d0750a"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.recognizer.unit.candidate.1",
-        "previousRecordDigest": "bf1b58fbfafe705452a1780d16fc5440725df4d6272663d9e2bcfea6ff721878",
+        "previousRecordDigest": "d4fd15b6215b445443b09910c3c42c39ba811daac5006f48afa93c2a3fbfd194",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator",
@@ -78,8 +102,8 @@
         },
         "validation": {
           "result": "PASS",
-          "subjectDigest": "df118f430d69950e734155b35366fdcc97f5e68acc0fc1871c6494f42804ab4c",
-          "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+          "subjectDigest": "390f6ab9a0dac4e7dce52c0ecec6ef0417bc12a0e3c4f95200bc7971d8d0750a",
+          "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
           "profile": {
             "id": "player-recognition-conformance/0.1.0",
             "revision": "0.1.0"
@@ -106,15 +130,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+              "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+              "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+              "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
             }
           ],
           "limitations": [
@@ -282,10 +306,10 @@
               "kind": "unit",
               "id": "xdownload.player.recognizer",
               "revision": "1.0.0",
-              "sha256": "df118f430d69950e734155b35366fdcc97f5e68acc0fc1871c6494f42804ab4c"
+              "sha256": "390f6ab9a0dac4e7dce52c0ecec6ef0417bc12a0e3c4f95200bc7971d8d0750a"
             },
             "dependencyClosure": {
-              "sha256": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+              "sha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
               "resources": [
                 {
                   "path": "fixtures/player-signatures.json",
@@ -293,15 +317,15 @@
                 },
                 {
                   "path": "src/runner.mjs",
-                  "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+                  "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
                 },
                 {
                   "path": "scripts/validate.py",
-                  "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+                  "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
                 },
                 {
                   "path": "test/runner.test.mjs",
-                  "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+                  "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
                 }
               ]
             },
@@ -325,13 +349,13 @@
               "heldOut": 0
             }
           },
-          "reportSha256": "ad076530396e6aecb3fc61f1e7ef84c8777f9d8633e1310d5b3216dd01d27d0e"
+          "reportSha256": "92071bc568b7dd35c61340909471395439edccb97b66beb81209d1287939830a"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/recognizer.json",
-        "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.recognizer\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"recognizer\",\n  \"purpose\": \"Recognize a supported media player from a bounded page observation and retain match evidence.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"http-or-https-page-observation\"\n    ],\n    \"excludes\": [\n      \"encrypted-player-decryption\",\n      \"unsupported-player-families\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.recognizer.qualification/0.1.0\",\n    \"limitations\": [\n      \"Small demo signature catalog.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/page-observation.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/recognition-result.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\",\n    \"candidates\": [\n      {\n        \"candidateId\": \"signature-exact-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      },\n      {\n        \"candidateId\": \"signature-normalized-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer-normalized@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ],\n    \"selectionPolicy\": {\n      \"mode\": \"PACKAGE_LOCK_EXACT\",\n      \"consumerProfileId\": \"xdownload.player-recognition/1.0.0\",\n      \"target\": \"node24\",\n      \"consumerProfileRevision\": \"1.0.0\"\n    }\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"player-signature-fixture\",\n        \"kind\": \"reference\",\n        \"ref\": \"fixtures/player-signatures.json\",\n        \"claim\": \"Known markers identify supported player families.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"PRESERVE_UNKNOWN\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Conflicting observations require clarification.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"OUT_OF_SCOPE\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared OUT_OF_SCOPE handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-recognition-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  },\n  \"capabilities\": {\n    \"provides\": [\n      {\n        \"capabilityId\": \"xdownload.player.recognition\",\n        \"owner\": \"xdownload-demo\",\n        \"authorityRef\": \"xdownload-demo/domain-authority@1.0.0\",\n        \"version\": \"1.0.0\",\n        \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n        \"inputSchemaDigest\": \"cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8\",\n        \"outputSchemaRef\": \"domain/schemas/recognition-result.schema.json\",\n        \"outputSchemaDigest\": \"53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ]\n  },\n  \"preconditions\": {\n    \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n    \"all\": [\n      {\n        \"path\": \"/url\",\n        \"operator\": \"exists\"\n      },\n      {\n        \"path\": \"/signals\",\n        \"operator\": \"exists\"\n      }\n    ]\n  },\n  \"knowledgeRefs\": [\n    {\n      \"id\": \"xdownload.player-signatures\",\n      \"revision\": \"1.0.0\",\n      \"kind\": \"rule-set\",\n      \"path\": \"fixtures/player-signatures.json\",\n      \"sha256\": \"3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168\"\n    }\n  ]\n}\n",
-        "recordDigest": "86b37c2d1df7f863f4d99066ed9d9946be7e6b279382424f6c5d06ccbddd9372"
+        "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.recognizer\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"recognizer\",\n  \"purpose\": \"Recognize a supported media player from a bounded page observation and retain match evidence.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"http-or-https-page-observation\"\n    ],\n    \"excludes\": [\n      \"encrypted-player-decryption\",\n      \"unsupported-player-families\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.recognizer.qualification/0.1.0\",\n    \"limitations\": [\n      \"Small demo signature catalog.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/page-observation.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/recognition-result.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\",\n    \"candidates\": [\n      {\n        \"candidateId\": \"signature-exact-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      },\n      {\n        \"candidateId\": \"signature-normalized-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer-normalized@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ],\n    \"selectionPolicy\": {\n      \"mode\": \"PACKAGE_LOCK_EXACT\",\n      \"consumerProfileId\": \"xdownload.player-recognition/1.0.0\",\n      \"target\": \"node24\",\n      \"consumerProfileRevision\": \"1.0.0\"\n    }\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"player-signature-fixture\",\n        \"kind\": \"reference\",\n        \"ref\": \"fixtures/player-signatures.json\",\n        \"claim\": \"Known markers identify supported player families.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"PRESERVE_UNKNOWN\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Conflicting observations require clarification.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"OUT_OF_SCOPE\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared OUT_OF_SCOPE handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-recognition-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  },\n  \"capabilities\": {\n    \"provides\": [\n      {\n        \"capabilityId\": \"xdownload.player.recognition\",\n        \"owner\": \"xdownload-demo\",\n        \"authorityRef\": \"xdownload-demo/domain-authority@1.0.0\",\n        \"version\": \"1.0.0\",\n        \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n        \"inputSchemaDigest\": \"cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8\",\n        \"outputSchemaRef\": \"domain/schemas/recognition-result.schema.json\",\n        \"outputSchemaDigest\": \"53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ]\n  },\n  \"preconditions\": {\n    \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n    \"all\": [\n      {\n        \"path\": \"/url\",\n        \"operator\": \"exists\"\n      },\n      {\n        \"path\": \"/signals\",\n        \"operator\": \"exists\"\n      }\n    ]\n  },\n  \"knowledgeRefs\": [\n    {\n      \"id\": \"xdownload.player-signatures\",\n      \"revision\": \"1.0.0\",\n      \"kind\": \"rule-set\",\n      \"path\": \"fixtures/player-signatures.json\",\n      \"sha256\": \"3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168\"\n    }\n  ]\n}\n",
+        "recordDigest": "6de418aa56a6858b8a0b948a3e06597c758c841f82e37a72ea42b5233c18a0f2"
       },
       {
         "recordId": "xdownload.player.recognizer.unit.promoted.1",
@@ -340,11 +364,11 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "df118f430d69950e734155b35366fdcc97f5e68acc0fc1871c6494f42804ab4c"
+          "sha256": "390f6ab9a0dac4e7dce52c0ecec6ef0417bc12a0e3c4f95200bc7971d8d0750a"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.recognizer.unit.validated.1",
-        "previousRecordDigest": "86b37c2d1df7f863f4d99066ed9d9946be7e6b279382424f6c5d06ccbddd9372",
+        "previousRecordDigest": "6de418aa56a6858b8a0b948a3e06597c758c841f82e37a72ea42b5233c18a0f2",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -353,7 +377,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "86b37c2d1df7f863f4d99066ed9d9946be7e6b279382424f6c5d06ccbddd9372",
+          "validationRecordDigest": "6de418aa56a6858b8a0b948a3e06597c758c841f82e37a72ea42b5233c18a0f2",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -380,8 +404,8 @@
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/recognizer.json",
-        "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.recognizer\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"recognizer\",\n  \"purpose\": \"Recognize a supported media player from a bounded page observation and retain match evidence.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"http-or-https-page-observation\"\n    ],\n    \"excludes\": [\n      \"encrypted-player-decryption\",\n      \"unsupported-player-families\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.recognizer.qualification/0.1.0\",\n    \"limitations\": [\n      \"Small demo signature catalog.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/page-observation.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/recognition-result.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\",\n    \"candidates\": [\n      {\n        \"candidateId\": \"signature-exact-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      },\n      {\n        \"candidateId\": \"signature-normalized-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer-normalized@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ],\n    \"selectionPolicy\": {\n      \"mode\": \"PACKAGE_LOCK_EXACT\",\n      \"consumerProfileId\": \"xdownload.player-recognition/1.0.0\",\n      \"target\": \"node24\",\n      \"consumerProfileRevision\": \"1.0.0\"\n    }\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"player-signature-fixture\",\n        \"kind\": \"reference\",\n        \"ref\": \"fixtures/player-signatures.json\",\n        \"claim\": \"Known markers identify supported player families.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"PRESERVE_UNKNOWN\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Conflicting observations require clarification.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"OUT_OF_SCOPE\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared OUT_OF_SCOPE handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-recognition-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  },\n  \"capabilities\": {\n    \"provides\": [\n      {\n        \"capabilityId\": \"xdownload.player.recognition\",\n        \"owner\": \"xdownload-demo\",\n        \"authorityRef\": \"xdownload-demo/domain-authority@1.0.0\",\n        \"version\": \"1.0.0\",\n        \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n        \"inputSchemaDigest\": \"cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8\",\n        \"outputSchemaRef\": \"domain/schemas/recognition-result.schema.json\",\n        \"outputSchemaDigest\": \"53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ]\n  },\n  \"preconditions\": {\n    \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n    \"all\": [\n      {\n        \"path\": \"/url\",\n        \"operator\": \"exists\"\n      },\n      {\n        \"path\": \"/signals\",\n        \"operator\": \"exists\"\n      }\n    ]\n  },\n  \"knowledgeRefs\": [\n    {\n      \"id\": \"xdownload.player-signatures\",\n      \"revision\": \"1.0.0\",\n      \"kind\": \"rule-set\",\n      \"path\": \"fixtures/player-signatures.json\",\n      \"sha256\": \"3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168\"\n    }\n  ]\n}\n",
-        "recordDigest": "612944b1ab296726f85c54353a05da902e566e4005a36e1c9bf04118365f5134"
+        "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.recognizer\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"recognizer\",\n  \"purpose\": \"Recognize a supported media player from a bounded page observation and retain match evidence.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"http-or-https-page-observation\"\n    ],\n    \"excludes\": [\n      \"encrypted-player-decryption\",\n      \"unsupported-player-families\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.recognizer.qualification/0.1.0\",\n    \"limitations\": [\n      \"Small demo signature catalog.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/page-observation.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/recognition-result.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\",\n    \"candidates\": [\n      {\n        \"candidateId\": \"signature-exact-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      },\n      {\n        \"candidateId\": \"signature-normalized-v1\",\n        \"strategy\": \"function\",\n        \"ref\": \"registry:xdownload.player.recognizer-normalized@1.0.0\",\n        \"exposure\": \"semantic\",\n        \"artifactRef\": \"src/runner.mjs\",\n        \"artifactDigest\": \"a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906\",\n        \"target\": \"node24\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ],\n    \"selectionPolicy\": {\n      \"mode\": \"PACKAGE_LOCK_EXACT\",\n      \"consumerProfileId\": \"xdownload.player-recognition/1.0.0\",\n      \"target\": \"node24\",\n      \"consumerProfileRevision\": \"1.0.0\"\n    }\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"player-signature-fixture\",\n        \"kind\": \"reference\",\n        \"ref\": \"fixtures/player-signatures.json\",\n        \"claim\": \"Known markers identify supported player families.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"PRESERVE_UNKNOWN\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Conflicting observations require clarification.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"OUT_OF_SCOPE\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared OUT_OF_SCOPE handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-recognition-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  },\n  \"capabilities\": {\n    \"provides\": [\n      {\n        \"capabilityId\": \"xdownload.player.recognition\",\n        \"owner\": \"xdownload-demo\",\n        \"authorityRef\": \"xdownload-demo/domain-authority@1.0.0\",\n        \"version\": \"1.0.0\",\n        \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n        \"inputSchemaDigest\": \"cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8\",\n        \"outputSchemaRef\": \"domain/schemas/recognition-result.schema.json\",\n        \"outputSchemaDigest\": \"53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n      }\n    ]\n  },\n  \"preconditions\": {\n    \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n    \"all\": [\n      {\n        \"path\": \"/url\",\n        \"operator\": \"exists\"\n      },\n      {\n        \"path\": \"/signals\",\n        \"operator\": \"exists\"\n      }\n    ]\n  },\n  \"knowledgeRefs\": [\n    {\n      \"id\": \"xdownload.player-signatures\",\n      \"revision\": \"1.0.0\",\n      \"kind\": \"rule-set\",\n      \"path\": \"fixtures/player-signatures.json\",\n      \"sha256\": \"3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168\"\n    }\n  ]\n}\n",
+        "recordDigest": "cba5990db72457bf8b643e6bcbb060c934311d421a964648b793cfdd6e835269"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.candidate.1",
@@ -392,7 +416,7 @@
           "revision": "1.0.0",
           "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -414,7 +438,31 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/decision.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.route-decision\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"decision\",\n  \"purpose\": \"Choose the deterministic resolution path for a recognition result.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"player-recognition-result\"\n    ],\n    \"excludes\": [\n      \"download-execution\",\n      \"external-side-effects\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.route-decision.qualification/0.1.0\",\n    \"limitations\": [\n      \"Deterministic routing for the three demo statuses.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/decision-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/decision-output.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"declarative\",\n    \"ref\": \"registry:xdownload.player.route-decision@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"recognition-status-contract\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/recognizer.json\",\n        \"claim\": \"Only one recognized candidate enters the known-player procedure.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"BOUNDED_FALLBACK\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Conflicting observations require clarification.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-route-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  },\n  \"capabilities\": {\n    \"requires\": [\n      {\n        \"capabilityId\": \"xdownload.player.recognition\",\n        \"owner\": \"xdownload-demo\",\n        \"authorityRef\": \"xdownload-demo/domain-authority@1.0.0\",\n        \"version\": \"1.0.0\",\n        \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n        \"inputSchemaDigest\": \"cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8\",\n        \"outputSchemaRef\": \"domain/schemas/recognition-result.schema.json\",\n        \"outputSchemaDigest\": \"53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\",\n        \"compatibility\": {\n          \"policy\": \"EXACT\",\n          \"accepted\": [\n            {\n              \"version\": \"1.0.0\",\n              \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"preconditions\": {\n    \"inputSchemaRef\": \"domain/schemas/decision-input.schema.json\",\n    \"all\": [\n      {\n        \"path\": \"/recognition\",\n        \"operator\": \"exists\"\n      }\n    ]\n  }\n}\n",
-        "recordDigest": "fc31e1d514f0d47b45dffd9040d862170a5c13b799bc528d7b785d8bbe206afc"
+        "candidateProvenance": {
+          "sourceClosureSha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
+          "sourceRefs": [
+            {
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            }
+          ],
+          "schemaRevision": "0.1.0",
+          "method": {
+            "id": "synthetic-reference-fixture",
+            "toolchain": "reference-fixture-generator"
+          },
+          "target": "node24",
+          "profile": {
+            "id": "xdownload-reference-demo",
+            "revision": "1.0.0"
+          },
+          "parent": {
+            "kind": "GENESIS",
+            "reason": "synthetic reference fixture"
+          },
+          "changeRef": "issue:1481#reference-demo"
+        },
+        "recordDigest": "4e0f04484845a31d0821d4da029555cd61e8da28ede4df799d599b57da59b6a2"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.validated.1",
@@ -425,9 +473,9 @@
           "revision": "1.0.0",
           "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.route-decision.unit.candidate.1",
-        "previousRecordDigest": "fc31e1d514f0d47b45dffd9040d862170a5c13b799bc528d7b785d8bbe206afc",
+        "previousRecordDigest": "4e0f04484845a31d0821d4da029555cd61e8da28ede4df799d599b57da59b6a2",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator",
@@ -440,7 +488,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5",
-          "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+          "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
           "profile": {
             "id": "player-route-conformance/0.1.0",
             "revision": "0.1.0"
@@ -467,15 +515,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+              "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+              "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+              "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
             }
           ],
           "limitations": [
@@ -646,7 +694,7 @@
               "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5"
             },
             "dependencyClosure": {
-              "sha256": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+              "sha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
               "resources": [
                 {
                   "path": "fixtures/player-signatures.json",
@@ -654,15 +702,15 @@
                 },
                 {
                   "path": "src/runner.mjs",
-                  "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+                  "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
                 },
                 {
                   "path": "scripts/validate.py",
-                  "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+                  "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
                 },
                 {
                   "path": "test/runner.test.mjs",
-                  "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+                  "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
                 }
               ]
             },
@@ -686,13 +734,13 @@
               "heldOut": 0
             }
           },
-          "reportSha256": "7ec37d99218dc9952ecb2fe9222d297c153b8c3feb74967aebb2af3fbd371870"
+          "reportSha256": "d2f324fe8cb7274680c51e8ceda1841fd4a2e2aa7b214efcdebbf14b801dcfa5"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/decision.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.route-decision\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"decision\",\n  \"purpose\": \"Choose the deterministic resolution path for a recognition result.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"player-recognition-result\"\n    ],\n    \"excludes\": [\n      \"download-execution\",\n      \"external-side-effects\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.route-decision.qualification/0.1.0\",\n    \"limitations\": [\n      \"Deterministic routing for the three demo statuses.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/decision-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/decision-output.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"declarative\",\n    \"ref\": \"registry:xdownload.player.route-decision@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"recognition-status-contract\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/recognizer.json\",\n        \"claim\": \"Only one recognized candidate enters the known-player procedure.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"BOUNDED_FALLBACK\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Conflicting observations require clarification.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-route-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  },\n  \"capabilities\": {\n    \"requires\": [\n      {\n        \"capabilityId\": \"xdownload.player.recognition\",\n        \"owner\": \"xdownload-demo\",\n        \"authorityRef\": \"xdownload-demo/domain-authority@1.0.0\",\n        \"version\": \"1.0.0\",\n        \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n        \"inputSchemaDigest\": \"cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8\",\n        \"outputSchemaRef\": \"domain/schemas/recognition-result.schema.json\",\n        \"outputSchemaDigest\": \"53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\",\n        \"compatibility\": {\n          \"policy\": \"EXACT\",\n          \"accepted\": [\n            {\n              \"version\": \"1.0.0\",\n              \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"preconditions\": {\n    \"inputSchemaRef\": \"domain/schemas/decision-input.schema.json\",\n    \"all\": [\n      {\n        \"path\": \"/recognition\",\n        \"operator\": \"exists\"\n      }\n    ]\n  }\n}\n",
-        "recordDigest": "6baf40760a2113317d75c084170f00d00d68517b9ac414c790c3de5e24df0111"
+        "recordDigest": "0e0abf89836859febb2e5a3f5b0adb81ecdbcc629001139643291f1388d778e2"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.promoted.1",
@@ -703,9 +751,9 @@
           "revision": "1.0.0",
           "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.route-decision.unit.validated.1",
-        "previousRecordDigest": "6baf40760a2113317d75c084170f00d00d68517b9ac414c790c3de5e24df0111",
+        "previousRecordDigest": "0e0abf89836859febb2e5a3f5b0adb81ecdbcc629001139643291f1388d778e2",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -714,7 +762,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.route-decision.unit.validated.1",
-          "validationRecordDigest": "6baf40760a2113317d75c084170f00d00d68517b9ac414c790c3de5e24df0111",
+          "validationRecordDigest": "0e0abf89836859febb2e5a3f5b0adb81ecdbcc629001139643291f1388d778e2",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -742,7 +790,7 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/decision.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.route-decision\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"decision\",\n  \"purpose\": \"Choose the deterministic resolution path for a recognition result.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"player-recognition-result\"\n    ],\n    \"excludes\": [\n      \"download-execution\",\n      \"external-side-effects\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.route-decision.qualification/0.1.0\",\n    \"limitations\": [\n      \"Deterministic routing for the three demo statuses.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/decision-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/decision-output.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"declarative\",\n    \"ref\": \"registry:xdownload.player.route-decision@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"recognition-status-contract\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/recognizer.json\",\n        \"claim\": \"Only one recognized candidate enters the known-player procedure.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"BOUNDED_FALLBACK\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Conflicting observations require clarification.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-route-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  },\n  \"capabilities\": {\n    \"requires\": [\n      {\n        \"capabilityId\": \"xdownload.player.recognition\",\n        \"owner\": \"xdownload-demo\",\n        \"authorityRef\": \"xdownload-demo/domain-authority@1.0.0\",\n        \"version\": \"1.0.0\",\n        \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n        \"inputSchemaDigest\": \"cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8\",\n        \"outputSchemaRef\": \"domain/schemas/recognition-result.schema.json\",\n        \"outputSchemaDigest\": \"53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623\",\n        \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\",\n        \"compatibility\": {\n          \"policy\": \"EXACT\",\n          \"accepted\": [\n            {\n              \"version\": \"1.0.0\",\n              \"contractDigest\": \"4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"preconditions\": {\n    \"inputSchemaRef\": \"domain/schemas/decision-input.schema.json\",\n    \"all\": [\n      {\n        \"path\": \"/recognition\",\n        \"operator\": \"exists\"\n      }\n    ]\n  }\n}\n",
-        "recordDigest": "b2a68b73ec4d7782d9d47849907bba92ab0163eaed33e89a0c8f284cf9c91e0f"
+        "recordDigest": "de476895bb6dee4e3c9d983bbb3af392473ef3cea7fb9fc1f1cda67467529450"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.candidate.1",
@@ -753,7 +801,7 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -775,7 +823,31 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/resolve-procedure.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.resolve-procedure\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"procedure\",\n  \"purpose\": \"Resolve a recognized player into a deterministic extraction strategy descriptor.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"one-supported-player-candidate\"\n    ],\n    \"excludes\": [\n      \"network-request\",\n      \"media-download\",\n      \"credential-access\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.resolve-procedure.qualification/0.1.0\",\n    \"limitations\": [\n      \"Returns a strategy descriptor only.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/resolve-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/resolution.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.resolve-procedure@1.0.0\",\n    \"exposure\": \"private\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"strategy-map\",\n        \"kind\": \"reference\",\n        \"ref\": \"fixtures/player-strategies.json\",\n        \"claim\": \"Maps supported player IDs to local strategy identifiers.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"UNKNOWN\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-resolution-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "1847c669a7248d083a2e21f0c8f0de9f92f06d781a61992459d9105ec8bda5a5"
+        "candidateProvenance": {
+          "sourceClosureSha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
+          "sourceRefs": [
+            {
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            }
+          ],
+          "schemaRevision": "0.1.0",
+          "method": {
+            "id": "synthetic-reference-fixture",
+            "toolchain": "reference-fixture-generator"
+          },
+          "target": "node24",
+          "profile": {
+            "id": "xdownload-reference-demo",
+            "revision": "1.0.0"
+          },
+          "parent": {
+            "kind": "GENESIS",
+            "reason": "synthetic reference fixture"
+          },
+          "changeRef": "issue:1481#reference-demo"
+        },
+        "recordDigest": "5ab0b850bafc8c0b76e2ee854b978c41b9d81b222fc787705db186ee87ad140e"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.validated.1",
@@ -786,9 +858,9 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.resolve-procedure.unit.candidate.1",
-        "previousRecordDigest": "1847c669a7248d083a2e21f0c8f0de9f92f06d781a61992459d9105ec8bda5a5",
+        "previousRecordDigest": "5ab0b850bafc8c0b76e2ee854b978c41b9d81b222fc787705db186ee87ad140e",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator",
@@ -801,7 +873,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb",
-          "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+          "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
           "profile": {
             "id": "player-resolution-conformance/0.1.0",
             "revision": "0.1.0"
@@ -828,15 +900,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+              "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+              "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+              "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
             }
           ],
           "limitations": [
@@ -1007,7 +1079,7 @@
               "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
             },
             "dependencyClosure": {
-              "sha256": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+              "sha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
               "resources": [
                 {
                   "path": "fixtures/player-signatures.json",
@@ -1015,15 +1087,15 @@
                 },
                 {
                   "path": "src/runner.mjs",
-                  "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+                  "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
                 },
                 {
                   "path": "scripts/validate.py",
-                  "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+                  "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
                 },
                 {
                   "path": "test/runner.test.mjs",
-                  "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+                  "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
                 }
               ]
             },
@@ -1047,13 +1119,13 @@
               "heldOut": 0
             }
           },
-          "reportSha256": "0c42b0c61587608fe290e31dc683625ae422d4fbd0b52cefc3510f734256024b"
+          "reportSha256": "2f43d2b0d1180b8782e2a5d3c314c74e9f37beb6ccee69d364ac781a6884cf2f"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/resolve-procedure.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.resolve-procedure\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"procedure\",\n  \"purpose\": \"Resolve a recognized player into a deterministic extraction strategy descriptor.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"one-supported-player-candidate\"\n    ],\n    \"excludes\": [\n      \"network-request\",\n      \"media-download\",\n      \"credential-access\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.resolve-procedure.qualification/0.1.0\",\n    \"limitations\": [\n      \"Returns a strategy descriptor only.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/resolve-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/resolution.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.resolve-procedure@1.0.0\",\n    \"exposure\": \"private\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"strategy-map\",\n        \"kind\": \"reference\",\n        \"ref\": \"fixtures/player-strategies.json\",\n        \"claim\": \"Maps supported player IDs to local strategy identifiers.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"UNKNOWN\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-resolution-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "8e19697e7d7b7472094312456a7f7975298700e8aec39764f927a1c8ac9fb0ea"
+        "recordDigest": "8e4d6ae12ef3b012995a7c82af97e0bd997ff063a11b06b807caea210486ab46"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.promoted.1",
@@ -1064,9 +1136,9 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-        "previousRecordDigest": "8e19697e7d7b7472094312456a7f7975298700e8aec39764f927a1c8ac9fb0ea",
+        "previousRecordDigest": "8e4d6ae12ef3b012995a7c82af97e0bd997ff063a11b06b807caea210486ab46",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -1075,7 +1147,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-          "validationRecordDigest": "8e19697e7d7b7472094312456a7f7975298700e8aec39764f927a1c8ac9fb0ea",
+          "validationRecordDigest": "8e4d6ae12ef3b012995a7c82af97e0bd997ff063a11b06b807caea210486ab46",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -1103,7 +1175,7 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/resolve-procedure.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.resolve-procedure\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"procedure\",\n  \"purpose\": \"Resolve a recognized player into a deterministic extraction strategy descriptor.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"one-supported-player-candidate\"\n    ],\n    \"excludes\": [\n      \"network-request\",\n      \"media-download\",\n      \"credential-access\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.resolve-procedure.qualification/0.1.0\",\n    \"limitations\": [\n      \"Returns a strategy descriptor only.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/resolve-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/resolution.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.resolve-procedure@1.0.0\",\n    \"exposure\": \"private\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"strategy-map\",\n        \"kind\": \"reference\",\n        \"ref\": \"fixtures/player-strategies.json\",\n        \"claim\": \"Maps supported player IDs to local strategy identifiers.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"UNKNOWN\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-resolution-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "5e7173a30e2aa03702506229a67ac609c2d4701f7d2946bb7cd5a3b4e3af1e50"
+        "recordDigest": "1263e753bbac6c1b7b6e44761296b6c05c8d32dcda5d58600695cf81c5c563a1"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.candidate.1",
@@ -1114,7 +1186,7 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -1136,7 +1208,31 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/fallback-procedure.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.bounded-fallback\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"procedure\",\n  \"purpose\": \"Return a bounded clarification or review outcome when recognition is ambiguous or unknown.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"ambiguous-or-unknown-player-recognition\"\n    ],\n    \"excludes\": [\n      \"automatic-player-guessing\",\n      \"download-execution\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.bounded-fallback.qualification/0.1.0\",\n    \"limitations\": [\n      \"No LLM call; emits a bounded handoff.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/resolve-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/resolution.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.bounded-fallback@1.0.0\",\n    \"exposure\": \"private\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"fallback-policy\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/decision.json\",\n        \"claim\": \"Unknown and ambiguous recognition must not be silently promoted.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"AMBIGUOUS\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"UNKNOWN\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"NEEDS_INPUT\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Declared NEEDS_INPUT handling for the reference Consumer.\"\n      },\n      \"NEEDS_REVIEW\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared NEEDS_REVIEW handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-fallback-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "6bc0a0b51ca7646bdcbaf0b3a284cf216c7037bac154e1a271a0c79972d07ad1"
+        "candidateProvenance": {
+          "sourceClosureSha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
+          "sourceRefs": [
+            {
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            }
+          ],
+          "schemaRevision": "0.1.0",
+          "method": {
+            "id": "synthetic-reference-fixture",
+            "toolchain": "reference-fixture-generator"
+          },
+          "target": "node24",
+          "profile": {
+            "id": "xdownload-reference-demo",
+            "revision": "1.0.0"
+          },
+          "parent": {
+            "kind": "GENESIS",
+            "reason": "synthetic reference fixture"
+          },
+          "changeRef": "issue:1481#reference-demo"
+        },
+        "recordDigest": "b3f52385488f9dcadaef5f7eb67de1f0b3daa73077e657e55d12ce6b75c012b5"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.validated.1",
@@ -1147,9 +1243,9 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.bounded-fallback.unit.candidate.1",
-        "previousRecordDigest": "6bc0a0b51ca7646bdcbaf0b3a284cf216c7037bac154e1a271a0c79972d07ad1",
+        "previousRecordDigest": "b3f52385488f9dcadaef5f7eb67de1f0b3daa73077e657e55d12ce6b75c012b5",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator",
@@ -1162,7 +1258,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c",
-          "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+          "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
           "profile": {
             "id": "player-fallback-conformance/0.1.0",
             "revision": "0.1.0"
@@ -1189,15 +1285,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+              "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+              "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+              "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
             }
           ],
           "limitations": [
@@ -1368,7 +1464,7 @@
               "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
             },
             "dependencyClosure": {
-              "sha256": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+              "sha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
               "resources": [
                 {
                   "path": "fixtures/player-signatures.json",
@@ -1376,15 +1472,15 @@
                 },
                 {
                   "path": "src/runner.mjs",
-                  "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+                  "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
                 },
                 {
                   "path": "scripts/validate.py",
-                  "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+                  "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
                 },
                 {
                   "path": "test/runner.test.mjs",
-                  "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+                  "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
                 }
               ]
             },
@@ -1408,13 +1504,13 @@
               "heldOut": 0
             }
           },
-          "reportSha256": "c63e74b31d02ccba54bcabc0effb6da5fddd770296933703f2247984c2d32cee"
+          "reportSha256": "58884da3df22cc3a5e16671d3f1ab5de8caa4bfde71d8cab8fe04253979fe0c1"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/fallback-procedure.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.bounded-fallback\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"procedure\",\n  \"purpose\": \"Return a bounded clarification or review outcome when recognition is ambiguous or unknown.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"ambiguous-or-unknown-player-recognition\"\n    ],\n    \"excludes\": [\n      \"automatic-player-guessing\",\n      \"download-execution\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.bounded-fallback.qualification/0.1.0\",\n    \"limitations\": [\n      \"No LLM call; emits a bounded handoff.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/resolve-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/resolution.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.bounded-fallback@1.0.0\",\n    \"exposure\": \"private\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"fallback-policy\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/decision.json\",\n        \"claim\": \"Unknown and ambiguous recognition must not be silently promoted.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"AMBIGUOUS\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"UNKNOWN\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"NEEDS_INPUT\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Declared NEEDS_INPUT handling for the reference Consumer.\"\n      },\n      \"NEEDS_REVIEW\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared NEEDS_REVIEW handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-fallback-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "a14ff6e12d152456f24f7f2ecfbfefb44eda2140e61da24ea5b3db2f379c7eac"
+        "recordDigest": "cac1fcafa07d0416ba8516b14a7da5dd9bf15c950d3528871d1448a808771766"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.promoted.1",
@@ -1425,9 +1521,9 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-        "previousRecordDigest": "a14ff6e12d152456f24f7f2ecfbfefb44eda2140e61da24ea5b3db2f379c7eac",
+        "previousRecordDigest": "cac1fcafa07d0416ba8516b14a7da5dd9bf15c950d3528871d1448a808771766",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -1436,7 +1532,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-          "validationRecordDigest": "a14ff6e12d152456f24f7f2ecfbfefb44eda2140e61da24ea5b3db2f379c7eac",
+          "validationRecordDigest": "cac1fcafa07d0416ba8516b14a7da5dd9bf15c950d3528871d1448a808771766",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -1464,7 +1560,7 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/fallback-procedure.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.bounded-fallback\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"procedure\",\n  \"purpose\": \"Return a bounded clarification or review outcome when recognition is ambiguous or unknown.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"ambiguous-or-unknown-player-recognition\"\n    ],\n    \"excludes\": [\n      \"automatic-player-guessing\",\n      \"download-execution\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.bounded-fallback.qualification/0.1.0\",\n    \"limitations\": [\n      \"No LLM call; emits a bounded handoff.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/resolve-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/resolution.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.bounded-fallback@1.0.0\",\n    \"exposure\": \"private\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"fallback-policy\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/decision.json\",\n        \"claim\": \"Unknown and ambiguous recognition must not be silently promoted.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"AMBIGUOUS\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"UNKNOWN\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"NEEDS_INPUT\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Declared NEEDS_INPUT handling for the reference Consumer.\"\n      },\n      \"NEEDS_REVIEW\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared NEEDS_REVIEW handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-fallback-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "12592e4ed9bd6620da29c897ba205ae9844d0fcd8885b022cf567fb58aa67b79"
+        "recordDigest": "d1a7cc2714be88735f9a39a741e7ffc3ae4ff81171e9fd5a4ab5f668ccb9019f"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.candidate.1",
@@ -1475,7 +1571,7 @@
           "revision": "1.0.0",
           "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -1497,7 +1593,31 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/validator.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.outcome-validator\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"validator\",\n  \"purpose\": \"Validate that the final player-recognition outcome is consistent with evidence and resolution.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"player-recognition-outcome\"\n    ],\n    \"excludes\": [\n      \"download-result-validation\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.outcome-validator.qualification/0.1.0\",\n    \"limitations\": [\n      \"Validates the demo result contract, not a production catalog.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/validator-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/outcome.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.outcome-validator@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"recognition-evidence-contract\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/recognizer.json\",\n        \"claim\": \"Recognized results retain matched evidence.\"\n      }\n    ],\n    \"absenceReason\": null,\n    \"consumes\": [\n      \"recognitionEvidence\"\n    ]\n  },\n  \"failure\": {\n    \"handling\": {\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared CONFLICT handling for the reference Consumer.\"\n      },\n      \"NEEDS_INPUT\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Preserve the declared clarification outcome.\"\n      },\n      \"NEEDS_REVIEW\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Preserve the declared review outcome.\"\n      },\n      \"FAILED\": {\n        \"action\": \"FAIL\",\n        \"reason\": \"Declared FAILED handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-outcome-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "98cc366fce422207d09e21280e76556578470bd2fbeb55d088b3898ececd67d2"
+        "candidateProvenance": {
+          "sourceClosureSha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
+          "sourceRefs": [
+            {
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            }
+          ],
+          "schemaRevision": "0.1.0",
+          "method": {
+            "id": "synthetic-reference-fixture",
+            "toolchain": "reference-fixture-generator"
+          },
+          "target": "node24",
+          "profile": {
+            "id": "xdownload-reference-demo",
+            "revision": "1.0.0"
+          },
+          "parent": {
+            "kind": "GENESIS",
+            "reason": "synthetic reference fixture"
+          },
+          "changeRef": "issue:1481#reference-demo"
+        },
+        "recordDigest": "ec8a97ae72bbb1fe396715dd27c1a8ccfb577bdbd43cacefb942deef47021ea7"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.validated.1",
@@ -1508,9 +1628,9 @@
           "revision": "1.0.0",
           "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.outcome-validator.unit.candidate.1",
-        "previousRecordDigest": "98cc366fce422207d09e21280e76556578470bd2fbeb55d088b3898ececd67d2",
+        "previousRecordDigest": "ec8a97ae72bbb1fe396715dd27c1a8ccfb577bdbd43cacefb942deef47021ea7",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator",
@@ -1523,7 +1643,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6",
-          "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+          "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
           "profile": {
             "id": "player-outcome-conformance/0.1.0",
             "revision": "0.1.0"
@@ -1550,15 +1670,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+              "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+              "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+              "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
             }
           ],
           "limitations": [
@@ -1729,7 +1849,7 @@
               "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6"
             },
             "dependencyClosure": {
-              "sha256": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+              "sha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
               "resources": [
                 {
                   "path": "fixtures/player-signatures.json",
@@ -1737,15 +1857,15 @@
                 },
                 {
                   "path": "src/runner.mjs",
-                  "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+                  "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
                 },
                 {
                   "path": "scripts/validate.py",
-                  "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+                  "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
                 },
                 {
                   "path": "test/runner.test.mjs",
-                  "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+                  "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
                 }
               ]
             },
@@ -1769,13 +1889,13 @@
               "heldOut": 0
             }
           },
-          "reportSha256": "a7938f2143c8c5cef992e6da8fe6cbd15566459d55940bf89947378d2de3b5d0"
+          "reportSha256": "b8b9ad69d12ac8051f2e0043e99db0f1652ff658a97af9609b99881f05d24633"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/validator.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.outcome-validator\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"validator\",\n  \"purpose\": \"Validate that the final player-recognition outcome is consistent with evidence and resolution.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"player-recognition-outcome\"\n    ],\n    \"excludes\": [\n      \"download-result-validation\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.outcome-validator.qualification/0.1.0\",\n    \"limitations\": [\n      \"Validates the demo result contract, not a production catalog.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/validator-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/outcome.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.outcome-validator@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"recognition-evidence-contract\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/recognizer.json\",\n        \"claim\": \"Recognized results retain matched evidence.\"\n      }\n    ],\n    \"absenceReason\": null,\n    \"consumes\": [\n      \"recognitionEvidence\"\n    ]\n  },\n  \"failure\": {\n    \"handling\": {\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared CONFLICT handling for the reference Consumer.\"\n      },\n      \"NEEDS_INPUT\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Preserve the declared clarification outcome.\"\n      },\n      \"NEEDS_REVIEW\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Preserve the declared review outcome.\"\n      },\n      \"FAILED\": {\n        \"action\": \"FAIL\",\n        \"reason\": \"Declared FAILED handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-outcome-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "a5b82aad54eabad0606de7743e5c8274e7abe44cb53878445fb41f69741e15f6"
+        "recordDigest": "3d2d58e79d3367deb74654361dcb31ffc3ace578b5013fdd772ba19b3006bb65"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.promoted.1",
@@ -1786,9 +1906,9 @@
           "revision": "1.0.0",
           "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-        "previousRecordDigest": "a5b82aad54eabad0606de7743e5c8274e7abe44cb53878445fb41f69741e15f6",
+        "previousRecordDigest": "3d2d58e79d3367deb74654361dcb31ffc3ace578b5013fdd772ba19b3006bb65",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -1797,7 +1917,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-          "validationRecordDigest": "a5b82aad54eabad0606de7743e5c8274e7abe44cb53878445fb41f69741e15f6",
+          "validationRecordDigest": "3d2d58e79d3367deb74654361dcb31ffc3ace578b5013fdd772ba19b3006bb65",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -1825,7 +1945,7 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/validator.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player.outcome-validator\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"validator\",\n  \"purpose\": \"Validate that the final player-recognition outcome is consistent with evidence and resolution.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"player-recognition-outcome\"\n    ],\n    \"excludes\": [\n      \"download-result-validation\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player.outcome-validator.qualification/0.1.0\",\n    \"limitations\": [\n      \"Validates the demo result contract, not a production catalog.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/validator-input.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/outcome.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"function\",\n    \"ref\": \"registry:xdownload.player.outcome-validator@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"src/runner.mjs\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"recognition-evidence-contract\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/recognizer.json\",\n        \"claim\": \"Recognized results retain matched evidence.\"\n      }\n    ],\n    \"absenceReason\": null,\n    \"consumes\": [\n      \"recognitionEvidence\"\n    ]\n  },\n  \"failure\": {\n    \"handling\": {\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"CONFLICT\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared CONFLICT handling for the reference Consumer.\"\n      },\n      \"NEEDS_INPUT\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Preserve the declared clarification outcome.\"\n      },\n      \"NEEDS_REVIEW\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Preserve the declared review outcome.\"\n      },\n      \"FAILED\": {\n        \"action\": \"FAIL\",\n        \"reason\": \"Declared FAILED handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-outcome-conformance/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "834588bd808e2ac5a6725e45de589931b8dac5533077bd4646e0e6842088954f"
+        "recordDigest": "09be0a76d4647f7bbe20619897227f71ff53ef5d2f8021a7faafd30008bb5056"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.candidate.1",
@@ -1836,7 +1956,7 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -1858,7 +1978,31 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/workflow.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player-recognition.workflow\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"workflow\",\n  \"purpose\": \"Compose recognition, routing, resolution, bounded fallback and outcome validation.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"page-observation\"\n    ],\n    \"excludes\": [\n      \"media-download-execution\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player-recognition.workflow.qualification/0.1.0\",\n    \"limitations\": [\n      \"Uses typed control/data/evidence edges from demo-revised DIS 0.1.0.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/page-observation.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/outcome.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"workflow-graph\",\n    \"ref\": \"graph:xdownload.player-recognition@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"domain/player-recognition.graph.json\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"workflow-contract\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/recognizer.json\",\n        \"claim\": \"The workflow is bounded by recognition and validation contracts.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"NEEDS_INPUT\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Declared NEEDS_INPUT handling for the reference Consumer.\"\n      },\n      \"NEEDS_REVIEW\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared NEEDS_REVIEW handling for the reference Consumer.\"\n      },\n      \"FAILED\": {\n        \"action\": \"FAIL\",\n        \"reason\": \"Declared FAILED handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-recognition-workflow/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "773894896b4ad6f278db3ff97c32a82dc947507dc2f5116be9e81159d5f17d7c"
+        "candidateProvenance": {
+          "sourceClosureSha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
+          "sourceRefs": [
+            {
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            }
+          ],
+          "schemaRevision": "0.1.0",
+          "method": {
+            "id": "synthetic-reference-fixture",
+            "toolchain": "reference-fixture-generator"
+          },
+          "target": "node24",
+          "profile": {
+            "id": "xdownload-reference-demo",
+            "revision": "1.0.0"
+          },
+          "parent": {
+            "kind": "GENESIS",
+            "reason": "synthetic reference fixture"
+          },
+          "changeRef": "issue:1481#reference-demo"
+        },
+        "recordDigest": "7f26af1c685bb1d6f50083b4d8df85fc2dc82fe1f103e2e14de4cefad73b67a4"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.validated.1",
@@ -1869,9 +2013,9 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player-recognition.workflow.unit.candidate.1",
-        "previousRecordDigest": "773894896b4ad6f278db3ff97c32a82dc947507dc2f5116be9e81159d5f17d7c",
+        "previousRecordDigest": "7f26af1c685bb1d6f50083b4d8df85fc2dc82fe1f103e2e14de4cefad73b67a4",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator",
@@ -1884,7 +2028,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5",
-          "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+          "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
           "profile": {
             "id": "player-recognition-workflow/0.1.0",
             "revision": "0.1.0"
@@ -1911,15 +2055,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+              "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+              "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+              "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
             }
           ],
           "limitations": [
@@ -2090,7 +2234,7 @@
               "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
             },
             "dependencyClosure": {
-              "sha256": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+              "sha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
               "resources": [
                 {
                   "path": "fixtures/player-signatures.json",
@@ -2098,15 +2242,15 @@
                 },
                 {
                   "path": "src/runner.mjs",
-                  "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+                  "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
                 },
                 {
                   "path": "scripts/validate.py",
-                  "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+                  "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
                 },
                 {
                   "path": "test/runner.test.mjs",
-                  "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+                  "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
                 }
               ]
             },
@@ -2130,13 +2274,13 @@
               "heldOut": 0
             }
           },
-          "reportSha256": "b9ac32daba1927df4104134666b17c71d570ef8f233af43ed44fcbdc9ad0bc9e"
+          "reportSha256": "8af6c2348765b5cf69135420f05a1e95da040bfb1028a9bce69b5ce9a180fb18"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/workflow.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player-recognition.workflow\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"workflow\",\n  \"purpose\": \"Compose recognition, routing, resolution, bounded fallback and outcome validation.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"page-observation\"\n    ],\n    \"excludes\": [\n      \"media-download-execution\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player-recognition.workflow.qualification/0.1.0\",\n    \"limitations\": [\n      \"Uses typed control/data/evidence edges from demo-revised DIS 0.1.0.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/page-observation.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/outcome.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"workflow-graph\",\n    \"ref\": \"graph:xdownload.player-recognition@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"domain/player-recognition.graph.json\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"workflow-contract\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/recognizer.json\",\n        \"claim\": \"The workflow is bounded by recognition and validation contracts.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"NEEDS_INPUT\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Declared NEEDS_INPUT handling for the reference Consumer.\"\n      },\n      \"NEEDS_REVIEW\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared NEEDS_REVIEW handling for the reference Consumer.\"\n      },\n      \"FAILED\": {\n        \"action\": \"FAIL\",\n        \"reason\": \"Declared FAILED handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-recognition-workflow/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "8e8998eb29e9f9a49075625ed8b3d4f0d21f43077abf4e7e3376142b4de15a05"
+        "recordDigest": "9a5c1dbbdbb9eb206230472a49a7666d98963e912e6ce472a6d82f7c039836b9"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.promoted.1",
@@ -2147,9 +2291,9 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-        "previousRecordDigest": "8e8998eb29e9f9a49075625ed8b3d4f0d21f43077abf4e7e3376142b4de15a05",
+        "previousRecordDigest": "9a5c1dbbdbb9eb206230472a49a7666d98963e912e6ce472a6d82f7c039836b9",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -2158,7 +2302,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-          "validationRecordDigest": "8e8998eb29e9f9a49075625ed8b3d4f0d21f43077abf4e7e3376142b4de15a05",
+          "validationRecordDigest": "9a5c1dbbdbb9eb206230472a49a7666d98963e912e6ce472a6d82f7c039836b9",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -2186,7 +2330,7 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/units/workflow.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.unit/0.1.0\",\n  \"id\": \"xdownload.player-recognition.workflow\",\n  \"revision\": \"1.0.0\",\n  \"role\": \"workflow\",\n  \"purpose\": \"Compose recognition, routing, resolution, bounded fallback and outcome validation.\",\n  \"scope\": {\n    \"domain\": \"web-media\",\n    \"appliesTo\": [\n      \"page-observation\"\n    ],\n    \"excludes\": [\n      \"media-download-execution\"\n    ]\n  },\n  \"owner\": \"xdownload-demo\",\n  \"authority\": \"CONTROLLED\",\n  \"qualification\": {\n    \"profile\": \"xdownload.player-recognition.workflow.qualification/0.1.0\",\n    \"limitations\": [\n      \"Uses typed control/data/evidence edges from demo-revised DIS 0.1.0.\"\n    ]\n  },\n  \"input\": {\n    \"schemaRef\": \"domain/schemas/page-observation.schema.json\"\n  },\n  \"output\": {\n    \"schemaRef\": \"domain/schemas/outcome.schema.json\"\n  },\n  \"implementation\": {\n    \"strategy\": \"workflow-graph\",\n    \"ref\": \"graph:xdownload.player-recognition@1.0.0\",\n    \"exposure\": \"semantic\",\n    \"artifactRef\": \"domain/player-recognition.graph.json\"\n  },\n  \"evidence\": {\n    \"sources\": [\n      {\n        \"sourceId\": \"workflow-contract\",\n        \"kind\": \"authority\",\n        \"ref\": \"domain/units/recognizer.json\",\n        \"claim\": \"The workflow is bounded by recognition and validation contracts.\"\n      }\n    ],\n    \"absenceReason\": null\n  },\n  \"failure\": {\n    \"handling\": {\n      \"UNKNOWN\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared UNKNOWN handling for the reference Consumer.\"\n      },\n      \"AMBIGUOUS\": {\n        \"action\": \"CLARIFY\",\n        \"reason\": \"Declared AMBIGUOUS handling for the reference Consumer.\"\n      },\n      \"INVALID_INPUT\": {\n        \"action\": \"REJECT\",\n        \"reason\": \"Declared INVALID_INPUT handling for the reference Consumer.\"\n      },\n      \"NEEDS_INPUT\": {\n        \"action\": \"WAIT\",\n        \"reason\": \"Declared NEEDS_INPUT handling for the reference Consumer.\"\n      },\n      \"NEEDS_REVIEW\": {\n        \"action\": \"REVIEW\",\n        \"reason\": \"Declared NEEDS_REVIEW handling for the reference Consumer.\"\n      },\n      \"FAILED\": {\n        \"action\": \"FAIL\",\n        \"reason\": \"Declared FAILED handling for the reference Consumer.\"\n      }\n    }\n  },\n  \"validation\": {\n    \"profile\": \"player-recognition-workflow/0.1.0\",\n    \"profileRevision\": \"0.1.0\",\n    \"casesRef\": \"test/runner.test.mjs\",\n    \"validator\": {\n      \"id\": \"xdownload-dis-independent-conformance\",\n      \"version\": \"0.1.0\"\n    },\n    \"requiredCoverage\": [\n      \"positive\",\n      \"negative\",\n      \"boundary\"\n    ]\n  }\n}\n",
-        "recordDigest": "36b084f17f49a7096a7c0f21e932e7ec9a5f6ae57dd8a316cab1de92c04f910b"
+        "recordDigest": "7d62329af82d12d2e68b922571cd1a217475260373cb146388fccc9ea9394d9e"
       },
       {
         "recordId": "xdownload.player-signatures.rule.candidate.1",
@@ -2197,7 +2341,7 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -2219,7 +2363,31 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "fixtures/player-signatures.json",
         "subjectJson": "{\n  \"catalogId\":\"xdownload.player-signatures\",\"revision\":\"1.0.0\",\n  \"patterns\":[\n    {\"playerId\":\"jwplayer\",\"markers\":[\"jwplayer\"]},\n    {\"playerId\":\"videojs\",\"markers\":[\"videojs\",\"video.js\"]},\n    {\"playerId\":\"hlsjs\",\"markers\":[\"hls.js\",\"hlsjs\"]}\n  ]\n}",
-        "recordDigest": "58c4cba79b3093727c1ae99139acc52f6525e44fb9e5602efeb79848fb3f8df6"
+        "candidateProvenance": {
+          "sourceClosureSha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
+          "sourceRefs": [
+            {
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            }
+          ],
+          "schemaRevision": "0.1.0",
+          "method": {
+            "id": "synthetic-reference-fixture",
+            "toolchain": "reference-fixture-generator"
+          },
+          "target": "node24",
+          "profile": {
+            "id": "xdownload-reference-demo",
+            "revision": "1.0.0"
+          },
+          "parent": {
+            "kind": "GENESIS",
+            "reason": "synthetic reference fixture"
+          },
+          "changeRef": "issue:1481#reference-demo"
+        },
+        "recordDigest": "4af1206f19d45e16b00ee2b9443b5734111ca63eca6fdc1fcd0a49b8aee49a3d"
       },
       {
         "recordId": "xdownload.player-signatures.rule.validated.1",
@@ -2230,9 +2398,9 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player-signatures.rule.candidate.1",
-        "previousRecordDigest": "58c4cba79b3093727c1ae99139acc52f6525e44fb9e5602efeb79848fb3f8df6",
+        "previousRecordDigest": "4af1206f19d45e16b00ee2b9443b5734111ca63eca6fdc1fcd0a49b8aee49a3d",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator",
@@ -2245,7 +2413,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
-          "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+          "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
           "profile": {
             "id": "player-recognition-conformance/0.1.0",
             "revision": "0.1.0"
@@ -2272,15 +2440,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+              "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+              "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+              "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
             }
           ],
           "limitations": [
@@ -2451,7 +2619,7 @@
               "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
             },
             "dependencyClosure": {
-              "sha256": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+              "sha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
               "resources": [
                 {
                   "path": "fixtures/player-signatures.json",
@@ -2459,15 +2627,15 @@
                 },
                 {
                   "path": "src/runner.mjs",
-                  "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+                  "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
                 },
                 {
                   "path": "scripts/validate.py",
-                  "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+                  "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
                 },
                 {
                   "path": "test/runner.test.mjs",
-                  "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+                  "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
                 }
               ]
             },
@@ -2491,13 +2659,13 @@
               "heldOut": 0
             }
           },
-          "reportSha256": "8d22e15771adfaf61715958a33419788b49c31d5e01cc432ab4ccd6125c9fef3"
+          "reportSha256": "efac54b2e653f568c785a158dfc916c16ee96f31a7e2a1405ae806b41fe428ce"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "fixtures/player-signatures.json",
         "subjectJson": "{\n  \"catalogId\":\"xdownload.player-signatures\",\"revision\":\"1.0.0\",\n  \"patterns\":[\n    {\"playerId\":\"jwplayer\",\"markers\":[\"jwplayer\"]},\n    {\"playerId\":\"videojs\",\"markers\":[\"videojs\",\"video.js\"]},\n    {\"playerId\":\"hlsjs\",\"markers\":[\"hls.js\",\"hlsjs\"]}\n  ]\n}",
-        "recordDigest": "2ec48f341641c3adbcd16f945bb84d0ac2712d72f826f933072c5f7d95fef3ac"
+        "recordDigest": "c7a89f01373b3b85d145584120f55e26f823cd90ae9804d4e4634a8053c3e429"
       },
       {
         "recordId": "xdownload.player-signatures.rule.promoted.1",
@@ -2508,9 +2676,9 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player-signatures.rule.validated.1",
-        "previousRecordDigest": "2ec48f341641c3adbcd16f945bb84d0ac2712d72f826f933072c5f7d95fef3ac",
+        "previousRecordDigest": "c7a89f01373b3b85d145584120f55e26f823cd90ae9804d4e4634a8053c3e429",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -2519,7 +2687,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-signatures.rule.validated.1",
-          "validationRecordDigest": "2ec48f341641c3adbcd16f945bb84d0ac2712d72f826f933072c5f7d95fef3ac",
+          "validationRecordDigest": "c7a89f01373b3b85d145584120f55e26f823cd90ae9804d4e4634a8053c3e429",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -2547,7 +2715,7 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "fixtures/player-signatures.json",
         "subjectJson": "{\n  \"catalogId\":\"xdownload.player-signatures\",\"revision\":\"1.0.0\",\n  \"patterns\":[\n    {\"playerId\":\"jwplayer\",\"markers\":[\"jwplayer\"]},\n    {\"playerId\":\"videojs\",\"markers\":[\"videojs\",\"video.js\"]},\n    {\"playerId\":\"hlsjs\",\"markers\":[\"hls.js\",\"hlsjs\"]}\n  ]\n}",
-        "recordDigest": "35770c68d129fddc0a35e0fa942fbdf2d8b6aad98dd7080e4502c1c8204bb60f"
+        "recordDigest": "a1b2384c12d711b57e166c3e4cab0f893bbbc8b916772d1dc090126149bf447e"
       },
       {
         "recordId": "xdownload.player-recognition.graph.candidate.1",
@@ -2558,7 +2726,7 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -2580,7 +2748,31 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/player-recognition.graph.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.graph/0.1.0\",\n  \"id\": \"xdownload.player-recognition\",\n  \"revision\": \"1.0.0\",\n  \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n  \"outputSchemaRef\": \"domain/schemas/outcome.schema.json\",\n  \"entryNode\": \"recognize\",\n  \"nodes\": [\n    {\n      \"nodeId\": \"recognize\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.recognizer\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"decide\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.route-decision\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"resolve-known\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.resolve-procedure\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"bounded-fallback\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.bounded-fallback\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"validate\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.outcome-validator\",\n        \"revision\": \"1.0.0\"\n      }\n    }\n  ],\n  \"edges\": [\n    {\n      \"kind\": \"control\",\n      \"from\": \"recognize\",\n      \"to\": \"decide\"\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"decide\",\n      \"to\": \"resolve-known\",\n      \"when\": {\n        \"path\": \"/route\",\n        \"operator\": \"equals\",\n        \"value\": \"KNOWN\"\n      }\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"decide\",\n      \"to\": \"bounded-fallback\",\n      \"when\": {\n        \"path\": \"/route\",\n        \"operator\": \"equals\",\n        \"value\": \"REVIEW\"\n      }\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"resolve-known\",\n      \"to\": \"validate\"\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"bounded-fallback\",\n      \"to\": \"validate\"\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"decide\",\n        \"pointer\": \"/recognition\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"resolve-known\",\n        \"pointer\": \"/recognition\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"bounded-fallback\",\n        \"pointer\": \"/recognition\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"resolve-known\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"validate\",\n        \"pointer\": \"/resolution\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"bounded-fallback\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"validate\",\n        \"pointer\": \"/resolution\"\n      }\n    },\n    {\n      \"kind\": \"evidence\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"/evidence\"\n      },\n      \"to\": {\n        \"node\": \"validate\",\n        \"slot\": \"recognitionEvidence\"\n      }\n    }\n  ],\n  \"terminalNodes\": [\n    \"validate\"\n  ],\n  \"cyclePolicy\": \"DAG_ONLY\"\n}\n",
-        "recordDigest": "3b7e02a28db81248c1ea1b5aa6525438a26865820cbe4c29d976c9d9e3382ca5"
+        "candidateProvenance": {
+          "sourceClosureSha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
+          "sourceRefs": [
+            {
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            }
+          ],
+          "schemaRevision": "0.1.0",
+          "method": {
+            "id": "synthetic-reference-fixture",
+            "toolchain": "reference-fixture-generator"
+          },
+          "target": "node24",
+          "profile": {
+            "id": "xdownload-reference-demo",
+            "revision": "1.0.0"
+          },
+          "parent": {
+            "kind": "GENESIS",
+            "reason": "synthetic reference fixture"
+          },
+          "changeRef": "issue:1481#reference-demo"
+        },
+        "recordDigest": "257e2954ca4dd45f8f76c574602d2cc5ca35a773c4232d3df5b4d6ebb5212db8"
       },
       {
         "recordId": "xdownload.player-recognition.graph.validated.1",
@@ -2591,9 +2783,9 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player-recognition.graph.candidate.1",
-        "previousRecordDigest": "3b7e02a28db81248c1ea1b5aa6525438a26865820cbe4c29d976c9d9e3382ca5",
+        "previousRecordDigest": "257e2954ca4dd45f8f76c574602d2cc5ca35a773c4232d3df5b4d6ebb5212db8",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator",
@@ -2606,7 +2798,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e",
-          "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+          "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
           "profile": {
             "id": "player-recognition-workflow/0.1.0",
             "revision": "0.1.0"
@@ -2633,15 +2825,15 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+              "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+              "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+              "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
             }
           ],
           "limitations": [
@@ -2812,7 +3004,7 @@
               "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
             },
             "dependencyClosure": {
-              "sha256": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+              "sha256": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
               "resources": [
                 {
                   "path": "fixtures/player-signatures.json",
@@ -2820,15 +3012,15 @@
                 },
                 {
                   "path": "src/runner.mjs",
-                  "sha256": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6"
+                  "sha256": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906"
                 },
                 {
                   "path": "scripts/validate.py",
-                  "sha256": "da25d58b483602cf2aa58bb59af3e7a3f8e59ca6e77c8b7db41accb47e3ec0ad"
+                  "sha256": "02f7f353491e9375d9d7b61146eefca60ce04c53c3d8729d2541c7aafd3b12ee"
                 },
                 {
                   "path": "test/runner.test.mjs",
-                  "sha256": "fa9223a32c60d86b8ba6a8f725577147f045decef57c859a4c275a4e099363c8"
+                  "sha256": "14c35bf61cb63d888453a396ab51c04fd21378512e45a2ba452deef5df734877"
                 }
               ]
             },
@@ -2852,13 +3044,13 @@
               "heldOut": 0
             }
           },
-          "reportSha256": "43e48d96b12998fc2d92468439e46519f90c28301c3273439b38ebd7589341cc"
+          "reportSha256": "9e1059a7a8f8fef4bef80b9af739dadb08c0d929b7eb77d6f2e92237df10193c"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/player-recognition.graph.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.graph/0.1.0\",\n  \"id\": \"xdownload.player-recognition\",\n  \"revision\": \"1.0.0\",\n  \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n  \"outputSchemaRef\": \"domain/schemas/outcome.schema.json\",\n  \"entryNode\": \"recognize\",\n  \"nodes\": [\n    {\n      \"nodeId\": \"recognize\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.recognizer\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"decide\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.route-decision\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"resolve-known\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.resolve-procedure\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"bounded-fallback\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.bounded-fallback\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"validate\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.outcome-validator\",\n        \"revision\": \"1.0.0\"\n      }\n    }\n  ],\n  \"edges\": [\n    {\n      \"kind\": \"control\",\n      \"from\": \"recognize\",\n      \"to\": \"decide\"\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"decide\",\n      \"to\": \"resolve-known\",\n      \"when\": {\n        \"path\": \"/route\",\n        \"operator\": \"equals\",\n        \"value\": \"KNOWN\"\n      }\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"decide\",\n      \"to\": \"bounded-fallback\",\n      \"when\": {\n        \"path\": \"/route\",\n        \"operator\": \"equals\",\n        \"value\": \"REVIEW\"\n      }\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"resolve-known\",\n      \"to\": \"validate\"\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"bounded-fallback\",\n      \"to\": \"validate\"\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"decide\",\n        \"pointer\": \"/recognition\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"resolve-known\",\n        \"pointer\": \"/recognition\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"bounded-fallback\",\n        \"pointer\": \"/recognition\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"resolve-known\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"validate\",\n        \"pointer\": \"/resolution\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"bounded-fallback\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"validate\",\n        \"pointer\": \"/resolution\"\n      }\n    },\n    {\n      \"kind\": \"evidence\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"/evidence\"\n      },\n      \"to\": {\n        \"node\": \"validate\",\n        \"slot\": \"recognitionEvidence\"\n      }\n    }\n  ],\n  \"terminalNodes\": [\n    \"validate\"\n  ],\n  \"cyclePolicy\": \"DAG_ONLY\"\n}\n",
-        "recordDigest": "6c808ef1bfc28ebebb6e8cd763bee9900666f7263484ac42c8570e7d1c43d409"
+        "recordDigest": "9b292663764385b6dac70daf3155fdc16911c7b4ad1c42d636ce8e92ae116d31"
       },
       {
         "recordId": "xdownload.player-recognition.graph.promoted.1",
@@ -2869,9 +3061,9 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "c569a0d1f116d2f7d84ef9fa0fccf3cdf0ea2aaa7eac83fb005188f6889425a4",
+        "dependencyClosureDigest": "79deb45ef2ca9dea54f0789bf6f81f59338ef7d03dbbcadc79cf3539aa009d4d",
         "previousRecordId": "xdownload.player-recognition.graph.validated.1",
-        "previousRecordDigest": "6c808ef1bfc28ebebb6e8cd763bee9900666f7263484ac42c8570e7d1c43d409",
+        "previousRecordDigest": "9b292663764385b6dac70daf3155fdc16911c7b4ad1c42d636ce8e92ae116d31",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -2880,7 +3072,7 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-recognition.graph.validated.1",
-          "validationRecordDigest": "6c808ef1bfc28ebebb6e8cd763bee9900666f7263484ac42c8570e7d1c43d409",
+          "validationRecordDigest": "9b292663764385b6dac70daf3155fdc16911c7b4ad1c42d636ce8e92ae116d31",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
@@ -2908,7 +3100,7 @@
         "scope": "REFERENCE_DEMO_ONLY",
         "subjectPath": "domain/player-recognition.graph.json",
         "subjectJson": "{\n  \"schemaVersion\": \"dis.graph/0.1.0\",\n  \"id\": \"xdownload.player-recognition\",\n  \"revision\": \"1.0.0\",\n  \"inputSchemaRef\": \"domain/schemas/page-observation.schema.json\",\n  \"outputSchemaRef\": \"domain/schemas/outcome.schema.json\",\n  \"entryNode\": \"recognize\",\n  \"nodes\": [\n    {\n      \"nodeId\": \"recognize\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.recognizer\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"decide\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.route-decision\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"resolve-known\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.resolve-procedure\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"bounded-fallback\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.bounded-fallback\",\n        \"revision\": \"1.0.0\"\n      }\n    },\n    {\n      \"nodeId\": \"validate\",\n      \"unitRef\": {\n        \"id\": \"xdownload.player.outcome-validator\",\n        \"revision\": \"1.0.0\"\n      }\n    }\n  ],\n  \"edges\": [\n    {\n      \"kind\": \"control\",\n      \"from\": \"recognize\",\n      \"to\": \"decide\"\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"decide\",\n      \"to\": \"resolve-known\",\n      \"when\": {\n        \"path\": \"/route\",\n        \"operator\": \"equals\",\n        \"value\": \"KNOWN\"\n      }\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"decide\",\n      \"to\": \"bounded-fallback\",\n      \"when\": {\n        \"path\": \"/route\",\n        \"operator\": \"equals\",\n        \"value\": \"REVIEW\"\n      }\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"resolve-known\",\n      \"to\": \"validate\"\n    },\n    {\n      \"kind\": \"control\",\n      \"from\": \"bounded-fallback\",\n      \"to\": \"validate\"\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"decide\",\n        \"pointer\": \"/recognition\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"resolve-known\",\n        \"pointer\": \"/recognition\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"bounded-fallback\",\n        \"pointer\": \"/recognition\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"resolve-known\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"validate\",\n        \"pointer\": \"/resolution\"\n      }\n    },\n    {\n      \"kind\": \"data\",\n      \"from\": {\n        \"node\": \"bounded-fallback\",\n        \"pointer\": \"\"\n      },\n      \"to\": {\n        \"node\": \"validate\",\n        \"pointer\": \"/resolution\"\n      }\n    },\n    {\n      \"kind\": \"evidence\",\n      \"from\": {\n        \"node\": \"recognize\",\n        \"pointer\": \"/evidence\"\n      },\n      \"to\": {\n        \"node\": \"validate\",\n        \"slot\": \"recognitionEvidence\"\n      }\n    }\n  ],\n  \"terminalNodes\": [\n    \"validate\"\n  ],\n  \"cyclePolicy\": \"DAG_ONLY\"\n}\n",
-        "recordDigest": "b2f2db4c160364d2e1861b93ce7261b58b7e98a4c88bf3851730d230ac74d8b3"
+        "recordDigest": "95b2fcef865a0923f6f67af70429a66dcde4322f4e5825efbd57870e781744a2"
       }
     ],
     "selectionLock": {
@@ -2927,11 +3119,11 @@
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
           "path": "domain/units/recognizer.json",
-          "sha256": "df118f430d69950e734155b35366fdcc97f5e68acc0fc1871c6494f42804ab4c",
+          "sha256": "390f6ab9a0dac4e7dce52c0ecec6ef0417bc12a0e3c4f95200bc7971d8d0750a",
           "promotionRecordId": "xdownload.player.recognizer.unit.promoted.1",
-          "promotionRecordDigest": "612944b1ab296726f85c54353a05da902e566e4005a36e1c9bf04118365f5134",
+          "promotionRecordDigest": "cba5990db72457bf8b643e6bcbb060c934311d421a964648b793cfdd6e835269",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "86b37c2d1df7f863f4d99066ed9d9946be7e6b279382424f6c5d06ccbddd9372"
+          "validationRecordDigest": "6de418aa56a6858b8a0b948a3e06597c758c841f82e37a72ea42b5233c18a0f2"
         },
         {
           "kind": "unit",
@@ -2940,9 +3132,9 @@
           "path": "domain/units/decision.json",
           "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5",
           "promotionRecordId": "xdownload.player.route-decision.unit.promoted.1",
-          "promotionRecordDigest": "b2a68b73ec4d7782d9d47849907bba92ab0163eaed33e89a0c8f284cf9c91e0f",
+          "promotionRecordDigest": "de476895bb6dee4e3c9d983bbb3af392473ef3cea7fb9fc1f1cda67467529450",
           "validationRecordId": "xdownload.player.route-decision.unit.validated.1",
-          "validationRecordDigest": "6baf40760a2113317d75c084170f00d00d68517b9ac414c790c3de5e24df0111"
+          "validationRecordDigest": "0e0abf89836859febb2e5a3f5b0adb81ecdbcc629001139643291f1388d778e2"
         },
         {
           "kind": "unit",
@@ -2951,9 +3143,9 @@
           "path": "domain/units/resolve-procedure.json",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb",
           "promotionRecordId": "xdownload.player.resolve-procedure.unit.promoted.1",
-          "promotionRecordDigest": "5e7173a30e2aa03702506229a67ac609c2d4701f7d2946bb7cd5a3b4e3af1e50",
+          "promotionRecordDigest": "1263e753bbac6c1b7b6e44761296b6c05c8d32dcda5d58600695cf81c5c563a1",
           "validationRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-          "validationRecordDigest": "8e19697e7d7b7472094312456a7f7975298700e8aec39764f927a1c8ac9fb0ea"
+          "validationRecordDigest": "8e4d6ae12ef3b012995a7c82af97e0bd997ff063a11b06b807caea210486ab46"
         },
         {
           "kind": "unit",
@@ -2962,9 +3154,9 @@
           "path": "domain/units/fallback-procedure.json",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c",
           "promotionRecordId": "xdownload.player.bounded-fallback.unit.promoted.1",
-          "promotionRecordDigest": "12592e4ed9bd6620da29c897ba205ae9844d0fcd8885b022cf567fb58aa67b79",
+          "promotionRecordDigest": "d1a7cc2714be88735f9a39a741e7ffc3ae4ff81171e9fd5a4ab5f668ccb9019f",
           "validationRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-          "validationRecordDigest": "a14ff6e12d152456f24f7f2ecfbfefb44eda2140e61da24ea5b3db2f379c7eac"
+          "validationRecordDigest": "cac1fcafa07d0416ba8516b14a7da5dd9bf15c950d3528871d1448a808771766"
         },
         {
           "kind": "unit",
@@ -2973,9 +3165,9 @@
           "path": "domain/units/validator.json",
           "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6",
           "promotionRecordId": "xdownload.player.outcome-validator.unit.promoted.1",
-          "promotionRecordDigest": "834588bd808e2ac5a6725e45de589931b8dac5533077bd4646e0e6842088954f",
+          "promotionRecordDigest": "09be0a76d4647f7bbe20619897227f71ff53ef5d2f8021a7faafd30008bb5056",
           "validationRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-          "validationRecordDigest": "a5b82aad54eabad0606de7743e5c8274e7abe44cb53878445fb41f69741e15f6"
+          "validationRecordDigest": "3d2d58e79d3367deb74654361dcb31ffc3ace578b5013fdd772ba19b3006bb65"
         },
         {
           "kind": "unit",
@@ -2984,9 +3176,9 @@
           "path": "domain/units/workflow.json",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5",
           "promotionRecordId": "xdownload.player-recognition.workflow.unit.promoted.1",
-          "promotionRecordDigest": "36b084f17f49a7096a7c0f21e932e7ec9a5f6ae57dd8a316cab1de92c04f910b",
+          "promotionRecordDigest": "7d62329af82d12d2e68b922571cd1a217475260373cb146388fccc9ea9394d9e",
           "validationRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-          "validationRecordDigest": "8e8998eb29e9f9a49075625ed8b3d4f0d21f43077abf4e7e3376142b4de15a05"
+          "validationRecordDigest": "9a5c1dbbdbb9eb206230472a49a7666d98963e912e6ce472a6d82f7c039836b9"
         },
         {
           "kind": "rule",
@@ -2995,9 +3187,9 @@
           "path": "fixtures/player-signatures.json",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
           "promotionRecordId": "xdownload.player-signatures.rule.promoted.1",
-          "promotionRecordDigest": "35770c68d129fddc0a35e0fa942fbdf2d8b6aad98dd7080e4502c1c8204bb60f",
+          "promotionRecordDigest": "a1b2384c12d711b57e166c3e4cab0f893bbbc8b916772d1dc090126149bf447e",
           "validationRecordId": "xdownload.player-signatures.rule.validated.1",
-          "validationRecordDigest": "2ec48f341641c3adbcd16f945bb84d0ac2712d72f826f933072c5f7d95fef3ac"
+          "validationRecordDigest": "c7a89f01373b3b85d145584120f55e26f823cd90ae9804d4e4634a8053c3e429"
         },
         {
           "kind": "graph",
@@ -3006,9 +3198,9 @@
           "path": "domain/player-recognition.graph.json",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e",
           "promotionRecordId": "xdownload.player-recognition.graph.promoted.1",
-          "promotionRecordDigest": "b2f2db4c160364d2e1861b93ce7261b58b7e98a4c88bf3851730d230ac74d8b3",
+          "promotionRecordDigest": "95b2fcef865a0923f6f67af70429a66dcde4322f4e5825efbd57870e781744a2",
           "validationRecordId": "xdownload.player-recognition.graph.validated.1",
-          "validationRecordDigest": "6c808ef1bfc28ebebb6e8cd763bee9900666f7263484ac42c8570e7d1c43d409"
+          "validationRecordDigest": "9b292663764385b6dac70daf3155fdc16911c7b4ad1c42d636ce8e92ae116d31"
         }
       ],
       "selectedCapabilities": [
@@ -3024,17 +3216,17 @@
             "candidateId": "signature-exact-v1",
             "implementationRef": "registry:xdownload.player.recognizer@1.0.0",
             "artifactRef": "src/runner.mjs",
-            "artifactDigest": "db221a63b5735d5cbec2b65428beb047a6e097fcce28335697346e47536aaad6",
+            "artifactDigest": "a65ebfe5ac61b5708f04c4f8e16778c9f29fd83e1018206b9ce52c1783cd2906",
             "target": "node24",
             "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518"
           },
           "promotionRecordId": "xdownload.player.recognizer.unit.promoted.1",
-          "promotionRecordDigest": "612944b1ab296726f85c54353a05da902e566e4005a36e1c9bf04118365f5134",
+          "promotionRecordDigest": "cba5990db72457bf8b643e6bcbb060c934311d421a964648b793cfdd6e835269",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "86b37c2d1df7f863f4d99066ed9d9946be7e6b279382424f6c5d06ccbddd9372"
+          "validationRecordDigest": "6de418aa56a6858b8a0b948a3e06597c758c841f82e37a72ea42b5233c18a0f2"
         }
       ]
     },
-    "selectionLockSha256": "b5925ccd42bb43a2330a03c4a144d4eb113635aaa5705f886d9a22c696f47295"
+    "selectionLockSha256": "225d765a2b26e5ca954872c4a1659ec49d1e4f02a2b4c917eb21e988dc4ff4e4"
   }
 }

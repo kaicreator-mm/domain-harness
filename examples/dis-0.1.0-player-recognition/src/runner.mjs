@@ -142,11 +142,16 @@ export function referenceFailureAction(unit, status) {
 }
 
 // Feedback is an immutable intake envelope, never a lifecycle transition.
-export function validateReferenceFeedback(feedback, expectedLockSha256) {
+export function validateReferenceFeedback(feedback, trustedOrigin) {
   const allowed = ['SYSTEM_OBSERVED', 'USER_CONFIRMED', 'MODEL_INFERRED'];
-  if (!feedback || !feedback.traceId || !/^[a-f0-9]{64}$/.test(expectedLockSha256 || '') || feedback.packageLockSha256 !== expectedLockSha256 ||
-      !allowed.includes(feedback.provenance) || feedback.claimedProvenance !== feedback.provenance ||
-      !feedback.finding || feedback.disposition !== 'PROPOSAL_ONLY') throw new DisExecutionError('INVALID_RUNTIME_FEEDBACK', feedback?.traceId || 'missing');
+  const strings = ['sourceRuntime', 'executionId', 'journalId', 'traceId', 'redaction', 'retention', 'outcome', 'validationStatus', 'uncertainty', 'scope', 'finding'];
+  const keys = [...strings, 'packageLockSha256', 'intelligencePins', 'evidenceProvenance', 'provenance', 'claimedProvenance', 'limitations', 'intake', 'disposition'];
+  const trusted = keys.filter((key) => !['finding', 'disposition', 'claimedProvenance'].includes(key));
+  const nonempty = (value) => typeof value === 'string' && value.length > 0;
+  if (!exactKeys(feedback, keys) || !trustedOrigin || strings.some((key) => !nonempty(feedback[key])) || !/^[a-f0-9]{64}$/.test(feedback.packageLockSha256 || '') || trusted.some((key) => !jsonValueEqual(feedback[key], trustedOrigin[key])) ||
+      !Array.isArray(feedback.intelligencePins) || !feedback.intelligencePins.length || feedback.intelligencePins.some((pin) => !exactKeys(pin, ['kind', 'id', 'revision', 'sha256']) || !nonempty(pin.kind) || !nonempty(pin.id) || !nonempty(pin.revision) || !/^[a-f0-9]{64}$/.test(pin.sha256 || '')) ||
+      !Array.isArray(feedback.evidenceProvenance) || !feedback.evidenceProvenance.length || feedback.evidenceProvenance.some((item) => !nonempty(item)) || !Array.isArray(feedback.limitations) || !feedback.limitations.length || feedback.limitations.some((item) => !nonempty(item)) ||
+      !exactKeys(feedback.intake, ['status', 'consent', 'policy']) || Object.values(feedback.intake).some((item) => !nonempty(item)) || !allowed.includes(feedback.provenance) || feedback.claimedProvenance !== feedback.provenance || feedback.disposition !== 'PROPOSAL_ONLY') throw new DisExecutionError('INVALID_RUNTIME_FEEDBACK', feedback?.traceId || 'missing');
   return structuredClone(feedback);
 }
 
@@ -311,6 +316,14 @@ export function replayLifecycle(records, resources, closureDigest, historicalClo
       if (actor.id !== 'xdownload-demo-observer' || actor.role !== 'observation-source' || actor.authorityRef !== 'xdownload-demo/domain-authority@1.0.0' || policy.id !== 'xdownload-demo/observation-policy' || policy.revision !== '1.0.0' || !checkEvidence(record.evidenceRefs) || !['SYSTEM_OBSERVED', 'USER_CONFIRMED', 'MODEL_INFERRED'].includes(record.provenance)) throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_POLICY', record.recordId);
     } else if (transition === 'CANDIDATE') {
       if (actor.id !== 'xdownload-domain-forge-reference' || actor.role !== 'candidate-producer' || actor.authorityRef !== 'xdownload-demo/domain-authority@1.0.0' || policy.id !== 'xdownload-demo/candidate-policy' || policy.revision !== '1.0.0' || !checkEvidence(record.evidenceRefs)) throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_POLICY', record.recordId);
+      const production = record.candidateProvenance;
+      const nonempty = (value) => typeof value === 'string' && value.length > 0;
+      if (!exactKeys(production, ['sourceClosureSha256', 'sourceRefs', 'schemaRevision', 'method', 'target', 'profile', 'parent', 'changeRef']) || production.sourceClosureSha256 !== recordClosure || !checkEvidence(production.sourceRefs) || production.sourceRefs.some((source) => !exactKeys(source, ['path', 'sha256']) || !record.evidenceRefs.some((ref) => ref.path === source.path && ref.sha256 === source.sha256)) || production.schemaRevision !== '0.1.0' || !exactKeys(production.method, ['id', 'toolchain']) || !nonempty(production.method.id) || !nonempty(production.method.toolchain) || !nonempty(production.target) || !exactKeys(production.profile, ['id', 'revision']) || !nonempty(production.profile.id) || !nonempty(production.profile.revision) || !nonempty(production.changeRef) || (production.parent?.kind === 'GENESIS' ? !exactKeys(production.parent, ['kind', 'reason']) || !nonempty(production.parent.reason) : !exactKeys(production.parent, ['kind', 'subject']) || production.parent.kind !== 'SUBJECT' || !exactKeys(production.parent.subject, ['kind', 'id', 'revision', 'sha256']) || !nonempty(production.parent.subject.kind) || !nonempty(production.parent.subject.id) || !nonempty(production.parent.subject.revision) || !/^[a-f0-9]{64}$/.test(production.parent.subject.sha256 || ''))) throw new DisExecutionError('INVALID_CANDIDATE_PROVENANCE', record.recordId);
+      if (production.parent.kind === 'SUBJECT') {
+        const parent = production.parent.subject;
+        const parentState = histories.get(JSON.stringify([parent.kind, parent.id, parent.revision, parent.sha256]));
+        if (!parentState?.candidate || Date.parse(record.recordedAt) < Date.parse(parentState.candidate.recordedAt)) throw new DisExecutionError('INVALID_CANDIDATE_PROVENANCE', record.recordId);
+      }
       state.candidate = record;
     } else if (transition === 'VALIDATED') {
       const validation = record.validation;

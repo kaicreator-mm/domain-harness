@@ -830,10 +830,15 @@ def validate_selected_graph(selection_lock: dict, graph_ref: dict, graph: dict, 
         fail('selected Graph does not match loaded manifest Graph')
 
 
-def validate_reference_feedback(feedback: dict, expected_lock_sha256: str):
-    if (not isinstance(feedback, dict) or not feedback.get('traceId') or not re.fullmatch(r'[a-f0-9]{64}', expected_lock_sha256 or '') or feedback.get('packageLockSha256') != expected_lock_sha256 or
-        feedback.get('provenance') not in ('SYSTEM_OBSERVED', 'USER_CONFIRMED', 'MODEL_INFERRED') or feedback.get('claimedProvenance') != feedback.get('provenance') or
-        not feedback.get('finding') or feedback.get('disposition') != 'PROPOSAL_ONLY'):
+def validate_reference_feedback(feedback: dict, trusted_origin: dict):
+    nonempty = lambda value: isinstance(value, str) and bool(value)
+    strings = ('sourceRuntime', 'executionId', 'journalId', 'traceId', 'redaction', 'retention', 'outcome', 'validationStatus', 'uncertainty', 'scope', 'finding')
+    keys = set(strings) | {'packageLockSha256', 'intelligencePins', 'evidenceProvenance', 'provenance', 'claimedProvenance', 'limitations', 'intake', 'disposition'}
+    trusted = keys - {'finding', 'disposition', 'claimedProvenance'}
+    if (not isinstance(feedback, dict) or set(feedback) != keys or not isinstance(trusted_origin, dict) or any(not nonempty(feedback.get(key)) for key in strings) or not re.fullmatch(r'[a-f0-9]{64}', feedback.get('packageLockSha256', '')) or any(not json_value_equal(feedback.get(key), trusted_origin.get(key)) for key in trusted) or
+        not isinstance(feedback.get('intelligencePins'), list) or not feedback['intelligencePins'] or any(not isinstance(pin, dict) or set(pin) != {'kind', 'id', 'revision', 'sha256'} or any(not nonempty(pin.get(key)) for key in ('kind', 'id', 'revision')) or not re.fullmatch(r'[a-f0-9]{64}', pin.get('sha256', '')) for pin in feedback['intelligencePins']) or
+        any(not isinstance(feedback.get(key), list) or not feedback[key] or any(not nonempty(item) for item in feedback[key]) for key in ('evidenceProvenance', 'limitations')) or not isinstance(feedback.get('intake'), dict) or set(feedback['intake']) != {'status', 'consent', 'policy'} or any(not nonempty(item) for item in feedback['intake'].values()) or
+        feedback.get('provenance') not in ('SYSTEM_OBSERVED', 'USER_CONFIRMED', 'MODEL_INFERRED') or feedback.get('claimedProvenance') != feedback.get('provenance') or feedback.get('disposition') != 'PROPOSAL_ONLY'):
         fail('invalid Runtime feedback envelope')
     return copy.deepcopy(feedback)
 
@@ -915,6 +920,19 @@ def replay_lifecycle(records: list, resources: dict, closure_digest: str, histor
         elif transition == 'CANDIDATE':
             if actor.get('id') != 'xdownload-domain-forge-reference' or actor.get('role') != 'candidate-producer' or actor.get('authorityRef') != 'xdownload-demo/domain-authority@1.0.0' or policy != {'id':'xdownload-demo/candidate-policy', 'revision':'1.0.0'} or not evidence_ok(record.get('evidenceRefs')):
                 fail('invalid candidate authority or evidence')
+            production = record.get('candidateProvenance', {})
+            if not isinstance(production, dict) or not isinstance(production.get('parent'), dict):
+                fail('invalid candidate production provenance')
+            parent = production.get('parent', {})
+            parent_subject = parent.get('subject', {})
+            nonempty = lambda value: isinstance(value, str) and bool(value)
+            exact = lambda value, keys: isinstance(value, dict) and set(value) == set(keys)
+            if (not exact(production, ('sourceClosureSha256', 'sourceRefs', 'schemaRevision', 'method', 'target', 'profile', 'parent', 'changeRef')) or production.get('sourceClosureSha256') != record_closure or not evidence_ok(production.get('sourceRefs')) or any(not exact(source, ('path', 'sha256')) or not any(ref.get('path') == source.get('path') and ref.get('sha256') == source.get('sha256') for ref in record['evidenceRefs']) for source in production['sourceRefs']) or production.get('schemaRevision') != '0.1.0' or not exact(production.get('method'), ('id', 'toolchain')) or not all(nonempty(production['method'].get(key)) for key in ('id', 'toolchain')) or not nonempty(production.get('target')) or not exact(production.get('profile'), ('id', 'revision')) or not all(nonempty(production['profile'].get(key)) for key in ('id', 'revision')) or not nonempty(production.get('changeRef')) or (not exact(parent, ('kind', 'reason')) or not nonempty(parent.get('reason')) if parent.get('kind') == 'GENESIS' else not exact(parent, ('kind', 'subject')) or parent.get('kind') != 'SUBJECT' or not exact(parent_subject, ('kind', 'id', 'revision', 'sha256')) or not all(nonempty(parent_subject.get(key)) for key in ('kind', 'id', 'revision')) or not re.fullmatch(r'[a-f0-9]{64}', parent_subject.get('sha256', '')))):
+                fail('invalid candidate production provenance')
+            if parent.get('kind') == 'SUBJECT':
+                parent_state = histories.get(tuple(parent_subject.get(field) for field in ('kind', 'id', 'revision', 'sha256')), {})
+                if not parent_state.get('candidate') or record['recordedAt'] < parent_state['candidate']['recordedAt']:
+                    fail('candidate parent subject is unavailable or from the future')
             state['candidate'] = record
         elif transition == 'VALIDATED':
             val = record.get('validation', {})
@@ -1427,6 +1445,9 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
         ('stale dependency closure', lambda h: h[1].__setitem__('dependencyClosureDigest', '0' * 64)),
         ('self promotion', lambda h: h[2]['actor'].__setitem__('id', h[0]['actor']['id'])),
         ('candidate actor missing', lambda h: h[0].__setitem__('actor', {})),
+        ('candidate provenance missing', lambda h: h[0].pop('candidateProvenance')),
+        ('candidate source closure mismatch', lambda h: h[0]['candidateProvenance'].__setitem__('sourceClosureSha256', '0' * 64)),
+        ('candidate parent absent', lambda h: h[0]['candidateProvenance'].__setitem__('parent', {'kind':'SUBJECT', 'subject':dict(h[0]['subject'], revision='9.0.0')})),
         ('validation policy missing', lambda h: h[1].__setitem__('policy', {})),
         ('unknown transition', lambda h: h[1].__setitem__('transition', 'SELECTED')),
         ('duplicate record id', lambda h: h[1].__setitem__('recordId', h[0]['recordId'])),
@@ -1619,6 +1640,8 @@ def validate_historical_closure(package_identity: dict, units_by_id: dict, unit_
         record['dependencyClosureDigest'] = old_digest
         if record['transition'] == 'CANDIDATE':
             next(item for item in record['evidenceRefs'] if item['path'] == 'fixtures/player-signatures.json')['sha256'] = old_fixture_digest
+            record['candidateProvenance']['sourceClosureSha256'] = old_digest
+            record['candidateProvenance']['sourceRefs'] = copy.deepcopy(record['evidenceRefs'])
         if index:
             record['previousRecordId'] = history[index - 1]['recordId']
             record['previousRecordDigest'] = history[index - 1]['recordDigest']
@@ -2079,12 +2102,44 @@ def main():
         probe_units[policy['unitId']]['failure']['handling'][policy['status']]['action'] = policy['action']
         validate_trace_assembly(probe, graph, probe_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True)
     old_lock = copy.deepcopy(package_identity['selectionLock'])
-    feedback = {'traceId':'synthetic-trace-1', 'packageLockSha256':package_identity['selectionLockSha256'], 'provenance':'MODEL_INFERRED', 'claimedProvenance':'MODEL_INFERRED', 'finding':'possible alternative marker', 'disposition':'PROPOSAL_ONLY'}
-    if validate_reference_feedback(feedback, package_identity['selectionLockSha256']) != feedback:
+    feedback = {'sourceRuntime':'reference-runtime', 'executionId':'synthetic-execution', 'journalId':'synthetic-journal', 'traceId':'synthetic-trace-1', 'packageLockSha256':package_identity['selectionLockSha256'], 'intelligencePins':[copy.deepcopy(package_identity['lifecycleRecords'][0]['subject'])], 'evidenceProvenance':['synthetic observation'], 'redaction':'reference-only', 'retention':'reference-only', 'outcome':'READY', 'validationStatus':'UNVERIFIED', 'provenance':'MODEL_INFERRED', 'claimedProvenance':'MODEL_INFERRED', 'uncertainty':'unverified', 'scope':'reference-demo', 'limitations':['synthetic'], 'intake':{'status':'PENDING', 'consent':'NOT_ASSERTED', 'policy':'reference-only'}, 'finding':'possible alternative marker', 'disposition':'PROPOSAL_ONLY'}
+    trusted = {key:copy.deepcopy(value) for key, value in feedback.items() if key not in ('finding', 'disposition', 'claimedProvenance')}
+    Draft202012Validator(unit_schema['$defs']['runtimeFeedbackEnvelope']).validate(feedback)
+    if validate_reference_feedback(feedback, trusted) != feedback:
         fail('feedback provenance was rewritten')
     spoofed = copy.deepcopy(feedback)
     spoofed['claimedProvenance'] = 'SYSTEM_OBSERVED'
-    expect_rejection(lambda: validate_reference_feedback(spoofed, package_identity['selectionLockSha256']), 'model inference spoofed as observation')
+    expect_rejection(lambda: validate_reference_feedback(spoofed, trusted), 'model inference spoofed as observation')
+    spoofed['provenance'] = 'SYSTEM_OBSERVED'
+    expect_rejection(lambda: validate_reference_feedback(spoofed, trusted), 'both self-reported provenance fields spoofed')
+    changed_outcome = copy.deepcopy(feedback)
+    changed_outcome['outcome'] = 'FORGED'
+    expect_rejection(lambda: validate_reference_feedback(changed_outcome, trusted), 'feedback actual outcome spoofed')
+    changed_evidence = copy.deepcopy(feedback)
+    changed_evidence['evidenceProvenance'] = ['forged source']
+    expect_rejection(lambda: validate_reference_feedback(changed_evidence, trusted), 'feedback evidence provenance spoofed')
+    missing_intake = copy.deepcopy(feedback)
+    del missing_intake['intake']
+    expect_rejection(lambda: Draft202012Validator(unit_schema['$defs']['runtimeFeedbackEnvelope']).validate(missing_intake), 'feedback intake missing')
+    expect_rejection(lambda: validate_reference_feedback(missing_intake, trusted), 'feedback intake missing')
+    future_env = dict(os.environ)
+    future_env['DIS_EMIT_FUTURE_PROBE'] = '1'
+    future_script = subprocess.run(['node', '--test', '--test-name-pattern=feedback retains provenance and cannot change an already-pinned execution', 'test/runner.test.mjs'], cwd=PACKAGE_ROOT, env=future_env, check=True, capture_output=True, text=True, encoding='utf-8')
+    future_lines = [line.split('DIS_FUTURE_PROBE=', 1)[1] for line in future_script.stdout.splitlines() if 'DIS_FUTURE_PROBE=' in line]
+    if len(future_lines) != 1:
+        fail('missing actual successor Package probe')
+    future = json.loads(future_lines[0])
+    future_units, future_resources = dict(future['units']), dict(future['resources'])
+    future_paths = {item['id']:item['path'] for item in future['manifest']['units']}
+    future_identity = future['identity']
+    validate_lifecycle_records(future_identity, future_units, future_paths, future_resources, future_identity['resourceClosureSha256'], future_identity['selectionLockSha256'])
+    future_recognizer = future_units['xdownload.player.recognizer']
+    future_providers = {future_recognizer['id']:resolve_provider_selection(future_recognizer, future_identity['selectionLock'], future_identity['selectionLock']['target'], future_resources)}
+    future_result = dict(future['result'], input=future['input'])
+    future_nodes = {node['nodeId']:node for node in future['graph']['nodes']}
+    validate_trace_assembly(future_result, future['graph'], future_units, future_nodes, future_providers, demo_schemas, registry)
+    if (future_result['trace'][0]['unitRevision'] != '2.0.0' or future['oldBefore']['trace'][0]['unitRevision'] != '1.0.0' or not json_value_equal(future['oldBefore'], future['oldAfter']) or future['oldLock'] == future_identity['selectionLockSha256']):
+        fail('successor Package execution changed old pinned execution')
     new_lock = copy.deepcopy(old_lock)
     new_lock['packageRevision'] = '2.0.0'
     if package_identity['selectionLock'] != old_lock or json_value_equal(new_lock, old_lock):

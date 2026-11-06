@@ -285,3 +285,9 @@ L2 Freeze 前必须具备：
 14. 明确 Task DAG 是否允许开始，以及仍禁止哪些 Runtime/ABI 实现。
 
 L2 Freeze 不代表 DomainHarness v0.10.3 Runtime 已实现 DIS，不代表 SDK ABI 已变化，也不代表 Release/Deployment 已获准。
+
+## Candidate 与 Runtime feedback 交换
+
+Candidate 交换记录必须绑定精确主体、来源和 provenance 闭包、schema 修订、生产方法及工具链、目标和 profile、父主体或明确 genesis，以及对应变更或需求。来源引用必须标识声明闭包中的证据；生成不授予验证或晋升权力。
+
+Runtime feedback envelope 必须保留来源 Runtime、execution/Journal/trace 身份、选定 Package 锁与精确智能 pins、输入及证据来源、脱敏和保留约束、实际结果与验证状态、观察/推断/用户确认来源、不确定性、范围、局限和 intake/consent/policy 状态。消费者必须将来源身份及 provenance 绑定到独立可信的原始证据；两个自报标签不能证明来源。反馈是未来治理周期的提案，不能修改活动 Package 或锁。
