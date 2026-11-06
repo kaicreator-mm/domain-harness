@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "candidates",
+    "evidence",
+    "sourceUrl",
+    "values",
+    "missingFields",
+    "ambiguities",
+    "conflicts",
+    "uncertainty"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "recognized",
+        "ambiguous",
+        "unknown",
+        "conflict",
+        "out_of_scope"
+      ]
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "sourceId",
+          "kind",
+          "ref",
+          "claim"
+        ],
+        "properties": {
+          "sourceId": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "observation"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "claim": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sourceUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "values": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/recognizedValue"
+      }
+    },
+    "missingFields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ambiguities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "candidates"
+        ],
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "candidates": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "claims"],
+        "properties": {
+          "field": { "const": "playerId" },
+          "claims": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["sourceId", "playerId"],
+              "properties": { "sourceId": { "type": "string", "minLength": 1 }, "playerId": { "type": "string", "minLength": 1 } }
+            }
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "reason"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "UNKNOWN"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "recognizedValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "source",
+        "status",
+        "evidence"
+      ],
+      "properties": {
+        "value": {},
+        "source": {
+          "enum": [
+            "USER_CONFIRMED",
+            "SYSTEM_OBSERVED",
+            "MODEL_INFERRED",
+            "DERIVED"
+          ]
+        },
+        "status": {
+          "enum": [
+            "CONFIRMED",
+            "INFERRED",
+            "CANDIDATE",
+            "UNKNOWN"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

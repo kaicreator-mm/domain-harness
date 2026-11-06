@@ -1,0 +1,151 @@
+{
+  "schemaVersion": "dis.unit/0.1.0",
+  "id": "xdownload.player.recognizer",
+  "revision": "1.0.0",
+  "role": "recognizer",
+  "purpose": "Recognize a supported media player from a bounded page observation and retain match evidence.",
+  "scope": {
+    "domain": "web-media",
+    "appliesTo": [
+      "http-or-https-page-observation"
+    ],
+    "excludes": [
+      "encrypted-player-decryption",
+      "unsupported-player-families"
+    ]
+  },
+  "owner": "xdownload-demo",
+  "authority": "CONTROLLED",
+  "qualification": {
+    "profile": "xdownload.player.recognizer.qualification/0.1.0",
+    "limitations": [
+      "Small demo signature catalog."
+    ]
+  },
+  "input": {
+    "schemaRef": "domain/schemas/page-observation.schema.json"
+  },
+  "output": {
+    "schemaRef": "domain/schemas/recognition-result.schema.json"
+  },
+  "implementation": {
+    "strategy": "function",
+    "ref": "registry:xdownload.player.recognizer@1.0.0",
+    "exposure": "semantic",
+    "artifactRef": "src/runner.mjs",
+    "candidates": [
+      {
+        "candidateId": "signature-exact-v1",
+        "strategy": "function",
+        "ref": "registry:xdownload.player.recognizer@1.0.0",
+        "exposure": "semantic",
+        "artifactRef": "src/runner.mjs",
+        "artifactDigest": "6f5412991ab46487eade8bca14fdb716f70ffcd3b82d6ddb567f7d306eafe179",
+        "target": "node24",
+        "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518"
+      },
+      {
+        "candidateId": "signature-normalized-v1",
+        "strategy": "function",
+        "ref": "registry:xdownload.player.recognizer-normalized@1.0.0",
+        "exposure": "semantic",
+        "artifactRef": "src/runner.mjs",
+        "artifactDigest": "6f5412991ab46487eade8bca14fdb716f70ffcd3b82d6ddb567f7d306eafe179",
+        "target": "node24",
+        "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518"
+      }
+    ],
+    "selectionPolicy": {
+      "mode": "PACKAGE_LOCK_EXACT",
+      "consumerProfileId": "xdownload.player-recognition/1.0.0",
+      "target": "node24",
+      "consumerProfileRevision": "1.0.0"
+    }
+  },
+  "evidence": {
+    "sources": [
+      {
+        "sourceId": "player-signature-fixture",
+        "kind": "reference",
+        "ref": "fixtures/player-signatures.json",
+        "claim": "Known markers identify supported player families."
+      }
+    ],
+    "absenceReason": null
+  },
+  "failure": {
+    "handling": {
+      "UNKNOWN": {
+        "action": "PRESERVE_UNKNOWN",
+        "reason": "Declared UNKNOWN handling for the reference Consumer."
+      },
+      "AMBIGUOUS": {
+        "action": "CLARIFY",
+        "reason": "Declared AMBIGUOUS handling for the reference Consumer."
+      },
+      "CONFLICT": {
+        "action": "CLARIFY",
+        "reason": "Conflicting observations require clarification."
+      },
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Declared INVALID_INPUT handling for the reference Consumer."
+      },
+      "OUT_OF_SCOPE": {
+        "action": "REJECT",
+        "reason": "Declared OUT_OF_SCOPE handling for the reference Consumer."
+      }
+    }
+  },
+  "validation": {
+    "profile": "player-recognition-conformance/0.1.0",
+    "profileRevision": "0.1.0",
+    "casesRef": "test/runner.test.mjs",
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
+  },
+  "capabilities": {
+    "provides": [
+      {
+        "capabilityId": "xdownload.player.recognition",
+        "owner": "xdownload-demo",
+        "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+        "version": "1.0.0",
+        "inputSchemaRef": "domain/schemas/page-observation.schema.json",
+        "inputSchemaDigest": "cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8",
+        "outputSchemaRef": "domain/schemas/recognition-result.schema.json",
+        "outputSchemaDigest": "53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623",
+        "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518"
+      }
+    ]
+  },
+  "preconditions": {
+    "inputSchemaRef": "domain/schemas/page-observation.schema.json",
+    "all": [
+      {
+        "path": "/url",
+        "operator": "exists"
+      },
+      {
+        "path": "/signals",
+        "operator": "exists"
+      }
+    ]
+  },
+  "knowledgeRefs": [
+    {
+      "id": "xdownload.player-signatures",
+      "revision": "1.0.0",
+      "kind": "rule-set",
+      "path": "fixtures/player-signatures.json",
+      "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+    }
+  ]
+}

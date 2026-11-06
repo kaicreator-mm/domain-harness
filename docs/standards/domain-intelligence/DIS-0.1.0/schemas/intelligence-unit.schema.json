@@ -1,0 +1,1412 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/intelligence-unit.schema.json",
+  "title": "DIS 0.1.0 Intelligence Unit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "revision",
+    "role",
+    "purpose",
+    "scope",
+    "owner",
+    "authority",
+    "qualification",
+    "evidence",
+    "failure"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "dis.unit/0.1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9._-]*$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "role": {
+      "enum": [
+        "knowledge",
+        "recognizer",
+        "decision",
+        "procedure",
+        "tool",
+        "workflow",
+        "validator"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 8
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain",
+        "appliesTo",
+        "excludes"
+      ],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "appliesTo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority": {
+      "enum": [
+        "FROZEN",
+        "CONTROLLED",
+        "REFERENCE",
+        "EXAMPLE",
+        "DERIVED"
+      ]
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile"
+      ],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "input": {
+      "$ref": "#/$defs/ioContract"
+    },
+    "output": {
+      "$ref": "#/$defs/ioContract"
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requires": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capabilityRequirement"
+          }
+        },
+        "provides": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capabilityProvision"
+          }
+        }
+      }
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy"
+      ],
+      "properties": {
+        "strategy": {
+          "enum": [
+            "declarative",
+            "function",
+            "parser",
+            "model",
+            "hybrid",
+            "tool-operation",
+            "workflow-graph"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^(?:(?:registry|graph|tool):[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))$"
+        },
+        "exposure": {
+          "enum": [
+            "private",
+            "semantic",
+            "tool"
+          ]
+        },
+        "artifactRef": {
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/implementationCandidate"
+          }
+        },
+        "selectionPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "consumerProfileId",
+            "consumerProfileRevision",
+            "target"
+          ],
+          "properties": {
+            "mode": {
+              "const": "PACKAGE_LOCK_EXACT"
+            },
+            "consumerProfileId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "consumerProfileRevision": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "candidates"
+            ]
+          },
+          "then": {
+            "required": [
+              "ref",
+              "artifactRef",
+              "selectionPolicy"
+            ]
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sources",
+        "absenceReason"
+      ],
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          }
+        },
+        "absenceReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "consumes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handling"
+      ],
+      "properties": {
+        "handling": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "enum": [
+              "UNKNOWN",
+              "AMBIGUOUS",
+              "CONFLICT",
+              "OUT_OF_SCOPE",
+              "INVALID_INPUT",
+              "PARTIAL",
+              "FAILED",
+              "NEEDS_INPUT",
+              "NEEDS_REVIEW"
+            ]
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/handlingPolicy"
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "profileRevision",
+        "casesRef",
+        "validator"
+      ],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profileRevision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "casesRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+            }
+          }
+        },
+        "requiredCoverage": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "positive",
+              "negative",
+              "boundary",
+              "heldOut"
+            ]
+          }
+        }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dynamicForm": {
+          "$ref": "#/$defs/dynamicFormProfile"
+        }
+      }
+    },
+    "preconditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputSchemaRef",
+        "all"
+      ],
+      "properties": {
+        "inputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "all": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/precondition"
+          }
+        }
+      }
+    },
+    "knowledgeRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/knowledgeRef"
+      }
+    }
+  },
+  "$defs": {
+    "runtimeFeedbackEnvelope": {
+      "type": "object",
+      "required": [
+        "sourceRuntime",
+        "executionId",
+        "journalId",
+        "traceId",
+        "packageLockSha256",
+        "intelligencePins",
+        "evidenceProvenance",
+        "redaction",
+        "retention",
+        "outcome",
+        "validationStatus",
+        "provenance",
+        "claimedProvenance",
+        "uncertainty",
+        "scope",
+        "limitations",
+        "intake",
+        "finding",
+        "disposition"
+      ],
+      "properties": {
+        "sourceRuntime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "journalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "packageLockSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "intelligencePins": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "id",
+              "revision",
+              "sha256"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "evidenceProvenance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "redaction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retention": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validationStatus": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "enum": [
+            "SYSTEM_OBSERVED",
+            "USER_CONFIRMED",
+            "MODEL_INFERRED"
+          ]
+        },
+        "claimedProvenance": {
+          "enum": [
+            "SYSTEM_OBSERVED",
+            "USER_CONFIRMED",
+            "MODEL_INFERRED"
+          ]
+        },
+        "uncertainty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "intake": {
+          "type": "object",
+          "required": [
+            "status",
+            "consent",
+            "policy"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "consent": {
+              "type": "string",
+              "minLength": 1
+            },
+            "policy": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "finding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "const": "PROPOSAL_ONLY"
+        }
+      },
+      "additionalProperties": false
+    },
+    "lifecycleRecord": {
+      "type": "object",
+      "required": ["recordId", "recordDigest", "transition", "subject", "subjectPath", "dependencyClosureDigest", "previousRecordId", "previousRecordDigest", "actor", "recordedAt"],
+      "properties": {
+        "recordId": { "type": "string", "minLength": 1 },
+        "recordDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "transition": { "enum": ["OBSERVED", "CANDIDATE", "VALIDATED", "PROMOTED", "REJECTED", "WITHDRAWN", "EXPIRED", "SUPERSEDED"] },
+        "subject": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "id", "revision", "sha256"],
+          "properties": {
+            "kind": { "enum": ["unit", "knowledge", "rule", "graph", "package"] },
+            "id": { "type": "string", "minLength": 1 },
+            "revision": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "dependencyClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "subjectPath": { "type": "string", "minLength": 1 },
+        "subjectJson": { "type": "string", "minLength": 1 },
+        "subjectBase64": { "type": "string" },
+        "previousRecordId": { "type": ["string", "null"] },
+        "previousRecordDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "actor": { "type": "object", "required": ["id", "role", "authorityRef"], "properties": { "id": { "type": "string", "minLength": 1 }, "role": { "type": "string", "minLength": 1 }, "authorityRef": { "type": "string", "minLength": 1 } } },
+        "policy": { "type": "object", "required": ["id", "revision"], "properties": { "id": { "type": "string", "minLength": 1 }, "revision": { "type": "string", "minLength": 1 } } },
+        "recordedAt": { "type": "string", "format": "date-time" },
+        "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["path", "sha256"], "properties": { "path": { "type": "string", "minLength": 1 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } } },
+        "candidateProvenance": {
+          "type": "object",
+          "required": [
+            "sourceClosureSha256",
+            "sourceRefs",
+            "schemaRevision",
+            "method",
+            "target",
+            "profile",
+            "parent",
+            "changeRef"
+          ],
+          "properties": {
+            "sourceClosureSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "sourceRefs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "path",
+                  "sha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "schemaRevision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "method": {
+              "type": "object",
+              "required": [
+                "id",
+                "toolchain"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "toolchain": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profile": {
+              "type": "object",
+              "required": [
+                "id",
+                "revision"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "revision": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "parent": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "reason"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "GENESIS"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "subject"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "SUBJECT"
+                    },
+                    "subject": {
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "id",
+                        "revision",
+                        "sha256"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "revision": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "changeRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "validation": { "type": "object", "required": ["result", "subjectDigest", "dependencyClosureDigest", "profile", "validator", "evidenceRefs", "reportSchema", "report", "reportSha256"] },
+        "promotion": { "type": "object", "required": ["decision", "validationRecordId", "validationRecordDigest", "policy", "priorPromotedBaseline", "authorizationEvidence", "authorizationEvidenceSha256", "scope", "rationale", "limitations"], "properties": { "scope": { "type": "string", "minLength": 1 }, "rationale": { "type": "string", "minLength": 1 }, "limitations": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } } } }
+      },
+      "allOf": [
+        { "oneOf": [ { "required": ["subjectJson"] }, { "required": ["subjectBase64"] } ] },
+        { "if": { "properties": { "transition": { "enum": ["OBSERVED", "CANDIDATE", "REJECTED", "WITHDRAWN", "EXPIRED", "SUPERSEDED"] } }, "required": ["transition"] }, "then": { "required": ["policy", "evidenceRefs"] } },
+        { "if": { "properties": { "transition": { "const": "VALIDATED" } }, "required": ["transition"] }, "then": { "required": ["policy", "validation"] } },
+        { "if": { "properties": { "transition": { "const": "PROMOTED" } }, "required": ["transition"] }, "then": { "required": ["promotion"] } },
+        { "if": { "properties": { "transition": { "const": "SUPERSEDED" } }, "required": ["transition"] }, "then": { "required": ["successor"] } },
+        { "if": { "properties": { "transition": { "const": "CANDIDATE" } }, "required": ["transition"] }, "then": { "required": ["candidateProvenance"] } }
+      ]
+    },
+    "ioContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaRef"
+      ],
+      "properties": {
+        "schemaRef": {
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+\\.schema\\.json$"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "authority",
+            "reference",
+            "example",
+            "observation",
+            "validation",
+            "adjudication"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "anyOf": [
+            {
+              "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+            },
+            {
+              "pattern": "^https://\\S+$"
+            },
+            {
+              "pattern": "^doi:10\\.[0-9]{4,9}/\\S+$"
+            },
+            {
+              "pattern": "^urn:[A-Za-z0-9][A-Za-z0-9-]{0,31}:\\S+$"
+            }
+          ]
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "claim": {
+          "type": "string"
+        }
+      }
+    },
+    "dynamicFormProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision",
+        "targetSchemaRef",
+        "questions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "targetSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "applicability": {
+          "type": "string"
+        },
+        "clarificationReason": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "questionId",
+              "targetField",
+              "prompt",
+              "responseType",
+              "required"
+            ],
+            "properties": {
+              "questionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "targetField": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "responseType": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "single-choice",
+                  "multi-choice",
+                  "date",
+                  "structured"
+                ]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "options": {
+                "type": "array",
+                "items": {}
+              },
+              "constraints": {
+                "type": "object"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "completionStatus": {
+          "enum": [
+            "COMPLETED",
+            "CANCELLED",
+            "NEEDS_REVIEW"
+          ]
+        }
+      }
+    },
+    "packageRelativeSchemaRef": {
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+\\.schema\\.json$"
+    },
+    "capabilityProvision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityId",
+        "owner",
+        "authorityRef",
+        "version",
+        "contractDigest",
+        "inputSchemaRef",
+        "inputSchemaDigest",
+        "outputSchemaRef",
+        "outputSchemaDigest"
+      ],
+      "properties": {
+        "capabilityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorityRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "contractDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "inputSchemaDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "outputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "outputSchemaDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "capabilityRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityId",
+        "owner",
+        "authorityRef",
+        "version",
+        "contractDigest",
+        "inputSchemaRef",
+        "inputSchemaDigest",
+        "outputSchemaRef",
+        "outputSchemaDigest",
+        "compatibility"
+      ],
+      "properties": {
+        "capabilityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorityRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "contractDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "inputSchemaDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "outputSchemaRef": {
+          "$ref": "#/$defs/packageRelativeSchemaRef"
+        },
+        "outputSchemaDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy",
+            "accepted"
+          ],
+          "properties": {
+            "policy": {
+              "enum": [
+                "EXACT",
+                "EXPLICIT_ALLOWLIST"
+              ]
+            },
+            "accepted": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version",
+                  "contractDigest"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+                  },
+                  "contractDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "implementationCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "strategy",
+        "ref",
+        "exposure",
+        "artifactRef",
+        "artifactDigest",
+        "target",
+        "contractDigest"
+      ],
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strategy": {
+          "enum": [
+            "declarative",
+            "function",
+            "parser",
+            "model",
+            "hybrid",
+            "tool-operation",
+            "workflow-graph"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^(?:(?:registry|graph|tool):[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))$"
+        },
+        "exposure": {
+          "enum": [
+            "private",
+            "semantic",
+            "tool"
+          ]
+        },
+        "artifactRef": {
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+        },
+        "artifactDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contractDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "precondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "operator"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?:|/[A-Za-z0-9_~-]+)$"
+        },
+        "operator": {
+          "enum": [
+            "exists",
+            "equals",
+            "notEquals"
+          ]
+        },
+        "value": {}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "operator": {
+              "const": "exists"
+            }
+          },
+          "not": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "operator": {
+              "enum": [
+                "equals",
+                "notEquals"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "knowledgeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision",
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "kind": {
+          "enum": [
+            "knowledge",
+            "rule-set",
+            "taxonomy",
+            "lookup",
+            "pattern-set",
+            "reference"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "handlingPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "REJECT",
+            "PRESERVE_UNKNOWN",
+            "CLARIFY",
+            "WAIT",
+            "REVIEW",
+            "BOUNDED_FALLBACK",
+            "BOUNDED_RETRY",
+            "ESCALATE",
+            "RETURN_PARTIAL",
+            "FAIL"
+          ]
+        },
+        "retryLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "BOUNDED_RETRY"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "retryLimit"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "enum": [
+              "recognizer",
+              "decision",
+              "procedure",
+              "tool",
+              "workflow",
+              "validator"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "required": [
+          "input",
+          "output",
+          "implementation"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "tool"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "implementation": {
+            "properties": {
+              "exposure": {
+                "const": "tool"
+              },
+              "strategy": {
+                "const": "tool-operation"
+              },
+              "ref": {
+                "type": "string",
+                "pattern": "^tool:[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+              }
+            },
+            "required": [
+              "exposure",
+              "strategy"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "procedure"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "implementation": {
+            "properties": {
+              "exposure": {
+                "const": "private"
+              }
+            },
+            "required": [
+              "exposure"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "workflow"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "implementation": {
+            "properties": {
+              "strategy": {
+                "const": "workflow-graph"
+              },
+              "ref": {
+                "type": "string",
+                "pattern": "^graph:[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+              },
+              "artifactRef": {
+                "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+              }
+            },
+            "required": [
+              "strategy",
+              "ref",
+              "artifactRef",
+              "exposure"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "enum": [
+              "recognizer",
+              "decision",
+              "procedure",
+              "validator"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "implementation": {
+            "properties": {
+              "ref": {
+                "type": "string",
+                "pattern": "^registry:[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+              },
+              "artifactRef": {
+                "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+              }
+            },
+            "required": [
+              "strategy",
+              "ref",
+              "artifactRef",
+              "exposure"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "tool"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "implementation": {
+            "properties": {
+              "ref": {
+                "type": "string",
+                "pattern": "^tool:[a-z][a-z0-9._-]*@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+              }
+            },
+            "required": [
+              "strategy",
+              "ref",
+              "exposure"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

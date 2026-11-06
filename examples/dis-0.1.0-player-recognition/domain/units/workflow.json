@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "dis.unit/0.1.0",
+  "id": "xdownload.player-recognition.workflow",
+  "revision": "1.0.0",
+  "role": "workflow",
+  "purpose": "Compose recognition, routing, resolution, bounded fallback and outcome validation.",
+  "scope": {
+    "domain": "web-media",
+    "appliesTo": [
+      "page-observation"
+    ],
+    "excludes": [
+      "media-download-execution"
+    ]
+  },
+  "owner": "xdownload-demo",
+  "authority": "CONTROLLED",
+  "qualification": {
+    "profile": "xdownload.player-recognition.workflow.qualification/0.1.0",
+    "limitations": [
+      "Uses typed control/data/evidence edges from demo-revised DIS 0.1.0."
+    ]
+  },
+  "input": {
+    "schemaRef": "domain/schemas/page-observation.schema.json"
+  },
+  "output": {
+    "schemaRef": "domain/schemas/outcome.schema.json"
+  },
+  "implementation": {
+    "strategy": "workflow-graph",
+    "ref": "graph:xdownload.player-recognition@1.0.0",
+    "exposure": "semantic",
+    "artifactRef": "domain/player-recognition.graph.json"
+  },
+  "evidence": {
+    "sources": [
+      {
+        "sourceId": "workflow-contract",
+        "kind": "authority",
+        "ref": "domain/units/recognizer.json",
+        "claim": "The workflow is bounded by recognition and validation contracts."
+      }
+    ],
+    "absenceReason": null
+  },
+  "failure": {
+    "handling": {
+      "UNKNOWN": {
+        "action": "REVIEW",
+        "reason": "Declared UNKNOWN handling for the reference Consumer."
+      },
+      "AMBIGUOUS": {
+        "action": "CLARIFY",
+        "reason": "Declared AMBIGUOUS handling for the reference Consumer."
+      },
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Declared INVALID_INPUT handling for the reference Consumer."
+      },
+      "NEEDS_INPUT": {
+        "action": "WAIT",
+        "reason": "Declared NEEDS_INPUT handling for the reference Consumer."
+      },
+      "NEEDS_REVIEW": {
+        "action": "REVIEW",
+        "reason": "Declared NEEDS_REVIEW handling for the reference Consumer."
+      },
+      "FAILED": {
+        "action": "FAIL",
+        "reason": "Declared FAILED handling for the reference Consumer."
+      }
+    }
+  },
+  "validation": {
+    "profile": "player-recognition-workflow/0.1.0",
+    "profileRevision": "0.1.0",
+    "casesRef": "test/runner.test.mjs",
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
+  }
+}
