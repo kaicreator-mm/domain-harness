@@ -12,7 +12,7 @@
     "revision": "1.0.0",
     "standardVersion": "0.1.0",
     "resourceClosurePath": "domain/resource-closure.json",
-    "resourceClosureSha256": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+    "resourceClosureSha256": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
     "conformanceResources": [
       "src/verified-loader.mjs",
       "src/emit-conformance-traces.mjs",
@@ -29,9 +29,9 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2"
+          "sha256": "e2d76a282d85e0edb3746564b17d48d57d4456209cd004477f323ca353e75902"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -51,7 +51,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "d47a080fc85eb698433592748cab1bd1dfaca07694bc642848e4e25b0a0cc810"
+        "recordDigest": "ae6df70dcce4dac3a706236f648bd1efde5e98f8c74b4be84bd141aff8b31ae7"
       },
       {
         "recordId": "xdownload.player.recognizer.unit.validated.1",
@@ -60,11 +60,11 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2"
+          "sha256": "e2d76a282d85e0edb3746564b17d48d57d4456209cd004477f323ca353e75902"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.recognizer.unit.candidate.1",
-        "previousRecordDigest": "d47a080fc85eb698433592748cab1bd1dfaca07694bc642848e4e25b0a0cc810",
+        "previousRecordDigest": "ae6df70dcce4dac3a706236f648bd1efde5e98f8c74b4be84bd141aff8b31ae7",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -75,8 +75,8 @@
         },
         "validation": {
           "result": "PASS",
-          "subjectDigest": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2",
-          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+          "subjectDigest": "e2d76a282d85e0edb3746564b17d48d57d4456209cd004477f323ca353e75902",
+          "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
           "profile": {
             "id": "player-recognition-conformance/0.1.0",
             "revision": "0.1.0"
@@ -103,7 +103,7 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
+              "sha256": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306"
             },
             {
               "path": "scripts/validate.py",
@@ -111,7 +111,7 @@
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
+              "sha256": "d00d34720157cc6661ad300377c68ce1a73c6738bcc79da36cdc7d80d19b30d3"
             }
           ],
           "limitations": [
@@ -121,7 +121,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675"
+        "recordDigest": "c3df2174e30c4646da605f0ee4a88197deaa38671a72aea325c45f4aa6ac7ec1"
       },
       {
         "recordId": "xdownload.player.recognizer.unit.promoted.1",
@@ -130,11 +130,11 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2"
+          "sha256": "e2d76a282d85e0edb3746564b17d48d57d4456209cd004477f323ca353e75902"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.recognizer.unit.validated.1",
-        "previousRecordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675",
+        "previousRecordDigest": "c3df2174e30c4646da605f0ee4a88197deaa38671a72aea325c45f4aa6ac7ec1",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -143,17 +143,17 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675",
+          "validationRecordDigest": "c3df2174e30c4646da605f0ee4a88197deaa38671a72aea325c45f4aa6ac7ec1",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote this exact reference recognizer and its pinned rule dependency for the isolated conformance demo only."
+          "rationale": "Promote exact reference unit xdownload.player.recognizer for the isolated conformance fixture only."
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "3f104c3fe15b9bdff6267ee19bbd09f0f78aea168e48020aec0b31beedb1324d"
+        "recordDigest": "1d260c7ff5f12a0148b5ce39f7fa86d1634d91a9a27b68e28ea5f897089dddab"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.candidate.1",
@@ -164,7 +164,7 @@
           "revision": "1.0.0",
           "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -184,7 +184,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "bec538e3ba682947141d05512b3834985837c3842ef5b8c9b7313f8d83af40b3"
+        "recordDigest": "6e4d3dc53d9f58e1880ee4da545c63542f23b31f735d606b00392e6e996e102a"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.validated.1",
@@ -195,9 +195,9 @@
           "revision": "1.0.0",
           "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.route-decision.unit.candidate.1",
-        "previousRecordDigest": "bec538e3ba682947141d05512b3834985837c3842ef5b8c9b7313f8d83af40b3",
+        "previousRecordDigest": "6e4d3dc53d9f58e1880ee4da545c63542f23b31f735d606b00392e6e996e102a",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -209,7 +209,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5",
-          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+          "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
           "profile": {
             "id": "player-route-conformance/0.1.0",
             "revision": "0.1.0"
@@ -236,7 +236,7 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
+              "sha256": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306"
             },
             {
               "path": "scripts/validate.py",
@@ -244,7 +244,7 @@
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
+              "sha256": "d00d34720157cc6661ad300377c68ce1a73c6738bcc79da36cdc7d80d19b30d3"
             }
           ],
           "limitations": [
@@ -254,7 +254,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "0e07afe7fd0c02c40762f5f2e4d4ef9c5d63e979fe953b33db724963f021d62b"
+        "recordDigest": "2db2433aab301d4ee2ad2493f46f60b268f6306d8bba3cfab0b35f422ec47969"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.promoted.1",
@@ -265,9 +265,9 @@
           "revision": "1.0.0",
           "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.route-decision.unit.validated.1",
-        "previousRecordDigest": "0e07afe7fd0c02c40762f5f2e4d4ef9c5d63e979fe953b33db724963f021d62b",
+        "previousRecordDigest": "2db2433aab301d4ee2ad2493f46f60b268f6306d8bba3cfab0b35f422ec47969",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -276,17 +276,17 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.route-decision.unit.validated.1",
-          "validationRecordDigest": "0e07afe7fd0c02c40762f5f2e4d4ef9c5d63e979fe953b33db724963f021d62b",
+          "validationRecordDigest": "2db2433aab301d4ee2ad2493f46f60b268f6306d8bba3cfab0b35f422ec47969",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote this exact reference recognizer and its pinned rule dependency for the isolated conformance demo only."
+          "rationale": "Promote exact reference unit xdownload.player.route-decision for the isolated conformance fixture only."
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "a7279d2b7c911f457302a04ceae4c03106fd09b2bf501e70cf3a6bd4b6fa571a"
+        "recordDigest": "8f76642dd51c852b90ab5e617fc76533605a30ace1e6fb784bc34e968fd3c63f"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.candidate.1",
@@ -297,7 +297,7 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -317,7 +317,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "db5ce5f5c41f2edd5447c0e000b9e4943d49c35f78518be7ba67e59988153a93"
+        "recordDigest": "320b569507064ce0dece608bec6a6c375ef710f8318be1ce560f15c1da88982e"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.validated.1",
@@ -328,9 +328,9 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.resolve-procedure.unit.candidate.1",
-        "previousRecordDigest": "db5ce5f5c41f2edd5447c0e000b9e4943d49c35f78518be7ba67e59988153a93",
+        "previousRecordDigest": "320b569507064ce0dece608bec6a6c375ef710f8318be1ce560f15c1da88982e",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -342,7 +342,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb",
-          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+          "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
           "profile": {
             "id": "player-resolution-conformance/0.1.0",
             "revision": "0.1.0"
@@ -369,7 +369,7 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
+              "sha256": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306"
             },
             {
               "path": "scripts/validate.py",
@@ -377,7 +377,7 @@
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
+              "sha256": "d00d34720157cc6661ad300377c68ce1a73c6738bcc79da36cdc7d80d19b30d3"
             }
           ],
           "limitations": [
@@ -387,7 +387,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "2ae19fe6ca23a9c1d5a9b4dcb54e3a192f33fa3b512e1ebaf05f8a2bce8ab958"
+        "recordDigest": "c9e83eecdcb8f7e6b517be43a85cccedee3fcaa868187dc88ad1ba25da0770e4"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.promoted.1",
@@ -398,9 +398,9 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-        "previousRecordDigest": "2ae19fe6ca23a9c1d5a9b4dcb54e3a192f33fa3b512e1ebaf05f8a2bce8ab958",
+        "previousRecordDigest": "c9e83eecdcb8f7e6b517be43a85cccedee3fcaa868187dc88ad1ba25da0770e4",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -409,17 +409,17 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-          "validationRecordDigest": "2ae19fe6ca23a9c1d5a9b4dcb54e3a192f33fa3b512e1ebaf05f8a2bce8ab958",
+          "validationRecordDigest": "c9e83eecdcb8f7e6b517be43a85cccedee3fcaa868187dc88ad1ba25da0770e4",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote this exact reference recognizer and its pinned rule dependency for the isolated conformance demo only."
+          "rationale": "Promote exact reference unit xdownload.player.resolve-procedure for the isolated conformance fixture only."
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "4bcb0ab22c8b67f6c05373b9eeec84913a223a5d2d48dbf74006c32b2f4429ce"
+        "recordDigest": "8ec9c8fb245c1768351572d7479a22af92b848051a63330100ae58df4167a658"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.candidate.1",
@@ -430,7 +430,7 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -450,7 +450,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "46ab90d3b08dacd1f11b1d724afe5821650e17f7b22a42e169e0c47a22cda7b4"
+        "recordDigest": "408943f024337a9dc3e33c5bbdccc700d2b4d284fb975f4691d05ec18c93c813"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.validated.1",
@@ -461,9 +461,9 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.bounded-fallback.unit.candidate.1",
-        "previousRecordDigest": "46ab90d3b08dacd1f11b1d724afe5821650e17f7b22a42e169e0c47a22cda7b4",
+        "previousRecordDigest": "408943f024337a9dc3e33c5bbdccc700d2b4d284fb975f4691d05ec18c93c813",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -475,7 +475,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c",
-          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+          "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
           "profile": {
             "id": "player-fallback-conformance/0.1.0",
             "revision": "0.1.0"
@@ -502,7 +502,7 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
+              "sha256": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306"
             },
             {
               "path": "scripts/validate.py",
@@ -510,7 +510,7 @@
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
+              "sha256": "d00d34720157cc6661ad300377c68ce1a73c6738bcc79da36cdc7d80d19b30d3"
             }
           ],
           "limitations": [
@@ -520,7 +520,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "75c61ea398e04385de79aa64a34fc3cf3f173a4ce38845536d64a1a06a1db412"
+        "recordDigest": "55150c5321633d9233856ecf4d37cc2f51da2b627b4cba444e7a3d8f2769913a"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.promoted.1",
@@ -531,9 +531,9 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-        "previousRecordDigest": "75c61ea398e04385de79aa64a34fc3cf3f173a4ce38845536d64a1a06a1db412",
+        "previousRecordDigest": "55150c5321633d9233856ecf4d37cc2f51da2b627b4cba444e7a3d8f2769913a",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -542,17 +542,17 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-          "validationRecordDigest": "75c61ea398e04385de79aa64a34fc3cf3f173a4ce38845536d64a1a06a1db412",
+          "validationRecordDigest": "55150c5321633d9233856ecf4d37cc2f51da2b627b4cba444e7a3d8f2769913a",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote this exact reference recognizer and its pinned rule dependency for the isolated conformance demo only."
+          "rationale": "Promote exact reference unit xdownload.player.bounded-fallback for the isolated conformance fixture only."
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "462ad9b35c0e985f883f025a48f05de281b8e3818b21941ad2178b6f1edd7f74"
+        "recordDigest": "aef95a92b40c77197320ff0290dd3e85cd717ebcafaec0e776458022556bd0ba"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.candidate.1",
@@ -563,7 +563,7 @@
           "revision": "1.0.0",
           "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -583,7 +583,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "7140260003d9a494883d80e59c2959af44799b1141641ea4551b843a5b1d1423"
+        "recordDigest": "1c5e9b399f5db18aa8e5d6013b84d81313ebec3a9c676674a4057941f543debd"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.validated.1",
@@ -594,9 +594,9 @@
           "revision": "1.0.0",
           "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.outcome-validator.unit.candidate.1",
-        "previousRecordDigest": "7140260003d9a494883d80e59c2959af44799b1141641ea4551b843a5b1d1423",
+        "previousRecordDigest": "1c5e9b399f5db18aa8e5d6013b84d81313ebec3a9c676674a4057941f543debd",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -608,7 +608,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55",
-          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+          "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
           "profile": {
             "id": "player-outcome-conformance/0.1.0",
             "revision": "0.1.0"
@@ -635,7 +635,7 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
+              "sha256": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306"
             },
             {
               "path": "scripts/validate.py",
@@ -643,7 +643,7 @@
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
+              "sha256": "d00d34720157cc6661ad300377c68ce1a73c6738bcc79da36cdc7d80d19b30d3"
             }
           ],
           "limitations": [
@@ -653,7 +653,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "ca2335fa236516abf4274f142d0dc2ec678f9ec37a85644ea04832cb66323913"
+        "recordDigest": "4eb5625b2f0952181d3aaa5be32d1864fb91b23337a22599ac4d3b5dd97c6c84"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.promoted.1",
@@ -664,9 +664,9 @@
           "revision": "1.0.0",
           "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-        "previousRecordDigest": "ca2335fa236516abf4274f142d0dc2ec678f9ec37a85644ea04832cb66323913",
+        "previousRecordDigest": "4eb5625b2f0952181d3aaa5be32d1864fb91b23337a22599ac4d3b5dd97c6c84",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -675,17 +675,17 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-          "validationRecordDigest": "ca2335fa236516abf4274f142d0dc2ec678f9ec37a85644ea04832cb66323913",
+          "validationRecordDigest": "4eb5625b2f0952181d3aaa5be32d1864fb91b23337a22599ac4d3b5dd97c6c84",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote this exact reference recognizer and its pinned rule dependency for the isolated conformance demo only."
+          "rationale": "Promote exact reference unit xdownload.player.outcome-validator for the isolated conformance fixture only."
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "1427263127bc027869c1d0b401a5e55f3635fa8e6e40953649913a539e382def"
+        "recordDigest": "39dcaf4be6010c444b75ec0129cb4fea7d0f46d2c62396886943bcfb0a12a89e"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.candidate.1",
@@ -696,7 +696,7 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -716,7 +716,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "1c797f754f9e6e9ee153b8faf73de41d6f4450c14d5aa5e34a90a59147a70fc8"
+        "recordDigest": "56aa1ce906bc51f72f02841469d233ef4359ebff5504f26f1c8a980d7e7d097a"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.validated.1",
@@ -727,9 +727,9 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player-recognition.workflow.unit.candidate.1",
-        "previousRecordDigest": "1c797f754f9e6e9ee153b8faf73de41d6f4450c14d5aa5e34a90a59147a70fc8",
+        "previousRecordDigest": "56aa1ce906bc51f72f02841469d233ef4359ebff5504f26f1c8a980d7e7d097a",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -741,7 +741,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5",
-          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+          "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
           "profile": {
             "id": "player-recognition-workflow/0.1.0",
             "revision": "0.1.0"
@@ -768,7 +768,7 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
+              "sha256": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306"
             },
             {
               "path": "scripts/validate.py",
@@ -776,7 +776,7 @@
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
+              "sha256": "d00d34720157cc6661ad300377c68ce1a73c6738bcc79da36cdc7d80d19b30d3"
             }
           ],
           "limitations": [
@@ -786,7 +786,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "a898aeabcaf9566877dbbe1f27636da591ab1db35ca5558661965eb665f122d5"
+        "recordDigest": "18aca814675367f3d585db50c5a9821c29c538fdf64007a34ada32c328a6ddf0"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.promoted.1",
@@ -797,9 +797,9 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-        "previousRecordDigest": "a898aeabcaf9566877dbbe1f27636da591ab1db35ca5558661965eb665f122d5",
+        "previousRecordDigest": "18aca814675367f3d585db50c5a9821c29c538fdf64007a34ada32c328a6ddf0",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -808,17 +808,17 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-          "validationRecordDigest": "a898aeabcaf9566877dbbe1f27636da591ab1db35ca5558661965eb665f122d5",
+          "validationRecordDigest": "18aca814675367f3d585db50c5a9821c29c538fdf64007a34ada32c328a6ddf0",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote this exact reference recognizer and its pinned rule dependency for the isolated conformance demo only."
+          "rationale": "Promote exact reference unit xdownload.player-recognition.workflow for the isolated conformance fixture only."
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "2a35dae4302c9657822c48e076e80c947034a1f7ab3e069a1f1d4b3ca492b8ee"
+        "recordDigest": "eb609e157ffadc4ad4ebeda4da3ffc728c40058919fe94aec52162a374cd0c7d"
       },
       {
         "recordId": "xdownload.player-signatures.rule.candidate.1",
@@ -829,7 +829,7 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -849,7 +849,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "872e6f59fb2e5f57e83530bb605c166d59d0f8d81c26147551fce682dda14b4e"
+        "recordDigest": "edfef2fb09c3dd1c2e610d8ded439f1928ea8743bda0cc7bccbbc0062754f4df"
       },
       {
         "recordId": "xdownload.player-signatures.rule.validated.1",
@@ -860,9 +860,9 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player-signatures.rule.candidate.1",
-        "previousRecordDigest": "872e6f59fb2e5f57e83530bb605c166d59d0f8d81c26147551fce682dda14b4e",
+        "previousRecordDigest": "edfef2fb09c3dd1c2e610d8ded439f1928ea8743bda0cc7bccbbc0062754f4df",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -874,7 +874,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
-          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+          "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
           "profile": {
             "id": "player-recognition-conformance/0.1.0",
             "revision": "0.1.0"
@@ -901,7 +901,7 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
+              "sha256": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306"
             },
             {
               "path": "scripts/validate.py",
@@ -909,7 +909,7 @@
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
+              "sha256": "d00d34720157cc6661ad300377c68ce1a73c6738bcc79da36cdc7d80d19b30d3"
             }
           ],
           "limitations": [
@@ -919,7 +919,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "b5cefdec5bbb961fba100ddfc99849999798721a240ce0dcb1047ba9c85e78f0"
+        "recordDigest": "1f93ee6d4da39141002e75c85719d6c10d778a39e53ce902f3c10409a4203921"
       },
       {
         "recordId": "xdownload.player-signatures.rule.promoted.1",
@@ -930,9 +930,9 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player-signatures.rule.validated.1",
-        "previousRecordDigest": "b5cefdec5bbb961fba100ddfc99849999798721a240ce0dcb1047ba9c85e78f0",
+        "previousRecordDigest": "1f93ee6d4da39141002e75c85719d6c10d778a39e53ce902f3c10409a4203921",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -941,17 +941,17 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-signatures.rule.validated.1",
-          "validationRecordDigest": "b5cefdec5bbb961fba100ddfc99849999798721a240ce0dcb1047ba9c85e78f0",
+          "validationRecordDigest": "1f93ee6d4da39141002e75c85719d6c10d778a39e53ce902f3c10409a4203921",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote this exact reference recognizer and its pinned rule dependency for the isolated conformance demo only."
+          "rationale": "Promote exact reference rule xdownload.player-signatures for the isolated conformance fixture only."
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "8ca606fe549ddac32f8449fee49ebfed9f31b14e422766d9c6ae4577037c8597"
+        "recordDigest": "85c9d253b567c1f5aef9d8307376c92715789d6accae42b52db2b116845a754f"
       },
       {
         "recordId": "xdownload.player-recognition.graph.candidate.1",
@@ -962,7 +962,7 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -982,7 +982,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "7fa4d0e991261aa107ea3db5590d6931f6b011b9961879ffde22a0592038dd5e"
+        "recordDigest": "edf45f3eaf591dac18aa5c60731378a9d59af35acc31f4c7514dd81c62936192"
       },
       {
         "recordId": "xdownload.player-recognition.graph.validated.1",
@@ -993,9 +993,9 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player-recognition.graph.candidate.1",
-        "previousRecordDigest": "7fa4d0e991261aa107ea3db5590d6931f6b011b9961879ffde22a0592038dd5e",
+        "previousRecordDigest": "edf45f3eaf591dac18aa5c60731378a9d59af35acc31f4c7514dd81c62936192",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -1007,7 +1007,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e",
-          "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+          "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
           "profile": {
             "id": "player-recognition-workflow/0.1.0",
             "revision": "0.1.0"
@@ -1034,7 +1034,7 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6"
+              "sha256": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306"
             },
             {
               "path": "scripts/validate.py",
@@ -1042,7 +1042,7 @@
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63"
+              "sha256": "d00d34720157cc6661ad300377c68ce1a73c6738bcc79da36cdc7d80d19b30d3"
             }
           ],
           "limitations": [
@@ -1052,7 +1052,7 @@
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "baa27522c510d872f38f3c49d6f66e5ea47e630444a92c62889d8276fd3edbdd"
+        "recordDigest": "c4b96bbfa02d24487acc075e8cf80f19282d1a49333870f0c4b59f5867295e9c"
       },
       {
         "recordId": "xdownload.player-recognition.graph.promoted.1",
@@ -1063,9 +1063,9 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "96365e3bb2aac1e6952ec05d35b176402203d07028256a0801822e487a61c651",
+        "dependencyClosureDigest": "cab4eb5975c974f3ac34b7a6aca63881866a342def26e9ed0cbffc5b9f9e83f5",
         "previousRecordId": "xdownload.player-recognition.graph.validated.1",
-        "previousRecordDigest": "baa27522c510d872f38f3c49d6f66e5ea47e630444a92c62889d8276fd3edbdd",
+        "previousRecordDigest": "c4b96bbfa02d24487acc075e8cf80f19282d1a49333870f0c4b59f5867295e9c",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -1074,17 +1074,17 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-recognition.graph.validated.1",
-          "validationRecordDigest": "baa27522c510d872f38f3c49d6f66e5ea47e630444a92c62889d8276fd3edbdd",
+          "validationRecordDigest": "c4b96bbfa02d24487acc075e8cf80f19282d1a49333870f0c4b59f5867295e9c",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote this exact reference recognizer and its pinned rule dependency for the isolated conformance demo only."
+          "rationale": "Promote exact reference graph xdownload.player-recognition for the isolated conformance fixture only."
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "df5fd003fb2671151da5b2907db59ff1919658e6b60dbf2f881bce2a3b18263d"
+        "recordDigest": "4466a592f0aec106f92a532614c9b8989b7eace35b01c02706fe5711bcfe4f35"
       }
     ],
     "selectionLock": {
@@ -1103,11 +1103,11 @@
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
           "path": "domain/units/recognizer.json",
-          "sha256": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2",
+          "sha256": "e2d76a282d85e0edb3746564b17d48d57d4456209cd004477f323ca353e75902",
           "promotionRecordId": "xdownload.player.recognizer.unit.promoted.1",
-          "promotionRecordDigest": "3f104c3fe15b9bdff6267ee19bbd09f0f78aea168e48020aec0b31beedb1324d",
+          "promotionRecordDigest": "1d260c7ff5f12a0148b5ce39f7fa86d1634d91a9a27b68e28ea5f897089dddab",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675"
+          "validationRecordDigest": "c3df2174e30c4646da605f0ee4a88197deaa38671a72aea325c45f4aa6ac7ec1"
         },
         {
           "kind": "unit",
@@ -1116,9 +1116,9 @@
           "path": "domain/units/decision.json",
           "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5",
           "promotionRecordId": "xdownload.player.route-decision.unit.promoted.1",
-          "promotionRecordDigest": "a7279d2b7c911f457302a04ceae4c03106fd09b2bf501e70cf3a6bd4b6fa571a",
+          "promotionRecordDigest": "8f76642dd51c852b90ab5e617fc76533605a30ace1e6fb784bc34e968fd3c63f",
           "validationRecordId": "xdownload.player.route-decision.unit.validated.1",
-          "validationRecordDigest": "0e07afe7fd0c02c40762f5f2e4d4ef9c5d63e979fe953b33db724963f021d62b"
+          "validationRecordDigest": "2db2433aab301d4ee2ad2493f46f60b268f6306d8bba3cfab0b35f422ec47969"
         },
         {
           "kind": "unit",
@@ -1127,9 +1127,9 @@
           "path": "domain/units/resolve-procedure.json",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb",
           "promotionRecordId": "xdownload.player.resolve-procedure.unit.promoted.1",
-          "promotionRecordDigest": "4bcb0ab22c8b67f6c05373b9eeec84913a223a5d2d48dbf74006c32b2f4429ce",
+          "promotionRecordDigest": "8ec9c8fb245c1768351572d7479a22af92b848051a63330100ae58df4167a658",
           "validationRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-          "validationRecordDigest": "2ae19fe6ca23a9c1d5a9b4dcb54e3a192f33fa3b512e1ebaf05f8a2bce8ab958"
+          "validationRecordDigest": "c9e83eecdcb8f7e6b517be43a85cccedee3fcaa868187dc88ad1ba25da0770e4"
         },
         {
           "kind": "unit",
@@ -1138,9 +1138,9 @@
           "path": "domain/units/fallback-procedure.json",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c",
           "promotionRecordId": "xdownload.player.bounded-fallback.unit.promoted.1",
-          "promotionRecordDigest": "462ad9b35c0e985f883f025a48f05de281b8e3818b21941ad2178b6f1edd7f74",
+          "promotionRecordDigest": "aef95a92b40c77197320ff0290dd3e85cd717ebcafaec0e776458022556bd0ba",
           "validationRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-          "validationRecordDigest": "75c61ea398e04385de79aa64a34fc3cf3f173a4ce38845536d64a1a06a1db412"
+          "validationRecordDigest": "55150c5321633d9233856ecf4d37cc2f51da2b627b4cba444e7a3d8f2769913a"
         },
         {
           "kind": "unit",
@@ -1149,9 +1149,9 @@
           "path": "domain/units/validator.json",
           "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55",
           "promotionRecordId": "xdownload.player.outcome-validator.unit.promoted.1",
-          "promotionRecordDigest": "1427263127bc027869c1d0b401a5e55f3635fa8e6e40953649913a539e382def",
+          "promotionRecordDigest": "39dcaf4be6010c444b75ec0129cb4fea7d0f46d2c62396886943bcfb0a12a89e",
           "validationRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-          "validationRecordDigest": "ca2335fa236516abf4274f142d0dc2ec678f9ec37a85644ea04832cb66323913"
+          "validationRecordDigest": "4eb5625b2f0952181d3aaa5be32d1864fb91b23337a22599ac4d3b5dd97c6c84"
         },
         {
           "kind": "unit",
@@ -1160,9 +1160,9 @@
           "path": "domain/units/workflow.json",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5",
           "promotionRecordId": "xdownload.player-recognition.workflow.unit.promoted.1",
-          "promotionRecordDigest": "2a35dae4302c9657822c48e076e80c947034a1f7ab3e069a1f1d4b3ca492b8ee",
+          "promotionRecordDigest": "eb609e157ffadc4ad4ebeda4da3ffc728c40058919fe94aec52162a374cd0c7d",
           "validationRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-          "validationRecordDigest": "a898aeabcaf9566877dbbe1f27636da591ab1db35ca5558661965eb665f122d5"
+          "validationRecordDigest": "18aca814675367f3d585db50c5a9821c29c538fdf64007a34ada32c328a6ddf0"
         },
         {
           "kind": "rule",
@@ -1171,9 +1171,9 @@
           "path": "fixtures/player-signatures.json",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
           "promotionRecordId": "xdownload.player-signatures.rule.promoted.1",
-          "promotionRecordDigest": "8ca606fe549ddac32f8449fee49ebfed9f31b14e422766d9c6ae4577037c8597",
+          "promotionRecordDigest": "85c9d253b567c1f5aef9d8307376c92715789d6accae42b52db2b116845a754f",
           "validationRecordId": "xdownload.player-signatures.rule.validated.1",
-          "validationRecordDigest": "b5cefdec5bbb961fba100ddfc99849999798721a240ce0dcb1047ba9c85e78f0"
+          "validationRecordDigest": "1f93ee6d4da39141002e75c85719d6c10d778a39e53ce902f3c10409a4203921"
         },
         {
           "kind": "graph",
@@ -1182,9 +1182,9 @@
           "path": "domain/player-recognition.graph.json",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e",
           "promotionRecordId": "xdownload.player-recognition.graph.promoted.1",
-          "promotionRecordDigest": "df5fd003fb2671151da5b2907db59ff1919658e6b60dbf2f881bce2a3b18263d",
+          "promotionRecordDigest": "4466a592f0aec106f92a532614c9b8989b7eace35b01c02706fe5711bcfe4f35",
           "validationRecordId": "xdownload.player-recognition.graph.validated.1",
-          "validationRecordDigest": "baa27522c510d872f38f3c49d6f66e5ea47e630444a92c62889d8276fd3edbdd"
+          "validationRecordDigest": "c4b96bbfa02d24487acc075e8cf80f19282d1a49333870f0c4b59f5867295e9c"
         }
       ],
       "selectedCapabilities": [
@@ -1200,17 +1200,17 @@
             "candidateId": "signature-exact-v1",
             "implementationRef": "registry:xdownload.player.recognizer@1.0.0",
             "artifactRef": "src/runner.mjs",
-            "artifactDigest": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6",
+            "artifactDigest": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306",
             "target": "node24",
             "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
           },
           "promotionRecordId": "xdownload.player.recognizer.unit.promoted.1",
-          "promotionRecordDigest": "3f104c3fe15b9bdff6267ee19bbd09f0f78aea168e48020aec0b31beedb1324d",
+          "promotionRecordDigest": "1d260c7ff5f12a0148b5ce39f7fa86d1634d91a9a27b68e28ea5f897089dddab",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "88c66db07faf82b4e2d890e6b55133e5681931933d8b8b5478ec920411e46675"
+          "validationRecordDigest": "c3df2174e30c4646da605f0ee4a88197deaa38671a72aea325c45f4aa6ac7ec1"
         }
       ]
     },
-    "selectionLockSha256": "1214a9cce7a9b8e94f9efaf11da474135530575c8ca85667d16c58709b4c4b09"
+    "selectionLockSha256": "e7b94500634d9d839245bea9befaf3e408cb754a873fb75689d047cc34dc27e7"
   }
 }

@@ -159,7 +159,7 @@
     },
     {
       "path": "domain/units/recognizer.json",
-      "sha256": "7849411097eed1a9b9a6190ffaaa3397bd36394854b7029fa6bcec893de1d3d2",
+      "sha256": "e2d76a282d85e0edb3746564b17d48d57d4456209cd004477f323ca353e75902",
       "kind": "unit",
       "owners": [
         "xdownload.player-recognition.workflow",
@@ -254,7 +254,7 @@
     },
     {
       "path": "src/runner.mjs",
-      "sha256": "ac310fe385f74c508db9b2ba9967a33758450c494deef648eead6d3cb7a9a7a6",
+      "sha256": "46d2b910e34961c278940c1150cb01cd0e3ce4dce0768b3311c5a17377197306",
       "kind": "implementation",
       "owners": [
         "xdownload.player.bounded-fallback",
@@ -277,7 +277,7 @@
     },
     {
       "path": "test/runner.test.mjs",
-      "sha256": "f37dce26fee9b4a1632e64db08efc0df8c9fad25e90a19f4cf50ed82703d0a63",
+      "sha256": "d00d34720157cc6661ad300377c68ce1a73c6738bcc79da36cdc7d80d19b30d3",
       "kind": "conformance",
       "owners": [
         "xdownload.player-recognition.workflow",

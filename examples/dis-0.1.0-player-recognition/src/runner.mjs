@@ -725,14 +725,14 @@ export function validateOutcome(input, context) {
   return { ...resolution, evidence, evidenceCount: evidence.length };
 }
 
-export const handlers = {
+export const handlers = Object.freeze({
   'registry:xdownload.player.recognizer@1.0.0': recognizePlayer,
   'registry:xdownload.player.recognizer-normalized@1.0.0': recognizePlayerNormalized,
   'registry:xdownload.player.route-decision@1.0.0': routeRecognition,
   'registry:xdownload.player.resolve-procedure@1.0.0': resolvePlayer,
   'registry:xdownload.player.bounded-fallback@1.0.0': boundedFallback,
   'registry:xdownload.player.outcome-validator@1.0.0': validateOutcome,
-};
+});
 
 export async function loadDemo({ expectedSelectionLockSha256 } = {}) {
   const descriptor = JSON.parse(await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8'));

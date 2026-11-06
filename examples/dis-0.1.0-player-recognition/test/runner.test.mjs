@@ -563,6 +563,8 @@ test('post-load implementation changes cannot bypass the pinned provider', async
   const changedUnits = new Map([...loaded.unitsById].map(([id, unit]) => [id, structuredClone(unit)]));
   changedUnits.get('xdownload.player.recognizer').implementation.ref = 'registry:xdownload.player.recognizer-normalized@1.0.0';
   await assert.rejects(() => runPipeline({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, { ...loaded, unitsById: changedUnits }), hasCode('SELECTED_IMPLEMENTATION_CHANGED'));
+  assert.equal(Object.isFrozen(handlers), true);
+  assert.throws(() => { handlers['registry:xdownload.player.recognizer@1.0.0'] = handlers['registry:xdownload.player.recognizer-normalized@1.0.0']; }, TypeError);
   const unit = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
   unit.failure.handling = {};
   assert.throws(() => validateUnit(unit), hasCode('INVALID_FAILURE_PROFILE'));
