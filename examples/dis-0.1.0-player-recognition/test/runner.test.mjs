@@ -562,7 +562,7 @@ test('post-load implementation changes cannot bypass the pinned provider', async
   const loaded = await loadedPromise;
   const changedUnits = new Map([...loaded.unitsById].map(([id, unit]) => [id, structuredClone(unit)]));
   changedUnits.get('xdownload.player.recognizer').implementation.ref = 'registry:xdownload.player.recognizer-normalized@1.0.0';
-  await assert.rejects(() => runPipeline({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, { ...loaded, unitsById: changedUnits }), hasCode('SELECTED_RESOURCE_CHANGED'));
+  assert.equal((await runPipeline({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, { ...loaded, unitsById: changedUnits })).outcome.status, 'NEEDS_REVIEW');
   assert.equal(Object.isFrozen(handlers), true);
   assert.throws(() => { handlers['registry:xdownload.player.recognizer@1.0.0'] = handlers['registry:xdownload.player.recognizer-normalized@1.0.0']; }, TypeError);
   const unit = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
@@ -570,7 +570,7 @@ test('post-load implementation changes cannot bypass the pinned provider', async
   assert.throws(() => validateUnit(unit), hasCode('INVALID_FAILURE_PROFILE'));
 });
 
-test('verified execution rejects changes to graph, schemas, rules, catalogs and selection', async () => {
+test('verified execution uses a private snapshot of graph, schemas, rules and catalogs', async () => {
   const loaded = await loadedPromise;
   const input = { url: 'https://example.test/watch', signals: ['jwplayer'] };
   const graph = structuredClone(loaded.graph);
@@ -584,15 +584,25 @@ test('verified execution rejects changes to graph, schemas, rules, catalogs and 
   const selectedProviders = structuredClone(loaded.selectedProviders);
   const packageIdentity = structuredClone(loaded.packageIdentity);
   packageIdentity.packageId = 'unselected-package';
-  for (const change of [{ graph }, { schemas }, { knowledge }, { catalogs }, { selectedProviders }, { packageIdentity }]) {
-    await assert.rejects(() => runPipeline(input, { ...loaded, ...change }), hasCode('SELECTED_RESOURCE_CHANGED'));
+  for (const change of [{ graph }, { schemas }, { knowledge }, { catalogs }, { packageIdentity }]) {
+    const result = await runPipeline(input, { ...loaded, ...change });
+    assert.equal(result.outcome.status, 'READY');
+    assert.equal(result.outcome.strategyId, 'jwplayer.extract.v1');
+    assert.equal(result.packageIdentity.packageId, loaded.packageIdentity.packageId);
   }
-  const patterns = loaded.knowledge['xdownload.player-signatures'].patterns;
-  loaded.knowledge['xdownload.player-signatures'].patterns = [];
+  await assert.rejects(() => runPipeline(input, { ...loaded, selectedProviders }), hasCode('SELECTED_RESOURCE_CHANGED'));
+  const signatures = loaded.knowledge['xdownload.player-signatures'];
+  const original = structuredClone(signatures);
+  const patterns = signatures.patterns;
+  Object.defineProperty(signatures, 'toJSON', { value: () => original, configurable: true });
+  signatures.patterns = structuredClone(patterns);
+  signatures.patterns[0].markers = ['JWPLAYER'];
   try {
-    await assert.rejects(() => runPipeline(input, loaded), hasCode('SELECTED_RESOURCE_CHANGED'));
+    assert.equal((await runPipeline(input, loaded)).outcome.status, 'READY');
+    assert.equal((await runPipeline({ url: input.url, signals: ['JWPLAYER'] }, loaded)).outcome.status, 'NEEDS_REVIEW');
   } finally {
-    loaded.knowledge['xdownload.player-signatures'].patterns = patterns;
+    signatures.patterns = patterns;
+    delete signatures.toJSON;
   }
   assert.equal((await runPipeline(input, loaded)).outcome.status, 'READY');
 });

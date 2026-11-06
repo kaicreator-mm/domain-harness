@@ -8,18 +8,6 @@ const packageRoot = path.resolve(here, '..');
 const lockedProviders = new WeakMap();
 const lockedExecutionResources = new WeakMap();
 
-function executionResources(loaded) {
-  return JSON.stringify({
-    graph: loaded.graph,
-    units: [...loaded.unitsById],
-    schemas: [...loaded.schemas],
-    catalogs: loaded.catalogs,
-    knowledge: loaded.knowledge,
-    selectedProviders: [...loaded.selectedProviders],
-    packageIdentity: loaded.packageIdentity,
-  });
-}
-
 export class DisExecutionError extends Error {
   constructor(code, message) {
     super(message);
@@ -896,7 +884,7 @@ export async function loadDemo({ expectedSelectionLockSha256 } = {}) {
   validateGraph(graph, unitsById, schemas);
   validateDefinition(definition, unitsById, graph, manifest.graphRef.path);
   const loaded = { graph, definition, unitsById, schemas, resources, catalogs, knowledge, selectedProviders, closureManifest: manifest, packageIdentity: { ...packageIdentity, resourceClosureSha256: manifestDigest } };
-  lockedExecutionResources.set(selectedProviders, executionResources(loaded));
+  lockedExecutionResources.set(selectedProviders, structuredClone({ graph, unitsById, schemas, catalogs, knowledge, packageIdentity: loaded.packageIdentity }));
   return loaded;
 }
 
@@ -916,17 +904,17 @@ export function bindAvailableData(graph, outputs, nodeId, initialInput) {
 }
 
 export async function runPipeline(input, loaded) {
-  let currentResources;
-  try { currentResources = executionResources(loaded); } catch { throw new DisExecutionError('SELECTED_RESOURCE_CHANGED', 'invalid execution resources'); }
-  if (lockedExecutionResources.get(loaded.selectedProviders) !== currentResources) throw new DisExecutionError('SELECTED_RESOURCE_CHANGED', 'execution resources differ from the verified selection');
-  const { graph, unitsById, schemas } = loaded;
+  const selection = loaded?.selectedProviders;
+  const snapshot = lockedExecutionResources.get(selection);
+  if (!snapshot) throw new DisExecutionError('SELECTED_RESOURCE_CHANGED', 'verified execution resources are required');
+  const { graph, unitsById, schemas, catalogs, knowledge, packageIdentity } = snapshot;
   const outputs = new Map();
   let nodeId = graph.entryNode;
   const trace = [];
   for (let step = 0; step <= graph.nodes.length; step += 1) {
     const node = graph.nodes.find((item) => item.nodeId === nodeId);
     const unit = unitsById.get(node.unitRef.id);
-    const binding = lockedProviders.get(loaded.selectedProviders)?.get(unit?.id);
+    const binding = lockedProviders.get(selection)?.get(unit?.id);
     if (!binding || binding.revision !== unit.revision || binding.ref !== unit.implementation?.ref) throw new DisExecutionError('SELECTED_IMPLEMENTATION_CHANGED', unit?.id || nodeId);
     const handler = handlers[binding.ref];
     if (!handler) throw new DisExecutionError('NO_TRUSTED_IMPLEMENTATION_BINDING', binding.ref);
@@ -948,10 +936,10 @@ export async function runPipeline(input, loaded) {
       if (value === undefined) throw new DisExecutionError('MISSING_RUNTIME_EVIDENCE_VALUE', edge.from.node + edge.from.pointer);
       evidence[edge.to.slot] = [...(evidence[edge.to.slot] || []), ...(Array.isArray(value) ? structuredClone(value) : [structuredClone(value)])];
     }
-    const output = handler(nodeInput, { evidence, catalogs: loaded.catalogs, knowledge: loaded.knowledge });
+    const output = handler(nodeInput, { evidence, catalogs, knowledge });
     outputs.set(nodeId, output);
     trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: binding.ref, implementationCandidateId: binding.candidateId, input: structuredClone(nodeInput), evidence: structuredClone(evidence), output: structuredClone(output) });
-    if (graph.terminalNodes.includes(nodeId)) return { outcome: output, trace, packageIdentity: loaded.packageIdentity };
+    if (graph.terminalNodes.includes(nodeId)) return { outcome: output, trace, packageIdentity: structuredClone(packageIdentity) };
     const candidates = graph.edges.filter((edge) => edge.kind === 'control' && edge.from === nodeId && conditionMatches(output, edge.when));
     if (candidates.length !== 1) throw new DisExecutionError('AMBIGUOUS_CONTROL_FLOW', nodeId + ' selected ' + candidates.length + ' control edges');
     nodeId = candidates[0].to;
