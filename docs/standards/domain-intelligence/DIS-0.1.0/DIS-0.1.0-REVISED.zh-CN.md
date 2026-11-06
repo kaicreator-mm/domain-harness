@@ -233,7 +233,7 @@ Demo 修订后 Decision 只输出 route，Procedure 只输出 resolution；Recog
 
 ### 12.4 Canonical L2 Review Findings
 
-DIS-L2-F001..F012 是 L2 架构审核台账，与初始 Demo 缺陷 DIS-F-001..F006 完全分开。统一编号顺序为：F001 两个相连的生命周期平面；F002 后继 Boot/KDP 唯一 Kernel 与 Host/Effect 权威边界；F003 实际 Consumer Trace；F004 Definition/Workflow/Graph/Unit 引用闭包；F005 完整 Package Resource Closure；F006 可信 Implementation Binding；F007 按路径验证 required input；F008 符号链接 containment；F009 DAG-only 控制图；F010 Provenance 与 Dynamic Form 权限边界；F011 EXECUTED 是运行发生记录；F012 Release Qualification 前使用第二个实质不同的 Domain Profile。R3 候选修复和审核状态记录在 L2_ARCHITECTURE 与 REVISION_LOG 中。exact-HEAD 证据、独立 Exact-SHA 审核和 Controller Freeze Checkpoint 完成前，DIS 仍为 NOT_FROZEN。
+DIS-L2-F001..F012 是 L2 架构审核台账，与初始 Demo 缺陷 DIS-F-001..F006 完全分开。统一编号顺序为：F001 两个相连的生命周期平面；F002 后继 Boot/KDP 唯一 Kernel 与 Host/Effect 权威边界；F003 实际 Consumer Trace；F004 Definition/Workflow/Graph/Unit 引用闭包；F005 完整 Package Resource Closure；F006 可信 Implementation Binding；F007 按路径验证 required input；F008 符号链接 containment；F009 DAG-only 控制图；F010 Provenance 与 Dynamic Form 权限边界；F011 EXECUTED 是运行发生记录；F012 Release Qualification 前使用第二个实质不同的 Domain Profile。R3 候选修复和审核状态记录在 L2_ARCHITECTURE 与 REVISION_LOG 中。R6 精确 HEAD 验证和独立 Exact-SHA 审核已针对已验证的实现基线完成。#1481 中的正式 Controller Freeze Checkpoint 是 L2 冻结状态的权威记录，并绑定最终 commit/tree 与 Schema 清单。F012 仍是独立的 Release Qualification 前置门禁。
 
 ## Candidate 与 Runtime feedback 交换
 

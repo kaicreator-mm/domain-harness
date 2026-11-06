@@ -25,8 +25,8 @@ Frozen Product/L1: https://github.com/kaicreator-mm/domain-harness/issues/1477
 - schemas/validation-report.schema.json
 
 ## R6 exact-HEAD qualification
-- Candidate HEAD: `16bee6937995fb211ab7c2fbcffbe68da69c9d62`
-- Candidate TREE: `8d5333ef171bb3fd484e4412343cc49e068ca97c`
+- R6 implementation validation baseline HEAD: `16bee6937995fb211ab7c2fbcffbe68da69c9d62`
+- R6 implementation validation baseline TREE: `8d5333ef171bb3fd484e4412343cc49e068ca97c`
 - Exact-HEAD receipt: [Issue #1481 comment #6694493616](https://github.com/kaicreator-mm/domain-harness/issues/1481#issuecomment-6694493616)
 - Independent review/verifier: [PR review #5806362784](https://github.com/kaicreator-mm/domain-harness/pull/1482#pullrequestreview-5806362784)
 - Woodpecker: [pipeline #2183](https://ci.kaicreator.com/repos/18/pipeline/2183)
@@ -38,6 +38,6 @@ Frozen Product/L1: https://github.com/kaicreator-mm/domain-harness/issues/1477
 - Revision log: validation/dis-0.1.0/REVISION_LOG.md
 - Historical Demo validation (tested commit d8c516e): validation/dis-0.1.0/FINAL_VALIDATION.md
 
-Active L2 candidate PR: #1482 (Draft). The integrated R6 batch combines #1484 Boot/KDP successor-authority synchronization, #1485 Capability/Recognizer/Pipeline contract closure and #1487 governed lifecycle closure in the existing 46-path write set. R4/R5 reviews and validation receipts remain historical, exact-snapshot evidence only; final integrated exact-HEAD validation and Fresh Independent Exact-SHA review are pending. The historical Demo validation report applies only to its recorded d8c516e artifact.
+Active L2 freeze-candidate PR: #1482 (Draft). The integrated R6 batch combines #1484 Boot/KDP successor-authority synchronization, #1485 Capability/Recognizer/Pipeline contract closure and #1487 governed lifecycle closure in the existing 46-path write set. The R6 implementation candidate passed exact-HEAD validation and independent source review/verifier at baseline HEAD `16bee6937995fb211ab7c2fbcffbe68da69c9d62` (receipt #6694493616; review #5806362784); Woodpecker pipeline #2183 succeeded. The current branch ref and any subsequent status-only metadata delta must be read from PR #1482. R4/R5 reviews and validation receipts remain historical, exact-snapshot evidence only. The historical Demo validation report applies only to its recorded d8c516e artifact.
 
-This branch carries the original experiment as historical evidence and the current integrated L2 candidate. Product/L1 is frozen by #1477; Harness capability Product/L1 is frozen by #1478; the Boot → KDP Primary successor authority is checkpointed by #1484. DIS L2 remains NOT_FROZEN. No v0.10.3 ABI/runtime implementation, successor SDK version, Task DAG, release, tag or deployment is authorized.
+This branch carries the original experiment as historical evidence and the current integrated L2 candidate. Product/L1 is frozen by #1477; Harness capability Product/L1 is frozen by #1478; the Boot → KDP Primary successor authority is checkpointed by #1484. The formal L2 Freeze Checkpoint in #1481 is the sole authority for declaring DIS L2 frozen and for explicitly authorizing or blocking Task DAG creation. No v0.10.3 ABI/runtime implementation, successor SDK version, release, tag or deployment is authorized by this branch alone.
