@@ -15,7 +15,9 @@ The demo proves:
 
 The first iteration and its findings remain in Git history and validation/dis-0.1.0/INITIAL_VALIDATION.md. The revised 15-test suite, five-schema self-validation, six Unit checks, Graph/Definition/resource closure checks, and all 16 node input/output contract checks are recorded in `validation/dis-0.1.0/FINAL_VALIDATION.md`.
 
-This is a standards proof, not a production xDownload implementation and not evidence that the current DomainHarness Runtime already consumes DIS. The runner is a small reference consumer for the DIS model, not a replacement for the frozen DomainHarness v0.7 Kernel/Microkernel, Domain Runtime or Host/Effect contracts. The #1480 KDP proposal is not frozen and is non-normative here.
+This is a standards proof, not a production xDownload implementation or evidence that v0.10.3 consumes DIS or implements the #1484 successor Boot → KDP Primary authority. The lifecycle records and governance actors in the Package descriptor are synthetic fixtures, not real production approvals.
 
 
 The signature and strategy catalogs under `fixtures/` are the actual sources consumed by Recognizer and Procedure; Unit evidence references these package resources. The 0.1.0 Graph pointer profile intentionally supports only the root output object or one top-level property pointer. Nested JSON Pointers are rejected rather than partially validated.
+
+The descriptor pins a digest of the complete selection lock. An independently trusted caller may pass `expectedSelectionLockSha256` to `loadDemo`; mismatches fail closed. The default demo reads its own descriptor and does not prove resistance to an attacker replacing both the descriptor and lock: production trust must come from the authorized Package BUILD/deployment boundary.

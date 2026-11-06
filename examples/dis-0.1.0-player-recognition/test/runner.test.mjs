@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, validatePreconditions, validateCapabilityContracts, resolveProviderSelection, validateLifecycleRecords, recognizePlayerNormalized, handlers, assertInsidePackage, conditionMatches, DisExecutionError } from '../src/runner.mjs';
 import { loadVerifiedDemo, verifyResourceClosure } from '../src/verified-loader.mjs';
@@ -12,6 +13,23 @@ const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 
 function hasCode(code) {
   return (error) => error instanceof DisExecutionError && error.code === code;
+}
+
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+  return value;
+}
+function hashRecord(value) {
+  return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
+}
+function refreshRecord(record) {
+  const payload = { ...record };
+  delete payload.recordDigest;
+  record.recordDigest = hashRecord(payload);
+}
+function refreshLock(identity) {
+  identity.selectionLockSha256 = hashRecord(identity.selectionLock);
 }
 
 test('known player follows control path while data arrives through an independent edge', async () => {
@@ -454,5 +472,50 @@ test('append-only lifecycle chain binds exact Unit digest and dependency closure
 
   const unpromoted = structuredClone(loaded.packageIdentity);
   unpromoted.selectionLock.selectedAssets.find((asset) => asset.kind === 'unit').promotionRecordId = 'missing-promotion';
+  refreshLock(unpromoted);
   assert.throws(() => validateLifecycleRecords(unpromoted, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('PACKAGE_PROMOTION_PIN_MISMATCH'));
+});
+
+test('Package locks bind all executed assets, profile and independent promotion authority', async () => {
+  const loaded = await loadedPromise;
+  const unitPaths = new Map(loaded.closureManifest.units.map((item) => [item.id, item.path]));
+  const verify = (identity) => validateLifecycleRecords(identity, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256);
+  const missing = structuredClone(loaded.packageIdentity);
+  missing.selectionLock.selectedAssets = missing.selectionLock.selectedAssets.filter((asset) => asset.id !== 'xdownload.player.route-decision');
+  refreshLock(missing);
+  assert.throws(() => verify(missing), hasCode('PACKAGE_SELECTION_CARDINALITY_INVALID'));
+  const profile = structuredClone(loaded.packageIdentity);
+  profile.selectionLock.consumerProfile.revision = '9.9.9';
+  refreshLock(profile);
+  assert.throws(() => verify(profile), hasCode('PACKAGE_CONSUMER_PROFILE_OR_TARGET_MISMATCH'));
+  const unauthorized = structuredClone(loaded.packageIdentity);
+  const promotion = unauthorized.lifecycleRecords.find((record) => record.transition === 'PROMOTED');
+  promotion.actor.id = unauthorized.lifecycleRecords.find((record) => record.transition === 'CANDIDATE').actor.id;
+  refreshRecord(promotion);
+  assert.throws(() => verify(unauthorized), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
+  const altered = structuredClone(loaded.packageIdentity);
+  altered.selectionLock.consumerProfile.revision = '9.9.9';
+  assert.throws(() => verify(altered), hasCode('PACKAGE_SELECTION_DIGEST_MISMATCH'));
+  await assert.rejects(() => loadDemo({ expectedSelectionLockSha256: '0'.repeat(64) }), hasCode('EXTERNAL_SELECTION_PIN_MISMATCH'));
+});
+
+test('fixture-only evidence cannot support a rehashed validation and promotion chain', async () => {
+  const loaded = await loadedPromise;
+  const identity = structuredClone(loaded.packageIdentity);
+  const unitPaths = new Map(loaded.closureManifest.units.map((item) => [item.id, item.path]));
+  const validated = identity.lifecycleRecords.find((record) => record.transition === 'VALIDATED');
+  const promoted = identity.lifecycleRecords.find((record) => record.transition === 'PROMOTED');
+  validated.validation.evidenceRefs = validated.validation.evidenceRefs.filter((item) => item.path === 'fixtures/player-signatures.json');
+  refreshRecord(validated);
+  promoted.previousRecordDigest = validated.recordDigest;
+  promoted.promotion.validationRecordDigest = validated.recordDigest;
+  refreshRecord(promoted);
+  const selected = identity.selectionLock.selectedAssets.find((asset) => asset.kind === 'unit' && asset.id === validated.subject.id);
+  const capability = identity.selectionLock.selectedCapabilities[0];
+  for (const item of [selected, capability]) {
+    item.validationRecordDigest = validated.recordDigest;
+    item.promotionRecordDigest = promoted.recordDigest;
+  }
+  refreshLock(identity);
+  assert.throws(() => validateLifecycleRecords(identity, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('VALIDATION_EVIDENCE_INCOMPLETE'));
 });

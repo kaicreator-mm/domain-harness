@@ -30,7 +30,9 @@ DIS 不定义新 Component family、新 Runtime、新 Scheduler、新 KDP、通�
 4. 六类 Domain Data 保持不变：Authority、Executable Harness、Knowledge/Reference、Pattern/Recipe、Example/Counterexample、Validation/Evidence。
 5. Understanding、Decision、Solving/Evaluation 是质量评价维度，不是新资产分类。
 6. requires/provides 表示 Capability Contract，不等于数据流、控制流或 Package dependency。
-7. 唯一既有 DomainHarness Runtime 仍在冻结的 Kernel/Microkernel 与 Host/Effect 契约下保持权威；Hook 仅遵循既有受限契约。#1480 的 KDP 架构候选尚未冻结，在 DIS 0.1.0 中不具规范效力。
+7. 历史 v0.10.3 仍由其冻结的 v0.7 Kernel/Microkernel 和 Host/Effect 契约管理。在研后继的权威是 #1484 已单独检查点的 Boot → KDP Primary 模型：Boot 只做最小引导，KDP Primary 拥有唯一 Kernel Core 与内部 Package System。该后继检查点不改写 v0.10.3，也不证明当前 Runtime 已采用 KDP 或 DIS。DIS 定义智能契约，不定义 KDP API 或实现；Hook 仍受适用契约约束。
+
+KDP Primary 初始化自身核心时不得依赖 SDK 或 Business Package。Boot 验证精确 KDP pin，调用固定入口并移交，不解析 Package DAG、不绑定 Hook，也不执行业务 Workflow。唯一后继 Kernel Core 拥有 Runtime、admission、状态、Effect、Journal、replay/recovery 权威；内部 Package System 负责精确 Package DAG 解析、加载、Hook 绑定和生命周期。Host 仅在 admission 后执行物理操作。不存在第二套 Runtime、Scheduler、Journal 或 Effect 权威；原 Microkernel 不是独立后继层。
 8. Hook 仅按现有明确支持的受限契约使用，不由 DIS 推导通用 Event Bus。
 9. Workflow/Pipeline 是领域解决过程，不是 Scheduler，也不创建第二个状态权威。
 10. 保持既有 resolver precedence：确定性编译智能 → 精确语义结果复用 → 适用的已晋升 Subworkflow → 有界 HarnessMachine/LLM Fallback。
@@ -45,7 +47,7 @@ Corpus 可以包含缺口、未知、冲突和候选材料，不自动等于生�
 
 ## 2.2 Runtime Consumption
 
-运行期 Consumer 规范化输入，经 Recognizer/可选澄清理解输入，选择 Decision 和 Workflow/Procedure/Tool/Validator Unit，执行 typed Composition Graph，并输出带结构化证据的终态。Consumer 只消费精确、已选择且兼容的 Package identity。未知、歧义、冲突、越界、部分成功和失败必须显式保留。状态转移、持久化和外部 Effect 权威仍由唯一既有 DomainHarness Runtime 及冻结 Kernel/Microkernel、Host/Effect 契约掌握；DIS 不增加 Scheduler 或权威。
+运行期 Consumer 规范化输入，经 Recognizer/可选澄清理解输入，选择 Decision 和 Workflow/Procedure/Tool/Validator Unit，执行 typed Composition Graph，并输出带结构化证据的终态。Consumer 只消费精确、已选择且兼容的 Package identity。未知、歧义、冲突、越界、部分成功和失败必须显式保留。后继系统的唯一 KDP Kernel Core 掌握状态转移和 Effect admission；Host 仅在 admission 后执行物理操作。历史 v0.10.3 保留既有 v0.7 契约；DIS 不增加 Scheduler 或权威。
 
 ## 3. Intelligence Unit
 
@@ -229,4 +231,4 @@ Demo 修订后 Decision 只输出 route，Procedure 只输出 resolution；Recog
 
 ### 12.4 Canonical L2 Review Findings
 
-DIS-L2-F001..F012 是 L2 架构审核台账，与初始 Demo 缺陷 DIS-F-001..F006 完全分开。统一编号顺序为：F001 两个相连的生命周期平面；F002 冻结的 Kernel/Microkernel 与 Host/Effect 权威边界；F003 实际 Consumer Trace；F004 Definition/Workflow/Graph/Unit 引用闭包；F005 完整 Package Resource Closure；F006 可信 Implementation Binding；F007 按路径验证 required input；F008 符号链接 containment；F009 DAG-only 控制图；F010 Provenance 与 Dynamic Form 权限边界；F011 EXECUTED 是运行发生记录；F012 Release Qualification 前使用第二个实质不同的 Domain Profile。R3 候选修复和审核状态记录在 L2_ARCHITECTURE 与 REVISION_LOG 中。exact-HEAD 证据、独立 Exact-SHA 审核和 Controller Freeze Checkpoint 完成前，DIS 仍为 NOT_FROZEN。
+DIS-L2-F001..F012 是 L2 架构审核台账，与初始 Demo 缺陷 DIS-F-001..F006 完全分开。统一编号顺序为：F001 两个相连的生命周期平面；F002 后继 Boot/KDP 唯一 Kernel 与 Host/Effect 权威边界；F003 实际 Consumer Trace；F004 Definition/Workflow/Graph/Unit 引用闭包；F005 完整 Package Resource Closure；F006 可信 Implementation Binding；F007 按路径验证 required input；F008 符号链接 containment；F009 DAG-only 控制图；F010 Provenance 与 Dynamic Form 权限边界；F011 EXECUTED 是运行发生记录；F012 Release Qualification 前使用第二个实质不同的 Domain Profile。R3 候选修复和审核状态记录在 L2_ARCHITECTURE 与 REVISION_LOG 中。exact-HEAD 证据、独立 Exact-SHA 审核和 Controller Freeze Checkpoint 完成前，DIS 仍为 NOT_FROZEN。

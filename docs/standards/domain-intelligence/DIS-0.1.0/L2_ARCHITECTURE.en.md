@@ -6,7 +6,7 @@ Product/L1: #1477 — FROZEN\
 Product Freeze Commit: b8135aa801eb38fcae2fa1fce3bada541178d5b9\
 Candidate branch: dis/0.1.0-l2-candidate
 
-This document turns the frozen Domain Intelligence Product/L1 into standard boundaries, logical contracts, machine-readable descriptions, Consumer semantics and conformance requirements. It is not an SDK ABI, Manifest/BUILD ABI, Runtime API or implementation design for DomainForge/DomainHarness. DIS preserves the frozen v0.7 Kernel/Microkernel, single Domain Runtime and Host/Effect contracts. The KDP architecture proposal in #1480 is not frozen and is non-normative for DIS 0.1.0.
+This document turns frozen Product/L1 and the #1484 successor checkpoint into standard boundaries, logical contracts and conformance requirements. It is not an SDK ABI, Runtime API or implementation design. Historical v0.10.3 retains its existing v0.7 implementation; the successor checkpoint does not prove v0.10.3 implements KDP or DIS.
 
 ## 1. Standard purpose
 
@@ -71,7 +71,7 @@ Requirements:
 - Workflow/Graph describes domain solving, not a second Scheduler.
 - Procedure is private; Tool is an explicit cross-boundary Operation.
 - UNKNOWN, AMBIGUOUS, CONFLICT, OUT_OF_SCOPE, NEEDS_INPUT, NEEDS_REVIEW, PARTIAL and FAILED are not silently converted into success.
-- State transitions, persistence and external Effects remain under the single existing DomainHarness Runtime and its frozen Kernel/Microkernel and Host/Effect contracts. DIS does not create a second authority; #1480 remains a non-normative architecture candidate until separately frozen.
+- Minimal Boot verifies the exact KDP Primary pin and hands off through one fixed entry. KDP Primary initializes its own core without an SDK or Business Package. Its single Kernel Core owns Runtime, admission, state, Effect, Journal, replay and recovery; the internal Package System resolves and loads the exact Package DAG, binds Hooks and manages lifecycle. Host performs physical operations only after Kernel admission. No second Runtime, Scheduler, Journal or Effect authority exists; the former Microkernel is not a separate successor layer.
 
 ### 2.3 Fixed resolver precedence
 
@@ -121,7 +121,7 @@ A Unit need not be exposed as a Component; one Component may be implemented by s
 - Pipeline is the concrete execution organization of that Workflow: nodes, ordering, branches and terminal outcomes.
 - Composition Graph is DIS's structured, verifiable representation of a Pipeline.
 - A Workflow Unit may be exposed as a Semantic Component; the Graph is its implementation/composition artifact. They are bound by exact references.
-- Pipeline is not a Scheduler; Node execution remains managed by the frozen DomainHarness v0.7 Kernel/Microkernel, Domain Runtime and Host/Effect contracts. The successor authority is the #1484 Boot-minimal → KDP Primary checkpoint; the released v0.10.3 source baseline remains on its historical v0.7 Microkernel authority.
+- Pipeline is not a Scheduler; successor execution is managed by the single KDP Kernel Core and Host/Effect boundary. Released v0.10.3 remains on its historical v0.7 implementation and is not claimed to implement the successor.
 - A Workflow may compose Procedures, Tools, Recognizers, Decisions and Validators without creating a new Component family.
 
 ### 3.4 Identity / Qualification / Execution

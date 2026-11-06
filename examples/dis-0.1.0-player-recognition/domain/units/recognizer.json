@@ -40,7 +40,7 @@
         "ref": "registry:xdownload.player.recognizer@1.0.0",
         "exposure": "semantic",
         "artifactRef": "src/runner.mjs",
-        "artifactDigest": "384fdd8f06b1d967db55442817c17554c00024f9594a4976d2d51ad0ac58927d",
+        "artifactDigest": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0",
         "target": "node24",
         "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
       },
@@ -50,7 +50,7 @@
         "ref": "registry:xdownload.player.recognizer-normalized@1.0.0",
         "exposure": "semantic",
         "artifactRef": "src/runner.mjs",
-        "artifactDigest": "384fdd8f06b1d967db55442817c17554c00024f9594a4976d2d51ad0ac58927d",
+        "artifactDigest": "40363f85e8266defd7c4c70cdc005f730e82189abeb04b09d2a26fb4d90b38f0",
         "target": "node24",
         "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
       }
@@ -58,7 +58,8 @@
     "selectionPolicy": {
       "mode": "PACKAGE_LOCK_EXACT",
       "consumerProfileId": "xdownload.player-recognition/1.0.0",
-      "target": "node24"
+      "target": "node24",
+      "consumerProfileRevision": "1.0.0"
     }
   },
   "evidence": {

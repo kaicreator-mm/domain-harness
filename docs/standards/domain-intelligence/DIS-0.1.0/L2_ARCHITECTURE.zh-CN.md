@@ -6,7 +6,7 @@ Product/L1：#1477 — FROZEN\
 Product Freeze Commit：b8135aa801eb38fcae2fa1fce3bada541178d5b9\
 候选分支：dis/0.1.0-l2-candidate
 
-本文将冻结的 Domain Intelligence Product/L1 转换为标准边界、逻辑契约、机器可读描述、Consumer 语义和符合性要求。它不是 SDK ABI、Manifest/BUILD ABI、Runtime API 或 DomainForge/DomainHarness 的具体实现设计。DIS 保留已冻结的 v0.7 Kernel/Microkernel、唯一 Domain Runtime 以及 Host/Effect 契约。#1480 中的 KDP 架构提案尚未冻结，在 DIS 0.1.0 中仅作为非规范性背景。
+本文将冻结的 Product/L1 与 #1484 后继检查点转换为标准边界、逻辑契约和符合性要求，不是 SDK ABI、Runtime API 或具体实现设计。历史 v0.10.3 保留其既有 v0.7 实现；后继检查点不证明 v0.10.3 已实现 KDP 或 DIS。
 
 ## 1. 标准定位
 
@@ -71,7 +71,7 @@ User / System Input
 - Workflow/Graph 描述领域解决过程，不成为第二个 Scheduler。
 - Procedure 是私有处理单元；Tool 是明确跨边界 Operation。
 - UNKNOWN、AMBIGUOUS、CONFLICT、OUT_OF_SCOPE、NEEDS_INPUT、NEEDS_REVIEW、PARTIAL 和 FAILED 不得静默变成成功。
-- 状态转移、持久化和外部 Effect 仍由既有唯一 DomainHarness Runtime 及其冻结的 Kernel/Microkernel、Host/Effect 契约执行。DIS 不创建第二套权威；#1480 在独立冻结前仍是非规范性架构候选。
+- 最小 Boot 验证精确 KDP Primary pin，通过唯一固定入口移交。KDP Primary 初始化自身核心时不依赖 SDK 或 Business Package。唯一 Kernel Core 拥有 Runtime、admission、状态、Effect、Journal、replay 和 recovery；内部 Package System 负责精确 Package DAG 解析、加载、Hook 绑定和生命周期。Host 仅在 Kernel admission 后执行物理操作。不存在第二套 Runtime、Scheduler、Journal 或 Effect 权威；原 Microkernel 不是独立后继层。
 
 ### 2.3 固定 Resolver Precedence
 
@@ -121,7 +121,7 @@ Unit 是可描述、可引用、可资格确认和可组合的逻辑单元，不
 - Pipeline 是该 Workflow 的具体执行组织，描述节点、顺序、分支和终态。
 - Composition Graph 是 DIS 对 Pipeline 的结构化、可验证表示。
 - Workflow Unit 可暴露为 Semantic Component；Graph 是其实现/组合制品，二者通过精确引用绑定。
-- Pipeline 不是 Scheduler；Node 执行仍由冻结的 DomainHarness v0.7 Kernel/Microkernel、Domain Runtime 和 Host/Effect 契约管理。successor authority 服从 #1484 的 Boot 最小引导 → KDP Primary checkpoint；已发布 v0.10.3 源码基线仍保留历史 v0.7 Microkernel 权威。
+- Pipeline 不是 Scheduler；后继执行由唯一 KDP Kernel Core 和 Host/Effect 边界管理。已发布 v0.10.3 保留历史 v0.7 实现，不声称已实现后继架构。
 - Workflow 可组合 Procedure、Tool、Recognizer、Decision 和 Validator，不因此创建新的 Component family。
 
 ### 3.4 Identity / Qualification / Execution
