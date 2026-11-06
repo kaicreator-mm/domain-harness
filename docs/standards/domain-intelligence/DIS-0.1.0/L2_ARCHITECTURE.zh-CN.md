@@ -263,7 +263,7 @@ DIS-L2-F001..F012 是统一的 L2 架构审核编号，与初始 Demo 的 DIS-F-
 
 R2 代码修复记录在 commit 3ca5f9d 和 f842fac。R3 进一步统一 Reference Consumer、独立 Python Conformance 与规范文本中的 optional control-condition 语义，并在 Graph 静态验证阶段拒绝不支持的 operator。中文架构文档已补齐英文版中的 Workflow / Pipeline / Composition Graph 契约。
 
-F001-F011 已在 L2 候选的 R4 快照 `ff5f13823dc44fe2ca5e2fc03db4591c3dc319e5` 关闭：该精确 HEAD 的 LOCAL_VALIDATION 回执 #6666234171 已通过 Node、Demo、Python Conformance、16/16 实际执行输入/输出校验、16 项条件语义向量、optional data binding、实际 Trace 校验、25/25 Resource Closure 哈希、Package Digest，以及两项仓库 Woodpecker 检查。全量快照源码审核 #5788712224 与四路径修复增量审核 #5789678159 合并覆盖该 R4 快照，结论为 P0=0/P1=0/P2=0；审核 #5790281099 覆盖其后的 R5 双文档增量。这些历史审核和验证回执分别绑定各自的快照，不能替代后续变更的审核或验证。当前集成 R6 批次还在原 46-path 写集内同步 #1484 权威、#1485 Capability/Recognizer/Pipeline 契约和 #1487 生命周期契约；最终 exact-HEAD 验证与独立审核仍待完成，必须绑定最终 commit 后才能 L2 Freeze。F012 仍保持 OPEN，并明确推迟到 Release Qualification 前置门禁：发布资格确认前必须使用第二个实质不同的 Domain Profile 验证泛化能力，xDownload 单独不足以证明泛化。d8c516e 的历史 Demo PASS 仅保留为历史证据，不作为当前候选验证依据。
+F001-F011 首先在 R4 快照 `ff5f13823dc44fe2ca5e2fc03db4591c3dc319e5` 关闭；其精确 HEAD 回执 #6666234171 及源码审核 #5788712224/#5789678159/#5790281099 均是分别绑定对应历史快照的证据。之后审核 #5798666151 在集成候选中发现六项 P1，六项问题均已在原始 46-path 写集内修复。修复后的实现基线 `16bee6937995fb211ab7c2fbcffbe68da69c9d62` / TREE `8d5333ef171bb3fd484e4412343cc49e068ca97c` 通过精确 HEAD 回执 #6694493616、独立源码审核和独立验证 #5806362784（P0=0/P1=0/P2=0），以及 Woodpecker #2183 两项检查。当前 PR HEAD 是后续双语文档状态增量；在正式 L2 Freeze Checkpoint 前，必须对该新 HEAD 完成独立复核并确认其自身 CI 状态。F012 仍保持 OPEN，并明确推迟到 Release Qualification 前置门禁：发布资格确认前必须使用第二个实质不同的 Domain Profile 验证泛化能力，xDownload 单独不足以证明泛化。d8c516e 的历史 Demo PASS 仅保留为历史证据，不作为当前候选验证依据。
 
 
 ## 12. L2 Freeze Gate
