@@ -365,6 +365,40 @@
     }
   },
   "$defs": {
+    "lifecycleRecord": {
+      "type": "object",
+      "required": ["recordId", "recordDigest", "transition", "subject", "dependencyClosureDigest", "previousRecordId", "previousRecordDigest", "actor", "recordedAt"],
+      "properties": {
+        "recordId": { "type": "string", "minLength": 1 },
+        "recordDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "transition": { "enum": ["OBSERVED", "CANDIDATE", "VALIDATED", "PROMOTED", "REJECTED", "WITHDRAWN", "EXPIRED", "SUPERSEDED"] },
+        "subject": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "id", "revision", "sha256"],
+          "properties": {
+            "kind": { "enum": ["unit", "rule", "graph"] },
+            "id": { "type": "string", "minLength": 1 },
+            "revision": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "dependencyClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "previousRecordId": { "type": ["string", "null"] },
+        "previousRecordDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "actor": { "type": "object", "required": ["id", "role"], "properties": { "id": { "type": "string", "minLength": 1 }, "role": { "type": "string", "minLength": 1 } } },
+        "policy": { "type": "object", "required": ["id", "revision"], "properties": { "id": { "type": "string", "minLength": 1 }, "revision": { "type": "string", "minLength": 1 } } },
+        "recordedAt": { "type": "string", "format": "date-time" },
+        "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["path", "sha256"], "properties": { "path": { "type": "string", "minLength": 1 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } } },
+        "validation": { "type": "object", "required": ["result", "subjectDigest", "dependencyClosureDigest", "profile", "validator", "evidenceRefs", "reportSchema", "report", "reportSha256"] },
+        "promotion": { "type": "object", "required": ["decision", "validationRecordId", "validationRecordDigest", "policy", "priorPromotedBaseline", "authorizationEvidence", "authorizationEvidenceSha256"] }
+      },
+      "allOf": [
+        { "if": { "properties": { "transition": { "enum": ["OBSERVED", "CANDIDATE", "REJECTED", "WITHDRAWN", "EXPIRED", "SUPERSEDED"] } }, "required": ["transition"] }, "then": { "required": ["policy", "evidenceRefs"] } },
+        { "if": { "properties": { "transition": { "const": "VALIDATED" } }, "required": ["transition"] }, "then": { "required": ["policy", "validation"] } },
+        { "if": { "properties": { "transition": { "const": "PROMOTED" } }, "required": ["transition"] }, "then": { "required": ["promotion"] } },
+        { "if": { "properties": { "transition": { "const": "SUPERSEDED" } }, "required": ["transition"] }, "then": { "required": ["successor"] } }
+      ]
+    },
     "ioContract": {
       "type": "object",
       "additionalProperties": false,

@@ -1,5 +1,7 @@
 # Domain Intelligence Standard（DIS）0.1.0 — Demo Revised Candidate
 
+R6 契约澄清：Consumer 必须执行其支持的失败动作，遇到不支持的语义必须 fail-closed；终态必须与声明动作一致。Recognizer 输出必须区分冲突声明与超出范围的输入，并保留证据。必须重放精确主体的历史，包括未选主体与终止处置。重新验证后须获得新的授权晋升；回滚通过新 Package 锁选择另一已晋升的精确版本。Validation Report 必须绑定场景、发现、反例、可复现信息以及主体和闭包摘要。Promotion Decision 必须绑定先前基线和明确的权威证据。合成参考夹具不得冒充生产资质或授权。
+
 状态：L2_STANDARD_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
 分支：dis/0.1.0-l2-candidate
 L2 Issue：#1481

@@ -4,8 +4,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
-import { loadDemo, runPipeline, bindAvailableData, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, validatePreconditions, validateCapabilityContracts, resolveProviderSelection, validateLifecycleRecords, recognizePlayerNormalized, handlers, assertInsidePackage, conditionMatches, DisExecutionError } from '../src/runner.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadDemo, runPipeline, bindAvailableData, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, validatePreconditions, referenceFailureAction, validateReferenceFeedback, validateCapabilityContracts, resolveProviderSelection, validateSelectedGraph, replayLifecycle, validateLifecycleRecords, recognizePlayerNormalized, handlers, assertInsidePackage, conditionMatches, DisExecutionError } from '../src/runner.mjs';
 import { loadVerifiedDemo, verifyResourceClosure } from '../src/verified-loader.mjs';
 
 const loadedPromise = loadVerifiedDemo();
@@ -49,6 +49,95 @@ function refreshChain(identity, subjectId) {
   refreshLock(identity);
 }
 
+function makeSuccessorHistory(records) {
+  const successor = structuredClone(records), priorPromotion = records.at(-1);
+  for (let i = 0; i < successor.length; i += 1) {
+    const record = successor[i];
+    record.recordId += '.successor';
+    record.subject.revision = '2.0.0';
+    record.subject.sha256 = 'b'.repeat(64);
+    if (i) {
+      record.previousRecordId = successor[i - 1].recordId;
+      record.previousRecordDigest = successor[i - 1].recordDigest;
+    }
+    if (record.transition === 'VALIDATED') {
+      record.validation.subjectDigest = record.subject.sha256;
+      record.validation.report.subject = structuredClone(record.subject);
+      record.validation.reportSha256 = hashRecord(record.validation.report);
+    }
+    if (record.transition === 'PROMOTED') {
+      record.promotion.validationRecordId = successor[i - 1].recordId;
+      record.promotion.validationRecordDigest = successor[i - 1].recordDigest;
+      record.promotion.priorPromotedBaseline = { kind: 'PROMOTED', recordId: priorPromotion.recordId, recordDigest: priorPromotion.recordDigest };
+    }
+    refreshRecord(record);
+  }
+  return successor;
+}
+
+async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
+  const root = path.join(temporary, 'package');
+  await fs.cp(packageRoot, root, { recursive: true });
+  const read = async (relative) => JSON.parse(await fs.readFile(path.join(root, relative), 'utf8'));
+  const write = async (relative, value) => fs.writeFile(path.join(root, relative), JSON.stringify(value, null, 2) + '\n');
+  const unit = await read('domain/units/recognizer.json');
+  for (const [status, action] of Object.entries(changes)) unit.failure.handling[status].action = action;
+  await write('domain/units/recognizer.json', unit);
+  const manifest = await read('domain/resource-closure.json');
+  if (options.packageRevision) manifest.packageRevision = options.packageRevision;
+  for (const entry of manifest.resources) entry.sha256 = createHash('sha256').update(await fs.readFile(path.join(root, entry.path))).digest('hex');
+  await write('domain/resource-closure.json', manifest);
+  const closureDigest = createHash('sha256').update(await fs.readFile(path.join(root, 'domain/resource-closure.json'))).digest('hex');
+  const resources = new Map(manifest.resources.map((entry) => [entry.path, entry.sha256]));
+  const descriptor = await read('package.json'), identity = descriptor.dis;
+  if (options.packageRevision) {
+    identity.revision = options.packageRevision;
+    identity.selectionLock.packageRevision = options.packageRevision;
+  }
+  if (options.candidateId) {
+    const candidate = unit.implementation.candidates.find((item) => item.candidateId === options.candidateId);
+    Object.assign(identity.selectionLock.selectedCapabilities[0].provider, { candidateId: candidate.candidateId, implementationRef: candidate.ref, artifactRef: candidate.artifactRef, artifactDigest: candidate.artifactDigest });
+  }
+  identity.resourceClosureSha256 = closureDigest;
+  const priorBySubject = new Map();
+  for (const record of identity.lifecycleRecords) {
+    const asset = identity.selectionLock.selectedAssets.find((item) => item.kind === record.subject.kind && item.id === record.subject.id);
+    record.subject.sha256 = resources.get(asset.path);
+    record.dependencyClosureDigest = closureDigest;
+    const previous = priorBySubject.get(asset.id);
+    record.previousRecordId = previous?.recordId || null;
+    record.previousRecordDigest = previous?.recordDigest || null;
+    if (record.transition === 'VALIDATED') {
+      record.validation.subjectDigest = record.subject.sha256;
+      record.validation.dependencyClosureDigest = closureDigest;
+      record.validation.report.subject = structuredClone(record.subject);
+      record.validation.report.dependencyClosure.sha256 = closureDigest;
+      record.validation.reportSha256 = hashRecord(record.validation.report);
+    }
+    if (record.transition === 'PROMOTED') {
+      record.promotion.validationRecordId = previous.recordId;
+      record.promotion.validationRecordDigest = previous.recordDigest;
+    }
+    refreshRecord(record);
+    priorBySubject.set(asset.id, record);
+  }
+  for (const asset of identity.selectionLock.selectedAssets) {
+    asset.sha256 = resources.get(asset.path);
+    const history = identity.lifecycleRecords.filter((record) => record.subject.id === asset.id);
+    const validation = history.find((record) => record.transition === 'VALIDATED');
+    const promotion = history.find((record) => record.transition === 'PROMOTED');
+    Object.assign(asset, { validationRecordId: validation.recordId, validationRecordDigest: validation.recordDigest, promotionRecordId: promotion.recordId, promotionRecordDigest: promotion.recordDigest });
+  }
+  const selected = identity.selectionLock.selectedAssets.find((asset) => asset.id === unit.id);
+  const capability = identity.selectionLock.selectedCapabilities[0];
+  for (const key of ['validationRecordId', 'validationRecordDigest', 'promotionRecordId', 'promotionRecordDigest']) capability[key] = selected[key];
+  refreshLock(identity);
+  await write('package.json', descriptor);
+  const isolated = await import(pathToFileURL(path.join(root, 'src/runner.mjs')).href);
+  const loaded = await isolated.loadDemo({ expectedSelectionLockSha256: identity.selectionLockSha256 });
+  return { isolated, loaded };
+}
+
 test('known player follows control path while data arrives through an independent edge', async () => {
   const loaded = await loadedPromise;
   const result = await runPipeline({ url: 'https://example.test/watch', signals: ['jwplayer.setup({})'] }, loaded);
@@ -87,7 +176,20 @@ test('unknown recognition escalates instead of inventing a player', async () => 
 
 test('invalid input is rejected before recognition', async () => {
   const loaded = await loadedPromise;
-  await assert.rejects(() => runPipeline({ url: 'file:///etc/passwd', signals: [] }, loaded), hasCode('INVALID_INPUT'));
+  await assert.rejects(() => runPipeline({ url: 'not a URL', signals: [] }, loaded), hasCode('INVALID_INPUT'));
+  await assert.rejects(() => runPipeline({ url: 'file:///etc/passwd', signals: [] }, loaded), hasCode('FAILURE_POLICY_REJECT'));
+});
+
+test('conflicting observations are evidenced and clarified; exclusions fail closed', async () => {
+  const loaded = await loadedPromise;
+  const result = await runPipeline({ url: 'https://example.test/watch', signals: ['jwplayer'], claims: [{ sourceId: 'browser', playerId: 'videojs' }] }, loaded);
+  assert.equal(result.trace[0].output.status, 'conflict');
+  assert.equal(result.trace[0].output.conflicts[0].claims.length, 2);
+  assert.ok(result.trace[0].output.evidence.some((entry) => entry.sourceId === 'browser'));
+  assert.equal(result.outcome.status, 'NEEDS_INPUT');
+  for (const input of [{ url: 'ftp://example.test/page', signals: [] }, { url: 'https://example.test', signals: [], encryptedPlayer: true }, { url: 'https://example.test', signals: [], unsupportedPlayerFamily: true }]) {
+    await assert.rejects(() => runPipeline(input, loaded), hasCode('FAILURE_POLICY_REJECT'));
+  }
 });
 
 test('evidence edge independently carries recognizer evidence to terminal validation', async () => {
@@ -424,6 +526,43 @@ test('Package lock deterministically selects one exact implementation candidate 
   assert.equal(again.candidate.candidateId, 'signature-exact-v1');
 });
 
+test('selected Graph must match the loaded manifest identity, path and bytes', async () => {
+  const loaded = await loadedPromise;
+  assert.equal(validateSelectedGraph(loaded.packageIdentity.selectionLock, loaded.closureManifest.graphRef, loaded.graph, loaded.resources), true);
+  for (const [field, value] of [['id', 'other'], ['revision', '9.0.0'], ['path', 'domain/other.json'], ['sha256', '0'.repeat(64)]]) {
+    const lock = structuredClone(loaded.packageIdentity.selectionLock);
+    lock.selectedAssets.find((asset) => asset.kind === 'graph')[field] = value;
+    assert.throws(() => validateSelectedGraph(lock, loaded.closureManifest.graphRef, loaded.graph, loaded.resources), hasCode('SELECTED_GRAPH_IDENTITY_MISMATCH'));
+  }
+});
+
+test('each Package-selected provider drives execution and trace', async () => {
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'dis-provider-selection-'));
+  try {
+    for (const candidateId of ['signature-exact-v1', 'signature-normalized-v1']) {
+      const root = path.join(temporary, candidateId);
+      await fs.cp(packageRoot, root, { recursive: true });
+      const descriptorPath = path.join(root, 'package.json');
+      const descriptor = JSON.parse(await fs.readFile(descriptorPath, 'utf8'));
+      const unit = JSON.parse(await fs.readFile(path.join(root, 'domain/units/recognizer.json'), 'utf8'));
+      const candidate = unit.implementation.candidates.find((item) => item.candidateId === candidateId);
+      Object.assign(descriptor.dis.selectionLock.selectedCapabilities[0].provider, {
+        candidateId, implementationRef: candidate.ref, artifactRef: candidate.artifactRef, artifactDigest: candidate.artifactDigest,
+      });
+      refreshLock(descriptor.dis);
+      await fs.writeFile(descriptorPath, JSON.stringify(descriptor));
+      const isolated = await import(pathToFileURL(path.join(root, 'src/runner.mjs')).href);
+      const loaded = await isolated.loadDemo({ expectedSelectionLockSha256: descriptor.dis.selectionLockSha256 });
+      const result = await isolated.runPipeline({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, loaded);
+      assert.equal(result.trace[0].implementationCandidateId, candidateId);
+      assert.equal(result.trace[0].implementationRef, candidate.ref);
+      assert.equal(result.trace[0].output.status, candidateId === 'signature-exact-v1' ? 'unknown' : 'recognized');
+    }
+  } finally {
+    await fs.rm(temporary, { recursive: true, force: true });
+  }
+});
+
 test('provider selection fails closed for missing, ambiguous and incompatible candidates', async () => {
   const loaded = await loadedPromise;
   const unit = loaded.unitsById.get('xdownload.player.recognizer');
@@ -448,10 +587,11 @@ test('alternative normalized provider is an explicit implementation, not ambient
     knowledge: loaded.knowledge,
     catalogs: loaded.catalogs,
     evidence: {},
+    unit: loaded.unitsById.get('xdownload.player.recognizer'),
   });
   assert.equal(result.status, 'recognized');
   assert.equal(result.candidates[0], 'jwplayer');
-  assert.equal(recognizePlayerNormalized({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, { knowledge: loaded.knowledge }).status, 'recognized');
+  assert.equal(recognizePlayerNormalized({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, { knowledge: loaded.knowledge, unit: loaded.unitsById.get('xdownload.player.recognizer') }).status, 'recognized');
 });
 
 test('Unit failure profile has one canonical handling map and rejects malformed policy values', async () => {
@@ -468,6 +608,54 @@ test('Unit failure profile has one canonical handling map and rejects malformed 
   const mutable = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
   mutable.qualification.stage = 'PROMOTED';
   assert.throws(() => validateUnit(mutable), hasCode('MUTABLE_QUALIFICATION_STAGE_FORBIDDEN'));
+});
+
+test('reference failure dispatch consumes the declared policy and rejects unsupported actions', async () => {
+  const unit = structuredClone((await loadedPromise).unitsById.get('xdownload.player.recognizer'));
+  assert.equal(referenceFailureAction(unit, 'AMBIGUOUS'), 'CLARIFY');
+  assert.equal(referenceFailureAction(unit, 'UNKNOWN'), 'PRESERVE_UNKNOWN');
+  unit.failure.handling.AMBIGUOUS.action = 'REJECT';
+  assert.equal(referenceFailureAction(unit, 'AMBIGUOUS'), 'REJECT');
+  unit.failure.handling.AMBIGUOUS.action = 'WAIT';
+  assert.throws(() => referenceFailureAction(unit, 'AMBIGUOUS'), hasCode('UNSUPPORTED_FAILURE_POLICY'));
+  assert.equal(referenceFailureAction(unit, 'CONFLICT'), 'CLARIFY');
+  assert.throws(() => referenceFailureAction(unit, 'PARTIAL'), hasCode('UNDECLARED_FAILURE_STATUS'));
+});
+
+test('Package-pinned failure policy changes execution and precondition handling', async () => {
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'dis-failure-policy-'));
+  try {
+    const reject = await copyWithRecognizerPolicy(path.join(temporary, 'reject'), { AMBIGUOUS: 'REJECT' });
+    await assert.rejects(() => reject.isolated.runPipeline({ url: 'https://example.test', signals: ['jwplayer', 'videojs'] }, reject.loaded), (error) => error.code === 'FAILURE_POLICY_REJECT');
+    const unsupported = await copyWithRecognizerPolicy(path.join(temporary, 'unsupported'), { INVALID_INPUT: 'WAIT' });
+    await assert.rejects(() => unsupported.isolated.runPipeline({ url: 'https://example.test' }, unsupported.loaded), (error) => error.code === 'UNSUPPORTED_FAILURE_POLICY');
+  } finally {
+    await fs.rm(temporary, { recursive: true, force: true });
+  }
+});
+
+test('feedback retains provenance and cannot change an already-pinned execution', async () => {
+  const loaded = await loadedPromise;
+  const beforeLock = hashRecord(loaded.packageIdentity.selectionLock);
+  const beforeUnits = JSON.stringify([...loaded.unitsById]);
+  const input = { url: 'https://example.test', signals: ['jwplayer'] };
+  const before = await runPipeline(input, loaded);
+  const feedback = { traceId: 'synthetic-trace-1', packageLockSha256: beforeLock, provenance: 'MODEL_INFERRED', claimedProvenance: 'MODEL_INFERRED', finding: 'possible alternative marker', disposition: 'PROPOSAL_ONLY' };
+  assert.deepEqual(validateReferenceFeedback(feedback, beforeLock), feedback);
+  assert.throws(() => validateReferenceFeedback({ ...feedback, claimedProvenance: 'SYSTEM_OBSERVED' }, beforeLock), hasCode('INVALID_RUNTIME_FEEDBACK'));
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'dis-future-package-'));
+  try {
+    const future = await copyWithRecognizerPolicy(temporary, {}, { packageRevision: '2.0.0', candidateId: 'signature-normalized-v1' });
+    assert.notEqual(hashRecord(future.loaded.packageIdentity.selectionLock), beforeLock);
+    const futureResult = await future.isolated.runPipeline({ url: 'https://example.test', signals: ['JWPLAYER'] }, future.loaded);
+    assert.equal(futureResult.trace[0].implementationCandidateId, 'signature-normalized-v1');
+    assert.equal(hashRecord(loaded.packageIdentity.selectionLock), beforeLock);
+    assert.equal(JSON.stringify([...loaded.unitsById]), beforeUnits);
+    const after = await runPipeline(input, loaded);
+    assert.deepEqual(after.outcome, before.outcome);
+  } finally {
+    await fs.rm(temporary, { recursive: true, force: true });
+  }
 });
 
 test('append-only lifecycle chain binds exact Unit digest and dependency closure', async () => {
@@ -492,6 +680,180 @@ test('append-only lifecycle chain binds exact Unit digest and dependency closure
   refreshLock(unpromoted);
   assert.throws(() => validateLifecycleRecords(unpromoted, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, unpromoted.selectionLockSha256), hasCode('PACKAGE_PROMOTION_PIN_MISMATCH'));
 });
+
+test('serialized lifecycle histories replay dispositions, revalidation and exact rollback selection', async () => {
+  const loaded = await loadedPromise;
+  const records = loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer');
+  const [candidate, validation, promotion] = structuredClone(records);
+  const successor = makeSuccessorHistory(records);
+  const digest = loaded.packageIdentity.resourceClosureSha256;
+  const key = JSON.stringify([candidate.subject.kind, candidate.subject.id, candidate.subject.revision, candidate.subject.sha256]);
+  for (const transition of ['REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED']) {
+    const end = { recordId: 'test.' + transition, transition, subject: candidate.subject, dependencyClosureDigest: digest, previousRecordId: promotion.recordId, previousRecordDigest: promotion.recordDigest, actor: promotion.actor, policy: promotion.promotion.policy, evidenceRefs: candidate.evidenceRefs, recordedAt: promotion.recordedAt, decision: transition };
+    const prefix = transition === 'SUPERSEDED' ? [...records, ...successor] : records;
+    if (transition === 'SUPERSEDED') end.successor = { subject: successor[2].subject, promotionRecordId: successor[2].recordId, promotionRecordDigest: successor[2].recordDigest };
+    refreshRecord(end);
+    assert.equal(replayLifecycle([...prefix, end], loaded.resources, digest).get(key).state, transition);
+    const identity = structuredClone(loaded.packageIdentity);
+    if (transition === 'SUPERSEDED') identity.lifecycleRecords.push(...successor);
+    identity.lifecycleRecords.push(end);
+    const paths = new Map(loaded.closureManifest.units.map((item) => [item.id, item.path]));
+    assert.throws(() => validateLifecycleRecords(identity, loaded.unitsById, paths, loaded.resources, digest, identity.selectionLockSha256), hasCode('INCOMPLETE_LIFECYCLE_CHAIN'));
+    const invalidRevival = { ...structuredClone(validation), recordId: 'revive.' + transition, previousRecordId: end.recordId, previousRecordDigest: end.recordDigest };
+    refreshRecord(invalidRevival);
+    assert.throws(() => replayLifecycle([...prefix, end, invalidRevival], loaded.resources, digest), hasCode('INCOMPLETE_LIFECYCLE_CHAIN'));
+  }
+  const again = { ...structuredClone(validation), recordId: 'test.revalidation', previousRecordId: promotion.recordId, previousRecordDigest: promotion.recordDigest };
+  refreshRecord(again);
+  assert.equal(replayLifecycle([...records, again], loaded.resources, digest).get(key).state, 'VALIDATED');
+  const repromote = { ...structuredClone(promotion), recordId: 'test.repromotion', previousRecordId: again.recordId, previousRecordDigest: again.recordDigest };
+  Object.assign(repromote.promotion, { validationRecordId: again.recordId, validationRecordDigest: again.recordDigest, priorPromotedBaseline: { kind: 'PROMOTED', recordId: promotion.recordId, recordDigest: promotion.recordDigest } });
+  refreshRecord(repromote);
+  assert.equal(replayLifecycle([...records, again, repromote], loaded.resources, digest).get(key).promoted.recordId, repromote.recordId);
+  const twoRevisions = replayLifecycle([...records, ...successor], loaded.resources, digest);
+  assert.equal(twoRevisions.get(key).state, 'PROMOTED');
+  assert.equal(twoRevisions.get(JSON.stringify(['unit', candidate.subject.id, '2.0.0', 'b'.repeat(64)])).state, 'PROMOTED');
+  const falseGenesis = structuredClone(successor);
+  falseGenesis[2].promotion.priorPromotedBaseline = { kind: 'GENESIS', reason: 'incorrect' };
+  refreshRecord(falseGenesis[2]);
+  assert.throws(() => replayLifecycle([...records, ...falseGenesis], loaded.resources, digest), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
+  const other = loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.route-decision');
+  assert.equal(replayLifecycle([...records, endForTest(promotion, candidate, digest), ...other], loaded.resources, digest).get(JSON.stringify(['unit', other[0].subject.id, other[0].subject.revision, other[0].subject.sha256])).state, 'PROMOTED');
+});
+
+test('independent lifecycle negative vectors remain rejected after record hashes are recomputed', async () => {
+  const loaded = await loadedPromise;
+  const original = loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer');
+  const vectors = [
+    ['validation without candidate', (h) => h.shift()],
+    ['promotion without validation', (h) => h.splice(1, 1)],
+    ['candidate wrong subject', (h) => { h[0].subject.sha256 = '0'.repeat(64); }],
+    ['stale closure', (h) => { h[1].dependencyClosureDigest = '0'.repeat(64); }],
+    ['self promotion', (h) => { h[2].actor.id = h[0].actor.id; }],
+    ['missing candidate actor', (h) => { h[0].actor = {}; }],
+    ['missing validation policy', (h) => { h[1].policy = {}; }],
+    ['unknown transition', (h) => { h[1].transition = 'SELECTED'; }],
+    ['duplicate id', (h) => { h[1].recordId = h[0].recordId; }],
+    ['stale report digest', (h) => { h[1].validation.reportSha256 = '0'.repeat(64); }],
+    ['unknown report schema', (h) => { h[1].validation.reportSchema = 'unknown'; }],
+    ['missing authorization', (h) => { delete h[2].promotion.authorizationEvidence; }],
+    ['incorrect authorization digest', (h) => { h[2].promotion.authorizationEvidenceSha256 = '0'.repeat(64); }],
+    ['missing promotion baseline', (h) => { delete h[2].promotion.priorPromotedBaseline; }],
+    ['missing candidate evidence', (h) => { h[0].evidenceRefs = []; }],
+    ['invalid validation evidence', (h) => { h[1].validation.evidenceRefs[0].sha256 = '0'.repeat(64); }],
+    ['missing authority', (h) => { h[2].actor.authorityRef = ''; }],
+    ['invalid timestamp', (h) => { h[1].recordedAt = 'not-a-timestamp'; }],
+    ['coverage disagrees with scenarios', (h) => { h[1].validation.coverage.positive += 1; h[1].validation.report.coverage.positive += 1; h[1].validation.reportSha256 = hashRecord(h[1].validation.report); }],
+    ['scenario case omitted', (h) => { h[1].validation.report.tests.pop(); h[1].validation.reportSha256 = hashRecord(h[1].validation.report); }],
+    ['failed scenario cannot be reported as PASS', (h) => { h[1].validation.report.tests[0].result = 'FAIL'; h[1].validation.report.scenarios[0].result = 'FAIL'; h[1].validation.reportSha256 = hashRecord(h[1].validation.report); }],
+  ];
+  for (const [label, mutate] of vectors) {
+    const history = structuredClone(original);
+    mutate(history);
+    for (let i = 0; i < history.length; i += 1) {
+      const record = history[i], previous = history[i - 1];
+      if (previous) {
+        record.previousRecordId = previous.recordId;
+        record.previousRecordDigest = previous.recordDigest;
+      }
+      if (record.transition === 'PROMOTED' && previous?.transition === 'VALIDATED') {
+        record.promotion.validationRecordId = previous.recordId;
+        record.promotion.validationRecordDigest = previous.recordDigest;
+      }
+      refreshRecord(record);
+    }
+    assert.throws(() => replayLifecycle(history, loaded.resources, loaded.packageIdentity.resourceClosureSha256), undefined, label);
+  }
+});
+
+test('validation findings and counterexamples remain proposals without granting promotion', async () => {
+  const loaded = await loadedPromise;
+  const history = structuredClone(loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer').slice(0, 2));
+  const report = history[1].validation.report;
+  report.findings = [{ id: 'synthetic-finding', severity: 'P2', description: 'simulator observation', resolution: 'review before production' }];
+  report.counterexamples = ['synthetic counterexample'];
+  history[1].validation.reportSha256 = hashRecord(report);
+  refreshRecord(history[1]);
+  const replay = replayLifecycle(history, loaded.resources, loaded.packageIdentity.resourceClosureSha256);
+  const key = JSON.stringify([history[0].subject.kind, history[0].subject.id, history[0].subject.revision, history[0].subject.sha256]);
+  assert.equal(replay.get(key).state, 'VALIDATED');
+  assert.equal(replay.get(key).promoted, null);
+  assert.equal(replay.get(key).validated.validation.report.counterexamples[0], 'synthetic counterexample');
+  assert.equal(replay.get(key).validated.validation.report.findings[0].id, 'synthetic-finding');
+});
+
+test('observation stays an evidenced occurrence until a candidate is explicitly produced', async () => {
+  const loaded = await loadedPromise;
+  const [candidate] = structuredClone(loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer'));
+  const observation = { recordId: 'synthetic.observation', transition: 'OBSERVED', subject: candidate.subject, dependencyClosureDigest: candidate.dependencyClosureDigest, previousRecordId: null, previousRecordDigest: null, actor: { id: 'xdownload-demo-observer', role: 'observation-source', authorityRef: candidate.actor.authorityRef }, policy: { id: 'xdownload-demo/observation-policy', revision: '1.0.0' }, evidenceRefs: candidate.evidenceRefs, recordedAt: candidate.recordedAt, provenance: 'MODEL_INFERRED' };
+  refreshRecord(observation);
+  const observed = replayLifecycle([observation], loaded.resources, candidate.dependencyClosureDigest);
+  const key = JSON.stringify([candidate.subject.kind, candidate.subject.id, candidate.subject.revision, candidate.subject.sha256]);
+  assert.equal(observed.get(key).state, 'OBSERVED');
+  candidate.previousRecordId = observation.recordId;
+  candidate.previousRecordDigest = observation.recordDigest;
+  refreshRecord(candidate);
+  assert.equal(replayLifecycle([observation, candidate], loaded.resources, candidate.dependencyClosureDigest).get(key).state, 'CANDIDATE');
+  const bad = structuredClone(observation);
+  bad.provenance = 'PROMOTED_FACT';
+  refreshRecord(bad);
+  assert.throws(() => replayLifecycle([bad], loaded.resources, candidate.dependencyClosureDigest), hasCode('INVALID_LIFECYCLE_ACTOR_OR_POLICY'));
+});
+
+test('historical closure remains auditable while a changed closure requires fresh validation', async () => {
+  const loaded = await loadedPromise;
+  const identity = structuredClone(loaded.packageIdentity);
+  const paths = new Map(loaded.closureManifest.units.map((entry) => [entry.id, entry.path]));
+  const historicalManifest = structuredClone(loaded.closureManifest);
+  historicalManifest.resources.find((entry) => entry.path === 'domain/schemas/recognition-result.schema.json').sha256 = 'c'.repeat(64);
+  const manifestJson = JSON.stringify(historicalManifest);
+  const oldDigest = createHash('sha256').update(manifestJson).digest('hex');
+  identity.selectionLock.historicalClosures = [{ sha256: oldDigest, manifestJson }];
+  const history = identity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer');
+  for (const record of history) {
+    record.dependencyClosureDigest = oldDigest;
+    if (record.transition === 'VALIDATED') {
+      record.validation.dependencyClosureDigest = oldDigest;
+      record.validation.report.dependencyClosure.sha256 = oldDigest;
+      record.validation.reportSha256 = hashRecord(record.validation.report);
+    }
+  }
+  refreshChain(identity, 'xdownload.player.recognizer');
+  assert.throws(() => validateLifecycleRecords(identity, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, identity.selectionLockSha256), hasCode('INVALID_LIFECYCLE_VALIDATION'));
+  const oldPromotion = history.find((record) => record.transition === 'PROMOTED');
+  const nextValidation = structuredClone(history.find((record) => record.transition === 'VALIDATED'));
+  nextValidation.recordId = 'synthetic.current.validation';
+  nextValidation.previousRecordId = oldPromotion.recordId;
+  nextValidation.previousRecordDigest = oldPromotion.recordDigest;
+  nextValidation.dependencyClosureDigest = loaded.packageIdentity.resourceClosureSha256;
+  nextValidation.validation.dependencyClosureDigest = loaded.packageIdentity.resourceClosureSha256;
+  nextValidation.validation.report.dependencyClosure.sha256 = loaded.packageIdentity.resourceClosureSha256;
+  nextValidation.validation.reportSha256 = hashRecord(nextValidation.validation.report);
+  refreshRecord(nextValidation);
+  const nextPromotion = structuredClone(oldPromotion);
+  nextPromotion.recordId = 'synthetic.current.promotion';
+  nextPromotion.previousRecordId = nextValidation.recordId;
+  nextPromotion.previousRecordDigest = nextValidation.recordDigest;
+  nextPromotion.dependencyClosureDigest = loaded.packageIdentity.resourceClosureSha256;
+  Object.assign(nextPromotion.promotion, { validationRecordId: nextValidation.recordId, validationRecordDigest: nextValidation.recordDigest, priorPromotedBaseline: { kind: 'PROMOTED', recordId: oldPromotion.recordId, recordDigest: oldPromotion.recordDigest } });
+  refreshRecord(nextPromotion);
+  identity.lifecycleRecords.push(nextValidation, nextPromotion);
+  for (const entry of [identity.selectionLock.selectedAssets.find((item) => item.id === 'xdownload.player.recognizer'), identity.selectionLock.selectedCapabilities[0]]) {
+    Object.assign(entry, { validationRecordId: nextValidation.recordId, validationRecordDigest: nextValidation.recordDigest, promotionRecordId: nextPromotion.recordId, promotionRecordDigest: nextPromotion.recordDigest });
+  }
+  refreshLock(identity);
+  assert.equal(validateLifecycleRecords(identity, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, identity.selectionLockSha256), true);
+  identity.selectionLock.historicalClosures[0].manifestJson += ' ';
+  refreshLock(identity);
+  assert.throws(() => validateLifecycleRecords(identity, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, identity.selectionLockSha256), hasCode('INVALID_HISTORICAL_CLOSURE'));
+  assert.equal(loaded.packageIdentity.selectionLock.historicalClosures, undefined);
+});
+
+function endForTest(promotion, candidate, digest) {
+  const end = { recordId: 'test.withdrawn', transition: 'WITHDRAWN', subject: candidate.subject, dependencyClosureDigest: digest, previousRecordId: promotion.recordId, previousRecordDigest: promotion.recordDigest, actor: promotion.actor, policy: promotion.promotion.policy, evidenceRefs: candidate.evidenceRefs, recordedAt: promotion.recordedAt, decision: 'WITHDRAWN' };
+  refreshRecord(end);
+  return end;
+}
 
 test('Package locks bind all executed assets, profile and independent promotion authority', async () => {
   const loaded = await loadedPromise;
@@ -526,6 +888,8 @@ test('fixture-only evidence cannot support a rehashed validation and promotion c
   const validated = identity.lifecycleRecords.find((record) => record.transition === 'VALIDATED');
   const promoted = identity.lifecycleRecords.find((record) => record.transition === 'PROMOTED');
   validated.validation.evidenceRefs = validated.validation.evidenceRefs.filter((item) => item.path === 'fixtures/player-signatures.json');
+  validated.validation.report.dependencyClosure.resources = structuredClone(validated.validation.evidenceRefs);
+  validated.validation.reportSha256 = hashRecord(validated.validation.report);
   refreshRecord(validated);
   promoted.previousRecordDigest = validated.recordDigest;
   promoted.promotion.validationRecordDigest = validated.recordDigest;
@@ -547,8 +911,10 @@ test('recomputed lifecycle records still require coverage and every Candidate au
   const noCoverage = structuredClone(loaded.packageIdentity);
   const validated = noCoverage.lifecycleRecords.find((record) => record.subject.id === 'xdownload.player.recognizer' && record.transition === 'VALIDATED');
   Object.assign(validated.validation.coverage, { positive: 0, negative: 0, boundary: 0 });
+  validated.validation.report.coverage = structuredClone(validated.validation.coverage);
+  validated.validation.reportSha256 = hashRecord(validated.validation.report);
   refreshChain(noCoverage, 'xdownload.player.recognizer');
-  assert.throws(() => verify(noCoverage), hasCode('INVALID_LIFECYCLE_COVERAGE'));
+  assert.throws(() => verify(noCoverage), hasCode('INVALID_VALIDATION_REPORT'));
   const noCandidate = structuredClone(loaded.packageIdentity);
   const candidate = noCandidate.lifecycleRecords.find((record) => record.subject.id === 'xdownload.player.route-decision' && record.transition === 'CANDIDATE');
   candidate.actor = {};

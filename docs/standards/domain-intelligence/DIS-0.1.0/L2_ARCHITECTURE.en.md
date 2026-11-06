@@ -1,6 +1,18 @@
 # DIS 0.1.0 — L2 Architecture & Conformance Model
 
 Status: L2_ARCHITECTURE_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
+
+### R6 repair contract and status
+
+R6 review #5798666151 blocked the `aab97e0` candidate on six P1 findings; earlier snapshot evidence does not close them. A repaired candidate remains subject to fresh exact-HEAD validation and independent review. F012 and #1486 remain separate gates.
+
+Lifecycle records MUST be replayed per exact subject identity and digest, including non-selected histories. Each transition binds its prior record, actor, policy, time, evidence and dependency closure. Re-validation invalidates the previous effective promotion until an authorized new Promotion Decision; rejected, withdrawn, expired and superseded histories cannot be revived by name. Rollback selects an independently promoted earlier exact revision through a new immutable Package lock; it does not rewrite an existing Package or revive a terminated history.
+
+Historical closure manifests are authenticated by raw-byte digest inside the externally trusted Package lock before their resource digests are used to replay older records. Historical evidence is not current qualification: a required selected subject must have current-closure validation and a subsequent promotion.
+
+Validation MUST bind a digest of a Validation Report, exact subject and closure, profile, validator, scenario/case identities, findings, counterexamples, limitations and reproducibility environment. Promotion MUST bind the current Validation record, prior promoted baseline or explicit genesis, and authorization evidence for the designated authority. Synthetic demo actors and grants are test fixtures, not production authorization.
+
+The Reference Consumer evaluates declared Recognizer scope and exclusions, retains conflicting claims with their sources, and applies declared failure actions. Unsupported action semantics fail closed. The selected provider reference drives the trusted registry binding and the selected Graph identity, path and digest match the loaded manifest resource.
 L2 Issue: #1481\
 Product/L1: #1477 — FROZEN\
 Product Freeze Commit: b8135aa801eb38fcae2fa1fce3bada541178d5b9\
@@ -241,7 +253,7 @@ The canonical L2 review identifiers are DIS-L2-F001..F012. They are distinct fro
 
 R2 code repairs are recorded in commits 3ca5f9d and f842fac. R3 additionally aligns optional control-condition semantics across the Reference Consumer, independent Python Conformance, and normative text; unsupported condition operators now fail during Graph validation. The Chinese architecture text now includes the Workflow / Pipeline / Composition Graph contract present in English.
 
-F001-F011 are CLOSED for the L2 candidate at the R4 snapshot `ff5f13823dc44fe2ca5e2fc03db4591c3dc319e5`: exact-HEAD LOCAL_VALIDATION receipt #6666234171 passed Node, Demo, Python Conformance, 16/16 executed input/output checks, 16 condition vectors, optional data binding, actual Trace validation, 25/25 Resource Closure hashes, the Package digest, and both repository Woodpecker checks. Full-snapshot source review #5788712224 and four-path repair-delta review #5789678159 cover that R4 snapshot, with P0=0/P1=0/P2=0; review #5790281099 covers the subsequent R5 two-document delta. These historical reviews and validation receipts are bound to their respective snapshots and do not replace review or validation of later changes. The current integrated R6 batch additionally closes #1484 authority synchronization, #1485 Capability/Recognizer/Pipeline contracts and #1487 governed lifecycle contracts in the existing 46-path write set; its final exact-HEAD validation and independent review remain pending and must be recorded against the final commit before L2 Freeze. F012 remains OPEN and is explicitly deferred to the pre-Release Qualification gate: a second materially different Domain Profile is required before release qualification; xDownload alone is not a generality proof. The historical Demo PASS at d8c516e remains historical evidence only and is not used as current-candidate validation.
+F001-F011 were closed for the L2 candidate at the R4 snapshot `ff5f13823dc44fe2ca5e2fc03db4591c3dc319e5`: exact-HEAD LOCAL_VALIDATION receipt #6666234171 passed Node, Demo, Python Conformance, 16/16 executed input/output checks, 16 condition vectors, optional data binding, actual Trace validation, 25/25 Resource Closure hashes, the Package digest, and both repository Woodpecker checks. Full-snapshot source review #5788712224 and four-path repair-delta review #5789678159 cover that R4 snapshot, with P0=0/P1=0/P2=0; review #5790281099 covers the subsequent R5 two-document delta. These historical reviews and validation receipts are bound to their respective snapshots and do not replace review or validation of later changes. Review #5798666151 found six P1 issues in the later integrated candidate; the R6 repair batch addresses those findings within the existing 46-path write set, subject to final exact-HEAD validation and independent review. F012 remains OPEN and is explicitly deferred to the pre-Release Qualification gate: a second materially different Domain Profile is required before release qualification; xDownload alone is not a generality proof. The historical Demo PASS at d8c516e remains historical evidence only and is not used as current-candidate validation.
 
 
 ## 12. L2 Freeze Gate

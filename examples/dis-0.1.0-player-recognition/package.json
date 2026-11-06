@@ -12,7 +12,7 @@
     "revision": "1.0.0",
     "standardVersion": "0.1.0",
     "resourceClosurePath": "domain/resource-closure.json",
-    "resourceClosureSha256": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+    "resourceClosureSha256": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
     "conformanceResources": [
       "src/verified-loader.mjs",
       "src/emit-conformance-traces.mjs",
@@ -29,9 +29,9 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "835444bdc96411a21a41eabee17ec26f7e9941497e73debd2d233c1b92a31f3d"
+          "sha256": "dc6ea9641ba97c363f47e974517bb3db9854dc18ddb250141f2cc65a851958b1"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -51,7 +51,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "09470d294a2849480592ff9f2d8f1ef001f5dc9133d5f299f9ce5c905b0c2e2a"
+        "recordDigest": "251a0c0409ea70887035435b8007094917684812ba8f62deadc8cd53ee35fcf6"
       },
       {
         "recordId": "xdownload.player.recognizer.unit.validated.1",
@@ -60,11 +60,11 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "835444bdc96411a21a41eabee17ec26f7e9941497e73debd2d233c1b92a31f3d"
+          "sha256": "dc6ea9641ba97c363f47e974517bb3db9854dc18ddb250141f2cc65a851958b1"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.recognizer.unit.candidate.1",
-        "previousRecordDigest": "09470d294a2849480592ff9f2d8f1ef001f5dc9133d5f299f9ce5c905b0c2e2a",
+        "previousRecordDigest": "251a0c0409ea70887035435b8007094917684812ba8f62deadc8cd53ee35fcf6",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -75,8 +75,8 @@
         },
         "validation": {
           "result": "PASS",
-          "subjectDigest": "835444bdc96411a21a41eabee17ec26f7e9941497e73debd2d233c1b92a31f3d",
-          "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+          "subjectDigest": "dc6ea9641ba97c363f47e974517bb3db9854dc18ddb250141f2cc65a851958b1",
+          "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
           "profile": {
             "id": "player-recognition-conformance/0.1.0",
             "revision": "0.1.0"
@@ -103,25 +103,230 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408"
+              "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
+              "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "74199b4b78daf88ecc8f9b4400d2d94b290982c54407ffaefcc4bb4fabc996bd"
+              "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
             }
           ],
           "limitations": [
             "REFERENCE_DEMO_ONLY",
             "not production governance evidence"
-          ]
+          ],
+          "reportSchema": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json",
+          "report": {
+            "reportId": "xdownload.player.recognizer.unit.validated.1.synthetic-report",
+            "standard": {
+              "version": "0.1.0",
+              "revision": "0.1.0"
+            },
+            "demo": {
+              "id": "xdownload.player-recognition",
+              "revision": "1.0.0"
+            },
+            "environment": {
+              "runtime": "synthetic fixture; Node 24 and Python 3.13 target",
+              "platform": "synthetic fixture; no production environment asserted"
+            },
+            "command": "REFERENCE_SYNTHETIC_FIXTURE_ONLY",
+            "result": "PASS",
+            "tests": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "result": "PASS"
+              }
+            ],
+            "scenarios": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "category": "ambiguous",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "category": "out_of_scope",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              }
+            ],
+            "findings": [],
+            "counterexamples": [],
+            "limitations": [
+              "SYNTHETIC_REFERENCE_ONLY; not evidence of production qualification"
+            ],
+            "validatedAt": "2026-11-06T00:00:00Z",
+            "subject": {
+              "kind": "unit",
+              "id": "xdownload.player.recognizer",
+              "revision": "1.0.0",
+              "sha256": "dc6ea9641ba97c363f47e974517bb3db9854dc18ddb250141f2cc65a851958b1"
+            },
+            "dependencyClosure": {
+              "sha256": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
+              "resources": [
+                {
+                  "path": "fixtures/player-signatures.json",
+                  "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+                },
+                {
+                  "path": "src/runner.mjs",
+                  "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
+                },
+                {
+                  "path": "scripts/validate.py",
+                  "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
+                },
+                {
+                  "path": "test/runner.test.mjs",
+                  "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
+                }
+              ]
+            },
+            "profile": {
+              "id": "player-recognition-conformance/0.1.0",
+              "revision": "0.1.0"
+            },
+            "validator": {
+              "id": "xdownload-dis-independent-conformance",
+              "version": "0.1.0"
+            },
+            "baseline": {
+              "id": "xdownload.player-signatures",
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            "coverage": {
+              "positive": 4,
+              "negative": 7,
+              "boundary": 2,
+              "heldOut": 0
+            }
+          },
+          "reportSha256": "03098de677c75475337e9036f1388823b237b9daacd2dc8ee90d7ea8a8b3e113"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "402c80b3751726d5ac45d39b40c59dd3e040bf3ae00de2359cd2c2da81eaeb79"
+        "recordDigest": "60169cbf4a072b50a2ffb49c4328c7919c664ee5ab24cba0c1a2dec15059ab64"
       },
       {
         "recordId": "xdownload.player.recognizer.unit.promoted.1",
@@ -130,11 +335,11 @@
           "kind": "unit",
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
-          "sha256": "835444bdc96411a21a41eabee17ec26f7e9941497e73debd2d233c1b92a31f3d"
+          "sha256": "dc6ea9641ba97c363f47e974517bb3db9854dc18ddb250141f2cc65a851958b1"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.recognizer.unit.validated.1",
-        "previousRecordDigest": "402c80b3751726d5ac45d39b40c59dd3e040bf3ae00de2359cd2c2da81eaeb79",
+        "previousRecordDigest": "60169cbf4a072b50a2ffb49c4328c7919c664ee5ab24cba0c1a2dec15059ab64",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -143,17 +348,30 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "402c80b3751726d5ac45d39b40c59dd3e040bf3ae00de2359cd2c2da81eaeb79",
+          "validationRecordDigest": "60169cbf4a072b50a2ffb49c4328c7919c664ee5ab24cba0c1a2dec15059ab64",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote exact reference unit xdownload.player.recognizer for the isolated conformance fixture only."
+          "rationale": "Promote exact reference unit xdownload.player.recognizer for the isolated conformance fixture only.",
+          "priorPromotedBaseline": {
+            "kind": "GENESIS",
+            "reason": "Synthetic reference fixture has no prior promoted subject."
+          },
+          "authorizationEvidence": {
+            "id": "synthetic-reference-governance-grant",
+            "issuer": "xdownload-demo",
+            "subject": "xdownload-demo-governance",
+            "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+            "scope": "REFERENCE_DEMO_ONLY",
+            "outcome": "AUTHORIZED"
+          },
+          "authorizationEvidenceSha256": "555e8b260baf028fb36725c8a81629b579ab0f42f0f7de9781d65f72600f8fb3"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "af0cbc1cce5b725484abf9b6e5c14db46415ca51306a31c60a92bb0ff4ef57b5"
+        "recordDigest": "ff82ab47ddbdbfb0e3b5f25a94b7b0e5bc96f75dca8d1d6ae593a6feb373cd98"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.candidate.1",
@@ -162,9 +380,9 @@
           "kind": "unit",
           "id": "xdownload.player.route-decision",
           "revision": "1.0.0",
-          "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5"
+          "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -184,7 +402,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "10b3ff6bf8cf1926c8c4163813b381993d9891aa79ee24dde0127a0073f539fd"
+        "recordDigest": "ef20c3d7702bbdd02075db0a23a8df836cc4ca268def571c7233f1c08c16b9ec"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.validated.1",
@@ -193,11 +411,11 @@
           "kind": "unit",
           "id": "xdownload.player.route-decision",
           "revision": "1.0.0",
-          "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5"
+          "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.route-decision.unit.candidate.1",
-        "previousRecordDigest": "10b3ff6bf8cf1926c8c4163813b381993d9891aa79ee24dde0127a0073f539fd",
+        "previousRecordDigest": "ef20c3d7702bbdd02075db0a23a8df836cc4ca268def571c7233f1c08c16b9ec",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -208,8 +426,8 @@
         },
         "validation": {
           "result": "PASS",
-          "subjectDigest": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5",
-          "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+          "subjectDigest": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5",
+          "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
           "profile": {
             "id": "player-route-conformance/0.1.0",
             "revision": "0.1.0"
@@ -236,25 +454,230 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408"
+              "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
+              "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "74199b4b78daf88ecc8f9b4400d2d94b290982c54407ffaefcc4bb4fabc996bd"
+              "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
             }
           ],
           "limitations": [
             "REFERENCE_DEMO_ONLY",
             "not production governance evidence"
-          ]
+          ],
+          "reportSchema": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json",
+          "report": {
+            "reportId": "xdownload.player.route-decision.unit.validated.1.synthetic-report",
+            "standard": {
+              "version": "0.1.0",
+              "revision": "0.1.0"
+            },
+            "demo": {
+              "id": "xdownload.player-recognition",
+              "revision": "1.0.0"
+            },
+            "environment": {
+              "runtime": "synthetic fixture; Node 24 and Python 3.13 target",
+              "platform": "synthetic fixture; no production environment asserted"
+            },
+            "command": "REFERENCE_SYNTHETIC_FIXTURE_ONLY",
+            "result": "PASS",
+            "tests": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "result": "PASS"
+              }
+            ],
+            "scenarios": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "category": "ambiguous",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "category": "out_of_scope",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              }
+            ],
+            "findings": [],
+            "counterexamples": [],
+            "limitations": [
+              "SYNTHETIC_REFERENCE_ONLY; not evidence of production qualification"
+            ],
+            "validatedAt": "2026-11-06T00:00:00Z",
+            "subject": {
+              "kind": "unit",
+              "id": "xdownload.player.route-decision",
+              "revision": "1.0.0",
+              "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5"
+            },
+            "dependencyClosure": {
+              "sha256": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
+              "resources": [
+                {
+                  "path": "fixtures/player-signatures.json",
+                  "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+                },
+                {
+                  "path": "src/runner.mjs",
+                  "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
+                },
+                {
+                  "path": "scripts/validate.py",
+                  "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
+                },
+                {
+                  "path": "test/runner.test.mjs",
+                  "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
+                }
+              ]
+            },
+            "profile": {
+              "id": "player-route-conformance/0.1.0",
+              "revision": "0.1.0"
+            },
+            "validator": {
+              "id": "xdownload-dis-independent-conformance",
+              "version": "0.1.0"
+            },
+            "baseline": {
+              "id": "xdownload.player-signatures",
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            "coverage": {
+              "positive": 4,
+              "negative": 7,
+              "boundary": 2,
+              "heldOut": 0
+            }
+          },
+          "reportSha256": "54bad89a9dd03ea21e8ec51379594ebfc248e38c56b163a5b41d9ded00bd79d0"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "8c23c3895bde8175770ab4091d3fd04fbd5e34d35f9bef9a068989e6c0fd1384"
+        "recordDigest": "1541a26f4a6f609cd226848b42d60ba83cb5959ae5f656022a816b4788f7a6bc"
       },
       {
         "recordId": "xdownload.player.route-decision.unit.promoted.1",
@@ -263,11 +686,11 @@
           "kind": "unit",
           "id": "xdownload.player.route-decision",
           "revision": "1.0.0",
-          "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5"
+          "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.route-decision.unit.validated.1",
-        "previousRecordDigest": "8c23c3895bde8175770ab4091d3fd04fbd5e34d35f9bef9a068989e6c0fd1384",
+        "previousRecordDigest": "1541a26f4a6f609cd226848b42d60ba83cb5959ae5f656022a816b4788f7a6bc",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -276,17 +699,30 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.route-decision.unit.validated.1",
-          "validationRecordDigest": "8c23c3895bde8175770ab4091d3fd04fbd5e34d35f9bef9a068989e6c0fd1384",
+          "validationRecordDigest": "1541a26f4a6f609cd226848b42d60ba83cb5959ae5f656022a816b4788f7a6bc",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote exact reference unit xdownload.player.route-decision for the isolated conformance fixture only."
+          "rationale": "Promote exact reference unit xdownload.player.route-decision for the isolated conformance fixture only.",
+          "priorPromotedBaseline": {
+            "kind": "GENESIS",
+            "reason": "Synthetic reference fixture has no prior promoted subject."
+          },
+          "authorizationEvidence": {
+            "id": "synthetic-reference-governance-grant",
+            "issuer": "xdownload-demo",
+            "subject": "xdownload-demo-governance",
+            "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+            "scope": "REFERENCE_DEMO_ONLY",
+            "outcome": "AUTHORIZED"
+          },
+          "authorizationEvidenceSha256": "555e8b260baf028fb36725c8a81629b579ab0f42f0f7de9781d65f72600f8fb3"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "8c567714e2ed8b5fb2f22ba33141bc3af7e67f460d9e11f568eb133ecf44f2d3"
+        "recordDigest": "e5cb3d5789c8281ebcf9fb4bbc5bed3b88612e3c10091b7900c2cd9ad2e42ef5"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.candidate.1",
@@ -297,7 +733,7 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -317,7 +753,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "731653e5f49aae45ccffc264cad7edf1a9260f982f12b5677d3524085d87b99d"
+        "recordDigest": "59cab2e4a9dd4317a31e674b31102420618c2a70ff56da2ca93d4614aad48c27"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.validated.1",
@@ -328,9 +764,9 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.resolve-procedure.unit.candidate.1",
-        "previousRecordDigest": "731653e5f49aae45ccffc264cad7edf1a9260f982f12b5677d3524085d87b99d",
+        "previousRecordDigest": "59cab2e4a9dd4317a31e674b31102420618c2a70ff56da2ca93d4614aad48c27",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -342,7 +778,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb",
-          "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+          "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
           "profile": {
             "id": "player-resolution-conformance/0.1.0",
             "revision": "0.1.0"
@@ -369,25 +805,230 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408"
+              "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
+              "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "74199b4b78daf88ecc8f9b4400d2d94b290982c54407ffaefcc4bb4fabc996bd"
+              "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
             }
           ],
           "limitations": [
             "REFERENCE_DEMO_ONLY",
             "not production governance evidence"
-          ]
+          ],
+          "reportSchema": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json",
+          "report": {
+            "reportId": "xdownload.player.resolve-procedure.unit.validated.1.synthetic-report",
+            "standard": {
+              "version": "0.1.0",
+              "revision": "0.1.0"
+            },
+            "demo": {
+              "id": "xdownload.player-recognition",
+              "revision": "1.0.0"
+            },
+            "environment": {
+              "runtime": "synthetic fixture; Node 24 and Python 3.13 target",
+              "platform": "synthetic fixture; no production environment asserted"
+            },
+            "command": "REFERENCE_SYNTHETIC_FIXTURE_ONLY",
+            "result": "PASS",
+            "tests": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "result": "PASS"
+              }
+            ],
+            "scenarios": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "category": "ambiguous",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "category": "out_of_scope",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              }
+            ],
+            "findings": [],
+            "counterexamples": [],
+            "limitations": [
+              "SYNTHETIC_REFERENCE_ONLY; not evidence of production qualification"
+            ],
+            "validatedAt": "2026-11-06T00:00:00Z",
+            "subject": {
+              "kind": "unit",
+              "id": "xdownload.player.resolve-procedure",
+              "revision": "1.0.0",
+              "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
+            },
+            "dependencyClosure": {
+              "sha256": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
+              "resources": [
+                {
+                  "path": "fixtures/player-signatures.json",
+                  "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+                },
+                {
+                  "path": "src/runner.mjs",
+                  "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
+                },
+                {
+                  "path": "scripts/validate.py",
+                  "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
+                },
+                {
+                  "path": "test/runner.test.mjs",
+                  "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
+                }
+              ]
+            },
+            "profile": {
+              "id": "player-resolution-conformance/0.1.0",
+              "revision": "0.1.0"
+            },
+            "validator": {
+              "id": "xdownload-dis-independent-conformance",
+              "version": "0.1.0"
+            },
+            "baseline": {
+              "id": "xdownload.player-signatures",
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            "coverage": {
+              "positive": 4,
+              "negative": 7,
+              "boundary": 2,
+              "heldOut": 0
+            }
+          },
+          "reportSha256": "a2b2b648fb79c2650329487567b753aba4f3d537c021a87653774af3f8516b63"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "0fc319a678b0fb0872dfe99603ac4109f3d85e10ee16aff49bf3438127a2364e"
+        "recordDigest": "d6cdb3b9b2b9ac4cc2a8e9e5c7c17cd22898b7e27c004f068424e39e1173ecda"
       },
       {
         "recordId": "xdownload.player.resolve-procedure.unit.promoted.1",
@@ -398,9 +1039,9 @@
           "revision": "1.0.0",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-        "previousRecordDigest": "0fc319a678b0fb0872dfe99603ac4109f3d85e10ee16aff49bf3438127a2364e",
+        "previousRecordDigest": "d6cdb3b9b2b9ac4cc2a8e9e5c7c17cd22898b7e27c004f068424e39e1173ecda",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -409,17 +1050,30 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-          "validationRecordDigest": "0fc319a678b0fb0872dfe99603ac4109f3d85e10ee16aff49bf3438127a2364e",
+          "validationRecordDigest": "d6cdb3b9b2b9ac4cc2a8e9e5c7c17cd22898b7e27c004f068424e39e1173ecda",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote exact reference unit xdownload.player.resolve-procedure for the isolated conformance fixture only."
+          "rationale": "Promote exact reference unit xdownload.player.resolve-procedure for the isolated conformance fixture only.",
+          "priorPromotedBaseline": {
+            "kind": "GENESIS",
+            "reason": "Synthetic reference fixture has no prior promoted subject."
+          },
+          "authorizationEvidence": {
+            "id": "synthetic-reference-governance-grant",
+            "issuer": "xdownload-demo",
+            "subject": "xdownload-demo-governance",
+            "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+            "scope": "REFERENCE_DEMO_ONLY",
+            "outcome": "AUTHORIZED"
+          },
+          "authorizationEvidenceSha256": "555e8b260baf028fb36725c8a81629b579ab0f42f0f7de9781d65f72600f8fb3"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "685289d90266ced38c8cd1752512c837f02609df29a3b88b8825db0786ddc470"
+        "recordDigest": "abbd7fa3a92c6e2e779ff5b322ea844502da315028958b6a28adefd341682265"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.candidate.1",
@@ -430,7 +1084,7 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -450,7 +1104,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "44491d9ece1f7347efd045170210ead3322bbd02fb441df82297870c3dafafc7"
+        "recordDigest": "63c1cf6825da0ad06d6ef72dc6009e53fee76b2ab0e18081c5095616f1e983ec"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.validated.1",
@@ -461,9 +1115,9 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.bounded-fallback.unit.candidate.1",
-        "previousRecordDigest": "44491d9ece1f7347efd045170210ead3322bbd02fb441df82297870c3dafafc7",
+        "previousRecordDigest": "63c1cf6825da0ad06d6ef72dc6009e53fee76b2ab0e18081c5095616f1e983ec",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -475,7 +1129,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c",
-          "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+          "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
           "profile": {
             "id": "player-fallback-conformance/0.1.0",
             "revision": "0.1.0"
@@ -502,25 +1156,230 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408"
+              "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
+              "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "74199b4b78daf88ecc8f9b4400d2d94b290982c54407ffaefcc4bb4fabc996bd"
+              "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
             }
           ],
           "limitations": [
             "REFERENCE_DEMO_ONLY",
             "not production governance evidence"
-          ]
+          ],
+          "reportSchema": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json",
+          "report": {
+            "reportId": "xdownload.player.bounded-fallback.unit.validated.1.synthetic-report",
+            "standard": {
+              "version": "0.1.0",
+              "revision": "0.1.0"
+            },
+            "demo": {
+              "id": "xdownload.player-recognition",
+              "revision": "1.0.0"
+            },
+            "environment": {
+              "runtime": "synthetic fixture; Node 24 and Python 3.13 target",
+              "platform": "synthetic fixture; no production environment asserted"
+            },
+            "command": "REFERENCE_SYNTHETIC_FIXTURE_ONLY",
+            "result": "PASS",
+            "tests": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "result": "PASS"
+              }
+            ],
+            "scenarios": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "category": "ambiguous",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "category": "out_of_scope",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              }
+            ],
+            "findings": [],
+            "counterexamples": [],
+            "limitations": [
+              "SYNTHETIC_REFERENCE_ONLY; not evidence of production qualification"
+            ],
+            "validatedAt": "2026-11-06T00:00:00Z",
+            "subject": {
+              "kind": "unit",
+              "id": "xdownload.player.bounded-fallback",
+              "revision": "1.0.0",
+              "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
+            },
+            "dependencyClosure": {
+              "sha256": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
+              "resources": [
+                {
+                  "path": "fixtures/player-signatures.json",
+                  "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+                },
+                {
+                  "path": "src/runner.mjs",
+                  "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
+                },
+                {
+                  "path": "scripts/validate.py",
+                  "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
+                },
+                {
+                  "path": "test/runner.test.mjs",
+                  "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
+                }
+              ]
+            },
+            "profile": {
+              "id": "player-fallback-conformance/0.1.0",
+              "revision": "0.1.0"
+            },
+            "validator": {
+              "id": "xdownload-dis-independent-conformance",
+              "version": "0.1.0"
+            },
+            "baseline": {
+              "id": "xdownload.player-signatures",
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            "coverage": {
+              "positive": 4,
+              "negative": 7,
+              "boundary": 2,
+              "heldOut": 0
+            }
+          },
+          "reportSha256": "586319ff0925e5773242a433956112dc833325b0bb12b417cce20a486adf3856"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "b70b339bbcc30406dc3f3304664d62cfe9eed5790dde2ce8879c66f1a6738983"
+        "recordDigest": "5ca05e07877ae566cca9d8332ca29816129590dcbcb836966be56d41356ef41d"
       },
       {
         "recordId": "xdownload.player.bounded-fallback.unit.promoted.1",
@@ -531,9 +1390,9 @@
           "revision": "1.0.0",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-        "previousRecordDigest": "b70b339bbcc30406dc3f3304664d62cfe9eed5790dde2ce8879c66f1a6738983",
+        "previousRecordDigest": "5ca05e07877ae566cca9d8332ca29816129590dcbcb836966be56d41356ef41d",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -542,17 +1401,30 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-          "validationRecordDigest": "b70b339bbcc30406dc3f3304664d62cfe9eed5790dde2ce8879c66f1a6738983",
+          "validationRecordDigest": "5ca05e07877ae566cca9d8332ca29816129590dcbcb836966be56d41356ef41d",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote exact reference unit xdownload.player.bounded-fallback for the isolated conformance fixture only."
+          "rationale": "Promote exact reference unit xdownload.player.bounded-fallback for the isolated conformance fixture only.",
+          "priorPromotedBaseline": {
+            "kind": "GENESIS",
+            "reason": "Synthetic reference fixture has no prior promoted subject."
+          },
+          "authorizationEvidence": {
+            "id": "synthetic-reference-governance-grant",
+            "issuer": "xdownload-demo",
+            "subject": "xdownload-demo-governance",
+            "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+            "scope": "REFERENCE_DEMO_ONLY",
+            "outcome": "AUTHORIZED"
+          },
+          "authorizationEvidenceSha256": "555e8b260baf028fb36725c8a81629b579ab0f42f0f7de9781d65f72600f8fb3"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "4dde7e901c95a7c3784aee00184315524262ad8a04d3e26a37f9a18ffbc50494"
+        "recordDigest": "6818a676e46401213c65f8776dff03e40585190264a7a4c557b0bb541508a5db"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.candidate.1",
@@ -561,9 +1433,9 @@
           "kind": "unit",
           "id": "xdownload.player.outcome-validator",
           "revision": "1.0.0",
-          "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55"
+          "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -583,7 +1455,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "1acd7208018506e014ae1aca576b5d72a63c1e5b000043fd62180f2194c7c248"
+        "recordDigest": "93e0b38e9806281672d4655c5ea8f563aa5481c1ddf88604f62f8c4acc00f9aa"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.validated.1",
@@ -592,11 +1464,11 @@
           "kind": "unit",
           "id": "xdownload.player.outcome-validator",
           "revision": "1.0.0",
-          "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55"
+          "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.outcome-validator.unit.candidate.1",
-        "previousRecordDigest": "1acd7208018506e014ae1aca576b5d72a63c1e5b000043fd62180f2194c7c248",
+        "previousRecordDigest": "93e0b38e9806281672d4655c5ea8f563aa5481c1ddf88604f62f8c4acc00f9aa",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -607,8 +1479,8 @@
         },
         "validation": {
           "result": "PASS",
-          "subjectDigest": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55",
-          "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+          "subjectDigest": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6",
+          "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
           "profile": {
             "id": "player-outcome-conformance/0.1.0",
             "revision": "0.1.0"
@@ -635,25 +1507,230 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408"
+              "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
+              "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "74199b4b78daf88ecc8f9b4400d2d94b290982c54407ffaefcc4bb4fabc996bd"
+              "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
             }
           ],
           "limitations": [
             "REFERENCE_DEMO_ONLY",
             "not production governance evidence"
-          ]
+          ],
+          "reportSchema": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json",
+          "report": {
+            "reportId": "xdownload.player.outcome-validator.unit.validated.1.synthetic-report",
+            "standard": {
+              "version": "0.1.0",
+              "revision": "0.1.0"
+            },
+            "demo": {
+              "id": "xdownload.player-recognition",
+              "revision": "1.0.0"
+            },
+            "environment": {
+              "runtime": "synthetic fixture; Node 24 and Python 3.13 target",
+              "platform": "synthetic fixture; no production environment asserted"
+            },
+            "command": "REFERENCE_SYNTHETIC_FIXTURE_ONLY",
+            "result": "PASS",
+            "tests": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "result": "PASS"
+              }
+            ],
+            "scenarios": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "category": "ambiguous",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "category": "out_of_scope",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              }
+            ],
+            "findings": [],
+            "counterexamples": [],
+            "limitations": [
+              "SYNTHETIC_REFERENCE_ONLY; not evidence of production qualification"
+            ],
+            "validatedAt": "2026-11-06T00:00:00Z",
+            "subject": {
+              "kind": "unit",
+              "id": "xdownload.player.outcome-validator",
+              "revision": "1.0.0",
+              "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6"
+            },
+            "dependencyClosure": {
+              "sha256": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
+              "resources": [
+                {
+                  "path": "fixtures/player-signatures.json",
+                  "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+                },
+                {
+                  "path": "src/runner.mjs",
+                  "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
+                },
+                {
+                  "path": "scripts/validate.py",
+                  "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
+                },
+                {
+                  "path": "test/runner.test.mjs",
+                  "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
+                }
+              ]
+            },
+            "profile": {
+              "id": "player-outcome-conformance/0.1.0",
+              "revision": "0.1.0"
+            },
+            "validator": {
+              "id": "xdownload-dis-independent-conformance",
+              "version": "0.1.0"
+            },
+            "baseline": {
+              "id": "xdownload.player-signatures",
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            "coverage": {
+              "positive": 4,
+              "negative": 7,
+              "boundary": 2,
+              "heldOut": 0
+            }
+          },
+          "reportSha256": "f5d8ee9aa5a7b13069edbed313807cfc7c55db7b39c3811563eeacc4c69b500b"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "719e82c1e819f853dfd9934ac6fc3105194cf5b90feb7207d004d5879b68a896"
+        "recordDigest": "9b45a4e4958bffea75ddb5088f056bc5a8362fe3c099227d4bd3b521a7497adf"
       },
       {
         "recordId": "xdownload.player.outcome-validator.unit.promoted.1",
@@ -662,11 +1739,11 @@
           "kind": "unit",
           "id": "xdownload.player.outcome-validator",
           "revision": "1.0.0",
-          "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55"
+          "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-        "previousRecordDigest": "719e82c1e819f853dfd9934ac6fc3105194cf5b90feb7207d004d5879b68a896",
+        "previousRecordDigest": "9b45a4e4958bffea75ddb5088f056bc5a8362fe3c099227d4bd3b521a7497adf",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -675,17 +1752,30 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-          "validationRecordDigest": "719e82c1e819f853dfd9934ac6fc3105194cf5b90feb7207d004d5879b68a896",
+          "validationRecordDigest": "9b45a4e4958bffea75ddb5088f056bc5a8362fe3c099227d4bd3b521a7497adf",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote exact reference unit xdownload.player.outcome-validator for the isolated conformance fixture only."
+          "rationale": "Promote exact reference unit xdownload.player.outcome-validator for the isolated conformance fixture only.",
+          "priorPromotedBaseline": {
+            "kind": "GENESIS",
+            "reason": "Synthetic reference fixture has no prior promoted subject."
+          },
+          "authorizationEvidence": {
+            "id": "synthetic-reference-governance-grant",
+            "issuer": "xdownload-demo",
+            "subject": "xdownload-demo-governance",
+            "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+            "scope": "REFERENCE_DEMO_ONLY",
+            "outcome": "AUTHORIZED"
+          },
+          "authorizationEvidenceSha256": "555e8b260baf028fb36725c8a81629b579ab0f42f0f7de9781d65f72600f8fb3"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "57f9d9a52c6a15c4543c2dd60ec9359229389d69999f33cbd8a01ea61df7e3b4"
+        "recordDigest": "d1c63bd616b4f99d84034e4267afbf459218bd8054102ad0ee4b92db4b9d1d23"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.candidate.1",
@@ -696,7 +1786,7 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -716,7 +1806,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "d182bc967bf56cfc47b253a14fe9261478d33777be40ff859354f1fb2acd86d6"
+        "recordDigest": "9e0942a725965a0039d2697284952cf41b50d7d98e813d6c6420556af23ea4bd"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.validated.1",
@@ -727,9 +1817,9 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player-recognition.workflow.unit.candidate.1",
-        "previousRecordDigest": "d182bc967bf56cfc47b253a14fe9261478d33777be40ff859354f1fb2acd86d6",
+        "previousRecordDigest": "9e0942a725965a0039d2697284952cf41b50d7d98e813d6c6420556af23ea4bd",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -741,7 +1831,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5",
-          "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+          "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
           "profile": {
             "id": "player-recognition-workflow/0.1.0",
             "revision": "0.1.0"
@@ -768,25 +1858,230 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408"
+              "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
+              "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "74199b4b78daf88ecc8f9b4400d2d94b290982c54407ffaefcc4bb4fabc996bd"
+              "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
             }
           ],
           "limitations": [
             "REFERENCE_DEMO_ONLY",
             "not production governance evidence"
-          ]
+          ],
+          "reportSchema": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json",
+          "report": {
+            "reportId": "xdownload.player-recognition.workflow.unit.validated.1.synthetic-report",
+            "standard": {
+              "version": "0.1.0",
+              "revision": "0.1.0"
+            },
+            "demo": {
+              "id": "xdownload.player-recognition",
+              "revision": "1.0.0"
+            },
+            "environment": {
+              "runtime": "synthetic fixture; Node 24 and Python 3.13 target",
+              "platform": "synthetic fixture; no production environment asserted"
+            },
+            "command": "REFERENCE_SYNTHETIC_FIXTURE_ONLY",
+            "result": "PASS",
+            "tests": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "result": "PASS"
+              }
+            ],
+            "scenarios": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "category": "ambiguous",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "category": "out_of_scope",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              }
+            ],
+            "findings": [],
+            "counterexamples": [],
+            "limitations": [
+              "SYNTHETIC_REFERENCE_ONLY; not evidence of production qualification"
+            ],
+            "validatedAt": "2026-11-06T00:00:00Z",
+            "subject": {
+              "kind": "unit",
+              "id": "xdownload.player-recognition.workflow",
+              "revision": "1.0.0",
+              "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
+            },
+            "dependencyClosure": {
+              "sha256": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
+              "resources": [
+                {
+                  "path": "fixtures/player-signatures.json",
+                  "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+                },
+                {
+                  "path": "src/runner.mjs",
+                  "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
+                },
+                {
+                  "path": "scripts/validate.py",
+                  "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
+                },
+                {
+                  "path": "test/runner.test.mjs",
+                  "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
+                }
+              ]
+            },
+            "profile": {
+              "id": "player-recognition-workflow/0.1.0",
+              "revision": "0.1.0"
+            },
+            "validator": {
+              "id": "xdownload-dis-independent-conformance",
+              "version": "0.1.0"
+            },
+            "baseline": {
+              "id": "xdownload.player-signatures",
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            "coverage": {
+              "positive": 4,
+              "negative": 7,
+              "boundary": 2,
+              "heldOut": 0
+            }
+          },
+          "reportSha256": "8005a28f1c70e4b7b21f3ccf53483c80ba704368b4d3cdf23804c11a8ca74e68"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "768295d5c1d2a6882d4cac36e78ae932a48656eb767c85835e4cfbaef7a0572a"
+        "recordDigest": "50ed03b47b353c84ff3d723e25baa3f0aa70900af9bb4d184e8b8301e277cb6a"
       },
       {
         "recordId": "xdownload.player-recognition.workflow.unit.promoted.1",
@@ -797,9 +2092,9 @@
           "revision": "1.0.0",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-        "previousRecordDigest": "768295d5c1d2a6882d4cac36e78ae932a48656eb767c85835e4cfbaef7a0572a",
+        "previousRecordDigest": "50ed03b47b353c84ff3d723e25baa3f0aa70900af9bb4d184e8b8301e277cb6a",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -808,17 +2103,30 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-          "validationRecordDigest": "768295d5c1d2a6882d4cac36e78ae932a48656eb767c85835e4cfbaef7a0572a",
+          "validationRecordDigest": "50ed03b47b353c84ff3d723e25baa3f0aa70900af9bb4d184e8b8301e277cb6a",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote exact reference unit xdownload.player-recognition.workflow for the isolated conformance fixture only."
+          "rationale": "Promote exact reference unit xdownload.player-recognition.workflow for the isolated conformance fixture only.",
+          "priorPromotedBaseline": {
+            "kind": "GENESIS",
+            "reason": "Synthetic reference fixture has no prior promoted subject."
+          },
+          "authorizationEvidence": {
+            "id": "synthetic-reference-governance-grant",
+            "issuer": "xdownload-demo",
+            "subject": "xdownload-demo-governance",
+            "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+            "scope": "REFERENCE_DEMO_ONLY",
+            "outcome": "AUTHORIZED"
+          },
+          "authorizationEvidenceSha256": "555e8b260baf028fb36725c8a81629b579ab0f42f0f7de9781d65f72600f8fb3"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "5fce552bdf49fc622ca0f0231aabace1cf5c01324d1958e68c106fcd85cfc016"
+        "recordDigest": "8b49c2dae42dbccf72bf8515edf3b612092cd388ca129bd5b57a04d1fb71c96a"
       },
       {
         "recordId": "xdownload.player-signatures.rule.candidate.1",
@@ -829,7 +2137,7 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -849,7 +2157,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "47678137a9d9425cd620f3dbfa711f2c507ec77eb4139cb32b18b434adea4646"
+        "recordDigest": "4c78dc80c09aeaa26022bc60910d43dc46ba014364cbfc5f39c9430c876a8a44"
       },
       {
         "recordId": "xdownload.player-signatures.rule.validated.1",
@@ -860,9 +2168,9 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player-signatures.rule.candidate.1",
-        "previousRecordDigest": "47678137a9d9425cd620f3dbfa711f2c507ec77eb4139cb32b18b434adea4646",
+        "previousRecordDigest": "4c78dc80c09aeaa26022bc60910d43dc46ba014364cbfc5f39c9430c876a8a44",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -874,7 +2182,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
-          "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+          "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
           "profile": {
             "id": "player-recognition-conformance/0.1.0",
             "revision": "0.1.0"
@@ -901,25 +2209,230 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408"
+              "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
+              "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "74199b4b78daf88ecc8f9b4400d2d94b290982c54407ffaefcc4bb4fabc996bd"
+              "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
             }
           ],
           "limitations": [
             "REFERENCE_DEMO_ONLY",
             "not production governance evidence"
-          ]
+          ],
+          "reportSchema": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json",
+          "report": {
+            "reportId": "xdownload.player-signatures.rule.validated.1.synthetic-report",
+            "standard": {
+              "version": "0.1.0",
+              "revision": "0.1.0"
+            },
+            "demo": {
+              "id": "xdownload.player-recognition",
+              "revision": "1.0.0"
+            },
+            "environment": {
+              "runtime": "synthetic fixture; Node 24 and Python 3.13 target",
+              "platform": "synthetic fixture; no production environment asserted"
+            },
+            "command": "REFERENCE_SYNTHETIC_FIXTURE_ONLY",
+            "result": "PASS",
+            "tests": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "result": "PASS"
+              }
+            ],
+            "scenarios": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "category": "ambiguous",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "category": "out_of_scope",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              }
+            ],
+            "findings": [],
+            "counterexamples": [],
+            "limitations": [
+              "SYNTHETIC_REFERENCE_ONLY; not evidence of production qualification"
+            ],
+            "validatedAt": "2026-11-06T00:00:00Z",
+            "subject": {
+              "kind": "rule",
+              "id": "xdownload.player-signatures",
+              "revision": "1.0.0",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            "dependencyClosure": {
+              "sha256": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
+              "resources": [
+                {
+                  "path": "fixtures/player-signatures.json",
+                  "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+                },
+                {
+                  "path": "src/runner.mjs",
+                  "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
+                },
+                {
+                  "path": "scripts/validate.py",
+                  "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
+                },
+                {
+                  "path": "test/runner.test.mjs",
+                  "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
+                }
+              ]
+            },
+            "profile": {
+              "id": "player-recognition-conformance/0.1.0",
+              "revision": "0.1.0"
+            },
+            "validator": {
+              "id": "xdownload-dis-independent-conformance",
+              "version": "0.1.0"
+            },
+            "baseline": {
+              "id": "xdownload.player-signatures",
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            "coverage": {
+              "positive": 4,
+              "negative": 7,
+              "boundary": 2,
+              "heldOut": 0
+            }
+          },
+          "reportSha256": "00002c98abed905e70ccf381672a9f3702e3d543496256b56591aa8f5fbf70cd"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "bc403ddbe7a5293257989a5230e1bbcc167599de75d9d9a110660acd5d51fcea"
+        "recordDigest": "a539fdb7a72f5f415d9c787bc95665e3167ba6ef2312e7908f176258ec5379a2"
       },
       {
         "recordId": "xdownload.player-signatures.rule.promoted.1",
@@ -930,9 +2443,9 @@
           "revision": "1.0.0",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player-signatures.rule.validated.1",
-        "previousRecordDigest": "bc403ddbe7a5293257989a5230e1bbcc167599de75d9d9a110660acd5d51fcea",
+        "previousRecordDigest": "a539fdb7a72f5f415d9c787bc95665e3167ba6ef2312e7908f176258ec5379a2",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -941,17 +2454,30 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-signatures.rule.validated.1",
-          "validationRecordDigest": "bc403ddbe7a5293257989a5230e1bbcc167599de75d9d9a110660acd5d51fcea",
+          "validationRecordDigest": "a539fdb7a72f5f415d9c787bc95665e3167ba6ef2312e7908f176258ec5379a2",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote exact reference rule xdownload.player-signatures for the isolated conformance fixture only."
+          "rationale": "Promote exact reference rule xdownload.player-signatures for the isolated conformance fixture only.",
+          "priorPromotedBaseline": {
+            "kind": "GENESIS",
+            "reason": "Synthetic reference fixture has no prior promoted subject."
+          },
+          "authorizationEvidence": {
+            "id": "synthetic-reference-governance-grant",
+            "issuer": "xdownload-demo",
+            "subject": "xdownload-demo-governance",
+            "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+            "scope": "REFERENCE_DEMO_ONLY",
+            "outcome": "AUTHORIZED"
+          },
+          "authorizationEvidenceSha256": "555e8b260baf028fb36725c8a81629b579ab0f42f0f7de9781d65f72600f8fb3"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "5eb81cbe34f76d21acc202d0f6b753438941d7c85327121e50894b5181de61cf"
+        "recordDigest": "5bf43f629adf0632427b3a75321731f70533881693aa12b4d6455fcf2fdc6788"
       },
       {
         "recordId": "xdownload.player-recognition.graph.candidate.1",
@@ -962,7 +2488,7 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": null,
         "previousRecordDigest": null,
         "actor": {
@@ -982,7 +2508,7 @@
         ],
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "ae2b539cc3577635feadadb011e6b5f753112e5378ae34cc11d1023f32d74ee1"
+        "recordDigest": "5838a7a3031fb86113bc00806951b4cb54a6d9b02484354b8d8b2262f26e6adb"
       },
       {
         "recordId": "xdownload.player-recognition.graph.validated.1",
@@ -993,9 +2519,9 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player-recognition.graph.candidate.1",
-        "previousRecordDigest": "ae2b539cc3577635feadadb011e6b5f753112e5378ae34cc11d1023f32d74ee1",
+        "previousRecordDigest": "5838a7a3031fb86113bc00806951b4cb54a6d9b02484354b8d8b2262f26e6adb",
         "actor": {
           "id": "xdownload-dis-independent-conformance",
           "role": "validator"
@@ -1007,7 +2533,7 @@
         "validation": {
           "result": "PASS",
           "subjectDigest": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e",
-          "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+          "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
           "profile": {
             "id": "player-recognition-workflow/0.1.0",
             "revision": "0.1.0"
@@ -1034,25 +2560,230 @@
             },
             {
               "path": "src/runner.mjs",
-              "sha256": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408"
+              "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
             },
             {
               "path": "scripts/validate.py",
-              "sha256": "84460ff86baba51557b9b87881f2e4a273283862dedcce5c01eb8c8fb9837a50"
+              "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
             },
             {
               "path": "test/runner.test.mjs",
-              "sha256": "74199b4b78daf88ecc8f9b4400d2d94b290982c54407ffaefcc4bb4fabc996bd"
+              "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
             }
           ],
           "limitations": [
             "REFERENCE_DEMO_ONLY",
             "not production governance evidence"
-          ]
+          ],
+          "reportSchema": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json",
+          "report": {
+            "reportId": "xdownload.player-recognition.graph.validated.1.synthetic-report",
+            "standard": {
+              "version": "0.1.0",
+              "revision": "0.1.0"
+            },
+            "demo": {
+              "id": "xdownload.player-recognition",
+              "revision": "1.0.0"
+            },
+            "environment": {
+              "runtime": "synthetic fixture; Node 24 and Python 3.13 target",
+              "platform": "synthetic fixture; no production environment asserted"
+            },
+            "command": "REFERENCE_SYNTHETIC_FIXTURE_ONLY",
+            "result": "PASS",
+            "tests": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "result": "PASS"
+              }
+            ],
+            "scenarios": [
+              {
+                "id": "known player follows control path while data arrives through an independent edge",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "recognizer and resolver consume the package catalogs referenced by their Units",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "each Package-selected provider drives execution and trace",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "feedback retains provenance and cannot change an already-pinned execution",
+                "category": "positive",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "unknown recognition escalates instead of inventing a player",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "missing schema resource fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "path traversal fails package closure validation",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "provider selection fails closed for missing, ambiguous and incompatible candidates",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "independent lifecycle negative vectors remain rejected after record hashes are recomputed",
+                "category": "negative",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "ambiguous recognition asks for input instead of guessing",
+                "category": "ambiguous",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "conflicting observations are evidenced and clarified; exclusions fail closed",
+                "category": "out_of_scope",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "nested data pointers are rejected by the 0.1.0 top-level pointer profile",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              },
+              {
+                "id": "bounded preconditions are evaluated before a Unit implementation executes",
+                "category": "boundary",
+                "dataset": "AUTHORING",
+                "result": "PASS"
+              }
+            ],
+            "findings": [],
+            "counterexamples": [],
+            "limitations": [
+              "SYNTHETIC_REFERENCE_ONLY; not evidence of production qualification"
+            ],
+            "validatedAt": "2026-11-06T00:00:00Z",
+            "subject": {
+              "kind": "graph",
+              "id": "xdownload.player-recognition",
+              "revision": "1.0.0",
+              "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
+            },
+            "dependencyClosure": {
+              "sha256": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
+              "resources": [
+                {
+                  "path": "fixtures/player-signatures.json",
+                  "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+                },
+                {
+                  "path": "src/runner.mjs",
+                  "sha256": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8"
+                },
+                {
+                  "path": "scripts/validate.py",
+                  "sha256": "1f72aa70f8af7b5875c366b31c34579eb06008acd573aa49a5d80c64e33eb13c"
+                },
+                {
+                  "path": "test/runner.test.mjs",
+                  "sha256": "f2cec53fef2c9d9147934fdb59ae829e003de21c2a51161ea9e862cb1feac504"
+                }
+              ]
+            },
+            "profile": {
+              "id": "player-recognition-workflow/0.1.0",
+              "revision": "0.1.0"
+            },
+            "validator": {
+              "id": "xdownload-dis-independent-conformance",
+              "version": "0.1.0"
+            },
+            "baseline": {
+              "id": "xdownload.player-signatures",
+              "path": "fixtures/player-signatures.json",
+              "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168"
+            },
+            "coverage": {
+              "positive": 4,
+              "negative": 7,
+              "boundary": 2,
+              "heldOut": 0
+            }
+          },
+          "reportSha256": "e00902dbf067918c057e5b543ff675223e0342d52b23045df33525a7b75c7900"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "3b034871629cffa263d1383e0863745384647dfc7c335cea147f58cc4efbff1a"
+        "recordDigest": "75cb84afaa106efffb16c987f7dd6f2c2fe2651ca2e73feb82651b4307d41a91"
       },
       {
         "recordId": "xdownload.player-recognition.graph.promoted.1",
@@ -1063,9 +2794,9 @@
           "revision": "1.0.0",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e"
         },
-        "dependencyClosureDigest": "48cc8be6978c1a25b6d2126cff4b4972df2796faa422b48f965114fb5244950a",
+        "dependencyClosureDigest": "19590603844d49e246fb90e0c37fb2820d2893ef66bb3c8ed188cca2433dad3d",
         "previousRecordId": "xdownload.player-recognition.graph.validated.1",
-        "previousRecordDigest": "3b034871629cffa263d1383e0863745384647dfc7c335cea147f58cc4efbff1a",
+        "previousRecordDigest": "75cb84afaa106efffb16c987f7dd6f2c2fe2651ca2e73feb82651b4307d41a91",
         "actor": {
           "id": "xdownload-demo-governance",
           "role": "promotion-authority",
@@ -1074,17 +2805,30 @@
         "promotion": {
           "decision": "PROMOTE",
           "validationRecordId": "xdownload.player-recognition.graph.validated.1",
-          "validationRecordDigest": "3b034871629cffa263d1383e0863745384647dfc7c335cea147f58cc4efbff1a",
+          "validationRecordDigest": "75cb84afaa106efffb16c987f7dd6f2c2fe2651ca2e73feb82651b4307d41a91",
           "policy": {
             "id": "xdownload-demo/promotion-policy",
             "revision": "1.0.0"
           },
           "scope": "REFERENCE_DEMO_ONLY",
-          "rationale": "Promote exact reference graph xdownload.player-recognition for the isolated conformance fixture only."
+          "rationale": "Promote exact reference graph xdownload.player-recognition for the isolated conformance fixture only.",
+          "priorPromotedBaseline": {
+            "kind": "GENESIS",
+            "reason": "Synthetic reference fixture has no prior promoted subject."
+          },
+          "authorizationEvidence": {
+            "id": "synthetic-reference-governance-grant",
+            "issuer": "xdownload-demo",
+            "subject": "xdownload-demo-governance",
+            "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+            "scope": "REFERENCE_DEMO_ONLY",
+            "outcome": "AUTHORIZED"
+          },
+          "authorizationEvidenceSha256": "555e8b260baf028fb36725c8a81629b579ab0f42f0f7de9781d65f72600f8fb3"
         },
         "recordedAt": "2026-11-06T00:00:00Z",
         "scope": "REFERENCE_DEMO_ONLY",
-        "recordDigest": "d0f53da9e5c9c8fb395a208d77315c7e1c7f2e6756632ef3dbbbf81c4c1c27de"
+        "recordDigest": "dc2eae5c5fcdb7a18398c8f7d3bc3c5a17f6a230b7c12d4f109eda5981e9aa8a"
       }
     ],
     "selectionLock": {
@@ -1103,22 +2847,22 @@
           "id": "xdownload.player.recognizer",
           "revision": "1.0.0",
           "path": "domain/units/recognizer.json",
-          "sha256": "835444bdc96411a21a41eabee17ec26f7e9941497e73debd2d233c1b92a31f3d",
+          "sha256": "dc6ea9641ba97c363f47e974517bb3db9854dc18ddb250141f2cc65a851958b1",
           "promotionRecordId": "xdownload.player.recognizer.unit.promoted.1",
-          "promotionRecordDigest": "af0cbc1cce5b725484abf9b6e5c14db46415ca51306a31c60a92bb0ff4ef57b5",
+          "promotionRecordDigest": "ff82ab47ddbdbfb0e3b5f25a94b7b0e5bc96f75dca8d1d6ae593a6feb373cd98",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "402c80b3751726d5ac45d39b40c59dd3e040bf3ae00de2359cd2c2da81eaeb79"
+          "validationRecordDigest": "60169cbf4a072b50a2ffb49c4328c7919c664ee5ab24cba0c1a2dec15059ab64"
         },
         {
           "kind": "unit",
           "id": "xdownload.player.route-decision",
           "revision": "1.0.0",
           "path": "domain/units/decision.json",
-          "sha256": "7f67aabf506ec9654a2a2ff2ecc2b00382004adde401cc7fe870800854a286d5",
+          "sha256": "ba137c301f37fbcfce99d8af7c7b32782e415c76ebb2f4099d9b967e6d7148a5",
           "promotionRecordId": "xdownload.player.route-decision.unit.promoted.1",
-          "promotionRecordDigest": "8c567714e2ed8b5fb2f22ba33141bc3af7e67f460d9e11f568eb133ecf44f2d3",
+          "promotionRecordDigest": "e5cb3d5789c8281ebcf9fb4bbc5bed3b88612e3c10091b7900c2cd9ad2e42ef5",
           "validationRecordId": "xdownload.player.route-decision.unit.validated.1",
-          "validationRecordDigest": "8c23c3895bde8175770ab4091d3fd04fbd5e34d35f9bef9a068989e6c0fd1384"
+          "validationRecordDigest": "1541a26f4a6f609cd226848b42d60ba83cb5959ae5f656022a816b4788f7a6bc"
         },
         {
           "kind": "unit",
@@ -1127,9 +2871,9 @@
           "path": "domain/units/resolve-procedure.json",
           "sha256": "7be50226836f5bb18dc518eed9920773f5f115e7eeda88a2d8a71659b4c02bbb",
           "promotionRecordId": "xdownload.player.resolve-procedure.unit.promoted.1",
-          "promotionRecordDigest": "685289d90266ced38c8cd1752512c837f02609df29a3b88b8825db0786ddc470",
+          "promotionRecordDigest": "abbd7fa3a92c6e2e779ff5b322ea844502da315028958b6a28adefd341682265",
           "validationRecordId": "xdownload.player.resolve-procedure.unit.validated.1",
-          "validationRecordDigest": "0fc319a678b0fb0872dfe99603ac4109f3d85e10ee16aff49bf3438127a2364e"
+          "validationRecordDigest": "d6cdb3b9b2b9ac4cc2a8e9e5c7c17cd22898b7e27c004f068424e39e1173ecda"
         },
         {
           "kind": "unit",
@@ -1138,20 +2882,20 @@
           "path": "domain/units/fallback-procedure.json",
           "sha256": "1987ee2234984bae17011690787d8f46b0e229cf594e36a3d21b7973a2275d7c",
           "promotionRecordId": "xdownload.player.bounded-fallback.unit.promoted.1",
-          "promotionRecordDigest": "4dde7e901c95a7c3784aee00184315524262ad8a04d3e26a37f9a18ffbc50494",
+          "promotionRecordDigest": "6818a676e46401213c65f8776dff03e40585190264a7a4c557b0bb541508a5db",
           "validationRecordId": "xdownload.player.bounded-fallback.unit.validated.1",
-          "validationRecordDigest": "b70b339bbcc30406dc3f3304664d62cfe9eed5790dde2ce8879c66f1a6738983"
+          "validationRecordDigest": "5ca05e07877ae566cca9d8332ca29816129590dcbcb836966be56d41356ef41d"
         },
         {
           "kind": "unit",
           "id": "xdownload.player.outcome-validator",
           "revision": "1.0.0",
           "path": "domain/units/validator.json",
-          "sha256": "6917c2cb10aed8b1096ec2b1543ab65af513de9d1d77d7564c1ef6d0116bce55",
+          "sha256": "7f3a06d6b1ca8742deed0f05944ebb06dff767958e4182393d1a27de049133f6",
           "promotionRecordId": "xdownload.player.outcome-validator.unit.promoted.1",
-          "promotionRecordDigest": "57f9d9a52c6a15c4543c2dd60ec9359229389d69999f33cbd8a01ea61df7e3b4",
+          "promotionRecordDigest": "d1c63bd616b4f99d84034e4267afbf459218bd8054102ad0ee4b92db4b9d1d23",
           "validationRecordId": "xdownload.player.outcome-validator.unit.validated.1",
-          "validationRecordDigest": "719e82c1e819f853dfd9934ac6fc3105194cf5b90feb7207d004d5879b68a896"
+          "validationRecordDigest": "9b45a4e4958bffea75ddb5088f056bc5a8362fe3c099227d4bd3b521a7497adf"
         },
         {
           "kind": "unit",
@@ -1160,9 +2904,9 @@
           "path": "domain/units/workflow.json",
           "sha256": "e4a810a856561ebde2a1df853adb3adf90f0b2120609309b88891da31527d1e5",
           "promotionRecordId": "xdownload.player-recognition.workflow.unit.promoted.1",
-          "promotionRecordDigest": "5fce552bdf49fc622ca0f0231aabace1cf5c01324d1958e68c106fcd85cfc016",
+          "promotionRecordDigest": "8b49c2dae42dbccf72bf8515edf3b612092cd388ca129bd5b57a04d1fb71c96a",
           "validationRecordId": "xdownload.player-recognition.workflow.unit.validated.1",
-          "validationRecordDigest": "768295d5c1d2a6882d4cac36e78ae932a48656eb767c85835e4cfbaef7a0572a"
+          "validationRecordDigest": "50ed03b47b353c84ff3d723e25baa3f0aa70900af9bb4d184e8b8301e277cb6a"
         },
         {
           "kind": "rule",
@@ -1171,9 +2915,9 @@
           "path": "fixtures/player-signatures.json",
           "sha256": "3ff38c6f5bbd41915ae3a6d036298d9c41cd886c6f13e30edeed8d156e763168",
           "promotionRecordId": "xdownload.player-signatures.rule.promoted.1",
-          "promotionRecordDigest": "5eb81cbe34f76d21acc202d0f6b753438941d7c85327121e50894b5181de61cf",
+          "promotionRecordDigest": "5bf43f629adf0632427b3a75321731f70533881693aa12b4d6455fcf2fdc6788",
           "validationRecordId": "xdownload.player-signatures.rule.validated.1",
-          "validationRecordDigest": "bc403ddbe7a5293257989a5230e1bbcc167599de75d9d9a110660acd5d51fcea"
+          "validationRecordDigest": "a539fdb7a72f5f415d9c787bc95665e3167ba6ef2312e7908f176258ec5379a2"
         },
         {
           "kind": "graph",
@@ -1182,9 +2926,9 @@
           "path": "domain/player-recognition.graph.json",
           "sha256": "e51650014a90328854678f36ec52d9ea490fc325a1a2e05ea543dfabad884f6e",
           "promotionRecordId": "xdownload.player-recognition.graph.promoted.1",
-          "promotionRecordDigest": "d0f53da9e5c9c8fb395a208d77315c7e1c7f2e6756632ef3dbbbf81c4c1c27de",
+          "promotionRecordDigest": "dc2eae5c5fcdb7a18398c8f7d3bc3c5a17f6a230b7c12d4f109eda5981e9aa8a",
           "validationRecordId": "xdownload.player-recognition.graph.validated.1",
-          "validationRecordDigest": "3b034871629cffa263d1383e0863745384647dfc7c335cea147f58cc4efbff1a"
+          "validationRecordDigest": "75cb84afaa106efffb16c987f7dd6f2c2fe2651ca2e73feb82651b4307d41a91"
         }
       ],
       "selectedCapabilities": [
@@ -1193,24 +2937,24 @@
           "owner": "xdownload-demo",
           "authorityRef": "xdownload-demo/domain-authority@1.0.0",
           "version": "1.0.0",
-          "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7",
+          "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518",
           "provider": {
             "unitId": "xdownload.player.recognizer",
             "unitRevision": "1.0.0",
             "candidateId": "signature-exact-v1",
             "implementationRef": "registry:xdownload.player.recognizer@1.0.0",
             "artifactRef": "src/runner.mjs",
-            "artifactDigest": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408",
+            "artifactDigest": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8",
             "target": "node24",
-            "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
+            "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518"
           },
           "promotionRecordId": "xdownload.player.recognizer.unit.promoted.1",
-          "promotionRecordDigest": "af0cbc1cce5b725484abf9b6e5c14db46415ca51306a31c60a92bb0ff4ef57b5",
+          "promotionRecordDigest": "ff82ab47ddbdbfb0e3b5f25a94b7b0e5bc96f75dca8d1d6ae593a6feb373cd98",
           "validationRecordId": "xdownload.player.recognizer.unit.validated.1",
-          "validationRecordDigest": "402c80b3751726d5ac45d39b40c59dd3e040bf3ae00de2359cd2c2da81eaeb79"
+          "validationRecordDigest": "60169cbf4a072b50a2ffb49c4328c7919c664ee5ab24cba0c1a2dec15059ab64"
         }
       ]
     },
-    "selectionLockSha256": "d78d9427c06c3468f9bf99b4f2fc20d21be1b21902838e2035cf0d0f55b197ba"
+    "selectionLockSha256": "432e07bf03fcc37fd240f5c6bea927dbd0b31ae61273b20d3562a7bf2d76da96"
   }
 }

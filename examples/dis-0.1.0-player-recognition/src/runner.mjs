@@ -130,6 +130,26 @@ export function validatePreconditions(unit, input) {
   return true;
 }
 
+// The reference graph implements this limited, observable failure profile.
+// Any other policy must be implemented explicitly rather than silently ignored.
+export function referenceFailureAction(unit, status) {
+  const action = unit.failure?.handling?.[status]?.action;
+  if (!action) throw new DisExecutionError('UNDECLARED_FAILURE_STATUS', unit.id + ':' + status);
+  if (action === 'REJECT' || action === 'FAIL') return action;
+  if ((status === 'UNKNOWN' && action === 'PRESERVE_UNKNOWN') || (['AMBIGUOUS', 'CONFLICT'].includes(status) && action === 'CLARIFY')) return action;
+  if ((status === 'UNKNOWN' && action === 'BOUNDED_FALLBACK') || (status === 'NEEDS_INPUT' && action === 'WAIT') || (status === 'NEEDS_REVIEW' && action === 'REVIEW')) return action;
+  throw new DisExecutionError('UNSUPPORTED_FAILURE_POLICY', unit.id + ':' + status + ':' + action);
+}
+
+// Feedback is an immutable intake envelope, never a lifecycle transition.
+export function validateReferenceFeedback(feedback, expectedLockSha256) {
+  const allowed = ['SYSTEM_OBSERVED', 'USER_CONFIRMED', 'MODEL_INFERRED'];
+  if (!feedback || !feedback.traceId || !/^[a-f0-9]{64}$/.test(expectedLockSha256 || '') || feedback.packageLockSha256 !== expectedLockSha256 ||
+      !allowed.includes(feedback.provenance) || feedback.claimedProvenance !== feedback.provenance ||
+      !feedback.finding || feedback.disposition !== 'PROPOSAL_ONLY') throw new DisExecutionError('INVALID_RUNTIME_FEEDBACK', feedback?.traceId || 'missing');
+  return structuredClone(feedback);
+}
+
 export function validateCapabilityContracts(unitsById, resources = null) {
   const providers = [];
   for (const unit of unitsById.values()) {
@@ -181,9 +201,21 @@ export function resolveProviderSelection(unit, selectionLock, target, resources)
   if (provider.target !== target || candidate.target !== target || provider.target !== candidate.target) throw new DisExecutionError('INCOMPATIBLE_PROVIDER_TARGET', provider.candidateId);
   if (candidate.contractDigest !== lock.contractDigest || provider.contractDigest !== candidate.contractDigest) throw new DisExecutionError('INCOMPATIBLE_PROVIDER_CONTRACT', provider.candidateId);
   if (provider.unitRevision !== unit.revision || provider.implementationRef !== candidate.ref || provider.artifactRef !== candidate.artifactRef || provider.artifactDigest !== candidate.artifactDigest) throw new DisExecutionError('PACKAGE_PROVIDER_PIN_MISMATCH', provider.candidateId);
-  if (unit.implementation.ref !== candidate.ref || unit.implementation.artifactRef !== candidate.artifactRef || unit.implementation.strategy !== candidate.strategy || unit.implementation.exposure !== candidate.exposure) throw new DisExecutionError('UNIT_PROVIDER_BINDING_MISMATCH', provider.candidateId);
+  if (unit.implementation.strategy !== candidate.strategy || unit.implementation.exposure !== candidate.exposure) throw new DisExecutionError('UNIT_PROVIDER_BINDING_MISMATCH', provider.candidateId);
   if (resources.get(candidate.artifactRef) !== candidate.artifactDigest) throw new DisExecutionError('PROVIDER_ARTIFACT_DIGEST_MISMATCH', candidate.artifactRef);
   return { candidate, lock };
+}
+
+export function validateSelectedGraph(selectionLock, graphRef, graph, resources) {
+  const matches = (selectionLock?.selectedAssets || []).filter((asset) => asset.kind === 'graph');
+  if (matches.length !== 1) throw new DisExecutionError('SELECTED_GRAPH_IDENTITY_MISMATCH', 'expected exactly one selected graph');
+  const selected = matches[0];
+  if (!graphRef || !graph || selected.id !== graphRef.id || selected.revision !== graphRef.revision ||
+      selected.path !== graphRef.path || selected.id !== graph.id || selected.revision !== graph.revision ||
+      !resources.has(graphRef.path) || selected.sha256 !== resources.get(graphRef.path)) {
+    throw new DisExecutionError('SELECTED_GRAPH_IDENTITY_MISMATCH', selected.id || 'missing');
+  }
+  return true;
 }
 
 function canonicalLifecycleValue(value) {
@@ -198,6 +230,106 @@ function lifecycleRecordDigest(record) {
   return sha256(Buffer.from(JSON.stringify(canonicalLifecycleValue(payload)), 'utf8'));
 }
 
+function exactKeys(value, required, optional = []) {
+  return value && typeof value === 'object' && !Array.isArray(value) && required.every((key) => Object.hasOwn(value, key)) && Object.keys(value).every((key) => required.includes(key) || optional.includes(key));
+}
+
+function validUtcTimestamp(value) {
+  return typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().replace('.000Z', 'Z') === value;
+}
+
+function validReferenceReportShape(report) {
+  const nonempty = (value) => typeof value === 'string' && value.length > 0;
+  const semver = (value) => typeof value === 'string' && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value);
+  const digest = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+  return exactKeys(report, ['reportId', 'standard', 'demo', 'environment', 'command', 'result', 'tests', 'findings', 'validatedAt', 'subject', 'dependencyClosure', 'profile', 'validator', 'baseline', 'coverage', 'scenarios', 'counterexamples', 'limitations']) &&
+    nonempty(report.reportId) && exactKeys(report.standard, ['version', 'revision']) && report.standard.version === '0.1.0' && nonempty(report.standard.revision) &&
+    exactKeys(report.demo, ['id', 'revision'], ['commit']) && nonempty(report.demo.id) && nonempty(report.demo.revision) && (!Object.hasOwn(report.demo, 'commit') || typeof report.demo.commit === 'string') &&
+    exactKeys(report.environment, ['runtime', 'platform']) && nonempty(report.environment.runtime) && nonempty(report.environment.platform) && nonempty(report.command) && report.result === 'PASS' && validUtcTimestamp(report.validatedAt) &&
+    Array.isArray(report.tests) && report.tests.length > 0 && report.tests.every((item) => exactKeys(item, ['id', 'result'], ['detail']) && nonempty(item.id) && ['PASS', 'FAIL', 'EXPECTED_GAP', 'NOT_RUN'].includes(item.result) && (!Object.hasOwn(item, 'detail') || typeof item.detail === 'string')) &&
+    Array.isArray(report.findings) && report.findings.every((item) => exactKeys(item, ['id', 'severity', 'description', 'resolution']) && typeof item.id === 'string' && ['P0', 'P1', 'P2', 'P3'].includes(item.severity) && typeof item.description === 'string' && typeof item.resolution === 'string') &&
+    Array.isArray(report.scenarios) && report.scenarios.length > 0 && report.scenarios.every((item) => exactKeys(item, ['id', 'category', 'dataset', 'result']) && nonempty(item.id) && ['positive', 'negative', 'boundary', 'ambiguous', 'out_of_scope'].includes(item.category) && ['AUTHORING', 'HELD_OUT'].includes(item.dataset) && ['PASS', 'FAIL', 'NOT_RUN'].includes(item.result)) &&
+    Array.isArray(report.counterexamples) && report.counterexamples.every((item) => typeof item === 'string') && Array.isArray(report.limitations) && report.limitations.length > 0 && report.limitations.every(nonempty) &&
+    exactKeys(report.subject, ['kind', 'id', 'revision', 'sha256']) && ['unit', 'knowledge', 'rule', 'graph', 'package'].includes(report.subject.kind) && nonempty(report.subject.id) && semver(report.subject.revision) && digest(report.subject.sha256) &&
+    exactKeys(report.dependencyClosure, ['sha256', 'resources']) && digest(report.dependencyClosure.sha256) && Array.isArray(report.dependencyClosure.resources) && report.dependencyClosure.resources.every((item) => exactKeys(item, ['path', 'sha256']) && nonempty(item.path) && digest(item.sha256)) &&
+    exactKeys(report.profile, ['id', 'revision']) && nonempty(report.profile.id) && semver(report.profile.revision) && exactKeys(report.validator, ['id', 'version']) && nonempty(report.validator.id) && semver(report.validator.version) && exactKeys(report.baseline, ['id', 'path', 'sha256']) && nonempty(report.baseline.id) && nonempty(report.baseline.path) && digest(report.baseline.sha256) && exactKeys(report.coverage, ['positive', 'negative', 'boundary', 'heldOut']) && Object.values(report.coverage).every((item) => Number.isInteger(item) && item >= 0);
+}
+
+function reportCoverageConsistent(report) {
+  const ids = new Set(report.scenarios.map((scenario) => scenario.id));
+  const tests = new Map(report.tests.map((test) => [test.id, test.result]));
+  const count = (category) => report.scenarios.filter((item) => category.includes(item.category)).length;
+  return ids.size === report.scenarios.length && tests.size === report.tests.length && tests.size === ids.size &&
+    report.scenarios.every((item) => item.result === 'PASS' && tests.get(item.id) === item.result) &&
+    report.coverage.positive === count(['positive']) && report.coverage.negative === count(['negative', 'ambiguous', 'out_of_scope']) &&
+    report.coverage.boundary === count(['boundary']) && report.coverage.heldOut === report.scenarios.filter((item) => item.dataset === 'HELD_OUT').length;
+}
+
+// Histories are keyed by the complete immutable subject. A terminal disposition
+// cannot be undone by appending a name-only record; rollback selects another
+// still-promoted exact subject through a new Package lock.
+export function replayLifecycle(records, resources, closureDigest, historicalClosures = new Map()) {
+  const histories = new Map(), ids = new Set(), revisions = new Map(), latestPromoted = new Map();
+  for (const record of records) {
+    const subject = record?.subject;
+    const key = JSON.stringify([subject?.kind, subject?.id, subject?.revision, subject?.sha256]);
+    const state = histories.get(key) || { state: null, previous: null, candidate: null, validated: null, promoted: null, lastPromoted: null };
+    const logicalKey = JSON.stringify([subject?.kind, subject?.id]);
+    const revisionKey = JSON.stringify([subject?.kind, subject?.id, subject?.revision]);
+    const recordClosure = record.dependencyClosureDigest;
+    const evidenceResources = recordClosure === closureDigest ? resources : historicalClosures.get(recordClosure);
+    const actor = record.actor || {}, policy = record.policy || record.promotion?.policy;
+    if (!record.recordId || ids.has(record.recordId) || !['unit', 'rule', 'graph'].includes(subject?.kind) || !subject.id || !subject.revision || !/^[a-f0-9]{64}$/.test(subject.sha256 || '') || !evidenceResources) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId || 'missing');
+    if (revisions.has(revisionKey) && revisions.get(revisionKey) !== subject.sha256) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+    revisions.set(revisionKey, subject.sha256);
+    if (lifecycleRecordDigest(record) !== record.recordDigest) throw new DisExecutionError('LIFECYCLE_RECORD_DIGEST_MISMATCH', record.recordId);
+    if (!actor.id || !actor.role || !exactKeys(policy, ['id', 'revision']) || !policy.id || !policy.revision || !validUtcTimestamp(record.recordedAt) || (state.previous && Date.parse(record.recordedAt) < Date.parse(state.previous.recordedAt))) throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_POLICY', record.recordId);
+    if ((record.previousRecordId ?? null) !== (state.previous?.recordId ?? null) || (record.previousRecordDigest ?? null) !== (state.previous?.recordDigest ?? null)) throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', record.recordId);
+    const transition = record.transition;
+    const allowed = !state.state ? ['OBSERVED', 'CANDIDATE'] : state.state === 'OBSERVED' ? ['OBSERVED', 'CANDIDATE'] : state.state === 'CANDIDATE' ? ['VALIDATED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'] : state.state === 'VALIDATED' ? ['VALIDATED', 'PROMOTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'] : state.state === 'PROMOTED' ? ['VALIDATED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'] : [];
+    if (!allowed.includes(transition)) throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', record.recordId);
+    const checkEvidence = (refs) => Array.isArray(refs) && refs.length > 0 && refs.every((item) => item && evidenceResources.has(item.path) && evidenceResources.get(item.path) === item.sha256);
+    if (transition === 'OBSERVED') {
+      if (actor.id !== 'xdownload-demo-observer' || actor.role !== 'observation-source' || actor.authorityRef !== 'xdownload-demo/domain-authority@1.0.0' || policy.id !== 'xdownload-demo/observation-policy' || policy.revision !== '1.0.0' || !checkEvidence(record.evidenceRefs) || !['SYSTEM_OBSERVED', 'USER_CONFIRMED', 'MODEL_INFERRED'].includes(record.provenance)) throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_POLICY', record.recordId);
+    } else if (transition === 'CANDIDATE') {
+      if (actor.id !== 'xdownload-domain-forge-reference' || actor.role !== 'candidate-producer' || actor.authorityRef !== 'xdownload-demo/domain-authority@1.0.0' || policy.id !== 'xdownload-demo/candidate-policy' || policy.revision !== '1.0.0' || !checkEvidence(record.evidenceRefs)) throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_POLICY', record.recordId);
+      state.candidate = record;
+    } else if (transition === 'VALIDATED') {
+      const validation = record.validation;
+      if (actor.id !== 'xdownload-dis-independent-conformance' || actor.role !== 'validator' || actor.id !== validation?.validator?.id || policy.id !== 'xdownload-demo/validation-profile' || policy.revision !== '0.1.0' || validation.result !== 'PASS' || validation.subjectDigest !== subject.sha256 || validation.dependencyClosureDigest !== recordClosure || !validation.profile?.id || !validation.profile.revision || !validation.validator?.version || !checkEvidence(validation.evidenceRefs)) throw new DisExecutionError('INVALID_LIFECYCLE_VALIDATION', record.recordId);
+      const report = validation.report;
+      if (validation.reportSchema !== 'https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json' || !validReferenceReportShape(report) || !reportCoverageConsistent(report) || sha256(Buffer.from(JSON.stringify(canonicalLifecycleValue(report)), 'utf8')) !== validation.reportSha256 ||
+          !jsonValueEqual(report.subject, subject) || report.dependencyClosure?.sha256 !== recordClosure || !jsonValueEqual(report.dependencyClosure.resources, validation.evidenceRefs) || !jsonValueEqual(report.profile, validation.profile) || !jsonValueEqual(report.validator, validation.validator) || !jsonValueEqual(report.baseline, validation.baseline) || !jsonValueEqual(report.coverage, validation.coverage) ||
+          report.result !== 'PASS' || report.standard?.version !== '0.1.0' || !report.standard?.revision || !report.demo?.id || !report.demo?.revision || !report.environment?.runtime || !report.environment?.platform || !report.command || !report.validatedAt || !Array.isArray(report.tests) || !report.tests.length || report.tests.some((test) => !test.id || !['PASS', 'FAIL', 'EXPECTED_GAP', 'NOT_RUN'].includes(test.result)) ||
+          !Array.isArray(report.scenarios) || !report.scenarios.length || report.scenarios.some((scenario) => !scenario.id || !['positive', 'negative', 'boundary', 'ambiguous', 'out_of_scope'].includes(scenario.category) || !['AUTHORING', 'HELD_OUT'].includes(scenario.dataset) || !['PASS', 'FAIL', 'NOT_RUN'].includes(scenario.result)) || !Array.isArray(report.findings) || !Array.isArray(report.counterexamples) || report.counterexamples.some((item) => typeof item !== 'string') || !Array.isArray(report.limitations) || !report.limitations.length) throw new DisExecutionError('INVALID_VALIDATION_REPORT', record.recordId);
+      state.validated = record;
+      state.promoted = null;
+    } else if (transition === 'PROMOTED') {
+      if (actor.id !== 'xdownload-demo-governance' || actor.role !== 'promotion-authority' || actor.authorityRef !== 'xdownload-demo/domain-authority@1.0.0' || actor.id === state.candidate.actor.id || actor.id === state.validated.actor.id || record.promotion?.decision !== 'PROMOTE' || record.promotion.validationRecordId !== state.validated.recordId || record.promotion.validationRecordDigest !== state.validated.recordDigest) throw new DisExecutionError('UNAUTHORIZED_PROMOTION_RECORD', record.recordId);
+      const promotion = record.promotion, grant = promotion.authorizationEvidence, baseline = promotion.priorPromotedBaseline, prior = state.lastPromoted || latestPromoted.get(logicalKey);
+      if (!exactKeys(grant, ['id', 'issuer', 'subject', 'authorityRef', 'scope', 'outcome']) || grant.id !== 'synthetic-reference-governance-grant' || grant.issuer !== 'xdownload-demo' || grant.subject !== actor.id || grant.authorityRef !== actor.authorityRef || grant.scope !== 'REFERENCE_DEMO_ONLY' || grant.outcome !== 'AUTHORIZED' || sha256(Buffer.from(JSON.stringify(canonicalLifecycleValue(grant)), 'utf8')) !== promotion.authorizationEvidenceSha256 ||
+          policy.id !== 'xdownload-demo/promotion-policy' || policy.revision !== '1.0.0' || !jsonValueEqual(policy, promotion.policy) || (prior ? baseline?.kind !== 'PROMOTED' || baseline.recordId !== prior.recordId || baseline.recordDigest !== prior.recordDigest : baseline?.kind !== 'GENESIS' || !baseline.reason)) throw new DisExecutionError('UNAUTHORIZED_PROMOTION_RECORD', record.recordId);
+      state.promoted = record;
+      state.lastPromoted = record;
+      latestPromoted.set(logicalKey, record);
+    } else {
+      if (actor.id !== 'xdownload-demo-governance' || actor.role !== 'promotion-authority' || actor.authorityRef !== 'xdownload-demo/domain-authority@1.0.0' || policy.id !== 'xdownload-demo/promotion-policy' || policy.revision !== '1.0.0' || !checkEvidence(record.evidenceRefs) || record.decision !== transition) throw new DisExecutionError('INVALID_LIFECYCLE_DISPOSITION', record.recordId);
+      if (transition === 'SUPERSEDED') {
+        const successor = record.successor, nextSubject = successor?.subject;
+        const nextKey = JSON.stringify([nextSubject?.kind, nextSubject?.id, nextSubject?.revision, nextSubject?.sha256]);
+        const next = histories.get(nextKey);
+        if (!nextSubject || nextSubject.kind !== subject.kind || nextSubject.id !== subject.id || nextSubject.revision === subject.revision || next?.state !== 'PROMOTED' || successor.promotionRecordId !== next.promoted?.recordId || successor.promotionRecordDigest !== next.promoted?.recordDigest) throw new DisExecutionError('INVALID_LIFECYCLE_DISPOSITION', record.recordId);
+      }
+      state.promoted = null;
+    }
+    state.state = transition;
+    state.previous = record;
+    histories.set(key, state);
+    ids.add(record.recordId);
+  }
+  return histories;
+}
+
 export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, resources, closureDigest, expectedSelectionLockSha256) {
   const records = packageIdentity.lifecycleRecords;
   const selection = packageIdentity.selectionLock;
@@ -207,25 +339,37 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   if (selection.selectedCapabilities.length !== 1 || selection.selectedAssets.length !== unitsById.size + 2) throw new DisExecutionError('PACKAGE_SELECTION_CARDINALITY_INVALID', packageIdentity.packageId);
   const selectionDigest = sha256(Buffer.from(JSON.stringify(canonicalLifecycleValue(selection)), 'utf8'));
   if (!/^[a-f0-9]{64}$/.test(expectedSelectionLockSha256 || '') || selectionDigest !== expectedSelectionLockSha256 || selectionDigest !== packageIdentity.selectionLockSha256) throw new DisExecutionError('PACKAGE_SELECTION_DIGEST_MISMATCH', packageIdentity.packageId);
+  const historicalClosures = new Map();
+  if (!Array.isArray(selection.historicalClosures || [])) throw new DisExecutionError('INVALID_HISTORICAL_CLOSURE', packageIdentity.packageId);
+  for (const history of selection.historicalClosures || []) {
+    if (typeof history?.manifestJson !== 'string' || !/^[a-f0-9]{64}$/.test(history.sha256 || '') || sha256(Buffer.from(history.manifestJson, 'utf8')) !== history.sha256 || history.sha256 === closureDigest || historicalClosures.has(history.sha256)) throw new DisExecutionError('INVALID_HISTORICAL_CLOSURE', packageIdentity.packageId);
+    let manifest;
+    try { manifest = JSON.parse(history.manifestJson); } catch { throw new DisExecutionError('INVALID_HISTORICAL_CLOSURE', history.sha256); }
+    if (manifest.schemaVersion !== 'dis.resource-closure/0.1.0' || manifest.standardVersion !== '0.1.0' || !Array.isArray(manifest.resources)) throw new DisExecutionError('INVALID_HISTORICAL_CLOSURE', history.sha256);
+    const entries = new Map();
+    for (const item of manifest.resources) {
+      if (!isSafePackageRelativeRef(item.path) || entries.has(item.path) || !/^[a-f0-9]{64}$/.test(item.sha256 || '')) throw new DisExecutionError('INVALID_HISTORICAL_CLOSURE', history.sha256);
+      entries.set(item.path, item.sha256);
+    }
+    historicalClosures.set(history.sha256, entries);
+  }
   const byId = new Map();
   for (const record of records) {
-    if (!record.recordId || byId.has(record.recordId) || !['CANDIDATE', 'VALIDATED', 'PROMOTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'].includes(record.transition)) throw new DisExecutionError('INVALID_LIFECYCLE_RECORD', record.recordId || 'missing');
+    if (!record.recordId || byId.has(record.recordId) || !['OBSERVED', 'CANDIDATE', 'VALIDATED', 'PROMOTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'].includes(record.transition)) throw new DisExecutionError('INVALID_LIFECYCLE_RECORD', record.recordId || 'missing');
     if (!/^[a-f0-9]{64}$/.test(record.recordDigest || '') || lifecycleRecordDigest(record) !== record.recordDigest) throw new DisExecutionError('LIFECYCLE_RECORD_DIGEST_MISMATCH', record.recordId);
-    if (record.dependencyClosureDigest !== closureDigest || !['unit', 'rule', 'graph'].includes(record.subject?.kind) || !record.subject?.id || !record.subject?.revision || !/^[a-f0-9]{64}$/.test(record.subject.sha256 || '')) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+    if ((record.dependencyClosureDigest !== closureDigest && !historicalClosures.has(record.dependencyClosureDigest)) || !['unit', 'rule', 'graph'].includes(record.subject?.kind) || !record.subject?.id || !record.subject?.revision || !/^[a-f0-9]{64}$/.test(record.subject.sha256 || '')) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
     byId.set(record.recordId, record);
   }
+  const histories = replayLifecycle(records, resources, closureDigest, historicalClosures);
   const unitAsset = selection.selectedAssets.find((asset) => asset.kind === 'unit' && asset.id === 'xdownload.player.recognizer');
   if (!unitAsset) throw new DisExecutionError('SELECTED_RECOGNIZER_ASSET_MISSING', packageIdentity.packageId);
   const unit = unitsById.get(unitAsset.id), unitPath = unitPaths.get(unitAsset.id);
   if (!unit || unit.revision !== unitAsset.revision || resources.get(unitPath) !== unitAsset.sha256) throw new DisExecutionError('SELECTED_ASSET_DIGEST_MISMATCH', unitAsset.id);
   if (selection.consumerProfile.id !== unit.implementation?.selectionPolicy?.consumerProfileId || selection.consumerProfile.revision !== unit.implementation?.selectionPolicy?.consumerProfileRevision || selection.target !== unit.implementation?.selectionPolicy?.target) throw new DisExecutionError('PACKAGE_CONSUMER_PROFILE_OR_TARGET_MISMATCH', unit.id);
-  const chain = records.filter((record) => record.subject.id === unit.id && record.subject.revision === unit.revision && record.subject.sha256 === unitAsset.sha256);
-  const candidate = chain.find((record) => record.transition === 'CANDIDATE');
-  const validated = chain.find((record) => record.transition === 'VALIDATED');
-  const promoted = chain.find((record) => record.transition === 'PROMOTED');
-  if (!candidate || !validated || !promoted || chain.length !== 3 || candidate.previousRecordId != null ||
-      validated.previousRecordId !== candidate.recordId || validated.previousRecordDigest !== candidate.recordDigest ||
-      promoted.previousRecordId !== validated.recordId || promoted.previousRecordDigest !== validated.recordDigest) {
+  const subjectKey = (subject) => JSON.stringify([subject.kind, subject.id, subject.revision, subject.sha256]);
+  const unitHistory = histories.get(subjectKey(unitAsset));
+  const candidate = unitHistory?.candidate, validated = unitHistory?.validated, promoted = unitHistory?.promoted;
+  if (!candidate || !validated || !promoted || unitHistory.state !== 'PROMOTED') {
     throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', unit.id);
   }
   if (!candidate.actor?.id || !candidate.actor?.role || !candidate.policy?.id || !candidate.policy?.revision ||
@@ -282,9 +426,9 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
     const selectedUnit = asset.kind === 'unit' ? unitsById.get(asset.id) : null;
     const assetPath = selectedUnit ? unitPaths.get(asset.id) : asset.path;
     if (!assetPath || resources.get(assetPath) !== asset.sha256 || (asset.kind === 'unit' && (!selectedUnit || selectedUnit.revision !== asset.revision))) throw new DisExecutionError('SELECTED_ASSET_DIGEST_MISMATCH', key);
-    const history = records.filter((item) => item.subject.kind === asset.kind && item.subject.id === asset.id && item.subject.revision === asset.revision && item.subject.sha256 === asset.sha256);
-    const c = history.find((item) => item.transition === 'CANDIDATE'), v = history.find((item) => item.transition === 'VALIDATED'), p = history.find((item) => item.transition === 'PROMOTED');
-    if (history.length !== 3 || !c || !v || !p || c.previousRecordId != null || v.previousRecordId !== c.recordId || v.previousRecordDigest !== c.recordDigest || p.previousRecordId !== v.recordId || p.previousRecordDigest !== v.recordDigest) throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', key);
+    const history = histories.get(subjectKey(asset));
+    const c = history?.candidate, v = history?.validated, p = history?.promoted;
+    if (history?.state !== 'PROMOTED' || !c || !v || !p) throw new DisExecutionError('INCOMPLETE_LIFECYCLE_CHAIN', key);
     if (!c.actor?.id || c.actor.role !== 'candidate-producer' || !c.actor.authorityRef || !c.policy?.id || !c.policy?.revision || !Array.isArray(c.evidenceRefs) || !c.evidenceRefs.length || c.evidenceRefs.some((item) => resources.get(item.path) !== item.sha256) || !v.actor?.id || v.actor.role !== 'validator') throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_POLICY', key);
     if (p.actor?.id !== 'xdownload-demo-governance' || p.actor?.role !== 'promotion-authority' || p.actor?.authorityRef !== 'xdownload-demo/domain-authority@1.0.0' || p.actor.id === c.actor?.id || p.actor.id === v.actor?.id || p.promotion?.decision !== 'PROMOTE' || p.promotion.validationRecordId !== v.recordId || p.promotion.validationRecordDigest !== v.recordDigest) throw new DisExecutionError('UNAUTHORIZED_PROMOTION_RECORD', key);
     if (v.validation?.result !== 'PASS' || v.validation.subjectDigest !== asset.sha256 || v.validation.dependencyClosureDigest !== closureDigest || !v.validation.profile?.id || !v.validation.profile?.revision || !v.validation.validator?.id || !v.validation.validator?.version || !Array.isArray(v.validation.evidenceRefs)) throw new DisExecutionError('INVALID_LIFECYCLE_VALIDATION', key);
@@ -649,23 +793,37 @@ export function validateDefinition(definition, unitsById, graph, graphPath) {
 }
 
 function recognizePlayerWithMode(input, context, normalize) {
-  if (!input || typeof input.url !== 'string' || !/^https?:\/\//.test(input.url) || !Array.isArray(input.signals) || input.signals.some((item) => typeof item !== 'string')) {
-    throw new DisExecutionError('INVALID_INPUT', 'PageObservation requires an http(s) url and string signals[]');
+  if (!input || typeof input.url !== 'string' || !Array.isArray(input.signals) || input.signals.some((item) => typeof item !== 'string') ||
+      (input.claims !== undefined && (!Array.isArray(input.claims) || input.claims.some((claim) => !claim || typeof claim.sourceId !== 'string' || !claim.sourceId || typeof claim.playerId !== 'string' || !claim.playerId))) ||
+      (input.encryptedPlayer !== undefined && typeof input.encryptedPlayer !== 'boolean') ||
+      (input.unsupportedPlayerFamily !== undefined && typeof input.unsupportedPlayerFamily !== 'boolean')) {
+    throw new DisExecutionError('INVALID_INPUT', 'PageObservation has malformed URL, signals, claims or scope flags');
   }
+  let protocol;
+  try { protocol = new URL(input.url).protocol; } catch { throw new DisExecutionError('INVALID_INPUT', 'PageObservation URL must be absolute'); }
+  const scope = context?.unit?.scope;
+  if (!scope || scope.domain !== 'web-media' || JSON.stringify(scope.appliesTo) !== JSON.stringify(['http-or-https-page-observation']) ||
+      !Array.isArray(scope.excludes) || scope.excludes.length !== 2 || !scope.excludes.includes('encrypted-player-decryption') || !scope.excludes.includes('unsupported-player-families')) {
+    throw new DisExecutionError('UNSUPPORTED_RECOGNIZER_SCOPE', 'unknown applicability or exclusion semantics');
+  }
+  const excluded = !['http:', 'https:'].includes(protocol) ? 'non-http-page' : input.encryptedPlayer ? 'encrypted-player-decryption' : input.unsupportedPlayerFamily ? 'unsupported-player-families' : null;
   const patterns = context?.knowledge?.['xdownload.player-signatures']?.patterns || context?.catalogs?.signatures?.patterns;
   if (!Array.isArray(patterns)) throw new DisExecutionError('MISSING_SIGNATURE_CATALOG', 'player-signatures knowledgeRef is required');
   const rawHaystack = input.url + '\n' + input.signals.join('\n');
   const haystack = normalize ? rawHaystack.toLowerCase() : rawHaystack;
-  const matches = patterns.flatMap((pattern) => {
+  const matches = excluded ? [] : patterns.flatMap((pattern) => {
     if (typeof pattern.playerId !== 'string' || !Array.isArray(pattern.markers)) throw new DisExecutionError('INVALID_SIGNATURE_CATALOG', 'each pattern needs playerId and markers[]');
     const marker = pattern.markers.find((candidate) => haystack.includes(normalize ? candidate.toLowerCase() : candidate));
     return marker ? [{ playerId: pattern.playerId, marker }] : [];
   });
   const candidates = [...new Set(matches.map((match) => match.playerId))];
-  const status = candidates.length === 1 ? 'recognized' : candidates.length > 1 ? 'ambiguous' : 'unknown';
-  const evidence = matches.length
+  const claims = [...(input.claims || []), ...matches.map((match) => ({ sourceId: 'signature:' + match.marker, playerId: match.playerId }))];
+  const claimConflict = (input.claims || []).length > 0 && new Set(claims.map((claim) => claim.playerId)).size > 1;
+  const status = excluded ? 'out_of_scope' : claimConflict ? 'conflict' : candidates.length === 1 ? 'recognized' : candidates.length > 1 ? 'ambiguous' : 'unknown';
+  const evidence = excluded ? [{ sourceId: 'page-observation', kind: 'observation', ref: input.url, claim: 'excluded by scope: ' + excluded }] : matches.length
     ? matches.map((match) => ({ sourceId: 'page-observation', kind: 'observation', ref: input.url, claim: 'matched marker ' + match.marker }))
     : [{ sourceId: 'page-observation', kind: 'observation', ref: input.url, claim: 'no supported player marker found' }];
+  for (const claim of input.claims || []) evidence.push({ sourceId: claim.sourceId, kind: 'observation', ref: input.url, claim: 'observed player claim ' + claim.playerId });
   const evidenceRefs = evidence.map((item) => item.sourceId);
   const values = status === 'recognized'
     ? { playerId: { value: candidates[0], source: 'DERIVED', status: 'INFERRED', evidence: evidenceRefs } }
@@ -676,10 +834,10 @@ function recognizePlayerWithMode(input, context, normalize) {
     status, candidates, evidence, sourceUrl: input.url, values,
     missingFields: status === 'recognized' ? [] : ['playerId'],
     ambiguities: status === 'ambiguous' ? [{ field: 'playerId', candidates }] : [],
-    conflicts: [],
+    conflicts: claimConflict && !excluded ? [{ field: 'playerId', claims }] : [],
     uncertainty: {
       level: status === 'recognized' ? 'LOW' : status === 'ambiguous' ? 'HIGH' : 'UNKNOWN',
-      reason: status === 'recognized' ? 'one supported deterministic signature matched' : status === 'ambiguous' ? 'multiple supported player identities matched' : 'no supported player signature matched',
+      reason: status === 'recognized' ? 'one supported deterministic signature matched' : status === 'ambiguous' ? 'multiple supported player identities matched' : status === 'conflict' ? 'incompatible observed player claims' : excluded ? 'excluded by scope: ' + excluded : 'no supported player signature matched',
     },
   };
 }
@@ -694,7 +852,7 @@ export function recognizePlayerNormalized(input, context) {
 
 export function routeRecognition(input) {
   const recognition = input?.recognition;
-  if (!recognition || !['recognized', 'ambiguous', 'unknown'].includes(recognition.status)) throw new DisExecutionError('INVALID_INPUT', 'route decision requires a recognition result');
+  if (!recognition || !['recognized', 'ambiguous', 'unknown', 'conflict'].includes(recognition.status)) throw new DisExecutionError('INVALID_INPUT', 'route decision requires a recognition result');
   return { route: recognition.status === 'recognized' ? 'KNOWN' : 'REVIEW' };
 }
 
@@ -709,11 +867,11 @@ export function resolvePlayer(input, context) {
 
 export function boundedFallback(input) {
   const recognition = input?.recognition;
-  if (!recognition || !['ambiguous', 'unknown'].includes(recognition.status)) throw new DisExecutionError('INVALID_INPUT', 'fallback requires ambiguous or unknown recognition');
+  if (!recognition || !['ambiguous', 'unknown', 'conflict'].includes(recognition.status)) throw new DisExecutionError('INVALID_INPUT', 'fallback requires ambiguous, conflicting or unknown recognition');
   return {
-    status: recognition.status === 'ambiguous' ? 'NEEDS_INPUT' : 'NEEDS_REVIEW',
-    reason: recognition.status === 'ambiguous' ? 'multiple-player-candidates' : 'no-supported-player-candidate',
-    question: recognition.status === 'ambiguous' ? 'Which player is present on this page?' : null,
+    status: recognition.status !== 'unknown' ? 'NEEDS_INPUT' : 'NEEDS_REVIEW',
+    reason: recognition.status === 'conflict' ? 'conflicting-player-claims' : recognition.status === 'ambiguous' ? 'multiple-player-candidates' : 'no-supported-player-candidate',
+    question: recognition.status !== 'unknown' ? 'Which player is present on this page?' : null,
   };
 }
 
@@ -791,6 +949,7 @@ export async function loadDemo({ expectedSelectionLockSha256 } = {}) {
   if (graph.id !== manifest.graphRef.id || graph.revision !== manifest.graphRef.revision || definition.domainId !== manifest.definitionRef.id || definition.revision !== manifest.definitionRef.revision) {
     throw new DisExecutionError('PACKAGE_ROOT_RESOURCE_IDENTITY_MISMATCH', packageIdentity.packageId);
   }
+  validateSelectedGraph(packageIdentity.selectionLock, manifest.graphRef, graph, resources);
 
   const refs = [graph.inputSchemaRef, graph.outputSchemaRef];
   for (const unit of units) {
@@ -875,7 +1034,7 @@ export async function loadDemo({ expectedSelectionLockSha256 } = {}) {
       selectedProviders.set(unit.id, selected.candidate);
     }
   }
-  lockedProviders.set(selectedProviders, new Map(units.map((unit) => [unit.id, { ref: unit.implementation.ref, revision: unit.revision, candidateId: selectedProviders.get(unit.id)?.candidateId || null }])));
+  lockedProviders.set(selectedProviders, new Map(units.map((unit) => [unit.id, { ref: selectedProviders.get(unit.id)?.ref || unit.implementation.ref, revision: unit.revision, candidateId: selectedProviders.get(unit.id)?.candidateId || null }])));
   const catalogs = {
     signatures: knowledge['xdownload.player-signatures'],
     strategies: JSON.parse(resourceContents.get(strategiesPath)),
@@ -911,11 +1070,19 @@ export async function runPipeline(input, loaded) {
   const outputs = new Map();
   let nodeId = graph.entryNode;
   const trace = [];
+  let expectedOutcome;
+  function applyFailurePolicy(unit, status) {
+    const action = referenceFailureAction(unit, status);
+    if (action === 'REJECT' || action === 'FAIL') throw new DisExecutionError('FAILURE_POLICY_' + action, unit.id + ':' + status);
+    const terminal = ['CLARIFY', 'WAIT'].includes(action) ? 'NEEDS_INPUT' : 'NEEDS_REVIEW';
+    if (expectedOutcome && expectedOutcome !== terminal) throw new DisExecutionError('FAILURE_POLICY_GRAPH_MISMATCH', unit.id + ':' + status);
+    expectedOutcome = terminal;
+  }
   for (let step = 0; step <= graph.nodes.length; step += 1) {
     const node = graph.nodes.find((item) => item.nodeId === nodeId);
     const unit = unitsById.get(node.unitRef.id);
     const binding = lockedProviders.get(selection)?.get(unit?.id);
-    if (!binding || binding.revision !== unit.revision || binding.ref !== unit.implementation?.ref) throw new DisExecutionError('SELECTED_IMPLEMENTATION_CHANGED', unit?.id || nodeId);
+    if (!binding || binding.revision !== unit.revision || (!binding.candidateId && binding.ref !== unit.implementation?.ref)) throw new DisExecutionError('SELECTED_IMPLEMENTATION_CHANGED', unit?.id || nodeId);
     const handler = handlers[binding.ref];
     if (!handler) throw new DisExecutionError('NO_TRUSTED_IMPLEMENTATION_BINDING', binding.ref);
 
@@ -927,7 +1094,14 @@ export async function runPipeline(input, loaded) {
         if (!Object.hasOwn(nodeInput, property)) throw new DisExecutionError('MISSING_RUNTIME_INPUT', nodeId + '/' + property);
       }
     }
-    validatePreconditions(unit, nodeInput);
+    try {
+      validatePreconditions(unit, nodeInput);
+    } catch (error) {
+      if (!(error instanceof DisExecutionError) || error.code !== 'PRECONDITION_FAILED') throw error;
+      const action = referenceFailureAction(unit, 'INVALID_INPUT');
+      if (action === 'REJECT' || action === 'FAIL') throw error;
+      throw new DisExecutionError('UNSUPPORTED_FAILURE_POLICY', unit.id + ':INVALID_INPUT:' + action);
+    }
     const evidence = {};
     const incomingEvidence = graph.edges.filter((edge) => edge.kind === 'evidence' && edge.to.node === nodeId);
     for (const edge of incomingEvidence) {
@@ -936,10 +1110,31 @@ export async function runPipeline(input, loaded) {
       if (value === undefined) throw new DisExecutionError('MISSING_RUNTIME_EVIDENCE_VALUE', edge.from.node + edge.from.pointer);
       evidence[edge.to.slot] = [...(evidence[edge.to.slot] || []), ...(Array.isArray(value) ? structuredClone(value) : [structuredClone(value)])];
     }
-    const output = handler(nodeInput, { evidence, catalogs, knowledge });
+    let output;
+    try {
+      output = handler(nodeInput, { evidence, catalogs, knowledge, unit });
+    } catch (error) {
+      if (!(error instanceof DisExecutionError) || !unit.failure?.handling?.[error.code]) throw error;
+      const action = referenceFailureAction(unit, error.code);
+      if (action === 'REJECT' || action === 'FAIL') throw error;
+      throw new DisExecutionError('UNSUPPORTED_FAILURE_POLICY', unit.id + ':' + error.code + ':' + action);
+    }
+    if (unit.role === 'recognizer' && ['unknown', 'ambiguous', 'conflict', 'out_of_scope'].includes(output?.status)) {
+      applyFailurePolicy(unit, output.status.toUpperCase());
+    }
+    if (unit.role === 'decision' && ['unknown', 'ambiguous', 'conflict'].includes(nodeInput.recognition?.status)) applyFailurePolicy(unit, nodeInput.recognition.status.toUpperCase());
+    if (['procedure', 'validator'].includes(unit.role) && ['NEEDS_INPUT', 'NEEDS_REVIEW'].includes(output?.status)) applyFailurePolicy(unit, output.status);
     outputs.set(nodeId, output);
     trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: binding.ref, implementationCandidateId: binding.candidateId, input: structuredClone(nodeInput), evidence: structuredClone(evidence), output: structuredClone(output) });
-    if (graph.terminalNodes.includes(nodeId)) return { outcome: output, trace, packageIdentity: structuredClone(packageIdentity) };
+    if (graph.terminalNodes.includes(nodeId)) {
+      const workflow = [...unitsById.values()].find((item) => item.role === 'workflow' && item.implementation.ref === 'graph:' + graph.id + '@' + graph.revision);
+      if (['NEEDS_INPUT', 'NEEDS_REVIEW'].includes(output.status)) {
+        if (!workflow) throw new DisExecutionError('WORKFLOW_UNIT_REF_MISMATCH', graph.id);
+        applyFailurePolicy(workflow, output.status);
+      }
+      if (expectedOutcome && output.status !== expectedOutcome) throw new DisExecutionError('FAILURE_POLICY_GRAPH_MISMATCH', nodeId + ':' + expectedOutcome);
+      return { outcome: output, trace, packageIdentity: structuredClone(packageIdentity) };
+    }
     const candidates = graph.edges.filter((edge) => edge.kind === 'control' && edge.from === nodeId && conditionMatches(output, edge.when));
     if (candidates.length !== 1) throw new DisExecutionError('AMBIGUOUS_CONTROL_FLOW', nodeId + ' selected ' + candidates.length + ' control edges');
     nodeId = candidates[0].to;

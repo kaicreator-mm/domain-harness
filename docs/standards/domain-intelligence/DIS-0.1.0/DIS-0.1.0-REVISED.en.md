@@ -3,6 +3,8 @@
 Status: L2_STANDARD_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
 Branch: dis/0.1.0-l2-candidate
 L2 Issue: #1481
+
+R6 contract clarification: Consumers MUST apply each supported failure action or fail closed on unsupported semantics; terminal results MUST agree with the declared action. Recognizer outputs MUST distinguish conflicting claims and out-of-scope input while retaining evidence. Exact-subject histories MUST be replayed, including non-selected subjects and terminal dispositions. Re-validation requires a new authorized promotion; rollback selects another previously promoted exact revision in a new Package lock. Validation Reports MUST bind scenarios, findings, counterexamples, reproducibility and subject/closure digests. Promotion Decisions MUST bind the prior baseline and explicit authority evidence. Synthetic reference fixtures MUST NOT be represented as production qualification or authorization.
 Frozen Product/L1: #1477 @ b8135aa801eb38fcae2fa1fce3bada541178d5b9
 
 This is an experimental standard candidate. It is not a frozen Product/L1 or L2, SDK ABI, Manifest/BUILD ABI, or Runtime API. It does not modify v0.10.3 and does not authorize SDK integration, release, or deployment. The initial draft, demo, validation records, and later candidate refinements remain separately traceable in Git history.

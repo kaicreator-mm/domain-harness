@@ -18,7 +18,9 @@
       "enum": [
         "recognized",
         "ambiguous",
-        "unknown"
+        "unknown",
+        "conflict",
+        "out_of_scope"
       ]
     },
     "candidates": {
@@ -96,7 +98,22 @@
     "conflicts": {
       "type": "array",
       "items": {
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "claims"],
+        "properties": {
+          "field": { "const": "playerId" },
+          "claims": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["sourceId", "playerId"],
+              "properties": { "sourceId": { "type": "string", "minLength": 1 }, "playerId": { "type": "string", "minLength": 1 } }
+            }
+          }
+        }
       }
     },
     "uncertainty": {

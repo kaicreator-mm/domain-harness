@@ -40,9 +40,9 @@
         "ref": "registry:xdownload.player.recognizer@1.0.0",
         "exposure": "semantic",
         "artifactRef": "src/runner.mjs",
-        "artifactDigest": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408",
+        "artifactDigest": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8",
         "target": "node24",
-        "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
+        "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518"
       },
       {
         "candidateId": "signature-normalized-v1",
@@ -50,9 +50,9 @@
         "ref": "registry:xdownload.player.recognizer-normalized@1.0.0",
         "exposure": "semantic",
         "artifactRef": "src/runner.mjs",
-        "artifactDigest": "760e2a6005f8525ba1106c6d3ad63ac2030646114040ad35997c68dcae87f408",
+        "artifactDigest": "0d27aca46224b3b7dbdad70737fff4f25117585b7620c0029a7f101b40e127c8",
         "target": "node24",
-        "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
+        "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518"
       }
     ],
     "selectionPolicy": {
@@ -82,6 +82,10 @@
       "AMBIGUOUS": {
         "action": "CLARIFY",
         "reason": "Declared AMBIGUOUS handling for the reference Consumer."
+      },
+      "CONFLICT": {
+        "action": "CLARIFY",
+        "reason": "Conflicting observations require clarification."
       },
       "INVALID_INPUT": {
         "action": "REJECT",
@@ -115,10 +119,10 @@
         "authorityRef": "xdownload-demo/domain-authority@1.0.0",
         "version": "1.0.0",
         "inputSchemaRef": "domain/schemas/page-observation.schema.json",
-        "inputSchemaDigest": "21d4866967caf6c8df7d8760845e51f73b99814fad45c4b2c9e6030bfa99efbb",
+        "inputSchemaDigest": "cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8",
         "outputSchemaRef": "domain/schemas/recognition-result.schema.json",
-        "outputSchemaDigest": "af1ec4586ab0de89630642d03b52e379b245976a6758c5962244a2dfce5cd285",
-        "contractDigest": "06c3d12f9324b49f590903c0e6c0941a973adc7193a8f49a78dab3c3090a47d7"
+        "outputSchemaDigest": "53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623",
+        "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518"
       }
     ]
   },

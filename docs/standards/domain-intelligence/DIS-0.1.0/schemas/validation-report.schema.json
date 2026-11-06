@@ -147,6 +147,23 @@
         }
       }
     },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "dataset", "result"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "category": { "enum": ["positive", "negative", "boundary", "ambiguous", "out_of_scope"] },
+          "dataset": { "enum": ["AUTHORING", "HELD_OUT"] },
+          "result": { "enum": ["PASS", "FAIL", "NOT_RUN"] }
+        }
+      }
+    },
+    "counterexamples": { "type": "array", "items": { "type": "string" } },
+    "limitations": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
     "validatedAt": {
       "type": "string",
       "format": "date-time"
