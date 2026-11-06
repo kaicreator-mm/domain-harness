@@ -367,7 +367,7 @@
   "$defs": {
     "lifecycleRecord": {
       "type": "object",
-      "required": ["recordId", "recordDigest", "transition", "subject", "dependencyClosureDigest", "previousRecordId", "previousRecordDigest", "actor", "recordedAt"],
+      "required": ["recordId", "recordDigest", "transition", "subject", "subjectPath", "dependencyClosureDigest", "previousRecordId", "previousRecordDigest", "actor", "recordedAt"],
       "properties": {
         "recordId": { "type": "string", "minLength": 1 },
         "recordDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
@@ -376,21 +376,23 @@
           "type": "object", "additionalProperties": false,
           "required": ["kind", "id", "revision", "sha256"],
           "properties": {
-            "kind": { "enum": ["unit", "rule", "graph"] },
+            "kind": { "enum": ["unit", "knowledge", "rule", "graph", "package"] },
             "id": { "type": "string", "minLength": 1 },
             "revision": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
             "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
           }
         },
         "dependencyClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "subjectPath": { "type": "string", "minLength": 1 },
+        "subjectJson": { "type": "string", "minLength": 1 },
         "previousRecordId": { "type": ["string", "null"] },
         "previousRecordDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
-        "actor": { "type": "object", "required": ["id", "role"], "properties": { "id": { "type": "string", "minLength": 1 }, "role": { "type": "string", "minLength": 1 } } },
+        "actor": { "type": "object", "required": ["id", "role", "authorityRef"], "properties": { "id": { "type": "string", "minLength": 1 }, "role": { "type": "string", "minLength": 1 }, "authorityRef": { "type": "string", "minLength": 1 } } },
         "policy": { "type": "object", "required": ["id", "revision"], "properties": { "id": { "type": "string", "minLength": 1 }, "revision": { "type": "string", "minLength": 1 } } },
         "recordedAt": { "type": "string", "format": "date-time" },
         "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["path", "sha256"], "properties": { "path": { "type": "string", "minLength": 1 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } } },
         "validation": { "type": "object", "required": ["result", "subjectDigest", "dependencyClosureDigest", "profile", "validator", "evidenceRefs", "reportSchema", "report", "reportSha256"] },
-        "promotion": { "type": "object", "required": ["decision", "validationRecordId", "validationRecordDigest", "policy", "priorPromotedBaseline", "authorizationEvidence", "authorizationEvidenceSha256"] }
+        "promotion": { "type": "object", "required": ["decision", "validationRecordId", "validationRecordDigest", "policy", "priorPromotedBaseline", "authorizationEvidence", "authorizationEvidenceSha256", "scope", "rationale", "limitations"], "properties": { "scope": { "type": "string", "minLength": 1 }, "rationale": { "type": "string", "minLength": 1 }, "limitations": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } } } }
       },
       "allOf": [
         { "if": { "properties": { "transition": { "enum": ["OBSERVED", "CANDIDATE", "REJECTED", "WITHDRAWN", "EXPIRED", "SUPERSEDED"] } }, "required": ["transition"] }, "then": { "required": ["policy", "evidenceRefs"] } },

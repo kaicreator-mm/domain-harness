@@ -49,13 +49,15 @@ function refreshChain(identity, subjectId) {
   refreshLock(identity);
 }
 
-function makeSuccessorHistory(records) {
+function makeSuccessorHistory(records, successorDigest, successorBytes) {
   const successor = structuredClone(records), priorPromotion = records.at(-1);
   for (let i = 0; i < successor.length; i += 1) {
     const record = successor[i];
     record.recordId += '.successor';
     record.subject.revision = '2.0.0';
-    record.subject.sha256 = 'b'.repeat(64);
+    record.subject.sha256 = successorDigest;
+    record.subjectPath = 'synthetic/successor-unit.json';
+    record.subjectJson = successorBytes;
     if (i) {
       record.previousRecordId = successor[i - 1].recordId;
       record.previousRecordDigest = successor[i - 1].recordDigest;
@@ -103,6 +105,7 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
   for (const record of identity.lifecycleRecords) {
     const asset = identity.selectionLock.selectedAssets.find((item) => item.kind === record.subject.kind && item.id === record.subject.id);
     record.subject.sha256 = resources.get(asset.path);
+    record.subjectJson = await fs.readFile(path.join(root, asset.path), 'utf8');
     record.dependencyClosureDigest = closureDigest;
     const previous = priorBySubject.get(asset.id);
     record.previousRecordId = previous?.recordId || null;
@@ -188,7 +191,7 @@ test('conflicting observations are evidenced and clarified; exclusions fail clos
   assert.ok(result.trace[0].output.evidence.some((entry) => entry.sourceId === 'browser'));
   assert.equal(result.outcome.status, 'NEEDS_INPUT');
   for (const input of [{ url: 'ftp://example.test/page', signals: [] }, { url: 'https://example.test', signals: [], encryptedPlayer: true }, { url: 'https://example.test', signals: [], unsupportedPlayerFamily: true }]) {
-    await assert.rejects(() => runPipeline(input, loaded), hasCode('FAILURE_POLICY_REJECT'));
+    await assert.rejects(() => runPipeline(input, loaded), (error) => error.code === 'FAILURE_POLICY_REJECT' && error.trace?.length === 1 && error.trace[0].output.status === 'out_of_scope' && error.trace[0].output.evidence.length > 0);
   }
 });
 
@@ -685,23 +688,27 @@ test('serialized lifecycle histories replay dispositions, revalidation and exact
   const loaded = await loadedPromise;
   const records = loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer');
   const [candidate, validation, promotion] = structuredClone(records);
-  const successor = makeSuccessorHistory(records);
+  const successorBytes = JSON.stringify({ id: candidate.subject.id, revision: '2.0.0' });
+  const successorDigest = createHash('sha256').update(successorBytes).digest('hex');
+  const resources = new Map(loaded.resources);
+  resources.set('synthetic/successor-unit.json', successorDigest);
+  const successor = makeSuccessorHistory(records, successorDigest, successorBytes);
   const digest = loaded.packageIdentity.resourceClosureSha256;
   const key = JSON.stringify([candidate.subject.kind, candidate.subject.id, candidate.subject.revision, candidate.subject.sha256]);
   for (const transition of ['REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED']) {
-    const end = { recordId: 'test.' + transition, transition, subject: candidate.subject, dependencyClosureDigest: digest, previousRecordId: promotion.recordId, previousRecordDigest: promotion.recordDigest, actor: promotion.actor, policy: promotion.promotion.policy, evidenceRefs: candidate.evidenceRefs, recordedAt: promotion.recordedAt, decision: transition };
+    const end = { recordId: 'test.' + transition, transition, subject: candidate.subject, subjectPath: candidate.subjectPath, subjectJson: candidate.subjectJson, dependencyClosureDigest: digest, previousRecordId: promotion.recordId, previousRecordDigest: promotion.recordDigest, actor: promotion.actor, policy: promotion.promotion.policy, evidenceRefs: candidate.evidenceRefs, recordedAt: promotion.recordedAt, decision: transition };
     const prefix = transition === 'SUPERSEDED' ? [...records, ...successor] : records;
     if (transition === 'SUPERSEDED') end.successor = { subject: successor[2].subject, promotionRecordId: successor[2].recordId, promotionRecordDigest: successor[2].recordDigest };
     refreshRecord(end);
-    assert.equal(replayLifecycle([...prefix, end], loaded.resources, digest).get(key).state, transition);
+    assert.equal(replayLifecycle([...prefix, end], resources, digest).get(key).state, transition);
     const identity = structuredClone(loaded.packageIdentity);
     if (transition === 'SUPERSEDED') identity.lifecycleRecords.push(...successor);
     identity.lifecycleRecords.push(end);
     const paths = new Map(loaded.closureManifest.units.map((item) => [item.id, item.path]));
-    assert.throws(() => validateLifecycleRecords(identity, loaded.unitsById, paths, loaded.resources, digest, identity.selectionLockSha256), hasCode('INCOMPLETE_LIFECYCLE_CHAIN'));
+    assert.throws(() => validateLifecycleRecords(identity, loaded.unitsById, paths, resources, digest, identity.selectionLockSha256), hasCode('INCOMPLETE_LIFECYCLE_CHAIN'));
     const invalidRevival = { ...structuredClone(validation), recordId: 'revive.' + transition, previousRecordId: end.recordId, previousRecordDigest: end.recordDigest };
     refreshRecord(invalidRevival);
-    assert.throws(() => replayLifecycle([...prefix, end, invalidRevival], loaded.resources, digest), hasCode('INCOMPLETE_LIFECYCLE_CHAIN'));
+    assert.throws(() => replayLifecycle([...prefix, end, invalidRevival], resources, digest), hasCode('INCOMPLETE_LIFECYCLE_CHAIN'));
   }
   const again = { ...structuredClone(validation), recordId: 'test.revalidation', previousRecordId: promotion.recordId, previousRecordDigest: promotion.recordDigest };
   refreshRecord(again);
@@ -710,13 +717,23 @@ test('serialized lifecycle histories replay dispositions, revalidation and exact
   Object.assign(repromote.promotion, { validationRecordId: again.recordId, validationRecordDigest: again.recordDigest, priorPromotedBaseline: { kind: 'PROMOTED', recordId: promotion.recordId, recordDigest: promotion.recordDigest } });
   refreshRecord(repromote);
   assert.equal(replayLifecycle([...records, again, repromote], loaded.resources, digest).get(key).promoted.recordId, repromote.recordId);
-  const twoRevisions = replayLifecycle([...records, ...successor], loaded.resources, digest);
+  const twoRevisions = replayLifecycle([...records, ...successor], resources, digest);
   assert.equal(twoRevisions.get(key).state, 'PROMOTED');
-  assert.equal(twoRevisions.get(JSON.stringify(['unit', candidate.subject.id, '2.0.0', 'b'.repeat(64)])).state, 'PROMOTED');
+  assert.equal(twoRevisions.get(JSON.stringify(['unit', candidate.subject.id, '2.0.0', successorDigest])).state, 'PROMOTED');
+  const rollbackValidation = { ...structuredClone(validation), recordId: 'test.rollback.validation', previousRecordId: promotion.recordId, previousRecordDigest: promotion.recordDigest };
+  refreshRecord(rollbackValidation);
+  const rollbackPromotion = { ...structuredClone(promotion), recordId: 'test.rollback.promotion', previousRecordId: rollbackValidation.recordId, previousRecordDigest: rollbackValidation.recordDigest };
+  Object.assign(rollbackPromotion.promotion, { validationRecordId: rollbackValidation.recordId, validationRecordDigest: rollbackValidation.recordDigest, priorPromotedBaseline: { kind: 'PROMOTED', recordId: successor[2].recordId, recordDigest: successor[2].recordDigest } });
+  refreshRecord(rollbackPromotion);
+  assert.equal(replayLifecycle([...records, ...successor, rollbackValidation, rollbackPromotion], resources, digest).get(key).promoted.recordId, rollbackPromotion.recordId);
+  const wrongRollback = structuredClone(rollbackPromotion);
+  wrongRollback.promotion.priorPromotedBaseline = { kind: 'PROMOTED', recordId: promotion.recordId, recordDigest: promotion.recordDigest };
+  refreshRecord(wrongRollback);
+  assert.throws(() => replayLifecycle([...records, ...successor, rollbackValidation, wrongRollback], resources, digest), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
   const falseGenesis = structuredClone(successor);
   falseGenesis[2].promotion.priorPromotedBaseline = { kind: 'GENESIS', reason: 'incorrect' };
   refreshRecord(falseGenesis[2]);
-  assert.throws(() => replayLifecycle([...records, ...falseGenesis], loaded.resources, digest), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
+  assert.throws(() => replayLifecycle([...records, ...falseGenesis], resources, digest), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
   const other = loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.route-decision');
   assert.equal(replayLifecycle([...records, endForTest(promotion, candidate, digest), ...other], loaded.resources, digest).get(JSON.stringify(['unit', other[0].subject.id, other[0].subject.revision, other[0].subject.sha256])).state, 'PROMOTED');
 });
@@ -743,6 +760,14 @@ test('independent lifecycle negative vectors remain rejected after record hashes
     ['invalid validation evidence', (h) => { h[1].validation.evidenceRefs[0].sha256 = '0'.repeat(64); }],
     ['missing authority', (h) => { h[2].actor.authorityRef = ''; }],
     ['invalid timestamp', (h) => { h[1].recordedAt = 'not-a-timestamp'; }],
+    ['invalid subject revision', (h) => { h[0].subject.revision = 'not-semver'; }],
+    ['subject absent from closure', (h) => { h[0].subjectPath = 'synthetic/not-present.json'; }],
+    ['subject identity does not match resource bytes', (h) => { h[0].subject.id = 'synthetic.impostor'; }],
+    ['subject bytes do not match digest', (h) => { h[0].subjectJson += ' '; }],
+    ['validator authority missing', (h) => { delete h[1].actor.authorityRef; }],
+    ['promotion exceeds grant scope', (h) => { h[2].promotion.scope = 'PRODUCTION_GLOBAL'; }],
+    ['promotion rationale missing', (h) => { delete h[2].promotion.rationale; }],
+    ['promotion limitations missing', (h) => { delete h[2].promotion.limitations; }],
     ['coverage disagrees with scenarios', (h) => { h[1].validation.coverage.positive += 1; h[1].validation.report.coverage.positive += 1; h[1].validation.reportSha256 = hashRecord(h[1].validation.report); }],
     ['scenario case omitted', (h) => { h[1].validation.report.tests.pop(); h[1].validation.reportSha256 = hashRecord(h[1].validation.report); }],
     ['failed scenario cannot be reported as PASS', (h) => { h[1].validation.report.tests[0].result = 'FAIL'; h[1].validation.report.scenarios[0].result = 'FAIL'; h[1].validation.reportSha256 = hashRecord(h[1].validation.report); }],
@@ -766,6 +791,23 @@ test('independent lifecycle negative vectors remain rejected after record hashes
   }
 });
 
+test('knowledge and package candidates require exact closed subject resources', async () => {
+  const loaded = await loadedPromise;
+  const candidate = loaded.packageIdentity.lifecycleRecords.find((record) => record.transition === 'CANDIDATE');
+  for (const kind of ['knowledge', 'package']) {
+    const content = JSON.stringify({ id: 'synthetic.' + kind, revision: '1.0.0' });
+    const digest = createHash('sha256').update(content).digest('hex');
+    const resources = new Map(loaded.resources);
+    const path = 'synthetic/' + kind + '.json';
+    resources.set(path, digest);
+    const record = { ...structuredClone(candidate), recordId: 'synthetic.' + kind, subject: { kind, id: 'synthetic.' + kind, revision: '1.0.0', sha256: digest }, subjectPath: path, subjectJson: content };
+    refreshRecord(record);
+    assert.equal(replayLifecycle([record], resources, loaded.packageIdentity.resourceClosureSha256).values().next().value.state, 'CANDIDATE');
+    resources.delete(path);
+    assert.throws(() => replayLifecycle([record], resources, loaded.packageIdentity.resourceClosureSha256), hasCode('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH'));
+  }
+});
+
 test('validation findings and counterexamples remain proposals without granting promotion', async () => {
   const loaded = await loadedPromise;
   const history = structuredClone(loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer').slice(0, 2));
@@ -785,7 +827,7 @@ test('validation findings and counterexamples remain proposals without granting 
 test('observation stays an evidenced occurrence until a candidate is explicitly produced', async () => {
   const loaded = await loadedPromise;
   const [candidate] = structuredClone(loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer'));
-  const observation = { recordId: 'synthetic.observation', transition: 'OBSERVED', subject: candidate.subject, dependencyClosureDigest: candidate.dependencyClosureDigest, previousRecordId: null, previousRecordDigest: null, actor: { id: 'xdownload-demo-observer', role: 'observation-source', authorityRef: candidate.actor.authorityRef }, policy: { id: 'xdownload-demo/observation-policy', revision: '1.0.0' }, evidenceRefs: candidate.evidenceRefs, recordedAt: candidate.recordedAt, provenance: 'MODEL_INFERRED' };
+  const observation = { recordId: 'synthetic.observation', transition: 'OBSERVED', subject: candidate.subject, subjectPath: candidate.subjectPath, subjectJson: candidate.subjectJson, dependencyClosureDigest: candidate.dependencyClosureDigest, previousRecordId: null, previousRecordDigest: null, actor: { id: 'xdownload-demo-observer', role: 'observation-source', authorityRef: candidate.actor.authorityRef }, policy: { id: 'xdownload-demo/observation-policy', revision: '1.0.0' }, evidenceRefs: candidate.evidenceRefs, recordedAt: candidate.recordedAt, provenance: 'MODEL_INFERRED' };
   refreshRecord(observation);
   const observed = replayLifecycle([observation], loaded.resources, candidate.dependencyClosureDigest);
   const key = JSON.stringify([candidate.subject.kind, candidate.subject.id, candidate.subject.revision, candidate.subject.sha256]);
@@ -805,16 +847,22 @@ test('historical closure remains auditable while a changed closure requires fres
   const identity = structuredClone(loaded.packageIdentity);
   const paths = new Map(loaded.closureManifest.units.map((entry) => [entry.id, entry.path]));
   const historicalManifest = structuredClone(loaded.closureManifest);
-  historicalManifest.resources.find((entry) => entry.path === 'domain/schemas/recognition-result.schema.json').sha256 = 'c'.repeat(64);
+  const oldFixtureDigest = createHash('sha256').update('historical-signature-fixture').digest('hex');
+  historicalManifest.resources.find((entry) => entry.path === 'fixtures/player-signatures.json').sha256 = oldFixtureDigest;
   const manifestJson = JSON.stringify(historicalManifest);
   const oldDigest = createHash('sha256').update(manifestJson).digest('hex');
-  identity.selectionLock.historicalClosures = [{ sha256: oldDigest, manifestJson }];
+  identity.selectionLock.historicalClosures = [{ sha256: oldDigest, manifestJson, resourceBase64: { 'fixtures/player-signatures.json': Buffer.from('historical-signature-fixture').toString('base64') } }];
   const history = identity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer');
   for (const record of history) {
     record.dependencyClosureDigest = oldDigest;
+    if (record.transition === 'CANDIDATE') record.evidenceRefs.find((item) => item.path === 'fixtures/player-signatures.json').sha256 = oldFixtureDigest;
     if (record.transition === 'VALIDATED') {
       record.validation.dependencyClosureDigest = oldDigest;
+      record.validation.baseline.sha256 = oldFixtureDigest;
+      record.validation.evidenceRefs.find((item) => item.path === 'fixtures/player-signatures.json').sha256 = oldFixtureDigest;
       record.validation.report.dependencyClosure.sha256 = oldDigest;
+      record.validation.report.dependencyClosure.resources = structuredClone(record.validation.evidenceRefs);
+      record.validation.report.baseline = structuredClone(record.validation.baseline);
       record.validation.reportSha256 = hashRecord(record.validation.report);
     }
   }
@@ -827,7 +875,11 @@ test('historical closure remains auditable while a changed closure requires fres
   nextValidation.previousRecordDigest = oldPromotion.recordDigest;
   nextValidation.dependencyClosureDigest = loaded.packageIdentity.resourceClosureSha256;
   nextValidation.validation.dependencyClosureDigest = loaded.packageIdentity.resourceClosureSha256;
+  nextValidation.validation.baseline.sha256 = loaded.resources.get('fixtures/player-signatures.json');
+  nextValidation.validation.evidenceRefs.find((item) => item.path === 'fixtures/player-signatures.json').sha256 = loaded.resources.get('fixtures/player-signatures.json');
   nextValidation.validation.report.dependencyClosure.sha256 = loaded.packageIdentity.resourceClosureSha256;
+  nextValidation.validation.report.dependencyClosure.resources = structuredClone(nextValidation.validation.evidenceRefs);
+  nextValidation.validation.report.baseline = structuredClone(nextValidation.validation.baseline);
   nextValidation.validation.reportSha256 = hashRecord(nextValidation.validation.report);
   refreshRecord(nextValidation);
   const nextPromotion = structuredClone(oldPromotion);
@@ -843,6 +895,17 @@ test('historical closure remains auditable while a changed closure requires fres
   }
   refreshLock(identity);
   assert.equal(validateLifecycleRecords(identity, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, identity.selectionLockSha256), true);
+  const missingHistoricalBytes = structuredClone(identity);
+  delete missingHistoricalBytes.selectionLock.historicalClosures[0].resourceBase64['fixtures/player-signatures.json'];
+  refreshLock(missingHistoricalBytes);
+  assert.throws(() => validateLifecycleRecords(missingHistoricalBytes, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, missingHistoricalBytes.selectionLockSha256), hasCode('INVALID_LIFECYCLE_ACTOR_OR_POLICY'));
+  const wrongClosure = structuredClone(identity);
+  const wrongPromotion = wrongClosure.lifecycleRecords.find((item) => item.recordId === nextPromotion.recordId);
+  wrongPromotion.dependencyClosureDigest = oldDigest;
+  refreshRecord(wrongPromotion);
+  for (const entry of [wrongClosure.selectionLock.selectedAssets.find((item) => item.id === 'xdownload.player.recognizer'), wrongClosure.selectionLock.selectedCapabilities[0]]) entry.promotionRecordDigest = wrongPromotion.recordDigest;
+  refreshLock(wrongClosure);
+  assert.throws(() => validateLifecycleRecords(wrongClosure, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, wrongClosure.selectionLockSha256), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
   identity.selectionLock.historicalClosures[0].manifestJson += ' ';
   refreshLock(identity);
   assert.throws(() => validateLifecycleRecords(identity, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, identity.selectionLockSha256), hasCode('INVALID_HISTORICAL_CLOSURE'));
@@ -850,7 +913,7 @@ test('historical closure remains auditable while a changed closure requires fres
 });
 
 function endForTest(promotion, candidate, digest) {
-  const end = { recordId: 'test.withdrawn', transition: 'WITHDRAWN', subject: candidate.subject, dependencyClosureDigest: digest, previousRecordId: promotion.recordId, previousRecordDigest: promotion.recordDigest, actor: promotion.actor, policy: promotion.promotion.policy, evidenceRefs: candidate.evidenceRefs, recordedAt: promotion.recordedAt, decision: 'WITHDRAWN' };
+  const end = { recordId: 'test.withdrawn', transition: 'WITHDRAWN', subject: candidate.subject, subjectPath: candidate.subjectPath, subjectJson: candidate.subjectJson, dependencyClosureDigest: digest, previousRecordId: promotion.recordId, previousRecordDigest: promotion.recordDigest, actor: promotion.actor, policy: promotion.promotion.policy, evidenceRefs: candidate.evidenceRefs, recordedAt: promotion.recordedAt, decision: 'WITHDRAWN' };
   refreshRecord(end);
   return end;
 }

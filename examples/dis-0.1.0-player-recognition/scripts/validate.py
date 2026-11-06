@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import base64
+import binascii
 import hashlib
 import json
 import math
@@ -725,8 +727,21 @@ def replay_lifecycle(records: list, resources: dict, closure_digest: str, histor
         evidence_resources = resources if record_closure == closure_digest else historical_closures.get(record_closure)
         def evidence_ok(refs):
             return isinstance(refs, list) and bool(refs) and all(isinstance(ref, dict) and ref.get('path') in evidence_resources and evidence_resources[ref['path']] == ref.get('sha256') for ref in refs)
-        if not record_id or record_id in ids or key[0] not in ('unit', 'rule', 'graph') or not key[1] or not key[2] or not re.fullmatch(r'[a-f0-9]{64}', key[3] or '') or evidence_resources is None:
+        if not record_id or record_id in ids or key[0] not in ('unit', 'knowledge', 'rule', 'graph', 'package') or not key[1] or not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', key[2] or '') or not re.fullmatch(r'[a-f0-9]{64}', key[3] or '') or evidence_resources is None or evidence_resources.get(safe_relative(record.get('subjectPath', ''))) != key[3]:
             fail('invalid lifecycle exact subject or duplicate record')
+        subject_json = record.get('subjectJson')
+        if not isinstance(subject_json, str) or sha256(subject_json.encode('utf-8')) != key[3]:
+            fail('lifecycle subject bytes mismatch')
+        try:
+            subject_document = json.loads(subject_json)
+        except (json.JSONDecodeError, TypeError):
+            fail('invalid lifecycle subject JSON')
+        if not isinstance(subject_document, dict):
+            fail('invalid lifecycle subject document')
+        content_id = subject_document.get('catalogId') if key[0] == 'rule' else subject_document.get('dis', {}).get('packageId') if key[0] == 'package' and isinstance(subject_document.get('dis'), dict) else subject_document.get('id')
+        content_revision = subject_document.get('dis', {}).get('revision') if key[0] == 'package' and isinstance(subject_document.get('dis'), dict) else subject_document.get('revision')
+        if content_id != key[1] or content_revision != key[2]:
+            fail('lifecycle subject identity does not match bytes')
         if revision_key in revisions and revisions[revision_key] != key[3]:
             fail('same lifecycle revision has conflicting subject digests')
         revisions[revision_key] = key[3]
@@ -756,7 +771,7 @@ def replay_lifecycle(records: list, resources: dict, closure_digest: str, histor
             state['candidate'] = record
         elif transition == 'VALIDATED':
             val = record.get('validation', {})
-            if actor.get('id') != 'xdownload-dis-independent-conformance' or actor.get('role') != 'validator' or actor.get('id') != val.get('validator', {}).get('id') or policy != {'id':'xdownload-demo/validation-profile', 'revision':'0.1.0'} or val.get('result') != 'PASS' or val.get('subjectDigest') != key[3] or val.get('dependencyClosureDigest') != record_closure or not val.get('profile', {}).get('id') or not val['profile'].get('revision') or not val.get('validator', {}).get('version') or not evidence_ok(val.get('evidenceRefs')):
+            if actor.get('id') != 'xdownload-dis-independent-conformance' or actor.get('role') != 'validator' or actor.get('authorityRef') != 'xdownload-demo/domain-authority@1.0.0' or actor.get('id') != val.get('validator', {}).get('id') or policy != {'id':'xdownload-demo/validation-profile', 'revision':'0.1.0'} or val.get('result') != 'PASS' or val.get('subjectDigest') != key[3] or val.get('dependencyClosureDigest') != record_closure or not val.get('profile', {}).get('id') or not val['profile'].get('revision') or not val.get('validator', {}).get('version') or not evidence_ok(val.get('evidenceRefs')):
                 fail('invalid lifecycle validation')
             report = val.get('report')
             if not isinstance(report, dict) or val.get('reportSchema') != 'https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json' or sha256(json.dumps(report, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')) != val.get('reportSha256'):
@@ -787,7 +802,9 @@ def replay_lifecycle(records: list, resources: dict, closure_digest: str, histor
             if (grant != {'id':'synthetic-reference-governance-grant', 'issuer':'xdownload-demo', 'subject':actor['id'], 'authorityRef':actor['authorityRef'], 'scope':'REFERENCE_DEMO_ONLY', 'outcome':'AUTHORIZED'} or
                 sha256(json.dumps(grant, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')) != promotion.get('authorizationEvidenceSha256')):
                 fail('missing or invalid synthetic reference authorization evidence')
-            prior = state['last_promoted'] or latest_promoted.get(logical_key)
+            prior = latest_promoted.get(logical_key)
+            if promotion.get('scope') != grant.get('scope') or not isinstance(promotion.get('rationale'), str) or not promotion['rationale'] or not isinstance(promotion.get('limitations'), list) or not promotion['limitations'] or any(not isinstance(item, str) or not item for item in promotion['limitations']) or record_closure != state['validated']['dependencyClosureDigest']:
+                fail('promotion scope, rationale, limitations or closure mismatch')
             if (prior and (baseline.get('kind') != 'PROMOTED' or baseline.get('recordId') != prior['recordId'] or baseline.get('recordDigest') != prior['recordDigest'])) or (not prior and (baseline.get('kind') != 'GENESIS' or not baseline.get('reason'))):
                 fail('promotion prior baseline mismatch')
             state['promoted'] = record
@@ -843,12 +860,29 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
             fail('invalid historical Resource Closure JSON')
         if manifest.get('schemaVersion') != 'dis.resource-closure/0.1.0' or manifest.get('standardVersion') != '0.1.0' or not isinstance(manifest.get('resources'), list):
             fail('invalid historical Resource Closure metadata')
-        entries = {}
+        entries, declared = {}, set()
+        supplied = history.get('resourceBase64', {})
+        if not isinstance(supplied, dict):
+            fail('invalid historical resource content map')
         for item in manifest['resources']:
             relative = safe_relative(item.get('path', ''))
-            if relative in entries or not re.fullmatch(r'[a-f0-9]{64}', item.get('sha256', '')):
+            if relative in declared or not re.fullmatch(r'[a-f0-9]{64}', item.get('sha256', '')):
                 fail('invalid historical Resource Closure entry')
-            entries[relative] = item['sha256']
+            declared.add(relative)
+            if relative in supplied:
+                try:
+                    encoded = supplied[relative]
+                    if not isinstance(encoded, str):
+                        fail('invalid historical resource encoding')
+                    content = base64.b64decode(encoded, validate=True)
+                    if base64.b64encode(content).decode('ascii') != encoded or sha256(content) != item['sha256']:
+                        fail('historical resource content digest mismatch')
+                except (ValueError, binascii.Error):
+                    fail('invalid historical resource encoding')
+            if resources.get(relative) == item['sha256'] or relative in supplied:
+                entries[relative] = item['sha256']
+        if set(supplied) - declared:
+            fail('historical resource content is not in the manifest')
         historical_closures[digest] = entries
     by_id = {}
     for record in records:
@@ -861,7 +895,7 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         subject = record.get("subject", {})
         if (
             (record.get("dependencyClosureDigest") != closure_digest and record.get('dependencyClosureDigest') not in historical_closures)
-            or subject.get("kind") not in ("unit", "rule", "graph")
+            or subject.get("kind") not in ("unit", "knowledge", "rule", "graph", "package")
             or not subject.get("id")
             or not subject.get("revision")
             or not re.fullmatch(r"[a-f0-9]{64}", subject.get("sha256", ""))
@@ -906,8 +940,9 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         fail("Candidate/Validation actor or policy identity missing")
     if not candidate.get("evidenceRefs"):
         fail("Candidate evidence is missing")
+    candidate_resources = resources if candidate['dependencyClosureDigest'] == closure_digest else historical_closures.get(candidate['dependencyClosureDigest'], {})
     for evidence in candidate.get("evidenceRefs", []):
-        if resources.get(evidence.get("path")) != evidence.get("sha256"):
+        if candidate_resources.get(evidence.get("path")) != evidence.get("sha256"):
             fail(f"Candidate evidence digest mismatch: {evidence.get('path')}")
     validation = validated.get("validation", {})
     if (
@@ -1009,7 +1044,8 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         c, v, p = history.get('candidate'), history.get('validated'), history.get('promoted')
         if history.get('state') != 'PROMOTED' or not c or not v or not p:
             fail('incomplete asset lifecycle chain')
-        if not c.get('actor', {}).get('id') or c['actor'].get('role') != 'candidate-producer' or not c['actor'].get('authorityRef') or not c.get('policy', {}).get('id') or not c['policy'].get('revision') or not isinstance(c.get('evidenceRefs'), list) or not c['evidenceRefs'] or any(resources.get(item.get('path')) != item.get('sha256') for item in c['evidenceRefs']) or not v.get('actor', {}).get('id') or v['actor'].get('role') != 'validator':
+        candidate_resources = resources if c['dependencyClosureDigest'] == closure_digest else historical_closures.get(c['dependencyClosureDigest'], {})
+        if not c.get('actor', {}).get('id') or c['actor'].get('role') != 'candidate-producer' or not c['actor'].get('authorityRef') or not c.get('policy', {}).get('id') or not c['policy'].get('revision') or not isinstance(c.get('evidenceRefs'), list) or not c['evidenceRefs'] or any(candidate_resources.get(item.get('path')) != item.get('sha256') for item in c['evidenceRefs']) or not v.get('actor', {}).get('id') or v['actor'].get('role') != 'validator':
             fail('invalid Candidate or Validation actor/policy/evidence')
         pa = p.get('actor', {})
         if pa.get('id') != 'xdownload-demo-governance' or pa.get('role') != 'promotion-authority' or pa.get('authorityRef') != 'xdownload-demo/domain-authority@1.0.0' or pa.get('id') in (c.get('actor', {}).get('id'), v.get('actor', {}).get('id')) or p.get('promotion', {}).get('decision') != 'PROMOTE' or p['promotion'].get('validationRecordId') != v['recordId'] or p['promotion'].get('validationRecordDigest') != v['recordDigest']:
@@ -1220,6 +1256,14 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
         ('invalid validation evidence', lambda h: h[1]['validation']['evidenceRefs'][0].__setitem__('sha256', '0' * 64)),
         ('actor authority missing', lambda h: h[2]['actor'].__setitem__('authorityRef', '')),
         ('invalid timestamp', lambda h: h[1].__setitem__('recordedAt', 'not-a-timestamp')),
+        ('invalid subject revision', lambda h: h[0]['subject'].__setitem__('revision', 'not-semver')),
+        ('subject absent from closure', lambda h: h[0].__setitem__('subjectPath', 'synthetic/not-present.json')),
+        ('subject identity does not match resource bytes', lambda h: h[0]['subject'].__setitem__('id', 'synthetic.impostor')),
+        ('subject bytes do not match digest', lambda h: h[0].__setitem__('subjectJson', h[0]['subjectJson'] + ' ')),
+        ('validator authority missing', lambda h: h[1]['actor'].pop('authorityRef')),
+        ('promotion exceeds grant scope', lambda h: h[2]['promotion'].__setitem__('scope', 'PRODUCTION_GLOBAL')),
+        ('promotion rationale missing', lambda h: h[2]['promotion'].pop('rationale')),
+        ('promotion limitations missing', lambda h: h[2]['promotion'].pop('limitations')),
         ('coverage disagrees with scenarios', bad_coverage),
         ('scenario case omitted', missing_case),
         ('failed scenario cannot be reported as PASS', failed_case),
@@ -1227,7 +1271,19 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
     for label, mutation in vectors:
         reject(label, mutation)
     candidate, validation, promotion = original
-    observation = {'recordId':'synthetic.observation', 'transition':'OBSERVED', 'subject':candidate['subject'], 'dependencyClosureDigest':closure_digest, 'previousRecordId':None, 'previousRecordDigest':None, 'actor':{'id':'xdownload-demo-observer', 'role':'observation-source', 'authorityRef':candidate['actor']['authorityRef']}, 'policy':{'id':'xdownload-demo/observation-policy', 'revision':'1.0.0'}, 'evidenceRefs':candidate['evidenceRefs'], 'recordedAt':candidate['recordedAt'], 'provenance':'MODEL_INFERRED'}
+    for kind in ('knowledge', 'package'):
+        content = json.dumps({'id':'synthetic.' + kind, 'revision':'1.0.0'}, separators=(',', ':')).encode('utf-8')
+        path, digest = 'synthetic/' + kind + '.json', sha256(content)
+        kind_resources = dict(resources)
+        kind_resources[path] = digest
+        record = copy.deepcopy(candidate)
+        record.update({'recordId':'synthetic.' + kind, 'subject':{'kind':kind, 'id':'synthetic.' + kind, 'revision':'1.0.0', 'sha256':digest}, 'subjectPath':path, 'subjectJson':content.decode('utf-8')})
+        record['recordDigest'] = lifecycle_record_digest(record)
+        if next(iter(replay_lifecycle([record], kind_resources, closure_digest).values()))['state'] != 'CANDIDATE':
+            fail('knowledge or package candidate not replayed')
+        del kind_resources[path]
+        expect_rejection(lambda: replay_lifecycle([record], kind_resources, closure_digest), 'subject resource absent')
+    observation = {'recordId':'synthetic.observation', 'transition':'OBSERVED', 'subject':candidate['subject'], 'subjectPath':candidate['subjectPath'], 'subjectJson':candidate['subjectJson'], 'dependencyClosureDigest':closure_digest, 'previousRecordId':None, 'previousRecordDigest':None, 'actor':{'id':'xdownload-demo-observer', 'role':'observation-source', 'authorityRef':candidate['actor']['authorityRef']}, 'policy':{'id':'xdownload-demo/observation-policy', 'revision':'1.0.0'}, 'evidenceRefs':candidate['evidenceRefs'], 'recordedAt':candidate['recordedAt'], 'provenance':'MODEL_INFERRED'}
     observation['recordDigest'] = lifecycle_record_digest(observation)
     if next(iter(replay_lifecycle([observation], resources, closure_digest).values()))['state'] != 'OBSERVED':
         fail('observation incorrectly became a candidate')
@@ -1241,9 +1297,15 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
     bad_observation['recordDigest'] = lifecycle_record_digest(bad_observation)
     expect_rejection(lambda: replay_lifecycle([bad_observation], resources, closure_digest), 'model inference cannot be asserted as promoted fact')
     successor = copy.deepcopy(original)
+    successor_bytes = json.dumps({'id':candidate['subject']['id'], 'revision':'2.0.0'}, separators=(',', ':')).encode('utf-8')
+    successor_digest = sha256(successor_bytes)
+    successor_resources = dict(resources)
+    successor_resources['synthetic/successor-unit.json'] = successor_digest
     for index, record in enumerate(successor):
         record['recordId'] += '.successor'
-        record['subject'].update({'revision':'2.0.0', 'sha256':'b' * 64})
+        record['subject'].update({'revision':'2.0.0', 'sha256':successor_digest})
+        record['subjectPath'] = 'synthetic/successor-unit.json'
+        record['subjectJson'] = successor_bytes.decode('utf-8')
         if index:
             record['previousRecordId'] = successor[index - 1]['recordId']
             record['previousRecordDigest'] = successor[index - 1]['recordDigest']
@@ -1254,18 +1316,30 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
         if record['transition'] == 'PROMOTED':
             record['promotion'].update({'validationRecordId':successor[index - 1]['recordId'], 'validationRecordDigest':successor[index - 1]['recordDigest'], 'priorPromotedBaseline':{'kind':'PROMOTED', 'recordId':promotion['recordId'], 'recordDigest':promotion['recordDigest']}})
         record['recordDigest'] = lifecycle_record_digest(record)
-    replay_lifecycle(original + successor, resources, closure_digest)
+    replay_lifecycle(original + successor, successor_resources, closure_digest)
+    rollback_validation = copy.deepcopy(validation)
+    rollback_validation.update({'recordId':'synthetic.rollback.validation', 'previousRecordId':promotion['recordId'], 'previousRecordDigest':promotion['recordDigest']})
+    rollback_validation['recordDigest'] = lifecycle_record_digest(rollback_validation)
+    rollback_promotion = copy.deepcopy(promotion)
+    rollback_promotion.update({'recordId':'synthetic.rollback.promotion', 'previousRecordId':rollback_validation['recordId'], 'previousRecordDigest':rollback_validation['recordDigest']})
+    rollback_promotion['promotion'].update({'validationRecordId':rollback_validation['recordId'], 'validationRecordDigest':rollback_validation['recordDigest'], 'priorPromotedBaseline':{'kind':'PROMOTED', 'recordId':successor[2]['recordId'], 'recordDigest':successor[2]['recordDigest']}})
+    rollback_promotion['recordDigest'] = lifecycle_record_digest(rollback_promotion)
+    replay_lifecycle(original + successor + [rollback_validation, rollback_promotion], successor_resources, closure_digest)
+    wrong_rollback = copy.deepcopy(rollback_promotion)
+    wrong_rollback['promotion']['priorPromotedBaseline'] = {'kind':'PROMOTED', 'recordId':promotion['recordId'], 'recordDigest':promotion['recordDigest']}
+    wrong_rollback['recordDigest'] = lifecycle_record_digest(wrong_rollback)
+    expect_rejection(lambda: replay_lifecycle(original + successor + [rollback_validation, wrong_rollback], successor_resources, closure_digest), 'rollback skips the latest promoted baseline')
     for disposition in ('REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'):
-        ending = {'recordId':'fixture.' + disposition, 'transition':disposition, 'subject':candidate['subject'], 'dependencyClosureDigest':closure_digest, 'previousRecordId':promotion['recordId'], 'previousRecordDigest':promotion['recordDigest'], 'actor':promotion['actor'], 'policy':promotion['promotion']['policy'], 'evidenceRefs':candidate['evidenceRefs'], 'recordedAt':promotion['recordedAt'], 'decision':disposition}
+        ending = {'recordId':'fixture.' + disposition, 'transition':disposition, 'subject':candidate['subject'], 'subjectPath':candidate['subjectPath'], 'subjectJson':candidate['subjectJson'], 'dependencyClosureDigest':closure_digest, 'previousRecordId':promotion['recordId'], 'previousRecordDigest':promotion['recordDigest'], 'actor':promotion['actor'], 'policy':promotion['promotion']['policy'], 'evidenceRefs':candidate['evidenceRefs'], 'recordedAt':promotion['recordedAt'], 'decision':disposition}
         prefix = original + successor if disposition == 'SUPERSEDED' else original
         if disposition == 'SUPERSEDED':
             ending['successor'] = {'subject':successor[2]['subject'], 'promotionRecordId':successor[2]['recordId'], 'promotionRecordDigest':successor[2]['recordDigest']}
         ending['recordDigest'] = lifecycle_record_digest(ending)
-        replay_lifecycle(prefix + [ending], resources, closure_digest)
+        replay_lifecycle(prefix + [ending], successor_resources, closure_digest)
         revival = copy.deepcopy(validation)
         revival.update({'recordId':'fixture.revival.' + disposition, 'previousRecordId':ending['recordId'], 'previousRecordDigest':ending['recordDigest']})
         revival['recordDigest'] = lifecycle_record_digest(revival)
-        expect_rejection(lambda: replay_lifecycle(prefix + [ending, revival], resources, closure_digest), disposition + ' cannot be revived')
+        expect_rejection(lambda: replay_lifecycle(prefix + [ending, revival], successor_resources, closure_digest), disposition + ' cannot be revived')
     again = copy.deepcopy(validation)
     again.update({'recordId':'fixture.revalidation', 'previousRecordId':promotion['recordId'], 'previousRecordDigest':promotion['recordDigest']})
     again['recordDigest'] = lifecycle_record_digest(again)
@@ -1289,19 +1363,26 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
 def validate_historical_closure(package_identity: dict, units_by_id: dict, unit_paths: dict, resources: dict, closure: dict, closure_digest: str):
     identity = copy.deepcopy(package_identity)
     historical_manifest = copy.deepcopy(closure)
-    next(item for item in historical_manifest['resources'] if item['path'] == 'domain/schemas/recognition-result.schema.json')['sha256'] = 'c' * 64
+    old_fixture_digest = sha256(b'historical-signature-fixture')
+    next(item for item in historical_manifest['resources'] if item['path'] == 'fixtures/player-signatures.json')['sha256'] = old_fixture_digest
     raw = json.dumps(historical_manifest, separators=(',', ':'), ensure_ascii=False)
     old_digest = sha256(raw.encode('utf-8'))
-    identity['selectionLock']['historicalClosures'] = [{'sha256':old_digest, 'manifestJson':raw}]
+    identity['selectionLock']['historicalClosures'] = [{'sha256':old_digest, 'manifestJson':raw, 'resourceBase64':{'fixtures/player-signatures.json':base64.b64encode(b'historical-signature-fixture').decode('ascii')}}]
     history = [item for item in identity['lifecycleRecords'] if item['subject']['id'] == 'xdownload.player.recognizer']
     for index, record in enumerate(history):
         record['dependencyClosureDigest'] = old_digest
+        if record['transition'] == 'CANDIDATE':
+            next(item for item in record['evidenceRefs'] if item['path'] == 'fixtures/player-signatures.json')['sha256'] = old_fixture_digest
         if index:
             record['previousRecordId'] = history[index - 1]['recordId']
             record['previousRecordDigest'] = history[index - 1]['recordDigest']
         if record['transition'] == 'VALIDATED':
             record['validation']['dependencyClosureDigest'] = old_digest
+            record['validation']['baseline']['sha256'] = old_fixture_digest
+            next(item for item in record['validation']['evidenceRefs'] if item['path'] == 'fixtures/player-signatures.json')['sha256'] = old_fixture_digest
             record['validation']['report']['dependencyClosure']['sha256'] = old_digest
+            record['validation']['report']['dependencyClosure']['resources'] = copy.deepcopy(record['validation']['evidenceRefs'])
+            record['validation']['report']['baseline'] = copy.deepcopy(record['validation']['baseline'])
             record['validation']['reportSha256'] = sha256(json.dumps(record['validation']['report'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
         if record['transition'] == 'PROMOTED':
             record['promotion']['validationRecordId'] = history[index - 1]['recordId']
@@ -1316,7 +1397,11 @@ def validate_historical_closure(package_identity: dict, units_by_id: dict, unit_
     current_validation = copy.deepcopy(old_validation)
     current_validation.update({'recordId':'synthetic.current.validation', 'previousRecordId':old_promotion['recordId'], 'previousRecordDigest':old_promotion['recordDigest'], 'dependencyClosureDigest':closure_digest})
     current_validation['validation']['dependencyClosureDigest'] = closure_digest
+    current_validation['validation']['baseline']['sha256'] = resources['fixtures/player-signatures.json']
+    next(item for item in current_validation['validation']['evidenceRefs'] if item['path'] == 'fixtures/player-signatures.json')['sha256'] = resources['fixtures/player-signatures.json']
     current_validation['validation']['report']['dependencyClosure']['sha256'] = closure_digest
+    current_validation['validation']['report']['dependencyClosure']['resources'] = copy.deepcopy(current_validation['validation']['evidenceRefs'])
+    current_validation['validation']['report']['baseline'] = copy.deepcopy(current_validation['validation']['baseline'])
     current_validation['validation']['reportSha256'] = sha256(json.dumps(current_validation['validation']['report'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
     current_validation['recordDigest'] = lifecycle_record_digest(current_validation)
     current_promotion = copy.deepcopy(old_promotion)
@@ -1328,6 +1413,18 @@ def validate_historical_closure(package_identity: dict, units_by_id: dict, unit_
         item.update({'validationRecordId':current_validation['recordId'], 'validationRecordDigest':current_validation['recordDigest'], 'promotionRecordId':current_promotion['recordId'], 'promotionRecordDigest':current_promotion['recordDigest']})
     identity['selectionLockSha256'] = sha256(json.dumps(identity['selectionLock'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
     validate_lifecycle_records(identity, units_by_id, unit_paths, resources, closure_digest, identity['selectionLockSha256'])
+    missing_bytes = copy.deepcopy(identity)
+    del missing_bytes['selectionLock']['historicalClosures'][0]['resourceBase64']['fixtures/player-signatures.json']
+    missing_bytes['selectionLockSha256'] = sha256(json.dumps(missing_bytes['selectionLock'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
+    expect_rejection(lambda: validate_lifecycle_records(missing_bytes, units_by_id, unit_paths, resources, closure_digest, missing_bytes['selectionLockSha256']), 'historical evidence bytes unavailable')
+    wrong_closure = copy.deepcopy(identity)
+    wrong_promotion = next(item for item in wrong_closure['lifecycleRecords'] if item['recordId'] == current_promotion['recordId'])
+    wrong_promotion['dependencyClosureDigest'] = old_digest
+    wrong_promotion['recordDigest'] = lifecycle_record_digest(wrong_promotion)
+    for item in [next(item for item in wrong_closure['selectionLock']['selectedAssets'] if item['id'] == history[0]['subject']['id']), wrong_closure['selectionLock']['selectedCapabilities'][0]]:
+        item['promotionRecordDigest'] = wrong_promotion['recordDigest']
+    wrong_closure['selectionLockSha256'] = sha256(json.dumps(wrong_closure['selectionLock'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
+    expect_rejection(lambda: validate_lifecycle_records(wrong_closure, units_by_id, unit_paths, resources, closure_digest, wrong_closure['selectionLockSha256']), 'promotion and validation closure mismatch')
     identity['selectionLock']['historicalClosures'][0]['manifestJson'] += ' '
     identity['selectionLockSha256'] = sha256(json.dumps(identity['selectionLock'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
     expect_rejection(lambda: validate_lifecycle_records(identity, units_by_id, unit_paths, resources, closure_digest, identity['selectionLockSha256']), 'tampered historical manifest')
@@ -1622,7 +1719,7 @@ def main():
     for probe in scope_results:
         Draft202012Validator(demo_schemas['domain/schemas/page-observation.schema.json'], registry=registry, format_checker=FormatChecker()).validate(probe['input'])
         Draft202012Validator(demo_schemas['domain/schemas/recognition-result.schema.json'], registry=registry, format_checker=FormatChecker()).validate(probe['output'])
-        if probe['output']['status'] != 'out_of_scope' or not probe['output']['evidence']:
+        if probe.get('errorCode') != 'FAILURE_POLICY_REJECT' or len(probe.get('trace', [])) != 1 or probe['trace'][0].get('nodeId') != graph['entryNode'] or not json_value_equal(probe['trace'][0].get('input'), probe['input']) or not json_value_equal(probe['trace'][0].get('output'), probe['output']) or probe['output']['status'] != 'out_of_scope' or not probe['output']['evidence']:
             fail('scope exclusion must preserve evidence and return out_of_scope')
     old_lock = copy.deepcopy(package_identity['selectionLock'])
     feedback = {'traceId':'synthetic-trace-1', 'packageLockSha256':package_identity['selectionLockSha256'], 'provenance':'MODEL_INFERRED', 'claimedProvenance':'MODEL_INFERRED', 'finding':'possible alternative marker', 'disposition':'PROPOSAL_ONLY'}
