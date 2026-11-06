@@ -526,6 +526,17 @@ test('Capability requirements resolve one exact provider contract', async () => 
   decision.capabilities.requires[0].compatibility.accepted[0].contractDigest = '0'.repeat(64);
   incompatible.set(decision.id, decision);
   assert.throws(() => validateCapabilityContracts(incompatible), hasCode('INCOMPATIBLE_CAPABILITY_PROVIDER'));
+  const unicode = new Map([...loaded.unitsById].map(([id, unit]) => [id, structuredClone(unit)]));
+  const provided = unicode.get('xdownload.player.recognizer').capabilities.provides[0];
+  provided.owner = '示例';
+  const fields = ['capabilityId', 'owner', 'authorityRef', 'version', 'inputSchemaRef', 'inputSchemaDigest', 'outputSchemaRef', 'outputSchemaDigest'];
+  provided.contractDigest = hashRecord(Object.fromEntries(fields.map((field) => [field, provided[field]])));
+  for (const unit of unicode.values()) for (const requirement of unit.capabilities?.requires || []) {
+    requirement.owner = provided.owner;
+    requirement.contractDigest = provided.contractDigest;
+    for (const accepted of requirement.compatibility.accepted) accepted.contractDigest = provided.contractDigest;
+  }
+  assert.equal(validateCapabilityContracts(unicode), true);
 });
 
 test('Package lock deterministically selects one exact implementation candidate independent of array order', async () => {
@@ -777,6 +788,32 @@ test('serialized lifecycle histories replay dispositions, revalidation and exact
   assert.throws(() => replayLifecycle([...records, ...falseGenesis], resources, digest), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
   const other = loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.route-decision');
   assert.equal(replayLifecycle([...records, endForTest(promotion, candidate, digest), ...other], loaded.resources, digest).get(JSON.stringify(['unit', other[0].subject.id, other[0].subject.revision, other[0].subject.sha256])).state, 'PROMOTED');
+  const badBaseline = structuredClone(other.slice(0, 2));
+  badBaseline[1].validation.baseline = { id: 'missing', path: 'missing/never.json', sha256: '0'.repeat(64) };
+  badBaseline[1].validation.report.baseline = structuredClone(badBaseline[1].validation.baseline);
+  badBaseline[1].validation.reportSha256 = hashRecord(badBaseline[1].validation.report);
+  refreshRecord(badBaseline[1]);
+  assert.throws(() => replayLifecycle(badBaseline, loaded.resources, digest), hasCode('INVALID_LIFECYCLE_VALIDATION'));
+  const earlySuccessor = structuredClone(successor);
+  for (let index = 0; index < earlySuccessor.length; index += 1) {
+    earlySuccessor[index].recordedAt = '2020-01-01T00:00:00Z';
+    if (index) earlySuccessor[index].previousRecordDigest = earlySuccessor[index - 1].recordDigest;
+    if (index === 2) earlySuccessor[index].promotion.validationRecordDigest = earlySuccessor[1].recordDigest;
+    if (index === 1) {
+      earlySuccessor[index].validation.report.validatedAt = earlySuccessor[index].recordedAt;
+      earlySuccessor[index].validation.reportSha256 = hashRecord(earlySuccessor[index].validation.report);
+    }
+    refreshRecord(earlySuccessor[index]);
+  }
+  assert.throws(() => replayLifecycle([...records, ...earlySuccessor], resources, digest), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
+  const futureReport = structuredClone(records.slice(0, 2));
+  futureReport[1].validation.report.validatedAt = '2036-01-01T00:00:00Z';
+  futureReport[1].validation.reportSha256 = hashRecord(futureReport[1].validation.report);
+  refreshRecord(futureReport[1]);
+  assert.throws(() => replayLifecycle(futureReport, resources, digest), hasCode('INVALID_VALIDATION_REPORT'));
+  const malformedNumber = structuredClone(records[1]);
+  malformedNumber.validation.coverage.positive = 4.5;
+  assert.throws(() => replayLifecycle([records[0], malformedNumber], resources, digest), hasCode('UNSUPPORTED_CANONICAL_NUMBER'));
 });
 
 test('independent lifecycle negative vectors remain rejected after record hashes are recomputed', async () => {

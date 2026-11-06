@@ -6,6 +6,8 @@ The bounded observation profile accepts `claims` with source and player identifi
 
 The Reference Consumer's URI profile accepts a bounded ASCII URI syntax with RFC 3986 path, query and fragment characters; HTTP, HTTPS and FTP use a host made of letters, digits, dots or hyphens, with an optional one-to-five-digit numeric port up to 65535. Userinfo and IPv6 host syntax are outside this narrow demonstration profile. Malformed or unsupported URI forms are rejected as `INVALID_INPUT` by both implementations.
 
+Lifecycle and selection-lock canonical JSON accepts safe integer numbers only; equivalent spellings such as `4` and `4.0` have the same digest. Fractional or unsafe numbers and unpaired Unicode surrogates are rejected by both consumers.
+
 Run from this directory with `npm test` and `npm run demo`. For schema and end-to-end I/O conformance, install `python -m pip install -r requirements-validation.txt` and run `python scripts/validate.py` (or `npm run validate`). Node.js 22+ is sufficient for this isolated proof; the DomainHarness repository itself retains its existing Node >=24 requirement.
 
 The demo proves:
