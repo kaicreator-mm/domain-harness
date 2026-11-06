@@ -2,13 +2,13 @@
 
 R6 契约澄清：Consumer 必须执行其支持的失败动作，遇到不支持的语义必须 fail-closed；终态必须与声明动作一致。Recognizer 输出必须区分冲突声明与超出范围的输入，并保留证据。必须重放精确主体的历史，包括未选主体与终止处置。重新验证后须获得新的授权晋升；回滚通过新 Package 锁选择另一已晋升的精确版本。Validation Report 必须绑定场景、发现、反例、可复现信息以及主体和闭包摘要。Promotion Decision 必须绑定先前基线和明确的权威证据。合成参考夹具不得冒充生产资质或授权。
 
-状态：L2_STANDARD_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
+状态：L2_FREEZE_CANDIDATE_R6_VERIFIED
 分支：dis/0.1.0-l2-candidate
 L2 Issue：#1481
 冻结 Product/L1：#1477 @ b8135aa801eb38fcae2fa1fce3bada541178d5b9
 修订依据：初始 Demo 验证 eb8b4d3836d6c8ef318d2b3af7e46e04fa57eba4
 
-本文是实验性标准候选，不是已冻结的 Product/L1、L2、SDK ABI 或 Runtime API。它不修改 v0.10.3，不授权将候选 Schema 接入现有 Runtime，也不构成发布/部署授权。初始草案、初始 Demo、初始发现和本修订版通过 Git 历史分别保留。
+DIS 0.1.0 仍是实验性标准。其 L2 候选已具备正式 Freeze Checkpoint 的条件；检查点将绑定最终精确 commit/tree 和 Schema 清单。该检查点不定义或冻结 SDK ABI、Manifest/BUILD ABI 或 Runtime API，不修改 v0.10.3，也不授权 SDK 集成、发布或部署。Runtime 消费证明（#1486）和第二个实质不同的 Domain Profile（F012）仍是独立门禁；F012 必须在 Release Qualification 前完成。初始草案、Demo、验证记录和后续修订仍通过 Git 历史分别追溯。
 
 ## 1. 目标和范围
 

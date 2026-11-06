@@ -1,10 +1,10 @@
 # DIS 0.1.0 — L2 Architecture & Conformance Model
 
-Status: L2_ARCHITECTURE_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
+Status: L2_FREEZE_CANDIDATE_R6_VERIFIED
 
 ### R6 repair contract and status
 
-R6 review #5798666151 blocked the `aab97e0` candidate on six P1 findings; earlier snapshot evidence does not close them. A repaired candidate remains subject to fresh exact-HEAD validation and independent review. F012 and #1486 remain separate gates.
+R6 review #5798666151 blocked the `aab97e0` candidate on six P1 findings. All six findings were repaired within the original 46-path write set. The consolidated repair candidate is `16bee6937995fb211ab7c2fbcffbe68da69c9d62` / tree `8d5333ef171bb3fd484e4412343cc49e068ca97c`, base `b8135aa801eb38fcae2fa1fce3bada541178d5b9`. Exact-HEAD local receipt #6694493616, independent source review and separate verifier results recorded in PR review #5806362784, and both Woodpecker checks in pipeline #2183 passed. This is the verified freeze candidate pending the formal L2 Freeze Checkpoint in #1481. F012 and #1486 remain separate pre-release/runtime gates.
 
 Lifecycle records MUST be replayed per exact subject identity and digest, including non-selected histories. Each transition binds its prior record, actor, policy, time, evidence and dependency closure. Re-validation invalidates the previous effective promotion until an authorized new Promotion Decision; rejected, withdrawn, expired and superseded histories cannot be revived by name. Rollback selects an independently promoted earlier exact revision through a new immutable Package lock; it does not rewrite an existing Package or revive a terminated history.
 

@@ -1,10 +1,10 @@
 # DIS 0.1.0 — L2 Architecture & Conformance Model
 
-状态：L2_ARCHITECTURE_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
+状态：L2_FREEZE_CANDIDATE_R6_VERIFIED
 
 ### R6 修复契约与状态
 
-R6 审核 #5798666151 以六项 P1 阻断 `aab97e0` 候选；先前快照的证据不能关闭这些问题。修复后的候选仍须通过绑定最终 HEAD 的验证和独立审核。F012 与 #1486 保持为独立门禁。
+R6 审核 #5798666151 曾以六项 P1 阻断 `aab97e0` 候选。六项问题均已在原始 46-path 写集内修复。集中修复候选为 `16bee6937995fb211ab7c2fbcffbe68da69c9d62`，TREE `8d5333ef171bb3fd484e4412343cc49e068ca97c`，BASE `b8135aa801eb38fcae2fa1fce3bada541178d5b9`。精确 HEAD 本地回执 #6694493616、PR review #5806362784 记录的独立源码审核和独立验证，以及 Woodpecker #2183 两项检查均 PASS。该候选已通过技术验收，等待在 #1481 建立正式 L2 Freeze Checkpoint。F012 与 #1486 仍是独立的发布前/Runtime 门禁。
 
 生命周期记录必须按主体的完整身份和摘要逐条重放，未选中主体也不例外。每次转换绑定前序记录、操作者、策略、时间、证据和依赖闭包。重新验证使先前晋升暂时失效，直到获得新的授权晋升决定；已拒绝、撤回、过期或被取代的历史不能凭名称复活。回滚通过新不可变 Package 锁选择仍然获得晋升的旧精确版本，不改写既有 Package，也不复活已终止历史。
 

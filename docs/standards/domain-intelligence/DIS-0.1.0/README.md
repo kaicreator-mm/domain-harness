@@ -1,11 +1,11 @@
 # Domain Intelligence Standard (DIS) 0.1.0
 
-Status: L2_ARCHITECTURE_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
+Status: L2_FREEZE_CANDIDATE_R6_VERIFIED
 Branch: dis/0.1.0-l2-candidate
 L2 Issue: https://github.com/kaicreator-mm/domain-harness/issues/1481
 Frozen Product/L1: https://github.com/kaicreator-mm/domain-harness/issues/1477
 
-## L2 architecture candidate
+## L2 architecture freeze candidate
 - L2_ARCHITECTURE.zh-CN.md
 - L2_ARCHITECTURE.en.md
 
@@ -23,6 +23,14 @@ Frozen Product/L1: https://github.com/kaicreator-mm/domain-harness/issues/1477
 - schemas/domain-definition.schema.json
 - schemas/resource-closure.schema.json
 - schemas/validation-report.schema.json
+
+## R6 exact-HEAD qualification
+- Candidate HEAD: `16bee6937995fb211ab7c2fbcffbe68da69c9d62`
+- Candidate TREE: `8d5333ef171bb3fd484e4412343cc49e068ca97c`
+- Exact-HEAD receipt: [Issue #1481 comment #6694493616](https://github.com/kaicreator-mm/domain-harness/issues/1481#issuecomment-6694493616)
+- Independent review/verifier: [PR review #5806362784](https://github.com/kaicreator-mm/domain-harness/pull/1482#pullrequestreview-5806362784)
+- Woodpecker: [pipeline #2183](https://ci.kaicreator.com/repos/18/pipeline/2183)
+- F012 second Domain Profile and #1486 Runtime adoption remain separate gates.
 
 ## Proof and traceability
 - Demo: examples/dis-0.1.0-player-recognition/
