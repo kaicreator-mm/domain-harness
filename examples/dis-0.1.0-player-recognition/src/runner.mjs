@@ -832,6 +832,21 @@ export function validateDefinition(definition, unitsById, graph, graphPath) {
   return true;
 }
 
+export function referenceUriProtocol(value) {
+  if (typeof value !== 'string' || !value.length || /[^\x21-\x7e]/.test(value) || /%(?![0-9A-Fa-f]{2})/.test(value)) return null;
+  const parsed = /^([A-Za-z][A-Za-z0-9+.-]*):([^\s]*)$/.exec(value);
+  if (!parsed) return null;
+  if (!/^[A-Za-z0-9._~!$&'()*+,;=:@%/\-]*(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?\-]*)?(?:#[A-Za-z0-9._~!$&'()*+,;=:@%/?\-]*)?$/.test(parsed[2])) return null;
+  const scheme = parsed[1].toLowerCase();
+  if (['http', 'https', 'ftp'].includes(scheme)) {
+    const authority = /^\/\/([A-Za-z0-9.-]+)(?::([0-9]{1,5}))?(?:[/?#]|$)/.exec(parsed[2]);
+    if (!authority || (authority[2] !== undefined && Number(authority[2]) > 65535)) return null;
+  } else if (parsed[2].startsWith('//') && !(scheme === 'file' && parsed[2].startsWith('///'))) {
+    return null;
+  }
+  return scheme + ':';
+}
+
 function recognizePlayerWithMode(input, context, normalize) {
   if (!input || typeof input.url !== 'string' || !Array.isArray(input.signals) || input.signals.some((item) => typeof item !== 'string') ||
       (input.claims !== undefined && (!Array.isArray(input.claims) || input.claims.some((claim) => !claim || typeof claim.sourceId !== 'string' || !claim.sourceId || typeof claim.playerId !== 'string' || !claim.playerId))) ||
@@ -839,8 +854,8 @@ function recognizePlayerWithMode(input, context, normalize) {
       (input.unsupportedPlayerFamily !== undefined && typeof input.unsupportedPlayerFamily !== 'boolean')) {
     throw new DisExecutionError('INVALID_INPUT', 'PageObservation has malformed URL, signals, claims or scope flags');
   }
-  let protocol;
-  try { protocol = new URL(input.url).protocol; } catch { throw new DisExecutionError('INVALID_INPUT', 'PageObservation URL must be absolute'); }
+  const protocol = referenceUriProtocol(input.url);
+  if (!protocol) throw new DisExecutionError('INVALID_INPUT', 'PageObservation URL is outside the reference URI profile');
   const scope = context?.unit?.scope;
   if (!scope || scope.domain !== 'web-media' || JSON.stringify(scope.appliesTo) !== JSON.stringify(['http-or-https-page-observation']) ||
       !Array.isArray(scope.excludes) || scope.excludes.length !== 2 || !scope.excludes.includes('encrypted-player-decryption') || !scope.excludes.includes('unsupported-player-families')) {
@@ -1113,7 +1128,11 @@ export async function runPipeline(input, loaded) {
   let expectedOutcome;
   function applyFailurePolicy(unit, status) {
     const action = referenceFailureAction(unit, status);
-    if (action === 'REJECT' || action === 'FAIL') throw new DisExecutionError('FAILURE_POLICY_' + action, unit.id + ':' + status);
+    if (action === 'REJECT' || action === 'FAIL') {
+      const error = new DisExecutionError('FAILURE_POLICY_' + action, unit.id + ':' + status);
+      error.failurePolicy = { unitId: unit.id, nodeId, status, action };
+      throw error;
+    }
     const terminal = ['CLARIFY', 'WAIT'].includes(action) ? 'NEEDS_INPUT' : 'NEEDS_REVIEW';
     if (expectedOutcome && expectedOutcome !== terminal) throw new DisExecutionError('FAILURE_POLICY_GRAPH_MISMATCH', unit.id + ':' + status);
     expectedOutcome = terminal;
@@ -1149,7 +1168,7 @@ export async function runPipeline(input, loaded) {
       if (!(error instanceof DisExecutionError) || error.code !== 'PRECONDITION_FAILED') throw error;
       trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: binding.ref, implementationCandidateId: binding.candidateId, input: structuredClone(nodeInput), evidence: structuredClone(evidence), failure: { code: error.code } });
       const action = referenceFailureAction(unit, 'INVALID_INPUT');
-      if (action === 'REJECT' || action === 'FAIL') throw error;
+      if (action === 'REJECT' || action === 'FAIL') { error.failurePolicy = { unitId: unit.id, nodeId, status: 'INVALID_INPUT', action }; throw error; }
       throw new DisExecutionError('UNSUPPORTED_FAILURE_POLICY', unit.id + ':INVALID_INPUT:' + action);
     }
     let output;
@@ -1161,7 +1180,7 @@ export async function runPipeline(input, loaded) {
       if (!(error instanceof DisExecutionError)) throw new DisExecutionError(failureCode, unit.id);
       if (!unit.failure?.handling?.[error.code]) throw error;
       const action = referenceFailureAction(unit, error.code);
-      if (action === 'REJECT' || action === 'FAIL') throw error;
+      if (action === 'REJECT' || action === 'FAIL') { error.failurePolicy = { unitId: unit.id, nodeId, status: error.code, action }; throw error; }
       throw new DisExecutionError('UNSUPPORTED_FAILURE_POLICY', unit.id + ':' + error.code + ':' + action);
     }
     outputs.set(nodeId, output);

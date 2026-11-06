@@ -37,13 +37,22 @@ if (process.argv.includes('--scope-probes')) {
     { input: { url: 'https://example.test/page', signals: [42] }, expected: 'INVALID_INPUT' },
     { input: { url: 'http://', signals: [] }, expected: 'INVALID_INPUT' },
     { input: { url: 'http://[invalid]', signals: [] }, expected: 'INVALID_INPUT' },
+    { input: { url: 'https://%zz', signals: [] }, expected: 'INVALID_INPUT' },
+    { input: { url: 'https://example.test/a b', signals: [] }, expected: 'INVALID_INPUT' },
+    { input: { url: 'https://example.test/a|b', signals: [] }, expected: 'INVALID_INPUT' },
+    { input: { url: 'https://example.test/<a>', signals: [] }, expected: 'INVALID_INPUT' },
+    { input: { url: 'https://example.test/[a]', signals: [] }, expected: 'INVALID_INPUT' },
+    { input: { url: 'ftp://example.test/a|b', signals: [] }, expected: 'INVALID_INPUT' },
+    { input: { url: 'https://example.test:000000/', signals: [] }, expected: 'INVALID_INPUT' },
+    { input: { url: 'https://example.test/\n', signals: [] }, expected: 'INVALID_INPUT' },
+    { input: { url: 'https://example.test/#a#b', signals: [] }, expected: 'INVALID_INPUT' },
   ];
   const result = [];
   for (const { input, expected } of probes) {
     try { await runPipeline(input, loaded); throw new Error('scope exclusion unexpectedly executed'); }
     catch (error) {
       if (error.code !== expected || !Array.isArray(error.trace)) throw error;
-      result.push({ input, errorCode: error.code, trace: error.trace, output: error.trace.at(-1)?.output });
+      result.push({ input, errorCode: error.code, failurePolicy: error.failurePolicy, trace: error.trace, output: error.trace.at(-1)?.output });
     }
   }
   console.log(JSON.stringify(result));

@@ -90,6 +90,12 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
     validator.preconditions = { inputSchemaRef: validator.input.schemaRef, all: [{ path: '/resolution', operator: 'equals', value: { status: 'IMPOSSIBLE' } }] };
     await write('domain/units/validator.json', validator);
   }
+  if (options.unitPolicy) {
+    const targetPath = 'domain/units/' + options.unitPolicy.file + '.json';
+    const target = await read(targetPath);
+    target.failure.handling[options.unitPolicy.status].action = options.unitPolicy.action;
+    await write(targetPath, target);
+  }
   const manifest = await read('domain/resource-closure.json');
   if (options.packageRevision) manifest.packageRevision = options.packageRevision;
   for (const entry of manifest.resources) entry.sha256 = createHash('sha256').update(await fs.readFile(path.join(root, entry.path))).digest('hex');
@@ -638,10 +644,36 @@ test('Package-pinned failure policy changes execution and precondition handling'
     const unsupported = await copyWithRecognizerPolicy(path.join(temporary, 'unsupported'), { INVALID_INPUT: 'WAIT' });
     await assert.rejects(() => unsupported.isolated.runPipeline({ url: 'https://example.test' }, unsupported.loaded), (error) => error.code === 'UNSUPPORTED_FAILURE_POLICY');
     const later = await copyWithRecognizerPolicy(path.join(temporary, 'later'), {}, { validatorPreconditions: true });
-    await assert.rejects(() => later.isolated.runPipeline({ url: 'https://example.test', signals: ['jwplayer'] }, later.loaded), (error) => error.code === 'PRECONDITION_FAILED' && error.trace?.at(-1)?.nodeId === 'validate' && error.trace.at(-1).evidence.recognitionEvidence.length > 0);
+    const laterInput = { url: 'https://example.test', signals: ['jwplayer'] };
+    await assert.rejects(() => later.isolated.runPipeline(laterInput, later.loaded), (error) => {
+      if (process.env.DIS_EMIT_LATER_PROBE === '1') console.log('DIS_LATER_PROBE=' + JSON.stringify({ input: laterInput, errorCode: error.code, failurePolicy: error.failurePolicy, trace: error.trace }));
+      return error.code === 'PRECONDITION_FAILED' && error.trace?.at(-1)?.nodeId === 'validate' && error.trace.at(-1).evidence.recognitionEvidence.length > 0;
+    });
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });
   }
+});
+
+test('decision and workflow rejection and FAIL carry exact policy attribution', async () => {
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'dis-policy-attribution-'));
+  const captured = [];
+  const capture = (input, predicate) => (error) => {
+    if (process.env.DIS_EMIT_POLICY_PROBES === '1') captured.push({ input, errorCode: error.code, failurePolicy: error.failurePolicy, trace: error.trace });
+    return predicate(error);
+  };
+  try {
+    const decision = await copyWithRecognizerPolicy(path.join(temporary, 'decision'), {}, { unitPolicy: { file: 'decision', status: 'UNKNOWN', action: 'REJECT' } });
+    const decisionInput = { url: 'https://example.test', signals: ['unknown'] };
+    await assert.rejects(() => decision.isolated.runPipeline(decisionInput, decision.loaded), capture(decisionInput, (error) => error.code === 'FAILURE_POLICY_REJECT' && error.failurePolicy?.unitId === 'xdownload.player.route-decision' && error.failurePolicy.status === 'UNKNOWN' && error.trace.at(-1).nodeId === 'decide'));
+    const workflow = await copyWithRecognizerPolicy(path.join(temporary, 'workflow'), {}, { unitPolicy: { file: 'workflow', status: 'NEEDS_REVIEW', action: 'FAIL' } });
+    const workflowInput = { url: 'https://example.test', signals: ['unknown'] };
+    await assert.rejects(() => workflow.isolated.runPipeline(workflowInput, workflow.loaded), capture(workflowInput, (error) => error.code === 'FAILURE_POLICY_FAIL' && error.failurePolicy?.unitId === 'xdownload.player-recognition.workflow' && error.failurePolicy.status === 'NEEDS_REVIEW' && error.trace.at(-1).nodeId === 'validate'));
+    const fail = await copyWithRecognizerPolicy(path.join(temporary, 'fail'), { INVALID_INPUT: 'FAIL' });
+    for (const input of [{ url: 'https://example.test' }, { url: 'not a URL', signals: [] }]) {
+      await assert.rejects(() => fail.isolated.runPipeline(input, fail.loaded), capture(input, (error) => ['PRECONDITION_FAILED', 'INVALID_INPUT'].includes(error.code) && error.failurePolicy?.action === 'FAIL' && error.failurePolicy.status === 'INVALID_INPUT'));
+    }
+    if (process.env.DIS_EMIT_POLICY_PROBES === '1') console.log('DIS_POLICY_PROBES=' + JSON.stringify(captured));
+  } finally { await fs.rm(temporary, { recursive: true, force: true }); }
 });
 
 test('feedback retains provenance and cannot change an already-pinned execution', async () => {

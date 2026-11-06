@@ -4,6 +4,8 @@ This isolated demo exercises the demo-revised DIS 0.1.0 candidate against a boun
 
 The bounded observation profile accepts `claims` with source and player identifiers and explicit `encryptedPlayer` / `unsupportedPlayerFamily` flags. Conflicting claims are preserved as structured evidence and require clarification. Non-HTTP(S) observations and either exclusion flag yield `out_of_scope` and are rejected by the selected policy. Unrecognized applicability or failure actions fail closed. Lifecycle reports and the reference governance grant are deliberately synthetic and demonstrate binding only; they do not claim production validation or authority.
 
+The Reference Consumer's URI profile accepts a bounded ASCII URI syntax with RFC 3986 path, query and fragment characters; HTTP, HTTPS and FTP use a host made of letters, digits, dots or hyphens, with an optional one-to-five-digit numeric port up to 65535. Userinfo and IPv6 host syntax are outside this narrow demonstration profile. Malformed or unsupported URI forms are rejected as `INVALID_INPUT` by both implementations.
+
 Run from this directory with `npm test` and `npm run demo`. For schema and end-to-end I/O conformance, install `python -m pip install -r requirements-validation.txt` and run `python scripts/validate.py` (or `npm run validate`). Node.js 22+ is sufficient for this isolated proof; the DomainHarness repository itself retains its existing Node >=24 requirement.
 
 The demo proves:

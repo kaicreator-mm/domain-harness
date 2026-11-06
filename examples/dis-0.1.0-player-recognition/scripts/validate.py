@@ -11,7 +11,6 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from urllib.parse import urlsplit
 
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import ValidationError
@@ -476,7 +475,25 @@ def validate_optional_data_binding_semantics(graph: dict, units_by_id: dict, sch
         fail("optional data binding accepted two sources on one control path")
 
 
-def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_by_id: dict, selected_providers: dict, rejection=False):
+def reference_uri_protocol(value):
+    if not isinstance(value, str) or not re.fullmatch(r'[\x21-\x7e]+', value) or re.search(r'%(?![0-9A-Fa-f]{2})', value):
+        return None
+    parsed = re.fullmatch(r'([A-Za-z][A-Za-z0-9+.-]*):([^\s]*)', value, flags=re.ASCII)
+    if not parsed:
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9._~!$&'()*+,;=:@%/\-]*(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?\-]*)?(?:#[A-Za-z0-9._~!$&'()*+,;=:@%/?\-]*)?", parsed.group(2)):
+        return None
+    scheme = parsed.group(1).lower()
+    if scheme in ('http', 'https', 'ftp'):
+        authority = re.match(r'//([A-Za-z0-9.-]+)(?::([0-9]{1,5}))?(?:[/?#]|$)', parsed.group(2), flags=re.ASCII)
+        if not authority or (authority.group(2) is not None and int(authority.group(2)) > 65535):
+            return None
+    elif parsed.group(2).startswith('//') and not (scheme == 'file' and parsed.group(2).startswith('///')):
+        return None
+    return scheme + ':'
+
+
+def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_by_id: dict, selected_providers: dict, schemas: dict, registry, rejection=False):
     trace = result.get("trace")
     if not isinstance(trace, list) or not trace:
         fail(f"missing execution trace: {result.get('label')}")
@@ -486,6 +503,25 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
     if not rejection and node_ids[-1] not in graph["terminalNodes"]:
         fail(f"trace does not end at a declared terminal: {result.get('label')}")
     outputs = {}
+    expected_outcome = None
+
+    def check_action(unit, status, node_id, index):
+        nonlocal expected_outcome
+        action = unit.get('failure', {}).get('handling', {}).get(status, {}).get('action')
+        supported = {'UNKNOWN': ('PRESERVE_UNKNOWN', 'BOUNDED_FALLBACK'), 'AMBIGUOUS': ('CLARIFY',), 'CONFLICT': ('CLARIFY',), 'NEEDS_INPUT': ('WAIT',), 'NEEDS_REVIEW': ('REVIEW',)}
+        if action not in ('REJECT', 'FAIL') and action not in supported.get(status, ()):
+            fail(f'undeclared or unsupported failure policy: {unit["id"]}:{status}')
+        if action in ('REJECT', 'FAIL'):
+            expected_policy = {'unitId': unit['id'], 'nodeId': node_id, 'status': status, 'action': action}
+            if index != len(trace) - 1 or not rejection or result.get('failurePolicy') != expected_policy or result.get('errorCode') != 'FAILURE_POLICY_' + action:
+                fail(f'trace continued past an earlier terminating Unit policy: {node_id}')
+            return True
+        terminal = 'NEEDS_INPUT' if action in ('CLARIFY', 'WAIT') else 'NEEDS_REVIEW'
+        if expected_outcome and expected_outcome != terminal:
+            fail(f'inconsistent failure policy outcome: {node_id}')
+        expected_outcome = terminal
+        return False
+
     for index, entry in enumerate(trace):
         node_id = entry.get("nodeId")
         node = nodes_by_id.get(node_id)
@@ -525,6 +561,15 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
                 pointer_set(expected_input, edge["to"]["pointer"], value)
         if not json_value_equal(entry.get("input"), expected_input):
             fail(f"trace input is not the Graph-assembled payload: {node_id}")
+        if 'failure' in entry and (index != len(trace) - 1 or not rejection or 'output' in entry):
+            fail(f'failure entry must be the final entry without output: {node_id}')
+        if 'failure' not in entry and 'output' not in entry:
+            fail(f'trace entry has neither output nor failure: {node_id}')
+        if entry.get('failure', {}).get('code') != 'PRECONDITION_FAILED':
+            validate_preconditions(unit, entry['input'])
+        if 'failure' not in entry:
+            Draft202012Validator(schemas[unit['input']['schemaRef']], registry=registry, format_checker=FormatChecker()).validate(entry['input'])
+            Draft202012Validator(schemas[unit['output']['schemaRef']], registry=registry, format_checker=FormatChecker()).validate(entry['output'])
         expected_evidence = {}
         for edge in graph["edges"]:
             if edge["kind"] != "evidence" or edge["to"]["node"] != node_id:
@@ -539,6 +584,21 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
             bucket.extend(value if isinstance(value, list) else [value])
         if not json_value_equal(entry.get("evidence", {}), expected_evidence):
             fail(f"trace evidence is not the Graph-assembled payload: {node_id}")
+        if 'output' in entry:
+            status = None
+            output_status = entry['output'].get('status') if isinstance(entry['output'], dict) else None
+            if unit['role'] == 'recognizer' and output_status in ('unknown', 'ambiguous', 'conflict', 'out_of_scope'):
+                status = output_status.upper()
+            elif unit['role'] == 'decision' and entry['input'].get('recognition', {}).get('status') in ('unknown', 'ambiguous', 'conflict'):
+                status = entry['input']['recognition']['status'].upper()
+            elif unit['role'] in ('procedure', 'validator') and output_status in ('NEEDS_INPUT', 'NEEDS_REVIEW'):
+                status = output_status
+            terminated = check_action(unit, status, node_id, index) if status else False
+            if not terminated and node_id in graph['terminalNodes'] and output_status in ('NEEDS_INPUT', 'NEEDS_REVIEW'):
+                workflow = next((candidate for candidate in units_by_id.values() if candidate.get('role') == 'workflow' and candidate.get('implementation', {}).get('ref') == 'graph:' + graph['id'] + '@' + graph['revision']), None)
+                if not workflow:
+                    fail('missing Workflow policy for terminal status')
+                check_action(workflow, output_status, node_id, index)
         outputs[node_id] = entry.get("output")
         is_terminal = node_id in graph["terminalNodes"]
         if index < len(trace) - 1:
@@ -556,34 +616,45 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
             fail(f"trace ended before a terminal Node: {node_id}")
     if not rejection and not json_value_equal(result.get("outcome"), trace[-1].get("output")):
         fail(f"terminal outcome differs from final trace output: {result.get('label')}")
+    if not rejection and expected_outcome and trace[-1]['output'].get('status') != expected_outcome:
+        fail('terminal output contradicts failure policies')
     if rejection:
         final = trace[-1]
-        unit = units_by_id[final['unitId']]
+        policy = result.get('failurePolicy')
+        if not isinstance(policy, dict) or set(policy) != {'unitId', 'nodeId', 'status', 'action'} or policy['nodeId'] != final['nodeId']:
+            fail('rejection policy attribution is missing or malformed')
+        unit = units_by_id.get(policy['unitId'])
+        if not unit or policy['action'] not in ('REJECT', 'FAIL') or unit.get('failure', {}).get('handling', {}).get(policy['status'], {}).get('action') != policy['action']:
+            fail('rejected trace is not justified by the declared Unit policy')
+        if unit['role'] == 'workflow':
+            if final['nodeId'] not in graph['terminalNodes'] or unit.get('implementation', {}).get('ref') != 'graph:' + graph['id'] + '@' + graph['revision']:
+                fail('workflow rejection not bound to terminal graph')
+        elif unit['id'] != final['unitId']:
+            fail('rejection policy Unit does not match the executing Node')
         code = result.get('errorCode')
-        if code == 'FAILURE_POLICY_REJECT':
-            status = final.get('output', {}).get('status', '').upper()
-            if unit.get('failure', {}).get('handling', {}).get(status, {}).get('action') != 'REJECT':
-                fail('rejected trace is not justified by the Unit failure policy')
+        if code in ('FAILURE_POLICY_REJECT', 'FAILURE_POLICY_FAIL'):
+            if code != 'FAILURE_POLICY_' + policy['action']:
+                fail('failure policy action and rejection code disagree')
+            if unit['role'] == 'decision':
+                status = final.get('input', {}).get('recognition', {}).get('status', '').upper()
+            else:
+                status = final.get('output', {}).get('status', '').upper()
+            if status != policy['status']:
+                fail('failure policy status does not match actual trace')
         elif code == 'PRECONDITION_FAILED':
-            if final.get('failure', {}).get('code') != code or unit.get('failure', {}).get('handling', {}).get('INVALID_INPUT', {}).get('action') != 'REJECT':
+            if final.get('failure', {}).get('code') != code or policy['status'] != 'INVALID_INPUT' or unit['id'] != final['unitId']:
                 fail('precondition rejection policy or trace mismatch')
             expect_rejection(lambda: validate_preconditions(unit, final['input']), 'precondition unexpectedly passes')
         elif code == 'INVALID_INPUT':
+            if unit.get('role') != 'recognizer':
+                fail('handler input rejection cannot be independently justified for this Unit role')
             url = final['input'].get('url', '')
             payload = final['input']
-            valid_url = isinstance(url, str) and bool(re.match(r'^[A-Za-z][A-Za-z0-9+.-]*:', url)) and not re.search(r'\s', url)
-            if valid_url:
-                try:
-                    parsed = urlsplit(url)
-                    if parsed.scheme.lower() in ('http', 'https', 'ftp'):
-                        valid_url = bool(parsed.hostname)
-                        _ = parsed.port
-                except ValueError:
-                    valid_url = False
+            valid_url = reference_uri_protocol(url) is not None
             valid_signals = isinstance(payload.get('signals'), list) and all(isinstance(item, str) for item in payload['signals'])
             valid_claims = 'claims' not in payload or (isinstance(payload['claims'], list) and all(isinstance(item, dict) and isinstance(item.get('sourceId'), str) and bool(item['sourceId']) and isinstance(item.get('playerId'), str) and bool(item['playerId']) for item in payload['claims']))
             valid_flags = all(name not in payload or type(payload[name]) is bool for name in ('encryptedPlayer', 'unsupportedPlayerFamily'))
-            if final.get('failure', {}).get('code') != code or unit.get('failure', {}).get('handling', {}).get('INVALID_INPUT', {}).get('action') != 'REJECT' or (valid_url and valid_signals and valid_claims and valid_flags):
+            if final.get('failure', {}).get('code') != code or policy['status'] != 'INVALID_INPUT' or unit['id'] != final['unitId'] or (valid_url and valid_signals and valid_claims and valid_flags):
                 fail('handler input rejection not independently justified')
         else:
             fail('unsupported rejection outcome')
@@ -1790,9 +1861,10 @@ def main():
         check=True,
         capture_output=True,
         text=True,
+        encoding='utf-8',
     )
     results = json.loads(node_script.stdout)
-    alternate_script = subprocess.run(['node', './src/emit-conformance-traces.mjs', '--provider-probe'], cwd=PACKAGE_ROOT, check=True, capture_output=True, text=True)
+    alternate_script = subprocess.run(['node', './src/emit-conformance-traces.mjs', '--provider-probe'], cwd=PACKAGE_ROOT, check=True, capture_output=True, text=True, encoding='utf-8')
     alternate_result = json.loads(alternate_script.stdout)
     alternate_identity = alternate_result['packageIdentity']
     alternate_lock = alternate_identity['selectionLock']
@@ -1801,7 +1873,7 @@ def main():
     alternate_providers = dict(selected_providers)
     recognizer = units_by_id['xdownload.player.recognizer']
     alternate_providers[recognizer['id']] = resolve_provider_selection(recognizer, alternate_lock, alternate_lock['target'], resources)
-    validate_trace_assembly(alternate_result, graph, units_by_id, nodes_by_id, alternate_providers)
+    validate_trace_assembly(alternate_result, graph, units_by_id, nodes_by_id, alternate_providers, demo_schemas, registry)
     if alternate_providers[recognizer['id']]['candidateId'] != 'signature-normalized-v1' or alternate_result['outcome']['status'] != 'READY':
         fail('alternate provider was not selected and executed')
     expected_cases = {'known': ('READY', 'recognized'), 'ambiguous': ('NEEDS_INPUT', 'ambiguous'), 'unknown': ('NEEDS_REVIEW', 'unknown'), 'fixture-hls': ('READY', 'recognized'), 'conflict': ('NEEDS_INPUT', 'conflict')}
@@ -1836,18 +1908,27 @@ def main():
     later_unit = later_units[later_probe['trace'][-1]['unitId']]
     later_unit['preconditions'] = {'inputSchemaRef':later_unit['input']['schemaRef'], 'all':[{'path':'/resolution', 'operator':'equals', 'value':{'status':'IMPOSSIBLE'}}]}
     later_probe['errorCode'] = 'PRECONDITION_FAILED'
+    later_probe['failurePolicy'] = {'unitId':later_unit['id'], 'nodeId':later_probe['trace'][-1]['nodeId'], 'status':'INVALID_INPUT', 'action':'REJECT'}
     del later_probe['trace'][-1]['output']
     later_probe['trace'][-1]['failure'] = {'code':'PRECONDITION_FAILED'}
-    validate_trace_assembly(later_probe, graph, later_units, nodes_by_id, selected_providers, rejection=True)
+    validate_trace_assembly(later_probe, graph, later_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True)
     without_evidence = copy.deepcopy(later_probe)
     without_evidence['trace'][-1]['evidence'] = {}
-    expect_rejection(lambda: validate_trace_assembly(without_evidence, graph, later_units, nodes_by_id, selected_providers, rejection=True), 'later precondition rejection without Graph evidence')
-    scope_script = subprocess.run(['node', './src/emit-conformance-traces.mjs', '--scope-probes'], cwd=PACKAGE_ROOT, check=True, capture_output=True, text=True)
+    expect_rejection(lambda: validate_trace_assembly(without_evidence, graph, later_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'later precondition rejection without Graph evidence')
+    later_env = dict(os.environ)
+    later_env['DIS_EMIT_LATER_PROBE'] = '1'
+    later_script = subprocess.run(['node', '--test', '--test-name-pattern=Package-pinned failure policy changes execution and precondition handling', 'test/runner.test.mjs'], cwd=PACKAGE_ROOT, env=later_env, check=True, capture_output=True, text=True, encoding='utf-8')
+    later_lines = [line.split('DIS_LATER_PROBE=', 1)[1] for line in later_script.stdout.splitlines() if 'DIS_LATER_PROBE=' in line]
+    if len(later_lines) != 1:
+        fail('missing actual later-node precondition trace')
+    actual_later = json.loads(later_lines[0])
+    validate_trace_assembly(actual_later, graph, later_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True)
+    scope_script = subprocess.run(['node', './src/emit-conformance-traces.mjs', '--scope-probes'], cwd=PACKAGE_ROOT, check=True, capture_output=True, text=True, encoding='utf-8')
     scope_results = json.loads(scope_script.stdout)
-    if len(scope_results) != 8:
+    if len(scope_results) != 17:
         fail('scope probe inventory mismatch')
     for probe in scope_results:
-        validate_trace_assembly(probe, graph, units_by_id, nodes_by_id, selected_providers, rejection=True)
+        validate_trace_assembly(probe, graph, units_by_id, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True)
         if probe['errorCode'] == 'FAILURE_POLICY_REJECT':
             Draft202012Validator(demo_schemas['domain/schemas/page-observation.schema.json'], registry=registry, format_checker=FormatChecker()).validate(probe['input'])
             Draft202012Validator(demo_schemas['domain/schemas/recognition-result.schema.json'], registry=registry, format_checker=FormatChecker()).validate(probe['output'])
@@ -1856,7 +1937,70 @@ def main():
         for field, value in [('unitId', 'invalid.unit'), ('implementationRef', 'registry:fake'), ('evidence', {'forged': []})]:
             forged = copy.deepcopy(probe)
             forged['trace'][0][field] = value
-            expect_rejection(lambda: validate_trace_assembly(forged, graph, units_by_id, nodes_by_id, selected_providers, rejection=True), 'tampered rejection trace ' + field)
+            expect_rejection(lambda: validate_trace_assembly(forged, graph, units_by_id, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'tampered rejection trace ' + field)
+    for probe in [item for item in scope_results if item['errorCode'] in ('PRECONDITION_FAILED', 'INVALID_INPUT')]:
+        fail_probe = copy.deepcopy(probe)
+        fail_units = copy.deepcopy(units_by_id)
+        fail_units[fail_probe['trace'][-1]['unitId']]['failure']['handling']['INVALID_INPUT']['action'] = 'FAIL'
+        fail_probe['failurePolicy']['action'] = 'FAIL'
+        validate_trace_assembly(fail_probe, graph, fail_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True)
+    unknown_trace = next(result for result in results if result['label'] == 'unknown')
+    decision_probe = copy.deepcopy(unknown_trace)
+    decision_probe['trace'] = decision_probe['trace'][:2]
+    decision_probe['errorCode'] = 'FAILURE_POLICY_REJECT'
+    decision_probe['failurePolicy'] = {'unitId':decision_probe['trace'][-1]['unitId'], 'nodeId':decision_probe['trace'][-1]['nodeId'], 'status':'UNKNOWN', 'action':'REJECT'}
+    decision_units = copy.deepcopy(units_by_id)
+    decision_units[decision_probe['failurePolicy']['unitId']]['failure']['handling']['UNKNOWN']['action'] = 'REJECT'
+    validate_trace_assembly(decision_probe, graph, decision_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True)
+    workflow_probe = copy.deepcopy(unknown_trace)
+    workflow_unit = next(unit for unit in units if unit['role'] == 'workflow')
+    workflow_probe['errorCode'] = 'FAILURE_POLICY_FAIL'
+    workflow_probe['failurePolicy'] = {'unitId':workflow_unit['id'], 'nodeId':workflow_probe['trace'][-1]['nodeId'], 'status':'NEEDS_REVIEW', 'action':'FAIL'}
+    workflow_units = copy.deepcopy(units_by_id)
+    workflow_units[workflow_unit['id']]['failure']['handling']['NEEDS_REVIEW']['action'] = 'FAIL'
+    validate_trace_assembly(workflow_probe, graph, workflow_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True)
+    earlier_units = copy.deepcopy(workflow_units)
+    earlier_units[workflow_probe['trace'][-1]['unitId']]['failure']['handling']['NEEDS_REVIEW']['action'] = 'FAIL'
+    expect_rejection(lambda: validate_trace_assembly(workflow_probe, graph, earlier_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'workflow policy bypassed earlier terminal Unit failure')
+    earlier_units = copy.deepcopy(decision_units)
+    earlier_units[decision_probe['trace'][0]['unitId']]['failure']['handling']['UNKNOWN']['action'] = 'REJECT'
+    expect_rejection(lambda: validate_trace_assembly(decision_probe, graph, earlier_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'decision policy bypassed earlier recognizer failure')
+    earlier_units[decision_probe['trace'][0]['unitId']]['failure']['handling']['UNKNOWN']['action'] = 'WAIT'
+    expect_rejection(lambda: validate_trace_assembly(decision_probe, graph, earlier_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'decision policy bypassed unsupported earlier action')
+    earlier_units = copy.deepcopy(decision_units)
+    earlier_unit = earlier_units[decision_probe['trace'][0]['unitId']]
+    earlier_unit['preconditions'] = {'inputSchemaRef': earlier_unit['input']['schemaRef'], 'all': [{'path': '/url', 'operator': 'equals', 'value': 'https://other.test'}]}
+    expect_rejection(lambda: validate_trace_assembly(decision_probe, graph, earlier_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'decision policy bypassed earlier failed precondition')
+    forged_precondition = copy.deepcopy(decision_probe)
+    forged_precondition['trace'][0]['failure'] = {'code': 'PRECONDITION_FAILED'}
+    expect_rejection(lambda: validate_trace_assembly(forged_precondition, graph, earlier_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'failure entry also has output and later nodes')
+    forged_schema = copy.deepcopy(decision_probe)
+    forged_schema['trace'][0]['output']['forgedExtra'] = 42
+    forged_schema['trace'][1]['input']['recognition']['forgedExtra'] = 42
+    expect_rejection(lambda: validate_trace_assembly(forged_schema, graph, decision_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'schema-invalid successful output in rejection trace')
+    forged_input = copy.deepcopy(decision_probe)
+    forged_input['errorCode'] = 'INVALID_INPUT'
+    forged_input['failurePolicy']['status'] = 'INVALID_INPUT'
+    forged_input['trace'][-1].pop('output')
+    forged_input['trace'][-1]['failure'] = {'code': 'INVALID_INPUT'}
+    expect_rejection(lambda: validate_trace_assembly(forged_input, graph, decision_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'non-recognizer forged handler input failure')
+    forged_policy = copy.deepcopy(workflow_probe)
+    forged_policy['failurePolicy']['unitId'] = forged_policy['trace'][-1]['unitId']
+    expect_rejection(lambda: validate_trace_assembly(forged_policy, graph, workflow_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True), 'misattributed Workflow policy')
+    probe_env = dict(os.environ)
+    probe_env['DIS_EMIT_POLICY_PROBES'] = '1'
+    policy_script = subprocess.run(['node', '--test', '--test-name-pattern=decision and workflow rejection and FAIL carry exact policy attribution', 'test/runner.test.mjs'], cwd=PACKAGE_ROOT, env=probe_env, check=True, capture_output=True, text=True, encoding='utf-8')
+    lines = [line.split('DIS_POLICY_PROBES=', 1)[1] for line in policy_script.stdout.splitlines() if 'DIS_POLICY_PROBES=' in line]
+    if len(lines) != 1:
+        fail('missing actual policy rejection probes')
+    actual_policy_probes = json.loads(lines[0])
+    if len(actual_policy_probes) != 4:
+        fail('policy rejection probe inventory mismatch')
+    for probe in actual_policy_probes:
+        probe_units = copy.deepcopy(units_by_id)
+        policy = probe['failurePolicy']
+        probe_units[policy['unitId']]['failure']['handling'][policy['status']]['action'] = policy['action']
+        validate_trace_assembly(probe, graph, probe_units, nodes_by_id, selected_providers, demo_schemas, registry, rejection=True)
     old_lock = copy.deepcopy(package_identity['selectionLock'])
     feedback = {'traceId':'synthetic-trace-1', 'packageLockSha256':package_identity['selectionLockSha256'], 'provenance':'MODEL_INFERRED', 'claimedProvenance':'MODEL_INFERRED', 'finding':'possible alternative marker', 'disposition':'PROPOSAL_ONLY'}
     if validate_reference_feedback(feedback, package_identity['selectionLockSha256']) != feedback:
@@ -1870,7 +2014,7 @@ def main():
         fail('future selection mutated the pinned Package')
     validated_inputs = validated_outputs = 0
     for result in results:
-        validate_trace_assembly(result, graph, units_by_id, nodes_by_id, selected_providers)
+        validate_trace_assembly(result, graph, units_by_id, nodes_by_id, selected_providers, demo_schemas, registry)
         trace = result["trace"]
         if not trace or not json_value_equal(result["outcome"], trace[-1]["output"]):
             fail(f"terminal outcome differs from last trace output: {result['label']}")
