@@ -11,6 +11,7 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path, PurePosixPath
+from urllib.parse import urlsplit
 
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import ValidationError
@@ -475,14 +476,14 @@ def validate_optional_data_binding_semantics(graph: dict, units_by_id: dict, sch
         fail("optional data binding accepted two sources on one control path")
 
 
-def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_by_id: dict, selected_providers: dict):
+def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_by_id: dict, selected_providers: dict, rejection=False):
     trace = result.get("trace")
     if not isinstance(trace, list) or not trace:
         fail(f"missing execution trace: {result.get('label')}")
     node_ids = [entry.get("nodeId") for entry in trace]
     if node_ids[0] != graph["entryNode"] or len(set(node_ids)) != len(node_ids):
         fail(f"trace entry/cycle identity invalid: {result.get('label')}")
-    if node_ids[-1] not in graph["terminalNodes"]:
+    if not rejection and node_ids[-1] not in graph["terminalNodes"]:
         fail(f"trace does not end at a declared terminal: {result.get('label')}")
     outputs = {}
     for index, entry in enumerate(trace):
@@ -491,7 +492,9 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
         unit = units_by_id.get(entry.get("unitId"))
         if not node or not unit or node["unitRef"]["id"] != unit["id"] or node["unitRef"]["revision"] != entry.get("unitRevision"):
             fail(f"trace Unit identity mismatch: {node_id}")
-        if entry.get("implementationRef") != unit.get("implementation", {}).get("ref"):
+        selected_provider = selected_providers.get(unit['id'])
+        expected_ref = selected_provider.get('ref') if selected_provider else unit.get('implementation', {}).get('ref')
+        if entry.get("implementationRef") != expected_ref:
             fail(f"trace implementation binding mismatch: {node_id}")
         selected_candidate = entry.get("implementationCandidateId")
         expected_candidate = next(
@@ -549,10 +552,41 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
             ]
             if len(matches) != 1 or matches[0]["to"] != trace[index + 1].get("nodeId"):
                 fail(f"trace does not follow exactly one selected control Edge: {node_id}")
-        elif not is_terminal:
+        elif not is_terminal and not rejection:
             fail(f"trace ended before a terminal Node: {node_id}")
-    if not json_value_equal(result.get("outcome"), trace[-1].get("output")):
+    if not rejection and not json_value_equal(result.get("outcome"), trace[-1].get("output")):
         fail(f"terminal outcome differs from final trace output: {result.get('label')}")
+    if rejection:
+        final = trace[-1]
+        unit = units_by_id[final['unitId']]
+        code = result.get('errorCode')
+        if code == 'FAILURE_POLICY_REJECT':
+            status = final.get('output', {}).get('status', '').upper()
+            if unit.get('failure', {}).get('handling', {}).get(status, {}).get('action') != 'REJECT':
+                fail('rejected trace is not justified by the Unit failure policy')
+        elif code == 'PRECONDITION_FAILED':
+            if final.get('failure', {}).get('code') != code or unit.get('failure', {}).get('handling', {}).get('INVALID_INPUT', {}).get('action') != 'REJECT':
+                fail('precondition rejection policy or trace mismatch')
+            expect_rejection(lambda: validate_preconditions(unit, final['input']), 'precondition unexpectedly passes')
+        elif code == 'INVALID_INPUT':
+            url = final['input'].get('url', '')
+            payload = final['input']
+            valid_url = isinstance(url, str) and bool(re.match(r'^[A-Za-z][A-Za-z0-9+.-]*:', url)) and not re.search(r'\s', url)
+            if valid_url:
+                try:
+                    parsed = urlsplit(url)
+                    if parsed.scheme.lower() in ('http', 'https', 'ftp'):
+                        valid_url = bool(parsed.hostname)
+                        _ = parsed.port
+                except ValueError:
+                    valid_url = False
+            valid_signals = isinstance(payload.get('signals'), list) and all(isinstance(item, str) for item in payload['signals'])
+            valid_claims = 'claims' not in payload or (isinstance(payload['claims'], list) and all(isinstance(item, dict) and isinstance(item.get('sourceId'), str) and bool(item['sourceId']) and isinstance(item.get('playerId'), str) and bool(item['playerId']) for item in payload['claims']))
+            valid_flags = all(name not in payload or type(payload[name]) is bool for name in ('encryptedPlayer', 'unsupportedPlayerFamily'))
+            if final.get('failure', {}).get('code') != code or unit.get('failure', {}).get('handling', {}).get('INVALID_INPUT', {}).get('action') != 'REJECT' or (valid_url and valid_signals and valid_claims and valid_flags):
+                fail('handler input rejection not independently justified')
+        else:
+            fail('unsupported rejection outcome')
 
 
 
@@ -705,9 +739,10 @@ def validate_reference_feedback(feedback: dict, expected_lock_sha256: str):
     return copy.deepcopy(feedback)
 
 
-def replay_lifecycle(records: list, resources: dict, closure_digest: str, historical_closures=None):
+def replay_lifecycle(records: list, resources: dict, closure_digest: str, historical_closures=None, binary_bindings=None):
     histories, ids, revisions, latest_promoted = {}, set(), {}, {}
     historical_closures = historical_closures or {}
+    binary_bindings = binary_bindings or set()
     transitions = {
         None: {'OBSERVED', 'CANDIDATE'},
         'OBSERVED': {'OBSERVED', 'CANDIDATE'},
@@ -729,19 +764,32 @@ def replay_lifecycle(records: list, resources: dict, closure_digest: str, histor
             return isinstance(refs, list) and bool(refs) and all(isinstance(ref, dict) and ref.get('path') in evidence_resources and evidence_resources[ref['path']] == ref.get('sha256') for ref in refs)
         if not record_id or record_id in ids or key[0] not in ('unit', 'knowledge', 'rule', 'graph', 'package') or not key[1] or not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', key[2] or '') or not re.fullmatch(r'[a-f0-9]{64}', key[3] or '') or evidence_resources is None or evidence_resources.get(safe_relative(record.get('subjectPath', ''))) != key[3]:
             fail('invalid lifecycle exact subject or duplicate record')
-        subject_json = record.get('subjectJson')
-        if not isinstance(subject_json, str) or sha256(subject_json.encode('utf-8')) != key[3]:
-            fail('lifecycle subject bytes mismatch')
-        try:
-            subject_document = json.loads(subject_json)
-        except (json.JSONDecodeError, TypeError):
-            fail('invalid lifecycle subject JSON')
-        if not isinstance(subject_document, dict):
-            fail('invalid lifecycle subject document')
-        content_id = subject_document.get('catalogId') if key[0] == 'rule' else subject_document.get('dis', {}).get('packageId') if key[0] == 'package' and isinstance(subject_document.get('dis'), dict) else subject_document.get('id')
-        content_revision = subject_document.get('dis', {}).get('revision') if key[0] == 'package' and isinstance(subject_document.get('dis'), dict) else subject_document.get('revision')
-        if content_id != key[1] or content_revision != key[2]:
-            fail('lifecycle subject identity does not match bytes')
+        subject_json, subject_base64 = record.get('subjectJson'), record.get('subjectBase64')
+        has_json, has_bytes = 'subjectJson' in record, 'subjectBase64' in record
+        if has_json == has_bytes or (has_json and not isinstance(subject_json, str)) or (has_bytes and not isinstance(subject_base64, str)):
+            fail('subject requires exactly one byte representation')
+        subject_document = None
+        if has_json:
+            if sha256(subject_json.encode('utf-8')) != key[3]:
+                fail('lifecycle subject bytes mismatch')
+            try:
+                subject_document = json.loads(subject_json)
+            except (json.JSONDecodeError, TypeError):
+                fail('invalid lifecycle subject JSON')
+            if not isinstance(subject_document, dict):
+                fail('invalid lifecycle subject document')
+            content_id = subject_document.get('catalogId') if key[0] == 'rule' else subject_document.get('dis', {}).get('packageId') if key[0] == 'package' and isinstance(subject_document.get('dis'), dict) else subject_document.get('id')
+            content_revision = subject_document.get('dis', {}).get('revision') if key[0] == 'package' and isinstance(subject_document.get('dis'), dict) else subject_document.get('revision')
+            if content_id != key[1] or content_revision != key[2]:
+                fail('lifecycle subject identity does not match bytes')
+        else:
+            try:
+                subject_bytes = base64.b64decode(subject_base64, validate=True)
+                binary_key = key + (record['subjectPath'], record_closure)
+                if key[0] == 'unit' or binary_key not in binary_bindings or base64.b64encode(subject_bytes).decode('ascii') != subject_base64 or sha256(subject_bytes) != key[3]:
+                    fail('invalid lifecycle subject bytes')
+            except (ValueError, binascii.Error):
+                fail('invalid lifecycle subject bytes')
         if revision_key in revisions and revisions[revision_key] != key[3]:
             fail('same lifecycle revision has conflicting subject digests')
         revisions[revision_key] = key[3]
@@ -773,6 +821,8 @@ def replay_lifecycle(records: list, resources: dict, closure_digest: str, histor
             val = record.get('validation', {})
             if actor.get('id') != 'xdownload-dis-independent-conformance' or actor.get('role') != 'validator' or actor.get('authorityRef') != 'xdownload-demo/domain-authority@1.0.0' or actor.get('id') != val.get('validator', {}).get('id') or policy != {'id':'xdownload-demo/validation-profile', 'revision':'0.1.0'} or val.get('result') != 'PASS' or val.get('subjectDigest') != key[3] or val.get('dependencyClosureDigest') != record_closure or not val.get('profile', {}).get('id') or not val['profile'].get('revision') or not val.get('validator', {}).get('version') or not evidence_ok(val.get('evidenceRefs')):
                 fail('invalid lifecycle validation')
+            if key[0] == 'unit' and (val['profile'] != {'id':subject_document.get('validation', {}).get('profile'), 'revision':subject_document.get('validation', {}).get('profileRevision')} or val['validator'] != subject_document.get('validation', {}).get('validator')):
+                fail('validation profile does not match exact subject')
             report = val.get('report')
             if not isinstance(report, dict) or val.get('reportSchema') != 'https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json' or sha256(json.dumps(report, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')) != val.get('reportSha256'):
                 fail('invalid validation report identity or digest')
@@ -881,9 +931,22 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
                     fail('invalid historical resource encoding')
             if resources.get(relative) == item['sha256'] or relative in supplied:
                 entries[relative] = item['sha256']
-        if set(supplied) - declared:
+        if set(supplied) - declared or len(entries) != len(declared):
             fail('historical resource content is not in the manifest')
         historical_closures[digest] = entries
+    binary_bindings = set()
+    bindings = selection.get('subjectBindings', [])
+    if not isinstance(bindings, list):
+        fail('invalid subject binding list')
+    for binding in bindings:
+        if not isinstance(binding, dict) or set(binding) != {'kind', 'id', 'revision', 'sha256', 'path', 'closureDigest'}:
+            fail('invalid subject binding shape')
+        kind, subject_id, revision, digest, path, digest_of_closure = (binding[field] for field in ('kind', 'id', 'revision', 'sha256', 'path', 'closureDigest'))
+        source = resources if digest_of_closure == closure_digest else historical_closures.get(digest_of_closure, {})
+        key = (kind, subject_id, revision, digest, path, digest_of_closure)
+        if kind not in ('knowledge', 'rule', 'graph', 'package') or not subject_id or not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', revision or '') or not re.fullmatch(r'[a-f0-9]{64}', digest or '') or source.get(safe_relative(path)) != digest or key in binary_bindings:
+            fail('invalid subject binding')
+        binary_bindings.add(key)
     by_id = {}
     for record in records:
         record_id = record.get("recordId")
@@ -905,7 +968,7 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
             fail(f"lifecycle record digest mismatch: {record_id}")
         by_id[record_id] = record
 
-    histories = replay_lifecycle(records, resources, closure_digest, historical_closures)
+    histories = replay_lifecycle(records, resources, closure_digest, historical_closures, binary_bindings)
 
     unit_asset = next((asset for asset in selection["selectedAssets"]
                        if asset.get("kind") == "unit" and asset.get("id") == "xdownload.player.recognizer"), None)
@@ -1207,7 +1270,7 @@ def validate_lifecycle_negatives(package_identity: dict, units_by_id: dict, unit
     expect_rejection(lambda: validate_lifecycle_records(replaced_lock, units_by_id, unit_paths, resources, closure_digest, package_identity['selectionLockSha256']), 'replacement conflicts with external trusted lock pin')
 
 
-def validate_replay_adversarial_vectors(package_identity: dict, resources: dict, closure_digest: str):
+def validate_replay_adversarial_vectors(package_identity: dict, resources: dict, closure_digest: str, units_by_id: dict, unit_paths: dict):
     original = [copy.deepcopy(record) for record in package_identity['lifecycleRecords'] if record['subject']['id'] == 'xdownload.player.recognizer']
     def reseal(history):
         for index, record in enumerate(history):
@@ -1237,6 +1300,10 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
         history[1]['validation']['report']['tests'][0]['result'] = 'FAIL'
         history[1]['validation']['report']['scenarios'][0]['result'] = 'FAIL'
         reseal_report(history)
+    def wrong_subject_profile(history):
+        history[1]['validation']['profile']['id'] = 'unrelated-profile'
+        history[1]['validation']['report']['profile']['id'] = 'unrelated-profile'
+        reseal_report(history)
     vectors = [
         ('validation without candidate', lambda h: h.pop(0)),
         ('promotion without validation', lambda h: h.pop(1)),
@@ -1261,6 +1328,7 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
         ('subject identity does not match resource bytes', lambda h: h[0]['subject'].__setitem__('id', 'synthetic.impostor')),
         ('subject bytes do not match digest', lambda h: h[0].__setitem__('subjectJson', h[0]['subjectJson'] + ' ')),
         ('validator authority missing', lambda h: h[1]['actor'].pop('authorityRef')),
+        ('subject validation profile mismatch', wrong_subject_profile),
         ('promotion exceeds grant scope', lambda h: h[2]['promotion'].__setitem__('scope', 'PRODUCTION_GLOBAL')),
         ('promotion rationale missing', lambda h: h[2]['promotion'].pop('rationale')),
         ('promotion limitations missing', lambda h: h[2]['promotion'].pop('limitations')),
@@ -1283,6 +1351,43 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
             fail('knowledge or package candidate not replayed')
         del kind_resources[path]
         expect_rejection(lambda: replay_lifecycle([record], kind_resources, closure_digest), 'subject resource absent')
+    for kind, content in (('knowledge', b'# Reference knowledge\nText remains files-first.\n'), ('package', bytes([0x50, 0x4b, 0x03, 0x04, 0xff]))):
+        path, digest = 'synthetic/' + kind + '.asset', sha256(content)
+        kind_resources = dict(resources)
+        kind_resources[path] = digest
+        binary_history = copy.deepcopy(original)
+        bindings = {(kind, 'synthetic.' + kind, '1.0.0', digest, path, closure_digest)}
+        for index, record in enumerate(binary_history):
+            record.update({'recordId':'binary.' + kind + '.' + record['transition'], 'subject':{'kind':kind, 'id':'synthetic.' + kind, 'revision':'1.0.0', 'sha256':digest}, 'subjectPath':path, 'subjectBase64':base64.b64encode(content).decode('ascii')})
+            del record['subjectJson']
+            if index:
+                record['previousRecordId'] = binary_history[index - 1]['recordId']
+                record['previousRecordDigest'] = binary_history[index - 1]['recordDigest']
+            if record['transition'] == 'VALIDATED':
+                record['validation']['subjectDigest'] = digest
+                record['validation']['report']['subject'] = copy.deepcopy(record['subject'])
+                record['validation']['reportSha256'] = sha256(json.dumps(record['validation']['report'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
+            if record['transition'] == 'PROMOTED':
+                record['promotion']['validationRecordId'] = binary_history[index - 1]['recordId']
+                record['promotion']['validationRecordDigest'] = binary_history[index - 1]['recordDigest']
+            record['recordDigest'] = lifecycle_record_digest(record)
+        if next(iter(replay_lifecycle(binary_history, kind_resources, closure_digest, binary_bindings=bindings).values()))['state'] != 'PROMOTED':
+            fail('non-JSON subject lifecycle was not promoted')
+        expect_rejection(lambda: replay_lifecycle(binary_history, kind_resources, closure_digest), 'binary subject without trusted identity binding')
+        identity = copy.deepcopy(package_identity)
+        identity['lifecycleRecords'].extend(binary_history)
+        identity['selectionLock']['subjectBindings'] = [{'kind':kind, 'id':'synthetic.' + kind, 'revision':'1.0.0', 'sha256':digest, 'path':path, 'closureDigest':closure_digest}]
+        identity['selectionLockSha256'] = sha256(json.dumps(identity['selectionLock'], sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
+        validate_lifecycle_records(identity, units_by_id, unit_paths, kind_resources, closure_digest, identity['selectionLockSha256'])
+        tampered = copy.deepcopy(binary_history[0])
+        tampered['subjectBase64'] = base64.b64encode(b'wrong').decode('ascii')
+        tampered['recordDigest'] = lifecycle_record_digest(tampered)
+        expect_rejection(lambda: replay_lifecycle([tampered], kind_resources, closure_digest, binary_bindings=bindings), 'non-JSON subject bytes mismatch')
+        forged = copy.deepcopy(binary_history[0])
+        forged['subject']['id'] = 'forged.other.identity'
+        forged['subject']['revision'] = '99.0.0'
+        forged['recordDigest'] = lifecycle_record_digest(forged)
+        expect_rejection(lambda: replay_lifecycle([forged], kind_resources, closure_digest, binary_bindings=bindings), 'binary subject identity forgery')
     observation = {'recordId':'synthetic.observation', 'transition':'OBSERVED', 'subject':candidate['subject'], 'subjectPath':candidate['subjectPath'], 'subjectJson':candidate['subjectJson'], 'dependencyClosureDigest':closure_digest, 'previousRecordId':None, 'previousRecordDigest':None, 'actor':{'id':'xdownload-demo-observer', 'role':'observation-source', 'authorityRef':candidate['actor']['authorityRef']}, 'policy':{'id':'xdownload-demo/observation-policy', 'revision':'1.0.0'}, 'evidenceRefs':candidate['evidenceRefs'], 'recordedAt':candidate['recordedAt'], 'provenance':'MODEL_INFERRED'}
     observation['recordDigest'] = lifecycle_record_digest(observation)
     if next(iter(replay_lifecycle([observation], resources, closure_digest).values()))['state'] != 'OBSERVED':
@@ -1297,7 +1402,9 @@ def validate_replay_adversarial_vectors(package_identity: dict, resources: dict,
     bad_observation['recordDigest'] = lifecycle_record_digest(bad_observation)
     expect_rejection(lambda: replay_lifecycle([bad_observation], resources, closure_digest), 'model inference cannot be asserted as promoted fact')
     successor = copy.deepcopy(original)
-    successor_bytes = json.dumps({'id':candidate['subject']['id'], 'revision':'2.0.0'}, separators=(',', ':')).encode('utf-8')
+    successor_document = json.loads(candidate['subjectJson'])
+    successor_document['revision'] = '2.0.0'
+    successor_bytes = json.dumps(successor_document, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
     successor_digest = sha256(successor_bytes)
     successor_resources = dict(resources)
     successor_resources['synthetic/successor-unit.json'] = successor_digest
@@ -1642,7 +1749,7 @@ def main():
             )
     validate_lifecycle_records(package_identity, units_by_id, unit_paths, resources, manifest_digest, os.environ.get('DIS_EXPECTED_SELECTION_LOCK_SHA256', ''))
     validate_lifecycle_negatives(package_identity, units_by_id, unit_paths, resources, manifest_digest)
-    replay_vectors = validate_replay_adversarial_vectors(package_identity, resources, manifest_digest)
+    replay_vectors = validate_replay_adversarial_vectors(package_identity, resources, manifest_digest, units_by_id, unit_paths)
     validate_historical_closure(package_identity, units_by_id, unit_paths, resources, closure, manifest_digest)
     validate_failure_profile_negatives(unit_schema, units[0])
     validate_capability_negatives(units_by_id, package_identity, resources)
@@ -1685,6 +1792,18 @@ def main():
         text=True,
     )
     results = json.loads(node_script.stdout)
+    alternate_script = subprocess.run(['node', './src/emit-conformance-traces.mjs', '--provider-probe'], cwd=PACKAGE_ROOT, check=True, capture_output=True, text=True)
+    alternate_result = json.loads(alternate_script.stdout)
+    alternate_identity = alternate_result['packageIdentity']
+    alternate_lock = alternate_identity['selectionLock']
+    if sha256(json.dumps(alternate_lock, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')) != alternate_identity.get('selectionLockSha256'):
+        fail('alternate provider Package lock digest mismatch')
+    alternate_providers = dict(selected_providers)
+    recognizer = units_by_id['xdownload.player.recognizer']
+    alternate_providers[recognizer['id']] = resolve_provider_selection(recognizer, alternate_lock, alternate_lock['target'], resources)
+    validate_trace_assembly(alternate_result, graph, units_by_id, nodes_by_id, alternate_providers)
+    if alternate_providers[recognizer['id']]['candidateId'] != 'signature-normalized-v1' or alternate_result['outcome']['status'] != 'READY':
+        fail('alternate provider was not selected and executed')
     expected_cases = {'known': ('READY', 'recognized'), 'ambiguous': ('NEEDS_INPUT', 'ambiguous'), 'unknown': ('NEEDS_REVIEW', 'unknown'), 'fixture-hls': ('READY', 'recognized'), 'conflict': ('NEEDS_INPUT', 'conflict')}
     if len(results) != len(expected_cases) or {result['label'] for result in results} != set(expected_cases):
         fail('conformance scenario inventory mismatch')
@@ -1712,15 +1831,32 @@ def main():
             workflow = next(unit for unit in units if unit['role'] == 'workflow')
             if actions.get(workflow['failure']['handling'].get(expected, {}).get('action')) != expected:
                 fail('Workflow failure action contradicts terminal outcome')
+    later_probe = copy.deepcopy(next(result for result in results if result['label'] == 'known'))
+    later_units = copy.deepcopy(units_by_id)
+    later_unit = later_units[later_probe['trace'][-1]['unitId']]
+    later_unit['preconditions'] = {'inputSchemaRef':later_unit['input']['schemaRef'], 'all':[{'path':'/resolution', 'operator':'equals', 'value':{'status':'IMPOSSIBLE'}}]}
+    later_probe['errorCode'] = 'PRECONDITION_FAILED'
+    del later_probe['trace'][-1]['output']
+    later_probe['trace'][-1]['failure'] = {'code':'PRECONDITION_FAILED'}
+    validate_trace_assembly(later_probe, graph, later_units, nodes_by_id, selected_providers, rejection=True)
+    without_evidence = copy.deepcopy(later_probe)
+    without_evidence['trace'][-1]['evidence'] = {}
+    expect_rejection(lambda: validate_trace_assembly(without_evidence, graph, later_units, nodes_by_id, selected_providers, rejection=True), 'later precondition rejection without Graph evidence')
     scope_script = subprocess.run(['node', './src/emit-conformance-traces.mjs', '--scope-probes'], cwd=PACKAGE_ROOT, check=True, capture_output=True, text=True)
     scope_results = json.loads(scope_script.stdout)
-    if len(scope_results) != 3:
+    if len(scope_results) != 8:
         fail('scope probe inventory mismatch')
     for probe in scope_results:
-        Draft202012Validator(demo_schemas['domain/schemas/page-observation.schema.json'], registry=registry, format_checker=FormatChecker()).validate(probe['input'])
-        Draft202012Validator(demo_schemas['domain/schemas/recognition-result.schema.json'], registry=registry, format_checker=FormatChecker()).validate(probe['output'])
-        if probe.get('errorCode') != 'FAILURE_POLICY_REJECT' or len(probe.get('trace', [])) != 1 or probe['trace'][0].get('nodeId') != graph['entryNode'] or not json_value_equal(probe['trace'][0].get('input'), probe['input']) or not json_value_equal(probe['trace'][0].get('output'), probe['output']) or probe['output']['status'] != 'out_of_scope' or not probe['output']['evidence']:
-            fail('scope exclusion must preserve evidence and return out_of_scope')
+        validate_trace_assembly(probe, graph, units_by_id, nodes_by_id, selected_providers, rejection=True)
+        if probe['errorCode'] == 'FAILURE_POLICY_REJECT':
+            Draft202012Validator(demo_schemas['domain/schemas/page-observation.schema.json'], registry=registry, format_checker=FormatChecker()).validate(probe['input'])
+            Draft202012Validator(demo_schemas['domain/schemas/recognition-result.schema.json'], registry=registry, format_checker=FormatChecker()).validate(probe['output'])
+            if not json_value_equal(probe['trace'][-1].get('output'), probe['output']) or probe['output']['status'] != 'out_of_scope' or not probe['output']['evidence']:
+                fail('scope exclusion must preserve evidence and return out_of_scope')
+        for field, value in [('unitId', 'invalid.unit'), ('implementationRef', 'registry:fake'), ('evidence', {'forged': []})]:
+            forged = copy.deepcopy(probe)
+            forged['trace'][0][field] = value
+            expect_rejection(lambda: validate_trace_assembly(forged, graph, units_by_id, nodes_by_id, selected_providers, rejection=True), 'tampered rejection trace ' + field)
     old_lock = copy.deepcopy(package_identity['selectionLock'])
     feedback = {'traceId':'synthetic-trace-1', 'packageLockSha256':package_identity['selectionLockSha256'], 'provenance':'MODEL_INFERRED', 'claimedProvenance':'MODEL_INFERRED', 'finding':'possible alternative marker', 'disposition':'PROPOSAL_ONLY'}
     if validate_reference_feedback(feedback, package_identity['selectionLockSha256']) != feedback:

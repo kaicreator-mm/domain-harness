@@ -85,6 +85,11 @@ async function copyWithRecognizerPolicy(temporary, changes, options = {}) {
   const unit = await read('domain/units/recognizer.json');
   for (const [status, action] of Object.entries(changes)) unit.failure.handling[status].action = action;
   await write('domain/units/recognizer.json', unit);
+  if (options.validatorPreconditions) {
+    const validator = await read('domain/units/validator.json');
+    validator.preconditions = { inputSchemaRef: validator.input.schemaRef, all: [{ path: '/resolution', operator: 'equals', value: { status: 'IMPOSSIBLE' } }] };
+    await write('domain/units/validator.json', validator);
+  }
   const manifest = await read('domain/resource-closure.json');
   if (options.packageRevision) manifest.packageRevision = options.packageRevision;
   for (const entry of manifest.resources) entry.sha256 = createHash('sha256').update(await fs.readFile(path.join(root, entry.path))).digest('hex');
@@ -632,6 +637,8 @@ test('Package-pinned failure policy changes execution and precondition handling'
     await assert.rejects(() => reject.isolated.runPipeline({ url: 'https://example.test', signals: ['jwplayer', 'videojs'] }, reject.loaded), (error) => error.code === 'FAILURE_POLICY_REJECT');
     const unsupported = await copyWithRecognizerPolicy(path.join(temporary, 'unsupported'), { INVALID_INPUT: 'WAIT' });
     await assert.rejects(() => unsupported.isolated.runPipeline({ url: 'https://example.test' }, unsupported.loaded), (error) => error.code === 'UNSUPPORTED_FAILURE_POLICY');
+    const later = await copyWithRecognizerPolicy(path.join(temporary, 'later'), {}, { validatorPreconditions: true });
+    await assert.rejects(() => later.isolated.runPipeline({ url: 'https://example.test', signals: ['jwplayer'] }, later.loaded), (error) => error.code === 'PRECONDITION_FAILED' && error.trace?.at(-1)?.nodeId === 'validate' && error.trace.at(-1).evidence.recognitionEvidence.length > 0);
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });
   }
@@ -688,7 +695,9 @@ test('serialized lifecycle histories replay dispositions, revalidation and exact
   const loaded = await loadedPromise;
   const records = loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer');
   const [candidate, validation, promotion] = structuredClone(records);
-  const successorBytes = JSON.stringify({ id: candidate.subject.id, revision: '2.0.0' });
+  const successorDocument = JSON.parse(candidate.subjectJson);
+  successorDocument.revision = '2.0.0';
+  const successorBytes = JSON.stringify(successorDocument);
   const successorDigest = createHash('sha256').update(successorBytes).digest('hex');
   const resources = new Map(loaded.resources);
   resources.set('synthetic/successor-unit.json', successorDigest);
@@ -765,6 +774,7 @@ test('independent lifecycle negative vectors remain rejected after record hashes
     ['subject identity does not match resource bytes', (h) => { h[0].subject.id = 'synthetic.impostor'; }],
     ['subject bytes do not match digest', (h) => { h[0].subjectJson += ' '; }],
     ['validator authority missing', (h) => { delete h[1].actor.authorityRef; }],
+    ['subject validation profile mismatch', (h) => { h[1].validation.profile.id = 'unrelated-profile'; h[1].validation.report.profile.id = 'unrelated-profile'; h[1].validation.reportSha256 = hashRecord(h[1].validation.report); }],
     ['promotion exceeds grant scope', (h) => { h[2].promotion.scope = 'PRODUCTION_GLOBAL'; }],
     ['promotion rationale missing', (h) => { delete h[2].promotion.rationale; }],
     ['promotion limitations missing', (h) => { delete h[2].promotion.limitations; }],
@@ -805,6 +815,55 @@ test('knowledge and package candidates require exact closed subject resources', 
     assert.equal(replayLifecycle([record], resources, loaded.packageIdentity.resourceClosureSha256).values().next().value.state, 'CANDIDATE');
     resources.delete(path);
     assert.throws(() => replayLifecycle([record], resources, loaded.packageIdentity.resourceClosureSha256), hasCode('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH'));
+  }
+});
+
+test('non-JSON knowledge and package bytes support complete governed lifecycles', async () => {
+  const loaded = await loadedPromise;
+  const original = loaded.packageIdentity.lifecycleRecords.filter((record) => record.subject.id === 'xdownload.player.recognizer');
+  for (const [kind, bytes] of [['knowledge', Buffer.from('# Reference knowledge\nText remains files-first.\n')], ['package', Buffer.from([0x50, 0x4b, 0x03, 0x04, 0xff])]]) {
+    const digest = createHash('sha256').update(bytes).digest('hex'), path = 'synthetic/' + kind + '.asset';
+    const resources = new Map(loaded.resources);
+    resources.set(path, digest);
+    const binding = JSON.stringify([kind, 'synthetic.' + kind, '1.0.0', digest, path, loaded.packageIdentity.resourceClosureSha256]);
+    const bindings = new Set([binding]);
+    const records = structuredClone(original);
+    for (let index = 0; index < records.length; index += 1) {
+      const record = records[index];
+      record.recordId = 'binary.' + kind + '.' + record.transition;
+      record.subject = { kind, id: 'synthetic.' + kind, revision: '1.0.0', sha256: digest };
+      record.subjectPath = path;
+      delete record.subjectJson;
+      record.subjectBase64 = bytes.toString('base64');
+      if (index) { record.previousRecordId = records[index - 1].recordId; record.previousRecordDigest = records[index - 1].recordDigest; }
+      if (record.transition === 'VALIDATED') {
+        record.validation.subjectDigest = digest;
+        record.validation.report.subject = structuredClone(record.subject);
+        record.validation.reportSha256 = hashRecord(record.validation.report);
+      }
+      if (record.transition === 'PROMOTED') {
+        record.promotion.validationRecordId = records[index - 1].recordId;
+        record.promotion.validationRecordDigest = records[index - 1].recordDigest;
+      }
+      refreshRecord(record);
+    }
+    assert.equal(replayLifecycle(records, resources, loaded.packageIdentity.resourceClosureSha256, new Map(), bindings).values().next().value.state, 'PROMOTED');
+    assert.throws(() => replayLifecycle(records, resources, loaded.packageIdentity.resourceClosureSha256), hasCode('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH'));
+    const identity = structuredClone(loaded.packageIdentity);
+    identity.lifecycleRecords.push(...records);
+    identity.selectionLock.subjectBindings = [{ kind, id: 'synthetic.' + kind, revision: '1.0.0', sha256: digest, path, closureDigest: loaded.packageIdentity.resourceClosureSha256 }];
+    refreshLock(identity);
+    const paths = new Map(loaded.closureManifest.units.map((entry) => [entry.id, entry.path]));
+    assert.equal(validateLifecycleRecords(identity, loaded.unitsById, paths, resources, loaded.packageIdentity.resourceClosureSha256, identity.selectionLockSha256), true);
+    const tampered = structuredClone(records[0]);
+    tampered.subjectBase64 = Buffer.from('wrong').toString('base64');
+    refreshRecord(tampered);
+    assert.throws(() => replayLifecycle([tampered], resources, loaded.packageIdentity.resourceClosureSha256, new Map(), bindings), hasCode('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH'));
+    const forged = structuredClone(records[0]);
+    forged.subject.id = 'forged.other.identity';
+    forged.subject.revision = '99.0.0';
+    refreshRecord(forged);
+    assert.throws(() => replayLifecycle([forged], resources, loaded.packageIdentity.resourceClosureSha256, new Map(), bindings), hasCode('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH'));
   }
 });
 
@@ -898,7 +957,7 @@ test('historical closure remains auditable while a changed closure requires fres
   const missingHistoricalBytes = structuredClone(identity);
   delete missingHistoricalBytes.selectionLock.historicalClosures[0].resourceBase64['fixtures/player-signatures.json'];
   refreshLock(missingHistoricalBytes);
-  assert.throws(() => validateLifecycleRecords(missingHistoricalBytes, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, missingHistoricalBytes.selectionLockSha256), hasCode('INVALID_LIFECYCLE_ACTOR_OR_POLICY'));
+  assert.throws(() => validateLifecycleRecords(missingHistoricalBytes, loaded.unitsById, paths, loaded.resources, loaded.packageIdentity.resourceClosureSha256, missingHistoricalBytes.selectionLockSha256), hasCode('INVALID_HISTORICAL_CLOSURE'));
   const wrongClosure = structuredClone(identity);
   const wrongPromotion = wrongClosure.lifecycleRecords.find((item) => item.recordId === nextPromotion.recordId);
   wrongPromotion.dependencyClosureDigest = oldDigest;

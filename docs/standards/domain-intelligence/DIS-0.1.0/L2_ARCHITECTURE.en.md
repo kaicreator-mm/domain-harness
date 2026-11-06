@@ -10,6 +10,8 @@ Lifecycle records MUST be replayed per exact subject identity and digest, includ
 
 Historical closure manifests are authenticated by raw-byte digest inside the externally trusted Package lock before their resource digests are used to replay older records. Historical evidence is not current qualification: a required selected subject must have current-closure validation and a subsequent promotion.
 
+The reference profile can carry non-JSON Knowledge or Package bytes as base64. Its externally trusted Package lock binds each such subject's kind, identity, revision, path, content digest and closure digest; raw bytes and all required historical resources are verified against that binding before replay. A byte digest alone does not authorize a claimed identity.
+
 Validation MUST bind a digest of a Validation Report, exact subject and closure, profile, validator, scenario/case identities, findings, counterexamples, limitations and reproducibility environment. Promotion MUST bind the current Validation record, prior promoted baseline or explicit genesis, and authorization evidence for the designated authority. Synthetic demo actors and grants are test fixtures, not production authorization.
 
 The Reference Consumer evaluates declared Recognizer scope and exclusions, retains conflicting claims with their sources, and applies declared failure actions. Unsupported action semantics fail closed. The selected provider reference drives the trusted registry binding and the selected Graph identity, path and digest match the loaded manifest resource.

@@ -268,7 +268,7 @@ function reportCoverageConsistent(report) {
 // Histories are keyed by the complete immutable subject. A terminal disposition
 // cannot be undone by appending a name-only record; rollback selects another
 // still-promoted exact subject through a new Package lock.
-export function replayLifecycle(records, resources, closureDigest, historicalClosures = new Map()) {
+export function replayLifecycle(records, resources, closureDigest, historicalClosures = new Map(), binaryBindings = new Set()) {
   const histories = new Map(), ids = new Set(), revisions = new Map(), latestPromoted = new Map();
   for (const record of records) {
     const subject = record?.subject;
@@ -280,14 +280,22 @@ export function replayLifecycle(records, resources, closureDigest, historicalClo
     const evidenceResources = recordClosure === closureDigest ? resources : historicalClosures.get(recordClosure);
     const actor = record.actor || {}, policy = record.policy || record.promotion?.policy;
     if (!record.recordId || ids.has(record.recordId) || !['unit', 'knowledge', 'rule', 'graph', 'package'].includes(subject?.kind) || !subject.id || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(subject.revision || '') || !/^[a-f0-9]{64}$/.test(subject.sha256 || '') || !evidenceResources || !isSafePackageRelativeRef(record.subjectPath) || evidenceResources.get(record.subjectPath) !== subject.sha256) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId || 'missing');
-    if (typeof record.subjectJson !== 'string' || sha256(Buffer.from(record.subjectJson, 'utf8')) !== subject.sha256) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
-    let subjectDocument;
-    try { subjectDocument = JSON.parse(record.subjectJson); } catch { throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId); }
-    if (!subjectDocument || typeof subjectDocument !== 'object' || Array.isArray(subjectDocument)) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
-    const packageDescriptor = subject.kind === 'package' && subjectDocument.dis && typeof subjectDocument.dis === 'object' && !Array.isArray(subjectDocument.dis);
-    const contentId = subject.kind === 'rule' ? subjectDocument.catalogId : packageDescriptor ? subjectDocument.dis.packageId : subjectDocument.id;
-    const contentRevision = packageDescriptor ? subjectDocument.dis.revision : subjectDocument.revision;
-    if (contentId !== subject.id || contentRevision !== subject.revision) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+    const hasJson = Object.hasOwn(record, 'subjectJson'), hasBytes = Object.hasOwn(record, 'subjectBase64');
+    if (hasJson === hasBytes || (hasJson && typeof record.subjectJson !== 'string') || (hasBytes && typeof record.subjectBase64 !== 'string')) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+    let subjectDocument = null;
+    if (hasJson) {
+      if (sha256(Buffer.from(record.subjectJson, 'utf8')) !== subject.sha256) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+      try { subjectDocument = JSON.parse(record.subjectJson); } catch { throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId); }
+      if (!subjectDocument || typeof subjectDocument !== 'object' || Array.isArray(subjectDocument)) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+      const packageDescriptor = subject.kind === 'package' && subjectDocument.dis && typeof subjectDocument.dis === 'object' && !Array.isArray(subjectDocument.dis);
+      const contentId = subject.kind === 'rule' ? subjectDocument.catalogId : packageDescriptor ? subjectDocument.dis.packageId : subjectDocument.id;
+      const contentRevision = packageDescriptor ? subjectDocument.dis.revision : subjectDocument.revision;
+      if (contentId !== subject.id || contentRevision !== subject.revision) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+    } else {
+      const bytes = Buffer.from(record.subjectBase64, 'base64');
+      const binaryKey = JSON.stringify([subject.kind, subject.id, subject.revision, subject.sha256, record.subjectPath, recordClosure]);
+      if (subject.kind === 'unit' || !binaryBindings.has(binaryKey) || bytes.toString('base64') !== record.subjectBase64 || sha256(bytes) !== subject.sha256) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+    }
     if (revisions.has(revisionKey) && revisions.get(revisionKey) !== subject.sha256) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
     revisions.set(revisionKey, subject.sha256);
     if (lifecycleRecordDigest(record) !== record.recordDigest) throw new DisExecutionError('LIFECYCLE_RECORD_DIGEST_MISMATCH', record.recordId);
@@ -305,6 +313,7 @@ export function replayLifecycle(records, resources, closureDigest, historicalClo
     } else if (transition === 'VALIDATED') {
       const validation = record.validation;
       if (actor.id !== 'xdownload-dis-independent-conformance' || actor.role !== 'validator' || actor.authorityRef !== 'xdownload-demo/domain-authority@1.0.0' || actor.id !== validation?.validator?.id || policy.id !== 'xdownload-demo/validation-profile' || policy.revision !== '0.1.0' || validation.result !== 'PASS' || validation.subjectDigest !== subject.sha256 || validation.dependencyClosureDigest !== recordClosure || !validation.profile?.id || !validation.profile.revision || !validation.validator?.version || !checkEvidence(validation.evidenceRefs)) throw new DisExecutionError('INVALID_LIFECYCLE_VALIDATION', record.recordId);
+      if (subject.kind === 'unit' && (validation.profile.id !== subjectDocument.validation?.profile || validation.profile.revision !== subjectDocument.validation?.profileRevision || !jsonValueEqual(validation.validator, subjectDocument.validation?.validator))) throw new DisExecutionError('VALIDATION_PROFILE_MISMATCH', record.recordId);
       const report = validation.report;
       if (validation.reportSchema !== 'https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/validation-report.schema.json' || !validReferenceReportShape(report) || !reportCoverageConsistent(report) || sha256(Buffer.from(JSON.stringify(canonicalLifecycleValue(report)), 'utf8')) !== validation.reportSha256 ||
           !jsonValueEqual(report.subject, subject) || report.dependencyClosure?.sha256 !== recordClosure || !jsonValueEqual(report.dependencyClosure.resources, validation.evidenceRefs) || !jsonValueEqual(report.profile, validation.profile) || !jsonValueEqual(report.validator, validation.validator) || !jsonValueEqual(report.baseline, validation.baseline) || !jsonValueEqual(report.coverage, validation.coverage) ||
@@ -369,8 +378,18 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
       }
       if (resources.get(item.path) === item.sha256 || Object.hasOwn(supplied, item.path)) entries.set(item.path, item.sha256);
     }
-    if (Object.keys(supplied).some((item) => !declared.has(item))) throw new DisExecutionError('INVALID_HISTORICAL_CLOSURE', history.sha256);
+    if (Object.keys(supplied).some((item) => !declared.has(item)) || entries.size !== declared.size) throw new DisExecutionError('INVALID_HISTORICAL_CLOSURE', history.sha256);
     historicalClosures.set(history.sha256, entries);
+  }
+  const binaryBindings = new Set();
+  const bindings = selection.subjectBindings === undefined ? [] : selection.subjectBindings;
+  if (!Array.isArray(bindings)) throw new DisExecutionError('INVALID_SUBJECT_BINDING', packageIdentity.packageId);
+  for (const binding of bindings) {
+    const { kind, id, revision, sha256: digest, path: subjectPath, closureDigest: digestOfClosure } = binding || {};
+    const source = digestOfClosure === closureDigest ? resources : historicalClosures.get(digestOfClosure);
+    const key = JSON.stringify([kind, id, revision, digest, subjectPath, digestOfClosure]);
+    if (!exactKeys(binding, ['kind', 'id', 'revision', 'sha256', 'path', 'closureDigest']) || !['knowledge', 'rule', 'graph', 'package'].includes(kind) || !id || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(revision || '') || !/^[a-f0-9]{64}$/.test(digest || '') || !isSafePackageRelativeRef(subjectPath) || source?.get(subjectPath) !== digest || binaryBindings.has(key)) throw new DisExecutionError('INVALID_SUBJECT_BINDING', id || 'missing');
+    binaryBindings.add(key);
   }
   const byId = new Map();
   for (const record of records) {
@@ -379,7 +398,7 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
     if ((record.dependencyClosureDigest !== closureDigest && !historicalClosures.has(record.dependencyClosureDigest)) || !['unit', 'knowledge', 'rule', 'graph', 'package'].includes(record.subject?.kind) || !record.subject?.id || !record.subject?.revision || !/^[a-f0-9]{64}$/.test(record.subject.sha256 || '')) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
     byId.set(record.recordId, record);
   }
-  const histories = replayLifecycle(records, resources, closureDigest, historicalClosures);
+  const histories = replayLifecycle(records, resources, closureDigest, historicalClosures, binaryBindings);
   const unitAsset = selection.selectedAssets.find((asset) => asset.kind === 'unit' && asset.id === 'xdownload.player.recognizer');
   if (!unitAsset) throw new DisExecutionError('SELECTED_RECOGNIZER_ASSET_MISSING', packageIdentity.packageId);
   const unit = unitsById.get(unitAsset.id), unitPath = unitPaths.get(unitAsset.id);
@@ -1116,15 +1135,6 @@ export async function runPipeline(input, loaded) {
         if (!Object.hasOwn(nodeInput, property)) throw new DisExecutionError('MISSING_RUNTIME_INPUT', nodeId + '/' + property);
       }
     }
-    try {
-      validatePreconditions(unit, nodeInput);
-    } catch (error) {
-      if (!(error instanceof DisExecutionError) || error.code !== 'PRECONDITION_FAILED') throw error;
-      trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: binding.ref, implementationCandidateId: binding.candidateId, input: structuredClone(nodeInput), evidence: {}, failure: { code: error.code } });
-      const action = referenceFailureAction(unit, 'INVALID_INPUT');
-      if (action === 'REJECT' || action === 'FAIL') throw error;
-      throw new DisExecutionError('UNSUPPORTED_FAILURE_POLICY', unit.id + ':INVALID_INPUT:' + action);
-    }
     const evidence = {};
     const incomingEvidence = graph.edges.filter((edge) => edge.kind === 'evidence' && edge.to.node === nodeId);
     for (const edge of incomingEvidence) {
@@ -1132,6 +1142,15 @@ export async function runPipeline(input, loaded) {
       const value = pointerGet(outputs.get(edge.from.node), edge.from.pointer);
       if (value === undefined) throw new DisExecutionError('MISSING_RUNTIME_EVIDENCE_VALUE', edge.from.node + edge.from.pointer);
       evidence[edge.to.slot] = [...(evidence[edge.to.slot] || []), ...(Array.isArray(value) ? structuredClone(value) : [structuredClone(value)])];
+    }
+    try {
+      validatePreconditions(unit, nodeInput);
+    } catch (error) {
+      if (!(error instanceof DisExecutionError) || error.code !== 'PRECONDITION_FAILED') throw error;
+      trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, implementationRef: binding.ref, implementationCandidateId: binding.candidateId, input: structuredClone(nodeInput), evidence: structuredClone(evidence), failure: { code: error.code } });
+      const action = referenceFailureAction(unit, 'INVALID_INPUT');
+      if (action === 'REJECT' || action === 'FAIL') throw error;
+      throw new DisExecutionError('UNSUPPORTED_FAILURE_POLICY', unit.id + ':INVALID_INPUT:' + action);
     }
     let output;
     try {
