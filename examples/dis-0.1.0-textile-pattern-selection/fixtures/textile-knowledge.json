@@ -1,0 +1,86 @@
+{
+  "id": "textile.process-knowledge",
+  "revision": "1.0.0",
+  "authority": "REFERENCE",
+  "sources": [
+    {
+      "id": "ncsu-studio",
+      "authority": "NC State Wilson College of Textiles",
+      "url": "https://textiles.ncsu.edu/industry/labs-and-facilities/weaving-studio/",
+      "locator": "Weaving Studio; Unique Capabilities; Equipment (lines 64–88)",
+      "accessed": "2026-11-07",
+      "supports": "Teaching and sampling equipment including individual-thread-control Jacquard.",
+      "limitations": "Institutional capabilities do not establish supplier availability or feasibility."
+    },
+    {
+      "id": "ncsu-lab",
+      "authority": "NC State Zeis Textiles Extension",
+      "url": "https://textiles.ncsu.edu/zte/weaving-lab/",
+      "locator": "Weaving Lab; What is Shedding?; Whats is dobby shedding?; What is jacquard shedding? (lines 35–40, 90–101)",
+      "accessed": "2026-11-07",
+      "supports": "Shedding distinguishes cam, dobby and individual-warp Jacquard control.",
+      "limitations": "Not machine suitability or production instructions."
+    },
+    {
+      "id": "gwu-traditions",
+      "authority": "George Washington University Museum and The Textile Museum",
+      "url": "https://museum.gwu.edu/textile-traditions",
+      "locator": "Block Printing in India (114–116); Suzani in Uzbekistan (129–131); Jacquard in Japan (140–142)",
+      "accessed": "2026-11-07",
+      "supports": "Printing applies pattern to cloth, embroidery uses stitching, and Jacquard forms design during weaving.",
+      "limitations": "No claim about a synthetic brief belonging to a named cultural tradition."
+    },
+    {
+      "id": "nps-weaves",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/articles/000/weaving-patterns.htm",
+      "locator": "Weaving Patterns (19–25); Plain Weave (26–36); Twill (37–49); Satin (52–54)",
+      "accessed": "2026-11-07",
+      "supports": "Warp/weft interlacing and weave structure affect cloth properties.",
+      "limitations": "Weave structure is distinct from surface decoration."
+    }
+  ],
+  "rules": [
+    {
+      "id": "jacquard",
+      "placement": "structure",
+      "surfaceMethod": null,
+      "enabled": true,
+      "sources": [
+        "ncsu-studio",
+        "ncsu-lab",
+        "gwu-traditions",
+        "nps-weaves"
+      ]
+    },
+    {
+      "id": "block-printing",
+      "placement": "surface",
+      "surfaceMethod": "print",
+      "enabled": true,
+      "sources": [
+        "gwu-traditions"
+      ]
+    },
+    {
+      "id": "embroidery",
+      "placement": "surface",
+      "surfaceMethod": "stitch",
+      "enabled": true,
+      "sources": [
+        "gwu-traditions"
+      ]
+    }
+  ],
+  "unresolved": [
+    "local production availability",
+    "cost",
+    "MOQ",
+    "lead time",
+    "machine suitability",
+    "commercial feasibility"
+  ],
+  "limitations": [
+    "Candidate sample-planning only; supplier and sample validation required."
+  ]
+}

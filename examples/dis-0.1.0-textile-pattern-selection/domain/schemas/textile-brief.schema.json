@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "domain": {
+      "type": "string"
+    },
+    "placement": {
+      "enum": [
+        "structure",
+        "surface",
+        "unknown"
+      ]
+    },
+    "surfaceMethod": {
+      "enum": [
+        "print",
+        "stitch",
+        "either",
+        "unknown"
+      ]
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "source",
+          "placement"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "placement": {
+            "enum": [
+              "structure",
+              "surface"
+            ]
+          }
+        }
+      }
+    },
+    "requestedProcess": {
+      "type": "string"
+    },
+    "machineControl": {
+      "type": "boolean"
+    },
+    "sampleCheck": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "UNKNOWN"
+      ]
+    }
+  },
+  "required": [
+    "domain",
+    "evidence"
+  ]
+}
