@@ -219,3 +219,7 @@ Event 来源、业务后置条件、外部系统回执、验证者版本和独�
 5. R2 机器 Schema、JSON/YAML/SQLite 参考消费者、负面测试、真实 Node24/CI、独立 exact-SHA Review、Product/L1 审核与正式 L2 Freeze。
 
 R2 是对实现风险的设计层修复，不是合格代码/测试/发布证据。
+
+## 10. 对抗问题的 R2 设计修复落点
+
+[R2 修复约束](EVOLUTION_DESIGN_REPAIRS_R2.zh-CN.md) 对先前所有 A01–A12 明确了程序化失败条件、资格真实性、Experience 与 Candidate 的最小语义、独立 Holdout 的隔离、受限数据解释器、任务快照与安全撤销、Server 跨应用验证及升级权威。**该补充优先于本稿较早的模糊表述。** 本地规则只有在生产 SDK 真正具备安全解释器/Task Pin/资格票据时才可运行；否则保存 Candidate 与 Shadow，不能为了 Demo 而声明 Runtime 功能已实现。

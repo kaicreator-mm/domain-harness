@@ -80,6 +80,8 @@ Experience 必须由真实 Trace/Evidence 和独立业务验证得到；缓存�
 
 **对抗审查结果**见 [ADVERSARIAL_REVIEW_R2.zh-CN.md](ADVERSARIAL_REVIEW_R2.zh-CN.md)（P0=3/P1=7/P2=2，均为设计发现；未完成执行验证）；测试计划见 [EVOLUTION_CONFORMANCE_R2.zh-CN.md](EVOLUTION_CONFORMANCE_R2.zh-CN.md)。
 
+本版本针对自对抗审查 A01–A12 的**限制性设计修复**另见 [EVOLUTION_DESIGN_REPAIRS_R2.zh-CN.md](EVOLUTION_DESIGN_REPAIRS_R2.zh-CN.md)。规则 Slot 未具备生产解释器/原子 Pin/撤销能力之前，局部执行一律降为 Candidate + Shadow；任何模型自述成功、缓存多次命中、跨租户上报或任意代码热加载均不能作为资质。
+
 ## 10. 实施边界及符合性
 
 本 R1 先完成 Product/L1 概念替代，**不宣称 Schema、Demo、SDK ABI 或真实 Runtime 已更新**。后续需：中文/英文规范完整一致；机器 Schema/inline+ref 等价性；Tally/xDownload/Shun/ai-rexform 真实消费场景；LLM 禁用及有界多轮 Harness；任务内/跨任务进化、非法晋升、未知 Effect；两层初始化和恢复；独立 Conformance、Exact-SHA review、CI 与 L2 Freeze。

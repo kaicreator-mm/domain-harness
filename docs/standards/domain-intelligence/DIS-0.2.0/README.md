@@ -37,3 +37,8 @@ R2 product-level self-review recorded 3 P0, 7 P1, 2 P2 design risks; the R2 cons
 ## Gates
 
 PRODUCT_L1=REVIEW_PENDING; L2=NOT_FROZEN; MACHINE_SCHEMA=NOT_DONE; CONSUMER_DEMO=NOT_RUN; CONFORMANCE=NOT_RUN; RUNTIME_ADOPTION=NOT_PROVEN; SDK_ABI_CHANGE=NOT_AUTHORIZED; MERGE=NO; RELEASE=NO.
+
+## Design closure and self-verification (R2)
+
+- [R2 adversarial design repair rules](EVOLUTION_DESIGN_REPAIRS_R2.zh-CN.md): all 12 risks have concrete design rejection rules. Design-mitigated does **not** mean production-verified.
+- [R2 reproducible reference demo](../../../../examples/dis-v020-evolution-demo/README.md) (repo-root path; see the PR file list): Mock LLM + fixture oracle + bounded interpreted rule slot; real SDK/LLM integration not implied.
