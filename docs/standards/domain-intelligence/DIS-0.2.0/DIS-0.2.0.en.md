@@ -20,47 +20,150 @@ Five *logical* areas, not five engines: (1) Unit & Capability Model; (2) Intelli
 | Concept | Single responsibility | Not equivalent to |
 |---|---|---|
 | **Capability Contract** | Stable identity and contract for typed inputs/outputs, preconditions, domain semantics, applicability, failure/outcome, evidence and compatibility | Function, permit, dispatcher |
-| **Intelligence Unit (Unit)** | Independently identifiable, versioned, qualified, composable intelligence implementation of one or more Capabilities | Arbitrary file or fact, extra Component family, Runtime instance |
+| **Intelligence Unit (Unit)** | Independently identifiable, versioned, qualified and composable domain data or processing unit; Data may expose no Capability, Processing/Composite provide callable Capabilities | Arbitrary physical file or fact, extra Component family, Runtime instance |
 | **Domain Package** | Consumer-/target-specific immutable selection, compilation, pinning and distribution of Units, knowledge, implementations and resources | Domain Intelligence itself or a parent ontology for Domain Definition |
 
 Capability-to-Unit is **contract-to-eligible-provider**, not literal class-to-instance. One contract may have several eligible Unit providers; one Unit may implement several cohesive Capabilities; BUILD selects a unique actual provider and exact binding.
 
-### 2.2 Knowledge, processing, roles and existing authority
+### 2.2 One Intelligence Unit abstraction, Data / Processing / Composite profiles
 
-- **Knowledge** is domain facts, concepts, entities, relations, rules, constraints, patterns and experience. Do **not** invent a first-class “Structured Knowledge” object or Runtime. Required production intelligence knowledge must be machine-consumable with explicit types, meaning, provenance, scope and validation; human-readable supporting references remain legitimate.
-- **Knowledge Resources** are typed, schema-/revision-/digest-/provenance-bound data/rule resources owned or referenced by a Unit, optionally shared by several Units. Do not wrap each fact in a Unit.
-- **Implementation** is a trusted binding to a Function, Parser, Rule/Expression Interpreter, bounded Query, model-assisted handler, existing Tool Operation, or Workflow. Implementation strategies are not new Capability types.
-- **Atomic** vs **Composite** are processing profiles, not separate object families. Composite Unit processing is Workflow composition of required Capabilities / selected Units.
-- **Role labels** (knowledge, recognizer, decision, procedure, tool, workflow, validator) are optional semantic profiles, never seven separate engines. Deployable Units MUST expose at least one Capability; static data with no callable Capability remains a Knowledge Resource.
-- **Domain Definition** remains the consumer-specific abstract Semantic/Tool Component Graph. Units do not automatically become Components; existing Semantic/Tool/Host authority persists.
+**Intelligence Unit is the common independently governed, versioned, scoped, provenance-grounded abstraction for domain knowledge, processing and composition.** The three profiles share identity/validation/lifecycle semantics; they are not three classes or runtime engines:
 
-### 2.3 Minimum Unit envelope
+| Profile | Purpose | Exposed Capability | Processing |
+|---|---|---|---|
+| **Data** | Typed facts, domain configuration, knowledge, rule tables, datasets | May be empty | Declared representation, reader, access and verification |
+| **Processing** | Parser, Function, Rule/Expression Engine, Query, bounded Tool | At least one | Trusted implementation/invocation |
+| **Composite** | Combines other Data/Processing/Composite Units | At least one | Workflow or declared bounded composition |
 
-A materializable Unit MUST provide:
-1. exact identity: stable ID, revision, content/build digest, owner, authority and Domain Scope;
-2. one or more provided Capabilities, optional required Capabilities with contract ID/revision/digest, typed I/O, applicability, preconditions, outcome/failure and evidence obligations;
-3. optional Knowledge references with schema, scope, source and resource digests;
-4. an Atomic/Composite processing profile, trusted binding, target requirements, dependency closure and effect classification;
-5. Structured Intent/clarification profile where relevant;
-6. Producer provenance, validation profile, positive/negative/boundary/conflict tests, evidence and limitations;
-7. explicit failure treatment for unavailable dependencies and unsupported required semantics.
+Profiles are compatible facets: a Processing/Composite Unit may embed its own Data payload; it does not need to fabricate a separate Data Unit just to hold a related rule table. **Unit granularity is set by independent semantic identity, source, ownership, evolution, reuse and verification**, not by individual fact/record/file. One Data Unit may contain thousands of locally identifiable records. A bare path, transient variable, private helper or Package Manifest does not become a Unit.
 
-Capability Contracts remain independently stable for cross-Unit/Package compatibility, without introducing a separate Capability Runtime hierarchy.
+**Knowledge is represented as Data Unit content, not a parallel knowledge-object hierarchy.** JSON/YAML/expressions/data files/indexes/schemas remain physical payload/resources with exact digest, provenance and Resource Closure. Domain configuration may be a Data Unit; deployment-only config, Package locks and Host secrets are not domain Knowledge Units. Preserve existing six Domain Data classes, Domain Definition and Semantic/Tool component authority.
+
+A **Capability Contract** is a stable *callable* interface. Several qualified Processing/Composite Units may provide it. Data Units need not provide Capabilities; internal consumers use exact UnitRefs. Cross-Package public queries still require declared Capability and applicable Semantic/Tool/Host admission, not a raw Data handle. Recognizer/Decision/Tool/Workflow remain optional semantic role labels/profiles, not separate engines.
+
+### 2.3 Full Unit envelope and profile-specific obligations
+
+Every Unit has shared identity and lifecycle envelope, with fields made required according to its profile:
+
+| Field group | Standardized meaning |
+|---|---|
+| identity | schemaVersion, stable ID, exact revision/digest, owner/authority, Domain Scope |
+| semantics | purpose, applicability/exclusions, preconditions, unknown/conflict/failure policies |
+| capability | provided and required typed contracts, revisions/digests, outcome and evidence obligations |
+| data | representation format/media type, semantic schema, resources, reader/codec, access/bounds |
+| processing | strategy, trusted implementationRef and invoke entry, Target, Effect classification |
+| composition | child Unit/Capability references, control/data/evidence, terminal outcomes |
+| lifecycle | initialize/invoke/read/dispose contract, no-op defaults, READY/FAILED handling |
+| governance | provenance, epistemic status, qualification and validation/test evidence |
+| build | resource/dependency closure, Target/Profile pins, artifact digests and selection |
+
+**Data profile** has typed payload/schema/reader/access/validation but need not have provides, executable invoke or fabricated function failure fields. **Processing/Composite profiles** must have at least one real provided Capability, exact callable/implementation binding and typed outcomes. Physical files retain separate physical integrity identities, not an independent domain ontology.
+
+### 2.4 Data Unit representation and processing contract
+
+A Data Unit specifies not just an input file:
+1. **Representation:** format/mediaType/Schema and semantic revision, types/units/encoding, exact resource refs and digests; profiles may support JSON, YAML, tables, expressions/rule sets, read-only indexes, without mandating one universal format.
+2. **Reader/Interpretation:** explicit readerBinding or standard codecProfile, implemented through a selected SDK/Business Parser/Rule Engine or trusted Host data adapter, with pinned versions and declared failure behavior. Data shape is not the decoder algorithm.
+3. **Access:** internal get/bounded lookup/filter/enumeration or domain-specific queries, typed results, maximum size/count, resource/caller scope, read-only policy, UNKNOWN/failed decoding; public cross-Package access must use a qualified Processing Unit/Capability and appropriate Host/Tool controls.
+4. **Validation:** structural and semantic constraints, applicability, provenance/version and negative cases for parse failures, duplicate IDs, wrong schema or tampered digest.
+5. **Materialization:** verified generated JSON/index/SQLite is a Derived resource, not a second authority; installed Package data remains immutable.
+
+Illustrative candidate profile (not a frozen DIS 0.2.0 schema):
+
+~~~yaml
+schemaVersion: dis.unit/0.2.0-candidate
+id: media.player-signatures
+revision: 1.0.0
+profile: data
+data:
+  representation:
+    format: json
+    mediaType: application/json
+    schemaRef: schemas/player-signatures.schema.json
+    resourceRef: knowledge/player-signatures.json
+    sha256: "<sha256-of-exact-resource>"
+  reader:
+    capabilityRef: sdk.json.decode@1.0.0
+    binding: PACKAGE_LOCK_EXACT
+  access:
+    mode: read-only
+    operations: [lookup]
+    maxResults: 100
+lifecycle:
+  initialize: { mode: none }
+  dispose: { mode: none }
+~~~
+
+The reader may be AOT-bound to an SDK Processing Unit; tightly coupled data and processing may instead remain inside a single Processing Unit with a real Capability. Format and interpretation semantics must be separately verifiable.
+
+### 2.5 Processing / Composite Unit invocation example
+
+A Processing Unit declares callable Capabilities and an exact invoke binding. A Composite Unit may refer to a bounded Workflow Graph. Both share the common lifecycle protocol, not a separate Workflow Engine.
+
+~~~yaml
+schemaVersion: dis.unit/0.2.0-candidate
+id: media.recognize-player
+revision: 1.0.0
+profile: composite
+provides:
+  - capabilityId: media.player-recognition
+    version: 1.0.0
+    contractDigest: "<sha256-of-capability-contract>"
+requires:
+  - capabilityId: sdk.json.decode
+    version: 1.0.0
+dataUnitRefs:
+  - id: media.player-signatures
+    revision: 1.0.0
+processing:
+  strategy: workflow
+  graphRef: media.recognize-player.graph@1.0.0
+  binding: PACKAGE_LOCK_EXACT
+  entry:
+    invoke: media.player-recognition
+lifecycle:
+  initialize: { mode: none }
+  invoke: { mode: exact-bound }
+  dispose: { mode: none }
+validation:
+  profileRef: media.player-recognition.conformance@1.0.0
+~~~
+
+Beyond ID/version/digest, each provides Contract fixes typed input/output, preconditions, applicability, outcome/failure and evidence requirements. Only explicitly promoted qualified Target/dependency/resource-closed versions are eligible for AOT BUILD. This is illustrative candidate syntax, **not an implemented 0.2.0 schema**.
+
+### 2.6 Candidate Unit Lifecycle ABI semantics
+
+These are logical signatures only; physical language ABI belongs to independently reviewed successor SDK/L2 contracts:
+
+~~~typescript
+type UnitInit = (context: ScopedUnitContext) =>
+  Promise<{ status: "READY" | "FAILED"; evidence?: unknown }>;
+
+type UnitInvoke<I, O> = (input: I, context: ScopedUnitContext) =>
+  Promise<{ outcome: O; evidence?: unknown }>;
+
+type UnitRead<Q, R> = (query: Q, context: ScopedUnitContext) =>
+  Promise<R>;
+
+type UnitDispose = (context: ScopedUnitContext) => Promise<void>;
+~~~
+
+`initialize: {mode:none}` / `dispose: {mode:none}` are normative default no-ops implemented by the KDP lifecycle adapter, **not mandatory empty authored functions**. Existing Package init/dispose entry points may delegate to Units, but no second independent Init authority is introduced.
 
 ## 3. Knowledge Structuring and Intelligence Unit Production
 
-### 3.1 Canonical produced artifact
+### 3.1 One governed intelligence production target
 
-**Knowledge Structuring is a production process, not an object family or a runtime.** Its primary governed output for the intelligence delivery pipeline is **one or more Candidate Intelligence Units**, together with referenced Knowledge, Schema, Rule, Implementation, Test and Evidence resources. This does not require every fact to become a Unit.
+The primary governed output of Knowledge Structuring and Unit Production is **one or more Candidate Intelligence Units** with Data, Processing or Composite profiles; JSON/YAML, Schemas, indexes, tests and evidence are declared physical resources, not a second intelligence ontology. Structured facts/domain configuration/datasets can become Data Units, combined with Parser/Rule/Function Units to provide real Capabilities. A single Unit may also bundle both data and processing where cohesive.
 
-A Producer may generate an Atomic Unit from documents, rules, cases, software and observations, or a Composite Unit from existing qualified Units plus goals and composition requirements. DomainForge or another conforming Producer implements internal algorithms; DIS specifies portable inputs, outputs, identity and evidence—not Forge's internal system design.
+DomainForge or another Producer may use any internal extraction/generation algorithm. DIS specifies input-source provenance, templates/profiles, transformation evidence, candidate identity, revision, repeatable verification and materialization receipts. No per-fact Unit requirement; Candidate != validated != promoted != selected.
 
 ### 3.2 Required portable production stages
 
 1. **Domain Scope and Consumer Profile:** goals, bounded problem, sources, context, exclusions, quality/risk.
 2. **Capability Specification and Unit Boundary:** define target contract and required sub-capabilities; split by independently verifiable domain responsibility, not per file/function/fact.
 3. **Knowledge Structuring:** extract and normalize types, units, entities/relations, constraints/rules, preserve source, conflict, unknown and applicability; JSON/YAML/rule tables are options, no universal graph-model mandate.
-4. **Unit Construction:** choose Atomic (Function/Rule/Parser/Query/Tool etc.) or Composite (Workflow), bind processors, resources, typed schema and target.
+4. **Unit Construction:** choose Data / Processing (Function/Rule/Parser/Query/Tool etc.) or Composite (Workflow), bind processors, resources, typed schema and target.
 5. **Contract and Closure:** declares requires/provides, I/O, preconditions, evidence, failures, trust/effects, exact dependencies.
 6. **Independent Qualification:** structural, domain-semantic, behavioral, negative/boundary/ambiguous/out-of-scope, composite and environmental tests with reproducible evidence.
 7. **Governed Promotion and Consumer Selection:** Candidate → validated evidence → independent explicit Promotion → BUILD selection and pins.
@@ -74,24 +177,26 @@ Previously validated child Units do not automatically validate a new Composite U
 
 ## 4. Recursive composition, Workflow and Main Workflow
 
-### 4.1 One composition model
+### 4.1 Recursive Unit composition, Package-owned internal topology
 
-A Composite Unit implements one or more Capabilities by invoking other required Capabilities using one or more Workflows; BUILD resolves child Capability requirements to exact qualified providers. The resulting Unit has its own identity, revision and independent evidence.
+Data, Processing and Composite Units share reference and identity mechanisms. A Composite Unit may call selected child Capabilities and reference exact internal Data Units, providing a new Capability with independent end-to-end qualification. **DIS does not require Main Workflow plus N Workflows per Package, nor an authored Unit DAG**. Each Package can choose Main, multiple public Workflows, direct Function/Tool, data providers or another validated topology. BUILD derives dependency closure and rejects cycles; Package dependency DAG stays with KDP Package System.
 
-**Main Workflow + zero or more Public/Internal Workflows is the primary authoring and business organization**, not an explicit “Unit DAG” to be maintained by authors. Build may derive a dependency closure, reject illegal recursion, and verify Package dependency DAG; this is not a parallel business Workflow execution engine.
+### 4.2 A uniform Unit lifecycle, without mandatory empty init functions
 
-### 4.2 Main / entry rules
+**Every Unit follows the same normalized Lifecycle Contract**, but authors need not emit a meaningless empty function for each Unit:
+- `initialize(context)`: optional real init; absent binding means `mode=none`, a **normative KDP default no-op semantic** (not unspecified behavior). A Data Unit may use its selected reader to prepare resources.
+- `invoke(input,context)`: typed, exact-pinned callable entry for Processing/Composite capabilities; Data Unit is not required to export invoke.
+- `read(query,context)`: bounded internal Data Unit decode/read protocol, potentially implemented by SDK/Host Reader; not automatically a public Tool.
+- `dispose(context)`: optional resource cleanup entry; `mode=none` default. Resource-owning implementations declare disposal/ownership explicitly.
+- `context` provides only scopes/handles admitted under existing KDP/Host contracts, never unrestricted filesystem/network/Effect authority.
 
-- Every Domain App MUST pin exactly **one App Entry/Main Workflow Unit**, directly loaded by KDP to avoid recursive discovery of the router.
-- Each Business Primary with domain entry responsibility SHOULD provide one **Domain Main Workflow Unit**. Library-only Extension/Business Packages need not fabricate Main Workflows.
-- A Package can expose many Public Workflow and Subworkflow Units. A selected cross-Package Public Capability can be directly invoked through its exact binding, without mandatory re-entry through the Domain Main Workflow.
-- Neither Main nor any Workflow owns KDP Scheduler, State, Journal or Effect authority.
+The **existing Package `init()/dispose()` are external Package lifecycle entry points**, not replaced by Unit initialize. A Package may implement its existing init by binding it to a qualified **Init Unit**, or retain the existing Package init adapter; the KDP dependency/lifecycle authority stays unchanged. Both Package `init:none` and Unit `initialize:none` have standard default semantics. KDP validates READY/FAILED, ordering, re-init/idempotency, failed-init cleanup and reverse disposal. Unit Init cannot modify the AOT provider lock or create new Effect permissions.
 
-### 4.3 Workflow / Graph distinction
+### 4.3 Optional ingress and optional Workflow
 
-**Workflow is the Composite Unit's domain composition implementation**; **Composition Graph** is its inspectable, machine-verifiable representation of exact Unit node refs and mutually exclusive control/data/evidence edges. It is not a second intelligence object hierarchy. “Pipeline” remains a descriptive term only.
+A Domain App pins **one or more ingress bindings** in its App descriptor/Package Lock to callable Unit/Capabilities; library/data-only Packages need not invent ingress. **Main Workflow is not mandatory**: a Package can initialize/organize its own Units under its existing init or Init Unit, then expose any valid number of public Capabilities. Intent Recognition and Intent Routing are ordinary Processing/Composite Units used only by ingress paths that need them, not an additional router engine.
 
-The candidate Core Profile retains deterministic, independently checkable paths, one available source per required input, exact evidence slots, no implicit data pass-through, explicit terminal outcomes and fail-closed route decisions. Unbounded cycles/retries/recursive invocation are forbidden. **Bounded Subworkflow Invocation** may only be admitted as an optional profile after independent conformance proves call limits, exit guards, idempotency, state/evidence continuity and limit-reached results; no new Loop Node/Engine is implied. DIS 0.1.0 remains strictly DAG_ONLY.
+When a Composite Unit chooses Workflow, its Composition Graph represents exact Node/Unit references and distinct control/data/evidence edges. Workflow/Graph is one implementation choice, not mandatory Package structure. Core retains deterministic control, valid inputs/evidence, terminal closure and rejection of unbounded cycles; bounded Subworkflow requires separate independent optional-profile conformance.
 
 ## 5. Intent Recognition and Routing are Units
 
@@ -116,13 +221,38 @@ Boot -> KDP Primary -> pinned App Entry/Main Workflow Unit
 
 Preserve historical resolver precedence: deterministic compiled intelligence → exact semantic reuse → applicable promoted reusable subworkflow → bounded HarnessMachine/LLM fallback.
 
-## 6. AOT Package compilation and Domain App
+### 5.3 Runtime entry through declared Package ingress
 
-BUILD MUST select Consumer Profile/Target; check contract compatibility, explicit Promotion and qualification, scope, package/Unit dependency closure, resources and Host requirements; resolve exactly one allowed provider per required Capability; pin Unit/Graph/Definition/Knowledge/Implementation/Schema/Target exact identities and digests in one immutable Package Lock. Runtime cannot rediscover providers by directory order, name similarity, LLM suggestion or arbitrary dynamic import.
+~~~text
+Boot -> KDP Primary [unchanged #1484]
+  -> resolve/verify/bind KDP-managed Packages
+  -> initialize Packages, optional Init Units and Unit lifecycles -> READY
+  -> declared App ingress Unit(s)
+  -> [if required] Intent Recognition Unit -> Structured Intent
+  -> [if required] Intent Routing Unit -> sealed Capability
+  -> selected Processing/Composite Unit + referenced Data Units
+  -> Outcome + Evidence/Trace
+~~~
 
-Separate **Runtime Resource Closure**, **Build/Validation Resources**, **Provenance/Evidence References**. Do not force the full Corpus or test fixtures into production. Files-first and optional immutable indexes / databases remain possible via controlled Host access; DIS does not require SQLite/LinkML/RDF/graph storage. #1476 owns deeper Knowledge access/storage investigation.
+No mandatory global App Main Workflow or Intent Router. An App may declare multiple ingress bindings; data/library-only Packages need not provide public entries. A non-Intent API/event can invoke a directly pinned public Unit. The Router can decide only among compiled eligible Capabilities; KDP remains the sole invocation, scheduling, State, Journal and Effect authority.
 
-A Domain App uses **minimal Boot + KDP Primary (one Kernel Core and internal Package System) + SDK Domain Package + one Business Primary and N Business Extension/dependency Packages**, with layer-specific Extensions as appropriate. N Business Packages does not imply N competing Business Primaries. KDP owns loading, Package lifecycle, Hooks and single Runtime authority; Host performs physical effects.
+## 6. KDP → SDK → Business, AOT and initialization
+
+**Preserve the existing Boot + KDP architecture (#1484), including the SDK Domain Package layer (#1480).**
+
+- **Boot:** minimal bootstrap and fixed KDP Primary startup; does not load SDK/Business or orchestrate Unit/Package dependencies.
+- **KDP Primary:** independently bootstrapped Kernel Core + internal Package System, sole Runtime/State/Effect/Journal/recovery authority; resolves/verifies/binds Packages, calls their init, checks READY, invokes and disposes. Core bootstrap must not depend on an initialized SDK.
+- **SDK Domain Package (Primary plus optional Extensions):** provides shared qualified Data/Processing/Composite Units such as Parser/Codec, Expression Engine, Schema Validator, generic Recognition/Decision mechanisms, common Workflows and typed data adapters. SDK is a *normal Package of Units and Capabilities*, not a second Scheduler/Runtime or Host Effect authority. Generic mechanisms belong to SDK; domain rules and knowledge belong to Business.
+- **Business Primary and N Business Extension/dependency Packages:** supply domain Data/Processing/Composite Units, domain intents and problem-solving logic under Package-owned internal organization; N Business Packages does not mean N competing Business Primaries.
+- **Host:** performs permitted physical effects and bounded file/database/adapters under KDP authority.
+
+Package layer (KDP/SDK/Business) and Unit profile (Data/Processing/Composite) are orthogonal: each layer uses the same Package contract and Boot/KDP ownership does not change.
+
+BUILD checks Consumer/Target, Package dependencies, UnitRefs/Capability, Promotion/qualification, schemas, reader/processor bindings, Implementation/Graph, resource closure and Target. Every required callable Capability resolves to one selected eligible provider. Data Units may have no provides but their Unit ID/revision/digest, typed payload/reader, schema and provenance are still pinned. Package Lock pins Unit/Graph/Definition, Reader/Processor and physical resource digests. No arbitrary runtime Provider rediscovery.
+
+**Package init plan:** KDP binds SDK, Business and extensions in the valid dependency order, invokes existing Package lifecycle init (which may delegate to an Init Unit), prepares Unit lifecycles according to the Package policy, validates READY before exposing ingress, fails closed and cleans up on init failure, then disposes in reverse order. Unit initialize is an optional implementation *inside* that existing lifecycle, never a second Package manager.
+
+Separate Runtime Resource Closure, Build/Validation Resources and Provenance References. Data Unit JSON/YAML/read-only indexes are governed payloads; no mandatory storage engine and no full Corpus by default. #1476 handles storage/access implementation. **Only KDP-internal Unit assembly, init and ingress organization changes; Boot/KDP architecture and authority do not.**
 
 ## 7. Lifecycle, verification and authority
 
@@ -138,16 +268,17 @@ Production is an additional validation profile, **not** a new Runtime Engine nor
 
 Minimum negative vectors: missing/forged sources, invalid schema, stale evidence/digest, unpromoted or incompatible providers, unresolved provider ambiguity, ambiguous/conflicting/no-match Intents, zero/multiple valid routes, tampered artifacts, missing evidence, nonterminal branches, child-PASS/composite-FAIL, bounded invocation overflow, unauthorized cross-Package Tool/Host Effects, false LLM Promotion and silent active Package replacement.
 
-## 8. Migration from frozen 0.1.0
+## 8. Migration from frozen DIS 0.1.0
 
-- **KEEP:** intelligence-first objective, exact identity/revision/digest, Capability requires/provides, existing Semantic/Tool/Definition, provenance, epistemic status, three edge kinds, trusted binding, Conformance, Boot/KDP/Host/Effect boundary.
-- **REVISE:** Unit as governed Capability implementation with semantic role profiles rather than independent role engines; static Knowledge-only assets without callable capabilities migrate explicitly to Knowledge Resources or meaningful Knowledge-access Units; do not manufacture fake Capabilities.
-- **MERGE:** Workflow/Pipeline/Graph into Composite Unit + Workflow with verifiable Graph representation; Pipeline not independently versioned.
-- **ADD:** Knowledge Structuring/Unit Production, independent Composite qualification, Intent Recognition/Routing Units, fixed App Entry/Main, Package Domain Main/Public Workflows and sealed AOT route catalog.
-- **REMOVE as primary authored abstraction:** explicit Unit DAG, one role engine per Unit, first-class Structured Knowledge object, independent Intent Router Engine, separate Knowledge/Package Runtime.
-- **DEFER:** bounded invocation/retries/loops until demonstrated as an independently qualified optional profile. Preserve 0.1.0 frozen bytes/history/qualification; no silent wire compatibility claim.
+- **KEEP:** frozen 0.1 artifacts/evidence, Unit identity, Capability contracts, Domain Definition, Semantic/Tool, distinct control/data/evidence edges, exact Resource Closure and sole KDP/Host Effect authority.
+- **REVISE:** Units have unified Data/Processing/Composite profiles. Legacy Knowledge roles and files map explicitly to Data Units with complete representation/reader/access, or to physical payloads of other Units; never fabricate public callable Capabilities for data.
+- **MERGE:** Workflow is optional Composite Unit processing and Graph its verifiable representation; Pipeline is not a separate normative artifact.
+- **ADD:** Data Unit Representation/Reader/Access/Validation profiles; uniform Unit lifecycle (`initialize:none` default, Processing/Composite `invoke`, Data `read`, `dispose`); optional Package Init Unit implementing existing Package init/dispose, multiple pinned ingress bindings, SDK-provided common qualified Units, Unit Production receipts.
+- **REMOVE AS MANDATE:** empty hand-written init per Unit; mandatory Main Workflow per Package; unique App Main; authored Unit DAG; separate Knowledge/Init/Router runtimes.
+- **KEEP #1484/#1480:** Boot + KDP Primary, KDP self-bootstrap and existing SDK Domain Package and Business layers; modify only internal KDP Package System Unit assembly/initialization.
+- **DEFER:** unbounded loops, unproven recursive invocation/retries and runtime substitution of unpinned providers.
 
-Migration MUST flag loss of evidence, qualification, exact identity or changed permissions and refuse to fabricate records.
+Cross-version migration preserves exact asset identity/provenance/qualification/evidence/digest, failing closed if evidence is missing; never fabricate old init/reader qualification. DIS 0.2 is a candidate, not a modification of frozen 0.1 or authorization to change KDP/SDK source.
 
 ## 9. Delivery and freeze gates
 

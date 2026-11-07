@@ -1,47 +1,58 @@
-# Domain Intelligence Standard (DIS) 0.2.0 — Unified Intelligence Production Model
+# Domain Intelligence Standard (DIS) 0.2.0 — Unified Unit and Package Model
 
 **Status:** PRODUCT_L1_SUCCESSOR_CANDIDATE / L2_DRAFT / NOT_FROZEN  
-**Product/L1 successor decision (pending):** [#1494](https://github.com/kaicreator-mm/domain-harness/issues/1494)  
-**Draft controller:** [PR #1493](https://github.com/kaicreator-mm/domain-harness/pull/1493)  
-**Predecessor:** DIS 0.1.0 L2 frozen HEAD 9504c78f4651f6c1ebc48c7858fca2d8b061544b  
-**Successor Boot/KDP:** #1484
+**Product/L1 decision:** [#1494](https://github.com/kaicreator-mm/domain-harness/issues/1494) (pending)  
+**L2 Draft PR:** [#1493](https://github.com/kaicreator-mm/domain-harness/pull/1493)  
+**Predecessor:** frozen DIS 0.1.0 HEAD `9504c78f4651f6c1ebc48c7858fca2d8b061544b`  
+**Unchanged architecture authority:** Boot/KDP #1484; KDP/SDK/Business Package hierarchy #1480.
 
-## Product thesis
+## Definition
 
-**Knowledge Structuring → Candidate Intelligence Unit(s) → Qualification/Promotion → recursive Capability-based Unit composition → AOT Domain Package BUILD → Domain App intent-driven execution.**
+**Knowledge Structuring / Intelligence Production → governed Candidate Data, Processing or Composite Units → validation / explicit promotion → recursive capability composition → consumer-specific AOT Domain Package materialization → KDP-operated Domain App.**
 
-Exactly three primary intelligence-delivery entities: **Capability Contract** (interface), **Intelligence Unit** (qualified implementation/atomic or composite), and **Domain Package** (sealed carrier). Knowledge, Workflow, Function, Rule, Tool and routing are resources, processing forms or Unit-provided capabilities; they are not separate parallel Runtime systems. Domain Definition and existing Semantic/Tool components remain respected engineering contracts.
+Three primary intelligence-delivery entities: **Capability Contract** (callable interface), **Intelligence Unit** (unified typed knowledge/processing/composition unit) and **Domain Package** (materialized, sealed carrier).
 
-### Documentation
+**Unit profiles are Data / Processing / Composite** under one logical identity. Data Units hold structured facts, domain config, rule sets or datasets and may expose **no callable Capability**. Processing Units implement Functions/Rules/Parsers/Queries/Tool operations with callable Capabilities. Composite Units optionally use Workflow/Graph and provide new qualified Capabilities. JSON/YAML/expressions/Schema/indexes are physical payloads/resources, not another parallel domain object hierarchy. One dataset Unit can contain many local records; Unit-per-fact is not mandatory.
 
-- [中文架构与规范候选](./DIS-0.2.0.zh-CN.md)
-- [English architecture and specification candidate](./DIS-0.2.0.en.md)
-- [中文迁移与简化台账](./SIMPLIFICATION_LEDGER.zh-CN.md)
-- [English migration / simplification ledger](./SIMPLIFICATION_LEDGER.en.md)
+## Retain KDP → SDK → Business
 
-## Five logical standard areas
+- **Boot:** minimal bootstrap; fixed KDP Primary handoff.
+- **KDP Primary:** independently bootstrapped sole Kernel Core + Package System; owns admission, dispatch, state, Journal, Effect, recovery, Package lifecycle/Unit assembly.
+- **SDK Domain Package:** normal Package supplying reusable qualified Units and Capabilities: Parser/Codec, Expression Engine, Validator, generic Recognition/Decision mechanics and shared workflows; not a second Runtime.
+- **Business Primary + optional Business Extension/dependency Packages:** domain knowledge/data, domain-specific processing and composite capabilities.
+- **Host:** effects and physical adapters under KDP authority.
+
+This is **not a change to the frozen Boot/KDP architecture**; any future implementation changes are confined to KDP's internal Unit binding/init/ingress organization and require their own implementation authorization.
+
+## Required Unit contract
+
+- **Common envelope:** stable identity/version/digest, semantics/scope/owner/authority, provenance, suitability, governance/validation, exact references and resource closure.
+- **Data profile:** representation format/media type, typed schema/semantic revision, exact payload path/digest, bound reader/codec and access/bounds/readonly policy, negative and semantic tests.
+- **Processing profile:** provides/requires Capability contracts, typed I/O/outcomes/failures, trusted invoke binding, target/Effect profile and evidence.
+- **Composite profile:** child Capability and/or Data UnitRef dependencies, composition (optionally Workflow), control/data/evidence/terminal policy and independent qualification.
+- **Lifecycle on all Units:** uniform logical `initialize`, `invoke` (for callable), `read` (for data), `dispose`. An absent custom initialize/dispose is a **normative no-op default**, not a mandatory empty authored function. Existing Package `init()/dispose()` remain authoritative; they may delegate to a declared Init Unit.
+
+## Package organization and App ingress
+
+**Package internal topology is autonomous.** No mandatory Main Workflow, no user-authored Unit DAG and no dedicated Router/Init Engine. Packages may declare Main Workflow, multiple public Workflows, direct processing entries, optional Init Unit or `init:none`, Data Units and multiple public Capabilities. KDP uses the Package DAG and immutable Lock to bind, initialize, verify READY, invoke and dispose. A Domain App declares one or more pinned ingress bindings as appropriate.
+
+**Intent Recognition and Intent Routing are ordinary Unit-provided capabilities**, used where necessary and confined to the AOT-sealed eligible Capability Catalog. They cannot bypass KDP/Host effects or discover arbitrary providers.
+
+## Standard areas
 
 1. Unit & Capability Model
-2. Knowledge Structuring and Intelligence Production
-3. Intent Routing Units, Main Workflow and composed Workflows
-4. AOT Package/Domain App compilation and binding
-5. Governance, Validation and independent Conformance
+2. Unit Production / Knowledge Structuring
+3. Intent & Unit Composition / optional Workflows
+4. AOT Package/Domain App + lifecycle materialization
+5. Governance, Validation and Conformance
 
-They are logical standard sections, not engines, services or independent Runtime authorities.
+These are logical concerns, **not separate engines**.
 
-## Critical architecture invariants
+## Current deliverables / status
 
-- Intent Recognition and Intent Routing are **Intelligence Units**, not a special platform dispatch subsystem.
-- One **pinned App Entry/Main Workflow** bootstraps routing without recursive router discovery. Business Primary can own Domain Main; library-only Packages need not.
-- Atomic Units bind functions/rules/parsers/queries/tool operations; Composite Units use Workflows and provide new Capabilities. Child validation never automatically qualifies a Composite.
-- No author-maintained Unit DAG is required. Workflows structure behavior, while AOT derives Unit/Package dependency closure; Package dependencies remain a DAG.
-- Core workflows retain independent control/data/evidence semantics; bounded Subworkflow Invocation requires a proven opt-in profile, no implicit unbounded loops.
-- Production Candidate, independent Validation, explicit Promotion, consumer-specific Selection, Runtime Activation and Execution occurrence are distinct.
-- Boot -> KDP Primary -> SDK + Business Primary + optional Extension Packages; KDP/Host retain all state/Effect authority.
-- The frozen DIS 0.1.0 artifacts are untouched. DIS version is independent of SDK/ABI version.
+- [中文规范候选](./DIS-0.2.0.zh-CN.md)
+- [English specification candidate](./DIS-0.2.0.en.md)
+- [中文迁移台账](./SIMPLIFICATION_LEDGER.zh-CN.md)
+- [English migration ledger](./SIMPLIFICATION_LEDGER.en.md)
 
-## Evidence and authorization
-
-This is **a complete conceptual draft**, not a frozen / implemented standard. Product/L1 #1494 remains to be reviewed; executable 0.2 schemas, a new/updated Reference Consumer, two-domain examples and independent Conformance have NOT yet been completed. No SDK ABI change, KDP/Runtime implementation, release, deployment or evidence of actual Runtime adoption is authorized. See #1486 for adoption and #1476 for Semantic Knowledge storage/access.
-
-For the ADS #1359 Delivery-First implementation sequence, keep one continuous writer for the bounded PR write set, verify Node24/CI, complete independent Exact-SHA review, and only then request formal L2 Freeze.
+Conceptual bilingual draft and migration ledger are being refined in PR #1493. Product/L1 decision #1494 is **PENDING**. Machine schemas, a producer/reference consumer, two materially different domain demos, independent Structural/Behavioral/Consumer Conformance, Exact-SHA review, required CI and formal L2 Freeze remain pending. No Runtime adoption, SDK ABI implementation, release or deployment authority is inferred.
