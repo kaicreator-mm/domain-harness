@@ -1,270 +1,160 @@
-# Domain Intelligence Standard（DIS）0.2.0
+# Domain Intelligence Standard（DIS）0.2.0 — 统一智能生产与消费模型
 
-**状态：ARCHITECTURE_CANDIDATE / NOT_FROZEN**  
-**控制 Issue：** [domain-harness#1493](https://github.com/kaicreator-mm/domain-harness/issues/1493)  
-**前序标准：** DIS 0.1.0，冻结 HEAD `9504c78f4651f6c1ebc48c7858fca2d8b061544b`  
-**上位权威：** Product/L1 #1477；Boot/KDP 后继权威检查点 #1484
+**状态：Product/L1 后继架构候选；L2 DRAFT / NOT_FROZEN。**
+**上位待审决策：** domain-harness #1494；**既有草案：** PR #1493。
+**前序冻结版本：** DIS 0.1.0 @ 9504c78f4651f6c1ebc48c7858fca2d8b061544b。
+**Boot/KDP 权威：** #1484。标准版本与 DomainHarness SDK 版本独立。
 
-> 本文是 DIS 0.2.0 的初始规范候选。它固化概念模型和边界，不代表 L2 Freeze、SDK/Runtime 实现授权或发布授权。机器可读 Schema、Reference Consumer 和独立 Conformance 必须随后与本文保持一致。
+本文是拟议的 DIS 0.2.0 **完整逻辑定义**，尚未经上位 Product/L1 审查、机器 Schema、独立 Conformance 和正式 L2 Freeze 证明。以下 MUST 等术语表达候选规范意图，不构成现有 Runtime 已支持的声明。
 
-## 1. 目标与非目标
+## 1. 产品目标与核心命题
 
-DIS 定义一种跨领域、可验证、可组合、可追溯的 Domain Intelligence 表达与消费契约。
+DIS 规定如何将领域来源知识与已有智能，经**知识结构化 / Unit 生产 → 递归能力组合 → 独立验证与治理 → AOT Package 物化 → Domain App 运行消费**，转化为可复用、可追溯、可验证的领域智能。领域智能是产品价值；Domain Package 是消费者特定的工程载体，而不是智能的本体。
 
-DIS 要表达的核心对象是领域知识和解决问题的能力，而不是 Package 文件格式、通用 Agent 平台或 Runtime 内部模块划分。
+五个逻辑规范领域（不是五个引擎）：(1) Unit & Capability Model；(2) Intelligence Production；(3) Intent & Workflow Composition；(4) AOT Package & Domain App；(5) Verification, Lifecycle & Conformance。
 
-DIS 0.2.0 的目标：
+## 2. 最小自洽抽象
 
-1. 用统一模型表达 Domain、Knowledge、Intelligence Unit、Capability、Provenance 和适用范围。
-2. 用单一 Structured Intent 表达用户目标、领域实体、参数、约束、缺失信息和确认状态。
-3. 用 Workflow 与 Composition Graph 表达领域问题的解决过程。
-4. 明确 Package 物化、实现绑定和资源闭包。
-5. 用 Validation、Evidence 和 Conformance 证明标准及其 Consumer 的行为正确。
+### 2.1 三个主要实体
 
-非目标：
-
-- 不创建新的 Runtime、Scheduler、Agent Engine、Event Bus 或 Tool Bus。
-- 不为每一种 Unit Role 创建独立 Engine。
-- 不新增 Domain Component 家族或平行 Capability 对象体系。
-- 不规定 DomainForge、Domain-Simulator 的内部生产/仿真流程。
-- 不规定 SQLite、图数据库、向量数据库、LinkML 或特定编程语言。
-- 不改变 DomainHarness SDK ABI、Boot/KDP、Host、Hook、Runtime 和 Effect 权威。
-- 不把 Demo PASS 等同于真实 DomainHarness Runtime Adoption。
-
-## 2. 五个逻辑领域
-
-DIS 由五个相互关联的逻辑领域组成：
-
-| 领域 | 规范职责 |
-|---|---|
-| Domain Intelligence Model | 领域范围、知识、能力、Unit、来源、认知状态和资格 |
-| Intent Interaction Model | 识别、Structured Intent、Intent Slot、Dynamic Form 和澄清 |
-| Workflow Composition Model | Workflow、Graph、Unit 绑定、控制/数据/证据流和 Outcome |
-| Package & Materialization Model | Definition、选择、实现绑定、资源闭包、Digest 和 Lock |
-| Validation & Conformance Model | 结构、行为、Consumer 验证以及治理证据 |
-
-它们是同一标准的逻辑分区，不是五个服务或五个运行引擎。Lifecycle Governance 和 Execution Occurrence 是跨领域契约。
-
-## 3. Domain Intelligence Model
-
-### 3.1 Domain 与 Knowledge
-
-Domain 是具有明确范围、实体、概念、关系、规则、目标、约束和预期结果的有限问题空间。
-
-Knowledge 可以表达事实、概念、实体、关系、规则、模式、参考资料、案例、反例和未知项。Knowledge 不要求全部可执行，也不因进入 Package 就自动成为已验证事实。
-
-### 3.2 Intelligence Unit
-
-Intelligence Unit（Unit）是具有稳定身份和版本的领域智能资产或能力描述。Unit 是逻辑资产，不自动等同于 Component、函数或 Runtime 对象。
-
-保留以下语义 Role：
-
-- **knowledge**：知识、事实、规则基础和引用；允许纯数据资产。
-- **recognizer**：将输入解释为带证据的候选实体、意图或分类。
-- **decision**：根据适用范围、规则、条件和证据产生有界判断。
-- **procedure**：可复用的内部处理步骤，默认私有。
-- **tool**：跨 Package/Host/Consumer 边界的显式 Operation。
-- **workflow**：可复用的领域解决能力契约，绑定 Composition Graph。
-- **validator**：验证结构、规则、证据或终态结果。
-
-Role 是统一 Unit 身份模型上的语义 Profile，不是七个独立 Engine，也不产生新的 Component 家族。
-
-### 3.3 Role-specific contract
-
-所有 Unit 共享适用的稳定身份、revision、purpose、scope、owner、authority 和来源信息。
-
-字段按 Role 约束：
-
-- 可执行 Role 必须声明输入/输出契约和可信实现绑定。
-- Knowledge 等数据型 Role 不强制声明 Procedure 式执行失败处理。
-- Evidence、Validation 和 Failure 契约按资产类型及实际用途要求，不机械地强制所有字段出现在每个 Unit。
-- 不适用的字段应省略，而不是填入虚构的默认值。
-
-Capability 的 requires/provides 继续表达版本化能力兼容契约，不代表数据流、Package 依赖、Tool 授权或 Effect Permit。不得再创建一套平行 Capability Unit/Component 体系。
-
-### 3.4 Provenance 与 Epistemic Status
-
-必须区分：
-
-- **Provenance**：值从哪里来，例如 USER_CONFIRMED、SYSTEM_OBSERVED、MODEL_INFERRED、DERIVED。
-- **Epistemic Status**：值当前处于什么认知状态，例如 CONFIRMED、INFERRED、CANDIDATE、UNKNOWN、CONFLICT。
-- **Applicability**：知识或规则适用于什么 Domain、对象、环境和条件。
-- **Qualification**：某个精确资产经过了什么验证或治理评估。
-
-模型置信度不能替代来源，也不能把推断自动升级为用户确认事实。UNKNOWN、AMBIGUOUS、CONFLICT、OUT_OF_SCOPE、PARTIAL 和 FAILED 不得静默变成成功。
-
-## 4. Intent Interaction Model
-
-### 4.1 单一 Structured Intent
-
-Structured Intent 是 Recognizer、Dynamic Form 和 Workflow 共享的规范化意图模型。它至少能表达：
-
-- 用户目标或待完成任务；
-- 相关 Domain Entity 及其属性；
-- Intent Slots、参数和约束；
-- 上下文与适用范围；
-- 已确认、推断、候选、缺失和冲突的值；
-- 每个值的 Provenance、Epistemic Status 和必要 Evidence；
-- 当前完整度以及需要澄清或人工复核的原因。
-
-Recognizer 创建或更新 Structured Intent，并输出识别证据和不确定性。Workflow 消费同一 Structured Intent，不得再维护一套语义不同的 Recognizer Output 模型。
-
-### 4.2 Dynamic Form
-
-Dynamic Form 是可选的 UI-neutral 交互描述，不是独立 Intent 模型、Component 家族或 Form Runtime。
-
-它负责将问题、选项和响应类型映射到 Structured Intent 的 Intent Slot 或目标输入字段。UX 负责渲染；现有 Harness 负责协调澄清、合并确认值和重新识别。
-
-表单展示本身不授予状态转换、Tool 调用或 Effect 权限。没有 Dynamic Form Profile 的 Consumer 仍可直接提交符合输入契约的结构化数据。
-
-### 4.3 确认与更新
-
-用户回答只更新相关 Slot，不应无依据地覆盖其他已确认值。确认值、系统观察、模型推断和派生值必须保持来源区别。意图仍不完整时，Consumer 必须产生明确的 NEEDS_INPUT、NEEDS_REVIEW 或其他声明的非成功结果。
-
-## 5. Workflow Composition Model
-
-### 5.1 Workflow 与 Composition Graph
-
-- **Workflow**：领域解决能力的逻辑契约，描述目标、适用范围、输入/输出、证据要求和失败/Outcome 语义。
-- **Composition Graph**：Workflow 的结构化、可验证组合表达，描述 Node、Edge、分支和终态。
-- **Pipeline**：可用于描述 Workflow 的执行组织，但不作为第三种独立规范资产或必须单独版本化的对象。
-
-Workflow Unit 必须绑定一个精确的 Graph ID/revision。Graph Node 引用精确的 Unit ID/revision。Package Materialization 再将这些引用绑定到确切资源和实现 Digest。
-
-### 5.2 Node 语义
-
-Graph Node 是对精确 Intelligence Unit 的组合引用，不建立另一套 Interaction、Intent、Knowledge、Condition、Procedure、Tool、Workflow、Evaluation、Terminal Node 类型体系。
-
-Node 的 Unit Role 决定其领域语义。Decision 只产生判断结果；Graph 根据结果选择控制路径。Decision 不拥有 Runtime 状态转换或 Effect 权限。
-
-### 5.3 三种 Edge
-
-保留三种互斥 Edge：
-
-| Edge | 语义 | 是否触发执行 |
+| 概念 | 唯一责任 | 不能被误解为 |
 |---|---|---|
-| control | 选择后续 Node | 是 |
-| data | 将已执行 Node 的输出绑定到目标输入 | 否 |
-| evidence | 将证据绑定到声明的 Evidence Slot | 否 |
+| **Capability Contract** | 声明对外能力的身份、输入/输出、前置条件、领域语义、适用性、失败、证据和兼容性 | Function、权限、执行调度器 |
+| **Intelligence Unit（Unit）** | 实现一个或多个 Capability 的可独立身份识别、验证、版本化和组合的智能制品 | 普通文件、每个原子事实、新 Component 家族或 Runtime 对象 |
+| **Domain Package** | 为特定 Consumer / Target 选择、编译、锁定和交付 Unit、Knowledge 与其他必需资源 | Domain Intelligence 自身或 Domain Definition 的上位本体 |
 
-禁止隐式全量输出透传。数据和证据传递不能隐式触发 Node。分支必须确定；零条或多条匹配路径都必须产生明确错误或声明的失败 Outcome。
+Capability 与 Unit 不是类与实例的严格关系，更接近**契约 / 合格提供者**：一个 Capability 可有多个不同 Unit 提供者；一个 Unit 可提供数个紧密相关的 Capability；Provider 选择由 BUILD 解析并记录唯一实际绑定。
 
-### 5.4 必须保证的 Graph 不变量
+### 2.2 知识、实现及其他对象的归属
 
-规范定义可观察的不变量，而不强制每个 Consumer 使用同一套内部验证算法：
+- **Knowledge** 是领域事实、概念、实体、关系、规则、约束、经验等领域资产。**Structured Knowledge** 不设独立一等对象/运行时。参与生产能力的必需知识须有可由程序消费的结构、语义、来源、范围和验证；普通参考文档仍允许存在。
+- **Knowledge Resource** 是 Unit 引用的类型化、带 Schema / version / digest / provenance 的数据或规则资源；允许被多个 Unit 共享，不能要求每个 Fact 都生成 Unit。
+- **Implementation** 是 Unit 的处理实现绑定：Function、Parser、Rule / Expression Interpreter、知识查询、受限模型处理器、既有 Tool Operation 或 Workflow 等。**实现类型不是新的能力契约类型。**
+- **Atomic / Composite** 是 Unit 处理结构 Profile，不是两种不兼容的 Unit Class。Atomic 由声明式或程序处理器实现；Composite 通过 Workflow 组合其他 Capability/Unit。
+- **Role**（Knowledge、Recognizer、Decision、Procedure、Tool、Workflow、Validator）是可选的语义 Profile/标签，不是七套 Engine，也不强制每个 Unit 拥有无意义的字段。可公开部署的 Unit MUST 提供至少一个 Capability；只提供静态数据、无对外能力的资产以 Knowledge Resource 表示。
+- **Domain Definition** 保留为 Consumer 特定的抽象 Semantic/Tool Component Graph；Unit 不自动变成 Component，既有 Component/Tool/Host 权威继续有效。
 
-- Node、Unit、Workflow、Graph 和 Schema 的引用精确且闭合。
-- 必需输入在每条可达执行路径上都有且只有一个有效来源。
-- Data/Evidence 来源必须在对应执行路径中可用。
-- 不允许隐式默认值、隐式合并或隐式透传。
-- Evidence Slot 必须声明，必需证据不能在终态验证前丢失。
-- 每条控制路径必须到达 Terminal、Wait 或明确的 Failure Outcome。
-- 静态 Graph 资格验证与运行时实际输入/分支验证均不可省略。
+### 2.3 最小 Unit 公共契约
 
-DIS 0.2.0 初始基础 Profile 继续采用 DAG 控制图，不允许无界循环或隐式 Retry。可选的 Bounded Subworkflow Invocation Profile 单独评估：它必须声明精确子 Workflow、最大调用次数、退出条件、失败策略、幂等要求和调用上限结果。不得通过新增 Loop Node 或 Loop Engine 实现。如果 Reference Consumer 和独立 Conformance 无法证明其安全性，则延期，不进入基础 Profile。
+一个可选入 Package 的 Unit 至少需能表达：
+1. identity：stable ID、revision、精确 content/build digest、owner、authority、Domain Scope；
+2. capability：provides（至少一个）、requires（可为零）；Contract ID/revision/digest、I/O Schema、适用性、preconditions、outcome/failure、evidence obligations；
+3. knowledge：零或多个结构化资源引用及所依赖的 Schema、provenance、applicability；
+4. processing：Atomic/Composite profile，可信实现绑定、target/requirements、资源完整性及 Effect 分类；
+5. interaction（按需）：Structured Intent 输入、澄清 / Dynamic Form 约束；
+6. qualification：候选来源、验证 Profile、正/负/边界/冲突测试、证据、局限；
+7. dependencies：精确/允许范围内兼容的 Capability 需求与明确的失败策略。
 
-### 5.5 Outcome
+无须为每个可调用 Unit 单独发明一个 Capability 对象 Runtime；Capability Contract 本身必须有独立稳定身份以保证跨 Unit/Package 兼容。
 
-Workflow 终态必须区分 COMPLETED、NEEDS_INPUT、NEEDS_REVIEW、PARTIAL、OUT_OF_SCOPE、FAILED 等适用结果。结构验证通过不代表领域结果正确；执行成功也不代表业务目标已达成。终态必须关联实际输入、Evidence、选中路径和 Validator 结果。
+## 3. Knowledge Structuring 与 Intelligence Unit Production
 
-## 6. Package & Materialization Model
+### 3.1 生产唯一主要产物
 
-### 6.1 Definition 与精确绑定
+**Knowledge Structuring** 不是新实体或新运行时，而是领域知识与已有智能的规范化生产过程。面向智能交付的**唯一主要可治理产物是一个或多个 Candidate Intelligence Units**，连同其声明引用的 Knowledge / Schema / Rule / Implementation / Test / Evidence 资源。这不等于每个事实必须包装一个 Unit。
 
-Domain Definition 仍是 Consumer-specific 的 Semantic/Tool Component Graph。Unit 是逻辑资产；Component 是现有外部组合/执行契约，两者不要求一一对应。
+既可从文档、规则、数据库、案例、经验、程序生成 Atomic Unit，也可从已有合格 Unit、业务目标和组合规则生产 Composite Unit。DomainForge 或其他 Producer 可负责实现，DIS 标准化可观察的输入、输出和证据，不规定 Forge 内部算法或 LLM 模型。
 
-Package Materialization 必须确定：
+### 3.2 生产阶段（可组合、可增量、可验证）
 
-- 选中的 Definition、Unit、Workflow 和 Graph 的精确 ID/revision；
-- 实现绑定和目标变体；
-- 运行时所需资源的精确路径和 Digest；
-- Package Lock 对资源闭包的固定引用。
+1. **Domain Scope / Consumer Profile**：确定问题、目标、来源、环境、排除范围及质量风险界限。
+2. **Capability Specification**：定义目标契约，分解需要的子能力；按独立语义/复用/治理需求确定 Unit 边界，而非按函数/文件拆分。
+3. **Knowledge Structuring**：来源抽取、类型/单位/实体/关系归一、规则/约束表达、冲突与缺失披露；以 JSON/YAML/规则表等可被消费的形式保留知识，不强制一种通用知识图谱。
+4. **Unit Construction**：选择 Atomic（Function/Rule/Parser/Query/Tool 等）或 Composite（Workflow），绑定 Processor、知识资源、实现、Schema 和目标。
+5. **Contract Closure**：声明 requires/provides、输入/输出、preconditions、证据槽、失败/未知语义、外部 Effect 及资源依赖。
+6. **Independent Qualification**：结构、领域语义、行为、负面/边界、知识来源与验证证据、组合行为、实现环境与复现元数据。
+7. **Governed Promotion & Selection**：候选→验证→由独立授权主体晋升→BUILD 精确选定；没有自动 Promotion。
+8. **Reproducible Materialization**：记录 Producer、工具/规则/Profile、输入版本、候选 digest、验证版本、选定资源闭包和编译结果；增量缓存不能使旧验证证据误用于新候选。
 
-Runtime 不得通过目录顺序、名称相似度、LLM 建议或任意动态导入选择实现。实现绑定必须来自可信 Registry、已验证 Package Artifact 或既有 Semantic/Tool/Host 契约。
+对 LLM 非确定性生产不要求“相同 Prompt 必定产生完全相同字节”，但必须能够固定候选、重做独立验证和再物化精确包。未证实的生成物仍为 Candidate。
 
-### 6.2 三种资源集合
+### 3.3 生产完成条件
 
-必须区分：
+“解析成功”、“格式合法”或“代码执行通过”均不自动等于领域智能正确。每个用于生产的 Unit 必须证明其 Capability 在声明适用域内的预期行为；Composite Unit 不能继承子 Unit 的 PASS 而绕过整体验证。
 
-1. **Runtime Resource Closure**：实际 Consumer 运行所必需的 Schema、Unit、Graph、Definition、Knowledge 和实现资源。
-2. **Build/Validation Resources**：测试 Fixture、验证案例、Conformance 工具和构建专用资源。
-3. **Provenance/Evidence References**：来源和证据定位符，不自动下载、不自动信任、不作为可执行资源。
+## 4. Unit 组合、Workflow 与 Main Workflow
 
-运行时需要的本地资源必须被闭包覆盖、路径约束和 Digest 固定。测试专用 Fixture 不应仅因参与 Conformance 就强制进入生产 Runtime Package。外部来源内容若需要运行时使用，必须物化为本地受控资源或通过既有 Tool/Host 契约访问。
+### 4.1 统一可递归组合
 
-## 7. Lifecycle Governance
+一个 Composite Unit 使用 Workflow 调用多个所需 Capability；BUILD 将每个 Capability 解析为合格的具体 Unit/Implementation。组合 Unit 自身向外提供一个或多个新的 Capability，且拥有独立 identity、validation 和 failure/evidence 契约。
 
-不得把所有状态塞入一个 Unit 全局枚举。至少区分五个维度：
+规范以 **Main Workflow + 零个或多个公开/内部 Workflow** 作为业务组织模型；**不要求创作者维护显式 Unit DAG**。BUILD 可以从引用派生依赖闭包、无环性及授权验证；Package Dependency DAG 属于 Package 构建/加载关系，不是业务 Workflow。核心 Profile 仍采用可验证的确定性 Workflow 控制图，子 Workflow 调用可形成层次而非扁平的 Unit DAG。
 
-| 维度 | 表达内容 |
-|---|---|
-| Asset/Intelligence Qualification | OBSERVED、CANDIDATE、VALIDATED 等资产资格 |
-| Governance Disposition | PROMOTED、REJECTED、WITHDRAWN、EXPIRED、SUPERSEDED 等治理处置 |
-| Package Selection | 某个 Consumer 的 Package 选择记录 |
-| Runtime Activation | 某个 Runtime/应用实例激活了哪个精确 Package |
-| Execution Occurrence | 某次执行是否发生及其 Trace、Outcome、Evidence |
+### 4.2 Main Workflow 的基数与边界
 
-这些记录必须绑定精确主体和版本。需要治理的状态变化采用可追溯的追加式记录。Selection、Activation 和 EXECUTED 不得修改不可变 Unit 的身份或 Qualification。
+- 一个 Domain App MUST 精确锁定**一个 App Entry/Main Workflow Unit**，KDP 可直接通过锁定入口启动，避免路由 Unit 递归找自己的启动问题。
+- 每个承担业务入口职责的 Business Primary SHOULD 提供一个 Domain Main Workflow Unit；只提供库 Capability 的 Extension/Business Package 不必伪造 Main。
+- Package 内可提供多个 Public Workflow / Subworkflow Unit；跨 Package 调用已公开的 Capability 不必强制绕行 Domain Main。
+- **Main Workflow 不持有 KDP 的 Scheduler/State/Effect 权威**，不成为新的通用 Dispatch Engine。
 
-Validation PASS 是证据，不是 Promotion 授权。Promotion、Selection 和 Activation 是不同的决定。运行时反馈可以形成候选或证据，但不能自动改写当前 Package 或生产知识。
+### 4.3 Workflow 与 Graph 的边界
 
-## 8. Validation & Conformance Model
+Workflow 是 Composite Unit 的**业务组合实现**。Composition Graph 是其可审查、机器可验证的表示（节点对精确 Unit 的引用，边规定控制 / 数据 / 证据流），不是另一个独立的 Intelligence 对象；Pipeline 只作描述性术语。保持 control、data、evidence 三类互斥边的语义。
 
-保留三个独立 Conformance 层次：
+Graph/Workflow MUST 检查输入来源唯一且有效、证据完整、控制分支确定性、终态可达、资源与绑定精确、无隐式透传。v0.2.0 Core 拒绝未声明的调用环/无限重试；**有界 Subworkflow Invocation** 可作为单独的可选 Profile，经 Demo 和独立 Conformance 证明最大次数、退出条件、幂等性、状态与证据连续性后方可纳入；不得默认为已支持 Loop Engine。旧 v0.1.0 仍严格 DAG_ONLY。
 
-1. **Structural Conformance**：身份、Role Profile、Schema、引用、Graph、Definition 和资源闭包正确。
-2. **Behavioral Conformance**：识别、判断、澄清、失败处理、分支和 Outcome 符合声明。
-3. **Consumer Conformance**：真实 Consumer 使用选中的 Domain Intelligence，产生可独立检查的实际 Trace，且不绕过 Runtime/Host/Effect 权威。
+## 5. Intent 与 Capability 路由也是 Unit
 
-Reference Consumer 只证明一个消费者如何解释标准，不能以自身内部验证结果证明 Conformance。独立 Conformance 必须检查实际输入、证据输入、选中控制路径、输出、精确资源身份和终态结果。
+### 5.1 Intent Recognition Unit
 
-验证至少覆盖正常、未知、歧义、冲突、越界、无效输入、缺失证据、资源篡改、错误实现绑定、失败和非授权状态变化。
+输入原始用户目标 / 系统事件 / API 数据，产出**唯一规范化 Structured Intent**：intentId/goal、slots/entities、constraints/context、值来源和认识状态、missing/conflict/ambiguity、evidence、所需澄清。Dynamic Form 仅是填充/确认 Slots 的可选 UI 中立元数据，UX 负责显示，不产生执行权限。
 
-## 9. Runtime 与权限边界
+### 5.2 Intent Routing Unit
 
-DIS 描述领域智能和消费语义，不创建 Runtime 权威。
+接收 Structured Intent 和已编译的可达 Capability Catalog，输出**受约束的 RouteDecision**：target Capability、匹配规则/证据、输入映射和执行资格判断，或 NEEDS_INPUT / AMBIGUOUS / OUT_OF_SCOPE / NO_MATCH 等显式结果。它不是 KDP 内建的业务路由器，也不能自由输出一个未经锁定的 Unit ID、动态导入地址或 Tool Effect。
 
-Boot/KDP 的职责必须服从后继 Product/L1 检查点 #1484。KDP/Kernel 保持运行时准入、状态、Journal、Effect 和恢复等既定权威；Host Adapter 执行物理环境操作；Business Package 提供领域知识和解决能力。
+App Entry/Main Workflow Unit 调用识别/路由 Unit，再依据 BUILD 解析并锁定的 Provider 映射委派给目标 Unit。路由是一个 Unit 实现的**业务判断**；KDP 对实际调度、状态、Tool/Host/Effect 和 Journal 仍保留唯一权威。
 
-Procedure 默认是内部处理步骤。跨边界 Operation 必须使用既有 Tool/Host 契约。Recognizer、Decision、LLM 和 Dynamic Form 均不能自行获得 Effect、状态转换、Promotion 或 Package 激活权限。
+Intent 与 Capability 不强制一对一：一个 Intent 可以对应一个更高阶 Composite Capability；一个 Capability 可服务多个 Intent。缺乏唯一合法目标时必须 fail-closed 或澄清，不能靠 Unit 名称相似度或 LLM 产生新的执行权。
 
-## 10. DIS 0.1.0 迁移原则
+### 5.3 运行主链
 
-DIS 0.1.0 保持冻结且可追溯。DIS 0.2.0 使用新的标准版本和 Schema Profile，不得静默重新解释旧文件。
+~~~text
+Boot -> KDP Primary -> pinned App Entry/Main Workflow Unit
+  -> Intent Recognition Unit -> Structured Intent
+  -> Intent Routing Unit -> selected Capability
+  -> AOT-pinned provider Intelligence Unit
+  -> Atomic Processing / Composite Workflow + Knowledge
+  -> validated Outcome + Evidence/Trace
+~~~
 
-| DIS 0.1.0 | DIS 0.2.0 方向 |
-|---|---|
-| Workflow / Pipeline / Composition Graph | Workflow + Composition Graph；Pipeline 仅作描述性术语 |
-| 七种 Unit Role | 保留 Role，改为按 Role 定义必需字段 |
-| Node 引用 Unit | 保留；不增加第二套 Node 分类 |
-| Recognizer Output + Dynamic Form | 统一到 Structured Intent 和 Intent Slot |
-| control/data/evidence Edge | 保留 |
-| 单一 Resource Closure | 拆分 Runtime、Build/Validation 和 Provenance |
-| 混合 Qualification 状态 | 分离资格、治理处置、选择、激活和执行 |
-| DAG_ONLY | 基础 Profile 保留；有界 Subworkflow 作为可选扩展评估 |
-| 实现语言相关比较细节 | 改为语言无关的规范语义 |
+保留确定性编译智能→精确语义结果复用→适用已晋升可复用子 Workflow→有界 HarnessMachine/LLM Fallback 的历史决策来源优先序。
 
-迁移工具必须显式报告无法映射、信息丢失或需要人工决策的字段。不得伪造历史资格、Evidence 或 Promotion 记录。
+## 6. AOT Package 编译与 Domain App
 
-## 11. 延期与待验证事项
+BUILD MUST 根据 Consumer Profile/Target：检查 Contract、Promotion/Qualification、依赖、作用域、Resource Closure 和 Target；对于每个 required Capability 选择且仅选择一个被允许的 Provider；对 Unit、Knowledge、Implementation、Workflow Graph、Definition、Schema、Target 和候选组合证明绑定精确 ID/revision/digest，生成不可变 Package Lock。不得 runtime 任意 Provider 发现或以未验证字符串动态导入。
 
-- Bounded Subworkflow Invocation 是否纳入 0.2.0 可选 Profile，必须由实际 Demo 和独立 Conformance 证明。
-- 更复杂的嵌套 JSON Pointer、聚合和跨路径数据绑定不属于初始简化目标。
-- Knowledge 存储与访问技术继续服从 #1476，不在 DIS 中指定数据库。
-- 真实 DomainHarness Runtime Adoption 继续由 #1486 独立证明。
-- DIS 0.1.0 的 F012 和 Release Qualification 不被本标准候选替代。
+资源集合分开：**Runtime Resource Closure**、**Build/Validation Resources**、**Provenance/Evidence References**；不要把整个 Corpus 或 build-only fixtures 强行打进 Runtime。来源资源采用 files-first，可通过受控 Host 访问可选不可变索引或数据库，不规定 SQLite/LinkML/RDF/Graph 引擎。#1476 继续负责 Knowledge 访问/存储协议的具体适配研究。
 
-## 12. L2 Freeze 条件
+Domain App 使用 **minimal Boot + KDP Primary（单一 Kernel Core 与内部 Package System）+ SDK Domain Package + 一个 Business Primary 及 N 个 Business Extension/依赖 Package**，也可有对应层的 Extension。KDP 管理 Package 解析/生命周期/Hook 和统一运行权威；Host 执行物理操作。所谓 SDK + N Business Packages 不排除 KDP 和 Boot，也不意味着 N 个相互竞争的 Business Primary。
 
-DIS 0.2.0 只有在以下条件全部满足后才能 Freeze：
+## 7. 生命周期、验证与安全权威
 
-- 中英文规范语义一致。
-- 概念台账中每项均有 KEEP、MERGE、REVISE、DEFER 或 REMOVE 决定及迁移理由。
-- Machine-readable Schemas 与规范及示例一致，且不强制不适用字段。
-- Structured Intent、Dynamic Form、Workflow、Graph、资源闭包和 Lifecycle 有可执行示例。
-- Reference Consumer 与独立 Conformance 通过正向、负向、边界和不确定性测试。
-- 如采用 Bounded Invocation，必须通过独立安全和语义验证；否则明确延期。
-- 精确 HEAD/TREE/BASE、写集、验证回执和独立 Exact-SHA Review 完整。
-- Controller 记录正式 L2 Freeze Checkpoint。
+分离：原始观察/生产 Candidate；独立 Validation；经授权 Promotion/撤销/过期；Consumer 专属 Selection/Lock；Runtime Activation；Execution Occurrence/Trace/Outcome；反馈到下一版本 Candidate。每一项绑定 exact subject/dependency digest，必要记录采用 append-only。不允许 Runtime feedback、Simulator PASS 或 LLM 输出自动 Promotion、改写当前 Unit / Package。
 
-在正式检查点之前，本标准始终是候选，不授权 SDK/Runtime 实现、发布或部署。
+符合性划分：
+1. **Production Conformance**（新增验证维度）：来源/工具/Profile/转换/候选与证据的可追溯生产契约；
+2. **Structural Conformance**：Unit、Contract、Workflow、资源及精确绑定结构；
+3. **Behavioral Conformance**：领域语义、组合、未知、冲突、适用性、失败与结果；
+4. **Consumer Conformance**：独立使用真实 Trace 验证路由、输入/数据/证据边、实际 Provider 和终态。
+
+前三项设计输入不取代原有三个独立 Conformance 结论；Production 可以实现为附加 Profile，而不是第四个运行时 Engine。
+
+最低负面用例：缺失/伪造知识来源；invalid schema；stale Candidate digest/validation；未晋升 Provider；Capability 不兼容或多个候选未决；未知/歧义/冲突 Intent；0 或多个有效路由；Unit/Resource 被篡改；不可达终态；证据丢失；子 Unit PASS 但组合行为错误；非法调用深度/次数；跨 Package 非授权 Tool / Host Effect；LLM 绕过晋升；活动包静默替换。
+
+## 8. v0.1.0 迁移与权威边界
+
+- **KEEP**：Domain Intelligence 为目标、独立 Unit 身份、Capability refs、Semantic/Tool Component/Definition、provenance/epistemic status、Graph control/data/evidence、可信实现、Resource digests、治理、Structural/Behavioral/Consumer Conformance、Boot/KDP/Host/Effect 权威。
+- **REVISE**：Unit 从七 Role 主导的逻辑描述，收敛为具 Capability 的可治理实现；Role 作为 Profile；Knowledge Role 的静态纯资源须显式迁移为 Knowledge Resource 或由有意义的 Knowledge-access Capability 实现；不自动伪造 Capability。
+- **MERGE**：Workflow/Pipeline/Graph 层级简化为 **Composite Unit + Workflow + 可验证 Graph 表达**，Pipeline 不再是第三规范资产。
+- **ADD**：Unit Production/Knowledge Structuring Profile、Composite Unit 独立验证、Intent Recognition/Route Unit、唯一 App Entry、Domain Main/Public Workflows、AOT Routing Catalog/Bindings。
+- **REMOVE as primary authored concept**：显式 Unit DAG、每种 Role 一套 Engine、独立 Structured Knowledge 对象、独立 Intent Router Engine、平行 Package/Knowledge Runtime。
+- **DEFER**：未验证的 Loop/Retry/Bounded Invocation 到独立的安全 Profile。v0.1.0 文件、身份和资格记录不能原地迁移或重新解释。
+
+任何迁移如果失去原始证据、资格、精确资源身份或需要新的权限，必须报告并停止，不得静默补写虚假事实。
+
+## 9. 交付与冻结门禁
+
+先通过 #1494 的 Product/L1 后继审查和冲突裁定，再将本候选转为 **双语规范 + 可执行 Schema + 至少两个实质不同 Domain 的 Unit 生产/组合/Intent Routing Demo + 独立 Conformance**。同时必须有迁移台账、负面测试、Exact HEAD/TREE/BASE、完整写集及最新 CI 和独立审核，最后由 Controller 明确 L2 Freeze。
+
+此文不修改 v0.1.0、SDK/ABI、KDP/Runtime 源码；不构成 Release、Deployment、Promotion 或真实 DomainHarness Runtime Adoption 证明（#1486 独立）。引用 #1490/#1491/#1492 的前序 0.1.0 门禁，不用 0.2.0 取代其既有结论。

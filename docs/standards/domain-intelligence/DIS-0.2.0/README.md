@@ -1,55 +1,47 @@
-# Domain Intelligence Standard (DIS) 0.2.0
+# Domain Intelligence Standard (DIS) 0.2.0 — Unified Intelligence Production Model
 
-**Status:** ARCHITECTURE_CANDIDATE / NOT_FROZEN  
-**Controller:** [domain-harness#1493](https://github.com/kaicreator-mm/domain-harness/issues/1493)  
-**Branch:** `dis/0.2.0-l2-candidate`  
-**Predecessor:** DIS 0.1.0, frozen at `9504c78f4651f6c1ebc48c7858fca2d8b061544b`  
-**Authority:** Product/L1 #1477 and successor Boot/KDP checkpoint #1484
+**Status:** PRODUCT_L1_SUCCESSOR_CANDIDATE / L2_DRAFT / NOT_FROZEN  
+**Product/L1 successor decision (pending):** [#1494](https://github.com/kaicreator-mm/domain-harness/issues/1494)  
+**Draft controller:** [PR #1493](https://github.com/kaicreator-mm/domain-harness/pull/1493)  
+**Predecessor:** DIS 0.1.0 L2 frozen HEAD 9504c78f4651f6c1ebc48c7858fca2d8b061544b  
+**Successor Boot/KDP:** #1484
 
-## Purpose
+## Product thesis
 
-DIS 0.2.0 is a deliberate simplification and evolution of DIS 0.1.0. It retains the valuable Domain Intelligence, provenance, evidence, authority, deterministic composition and reproducibility contracts, while reducing overlapping concepts and filling the structured-intent gap.
+**Knowledge Structuring → Candidate Intelligence Unit(s) → Qualification/Promotion → recursive Capability-based Unit composition → AOT Domain Package BUILD → Domain App intent-driven execution.**
 
-This is a **standard candidate**, not a Runtime or SDK implementation. DIS 0.1.0 remains immutable and independently frozen.
+Exactly three primary intelligence-delivery entities: **Capability Contract** (interface), **Intelligence Unit** (qualified implementation/atomic or composite), and **Domain Package** (sealed carrier). Knowledge, Workflow, Function, Rule, Tool and routing are resources, processing forms or Unit-provided capabilities; they are not separate parallel Runtime systems. Domain Definition and existing Semantic/Tool components remain respected engineering contracts.
 
-## Documents
+### Documentation
 
-- [DIS 0.2.0 — 中文规范候选](./DIS-0.2.0.zh-CN.md)
-- [DIS 0.2.0 — English specification candidate](./DIS-0.2.0.en.md)
-- [概念简化与迁移台账](./SIMPLIFICATION_LEDGER.zh-CN.md)
-- [Simplification and migration ledger](./SIMPLIFICATION_LEDGER.en.md)
+- [中文架构与规范候选](./DIS-0.2.0.zh-CN.md)
+- [English architecture and specification candidate](./DIS-0.2.0.en.md)
+- [中文迁移与简化台账](./SIMPLIFICATION_LEDGER.zh-CN.md)
+- [English migration / simplification ledger](./SIMPLIFICATION_LEDGER.en.md)
 
-## Five logical areas
+## Five logical standard areas
 
-1. Domain Intelligence Model
-2. Intent Interaction Model
-3. Workflow Composition Model
-4. Package & Materialization Model
-5. Validation & Conformance Model
+1. Unit & Capability Model
+2. Knowledge Structuring and Intelligence Production
+3. Intent Routing Units, Main Workflow and composed Workflows
+4. AOT Package/Domain App compilation and binding
+5. Governance, Validation and independent Conformance
 
-These are logical areas of one standard, **not five engines, runtimes, services or projects**. Lifecycle governance and execution occurrence are cross-cutting contracts.
+They are logical standard sections, not engines, services or independent Runtime authorities.
 
-## Candidate decisions
+## Critical architecture invariants
 
-- Workflow + Composition Graph are the normative composition model; Pipeline is descriptive, not a third independent artifact.
-- Intelligence Unit roles remain semantic profiles; they do not imply one engine per role.
-- Graph Nodes reference exact Units; no parallel Node taxonomy is introduced.
-- Recognizer, Structured Intent and Dynamic Form share one canonical intent model.
-- Control, Data and Evidence Edges remain distinct.
-- Resource closure is split by runtime, build/validation and provenance purpose.
-- Qualification, governance disposition, selection, activation and execution are separate dimensions.
-- Bounded Subworkflow Invocation is an optional profile under evaluation; no Loop Node or Loop Engine is introduced.
+- Intent Recognition and Intent Routing are **Intelligence Units**, not a special platform dispatch subsystem.
+- One **pinned App Entry/Main Workflow** bootstraps routing without recursive router discovery. Business Primary can own Domain Main; library-only Packages need not.
+- Atomic Units bind functions/rules/parsers/queries/tool operations; Composite Units use Workflows and provide new Capabilities. Child validation never automatically qualifies a Composite.
+- No author-maintained Unit DAG is required. Workflows structure behavior, while AOT derives Unit/Package dependency closure; Package dependencies remain a DAG.
+- Core workflows retain independent control/data/evidence semantics; bounded Subworkflow Invocation requires a proven opt-in profile, no implicit unbounded loops.
+- Production Candidate, independent Validation, explicit Promotion, consumer-specific Selection, Runtime Activation and Execution occurrence are distinct.
+- Boot -> KDP Primary -> SDK + Business Primary + optional Extension Packages; KDP/Host retain all state/Effect authority.
+- The frozen DIS 0.1.0 artifacts are untouched. DIS version is independent of SDK/ABI version.
 
-## Current evidence state
+## Evidence and authorization
 
-- Normative bilingual draft: **initial candidate**
-- Machine-readable DIS 0.2.0 schemas: **not yet authored**
-- Reference Consumer: **not yet adapted**
-- Independent Conformance: **not yet run**
-- Exact-SHA review / formal L2 Freeze: **not yet performed**
+This is **a complete conceptual draft**, not a frozen / implemented standard. Product/L1 #1494 remains to be reviewed; executable 0.2 schemas, a new/updated Reference Consumer, two-domain examples and independent Conformance have NOT yet been completed. No SDK ABI change, KDP/Runtime implementation, release, deployment or evidence of actual Runtime adoption is authorized. See #1486 for adoption and #1476 for Semantic Knowledge storage/access.
 
-Do not describe this candidate as frozen, implemented, adopted by the DomainHarness Runtime, or release-qualified.
-
-## Authority boundary
-
-No SDK ABI, Boot/KDP, Host, Runtime, Hook or physical-effect implementation change is authorized. Actual Runtime adoption remains separate under #1486. DIS 0.1.0 F012 and release qualification remain separate under #1490/#1491/#1492. Semantic Knowledge storage/access remains under #1476.
+For the ADS #1359 Delivery-First implementation sequence, keep one continuous writer for the bounded PR write set, verify Node24/CI, complete independent Exact-SHA review, and only then request formal L2 Freeze.

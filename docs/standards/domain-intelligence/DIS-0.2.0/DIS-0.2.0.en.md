@@ -1,270 +1,156 @@
-# Domain Intelligence Standard (DIS) 0.2.0
+# Domain Intelligence Standard (DIS) 0.2.0 — Unified Intelligence Production and Consumption Model
 
-**Status:** ARCHITECTURE_CANDIDATE / NOT_FROZEN  
-**Controller:** [domain-harness#1493](https://github.com/kaicreator-mm/domain-harness/issues/1493)  
-**Predecessor:** DIS 0.1.0, frozen at `9504c78f4651f6c1ebc48c7858fca2d8b061544b`  
-**Superior authority:** Product/L1 #1477; successor Boot/KDP checkpoint #1484
+**Status: successor Product/L1 architecture candidate; L2 DRAFT / NOT_FROZEN.**
+**Pending authority:** domain-harness #1494. **Existing vehicle:** Draft PR #1493.
+**Frozen predecessor:** DIS 0.1.0 at 9504c78f4651f6c1ebc48c7858fca2d8b061544b. **Successor Boot/KDP authority:** #1484.
+DIS standard versions are independent of DomainHarness SDK release versions.
 
-> This is the initial normative candidate for DIS 0.2.0. It records the conceptual model and boundaries. It is not an L2 Freeze, SDK/Runtime implementation authorization, or release authorization. Machine-readable schemas, a Reference Consumer and independent Conformance must subsequently be aligned with this text.
+This is a proposed logical definition, not an approved Product/L1 amendment, executable schema, independent conformance result, official L2 freeze or claim of Runtime implementation. Normative language below is the **candidate contract** to validate.
 
-## 1. Purpose and non-goals
+## 1. Product thesis and objective
 
-DIS defines a cross-domain, verifiable, composable and traceable contract for expressing and consuming Domain Intelligence.
+DIS standardizes the chain **domain sources / existing intelligence → Knowledge Structuring and Unit Production → recursively composed Intelligence Units using Capability Contracts → independent qualification / governance → consumer-specific AOT Domain Package build → Domain App consumption**. Domain Intelligence is the domain problem-solving value; a Package is the materialized engineering carrier, not its ontology.
 
-The subject of the standard is domain knowledge and domain problem-solving capability—not a Package file format, generic Agent platform, or internal Runtime module decomposition.
+Five *logical* areas, not five engines: (1) Unit & Capability Model; (2) Intelligence Production; (3) Intent & Workflow Composition; (4) AOT Package & Domain App; (5) Verification, Lifecycle & Conformance.
 
-DIS 0.2.0 aims to:
+## 2. Minimal coherent model
 
-1. Express Domain, Knowledge, Intelligence Units, Capabilities, Provenance and applicability through one coherent model.
-2. Express user goals, domain entities, parameters, constraints, missing information and confirmation status through one canonical Structured Intent.
-3. Express domain-solving processes through Workflow and Composition Graph.
-4. Define Package materialization, implementation binding and resource closure.
-5. Prove the correctness of the standard and its Consumers through Validation, Evidence and Conformance.
+### 2.1 Three primary identities
 
-Non-goals:
-
-- No new Runtime, Scheduler, Agent Engine, Event Bus or Tool Bus.
-- No separate Engine for each Unit Role.
-- No new Domain Component family or parallel Capability object hierarchy.
-- No prescription of DomainForge or Domain-Simulator internal production/simulation workflows.
-- No mandated SQLite, graph database, vector database, LinkML or programming language.
-- No change to DomainHarness SDK ABI, Boot/KDP, Host, Hook, Runtime or Effect authority.
-- A Demo PASS is not proof of actual DomainHarness Runtime adoption.
-
-## 2. Five logical areas
-
-DIS consists of five connected logical areas:
-
-| Area | Normative responsibility |
-|---|---|
-| Domain Intelligence Model | Domain scope, knowledge, capability, Unit, provenance, epistemic status and qualification |
-| Intent Interaction Model | Recognition, Structured Intent, Intent Slots, Dynamic Form and clarification |
-| Workflow Composition Model | Workflow, Graph, Unit binding, control/data/evidence flow and Outcome |
-| Package & Materialization Model | Definition, selection, implementation binding, resource closure, digest and lock |
-| Validation & Conformance Model | Structural, behavioral and Consumer validation and governance evidence |
-
-These are logical divisions of one standard, not five services or execution engines. Lifecycle Governance and Execution Occurrence are cross-cutting contracts.
-
-## 3. Domain Intelligence Model
-
-### 3.1 Domain and Knowledge
-
-A Domain is a bounded problem space with declared scope, entities, concepts, relations, rules, goals, constraints and expected outcomes.
-
-Knowledge may express facts, concepts, entities, relations, rules, patterns, references, cases, counterexamples and unknowns. Knowledge need not be executable, and inclusion in a Package does not automatically make it a verified fact.
-
-### 3.2 Intelligence Unit
-
-An Intelligence Unit (Unit) is a stable, versioned domain-intelligence asset or capability description. A Unit is a logical asset; it is not automatically a Component, function or Runtime object.
-
-Retain these semantic Roles:
-
-- **knowledge**: knowledge, facts, rule basis and references; data-only assets are allowed.
-- **recognizer**: interprets input into evidence-grounded candidate entities, intents or classifications.
-- **decision**: produces bounded judgments from applicability, rules, conditions and evidence.
-- **procedure**: reusable internal processing step, private by default.
-- **tool**: explicit Operation across a Package/Host/Consumer boundary.
-- **workflow**: reusable domain-solving capability contract bound to a Composition Graph.
-- **validator**: validates structure, rules, evidence or terminal outcomes.
-
-Roles are semantic profiles over one Unit identity model. They are not seven independent Engines and do not create new Component families.
-
-### 3.3 Role-specific contracts
-
-All Units share applicable stable identity, revision, purpose, scope, owner, authority and source information.
-
-Fields are role-dependent:
-
-- Executable Roles declare typed input/output contracts and trusted implementation binding.
-- Data-oriented Roles such as Knowledge are not forced to declare Procedure-style execution failure handling.
-- Evidence, Validation and Failure contracts are required according to asset type and actual use, not mechanically duplicated across every Unit.
-- Inapplicable fields are omitted rather than populated with invented defaults.
-
-Capability requires/provides continues to express a versioned compatibility contract. It does not represent data flow, Package dependency, Tool authorization or an Effect Permit. Do not create a parallel Capability Unit/Component hierarchy.
-
-### 3.4 Provenance and epistemic status
-
-Keep distinct:
-
-- **Provenance**: where a value came from, e.g. USER_CONFIRMED, SYSTEM_OBSERVED, MODEL_INFERRED or DERIVED.
-- **Epistemic Status**: its current knowledge state, e.g. CONFIRMED, INFERRED, CANDIDATE, UNKNOWN or CONFLICT.
-- **Applicability**: the Domain, object, environment and conditions for which knowledge or rules apply.
-- **Qualification**: the validation or governance assessment of an exact asset.
-
-Model confidence cannot replace source provenance or turn an inference into a user-confirmed fact. UNKNOWN, AMBIGUOUS, CONFLICT, OUT_OF_SCOPE, PARTIAL and FAILED must not silently become success.
-
-## 4. Intent Interaction Model
-
-### 4.1 One canonical Structured Intent
-
-Structured Intent is the canonical intent model shared by Recognizer, Dynamic Form and Workflow. It can express at least:
-
-- the user's goal or requested task;
-- relevant Domain Entities and their attributes;
-- Intent Slots, parameters and constraints;
-- context and applicability;
-- values that are confirmed, inferred, candidate, missing or conflicting;
-- Provenance, Epistemic Status and necessary Evidence for each value;
-- current completeness and reasons for clarification or human review.
-
-The Recognizer creates or updates Structured Intent and emits recognition evidence and uncertainty. Workflow consumes the same Structured Intent. A semantically competing Recognizer Output model must not be maintained.
-
-### 4.2 Dynamic Form
-
-Dynamic Form is optional, UI-neutral interaction metadata. It is not a separate Intent model, Component family or Form Runtime.
-
-It maps questions, options and response types to Structured Intent Slots or target input fields. UX renders the form; the existing Harness coordinates clarification, confirmed-value integration and re-recognition.
-
-Displaying a form grants no state-transition, Tool invocation or Effect authority. A Consumer without a Dynamic Form Profile may still submit structured data that conforms to the input contract.
-
-### 4.3 Confirmation and updates
-
-A user answer updates the relevant Slot and must not unjustifiably overwrite other confirmed values. User confirmation, system observation, model inference and derived values remain distinguishable. If the Intent remains incomplete, the Consumer produces an explicit NEEDS_INPUT, NEEDS_REVIEW or other declared non-success outcome.
-
-## 5. Workflow Composition Model
-
-### 5.1 Workflow and Composition Graph
-
-- **Workflow** is the logical domain-solving capability contract: goal, applicability, input/output, evidence requirements and failure/Outcome semantics.
-- **Composition Graph** is its structured, verifiable composition representation: Nodes, Edges, branches and terminal outcomes.
-- **Pipeline** may describe the execution organization of a Workflow, but is not a third independent normative asset or mandatory separately versioned object.
-
-A Workflow Unit binds to one exact Graph ID/revision. Graph Nodes reference exact Unit IDs/revisions. Package Materialization then binds these references to exact resources and implementation digests.
-
-### 5.2 Node semantics
-
-A Graph Node is a composition reference to an exact Intelligence Unit. Do not create a parallel taxonomy of Interaction, Intent, Knowledge, Condition, Procedure, Tool, Workflow, Evaluation or Terminal Node types.
-
-The Unit Role determines domain semantics. A Decision returns a judgment; the Graph selects the control path based on that result. A Decision does not own Runtime state transitions or Effect authority.
-
-### 5.3 Three Edge kinds
-
-Retain three mutually exclusive Edge kinds:
-
-| Edge | Semantics | Triggers execution |
+| Concept | Single responsibility | Not equivalent to |
 |---|---|---|
-| control | Selects the next Node | Yes |
-| data | Binds output from an executed Node to target input | No |
-| evidence | Binds evidence to a declared Evidence Slot | No |
+| **Capability Contract** | Stable identity and contract for typed inputs/outputs, preconditions, domain semantics, applicability, failure/outcome, evidence and compatibility | Function, permit, dispatcher |
+| **Intelligence Unit (Unit)** | Independently identifiable, versioned, qualified, composable intelligence implementation of one or more Capabilities | Arbitrary file or fact, extra Component family, Runtime instance |
+| **Domain Package** | Consumer-/target-specific immutable selection, compilation, pinning and distribution of Units, knowledge, implementations and resources | Domain Intelligence itself or a parent ontology for Domain Definition |
 
-Implicit whole-output pass-through is forbidden. Data and evidence transfer do not implicitly trigger a Node. Branching must be deterministic; zero or multiple matching paths produce an explicit error or declared failure Outcome.
+Capability-to-Unit is **contract-to-eligible-provider**, not literal class-to-instance. One contract may have several eligible Unit providers; one Unit may implement several cohesive Capabilities; BUILD selects a unique actual provider and exact binding.
 
-### 5.4 Required Graph invariants
+### 2.2 Knowledge, processing, roles and existing authority
 
-The standard defines observable invariants without prescribing one internal validation algorithm for every Consumer:
+- **Knowledge** is domain facts, concepts, entities, relations, rules, constraints, patterns and experience. Do **not** invent a first-class “Structured Knowledge” object or Runtime. Required production intelligence knowledge must be machine-consumable with explicit types, meaning, provenance, scope and validation; human-readable supporting references remain legitimate.
+- **Knowledge Resources** are typed, schema-/revision-/digest-/provenance-bound data/rule resources owned or referenced by a Unit, optionally shared by several Units. Do not wrap each fact in a Unit.
+- **Implementation** is a trusted binding to a Function, Parser, Rule/Expression Interpreter, bounded Query, model-assisted handler, existing Tool Operation, or Workflow. Implementation strategies are not new Capability types.
+- **Atomic** vs **Composite** are processing profiles, not separate object families. Composite Unit processing is Workflow composition of required Capabilities / selected Units.
+- **Role labels** (knowledge, recognizer, decision, procedure, tool, workflow, validator) are optional semantic profiles, never seven separate engines. Deployable Units MUST expose at least one Capability; static data with no callable Capability remains a Knowledge Resource.
+- **Domain Definition** remains the consumer-specific abstract Semantic/Tool Component Graph. Units do not automatically become Components; existing Semantic/Tool/Host authority persists.
 
-- Node, Unit, Workflow, Graph and Schema references are exact and closed.
-- Every required input has exactly one valid source on every reachable execution path.
-- Data/Evidence sources are available on the corresponding execution path.
-- No implicit defaults, merges or pass-through are permitted.
-- Evidence Slots are declared and required evidence is not lost before terminal validation.
-- Every control path reaches a Terminal, Wait or explicit Failure Outcome.
-- Static Graph qualification and runtime validation of actual inputs/branches are both required.
+### 2.3 Minimum Unit envelope
 
-The initial DIS 0.2.0 base profile remains DAG-only. Unbounded cycles and implicit retries are forbidden. An optional Bounded Subworkflow Invocation Profile may be evaluated separately. It must declare exact subworkflow identity, maximum invocation count, exit conditions, failure policy, idempotency requirements and limit-reached Outcome. Do not implement it with a new Loop Node or Loop Engine. If the Reference Consumer and independent Conformance cannot prove it safe, defer it rather than weaken the DAG guarantees.
+A materializable Unit MUST provide:
+1. exact identity: stable ID, revision, content/build digest, owner, authority and Domain Scope;
+2. one or more provided Capabilities, optional required Capabilities with contract ID/revision/digest, typed I/O, applicability, preconditions, outcome/failure and evidence obligations;
+3. optional Knowledge references with schema, scope, source and resource digests;
+4. an Atomic/Composite processing profile, trusted binding, target requirements, dependency closure and effect classification;
+5. Structured Intent/clarification profile where relevant;
+6. Producer provenance, validation profile, positive/negative/boundary/conflict tests, evidence and limitations;
+7. explicit failure treatment for unavailable dependencies and unsupported required semantics.
 
-### 5.5 Outcome
+Capability Contracts remain independently stable for cross-Unit/Package compatibility, without introducing a separate Capability Runtime hierarchy.
 
-Workflow terminal results distinguish applicable outcomes such as COMPLETED, NEEDS_INPUT, NEEDS_REVIEW, PARTIAL, OUT_OF_SCOPE and FAILED. Structural validation does not prove domain correctness; successful execution does not prove the business goal was achieved. A terminal result is associated with actual inputs, Evidence, selected path and Validator result.
+## 3. Knowledge Structuring and Intelligence Unit Production
 
-## 6. Package & Materialization Model
+### 3.1 Canonical produced artifact
 
-### 6.1 Definition and exact binding
+**Knowledge Structuring is a production process, not an object family or a runtime.** Its primary governed output for the intelligence delivery pipeline is **one or more Candidate Intelligence Units**, together with referenced Knowledge, Schema, Rule, Implementation, Test and Evidence resources. This does not require every fact to become a Unit.
 
-Domain Definition remains the Consumer-specific Semantic/Tool Component Graph. A Unit is a logical asset; a Component is an existing external composition/execution contract. They need not be one-to-one.
+A Producer may generate an Atomic Unit from documents, rules, cases, software and observations, or a Composite Unit from existing qualified Units plus goals and composition requirements. DomainForge or another conforming Producer implements internal algorithms; DIS specifies portable inputs, outputs, identity and evidence—not Forge's internal system design.
 
-Package Materialization resolves:
+### 3.2 Required portable production stages
 
-- exact selected Definition, Unit, Workflow and Graph IDs/revisions;
-- implementation binding and target variant;
-- exact paths and digests for required runtime resources;
-- Package Lock references to the resource closure.
+1. **Domain Scope and Consumer Profile:** goals, bounded problem, sources, context, exclusions, quality/risk.
+2. **Capability Specification and Unit Boundary:** define target contract and required sub-capabilities; split by independently verifiable domain responsibility, not per file/function/fact.
+3. **Knowledge Structuring:** extract and normalize types, units, entities/relations, constraints/rules, preserve source, conflict, unknown and applicability; JSON/YAML/rule tables are options, no universal graph-model mandate.
+4. **Unit Construction:** choose Atomic (Function/Rule/Parser/Query/Tool etc.) or Composite (Workflow), bind processors, resources, typed schema and target.
+5. **Contract and Closure:** declares requires/provides, I/O, preconditions, evidence, failures, trust/effects, exact dependencies.
+6. **Independent Qualification:** structural, domain-semantic, behavioral, negative/boundary/ambiguous/out-of-scope, composite and environmental tests with reproducible evidence.
+7. **Governed Promotion and Consumer Selection:** Candidate → validated evidence → independent explicit Promotion → BUILD selection and pins.
+8. **Reproducible Materialization and Change Impact:** Producer, toolchain, profile, transformations, input/output digests, test revision and dependency closure; no stale evidence reuse after meaningful changes.
 
-Runtime must not select an implementation by directory order, name similarity, LLM suggestion or arbitrary dynamic import. Binding must come from a trusted Registry, verified Package Artifact or existing Semantic/Tool/Host contract.
+A nondeterministic LLM Producer need not regenerate bit-identical bytes from the same prompt. The resulting Candidate MUST be exactly captured so independent verification and materialization can be reproduced. Generation success, syntactic validity and executable code do not establish domain correctness.
 
-### 6.2 Three resource sets
+### 3.3 Composite acceptance
 
-Distinguish:
+Previously validated child Units do not automatically validate a new Composite Unit. Each composite must prove its actual exported Capability, typed inputs/outputs, control/data/evidence, applicability, unknown/conflict propagation and terminal outcomes.
 
-1. **Runtime Resource Closure**: Schemas, Units, Graphs, Definition, Knowledge and implementation resources actually required by the runtime Consumer.
-2. **Build/Validation Resources**: test fixtures, validation cases, Conformance tools and build-only resources.
-3. **Provenance/Evidence References**: source and evidence locators that are not implicitly fetched, trusted or treated as executable resources.
+## 4. Recursive composition, Workflow and Main Workflow
 
-Required local runtime resources remain covered by closure, path constraints and exact digests. Test-only fixtures should not be forced into a production Runtime Package merely because Conformance uses them. If external source content is needed at runtime, materialize it as a controlled local resource or access it through an existing Tool/Host contract.
+### 4.1 One composition model
 
-## 7. Lifecycle Governance
+A Composite Unit implements one or more Capabilities by invoking other required Capabilities using one or more Workflows; BUILD resolves child Capability requirements to exact qualified providers. The resulting Unit has its own identity, revision and independent evidence.
 
-Do not place every state in one Unit-global enum. Keep at least five dimensions separate:
+**Main Workflow + zero or more Public/Internal Workflows is the primary authoring and business organization**, not an explicit “Unit DAG” to be maintained by authors. Build may derive a dependency closure, reject illegal recursion, and verify Package dependency DAG; this is not a parallel business Workflow execution engine.
 
-| Dimension | Meaning |
-|---|---|
-| Asset/Intelligence Qualification | Asset qualification such as OBSERVED, CANDIDATE and VALIDATED |
-| Governance Disposition | Governance decisions such as PROMOTED, REJECTED, WITHDRAWN, EXPIRED and SUPERSEDED |
-| Package Selection | A Consumer-specific Package selection record |
-| Runtime Activation | Which exact Package was activated by a Runtime/application instance |
-| Execution Occurrence | Whether an execution occurred, with its Trace, Outcome and Evidence |
+### 4.2 Main / entry rules
 
-Records bind exact subjects and versions. Governance transitions use traceable append-only records where required. Selection, Activation and EXECUTED must not mutate immutable Unit identity or Qualification.
+- Every Domain App MUST pin exactly **one App Entry/Main Workflow Unit**, directly loaded by KDP to avoid recursive discovery of the router.
+- Each Business Primary with domain entry responsibility SHOULD provide one **Domain Main Workflow Unit**. Library-only Extension/Business Packages need not fabricate Main Workflows.
+- A Package can expose many Public Workflow and Subworkflow Units. A selected cross-Package Public Capability can be directly invoked through its exact binding, without mandatory re-entry through the Domain Main Workflow.
+- Neither Main nor any Workflow owns KDP Scheduler, State, Journal or Effect authority.
 
-Validation PASS is evidence, not Promotion authority. Promotion, Selection and Activation are distinct decisions. Runtime feedback may create candidates or evidence, but cannot automatically rewrite the current Package or production knowledge.
+### 4.3 Workflow / Graph distinction
 
-## 8. Validation & Conformance Model
+**Workflow is the Composite Unit's domain composition implementation**; **Composition Graph** is its inspectable, machine-verifiable representation of exact Unit node refs and mutually exclusive control/data/evidence edges. It is not a second intelligence object hierarchy. “Pipeline” remains a descriptive term only.
 
-Retain three independent Conformance levels:
+The candidate Core Profile retains deterministic, independently checkable paths, one available source per required input, exact evidence slots, no implicit data pass-through, explicit terminal outcomes and fail-closed route decisions. Unbounded cycles/retries/recursive invocation are forbidden. **Bounded Subworkflow Invocation** may only be admitted as an optional profile after independent conformance proves call limits, exit guards, idempotency, state/evidence continuity and limit-reached results; no new Loop Node/Engine is implied. DIS 0.1.0 remains strictly DAG_ONLY.
 
-1. **Structural Conformance**: identity, Role Profiles, Schemas, references, Graph, Definition and resource closure are valid.
-2. **Behavioral Conformance**: recognition, judgment, clarification, failure handling, branching and Outcomes match declarations.
-3. **Consumer Conformance**: a real Consumer uses selected Domain Intelligence and produces independently inspectable actual Traces without bypassing Runtime/Host/Effect authority.
+## 5. Intent Recognition and Routing are Units
 
-The Reference Consumer demonstrates one interpretation of the standard; its own validation result cannot prove Conformance. Independent Conformance checks actual inputs, evidence inputs, selected control path, outputs, exact resource identities and terminal results.
+### 5.1 Recognition Unit
 
-Tests cover normal, unknown, ambiguous, conflicting, out-of-scope, invalid-input, missing-evidence, resource-tampering, incorrect implementation-binding, failure and unauthorized state-change cases.
+An **Intent Recognition Unit** produces/updates one canonical Structured Intent with intent goal/ID, entities, slots, constraints, provenance, epistemic status, missing/ambiguous/conflicting fields and evidence. Optional Dynamic Form is a UI-neutral slot clarification profile; UX renders it, but does not gain authority.
 
-## 9. Runtime and authority boundaries
+### 5.2 Routing Unit
 
-DIS defines domain-intelligence and consumption semantics; it does not create Runtime authority.
+An **Intent Routing Unit** takes Structured Intent and the **build-sealed eligible Capability Catalog**, returns a typed RouteDecision (target Capability, match policy/evidence, mapped inputs and admissibility) or NEEDS_INPUT, AMBIGUOUS, OUT_OF_SCOPE, NO_MATCH and other non-success outcomes. It does **not** dynamically choose unpinned providers, arbitrary Unit/file names, grant Tools/Effects, or become KDP's Scheduler.
 
-Boot/KDP responsibilities follow successor Product/L1 checkpoint #1484. KDP/Kernel retains the established Runtime admission, state, Journal, Effect and recovery authority. Host Adapters execute physical environment operations. Business Packages provide domain knowledge and solving capability.
+The fixed App Entry/Main Workflow invokes Recognition → Routing → already AOT-bound provider Unit. KDP retains actual execution, admission, state transitions and effects. Intent and Capability need not be one-to-one: a complex Intent can select a composite Capability; several Intents may share one Capability. No unique eligible route means clarify or fail closed.
 
-Procedure is private by default. Cross-boundary Operations use existing Tool/Host contracts. Recognizer, Decision, LLM and Dynamic Form cannot grant themselves Effect, state-transition, Promotion or Package activation authority.
+~~~text
+Boot -> KDP Primary -> pinned App Entry/Main Workflow Unit
+  -> Intent Recognition Unit -> canonical Structured Intent
+  -> Intent Routing Unit -> target Capability
+  -> AOT-pinned provider Intelligence Unit
+  -> Atomic Processing / Composite Workflow + Knowledge
+  -> validated Outcome + Evidence/Trace
+~~~
 
-## 10. DIS 0.1.0 migration principles
+Preserve historical resolver precedence: deterministic compiled intelligence → exact semantic reuse → applicable promoted reusable subworkflow → bounded HarnessMachine/LLM fallback.
 
-DIS 0.1.0 remains frozen and traceable. DIS 0.2.0 uses a new standard version and Schema Profile; old files are not silently reinterpreted.
+## 6. AOT Package compilation and Domain App
 
-| DIS 0.1.0 | DIS 0.2.0 direction |
-|---|---|
-| Workflow / Pipeline / Composition Graph | Workflow + Composition Graph; Pipeline is descriptive only |
-| Seven Unit Roles | Retain Roles; define required fields by Role |
-| Node references Unit | Retain; do not add a second Node taxonomy |
-| Recognizer Output + Dynamic Form | Unify around Structured Intent and Intent Slots |
-| control/data/evidence Edges | Retain |
-| One Resource Closure | Split Runtime, Build/Validation and Provenance |
-| Mixed Qualification states | Separate qualification, disposition, selection, activation and execution |
-| DAG_ONLY | Retain in the base profile; evaluate bounded Subworkflow as an optional extension |
-| Implementation-language-specific comparison details | Define language-independent normative semantics |
+BUILD MUST select Consumer Profile/Target; check contract compatibility, explicit Promotion and qualification, scope, package/Unit dependency closure, resources and Host requirements; resolve exactly one allowed provider per required Capability; pin Unit/Graph/Definition/Knowledge/Implementation/Schema/Target exact identities and digests in one immutable Package Lock. Runtime cannot rediscover providers by directory order, name similarity, LLM suggestion or arbitrary dynamic import.
 
-Migration tooling must explicitly report unmapped fields, information loss and cases requiring human decisions. It must not fabricate historical qualification, Evidence or Promotion records.
+Separate **Runtime Resource Closure**, **Build/Validation Resources**, **Provenance/Evidence References**. Do not force the full Corpus or test fixtures into production. Files-first and optional immutable indexes / databases remain possible via controlled Host access; DIS does not require SQLite/LinkML/RDF/graph storage. #1476 owns deeper Knowledge access/storage investigation.
 
-## 11. Deferred and unresolved items
+A Domain App uses **minimal Boot + KDP Primary (one Kernel Core and internal Package System) + SDK Domain Package + one Business Primary and N Business Extension/dependency Packages**, with layer-specific Extensions as appropriate. N Business Packages does not imply N competing Business Primaries. KDP owns loading, Package lifecycle, Hooks and single Runtime authority; Host performs physical effects.
 
-- Inclusion of Bounded Subworkflow Invocation in an optional 0.2.0 Profile requires evidence from the actual Demo and independent Conformance.
-- More complex nested JSON Pointers, aggregation and cross-path data binding are not initial simplification goals.
-- Knowledge storage/access remains under #1476; DIS does not select a database.
-- Actual DomainHarness Runtime adoption remains independently proven under #1486.
-- DIS 0.1.0 F012 and Release Qualification are not replaced by this candidate.
+## 7. Lifecycle, verification and authority
 
-## 12. L2 Freeze criteria
+Keep Observation/Candidate; independent Validation; separately authorized Promotion/withdrawal/expiry; consumer-specific Package Selection; Runtime Activation; Execution Occurrence/trace/outcome; and future candidate feedback **distinct**, exact-subject and append-only where required. Simulator PASS, Forge completion, LLM generation or Runtime feedback cannot grant Promotion or mutate pinned assets.
 
-DIS 0.2.0 may be frozen only after:
+Conformance:
+1. **Production Profile** (additional check): producer input/transform/profile/provenance/candidate and reproducible verification evidence;
+2. **Structural Conformance:** Units, Contracts, workflow, resources and exact bindings;
+3. **Behavioral Conformance:** domain outcomes, composed unit behavior, unknown/conflict/partial and failure semantics;
+4. **Consumer Conformance:** independent reconstruction from real routed inputs, provider binding, control/data/evidence edges and terminal trace.
 
-- English and Chinese normative semantics are equivalent.
-- Every concept in the simplification ledger has a KEEP, MERGE, REVISE, DEFER or REMOVE decision and migration rationale.
-- Machine-readable Schemas agree with the normative text and examples and do not require inapplicable fields.
-- Structured Intent, Dynamic Form, Workflow, Graph, resource closure and Lifecycle have executable examples.
-- The Reference Consumer and independent Conformance pass positive, negative, boundary and uncertainty tests.
-- Any Bounded Invocation profile is independently validated for safety and semantics, or explicitly deferred.
-- Exact HEAD/TREE/BASE, write set, validation receipts and independent Exact-SHA review are complete.
-- The Controller records a formal L2 Freeze Checkpoint.
+Production is an additional validation profile, **not** a new Runtime Engine nor a replacement of the three independent Structural / Behavioral / Consumer verdicts.
 
-Until that checkpoint, this standard remains a candidate and grants no SDK/Runtime implementation, release or deployment authority.
+Minimum negative vectors: missing/forged sources, invalid schema, stale evidence/digest, unpromoted or incompatible providers, unresolved provider ambiguity, ambiguous/conflicting/no-match Intents, zero/multiple valid routes, tampered artifacts, missing evidence, nonterminal branches, child-PASS/composite-FAIL, bounded invocation overflow, unauthorized cross-Package Tool/Host Effects, false LLM Promotion and silent active Package replacement.
+
+## 8. Migration from frozen 0.1.0
+
+- **KEEP:** intelligence-first objective, exact identity/revision/digest, Capability requires/provides, existing Semantic/Tool/Definition, provenance, epistemic status, three edge kinds, trusted binding, Conformance, Boot/KDP/Host/Effect boundary.
+- **REVISE:** Unit as governed Capability implementation with semantic role profiles rather than independent role engines; static Knowledge-only assets without callable capabilities migrate explicitly to Knowledge Resources or meaningful Knowledge-access Units; do not manufacture fake Capabilities.
+- **MERGE:** Workflow/Pipeline/Graph into Composite Unit + Workflow with verifiable Graph representation; Pipeline not independently versioned.
+- **ADD:** Knowledge Structuring/Unit Production, independent Composite qualification, Intent Recognition/Routing Units, fixed App Entry/Main, Package Domain Main/Public Workflows and sealed AOT route catalog.
+- **REMOVE as primary authored abstraction:** explicit Unit DAG, one role engine per Unit, first-class Structured Knowledge object, independent Intent Router Engine, separate Knowledge/Package Runtime.
+- **DEFER:** bounded invocation/retries/loops until demonstrated as an independently qualified optional profile. Preserve 0.1.0 frozen bytes/history/qualification; no silent wire compatibility claim.
+
+Migration MUST flag loss of evidence, qualification, exact identity or changed permissions and refuse to fabricate records.
+
+## 9. Delivery and freeze gates
+
+First resolve #1494 Product/L1 successor review and conflicts; then align **bilingual normative text, executable 0.2 schemas, producer/Unit/composition/routing demo in at least two materially different domains, independent conformance, migration ledger, negative cases, Exact-SHA review and current CI**. Formal Controller L2 Freeze is a distinct final decision.
+
+This document does not authorize modifying 0.1.0, SDK ABI, KDP/Runtime source, releases, deployments or automatic promotion. Actual DomainHarness Runtime adoption remains an independent #1486 proof, and #1490/#1491/#1492 retain their 0.1.0 scopes.
