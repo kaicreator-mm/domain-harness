@@ -1,0 +1,88 @@
+{
+  "name": "dis-textile-pattern-reference",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.21.0"
+  },
+  "scripts": {
+    "test": "node --test test/runner.test.mjs",
+    "demo": "node src/runner.mjs --demo",
+    "validate": "python scripts/validate.py"
+  },
+  "dis": {
+    "packageId": "textile.pattern",
+    "revision": "1.0.0",
+    "standardVersion": "0.1.0",
+    "authority": "REFERENCE",
+    "resourceClosurePath": "domain/resource-closure.json",
+    "resourceClosureSha256": "b0c2351b737604e48c323398f02c44b9020d30cc33f6328ce162ae23d3a0040f",
+    "selectionLock": {
+      "packageId": "textile.pattern",
+      "packageRevision": "1.0.0",
+      "closureSha256": "b0c2351b737604e48c323398f02c44b9020d30cc33f6328ce162ae23d3a0040f",
+      "target": "node24",
+      "consumerProfile": "textile-synthetic-sampling/1.0.0",
+      "referencePolicy": {
+        "id": "textile-reference-only",
+        "revision": "1.0.0",
+        "scope": "SYNTHETIC_REFERENCE_ONLY",
+        "production": false,
+        "activation": false,
+        "allowUnpromoted": true
+      },
+      "assets": [
+        {
+          "kind": "unit",
+          "id": "textile.knowledge",
+          "revision": "1.0.0",
+          "path": "domain/units/knowledge.json",
+          "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+        },
+        {
+          "kind": "unit",
+          "id": "textile.recognizer",
+          "revision": "1.0.0",
+          "path": "domain/units/recognizer.json",
+          "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+        },
+        {
+          "kind": "unit",
+          "id": "textile.decision",
+          "revision": "1.0.0",
+          "path": "domain/units/decision.json",
+          "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+        },
+        {
+          "kind": "unit",
+          "id": "textile.validator",
+          "revision": "1.0.0",
+          "path": "domain/units/validator.json",
+          "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+        },
+        {
+          "kind": "unit",
+          "id": "textile.workflow",
+          "revision": "1.0.0",
+          "path": "domain/units/workflow.json",
+          "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+        },
+        {
+          "kind": "graph",
+          "id": "textile.pattern-selection",
+          "revision": "1.0.0",
+          "path": "domain/textile-pattern-selection.graph.json",
+          "sha256": "782ef0517f5fb8e1811f805447a1f538c7f3a22f026d116ee78c24fa107663d0"
+        },
+        {
+          "kind": "knowledge",
+          "id": "textile.process-knowledge",
+          "revision": "1.0.0",
+          "path": "fixtures/textile-knowledge.json",
+          "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+        }
+      ]
+    },
+    "selectionLockSha256": "2bb77703cae5c50abaf2d061e6da504e5f0ef8a3586d75160ee853617e7c8ff7"
+  }
+}

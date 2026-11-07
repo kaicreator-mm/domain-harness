@@ -1,0 +1,318 @@
+[
+  {
+    "id": "jacquard",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [
+        "synthetic-design-brief"
+      ],
+      "placement": "structure"
+    },
+    "expected": {
+      "status": "READY",
+      "technique": "jacquard"
+    }
+  },
+  {
+    "id": "printing",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [
+        "synthetic-design-brief"
+      ],
+      "placement": "surface",
+      "surfaceMethod": "print"
+    },
+    "expected": {
+      "status": "READY",
+      "technique": "block-printing"
+    }
+  },
+  {
+    "id": "embroidery",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [
+        "synthetic-design-brief"
+      ],
+      "placement": "surface",
+      "surfaceMethod": "stitch"
+    },
+    "expected": {
+      "status": "READY",
+      "technique": "embroidery"
+    }
+  },
+  {
+    "id": "missing",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [
+        "synthetic-design-brief"
+      ]
+    },
+    "expected": {
+      "status": "NEEDS_INPUT",
+      "technique": null
+    }
+  },
+  {
+    "id": "unknown",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [
+        "synthetic-design-brief"
+      ],
+      "placement": "unknown"
+    },
+    "expected": {
+      "status": "UNKNOWN",
+      "technique": null
+    }
+  },
+  {
+    "id": "ambiguous",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [
+        "synthetic-design-brief"
+      ],
+      "placement": "surface",
+      "surfaceMethod": "either"
+    },
+    "expected": {
+      "status": "AMBIGUOUS",
+      "technique": null
+    }
+  },
+  {
+    "id": "conflict",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [
+        "synthetic-design-brief"
+      ],
+      "placement": "structure",
+      "claims": [
+        {
+          "source": "a",
+          "placement": "structure"
+        },
+        {
+          "source": "b",
+          "placement": "surface"
+        }
+      ]
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "unsupported",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [
+        "synthetic-design-brief"
+      ],
+      "placement": "surface",
+      "requestedProcess": "laser"
+    },
+    "expected": {
+      "status": "UNKNOWN",
+      "technique": null
+    }
+  },
+  {
+    "id": "evidence-missing",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [],
+      "placement": "structure"
+    },
+    "expected": {
+      "status": "NEEDS_INPUT",
+      "technique": null
+    }
+  },
+  {
+    "id": "out-of-scope",
+    "synthetic": true,
+    "input": {
+      "domain": "machine-control",
+      "evidence": [
+        "synthetic-design-brief"
+      ],
+      "machineControl": true
+    },
+    "expected": {
+      "status": "OUT_OF_SCOPE",
+      "technique": null
+    }
+  },
+  {
+    "id": "sample-failed",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "evidence": [
+        "synthetic-sample-report"
+      ],
+      "placement": "structure",
+      "sampleCheck": "FAIL"
+    },
+    "expected": {
+      "status": "FAILED",
+      "technique": null
+    }
+  },
+  {
+    "id": "requested-conflicts-surface",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "print",
+      "requestedProcess": "embroidery",
+      "evidence": [
+        "synthetic"
+      ]
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "requested-conflicts-structure",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "structure",
+      "requestedProcess": "block-printing",
+      "evidence": [
+        "synthetic"
+      ]
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "scope-before-sample-failure",
+    "synthetic": true,
+    "input": {
+      "domain": "machine-control",
+      "machineControl": true,
+      "evidence": [
+        "synthetic"
+      ],
+      "sampleCheck": "FAIL"
+    },
+    "expected": {
+      "status": "OUT_OF_SCOPE",
+      "technique": null
+    }
+  },
+  {
+    "id": "conflict-before-sample-failure",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "structure",
+      "surfaceMethod": "print",
+      "evidence": [
+        "synthetic"
+      ],
+      "sampleCheck": "FAIL"
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "request-disambiguates",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "either",
+      "requestedProcess": "embroidery",
+      "evidence": [
+        "synthetic"
+      ]
+    },
+    "expected": {
+      "status": "READY",
+      "technique": "embroidery"
+    }
+  },
+  {
+    "id": "requested-structure-with-missing-surface-method",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "requestedProcess": "jacquard",
+      "evidence": [
+        "user-brief"
+      ]
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "requested-structure-with-unknown-surface-method",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "unknown",
+      "requestedProcess": "jacquard",
+      "evidence": [
+        "user-brief"
+      ]
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "unverified-model-claim",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "unknown",
+      "requestedProcess": "laser",
+      "evidence": [
+        "untrusted"
+      ],
+      "claims": [
+        {
+          "source": "MODEL_INFERRED",
+          "placement": "surface"
+        }
+      ]
+    },
+    "expected": {
+      "status": "UNKNOWN",
+      "technique": null
+    }
+  }
+]

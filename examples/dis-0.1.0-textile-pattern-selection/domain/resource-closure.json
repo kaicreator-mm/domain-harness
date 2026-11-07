@@ -1,0 +1,189 @@
+{
+  "schemaVersion": "dis.resource-closure/0.1.0",
+  "packageId": "textile.pattern",
+  "packageRevision": "1.0.0",
+  "standardVersion": "0.1.0",
+  "definitionRef": {
+    "id": "textile.pattern",
+    "revision": "1.0.0",
+    "path": "domain/definition.json"
+  },
+  "graphRef": {
+    "id": "textile.pattern-selection",
+    "revision": "1.0.0",
+    "path": "domain/textile-pattern-selection.graph.json"
+  },
+  "units": [
+    {
+      "id": "textile.knowledge",
+      "revision": "1.0.0",
+      "path": "domain/units/knowledge.json"
+    },
+    {
+      "id": "textile.recognizer",
+      "revision": "1.0.0",
+      "path": "domain/units/recognizer.json"
+    },
+    {
+      "id": "textile.decision",
+      "revision": "1.0.0",
+      "path": "domain/units/decision.json"
+    },
+    {
+      "id": "textile.validator",
+      "revision": "1.0.0",
+      "path": "domain/units/validator.json"
+    },
+    {
+      "id": "textile.workflow",
+      "revision": "1.0.0",
+      "path": "domain/units/workflow.json"
+    }
+  ],
+  "resources": [
+    {
+      "path": "domain/definition.json",
+      "sha256": "254553cb7bff8ef4ce2fa54bb446d3d1dbac675a79a83475f71df2227c5cf51b",
+      "kind": "definition",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/schemas/textile-brief.schema.json",
+      "sha256": "86c2e88f4cbf709838c719d048a29682e84efe06d41f285657618fe111668e73",
+      "kind": "schema",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/schemas/textile-route.schema.json",
+      "sha256": "e53a53f8b6242fd601aceee5c86628174b2988cdbe799927ca71d7d0ba1989ed",
+      "kind": "schema",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/textile-pattern-selection.graph.json",
+      "sha256": "782ef0517f5fb8e1811f805447a1f538c7f3a22f026d116ee78c24fa107663d0",
+      "kind": "graph",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/decision.json",
+      "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60",
+      "kind": "unit",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/knowledge.json",
+      "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6",
+      "kind": "unit",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/recognizer.json",
+      "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
+      "kind": "unit",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/validator.json",
+      "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850",
+      "kind": "unit",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "domain/units/workflow.json",
+      "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f",
+      "kind": "unit",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "fixtures/scenarios.json",
+      "sha256": "c5a27fdbcabd6252dccadcf328304a520ad950fc17bc1b6c44bf8f0224d9ecef",
+      "kind": "fixture",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "fixtures/textile-knowledge.json",
+      "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
+      "kind": "fixture",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "README.md",
+      "sha256": "24a7563d59c7f0208d356e1c502362528b2ce6a7f0ab74e3bc575a7ce7cc1415",
+      "kind": "conformance",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "requirements-validation.txt",
+      "sha256": "756cc9e506ae4ee1a6f6c0507088b5cfc0dc8ba350fb2d2d46f1ffa72033adb6",
+      "kind": "conformance",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "scripts/validate.py",
+      "sha256": "5a75e4db15a79f4d558ae9042320de0dd08e01b9e2c1417e064e6618b19cd1de",
+      "kind": "conformance",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "src/runner.mjs",
+      "sha256": "1c0fe8ec5fa1f79bdb80fa490d7a99e1b689c184e6ac14a85c6e90c0583c1388",
+      "kind": "implementation",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    },
+    {
+      "path": "test/runner.test.mjs",
+      "sha256": "3275c89808003b728cd45ccc91bc54184ba10832ec859f440d5016fe24d97a33",
+      "kind": "conformance",
+      "owners": [
+        "textile.pattern"
+      ],
+      "required": true
+    }
+  ]
+}

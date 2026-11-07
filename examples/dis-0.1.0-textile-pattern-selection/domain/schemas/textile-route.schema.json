@@ -1,0 +1,1426 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "candidates",
+        "technique",
+        "evidence",
+        "unknowns",
+        "brief",
+        "recognition"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "KNOWN",
+            "UNKNOWN",
+            "AMBIGUOUS",
+            "CONFLICT",
+            "NEEDS_INPUT",
+            "FAILED",
+            "OUT_OF_SCOPE",
+            "READY"
+          ]
+        },
+        "candidates": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "jacquard",
+              "block-printing",
+              "embroidery"
+            ]
+          }
+        },
+        "technique": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "jacquard",
+            "block-printing",
+            "embroidery",
+            null
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "brief": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "domain": {
+              "type": "string"
+            },
+            "placement": {
+              "enum": [
+                "structure",
+                "surface",
+                "unknown"
+              ]
+            },
+            "surfaceMethod": {
+              "enum": [
+                "print",
+                "stitch",
+                "either",
+                "unknown"
+              ]
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "claims": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "source",
+                  "placement"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "placement": {
+                    "enum": [
+                      "structure",
+                      "surface"
+                    ]
+                  }
+                }
+              }
+            },
+            "requestedProcess": {
+              "type": "string"
+            },
+            "machineControl": {
+              "type": "boolean"
+            },
+            "sampleCheck": {
+              "enum": [
+                "PASS",
+                "FAIL",
+                "UNKNOWN"
+              ]
+            }
+          },
+          "required": [
+            "domain",
+            "evidence"
+          ]
+        },
+        "recognition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "normalizedIntent",
+            "confirmedValues",
+            "inferredValues",
+            "observedValues",
+            "candidateValues",
+            "unknownValues",
+            "missingFields",
+            "ambiguities",
+            "conflicts",
+            "uncertainty",
+            "inputStatus",
+            "inputEvidence",
+            "submittedValues"
+          ],
+          "properties": {
+            "normalizedIntent": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "value",
+                "source",
+                "evidence",
+                "status",
+                "sourceClaim"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "value": {},
+                "source": {
+                  "enum": [
+                    "USER_CONFIRMED",
+                    "SYSTEM_OBSERVED",
+                    "MODEL_INFERRED",
+                    "DERIVED",
+                    null
+                  ]
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "status": {
+                  "enum": [
+                    "CONFIRMED",
+                    "INFERRED",
+                    "CANDIDATE",
+                    "UNKNOWN"
+                  ]
+                },
+                "sourceClaim": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "confirmedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "inferredValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "observedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "candidateValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "unknownValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "missingFields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "ambiguities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "conflicts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "uncertainty": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "inputStatus": {
+              "enum": [
+                "VALID",
+                "OUT_OF_SCOPE"
+              ]
+            },
+            "inputEvidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "submittedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "candidates",
+        "technique",
+        "unknowns",
+        "brief",
+        "recognition"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "KNOWN",
+            "UNKNOWN",
+            "AMBIGUOUS",
+            "CONFLICT",
+            "NEEDS_INPUT",
+            "FAILED",
+            "OUT_OF_SCOPE",
+            "READY"
+          ]
+        },
+        "candidates": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "jacquard",
+              "block-printing",
+              "embroidery"
+            ]
+          }
+        },
+        "technique": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "jacquard",
+            "block-printing",
+            "embroidery",
+            null
+          ]
+        },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "brief": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "domain": {
+              "type": "string"
+            },
+            "placement": {
+              "enum": [
+                "structure",
+                "surface",
+                "unknown"
+              ]
+            },
+            "surfaceMethod": {
+              "enum": [
+                "print",
+                "stitch",
+                "either",
+                "unknown"
+              ]
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "claims": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "source",
+                  "placement"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "placement": {
+                    "enum": [
+                      "structure",
+                      "surface"
+                    ]
+                  }
+                }
+              }
+            },
+            "requestedProcess": {
+              "type": "string"
+            },
+            "machineControl": {
+              "type": "boolean"
+            },
+            "sampleCheck": {
+              "enum": [
+                "PASS",
+                "FAIL",
+                "UNKNOWN"
+              ]
+            }
+          },
+          "required": [
+            "domain",
+            "evidence"
+          ]
+        },
+        "recognition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "normalizedIntent",
+            "confirmedValues",
+            "inferredValues",
+            "observedValues",
+            "candidateValues",
+            "unknownValues",
+            "missingFields",
+            "ambiguities",
+            "conflicts",
+            "uncertainty",
+            "inputStatus",
+            "inputEvidence",
+            "submittedValues"
+          ],
+          "properties": {
+            "normalizedIntent": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "value",
+                "source",
+                "evidence",
+                "status",
+                "sourceClaim"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "value": {},
+                "source": {
+                  "enum": [
+                    "USER_CONFIRMED",
+                    "SYSTEM_OBSERVED",
+                    "MODEL_INFERRED",
+                    "DERIVED",
+                    null
+                  ]
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "status": {
+                  "enum": [
+                    "CONFIRMED",
+                    "INFERRED",
+                    "CANDIDATE",
+                    "UNKNOWN"
+                  ]
+                },
+                "sourceClaim": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "confirmedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "inferredValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "observedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "candidateValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "unknownValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "missingFields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "ambiguities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "conflicts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "uncertainty": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "inputStatus": {
+              "enum": [
+                "VALID",
+                "OUT_OF_SCOPE"
+              ]
+            },
+            "inputEvidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "submittedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence",
+                  "status",
+                  "sourceClaim"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED",
+                      null
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "CONFIRMED",
+                      "INFERRED",
+                      "CANDIDATE",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "sourceClaim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

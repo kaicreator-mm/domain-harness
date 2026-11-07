@@ -1,0 +1,201 @@
+{
+  "schemaVersion": "dis.graph/0.1.0",
+  "id": "textile.pattern-selection",
+  "revision": "1.0.0",
+  "inputSchemaRef": "domain/schemas/textile-brief.schema.json",
+  "outputSchemaRef": "domain/schemas/textile-route.schema.json",
+  "entryNode": "recognize",
+  "nodes": [
+    {
+      "nodeId": "recognize",
+      "unitRef": {
+        "id": "textile.recognizer",
+        "revision": "1.0.0"
+      }
+    },
+    {
+      "nodeId": "decide",
+      "unitRef": {
+        "id": "textile.decision",
+        "revision": "1.0.0"
+      }
+    },
+    {
+      "nodeId": "validate",
+      "unitRef": {
+        "id": "textile.validator",
+        "revision": "1.0.0"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "kind": "control",
+      "from": "recognize",
+      "to": "decide"
+    },
+    {
+      "kind": "control",
+      "from": "decide",
+      "to": "validate"
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/status"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/status"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/candidates"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/candidates"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/technique"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/technique"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/unknowns"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/unknowns"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/brief"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/brief"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/recognition"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/recognition"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/status"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/status"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/candidates"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/candidates"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/technique"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/technique"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/unknowns"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/unknowns"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/brief"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/brief"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/recognition"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/recognition"
+      }
+    },
+    {
+      "kind": "evidence",
+      "from": {
+        "node": "recognize",
+        "pointer": "/evidence"
+      },
+      "to": {
+        "node": "decide",
+        "slot": "sourceEvidence"
+      }
+    },
+    {
+      "kind": "evidence",
+      "from": {
+        "node": "decide",
+        "pointer": "/evidence"
+      },
+      "to": {
+        "node": "validate",
+        "slot": "sourceEvidence"
+      }
+    }
+  ],
+  "terminalNodes": [
+    "validate"
+  ],
+  "cyclePolicy": "DAG_ONLY"
+}

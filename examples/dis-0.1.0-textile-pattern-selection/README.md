@@ -1,0 +1,30 @@
+# Textile Pattern Process Selection — DIS F012 reference profile
+
+This experimental REFERENCE package proposes a **candidate sample-planning route**. It is not a production qualification, supplier recommendation, machine-control program or proof that DomainHarness Runtime adopts DIS (#1486). All briefs are synthetic and are unrelated to claims about ethnic textile traditions. No Tally assets are used.
+
+The frozen standard is HEAD `9504c78f4651f6c1ebc48c7858fca2d8b061544b`, TREE `c8bab9f5931f0a8e2fa97b4e98c9a77f33962149`. Its five schemas are consumed without modification. Unlike xDownload's page/player ontology, this profile models warp/weft structure, pattern placement and surface process evidence. Jacquard embeds design during weaving; block printing applies pattern to fabric; embroidery adds stitching. Plain/twill/satin describe weave structure and are not interchangeable surface-decoration methods.
+
+## Source ledger
+
+The machine-readable ledger in `fixtures/textile-knowledge.json` records authority, URL, exact section locator, access date and limitations. Only short original paraphrases are stored; no images or substantial text are copied.
+
+1. [NC State Weaving Studio](https://textiles.ncsu.edu/industry/labs-and-facilities/weaving-studio/): “Weaving Studio”, “Unique Capabilities”, “Equipment”; current capture lines 64–88. Educational sampling and individual-thread-control Jacquard capability.
+2. [NC State Weaving Lab](https://textiles.ncsu.edu/zte/weaving-lab/): “Weaving Lab”, “What is Shedding?”, “Whats is dobby shedding?”, “What is jacquard shedding?”; current capture lines 35–40, 90–101. Shedding and individual warp control distinctions.
+3. [GWU Textile Traditions](https://museum.gwu.edu/textile-traditions): “Block Printing in India” (114–116), “Suzani in Uzbekistan” (129–131), “Jacquard in Japan” (140–142). These sections support process distinctions, not a cultural attribution of synthetic inputs.
+4. [NPS Weaving Patterns](https://www.nps.gov/articles/000/weaving-patterns.htm): “Weaving Patterns” (19–25), “Plain Weave” (26–36), “Twill” (37–49), “Satin” (52–54). The last locator includes the Satin text beyond the original Issue's shortened capture range. Section headings are stable locators; web line numbers are capture-specific.
+
+All were accessed 2026-11-07. No evidence establishes Myanmar/local availability, price, MOQ, lead time, machine suitability or commercial feasibility. Each outcome preserves those UNKNOWN questions and requires supplier/sample validation.
+
+## Consumer profile
+
+`loadPackage({expectedClosureSha256, expectedSelectionSha256})` requires two independently supplied, trusted SHA-256 pins. It verifies the closure bytes and the canonical selection lock, all admitted bytes and local realpath containment before creating a private snapshot. The lock lists exact Unit, Graph and Knowledge identities, revisions and content digests and explicitly authorizes only this synthetic sampling REFERENCE profile; it denies production and activation. It is an experimental non-production selection policy, not promotion authority. Units do not claim PROMOTED maturity; no synthetic governance grant is manufactured. Obtain both expected digests from a trusted delivery receipt, not from the package being loaded. The Knowledge mutation test disables Jacquard in a new 2.0.0 package with revised assets and new pins; it demonstrates actual UNKNOWN output while the old loaded snapshot still returns Jacquard.
+
+`runPipeline(brief, handle)` performs no file/network/Tool/Effect operations. It executes the verified DAG: Recognizer → Decision → Validator. Explicit data and evidence edges carry separate payloads; traces record the consumed evidence and failure actions terminate execution at the responsible node. Malformed input raises INVALID_INPUT with its rejecting trace. Structured briefs distinguish placement and surface method, and incompatible requested processes produce CONFLICT. READY means only that one source-backed candidate route was found; a reported failed sample check changes a READY route to FAILED. There are no machine settings, prices or production commitments.
+
+The Recognizer preserves submitted evidence labels, including for conflict and out-of-scope outcomes. Submission is not proof of provenance: the profile records submitted values as candidates with unknown (`null`) source, retains any source claim as an unverified claim, and leaves observed, confirmed and inferred values empty. Derived candidates, field-level unknowns, missing fields, ambiguities, conflicts and uncertainty record provenance separately from value status. Evidence labels are descriptive and untrusted; their presence does not authenticate a claim. An unsupported failure action rejects with the executed node's input, output and evidence in the error trace.
+
+## Reproduction
+
+Use Windows-native Node **24.21.0** and Python 3.13.15 with `jsonschema==4.26.0`; no WSL. Supply the trusted receipt values as `DIS_TEXTILE_EXPECTED_CLOSURE` and `DIS_TEXTILE_EXPECTED_SELECTION`, and set `DIS_TEXTILE_TEMP_DIR` to a writable temporary directory for isolated tests. First run `node --check src/runner.mjs`, `node --check test/runner.test.mjs` and Python syntax compilation with a temporary pycache prefix. Then run `npm test`, `npm run demo` and `npm run validate`. Tests use Node's built-in runner and no package installation. The Python validator independently loads frozen schemas, hashes resources, reconstructs Graph inputs, evidence, control and outputs and checks actual Node traces and the changed-Knowledge result.
+
+`domain/resource-closure.json` includes all 16 consumed definition, graph, Unit, schema, knowledge, scenario, implementation, conformance and README resources. It excludes the descriptor/manifest envelopes and four generated validation outputs to avoid a self-hashing cycle. The descriptor pins the manifest's raw-byte SHA256. Generated traces/report are validated as outputs, never treated as source authority. `validation/FINAL_VALIDATION.md` and the external exact-SHA receipt describe validation scope and limitations.
