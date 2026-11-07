@@ -52,6 +52,79 @@ interface Manifest {
   resources: { path: string; sha256: string }[];
 }
 
+function validateProbeGraph(graph: Graph, units: Record<string, Unit>, parse: <T>(ref: string) => T): void {
+  type Schema = { properties?: Record<string, unknown>; required?: string[] };
+  const reject = (ok: unknown, code: string) => { if (!ok) throw new Error('INVALID_GRAPH:' + code); };
+  reject(graph.schemaVersion === 'dis.graph/0.1.0' && graph.cyclePolicy === 'DAG_ONLY', 'SCHEMA');
+  reject(Array.isArray(graph.nodes) && graph.nodes.length > 0 && graph.nodes.length <= 32 && Array.isArray(graph.edges) && graph.edges.length <= 128, 'SIZE');
+  const nodes = new Map(graph.nodes.map((node) => [node.nodeId, node]));
+  reject(nodes.size === graph.nodes.length && nodes.has(graph.entryNode), 'NODES');
+  reject(Array.isArray(graph.terminalNodes) && graph.terminalNodes.length > 0 && new Set(graph.terminalNodes).size === graph.terminalNodes.length && graph.terminalNodes.every((id) => nodes.has(id)), 'TERMINALS');
+  for (const node of graph.nodes) reject(units[node.unitRef.id]?.revision === node.unitRef.revision, 'UNIT_REF');
+  const schema = (id: string, field: 'input' | 'output') => parse<Schema>(units[nodes.get(id)!.unitRef.id][field].schemaRef);
+  reject(units[nodes.get(graph.entryNode)!.unitRef.id].input.schemaRef === graph.inputSchemaRef, 'GRAPH_INPUT');
+  for (const id of graph.terminalNodes) reject(units[nodes.get(id)!.unitRef.id].output.schemaRef === graph.outputSchemaRef, 'GRAPH_OUTPUT');
+  reject(new Set(graph.edges.map((edge) => canonicalDigest(edge))).size === graph.edges.length, 'DUPLICATE_EDGE');
+  const controls = graph.edges.filter((edge) => edge.kind === 'control');
+  const adjacency = new Map(graph.nodes.map((node) => [node.nodeId, [] as string[]]));
+  for (const edge of graph.edges) {
+    reject(['control','data','evidence'].includes(edge.kind), 'EDGE_KIND');
+    if (edge.kind === 'control') {
+      reject(nodes.has(edge.from) && nodes.has(edge.to), 'CONTROL_ENDPOINT');
+      if (edge.when) {
+        reject(edge.when.operator === 'equals' && Object.hasOwn(edge.when,'value'), 'CONDITION');
+        reject(edge.when.path === '' || /^\/[a-zA-Z][a-zA-Z0-9]*$/.test(edge.when.path) && Object.hasOwn(schema(edge.from,'output').properties ?? {},edge.when.path.slice(1)), 'CONDITION_POINTER');
+      }
+      adjacency.get(edge.from)!.push(edge.to);
+    } else {
+      reject(nodes.has(edge.from.node) && nodes.has(edge.to.node), 'BINDING_ENDPOINT');
+      reject(edge.from.node !== edge.to.node && edge.to.node !== graph.entryNode, 'BINDING_ANCESTRY');
+      const source = schema(edge.from.node,'output');
+      reject(edge.from.pointer === '' && edge.kind === 'data' || /^\/[a-zA-Z][a-zA-Z0-9]*$/.test(edge.from.pointer) && Object.hasOwn(source.properties ?? {},edge.from.pointer.slice(1)) && (source.required ?? []).includes(edge.from.pointer.slice(1)), 'SOURCE_POINTER');
+      if (edge.kind === 'data') reject(/^\/[a-zA-Z][a-zA-Z0-9]*$/.test(edge.to.pointer) && Object.hasOwn(schema(edge.to.node,'input').properties ?? {},edge.to.pointer.slice(1)), 'TARGET_POINTER');
+      else reject((units[nodes.get(edge.to.node)!.unitRef.id].evidence?.consumes ?? []).includes(edge.to.slot), 'EVIDENCE_SLOT');
+    }
+  }
+  for (const node of graph.nodes) {
+    const outgoing = controls.filter((edge) => edge.kind === 'control' && edge.from === node.nodeId);
+    if (outgoing.length === 1) reject(!outgoing[0].when, 'PARTIAL_CONTROL');
+    if (outgoing.length > 1) {
+      const path = outgoing[0].when?.path;
+      reject(typeof path === 'string' && path !== '' && outgoing.every((edge) => edge.when?.operator === 'equals' && edge.when.path === path), 'AMBIGUOUS_CONTROL');
+      const field = (schema(node.nodeId,'output').properties ?? {})[path!.slice(1)] as {enum?: unknown[]};
+      reject(Array.isArray(field?.enum) && new Set(outgoing.map((edge) => canonicalDigest(edge.when!.value))).size === outgoing.length && canonicalDigest(field.enum.map(canonicalDigest).sort()) === canonicalDigest(outgoing.map((edge) => canonicalDigest(edge.when!.value)).sort()), 'CONTROL_COVERAGE');
+    }
+  }
+  const paths: string[][] = [], visiting = new Set<string>(), reached = new Set<string>();
+  const visit = (node: string, path: string[]) => {
+    reject(!visiting.has(node), 'CYCLE');
+    visiting.add(node); reached.add(node);
+    const next = adjacency.get(node)!;
+    if (graph.terminalNodes.includes(node)) {
+      reject(next.length === 0, 'TERMINAL_CONTROL'); paths.push([...path,node]); reject(paths.length <= 256, 'PATH_LIMIT');
+    } else { reject(next.length > 0, 'DEAD_END'); for (const target of next) visit(target,[...path,node]); }
+    visiting.delete(node);
+  };
+  visit(graph.entryNode,[]); reject(reached.size === nodes.size, 'UNREACHABLE');
+  for (const edge of graph.edges) if (edge.kind !== 'control') {
+    reject(paths.some((path) => path.includes(edge.to.node) && path.indexOf(edge.from.node) >= 0 && path.indexOf(edge.from.node) < path.indexOf(edge.to.node)), 'BINDING_ANCESTRY');
+  }
+  for (const path of paths) for (const [index,id] of path.entries()) {
+    if (index === 0) continue;
+    const previous = new Set(path.slice(0,index));
+    const target = schema(id,'input');
+    const bindings = graph.edges.filter((edge) => edge.kind === 'data' && edge.to.node === id && previous.has(edge.from.node));
+    for (const field of Object.keys(target.properties ?? {})) {
+      const count = bindings.filter((edge) => edge.kind === 'data' && edge.to.pointer === '/'+field).length;
+      reject(count <= 1 && (!(target.required ?? []).includes(field) || count === 1), 'DATA_PATH_BINDING');
+    }
+    for (const slot of units[nodes.get(id)!.unitRef.id].evidence?.consumes ?? []) {
+      const count = graph.edges.filter((edge) => edge.kind === 'evidence' && edge.to.node === id && edge.to.slot === slot && previous.has(edge.from.node)).length;
+      reject(count === 1, 'EVIDENCE_PATH_BINDING');
+    }
+  }
+}
+
 export async function selectKnowledge(root: string, expected: { descriptor: string; closure: string; lock: string }): Promise<Selection> {
   root = await realpath(root);
   async function inside(ref: string) {
@@ -106,6 +179,7 @@ export async function selectKnowledge(root: string, expected: { descriptor: stri
     units[unit.id] = unit;
     unitRefs[unit.id] = { ...ref, sha256: selected.sha256 };
   }
+  validateProbeGraph(graph, units, parse);
   const workflow = units[definition.workflowRef.unitRef.id];
   if (!workflow || workflow.role !== 'workflow' || workflow.revision !== definition.workflowRef.unitRef.revision
       || workflow.implementation.ref !== 'graph:' + graph.id + '@' + graph.revision || workflow.implementation.artifactRef !== asset.path) throw new Error('WORKFLOW_BINDING');

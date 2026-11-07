@@ -13,17 +13,17 @@ export function consumeDis(input: unknown, selection: Selection) {
   });
   if (input === null || typeof input !== 'object' || Array.isArray(input)) return result('FAILED', null, 'Invalid structured observation');
   const brief = input as ObjectData;
-  if (!brief.url || brief.signals === undefined) return result('NEEDS_INPUT', null, 'Supply the Page URL and observed signals');
   if (Object.keys(brief).some((key) => !['url','signals','claims','encryptedPlayer','unsupportedPlayerFamily'].includes(key))
-      || typeof brief.url !== 'string' || !Array.isArray(brief.signals) || !brief.signals.every((item) => typeof item === 'string')
+      || (brief.url !== undefined && typeof brief.url !== 'string') || (brief.signals !== undefined && (!Array.isArray(brief.signals) || !brief.signals.every((item) => typeof item === 'string')))
       || (brief.claims !== undefined && (!Array.isArray(brief.claims) || !brief.claims.every((item) =>
         item && Object.keys(item).length === 2 && typeof item.sourceId === 'string' && item.sourceId
         && typeof item.playerId === 'string' && item.playerId)))
       || ['encryptedPlayer','unsupportedPlayerFamily'].some((key) => brief[key] !== undefined && typeof brief[key] !== 'boolean')) {
     return result('FAILED', null, 'Invalid structured observation');
   }
+  if (!brief.url || brief.signals === undefined) return result('NEEDS_INPUT', null, 'Supply the Page URL and observed signals');
   // Domain App accepts a bounded observation and normalizes only outer URL whitespace.
-  const sourceUrl = brief.url.trim();
+  const sourceUrl = (brief.url as string).trim();
   if (!/^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+$/.test(sourceUrl)) return result('FAILED', null, 'Invalid Page URL');
   const observed = { ...brief, url: sourceUrl };
   const graphRole = (provider: string, payload: ObjectData, evidence: Record<string, unknown>) => {

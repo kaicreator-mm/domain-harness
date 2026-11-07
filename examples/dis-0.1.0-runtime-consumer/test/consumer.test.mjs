@@ -40,6 +40,30 @@ async function assertHostReceipt(app, observation, message, expected, recognitio
   assert.equal(result.status,expected);
   if (recognitionStatus) assert.equal(result.trace[0].output.status,recognitionStatus);
   verifyTrace(result,observation,app.selected.selection,schemas);
+  if (recognitionStatus === 'conflict') {
+    const forged=structuredClone(result);forged.trace[0].output.conflicts[0].claims[0].playerId='forged';
+    assert.throws(()=>verifyTrace(forged,observation,app.selected.selection,schemas),/recognizer reconstructed output/);
+  }
+  if (recognitionStatus === 'ambiguous') {
+    const forged=structuredClone(result);forged.trace[0].output.ambiguities=[];
+    assert.throws(()=>verifyTrace(forged,observation,app.selected.selection,schemas),/recognizer reconstructed output/);
+  }
+  if (recognitionStatus === 'unknown') {
+    for(const mutate of [output=>{output.uncertainty.level='LOW';},output=>{output.missingFields=[];},output=>{output.sourceUrl='https://forged.test/';}]) {
+      const forged=structuredClone(result);mutate(forged.trace[0].output);
+      assert.throws(()=>verifyTrace(forged,observation,app.selected.selection,schemas),/recognizer reconstructed output/);
+    }
+    const forged=structuredClone(result),resolution={status:'READY',playerId:'jwplayer',strategyId:'forged'};
+    forged.trace.find((frame)=>frame.nodeId==='bounded-fallback').output=resolution;
+    const terminal=forged.trace.find((frame)=>frame.nodeId==='validate');terminal.input.resolution=resolution;
+    terminal.output={...resolution,evidence:terminal.evidence.recognitionEvidence,evidenceCount:terminal.evidence.recognitionEvidence.length};
+    forged.outcome=terminal.output;forged.status='READY';
+    assert.throws(()=>verifyTrace(forged,observation,app.selected.selection,schemas),/fallback reconstructed output/);
+  }
+  if (message === 'failed') {
+    const forged={...structuredClone(result),status:'NEEDS_INPUT',reason:'Supply the Page URL and observed signals'};
+    assert.throws(()=>verifyTrace(forged,observation,app.selected.selection,schemas),/invalid input classification/);
+  }
   assert.equal(effect.effectId,receipt.admitted.durableControlTurnId + '/effect/1');
   const journal = await app.readOccurrence(effect.effectId);
   assert.equal(journal.key,'v10/k/' + build.subjectDigest + '/tenant:dis-reference/v08-kernel:effect-journal:' + effect.effectId);
@@ -77,9 +101,11 @@ test('selected BUILD, one DomainApp, private adapter output and SQLite journal',
     assert.equal(readDisResult(receipt).outcome.playerId,'jwplayer');
     assert.equal(readDisResult(receipt).outcome.strategyId,'jwplayer.extract.v1');
     const forged = structuredClone(readDisResult(receipt));forged.trace[0].output.candidates=['videojs'];
-    assert.throws(()=>verifyTrace(forged,{...known,url:' ' + url + ' '},app.selected.selection,schemas),/recognizer candidate evidence/);
+    assert.throws(()=>verifyTrace(forged,{...known,url:' ' + url + ' '},app.selected.selection,schemas),/recognizer reconstructed output/);
     const forgedFailure = {...structuredClone(readDisResult(receipt)),status:'FAILED',outcome:null,trace:[]};
     assert.throws(()=>verifyTrace(forgedFailure,known,app.selected.selection,schemas),/valid input cannot terminate before recognition/);
+    const invalidBody = {...forgedFailure,reason:'Invalid structured observation'};
+    verifyTrace(invalidBody,null,app.selected.selection,schemas);verifyTrace(invalidBody,[],app.selected.selection,schemas);
     const cases = [
       ['unknown',{url,signals:['unrecognized']},'NEEDS_REVIEW','unknown'],
       ['ambiguous',{url,signals:['jwplayer','videojs']},'NEEDS_INPUT','ambiguous'],
@@ -87,6 +113,7 @@ test('selected BUILD, one DomainApp, private adapter output and SQLite journal',
       ['out-of-scope',{url,signals:['jwplayer'],encryptedPlayer:true},'OUT_OF_SCOPE','out_of_scope'],
       ['missing-input',{url},'NEEDS_INPUT'],
       ['failed',{url,signals:[7]},'FAILED'],
+      ['malformed-with-missing',{url,tool:'download'},'FAILED'],
       ['tool-refused',{...known,tool:'download'},'FAILED'],
       ['claims-only',{url,signals:[],claims:[{sourceId:'unverified',playerId:'jwplayer'}]},'NEEDS_REVIEW','unknown'],
       ['url-signature',{url:'https://example.test/jwplayer.setup',signals:[]},'READY','recognized'],
@@ -154,6 +181,27 @@ test('selected provider target and contract are checked even under new descripto
     mutated.dis.selectionLockSha256=canonicalDigest(mutated.dis.selectionLock);await writeJson(file,mutated);
     const pins={descriptor:digest(await readFile(file)),closure:mutated.dis.resourceClosureSha256,lock:mutated.dis.selectionLockSha256};
     await assert.rejects(buildDemo(root,pins),/PROVIDER_LOCK_MISMATCH/);
+  }
+}));
+test('invalid Graphs fail closed even with recomputed external pins',()=>withEvidence(async(dir)=>{
+  const mutations=[
+    graph=>graph.edges.push({kind:'control',from:'validate',to:'validate'}),
+    graph=>graph.nodes.push(structuredClone(graph.nodes[0])),
+    graph=>graph.edges.push(structuredClone(graph.edges.find((edge)=>edge.kind==='data'))),
+    graph=>{graph.edges=graph.edges.filter((edge)=>!(edge.kind==='data'&&edge.to.node==='decide'));},
+    graph=>{graph.edges.find((edge)=>edge.kind==='evidence').to.slot='undeclared';},
+    graph=>{graph.edges.find((edge)=>edge.kind==='evidence').from.node='bounded-fallback';},
+    graph=>{graph.edges.find((edge)=>edge.kind==='control'&&edge.to==='bounded-fallback').when.value='KNOWN';},
+  ];
+  for(const [index,mutate] of mutations.entries()) {
+    const root=path.join(dir,'graph-'+index);await cp(frozen,root,{recursive:true});
+    const descriptorPath=path.join(root,'package.json'),descriptor=await readJson(descriptorPath);
+    const closurePath=path.join(root,descriptor.dis.resourceClosurePath),closure=await readJson(closurePath);
+    const graphPath=path.join(root,closure.graphRef.path),graph=await readJson(graphPath);mutate(graph);await writeJson(graphPath,graph);
+    const graphDigest=digest(await readFile(graphPath));closure.resources.find((entry)=>entry.path===closure.graphRef.path).sha256=graphDigest;await writeJson(closurePath,closure);
+    descriptor.dis.selectionLock.selectedAssets.find((asset)=>asset.kind==='graph').sha256=graphDigest;
+    descriptor.dis.resourceClosureSha256=digest(await readFile(closurePath));descriptor.dis.selectionLockSha256=canonicalDigest(descriptor.dis.selectionLock);await writeJson(descriptorPath,descriptor);
+    await assert.rejects(buildDemo(root,{descriptor:digest(await readFile(descriptorPath)),closure:descriptor.dis.resourceClosureSha256,lock:descriptor.dis.selectionLockSha256}),/INVALID_GRAPH/);
   }
 }));
 test('BUILD rejects forged or modified selection snapshots',async()=>{

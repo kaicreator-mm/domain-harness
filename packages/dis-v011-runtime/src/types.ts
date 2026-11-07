@@ -5,8 +5,11 @@ export type GraphEdge =
   | { kind: 'data'; from: { node: string; pointer: string }; to: { node: string; pointer: string } }
   | { kind: 'evidence'; from: { node: string; pointer: string }; to: { node: string; slot: string } };
 export interface Graph {
+  schemaVersion: string;
   id: string;
   revision: string;
+  inputSchemaRef: string;
+  outputSchemaRef: string;
   entryNode: string;
   terminalNodes: string[];
   cyclePolicy: string;
@@ -19,6 +22,7 @@ export interface Unit {
   role: string;
   implementation: { ref: string; artifactRef: string; candidates?: { candidateId: string; ref: string; artifactRef: string; artifactDigest: string; target: string; contractDigest: string }[] };
   capabilities?: { provides: { capabilityId: string; owner: string; authorityRef: string; version: string; contractDigest: string }[] };
+  evidence?: { consumes?: string[] };
   failure: { handling: Record<string, { action: string }> };
   input: { schemaRef: string };
   output: { schemaRef: string };
