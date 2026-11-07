@@ -1,0 +1,34 @@
+{
+  "format": "dis-runtime-qualification-index/1",
+  "scope": "PRIVATE_REFERENCE_ONLY",
+  "appSha256": "69291116a5a90f05bbaf217763f0bf2972485541a8d3949b1eed3464d89dbea9",
+  "primarySha256": "399150a1fbaa07daf3b97e33c0d33b46ef43bb9f3b214b34f6c471341dd14c57",
+  "variants": {
+    "baseline": {
+      "packageId": "xdownload.web-media-runtime",
+      "revision": "2.0.0",
+      "target": "node24",
+      "descriptor": "d60c505184d1d9141181958b2df54f0ee2b1dfb14c94153fcbb1fc36fdeb36ac",
+      "closure": "e0faeb4bf88411f3df67ad70f854516895c395fb7b14b2bbb4f46f8c857bc2c1",
+      "lock": "914c160ce5af017d856d063aca757e6dfb1e0a5c053a723f8db788eb3aafaf67",
+      "provider": "7b3a6661a0f07848b5cd66ab64c9c2d1cea1ae261f722e33b8c9e0b5a7d06558",
+      "knowledge": "039bd05b6fc8f9b2e963112f36005bee045df3a7c0cd8b530879044c0105d947",
+      "graph": "b5021fb72765de7f94fbba310dc4608f0e7f84e38bfe4a93527ee5018513d978",
+      "validationEvidence": "fa1d48025bdfa0fd682c6d103d3304a9464a257564f964c963c2f92d93c8bf7f",
+      "promotionDecision": "e3c6dcd1d567424a93214e1468416303042f72bf1f88cec6efc3a214ee3ea2cf"
+    },
+    "reselected": {
+      "packageId": "xdownload.web-media-runtime",
+      "revision": "2.1.0",
+      "target": "node24",
+      "descriptor": "84f363326c454b604bbb4a36d2b6940a37714b4f13a5787f96dc4ea68d4eedd8",
+      "closure": "de802714df82139db900206e93e541773f6aa5e15b0a0f0dc2523f47337053d3",
+      "lock": "cd2dfc5bb3221a3d7f18a9bbe953eeb33b4fc8753f911f1a7735da8942706840",
+      "provider": "7b3a6661a0f07848b5cd66ab64c9c2d1cea1ae261f722e33b8c9e0b5a7d06558",
+      "knowledge": "fe56692e61e4d252f1bcbdacce561b774fec19e8612ee9262bdd4116e529d765",
+      "graph": "c54ebf7ed04ffefd661d40923ae323c326da8e53df72882e6859ec5b484a68c3",
+      "validationEvidence": "b55af5bf972df425a263118d646d8f75643808a660d59fd696c3031bb9cd0dfe",
+      "promotionDecision": "70c8f7df641d33484af73551b1eb6ba4fdd0a2a532627167e5fbb822b67d9669"
+    }
+  }
+}

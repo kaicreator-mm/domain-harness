@@ -35,11 +35,19 @@ interface PackageIdentity {
   resourceClosurePath: string;
   resourceClosureSha256: string;
   selectionLockSha256: string;
+  runtimeReader?: { knowledgeKind: string; processor: string; resourcePath: string };
   selectionLock: {
     packageId: string;
     packageRevision: string;
     selectedAssets: (UnitRef & { kind: string; sha256: string })[];
     target: string;
+    validationEvidence?: { path: string; sha256: string };
+    promotionDecision?: {
+      kind: string; scope: string; authority: string; authorizationEvidence: string;
+      prior: { kind: string; packageId?: string; revision?: string; lockSha256?: string };
+      subject: { id: string; revision: string; sha256: string };
+      validationEvidence: { path: string; sha256: string };
+    };
     selectedCapabilities: { capabilityId: string; owner: string; authorityRef: string; version: string; contractDigest: string; provider: { unitId: string; unitRevision: string; candidateId: string; implementationRef: string; artifactRef: string; artifactDigest: string; target: string; contractDigest: string } }[];
   };
 }
@@ -198,12 +206,56 @@ export async function selectKnowledge(root: string, expected: { descriptor: stri
   }
   const signaturesRef = units[graph.nodes.find((node) => node.nodeId === graph.entryNode)!.unitRef.id].knowledgeRefs?.[0];
   const resolveUnit = parse<Unit & { evidence: { sources: { sourceId: string; ref: string }[] } }>(unitRefs['xdownload.player.resolve-procedure'].path);
-  const strategiesRef = resolveUnit.evidence.sources.find((source) => source.sourceId === 'strategy-map')?.ref;
+  const runtimeReader = identity.runtimeReader;
+  const strategyKnowledge = resolveUnit.knowledgeRefs?.[0];
+  let providerArtifact: Selection['providerArtifact'];
+  if (runtimeReader) {
+    const provider = identity.selectionLock.selectedCapabilities[0].provider;
+    const strategiesAsset = identity.selectionLock.selectedAssets.find((item) => item.kind === 'knowledge');
+    const definitionAsset = identity.selectionLock.selectedAssets.find((item) => item.kind === 'definition');
+    if (!definitionAsset || definitionAsset.id !== definition.domainId || definitionAsset.revision !== definition.revision
+        || definitionAsset.path !== manifest.definitionRef.path) throw new Error('DEFINITION_LOCK_MISMATCH');
+    requirePin(resources[definitionAsset.path],definitionAsset.sha256,'DEFINITION_LOCK_DIGEST');
+    const validation = identity.selectionLock.validationEvidence;
+    const decision = identity.selectionLock.promotionDecision;
+    if (!validation || !decision || decision.kind !== 'PRIVATE_REFERENCE_SELECTION' || decision.scope !== 'PRIVATE_REFERENCE_ONLY'
+        || decision.authority !== 'kaicreator-mm/dis-private-runtime-reference'
+        || decision.authorizationEvidence !== 'https://github.com/kaicreator-mm/domain-harness/pull/1498#issuecomment-6714146893'
+        || decision.subject.id !== identity.packageId || decision.subject.revision !== identity.revision
+        || decision.subject.sha256 !== expected.closure || canonicalDigest(decision.validationEvidence) !== canonicalDigest(validation)
+        || !['GENESIS','PREVIOUS_PRIVATE_SELECTION'].includes(decision.prior.kind)) throw new Error('RUNTIME_PRIVATE_QUALIFICATION_MISSING');
+    if (decision.prior.kind === 'PREVIOUS_PRIVATE_SELECTION'
+        && (decision.prior.packageId !== identity.packageId || decision.prior.revision === identity.revision
+          || !/^[a-f0-9]{64}$/.test(decision.prior.lockSha256 ?? ''))) throw new Error('RUNTIME_PRIVATE_PRIOR_SELECTION_INVALID');
+    const reportBytes = await inside(validation.path);
+    requirePin(digest(reportBytes),validation.sha256,'RUNTIME_VALIDATION_REPORT_DIGEST_MISMATCH');
+    const report = JSON.parse(reportBytes.toString('utf8')) as { result: string; subject: typeof decision.subject; dependencyClosure: { sha256: string } };
+    if (report.result !== 'PASS' || canonicalDigest(report.subject) !== canonicalDigest(decision.subject)
+        || report.dependencyClosure.sha256 !== expected.closure) throw new Error('RUNTIME_VALIDATION_REPORT_MISMATCH');
+    if (runtimeReader.knowledgeKind !== 'rule-set' || runtimeReader.processor !== 'exact-player-strategy-map/1'
+        || !strategyKnowledge || strategyKnowledge.kind !== runtimeReader.knowledgeKind || resolveUnit.knowledgeRefs?.length !== 1
+        || strategyKnowledge.path !== runtimeReader.resourcePath || strategiesAsset?.id !== strategyKnowledge.id
+        || strategiesAsset.revision !== strategyKnowledge.revision || strategiesAsset.path !== strategyKnowledge.path
+        || strategiesAsset.sha256 !== strategyKnowledge.sha256) throw new Error('RUNTIME_KNOWLEDGE_NOT_SELECTED');
+    for (const unit of Object.values(units)) {
+      if (unit.role !== 'workflow' && unit.implementation.artifactRef !== provider.artifactRef) {
+        throw new Error('RUNTIME_PROVIDER_ARTIFACT_UNBOUND');
+      }
+    }
+    providerArtifact = { path: provider.artifactRef, sha256: provider.artifactDigest, target: provider.target };
+  }
+  const strategiesRef = runtimeReader ? strategyKnowledge?.path : resolveUnit.evidence.sources.find((source) => source.sourceId === 'strategy-map')?.ref;
   if (!signaturesRef || !strategiesRef) throw new Error('SELECTED_KNOWLEDGE_MISSING');
   const signatures = parse<Selection['signatures'] & { catalogId: string; revision: string }>(signaturesRef.path);
   const strategies = parse<Selection['strategies'] & { catalogId: string; revision: string }>(strategiesRef);
-  if (signatures.catalogId !== signaturesRef.id || signatures.revision !== signaturesRef.revision || strategies.catalogId !== 'xdownload.player-strategies' || !/^[0-9]+[.][0-9]+[.][0-9]+$/.test(strategies.revision)) throw new Error('KNOWLEDGE_IDENTITY_MISMATCH');
-  const selected = { packageId: identity.packageId, revision: identity.revision, closureSha256: expected.closure, lockSha256: expected.lock, graphSha256: asset.sha256, graph, units, unitRefs, providers, resources, signatures, strategies };
+  if (signatures.catalogId !== signaturesRef.id || signatures.revision !== signaturesRef.revision
+      || strategies.catalogId !== (strategyKnowledge?.id ?? 'xdownload.player-strategies')
+      || strategyKnowledge && strategies.revision !== strategyKnowledge.revision
+      || !/^[0-9]+[.][0-9]+[.][0-9]+$/.test(strategies.revision)
+      || !strategies.strategies || Array.isArray(strategies.strategies) || typeof strategies.strategies !== 'object'
+      || Object.values(strategies.strategies).some((value) => typeof value !== 'string' || !value)) throw new Error('KNOWLEDGE_IDENTITY_MISMATCH');
+  const selected = { packageId: identity.packageId, revision: identity.revision, closureSha256: expected.closure, lockSha256: expected.lock, graphSha256: asset.sha256, graph, units, unitRefs, providers, resources, signatures, strategies,
+    ...(providerArtifact ? { providerArtifact, strategyKnowledge } : {}) };
   verifiedSelections.set(selected, canonicalDigest(selected));
   return selected;
 }

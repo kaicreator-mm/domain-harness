@@ -4,9 +4,9 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { buildDemo, frozenPins } from '../build.mjs';
+import { buildDemo, frozenPins, readFrozen } from '../build.mjs';
 import { openDemo } from '../app.mjs';
-import { bootKdp, buildConsumer, canonicalDigest, digest } from '../../../packages/dis-v011-runtime/dist/index.js';
+import { buildConsumer, canonicalDigest, digest } from '../../../packages/dis-v011-runtime/dist/index.js';
 import { readDisResult, verifyTrace } from '../../../packages/dis-v011-runtime/dist/trace.js';
 
 const frozen = fileURLToPath(new URL('../../dis-0.1.0-player-recognition/',import.meta.url));
@@ -35,6 +35,9 @@ async function assertHostReceipt(app, observation, message, expected, recognitio
   const capability = build.modules.find((item) => item.capabilityId === 'dis-player');
   assert.equal(digest(capability.moduleSource), capability.moduleSha256);
   assert.equal(capability.moduleSha256,app.selected.adapterSha256);
+  assert.equal(capability.moduleSha256,app.selected.selection.providerArtifact.sha256);
+  assert.equal(result.buildSubjectDigest,build.subjectDigest);
+  assert.deepEqual(result.providerArtifact,app.selected.selection.providerArtifact);
   assert.deepEqual(capability.handlers,[{operationId:'dis.consume',handler:'consumeObservation'}]);
   assert.equal(capability.externalEffect,false);
   assert.equal(result.status,expected);
@@ -66,16 +69,17 @@ async function assertHostReceipt(app, observation, message, expected, recognitio
   }
   assert.equal(effect.effectId,receipt.admitted.durableControlTurnId + '/effect/1');
   const journal = await app.readOccurrence(effect.effectId);
-  assert.equal(journal.key,'v10/k/' + build.subjectDigest + '/tenant:dis-reference/v08-kernel:effect-journal:' + effect.effectId);
+  assert.equal(journal.key,'dis-kdp/tenant:dis-reference/' + app.selected.selection.lockSha256 + '/v08-kernel:effect-journal:' + effect.effectId);
   assert.equal(journal.document.value.kernelModuleSha256,journal.kernelModuleSha256);
   assert.equal(journal.kernelModuleSha256,build.modules.find((item) => item.role === 'kernel-primary').moduleSha256);
   assert.equal(receipt.attribution.kernel.moduleSha256,journal.kernelModuleSha256);
-  assert.equal(receipt.attribution.business.packageId,'business-dis-player@0.11.0-dev.0');
+  assert.equal(receipt.attribution.business.packageId,'dis-kdp-read-protocol@0.11.0-dev.0');
+  assert.equal(receipt.attribution.sdk.packageId,'dis-kdp-read-envelope@0.11.0-dev.0');
   const record = journal.document.value.record;
   assert.equal(record.effectId,effect.effectId);
   assert.equal(record.status,'completed');
   assert.deepEqual(record.output,result);
-  assert.deepEqual(record.target,{workflowId:'dis-player',instanceKey:'page:demo'});
+  assert.deepEqual(record.target,{workflowId:'kdp-qualified-read',instanceKey:'page:demo'});
   assert.equal(journal.permit,null);
   assert.deepEqual(journal.dispatchClaims,[]);
   if (process.env.DIS_RUNTIME_EMIT === '1') console.log(JSON.stringify({
@@ -91,12 +95,13 @@ async function assertHostReceipt(app, observation, message, expected, recognitio
   return receipt;
 }
 
-test('selected BUILD, one DomainApp, private adapter output and SQLite journal', () => withEvidence(async (dir) => {
+test('selected BUILD, one KDP and Domain App, exact provider output and SQLite Journal', () => withEvidence(async (dir) => {
   const sqlite = path.join(dir,'physical.sqlite');
   const app = await openDemo(sqlite);
   let receipt;
   try {
     assert.equal(app.selected.app.modules.filter((item) => item.role === 'kernel-primary').length,1);
+    assert.equal(app.boot.runtimeInstances,1);
     receipt = await assertHostReceipt(app,{...known,url:' ' + url + ' '},'known','READY','recognized');
     assert.equal(readDisResult(receipt).outcome.playerId,'jwplayer');
     assert.equal(readDisResult(receipt).outcome.strategyId,'jwplayer.extract.v1');
@@ -132,46 +137,9 @@ test('selected BUILD, one DomainApp, private adapter output and SQLite journal',
   } finally { await reopened.close(); }
 }));
 
-test('versioned probe Knowledge mutation changes the Kernel operation result', () => withEvidence(async (dir) => {
-  const root = path.join(dir,'separate-reference-package');
-  await cp(frozen,root,{recursive:true});
-  const strategiesPath = path.join(root,'fixtures/player-strategies.json');
-  const catalog = await readJson(strategiesPath);
-  catalog.revision = '2.0.0';
-  catalog.strategies.jwplayer = 'jwplayer.reference-review.v2';
-  delete catalog.strategies.videojs;
-  await writeJson(strategiesPath,catalog);
-  await assert.rejects(buildDemo(root),/RESOURCE_DIGEST_MISMATCH/);
-  const descriptorPath = path.join(root,'package.json');
-  const descriptor = await readJson(descriptorPath);
-  const closurePath = path.join(root,descriptor.dis.resourceClosurePath);
-  const closure = await readJson(closurePath);
-  closure.packageRevision = '2.0.0';
-  closure.resources.find((entry) => entry.path === 'fixtures/player-strategies.json').sha256 = digest(await readFile(strategiesPath));
-  await writeJson(closurePath,closure);
-  descriptor.dis.revision = '2.0.0';
-  descriptor.dis.selectionLock.packageRevision = '2.0.0';
-  descriptor.dis.resourceClosureSha256 = digest(await readFile(closurePath));
-  descriptor.dis.selectionLockSha256 = canonicalDigest(descriptor.dis.selectionLock);
-  await writeJson(descriptorPath,descriptor);
-  const pins = {descriptor:digest(await readFile(descriptorPath)),closure:descriptor.dis.resourceClosureSha256,lock:descriptor.dis.selectionLockSha256};
-  const original = await openDemo(path.join(dir,'original.sqlite'));
-  const built = await buildDemo(root,pins);
-  const variant = await openDemo(path.join(dir,'variant.sqlite'),built);
-  try {
-    const changed = await assertHostReceipt(variant,known,'changed-knowledge','READY','recognized');
-    assert.equal(readDisResult(changed).outcome.strategyId,'jwplayer.reference-review.v2');
-    await assertHostReceipt(variant,{url,signals:['videojs']},'partial-no-strategy','PARTIAL','recognized');
-    assert.notEqual(variant.selected.app.subjectDigest,original.selected.app.subjectDigest);
-    const unchanged = await assertHostReceipt(original,known,'original-after-variant','READY','recognized');
-    assert.equal(readDisResult(unchanged).outcome.strategyId,'jwplayer.extract.v1');
-    assert.equal(original.selected.selection.closureSha256,frozenPins.closure);
-  } finally { await variant.close(); await original.close(); }
-}));
-
 test('wrong independent lock or descriptor pin rejects before activation', async () => {
-  await assert.rejects(buildDemo(undefined,{...frozenPins, lock:'0'.repeat(64)}),/LOCK_PIN_MISMATCH/);
-  await assert.rejects(buildDemo(undefined,{...frozenPins, descriptor:'0'.repeat(64)}),/DESCRIPTOR_PIN_MISMATCH/);
+  await assert.rejects(readFrozen(undefined,{...frozenPins, lock:'0'.repeat(64)}),/LOCK_PIN_MISMATCH/);
+  await assert.rejects(readFrozen(undefined,{...frozenPins, descriptor:'0'.repeat(64)}),/DESCRIPTOR_PIN_MISMATCH/);
 });
 test('selected provider target and contract are checked even under new descriptor and lock pins',()=>withEvidence(async(dir)=>{
   const root=path.join(dir,'invalid-package');await cp(frozen,root,{recursive:true});
@@ -180,7 +148,7 @@ test('selected provider target and contract are checked even under new descripto
     const mutated=structuredClone(descriptor);mutated.dis.selectionLock.selectedCapabilities[0].provider[field]=value;
     mutated.dis.selectionLockSha256=canonicalDigest(mutated.dis.selectionLock);await writeJson(file,mutated);
     const pins={descriptor:digest(await readFile(file)),closure:mutated.dis.resourceClosureSha256,lock:mutated.dis.selectionLockSha256};
-    await assert.rejects(buildDemo(root,pins),/PROVIDER_LOCK_MISMATCH/);
+    await assert.rejects(readFrozen(root,pins),/PROVIDER_LOCK_MISMATCH/);
   }
 }));
 test('invalid Graphs fail closed even with recomputed external pins',()=>withEvidence(async(dir)=>{
@@ -201,7 +169,7 @@ test('invalid Graphs fail closed even with recomputed external pins',()=>withEvi
     const graphDigest=digest(await readFile(graphPath));closure.resources.find((entry)=>entry.path===closure.graphRef.path).sha256=graphDigest;await writeJson(closurePath,closure);
     descriptor.dis.selectionLock.selectedAssets.find((asset)=>asset.kind==='graph').sha256=graphDigest;
     descriptor.dis.resourceClosureSha256=digest(await readFile(closurePath));descriptor.dis.selectionLockSha256=canonicalDigest(descriptor.dis.selectionLock);await writeJson(descriptorPath,descriptor);
-    await assert.rejects(buildDemo(root,{descriptor:digest(await readFile(descriptorPath)),closure:descriptor.dis.resourceClosureSha256,lock:descriptor.dis.selectionLockSha256}),/INVALID_GRAPH/);
+    await assert.rejects(readFrozen(root,{descriptor:digest(await readFile(descriptorPath)),closure:descriptor.dis.resourceClosureSha256,lock:descriptor.dis.selectionLockSha256}),/INVALID_GRAPH/);
   }
 }));
 test('BUILD rejects forged or modified selection snapshots',async()=>{
@@ -211,7 +179,3 @@ test('BUILD rejects forged or modified selection snapshots',async()=>{
   selected.signatures.patterns[0].markers=['forged'];
   assert.throws(()=>buildConsumer(selected,{}),/SELECTION_NOT_VERIFIED/);
 });
-test('legacy boot refuses a changed selected Kernel before opening storage',()=>withEvidence(async(dir)=>{
-  const app=structuredClone((await buildDemo()).app);app.modules.find((module)=>module.role==='kernel-primary').moduleSource='forged';
-  await assert.rejects(bootKdp(app,path.join(dir,'untrusted.sqlite')),/UNTRUSTED_SELECTED_KERNEL/);
-}));

@@ -9,8 +9,6 @@ interface Frame {
   unitRevision: string;
   unitSha256: string;
   requestedProvider: string;
-  actualImplementation: string;
-  bindingStatus: string;
   input: ObjectData;
   evidence: ObjectData;
   output: ObjectData;
@@ -22,6 +20,8 @@ export interface DisResult {
   trace: Frame[];
   selectedDigest: string;
   selection: ObjectData;
+  providerArtifact: Selection['providerArtifact'];
+  strategyKnowledge: Selection['strategyKnowledge'];
 }
 export function readDisResult(receipt: ObjectData): DisResult {
   const admitted = receipt.admitted as { effects: { disposition: string; output: DisResult; effectType: string }[] };
@@ -36,6 +36,10 @@ export function readDisResult(receipt: ObjectData): DisResult {
 export function verifyTrace(actual: DisResult, observation: unknown, selection: Selection, schemas: ReadonlyMap<string, ObjectData>) {
   const graph = selection.graph;
   assert.equal(actual.selectedDigest, canonicalDigest(selection));
+  assert.ok(selection.providerArtifact, 'Runtime selection must identify a provider artifact');
+  assert.deepEqual(actual.providerArtifact, selection.providerArtifact);
+  assert.ok(selection.strategyKnowledge, 'Runtime selection must identify structured strategy Knowledge');
+  assert.deepEqual(actual.strategyKnowledge, selection.strategyKnowledge);
   assert.deepEqual(actual.selection, {
     packageId: selection.packageId, revision: selection.revision, closureSha256: selection.closureSha256,
     lockSha256: selection.lockSha256, graphId: graph.id, graphRevision: graph.revision, graphSha256: selection.graphSha256,
@@ -58,8 +62,7 @@ export function verifyTrace(actual: DisResult, observation: unknown, selection: 
     assert.deepEqual({ id: frame.unitId, revision: frame.unitRevision, sha256: frame.unitSha256 },
       { id: unit.id, revision: node.unitRef.revision, sha256: selection.unitRefs[unit.id].sha256 });
     assert.equal(frame.requestedProvider, selection.providers[unit.id]);
-    assert.equal(frame.actualImplementation, 'capability-dis-player@0.11.0-dev.0');
-    assert.equal(frame.bindingStatus, 'UNVERIFIED');
+    assert.equal(unit.implementation.artifactRef, actual.providerArtifact?.path);
     const input: ObjectData = frame.nodeId === graph.entryNode ? { ...(normalized as ObjectData) } : {};
     const evidence: ObjectData = {};
     for (const edge of graph.edges) {
@@ -80,8 +83,8 @@ export function verifyTrace(actual: DisResult, observation: unknown, selection: 
     assert.ok(ajv.validate(unit.output.schemaRef, frame.output), ajv.errorsText());
     if (unit.role === 'recognizer') {
       const page = input as {url:string; signals:string[]; claims?:{sourceId:string;playerId:string}[]; encryptedPlayer?:boolean; unsupportedPlayerFamily?:boolean};
-      const normalize = frame.requestedProvider === 'registry:xdownload.player.recognizer-normalized@1.0.0';
-      assert.ok(normalize || frame.requestedProvider === 'registry:xdownload.player.recognizer@1.0.0', 'untrusted recognizer');
+      const normalize = frame.requestedProvider === 'registry:xdownload.runtime.player.recognizer-normalized@2.0.0';
+      assert.ok(normalize || frame.requestedProvider === 'registry:xdownload.runtime.player.recognizer@2.0.0', 'untrusted recognizer');
       const contains = (text: string, marker: string) => (normalize ? text.toLowerCase() : text).includes(normalize ? marker.toLowerCase() : marker);
       const matched = selection.signatures.patterns.filter((rule) => rule.markers.some((marker) => [page.url,...page.signals].some((signal) => contains(signal,marker))));
       const ids = [...new Set(matched.map((rule) => rule.playerId))];
@@ -109,7 +112,7 @@ export function verifyTrace(actual: DisResult, observation: unknown, selection: 
       if (strategy) assert.deepEqual(frame.output, { status: 'READY', playerId: player, strategyId: strategy });
       else assert.deepEqual(frame.output, {status:'NEEDS_REVIEW',reason:'Selected strategy is missing'});
     }
-    if (frame.requestedProvider === 'registry:xdownload.player.bounded-fallback@1.0.0') {
+    if (frame.requestedProvider === 'registry:xdownload.runtime.player.bounded-fallback@2.0.0') {
       const status = (input.recognition as ObjectData).status;
       const expected = status === 'ambiguous' || status === 'conflict'
         ? {status:'NEEDS_INPUT',question:'Confirm the player',reason:String(status)}

@@ -2,13 +2,21 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { bootKdp } from '../../packages/dis-v011-runtime/dist/index.js';
-import { buildDemo } from './build.mjs';
+import { buildDemo, deployment, loadKernelSource } from './build.mjs';
 
-export async function openDemo(sqlitePath, built = undefined) {
-  const selected = built ?? await buildDemo();
-  const kdp = await bootKdp(selected.app, sqlitePath);
+export async function openDemo(sqlitePath, variant = 'baseline') {
+  const kdp = await bootKdp(await deployment(variant), await loadKernelSource(), sqlitePath);
+  let selected;
+  try {
+    selected = await buildDemo(variant);
+    await kdp.attach(selected);
+  } catch (error) {
+    await kdp.close();
+    throw error;
+  }
   return {
     selected,
+    boot: kdp.identity,
     recognize(observation, messageId = randomUUID(), instanceKey = 'page:demo') {
       return kdp.send({ intentType:'recognizePlayer', input:{ observation }, messageId, instanceKey });
     },

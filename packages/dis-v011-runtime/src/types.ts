@@ -26,9 +26,11 @@ export interface Unit {
   failure: { handling: Record<string, { action: string }> };
   input: { schemaRef: string };
   output: { schemaRef: string };
-  knowledgeRefs?: { id: string; revision: string; path: string; sha256: string }[];
+  knowledgeRefs?: { id: string; revision: string; kind: string; path: string; sha256: string }[];
 }
 export interface Selection {
+  providerArtifact?: { path: string; sha256: string; target: string };
+  strategyKnowledge?: NonNullable<Unit['knowledgeRefs']>[number];
   packageId: string;
   revision: string;
   closureSha256: string;

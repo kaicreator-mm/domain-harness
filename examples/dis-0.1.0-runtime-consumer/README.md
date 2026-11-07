@@ -1,9 +1,15 @@
-# xDownload DomainHarness integration probe — blocked
+# xDownload DomainHarness Runtime Consumer
 
-This bounded probe returns an actual K-owned occurrence receipt for a separately implemented local capability. It does not execute the frozen selected provider artifact and is not an adoption or conformance proof. See the [contract blocker](../../validation/dis-0.1.0/RUNTIME_CONSUMER_PROOF.md).
+Use Windows-native Node 24.21.0 and locked workspace dependencies. Run `node --check` on `build.mjs`, `app.mjs`, `src/provider.mjs` and the test entry files before running the workspace build and tests.
 
-Use Node 24.21.0 and locked workspace dependencies. First check syntax with `node --check examples/dis-0.1.0-runtime-consumer/build.mjs` and the corresponding checks for `app.mjs` and `test/consumer.test.mjs`. Build the workspaces with `npm run build --workspaces --if-present`. Run the private workspace's tests using `npm test -w @kaicreator/domain-harness-dis-v011-runtime`. For manual execution run `node examples/dis-0.1.0-runtime-consumer/app.mjs <SQLite evidence file>`. Provide a fresh local evidence filename. Set `DIS_RUNTIME_EVIDENCE_DIR` to an existing task evidence directory for native test temporary databases.
+```sh
+npm run build --workspaces --if-present
+npm test -w @kaicreator/domain-harness-dis-v011-runtime
+node examples/dis-0.1.0-runtime-consumer/app.mjs <SQLite evidence file>
+```
 
-The entry reads the frozen xDownload Package at revision 1.0.0 but executes a separately identified private adapter rather than the selected frozen handler. An isolated strategy-catalog revision 2.0.0 is resealed as a synthetic reference Package in tests. This does not establish a valid promotion or a fully governed successor Package selection.
+Set `DIS_RUNTIME_EVIDENCE_DIR` to the task evidence directory to collect disposable materializations and SQLite test databases there. Set `DIS_RUNTIME_EMIT=1` to emit machine-readable receipt and trace summaries during the tests.
 
-The demo fetches no URLs and downloads no media. SQLite persists only the selected Kernel's local control and evidence documents. See the [conformance proof](../../validation/dis-0.1.0/RUNTIME_CONSUMER_PROOF.md).
+The frozen xDownload Package at revision 1.0.0 is provenance. The application runs the separate qualified `xdownload.web-media-runtime` Package at revision 2.0.0. The 2.1.0 test Package selects changed Knowledge. It uses a distinct immutable lock and Journal namespace while the original active deployment continues to return the original strategy. The local capability returns strategy descriptors from structured observations. It has no network or media download port.
+
+The committed [qualification index](domain/runtime-lock.json) is the expected input for the deterministic AOT recipe and contains separate package pins for both revisions. See the [R1 evidence](../../validation/dis-0.1.0/RUNTIME_REPAIR_R1.md).
