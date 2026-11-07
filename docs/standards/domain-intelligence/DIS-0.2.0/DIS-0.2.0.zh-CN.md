@@ -1,8 +1,8 @@
-# Domain Intelligence Standard（DIS）v0.2.0 — Element-first 架构 R1
+# Domain Intelligence Standard（DIS）v0.2.0 — Element-first 架构 R1 · 进化专题 R2
 
 **状态：新 Product/L1 候选，非冻结标准。** 权威 Issue [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)。本候选**取代**旧 #1494 / PR #1493 的 Intelligence Unit + Data/Processing/Composite 设计；原候选不应合并或视为规范。保留 DIS 0.1.0 冻结基线不变。
 
-本文的 MUST/SHOULD 属于待审核的规范建议，不暗示 DomainHarness v0.10.3 已实现新 ABI。配套详细草案见同目录 Element/Function、App Init、LLM/Harness/Evolution R1。
+本文的 MUST/SHOULD 属于待审核的规范建议，不暗示 DomainHarness v0.10.3 已实现新 ABI。Element/Function 与 App Init 仍见 R1 候选；**LLM/Harness/进化以 [LLM_HARNESS_EVOLUTION_R2.zh-CN.md](LLM_HARNESS_EVOLUTION_R2.zh-CN.md) 为当前细化建议**，R1 相关建议保留历史。R2 已完成自对抗设计审核，但尚未独立验证、Schema 化或冻结。
 
 ## 1. 目标和责任边界
 
@@ -62,7 +62,7 @@ Interaction Element 接收当前 Goal/Intent、可信事实和此前回答，产
 
 LLM Element 标准化受控的**模型调用**；Harness Element 标准化一个**有边界的领域推理过程**：Context → 选定可达 Functions → 建议 → KDP 准入 → 真实观察 → 验证/退出。LLM 可缺席，Harness 可仅使用规则与已固化知识。禁止模型输出直接成为 Effect、Tool 权限、状态事实或新 Function binding。
 
-历史 v0.3 建议的决策来源默认优先级：确定性已编译智能 → 合条件的精确语义复用 → 已晋升子流程 → 受限 Harness/LLM 回退。允许 Domain 声明经过验证的例外，不把这个顺序写进 KDP 通用调度器。详见 LLM_HARNESS_EVOLUTION_R1.zh-CN.md。
+历史 v0.3 建议的决策来源默认优先级：确定性已编译智能 → 合条件的精确语义复用 → 已晋升子流程 → 受限 Harness/LLM 回退。允许 Domain 声明经过验证的例外，不把这个顺序写进 KDP 通用调度器。详见 LLM_HARNESS_EVOLUTION_R2.zh-CN.md；R1 作为前序设计记录。
 
 ## 9. 两层进化与版本治理（可选功能，交换边界必定义）
 
@@ -71,6 +71,14 @@ LLM Element 标准化受控的**模型调用**；Harness Element 标准化一个
 - **不新增第二个 Kernel/Meta Authority**。知识图谱资产化归 Forge；Meta Domain App 可以是用相同 Element Contract 构建的普通 Domain App。进化算法、Prompt 优化、数据仓库结构不进入 DIS Core。
 
 DIS 定义 `ExecutionEvidence`、`IntelligenceUsage`、`LearningFeedback`、`CandidateReference`、`QualificationReceipt`、`ActivationReference` 的最小交换语义，不能自动上传原始 Prompt、私有数据或模型内部推理过程。Outcome 的真实性与被允许晋升是不同维度。
+
+### 9.1 R2 进化统一约束（当前细化建议）
+
+AOT 为**适用的 Function**预先声明可选 Harness/LLM/Experience/受限 Evolution Slot 的已锁定边界，而非强制所有 App/Function 使用 LLM。Function 按 DETERMINIZABLE、HYBRID、GENERATIVE、NONE 的候选策略分别进化；原创生成应改进 Prompt/Context/验证，不默认固化结果。
+
+Experience 必须由真实 Trace/Evidence 和独立业务验证得到；缓存命中是收益，不是独立样本。程序可按 ProblemSignature + SolutionSignature 召回候选规律，LLM 只提出规则或 Function Candidate；持出来源独立的测试与负例才能决定是否合格。App 若且仅若具备已选有界解释器/Schema/Scope/原子任务 Pin/撤销能力，才可局部激活**规则数据**；新源代码/依赖/权限仍须经过 Server/Forge/AOT。不可把 RESULT_REUSE 用于未经重新核实的当前事实或 Effect，也不因本地合格自动发布新 Element/Package。
+
+**对抗审查结果**见 [ADVERSARIAL_REVIEW_R2.zh-CN.md](ADVERSARIAL_REVIEW_R2.zh-CN.md)（P0=3/P1=7/P2=2，均为设计发现；未完成执行验证）；测试计划见 [EVOLUTION_CONFORMANCE_R2.zh-CN.md](EVOLUTION_CONFORMANCE_R2.zh-CN.md)。
 
 ## 10. 实施边界及符合性
 

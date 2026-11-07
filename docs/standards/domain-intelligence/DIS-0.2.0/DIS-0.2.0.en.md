@@ -1,8 +1,8 @@
-# Domain Intelligence Standard (DIS) v0.2.0 — Element-first R1
+# Domain Intelligence Standard (DIS) v0.2.0 — Element-first R1 with Evolution R2 addendum
 
 **Status: new Product/L1 architecture candidate, NOT FROZEN.** Authority: [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496). This proposal replaces—not amends—the old #1494 / PR #1493 Intelligence Unit (Data/Processing/Composite) draft. DIS 0.1.0 stays frozen.
 
-This document mirrors the **architectural decisions** of the Chinese candidate. Focused R1 contract drafts currently have Chinese working text; a complete bilingual clause-level parity review and schemas are required before L2 freeze.
+The **current evolution architecture elaboration** is the Chinese R2 document [LLM_HARNESS_EVOLUTION_R2.zh-CN.md](LLM_HARNESS_EVOLUTION_R2.zh-CN.md) plus [self-adversarial review](ADVERSARIAL_REVIEW_R2.zh-CN.md) and [conformance cases](EVOLUTION_CONFORMANCE_R2.zh-CN.md). R2 supersedes the R1 evolution design, without claiming bilingual clause parity or independently validated implementation. This document mirrors the **architectural decisions** of the Chinese candidate. Focused R1 contract drafts currently have Chinese working text; a complete bilingual clause-level parity review and schemas are required before L2 freeze.
 
 ## 1. Purpose and boundaries
 
@@ -57,3 +57,11 @@ DIS defines minimal shared exchange semantics for execution/usage/evidence, cand
 Future gates: complete bilingual parity, machine schemas, two+ materially different consumer demos (including Tally, xDownload, Shun, ai-rexform), valid and invalid provider/tool/unknown tests, restart and two-stage init, task/meta evolution, independent exact-SHA review, Node24/CI and explicit L2 freeze.
 
 **R1 is NOT production code, a runtime adoption receipt, SDK ABI authorization, a release, or a migration of frozen DIS 0.1.0.**
+
+## 10. Evolution R2 design addendum (not yet frozen)
+
+The optional AOT-selected Function Resolution profile predeclares bounded deterministic, exact-experience, promoted subflow and Harness/LLM paths, plus any admissible local **interpreted-rule-data** Evolution Slot. There is no generic self-modifying runtime. Each Function may choose DETERMINIZABLE, HYBRID, GENERATIVE or NONE; intrinsically generative work evolves prompts, context and verification rather than replacing model output with cached text.
+
+Experience is derived from trusted runtime observations with domain-independent verification evidence and applicability/currentness limits. Cache hits are not independent training cases. Domain-specific Problem/Method signatures retrieve candidate patterns; LLM synthesis is only a hypothesis; independently held-out cohort-based and negative-case verification determines local qualification. Runtime rule selection is limited to AOT-sealed interpreters, schemas, budgets, scopes, task-snapshot pins and rollback; absent safe support, only candidate/shadow and server feedback are permitted. A Function Candidate cannot add executable dependencies or effects through a local Slot. Server qualification, governed promotion and new AOT Package activation remain separate steps, and previous active instances do not silently change.
+
+The R2 single-author self-adversarial design review found 3 P0, 7 P1 and 2 P2 **design risks** and documented mitigations and 25 planned tests; it is NOT an independent source review or executed conformance receipt. English clause-level parity and machine schema are OPEN.

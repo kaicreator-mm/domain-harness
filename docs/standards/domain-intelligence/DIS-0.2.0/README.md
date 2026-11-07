@@ -1,4 +1,4 @@
-# Domain Intelligence Standard (DIS) v0.2.0 — Element-first restart R1
+# Domain Intelligence Standard (DIS) v0.2.0 — Element-first R1 + Unified Evolution R2
 
 > **STATUS: NEW PRODUCT/L1 CANDIDATE; NOT FROZEN.**
 >
@@ -15,17 +15,24 @@
 - Runtime consumes selected Domain Intelligence. Knowledge-graph creation and asset management belong to Forge. Domain-specific state belongs to the Domain; optional SDK SQLite/JSON/etc. provide business-neutral functions.
 - Harness/LLM and Meta evolution are **optional profiles** with standardized evidence and boundaries, not mandatory engines or an automatically self-modifying runtime.
 
+## R2 convergence / self-adversarial review
+
+**Authoritative current evolution design:** [Unified LLM/Harness/Evolution R2](LLM_HARNESS_EVOLUTION_R2.zh-CN.md). It supersedes R1 advice on Experience, Function synthesis, local qualification, Evolution Slot, cache/evidence and two-layer evolution; R1 remains historical. [Self-adversarial findings](ADVERSARIAL_REVIEW_R2.zh-CN.md) and [negative/positive conformance cases](EVOLUTION_CONFORMANCE_R2.zh-CN.md) are design documents; this is NOT an independent review or executable certification. App may create locally scoped qualified **interpreted rule data** only if the AOT-selected SDK can safely support schema/interpreter/budget/atomic task pin/rollback; otherwise produce candidates and shadow only. Every Experience must have trusted verification; cache hits cannot manufacture independent samples.
+
 ## Candidate documents
 
 1. [Chinese complete standard](DIS-0.2.0.zh-CN.md)
 2. [English architecture parity candidate](DIS-0.2.0.en.md)
 3. [Element / Function Contract R1](ELEMENT_FUNCTION_CONTRACT_R1.zh-CN.md)
 4. [App Init Contract R1](APP_INIT_CONTRACT_R1.zh-CN.md)
-5. [LLM / Harness / Two-Layer Evolution R1](LLM_HARNESS_EVOLUTION_R1.zh-CN.md)
-6. [Migration and supersession ledger](MIGRATION_LEDGER_R1.zh-CN.md)
-7. [Five-consumer conformance scenarios](CONSUMER_SCENARIOS_R1.zh-CN.md)
+5. [LLM / Harness / Two-Layer Evolution R1 — historical predecessor](LLM_HARNESS_EVOLUTION_R1.zh-CN.md)
+6. [Unified LLM × Harness × Function Evolution R2 — current design advice](LLM_HARNESS_EVOLUTION_R2.zh-CN.md)
+7. [Adversarial self-review R2](ADVERSARIAL_REVIEW_R2.zh-CN.md)
+8. [Conformance cases R2](EVOLUTION_CONFORMANCE_R2.zh-CN.md)
+9. [Migration and supersession ledger](MIGRATION_LEDGER_R1.zh-CN.md)
+10. [Five-consumer conformance scenarios](CONSUMER_SCENARIOS_R1.zh-CN.md)
 
-All examples and schema expressions are **illustrative, not validated machine-readable schemas**. English parity for focused R1 documents, executable JSON/YAML schemas, demos, independent review and CI are future acceptance work, not claimed completed here.
+R2 product-level self-review recorded 3 P0, 7 P1, 2 P2 design risks; the R2 constraints are **DESIGN_MITIGATION_DOCUMENTED**, not closed by test. The old frozen DIS 0.1.0 has not changed. All examples and schema expressions are **illustrative, not validated machine-readable schemas**. English parity for focused R1 documents, executable JSON/YAML schemas, demos, independent review and CI are future acceptance work, not claimed completed here.
 
 ## Gates
 
