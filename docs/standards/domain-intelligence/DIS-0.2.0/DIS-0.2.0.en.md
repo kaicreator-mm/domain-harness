@@ -12,17 +12,17 @@ DIS standardizes the **consumption and operationalization of domain intelligence
 
 **Domain = Element dependency DAG**. Edges are *static* compile-time Element/Function dependencies, not runtime execution, state or data-flow graphs. Elements are cohesive semantic/service micro-libraries and may offer multiple public Functions, private implementations, optional internal state, knowledge query requirements and cross-Element dependencies.
 
-No mandatory exclusive \`Entity/Relationship/Knowledge/Rule/Operation/Process\` type. Optional tags are descriptive only. A relation, invariant or collaboration concern may itself be represented by an Element; a fact or file does not automatically become one. A declarative-only Element may expose zero callable Functions.
+No mandatory exclusive `Entity/Relationship/Knowledge/Rule/Operation/Process` type. Optional tags are descriptive only. A relation, invariant or collaboration concern may itself be represented by an Element; a fact or file does not automatically become one. A declarative-only Element may expose zero callable Functions.
 
 A **Function Contract** defines stable identity, description, inputs/outputs, applicability, preconditions, typed outcomes, evidence obligations, failures and compatibility. **Capability Contract** is the stable public view of these semantics, never a conflicting parallel handwritten specification.
 
 ## 3. Functions, dependencies and state
 
-Different Functions of the *same* Element may bind to different Code, Rule, Query, Workflow, LLM or Harness implementations. A Workflow is an implementation strategy, not a mandatory engine. Static \`dependencies\` may reference multiple public Functions within one target Element. AOT rejects missing bindings, incompatible versions and static dependency cycles.
+Different Functions of the *same* Element may bind to different Code, Rule, Query, Workflow, LLM or Harness implementations. A Workflow is an implementation strategy, not a mandatory engine. Static `dependencies` may reference multiple public Functions within one target Element. AOT rejects missing bindings, incompatible versions and static dependency cycles.
 
 Runtime loops, retries, multi-step reasoning, event-driven tasks and interactive workflows are allowed as business execution strategies, not encoded by the Element DAG. Event bindings must be declared and sealed.
 
-Each Domain owns its **business state semantics**, possibly by app-specific State Elements. SDK Elements supply business-neutral functions such as SQLite, JSON, schema validation and optional CAS primitives; \`sdk.state\` is not a mandated global business-state authority.
+Each Domain owns its **business state semantics**, possibly by app-specific State Elements. SDK Elements supply business-neutral functions such as SQLite, JSON, schema validation and optional CAS primitives; `sdk.state` is not a mandated global business-state authority.
 
 ## 4. Package and AOT
 
@@ -40,7 +40,7 @@ A normal Interaction Element may progressively clarify a goal using forms, chat,
 
 ## 7. Optional Harness / LLM
 
-\`sdk.llm\` provides bounded model-invocation contracts; \`sdk.harness\` provides an optional *bounded domain-reasoning episode* with context, AOT-selected callable functions, proposals, admission, observations, verification and termination. The Harness does not form a peer Kernel or force every Function through model reasoning.
+`sdk.llm` provides bounded model-invocation contracts; `sdk.harness` provides an optional *bounded domain-reasoning episode* with context, AOT-selected callable functions, proposals, admission, observations, verification and termination. The Harness does not form a peer Kernel or force every Function through model reasoning.
 
 Historic v0.3 preferred resolution order: compiled deterministic intelligence → exact semantic reuse → qualified promoted subflow → bounded Harness/LLM fallback. A business policy can explicitly override this with documented, validated applicability.
 

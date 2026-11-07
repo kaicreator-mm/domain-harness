@@ -2,7 +2,7 @@
 
 > **STATUS: NEW PRODUCT/L1 CANDIDATE; NOT FROZEN.**
 >
-> Owner decision 2026-11-08: the old Data/Processing/Composite Intelligence Unit draft (#1494 / draft PR #1493) is **SUPERSEDED, NOT MERGED**. This new candidate is independently based on frozen DIS 0.1.0 at \`9504c78f4651f6c1ebc48c7858fca2d8b061544b\`. The old files and discussion are retained in GitHub history, not silently rewritten.
+> Owner decision 2026-11-08: the old Data/Processing/Composite Intelligence Unit draft (#1494 / draft PR #1493) is **SUPERSEDED, NOT MERGED**. This new candidate is independently based on frozen DIS 0.1.0 at `9504c78f4651f6c1ebc48c7858fca2d8b061544b`. The old files and discussion are retained in GitHub history, not silently rewritten.
 >
 > Product/L1 successor authority: [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496). Boot/KDP: #1484; Package boundaries: #1480; Harness gap: #1478; original task/meta evolution: #1398; Runtime consumption proof: #1486.
 
