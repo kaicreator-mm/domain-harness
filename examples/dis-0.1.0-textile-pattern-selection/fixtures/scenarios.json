@@ -175,5 +175,88 @@
       "status": "FAILED",
       "technique": null
     }
+  },
+  {
+    "id": "requested-conflicts-surface",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "print",
+      "requestedProcess": "embroidery",
+      "evidence": [
+        "synthetic"
+      ]
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "requested-conflicts-structure",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "structure",
+      "requestedProcess": "block-printing",
+      "evidence": [
+        "synthetic"
+      ]
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "scope-before-sample-failure",
+    "synthetic": true,
+    "input": {
+      "domain": "machine-control",
+      "machineControl": true,
+      "evidence": [
+        "synthetic"
+      ],
+      "sampleCheck": "FAIL"
+    },
+    "expected": {
+      "status": "OUT_OF_SCOPE",
+      "technique": null
+    }
+  },
+  {
+    "id": "conflict-before-sample-failure",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "structure",
+      "surfaceMethod": "print",
+      "evidence": [
+        "synthetic"
+      ],
+      "sampleCheck": "FAIL"
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "request-disambiguates",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "either",
+      "requestedProcess": "embroidery",
+      "evidence": [
+        "synthetic"
+      ]
+    },
+    "expected": {
+      "status": "READY",
+      "technique": "embroidery"
+    }
   }
 ]

@@ -50,7 +50,10 @@
         "claim": "Warp/weft interlacing and weave structure affect cloth properties."
       }
     ],
-    "absenceReason": null
+    "absenceReason": null,
+    "consumes": [
+      "sourceEvidence"
+    ]
   },
   "validation": {
     "profile": "textile-conformance",

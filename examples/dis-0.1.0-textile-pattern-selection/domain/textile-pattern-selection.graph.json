@@ -43,22 +43,132 @@
       "kind": "data",
       "from": {
         "node": "recognize",
-        "pointer": ""
+        "pointer": "/status"
       },
       "to": {
         "node": "decide",
-        "pointer": "/prior"
+        "pointer": "/status"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/candidates"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/candidates"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/technique"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/technique"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/unknowns"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/unknowns"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": "/brief"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/brief"
       }
     },
     {
       "kind": "data",
       "from": {
         "node": "decide",
-        "pointer": ""
+        "pointer": "/status"
       },
       "to": {
         "node": "validate",
-        "pointer": "/prior"
+        "pointer": "/status"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/candidates"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/candidates"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/technique"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/technique"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/unknowns"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/unknowns"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/brief"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/brief"
+      }
+    },
+    {
+      "kind": "evidence",
+      "from": {
+        "node": "recognize",
+        "pointer": "/evidence"
+      },
+      "to": {
+        "node": "decide",
+        "slot": "sourceEvidence"
+      }
+    },
+    {
+      "kind": "evidence",
+      "from": {
+        "node": "decide",
+        "pointer": "/evidence"
+      },
+      "to": {
+        "node": "validate",
+        "slot": "sourceEvidence"
       }
     }
   ],

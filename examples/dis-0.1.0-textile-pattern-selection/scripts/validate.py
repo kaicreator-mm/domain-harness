@@ -40,12 +40,17 @@ def expected_recognition(brief, knowledge):
         pass
     elif brief['placement'] != 'unknown':
         matches = [rule for rule in knowledge['rules'] if rule['enabled'] and rule['placement'] == brief['placement'] and (rule['placement'] == 'structure' or brief.get('surfaceMethod') == 'either' or rule['surfaceMethod'] == brief.get('surfaceMethod'))]
+        if brief.get('requestedProcess') and matches and not any(rule['id'] == brief['requestedProcess'] for rule in matches):
+            result['status'] = 'CONFLICT'
+            return result
+        matches = [rule for rule in matches if not brief.get('requestedProcess') or rule['id'] == brief['requestedProcess']]
         result['candidates'] = list(dict.fromkeys(rule['id'] for rule in matches))
         result['evidence'] = list(dict.fromkeys(source for rule in matches for source in rule['sources']))
         result['status'] = 'AMBIGUOUS' if len(result['candidates']) > 1 else 'KNOWN' if result['candidates'] else 'NEEDS_INPUT' if brief['placement'] == 'surface' and 'surfaceMethod' not in brief else 'UNKNOWN'
     return result
-def expected_decision(prior, knowledge):
+def expected_decision(prior, knowledge, evidence):
     result = copy.deepcopy(prior)
+    result['evidence'] = copy.deepcopy(evidence['sourceEvidence'])
     if prior['status'] == 'KNOWN':
         chosen = next((rule for rule in knowledge['rules'] if rule['id'] == prior['candidates'][0] and rule['enabled']), None)
         if not chosen or not chosen['sources']:
@@ -53,14 +58,15 @@ def expected_decision(prior, knowledge):
         else:
             result.update(status='READY', technique=chosen['id'], evidence=copy.deepcopy(chosen['sources']))
     return result
-def expected_validation(prior, knowledge):
+def expected_validation(prior, knowledge, evidence):
     result = copy.deepcopy(prior)
-    if prior['brief'].get('sampleCheck') == 'FAIL' or prior['status'] == 'READY' and (not prior['technique'] or not prior['evidence'] or any(source not in {item['id'] for item in knowledge['sources']} for source in prior['evidence'])):
+    result['evidence'] = copy.deepcopy(evidence['sourceEvidence'])
+    if prior['status'] == 'READY' and (prior['brief'].get('sampleCheck') == 'FAIL' or not prior['technique'] or not result['evidence'] or any(source not in {item['id'] for item in knowledge['sources']} for source in result['evidence'])):
         result.update(status='FAILED', technique=None)
     return result
 def verify_result(result, brief, knowledge, graph, units, resources, identity):
     require(result['packageIdentity'] == identity, 'trace Package identity mismatch')
-    require(len(result['trace']) == 3, 'trace size')
+    require(1 <= len(result['trace']) <= 3, 'trace size')
     outputs = {}
     current = graph['entryNode']
     for index, entry in enumerate(result['trace']):
@@ -68,29 +74,42 @@ def verify_result(result, brief, knowledge, graph, units, resources, identity):
         node = next(node for node in graph['nodes'] if node['nodeId'] == current)
         unit = units[node['unitRef']['id']]
         payload = copy.deepcopy(brief) if current == graph['entryNode'] else {}
+        evidence = {}
         for edge in graph['edges']:
             if edge['kind'] == 'data' and edge['to']['node'] == current:
-                require(edge['from']['pointer'] == '' and edge['to']['pointer'] == '/prior', 'unsupported pointer')
-                payload['prior'] = copy.deepcopy(outputs[edge['from']['node']])
+                payload[edge['to']['pointer'][1:]] = copy.deepcopy(outputs[edge['from']['node']][edge['from']['pointer'][1:]])
+            if edge['kind'] == 'evidence' and edge['to']['node'] == current:
+                evidence[edge['to']['slot']] = copy.deepcopy(outputs[edge['from']['node']][edge['from']['pointer'][1:]])
         require(entry['input'] == payload, 'data input mismatch')
-        if current == 'recognize': expected = expected_recognition(payload, knowledge)
-        elif current == 'decide': expected = expected_decision(payload['prior'], knowledge)
-        else: expected = expected_validation(payload['prior'], knowledge)
+        require(entry['evidence'] == evidence, 'consumed evidence mismatch')
+        if unit['role'] == 'recognizer': expected = expected_recognition(payload, knowledge)
+        elif unit['role'] == 'decision': expected = expected_decision(payload, knowledge, evidence)
+        elif unit['role'] == 'validator': expected = expected_validation(payload, knowledge, evidence)
+        else: raise ValueError('unsupported executable role')
         Draft202012Validator(read(ROOT/unit['input']['schemaRef'])).validate(payload)
         Draft202012Validator(read(ROOT/unit['output']['schemaRef'])).validate(entry['output'])
-        require(entry['output'] == expected and entry['evidence'] == expected['evidence'], 'behavior/evidence mismatch')
+        require(entry['output'] == expected, 'behavior mismatch')
         unit_path = 'domain/units/' + unit['role'] + '.json'
         require(entry['unitId'] == unit['id'] and entry['unitRevision'] == unit['revision'] and entry['unitSha256'] == resources[unit_path], 'trace Unit pin mismatch')
         require(entry['graphSha256'] == resources['domain/textile-pattern-selection.graph.json'] and entry['knowledgeSha256'] == resources['fixtures/textile-knowledge.json'] and entry['implementationRef'] == unit['implementation']['ref'], 'trace binding mismatch')
         outputs[current] = expected
-        if index < 2:
+        actions = {'UNKNOWN':'PRESERVE_UNKNOWN','AMBIGUOUS':'CLARIFY','CONFLICT':'CLARIFY','NEEDS_INPUT':'WAIT','FAILED':'FAIL','OUT_OF_SCOPE':'REJECT'}
+        if expected['status'] in actions:
+            action = actions[expected['status']]
+            require(unit['failure']['handling'][expected['status']]['action'] == action and index == len(result['trace']) - 1, 'failure policy mismatch')
+            require(result['termination'] == {'action':action,'status':expected['status'],'nodeId':current,'unitId':unit['id']} and result['outcome'] == expected, 'termination mismatch')
+            return
+        if index < len(result['trace']) - 1:
             edges = [edge for edge in graph['edges'] if edge['kind'] == 'control' and edge['from'] == current]
             require(len(edges) == 1, 'control edge ambiguity'); current = edges[0]['to']
-    require(current in graph['terminalNodes'] and result['outcome'] == outputs[current], 'terminal mismatch')
+    require(current in graph['terminalNodes'] and result['outcome'] == outputs[current] and 'termination' not in result, 'terminal mismatch')
 def main():
     descriptor = read(ROOT/'package.json'); identity = descriptor['dis']
     raw_manifest = resolve(identity['resourceClosurePath']).read_bytes()
-    require(digest(raw_manifest) == identity['resourceClosureSha256'], 'manifest pin mismatch')
+    require(digest(raw_manifest) == identity['resourceClosureSha256'] == os.environ.get('DIS_TEXTILE_EXPECTED_CLOSURE'), 'external manifest pin mismatch')
+    lock = identity['selectionLock']
+    require(digest(json.dumps(lock,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode('utf-8')) == identity['selectionLockSha256'] == os.environ.get('DIS_TEXTILE_EXPECTED_SELECTION'), 'external selection pin mismatch')
+    require(identity['authority'] == 'REFERENCE' and lock['packageId'] == identity['packageId'] and lock['packageRevision'] == identity['revision'] and lock['closureSha256'] == identity['resourceClosureSha256'] and lock['target'] == 'node24' and lock['consumerProfile'] == 'textile-synthetic-sampling/1.0.0' and lock['referencePolicy'] == {'id':'textile-reference-only','revision':'1.0.0','scope':'SYNTHETIC_REFERENCE_ONLY','production':False,'activation':False,'allowUnpromoted':True}, 'reference selection policy')
     manifest = json.loads(raw_manifest)
     standard = {name:read(STANDARD/name) for name in ['intelligence-unit.schema.json','composition-graph.schema.json','domain-definition.schema.json','resource-closure.schema.json','validation-report.schema.json']}
     for schema in standard.values(): Draft202012Validator.check_schema(schema)
@@ -113,9 +132,13 @@ def main():
     require(definition['domainId'] == manifest['definitionRef']['id'] and definition['revision'] == manifest['definitionRef']['revision'], 'definition identity')
     require(definition['workflowRef']['graphRef'] == manifest['graphRef'] and definition['workflowRef']['unitRef'] == {'id':'textile.workflow','revision':'1.0.0'}, 'workflow ref')
     require(len(graph['nodes']) == 3 and [node['nodeId'] for node in graph['nodes']] == ['recognize','decide','validate'] and graph['cyclePolicy'] == 'DAG_ONLY', 'graph topology')
-    require(len(graph['edges']) == 4 and len([edge for edge in graph['edges'] if edge['kind'] == 'data']) == 2, 'graph edge inventory')
-    for node in graph['nodes']: require(units[node['unitRef']['id']]['revision'] == node['unitRef']['revision'], 'node revision')
+    require(len(graph['edges']) == 14 and len([edge for edge in graph['edges'] if edge['kind'] == 'data']) == 10 and len([edge for edge in graph['edges'] if edge['kind'] == 'evidence']) == 2, 'graph edge inventory')
+    for node in graph['nodes']: require(units[node['unitRef']['id']]['revision'] == node['unitRef']['revision'] and units[node['unitRef']['id']]['role'] == {'recognize':'recognizer','decide':'decision','validate':'validator'}[node['nodeId']], 'node role/revision')
     knowledge = read(ROOT/'fixtures/textile-knowledge.json')
+    selected = [dict(kind='unit',id=ref['id'],revision=ref['revision'],path=ref['path'],sha256=resources[ref['path']]) for ref in manifest['units']]
+    ref = manifest['graphRef']; selected.append(dict(kind='graph',id=ref['id'],revision=ref['revision'],path=ref['path'],sha256=resources[ref['path']]))
+    selected.append(dict(kind='knowledge',id=knowledge['id'],revision=knowledge['revision'],path='fixtures/textile-knowledge.json',sha256=resources['fixtures/textile-knowledge.json']))
+    require(lock['assets'] == selected, 'selection assets mismatch')
     require(len(knowledge['sources']) == 4 and all(source['accessed'] == '2026-11-07' and source['locator'] and source['limitations'] for source in knowledge['sources']), 'source authority/locator')
     expected_sources = {'ncsu-studio':('https://textiles.ncsu.edu/industry/labs-and-facilities/weaving-studio/',['Weaving Studio','Unique Capabilities']), 'ncsu-lab':('https://textiles.ncsu.edu/zte/weaving-lab/',['Weaving Lab','Whats is dobby shedding?','What is jacquard shedding?']), 'gwu-traditions':('https://museum.gwu.edu/textile-traditions',['Block Printing in India','Suzani in Uzbekistan','Jacquard in Japan']), 'nps-weaves':('https://www.nps.gov/articles/000/weaving-patterns.htm',['Weaving Patterns','Plain Weave','Twill','Satin'])}
     require({source['id'] for source in knowledge['sources']} == set(expected_sources), 'source inventory')
@@ -137,22 +160,37 @@ def main():
     lines = [line.split('TEXTILE_CHANGED=',1)[1] for line in changed.stdout.splitlines() if 'TEXTILE_CHANGED=' in line]
     require(len(lines) == 1, 'changed knowledge proof absent')
     proof = json.loads(lines[0]); expected_knowledge = copy.deepcopy(knowledge)
+    expected_knowledge['revision'] = '2.0.0'
     next(rule for rule in expected_knowledge['rules'] if rule['id'] == 'jacquard')['enabled'] = False
     require(proof['knowledge'] == expected_knowledge, 'changed Knowledge is not the intended rule change')
     expected_manifest = copy.deepcopy(manifest)
+    expected_manifest['packageRevision'] = '2.0.0'; expected_manifest['definitionRef']['revision'] = '2.0.0'; expected_manifest['graphRef']['revision'] = '2.0.0'
+    for ref in expected_manifest['units']: ref['revision'] = '2.0.0'
     expected_resources = dict(resources)
     knowledge_bytes = (json.dumps(expected_knowledge,ensure_ascii=False,indent=2)+'\n').encode('utf-8')
     expected_resources['fixtures/textile-knowledge.json'] = digest(knowledge_bytes)
     expected_units = copy.deepcopy(units)
     for role in ('knowledge','recognizer','decision','validator','workflow'):
         unit = expected_units['textile.'+role]
+        unit['revision'] = '2.0.0'; unit['knowledgeRefs'][0]['revision'] = '2.0.0'
         unit['knowledgeRefs'][0]['sha256'] = digest(knowledge_bytes)
+        if role == 'workflow': unit['implementation']['ref'] = 'graph:textile.pattern-selection@2.0.0'
         expected_resources['domain/units/'+role+'.json'] = digest((json.dumps(unit,ensure_ascii=False,indent=2)+'\n').encode('utf-8'))
+    expected_graph = copy.deepcopy(graph); expected_graph['revision'] = '2.0.0'
+    for node in expected_graph['nodes']: node['unitRef']['revision'] = '2.0.0'
+    expected_resources['domain/textile-pattern-selection.graph.json'] = digest((json.dumps(expected_graph,ensure_ascii=False,indent=2)+'\n').encode('utf-8'))
+    expected_definition = copy.deepcopy(definition); expected_definition['revision'] = '2.0.0'; expected_definition['workflowRef']['graphRef']['revision'] = '2.0.0'; expected_definition['workflowRef']['unitRef']['revision'] = '2.0.0'
+    for component in expected_definition['components']: component['unitRef']['revision'] = '2.0.0'
+    expected_resources['domain/definition.json'] = digest((json.dumps(expected_definition,ensure_ascii=False,indent=2)+'\n').encode('utf-8'))
     for entry in expected_manifest['resources']: entry['sha256'] = expected_resources[entry['path']]
     require(proof['manifest'] == expected_manifest, 'changed manifest differs from independent admitted mutation')
     expected_identity = copy.deepcopy(identity)
+    expected_identity['revision'] = '2.0.0'
     expected_identity['resourceClosureSha256'] = digest((json.dumps(expected_manifest,ensure_ascii=False,indent=2)+'\n').encode('utf-8'))
-    verify_result(proof['result'],scenarios[0]['input'],expected_knowledge,graph,expected_units,expected_resources,expected_identity)
+    expected_lock = expected_identity['selectionLock']; expected_lock['packageRevision'] = '2.0.0'; expected_lock['closureSha256'] = expected_identity['resourceClosureSha256']
+    for asset in expected_lock['assets']: asset['revision'] = '2.0.0'; asset['sha256'] = expected_resources[asset['path']]
+    expected_identity['selectionLockSha256'] = digest(json.dumps(expected_lock,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode('utf-8'))
+    verify_result(proof['result'],scenarios[0]['input'],expected_knowledge,expected_graph,expected_units,expected_resources,expected_identity)
     require(proof['result']['outcome']['status'] == 'UNKNOWN' and proof['result']['outcome']['technique'] is None, 'actual changed decision')
     persisted = read(ROOT/'validation/final-traces.json')
     require(persisted == results, 'stored actual traces differ from execution')

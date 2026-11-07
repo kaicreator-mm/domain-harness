@@ -14,7 +14,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -22,7 +89,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -32,12 +99,7 @@
           ],
           "placement": "structure"
         },
-        "evidence": [
-          "ncsu-studio",
-          "ncsu-lab",
-          "gwu-traditions",
-          "nps-weaves"
-        ],
+        "evidence": {},
         "output": {
           "status": "KNOWN",
           "candidates": [
@@ -71,58 +133,16 @@
         "nodeId": "decide",
         "unitId": "textile.decision",
         "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "unitSha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.decision@1.0.0",
         "input": {
-          "prior": {
-            "status": "KNOWN",
-            "candidates": [
-              "jacquard"
-            ],
-            "technique": null,
-            "evidence": [
-              "ncsu-studio",
-              "ncsu-lab",
-              "gwu-traditions",
-              "nps-weaves"
-            ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "structure"
-            }
-          }
-        },
-        "evidence": [
-          "ncsu-studio",
-          "ncsu-lab",
-          "gwu-traditions",
-          "nps-weaves"
-        ],
-        "output": {
-          "status": "READY",
+          "status": "KNOWN",
           "candidates": [
             "jacquard"
           ],
-          "technique": "jacquard",
-          "evidence": [
-            "ncsu-studio",
-            "ncsu-lab",
-            "gwu-traditions",
-            "nps-weaves"
-          ],
+          "technique": null,
           "unknowns": [
             "local production availability",
             "cost",
@@ -138,64 +158,58 @@
             ],
             "placement": "structure"
           }
+        },
+        "evidence": {
+          "sourceEvidence": [
+            "ncsu-studio",
+            "ncsu-lab",
+            "gwu-traditions",
+            "nps-weaves"
+          ]
+        },
+        "output": {
+          "status": "READY",
+          "candidates": [
+            "jacquard"
+          ],
+          "technique": "jacquard",
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "evidence": [
+              "synthetic-design-brief"
+            ],
+            "placement": "structure"
+          },
+          "evidence": [
+            "ncsu-studio",
+            "ncsu-lab",
+            "gwu-traditions",
+            "nps-weaves"
+          ]
         }
       },
       {
         "nodeId": "validate",
         "unitId": "textile.validator",
         "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "unitSha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.validator@1.0.0",
         "input": {
-          "prior": {
-            "status": "READY",
-            "candidates": [
-              "jacquard"
-            ],
-            "technique": "jacquard",
-            "evidence": [
-              "ncsu-studio",
-              "ncsu-lab",
-              "gwu-traditions",
-              "nps-weaves"
-            ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "structure"
-            }
-          }
-        },
-        "evidence": [
-          "ncsu-studio",
-          "ncsu-lab",
-          "gwu-traditions",
-          "nps-weaves"
-        ],
-        "output": {
           "status": "READY",
           "candidates": [
             "jacquard"
           ],
           "technique": "jacquard",
-          "evidence": [
-            "ncsu-studio",
-            "ncsu-lab",
-            "gwu-traditions",
-            "nps-weaves"
-          ],
           "unknowns": [
             "local production availability",
             "cost",
@@ -211,6 +225,42 @@
             ],
             "placement": "structure"
           }
+        },
+        "evidence": {
+          "sourceEvidence": [
+            "ncsu-studio",
+            "ncsu-lab",
+            "gwu-traditions",
+            "nps-weaves"
+          ]
+        },
+        "output": {
+          "status": "READY",
+          "candidates": [
+            "jacquard"
+          ],
+          "technique": "jacquard",
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "evidence": [
+              "synthetic-design-brief"
+            ],
+            "placement": "structure"
+          },
+          "evidence": [
+            "ncsu-studio",
+            "ncsu-lab",
+            "gwu-traditions",
+            "nps-weaves"
+          ]
         }
       }
     ],
@@ -220,12 +270,6 @@
         "jacquard"
       ],
       "technique": "jacquard",
-      "evidence": [
-        "ncsu-studio",
-        "ncsu-lab",
-        "gwu-traditions",
-        "nps-weaves"
-      ],
       "unknowns": [
         "local production availability",
         "cost",
@@ -240,7 +284,13 @@
           "synthetic-design-brief"
         ],
         "placement": "structure"
-      }
+      },
+      "evidence": [
+        "ncsu-studio",
+        "ncsu-lab",
+        "gwu-traditions",
+        "nps-weaves"
+      ]
     }
   },
   {
@@ -259,7 +309,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -267,7 +384,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -278,9 +395,7 @@
           "placement": "surface",
           "surfaceMethod": "print"
         },
-        "evidence": [
-          "gwu-traditions"
-        ],
+        "evidence": {},
         "output": {
           "status": "KNOWN",
           "candidates": [
@@ -312,50 +427,16 @@
         "nodeId": "decide",
         "unitId": "textile.decision",
         "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "unitSha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.decision@1.0.0",
         "input": {
-          "prior": {
-            "status": "KNOWN",
-            "candidates": [
-              "block-printing"
-            ],
-            "technique": null,
-            "evidence": [
-              "gwu-traditions"
-            ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "surface",
-              "surfaceMethod": "print"
-            }
-          }
-        },
-        "evidence": [
-          "gwu-traditions"
-        ],
-        "output": {
-          "status": "READY",
+          "status": "KNOWN",
           "candidates": [
             "block-printing"
           ],
-          "technique": "block-printing",
-          "evidence": [
-            "gwu-traditions"
-          ],
+          "technique": null,
           "unknowns": [
             "local production availability",
             "cost",
@@ -372,56 +453,53 @@
             "placement": "surface",
             "surfaceMethod": "print"
           }
+        },
+        "evidence": {
+          "sourceEvidence": [
+            "gwu-traditions"
+          ]
+        },
+        "output": {
+          "status": "READY",
+          "candidates": [
+            "block-printing"
+          ],
+          "technique": "block-printing",
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "evidence": [
+              "synthetic-design-brief"
+            ],
+            "placement": "surface",
+            "surfaceMethod": "print"
+          },
+          "evidence": [
+            "gwu-traditions"
+          ]
         }
       },
       {
         "nodeId": "validate",
         "unitId": "textile.validator",
         "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "unitSha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.validator@1.0.0",
         "input": {
-          "prior": {
-            "status": "READY",
-            "candidates": [
-              "block-printing"
-            ],
-            "technique": "block-printing",
-            "evidence": [
-              "gwu-traditions"
-            ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "surface",
-              "surfaceMethod": "print"
-            }
-          }
-        },
-        "evidence": [
-          "gwu-traditions"
-        ],
-        "output": {
           "status": "READY",
           "candidates": [
             "block-printing"
           ],
           "technique": "block-printing",
-          "evidence": [
-            "gwu-traditions"
-          ],
           "unknowns": [
             "local production availability",
             "cost",
@@ -438,6 +516,37 @@
             "placement": "surface",
             "surfaceMethod": "print"
           }
+        },
+        "evidence": {
+          "sourceEvidence": [
+            "gwu-traditions"
+          ]
+        },
+        "output": {
+          "status": "READY",
+          "candidates": [
+            "block-printing"
+          ],
+          "technique": "block-printing",
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "evidence": [
+              "synthetic-design-brief"
+            ],
+            "placement": "surface",
+            "surfaceMethod": "print"
+          },
+          "evidence": [
+            "gwu-traditions"
+          ]
         }
       }
     ],
@@ -447,9 +556,6 @@
         "block-printing"
       ],
       "technique": "block-printing",
-      "evidence": [
-        "gwu-traditions"
-      ],
       "unknowns": [
         "local production availability",
         "cost",
@@ -465,7 +571,10 @@
         ],
         "placement": "surface",
         "surfaceMethod": "print"
-      }
+      },
+      "evidence": [
+        "gwu-traditions"
+      ]
     }
   },
   {
@@ -484,7 +593,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -492,7 +668,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -503,9 +679,7 @@
           "placement": "surface",
           "surfaceMethod": "stitch"
         },
-        "evidence": [
-          "gwu-traditions"
-        ],
+        "evidence": {},
         "output": {
           "status": "KNOWN",
           "candidates": [
@@ -537,50 +711,16 @@
         "nodeId": "decide",
         "unitId": "textile.decision",
         "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "unitSha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.decision@1.0.0",
         "input": {
-          "prior": {
-            "status": "KNOWN",
-            "candidates": [
-              "embroidery"
-            ],
-            "technique": null,
-            "evidence": [
-              "gwu-traditions"
-            ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "surface",
-              "surfaceMethod": "stitch"
-            }
-          }
-        },
-        "evidence": [
-          "gwu-traditions"
-        ],
-        "output": {
-          "status": "READY",
+          "status": "KNOWN",
           "candidates": [
             "embroidery"
           ],
-          "technique": "embroidery",
-          "evidence": [
-            "gwu-traditions"
-          ],
+          "technique": null,
           "unknowns": [
             "local production availability",
             "cost",
@@ -597,56 +737,53 @@
             "placement": "surface",
             "surfaceMethod": "stitch"
           }
+        },
+        "evidence": {
+          "sourceEvidence": [
+            "gwu-traditions"
+          ]
+        },
+        "output": {
+          "status": "READY",
+          "candidates": [
+            "embroidery"
+          ],
+          "technique": "embroidery",
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "evidence": [
+              "synthetic-design-brief"
+            ],
+            "placement": "surface",
+            "surfaceMethod": "stitch"
+          },
+          "evidence": [
+            "gwu-traditions"
+          ]
         }
       },
       {
         "nodeId": "validate",
         "unitId": "textile.validator",
         "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "unitSha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.validator@1.0.0",
         "input": {
-          "prior": {
-            "status": "READY",
-            "candidates": [
-              "embroidery"
-            ],
-            "technique": "embroidery",
-            "evidence": [
-              "gwu-traditions"
-            ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "surface",
-              "surfaceMethod": "stitch"
-            }
-          }
-        },
-        "evidence": [
-          "gwu-traditions"
-        ],
-        "output": {
           "status": "READY",
           "candidates": [
             "embroidery"
           ],
           "technique": "embroidery",
-          "evidence": [
-            "gwu-traditions"
-          ],
           "unknowns": [
             "local production availability",
             "cost",
@@ -663,6 +800,37 @@
             "placement": "surface",
             "surfaceMethod": "stitch"
           }
+        },
+        "evidence": {
+          "sourceEvidence": [
+            "gwu-traditions"
+          ]
+        },
+        "output": {
+          "status": "READY",
+          "candidates": [
+            "embroidery"
+          ],
+          "technique": "embroidery",
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "evidence": [
+              "synthetic-design-brief"
+            ],
+            "placement": "surface",
+            "surfaceMethod": "stitch"
+          },
+          "evidence": [
+            "gwu-traditions"
+          ]
         }
       }
     ],
@@ -672,9 +840,6 @@
         "embroidery"
       ],
       "technique": "embroidery",
-      "evidence": [
-        "gwu-traditions"
-      ],
       "unknowns": [
         "local production availability",
         "cost",
@@ -690,7 +855,10 @@
         ],
         "placement": "surface",
         "surfaceMethod": "stitch"
-      }
+      },
+      "evidence": [
+        "gwu-traditions"
+      ]
     }
   },
   {
@@ -707,7 +875,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -715,7 +950,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -724,111 +959,7 @@
             "synthetic-design-brief"
           ]
         },
-        "evidence": [],
-        "output": {
-          "status": "NEEDS_INPUT",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ]
-          }
-        }
-      },
-      {
-        "nodeId": "decide",
-        "unitId": "textile.decision",
-        "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.decision@1.0.0",
-        "input": {
-          "prior": {
-            "status": "NEEDS_INPUT",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ]
-            }
-          }
-        },
-        "evidence": [],
-        "output": {
-          "status": "NEEDS_INPUT",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ]
-          }
-        }
-      },
-      {
-        "nodeId": "validate",
-        "unitId": "textile.validator",
-        "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.validator@1.0.0",
-        "input": {
-          "prior": {
-            "status": "NEEDS_INPUT",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ]
-            }
-          }
-        },
-        "evidence": [],
+        "evidence": {},
         "output": {
           "status": "NEEDS_INPUT",
           "candidates": [],
@@ -870,6 +1001,12 @@
           "synthetic-design-brief"
         ]
       }
+    },
+    "termination": {
+      "action": "WAIT",
+      "status": "NEEDS_INPUT",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
     }
   },
   {
@@ -887,7 +1024,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -895,7 +1099,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -905,115 +1109,7 @@
           ],
           "placement": "unknown"
         },
-        "evidence": [],
-        "output": {
-          "status": "UNKNOWN",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "placement": "unknown"
-          }
-        }
-      },
-      {
-        "nodeId": "decide",
-        "unitId": "textile.decision",
-        "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.decision@1.0.0",
-        "input": {
-          "prior": {
-            "status": "UNKNOWN",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "unknown"
-            }
-          }
-        },
-        "evidence": [],
-        "output": {
-          "status": "UNKNOWN",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "placement": "unknown"
-          }
-        }
-      },
-      {
-        "nodeId": "validate",
-        "unitId": "textile.validator",
-        "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.validator@1.0.0",
-        "input": {
-          "prior": {
-            "status": "UNKNOWN",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "unknown"
-            }
-          }
-        },
-        "evidence": [],
+        "evidence": {},
         "output": {
           "status": "UNKNOWN",
           "candidates": [],
@@ -1057,6 +1153,12 @@
         ],
         "placement": "unknown"
       }
+    },
+    "termination": {
+      "action": "PRESERVE_UNKNOWN",
+      "status": "UNKNOWN",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
     }
   },
   {
@@ -1075,7 +1177,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -1083,7 +1252,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -1094,145 +1263,7 @@
           "placement": "surface",
           "surfaceMethod": "either"
         },
-        "evidence": [
-          "gwu-traditions"
-        ],
-        "output": {
-          "status": "AMBIGUOUS",
-          "candidates": [
-            "block-printing",
-            "embroidery"
-          ],
-          "technique": null,
-          "evidence": [
-            "gwu-traditions"
-          ],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "placement": "surface",
-            "surfaceMethod": "either"
-          }
-        }
-      },
-      {
-        "nodeId": "decide",
-        "unitId": "textile.decision",
-        "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.decision@1.0.0",
-        "input": {
-          "prior": {
-            "status": "AMBIGUOUS",
-            "candidates": [
-              "block-printing",
-              "embroidery"
-            ],
-            "technique": null,
-            "evidence": [
-              "gwu-traditions"
-            ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "surface",
-              "surfaceMethod": "either"
-            }
-          }
-        },
-        "evidence": [
-          "gwu-traditions"
-        ],
-        "output": {
-          "status": "AMBIGUOUS",
-          "candidates": [
-            "block-printing",
-            "embroidery"
-          ],
-          "technique": null,
-          "evidence": [
-            "gwu-traditions"
-          ],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "placement": "surface",
-            "surfaceMethod": "either"
-          }
-        }
-      },
-      {
-        "nodeId": "validate",
-        "unitId": "textile.validator",
-        "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.validator@1.0.0",
-        "input": {
-          "prior": {
-            "status": "AMBIGUOUS",
-            "candidates": [
-              "block-printing",
-              "embroidery"
-            ],
-            "technique": null,
-            "evidence": [
-              "gwu-traditions"
-            ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "surface",
-              "surfaceMethod": "either"
-            }
-          }
-        },
-        "evidence": [
-          "gwu-traditions"
-        ],
+        "evidence": {},
         "output": {
           "status": "AMBIGUOUS",
           "candidates": [
@@ -1288,6 +1319,12 @@
         "placement": "surface",
         "surfaceMethod": "either"
       }
+    },
+    "termination": {
+      "action": "CLARIFY",
+      "status": "AMBIGUOUS",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
     }
   },
   {
@@ -1315,7 +1352,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -1323,7 +1427,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -1343,155 +1447,7 @@
             }
           ]
         },
-        "evidence": [],
-        "output": {
-          "status": "CONFLICT",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "placement": "structure",
-            "claims": [
-              {
-                "source": "a",
-                "placement": "structure"
-              },
-              {
-                "source": "b",
-                "placement": "surface"
-              }
-            ]
-          }
-        }
-      },
-      {
-        "nodeId": "decide",
-        "unitId": "textile.decision",
-        "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.decision@1.0.0",
-        "input": {
-          "prior": {
-            "status": "CONFLICT",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "structure",
-              "claims": [
-                {
-                  "source": "a",
-                  "placement": "structure"
-                },
-                {
-                  "source": "b",
-                  "placement": "surface"
-                }
-              ]
-            }
-          }
-        },
-        "evidence": [],
-        "output": {
-          "status": "CONFLICT",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "placement": "structure",
-            "claims": [
-              {
-                "source": "a",
-                "placement": "structure"
-              },
-              {
-                "source": "b",
-                "placement": "surface"
-              }
-            ]
-          }
-        }
-      },
-      {
-        "nodeId": "validate",
-        "unitId": "textile.validator",
-        "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.validator@1.0.0",
-        "input": {
-          "prior": {
-            "status": "CONFLICT",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "structure",
-              "claims": [
-                {
-                  "source": "a",
-                  "placement": "structure"
-                },
-                {
-                  "source": "b",
-                  "placement": "surface"
-                }
-              ]
-            }
-          }
-        },
-        "evidence": [],
+        "evidence": {},
         "output": {
           "status": "CONFLICT",
           "candidates": [],
@@ -1555,6 +1511,12 @@
           }
         ]
       }
+    },
+    "termination": {
+      "action": "CLARIFY",
+      "status": "CONFLICT",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
     }
   },
   {
@@ -1573,7 +1535,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -1581,7 +1610,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -1592,119 +1621,7 @@
           "placement": "surface",
           "requestedProcess": "laser"
         },
-        "evidence": [],
-        "output": {
-          "status": "UNKNOWN",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "placement": "surface",
-            "requestedProcess": "laser"
-          }
-        }
-      },
-      {
-        "nodeId": "decide",
-        "unitId": "textile.decision",
-        "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.decision@1.0.0",
-        "input": {
-          "prior": {
-            "status": "UNKNOWN",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "surface",
-              "requestedProcess": "laser"
-            }
-          }
-        },
-        "evidence": [],
-        "output": {
-          "status": "UNKNOWN",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "placement": "surface",
-            "requestedProcess": "laser"
-          }
-        }
-      },
-      {
-        "nodeId": "validate",
-        "unitId": "textile.validator",
-        "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.validator@1.0.0",
-        "input": {
-          "prior": {
-            "status": "UNKNOWN",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "placement": "surface",
-              "requestedProcess": "laser"
-            }
-          }
-        },
-        "evidence": [],
+        "evidence": {},
         "output": {
           "status": "UNKNOWN",
           "candidates": [],
@@ -1750,6 +1667,12 @@
         "placement": "surface",
         "requestedProcess": "laser"
       }
+    },
+    "termination": {
+      "action": "PRESERVE_UNKNOWN",
+      "status": "UNKNOWN",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
     }
   },
   {
@@ -1765,7 +1688,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -1773,7 +1763,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -1781,107 +1771,7 @@
           "evidence": [],
           "placement": "structure"
         },
-        "evidence": [],
-        "output": {
-          "status": "NEEDS_INPUT",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [],
-            "placement": "structure"
-          }
-        }
-      },
-      {
-        "nodeId": "decide",
-        "unitId": "textile.decision",
-        "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.decision@1.0.0",
-        "input": {
-          "prior": {
-            "status": "NEEDS_INPUT",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [],
-              "placement": "structure"
-            }
-          }
-        },
-        "evidence": [],
-        "output": {
-          "status": "NEEDS_INPUT",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "textile-pattern",
-            "evidence": [],
-            "placement": "structure"
-          }
-        }
-      },
-      {
-        "nodeId": "validate",
-        "unitId": "textile.validator",
-        "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.validator@1.0.0",
-        "input": {
-          "prior": {
-            "status": "NEEDS_INPUT",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [],
-              "placement": "structure"
-            }
-          }
-        },
-        "evidence": [],
+        "evidence": {},
         "output": {
           "status": "NEEDS_INPUT",
           "candidates": [],
@@ -1921,6 +1811,12 @@
         "evidence": [],
         "placement": "structure"
       }
+    },
+    "termination": {
+      "action": "WAIT",
+      "status": "NEEDS_INPUT",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
     }
   },
   {
@@ -1938,7 +1834,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -1946,7 +1909,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -1956,115 +1919,7 @@
           ],
           "machineControl": true
         },
-        "evidence": [],
-        "output": {
-          "status": "OUT_OF_SCOPE",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "machine-control",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "machineControl": true
-          }
-        }
-      },
-      {
-        "nodeId": "decide",
-        "unitId": "textile.decision",
-        "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.decision@1.0.0",
-        "input": {
-          "prior": {
-            "status": "OUT_OF_SCOPE",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "machine-control",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "machineControl": true
-            }
-          }
-        },
-        "evidence": [],
-        "output": {
-          "status": "OUT_OF_SCOPE",
-          "candidates": [],
-          "technique": null,
-          "evidence": [],
-          "unknowns": [
-            "local production availability",
-            "cost",
-            "MOQ",
-            "lead time",
-            "machine suitability",
-            "commercial feasibility"
-          ],
-          "brief": {
-            "domain": "machine-control",
-            "evidence": [
-              "synthetic-design-brief"
-            ],
-            "machineControl": true
-          }
-        }
-      },
-      {
-        "nodeId": "validate",
-        "unitId": "textile.validator",
-        "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
-        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
-        "implementationRef": "registry:textile.validator@1.0.0",
-        "input": {
-          "prior": {
-            "status": "OUT_OF_SCOPE",
-            "candidates": [],
-            "technique": null,
-            "evidence": [],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "machine-control",
-              "evidence": [
-                "synthetic-design-brief"
-              ],
-              "machineControl": true
-            }
-          }
-        },
-        "evidence": [],
+        "evidence": {},
         "output": {
           "status": "OUT_OF_SCOPE",
           "candidates": [],
@@ -2108,6 +1963,12 @@
         ],
         "machineControl": true
       }
+    },
+    "termination": {
+      "action": "REJECT",
+      "status": "OUT_OF_SCOPE",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
     }
   },
   {
@@ -2126,7 +1987,74 @@
       "standardVersion": "0.1.0",
       "authority": "REFERENCE",
       "resourceClosurePath": "domain/resource-closure.json",
-      "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
     },
     "trace": [
       {
@@ -2134,7 +2062,7 @@
         "unitId": "textile.recognizer",
         "unitRevision": "1.0.0",
         "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.recognizer@1.0.0",
         "input": {
@@ -2145,12 +2073,7 @@
           "placement": "structure",
           "sampleCheck": "FAIL"
         },
-        "evidence": [
-          "ncsu-studio",
-          "ncsu-lab",
-          "gwu-traditions",
-          "nps-weaves"
-        ],
+        "evidence": {},
         "output": {
           "status": "KNOWN",
           "candidates": [
@@ -2185,59 +2108,47 @@
         "nodeId": "decide",
         "unitId": "textile.decision",
         "unitRevision": "1.0.0",
-        "unitSha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "unitSha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.decision@1.0.0",
         "input": {
-          "prior": {
-            "status": "KNOWN",
-            "candidates": [
-              "jacquard"
-            ],
-            "technique": null,
+          "status": "KNOWN",
+          "candidates": [
+            "jacquard"
+          ],
+          "technique": null,
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
             "evidence": [
-              "ncsu-studio",
-              "ncsu-lab",
-              "gwu-traditions",
-              "nps-weaves"
+              "synthetic-sample-report"
             ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-sample-report"
-              ],
-              "placement": "structure",
-              "sampleCheck": "FAIL"
-            }
+            "placement": "structure",
+            "sampleCheck": "FAIL"
           }
         },
-        "evidence": [
-          "ncsu-studio",
-          "ncsu-lab",
-          "gwu-traditions",
-          "nps-weaves"
-        ],
+        "evidence": {
+          "sourceEvidence": [
+            "ncsu-studio",
+            "ncsu-lab",
+            "gwu-traditions",
+            "nps-weaves"
+          ]
+        },
         "output": {
           "status": "READY",
           "candidates": [
             "jacquard"
           ],
           "technique": "jacquard",
-          "evidence": [
-            "ncsu-studio",
-            "ncsu-lab",
-            "gwu-traditions",
-            "nps-weaves"
-          ],
           "unknowns": [
             "local production availability",
             "cost",
@@ -2253,66 +2164,29 @@
             ],
             "placement": "structure",
             "sampleCheck": "FAIL"
-          }
+          },
+          "evidence": [
+            "ncsu-studio",
+            "ncsu-lab",
+            "gwu-traditions",
+            "nps-weaves"
+          ]
         }
       },
       {
         "nodeId": "validate",
         "unitId": "textile.validator",
         "unitRevision": "1.0.0",
-        "unitSha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
-        "graphSha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+        "unitSha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
         "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
         "implementationRef": "registry:textile.validator@1.0.0",
         "input": {
-          "prior": {
-            "status": "READY",
-            "candidates": [
-              "jacquard"
-            ],
-            "technique": "jacquard",
-            "evidence": [
-              "ncsu-studio",
-              "ncsu-lab",
-              "gwu-traditions",
-              "nps-weaves"
-            ],
-            "unknowns": [
-              "local production availability",
-              "cost",
-              "MOQ",
-              "lead time",
-              "machine suitability",
-              "commercial feasibility"
-            ],
-            "brief": {
-              "domain": "textile-pattern",
-              "evidence": [
-                "synthetic-sample-report"
-              ],
-              "placement": "structure",
-              "sampleCheck": "FAIL"
-            }
-          }
-        },
-        "evidence": [
-          "ncsu-studio",
-          "ncsu-lab",
-          "gwu-traditions",
-          "nps-weaves"
-        ],
-        "output": {
-          "status": "FAILED",
+          "status": "READY",
           "candidates": [
             "jacquard"
           ],
-          "technique": null,
-          "evidence": [
-            "ncsu-studio",
-            "ncsu-lab",
-            "gwu-traditions",
-            "nps-weaves"
-          ],
+          "technique": "jacquard",
           "unknowns": [
             "local production availability",
             "cost",
@@ -2329,6 +2203,43 @@
             "placement": "structure",
             "sampleCheck": "FAIL"
           }
+        },
+        "evidence": {
+          "sourceEvidence": [
+            "ncsu-studio",
+            "ncsu-lab",
+            "gwu-traditions",
+            "nps-weaves"
+          ]
+        },
+        "output": {
+          "status": "FAILED",
+          "candidates": [
+            "jacquard"
+          ],
+          "technique": null,
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "evidence": [
+              "synthetic-sample-report"
+            ],
+            "placement": "structure",
+            "sampleCheck": "FAIL"
+          },
+          "evidence": [
+            "ncsu-studio",
+            "ncsu-lab",
+            "gwu-traditions",
+            "nps-weaves"
+          ]
         }
       }
     ],
@@ -2338,12 +2249,6 @@
         "jacquard"
       ],
       "technique": null,
-      "evidence": [
-        "ncsu-studio",
-        "ncsu-lab",
-        "gwu-traditions",
-        "nps-weaves"
-      ],
       "unknowns": [
         "local production availability",
         "cost",
@@ -2359,7 +2264,943 @@
         ],
         "placement": "structure",
         "sampleCheck": "FAIL"
+      },
+      "evidence": [
+        "ncsu-studio",
+        "ncsu-lab",
+        "gwu-traditions",
+        "nps-weaves"
+      ]
+    },
+    "termination": {
+      "action": "FAIL",
+      "status": "FAILED",
+      "nodeId": "validate",
+      "unitId": "textile.validator"
+    }
+  },
+  {
+    "id": "requested-conflicts-surface",
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "print",
+      "requestedProcess": "embroidery",
+      "evidence": [
+        "synthetic"
+      ]
+    },
+    "packageIdentity": {
+      "packageId": "textile.pattern",
+      "revision": "1.0.0",
+      "standardVersion": "0.1.0",
+      "authority": "REFERENCE",
+      "resourceClosurePath": "domain/resource-closure.json",
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
+    },
+    "trace": [
+      {
+        "nodeId": "recognize",
+        "unitId": "textile.recognizer",
+        "unitRevision": "1.0.0",
+        "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
+        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
+        "implementationRef": "registry:textile.recognizer@1.0.0",
+        "input": {
+          "domain": "textile-pattern",
+          "placement": "surface",
+          "surfaceMethod": "print",
+          "requestedProcess": "embroidery",
+          "evidence": [
+            "synthetic"
+          ]
+        },
+        "evidence": {},
+        "output": {
+          "status": "CONFLICT",
+          "candidates": [],
+          "technique": null,
+          "evidence": [],
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "placement": "surface",
+            "surfaceMethod": "print",
+            "requestedProcess": "embroidery",
+            "evidence": [
+              "synthetic"
+            ]
+          }
+        }
       }
+    ],
+    "outcome": {
+      "status": "CONFLICT",
+      "candidates": [],
+      "technique": null,
+      "evidence": [],
+      "unknowns": [
+        "local production availability",
+        "cost",
+        "MOQ",
+        "lead time",
+        "machine suitability",
+        "commercial feasibility"
+      ],
+      "brief": {
+        "domain": "textile-pattern",
+        "placement": "surface",
+        "surfaceMethod": "print",
+        "requestedProcess": "embroidery",
+        "evidence": [
+          "synthetic"
+        ]
+      }
+    },
+    "termination": {
+      "action": "CLARIFY",
+      "status": "CONFLICT",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
+    }
+  },
+  {
+    "id": "requested-conflicts-structure",
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "structure",
+      "requestedProcess": "block-printing",
+      "evidence": [
+        "synthetic"
+      ]
+    },
+    "packageIdentity": {
+      "packageId": "textile.pattern",
+      "revision": "1.0.0",
+      "standardVersion": "0.1.0",
+      "authority": "REFERENCE",
+      "resourceClosurePath": "domain/resource-closure.json",
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
+    },
+    "trace": [
+      {
+        "nodeId": "recognize",
+        "unitId": "textile.recognizer",
+        "unitRevision": "1.0.0",
+        "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
+        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
+        "implementationRef": "registry:textile.recognizer@1.0.0",
+        "input": {
+          "domain": "textile-pattern",
+          "placement": "structure",
+          "requestedProcess": "block-printing",
+          "evidence": [
+            "synthetic"
+          ]
+        },
+        "evidence": {},
+        "output": {
+          "status": "CONFLICT",
+          "candidates": [],
+          "technique": null,
+          "evidence": [],
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "placement": "structure",
+            "requestedProcess": "block-printing",
+            "evidence": [
+              "synthetic"
+            ]
+          }
+        }
+      }
+    ],
+    "outcome": {
+      "status": "CONFLICT",
+      "candidates": [],
+      "technique": null,
+      "evidence": [],
+      "unknowns": [
+        "local production availability",
+        "cost",
+        "MOQ",
+        "lead time",
+        "machine suitability",
+        "commercial feasibility"
+      ],
+      "brief": {
+        "domain": "textile-pattern",
+        "placement": "structure",
+        "requestedProcess": "block-printing",
+        "evidence": [
+          "synthetic"
+        ]
+      }
+    },
+    "termination": {
+      "action": "CLARIFY",
+      "status": "CONFLICT",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
+    }
+  },
+  {
+    "id": "scope-before-sample-failure",
+    "input": {
+      "domain": "machine-control",
+      "machineControl": true,
+      "evidence": [
+        "synthetic"
+      ],
+      "sampleCheck": "FAIL"
+    },
+    "packageIdentity": {
+      "packageId": "textile.pattern",
+      "revision": "1.0.0",
+      "standardVersion": "0.1.0",
+      "authority": "REFERENCE",
+      "resourceClosurePath": "domain/resource-closure.json",
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
+    },
+    "trace": [
+      {
+        "nodeId": "recognize",
+        "unitId": "textile.recognizer",
+        "unitRevision": "1.0.0",
+        "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
+        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
+        "implementationRef": "registry:textile.recognizer@1.0.0",
+        "input": {
+          "domain": "machine-control",
+          "machineControl": true,
+          "evidence": [
+            "synthetic"
+          ],
+          "sampleCheck": "FAIL"
+        },
+        "evidence": {},
+        "output": {
+          "status": "OUT_OF_SCOPE",
+          "candidates": [],
+          "technique": null,
+          "evidence": [],
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "machine-control",
+            "machineControl": true,
+            "evidence": [
+              "synthetic"
+            ],
+            "sampleCheck": "FAIL"
+          }
+        }
+      }
+    ],
+    "outcome": {
+      "status": "OUT_OF_SCOPE",
+      "candidates": [],
+      "technique": null,
+      "evidence": [],
+      "unknowns": [
+        "local production availability",
+        "cost",
+        "MOQ",
+        "lead time",
+        "machine suitability",
+        "commercial feasibility"
+      ],
+      "brief": {
+        "domain": "machine-control",
+        "machineControl": true,
+        "evidence": [
+          "synthetic"
+        ],
+        "sampleCheck": "FAIL"
+      }
+    },
+    "termination": {
+      "action": "REJECT",
+      "status": "OUT_OF_SCOPE",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
+    }
+  },
+  {
+    "id": "conflict-before-sample-failure",
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "structure",
+      "surfaceMethod": "print",
+      "evidence": [
+        "synthetic"
+      ],
+      "sampleCheck": "FAIL"
+    },
+    "packageIdentity": {
+      "packageId": "textile.pattern",
+      "revision": "1.0.0",
+      "standardVersion": "0.1.0",
+      "authority": "REFERENCE",
+      "resourceClosurePath": "domain/resource-closure.json",
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
+    },
+    "trace": [
+      {
+        "nodeId": "recognize",
+        "unitId": "textile.recognizer",
+        "unitRevision": "1.0.0",
+        "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
+        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
+        "implementationRef": "registry:textile.recognizer@1.0.0",
+        "input": {
+          "domain": "textile-pattern",
+          "placement": "structure",
+          "surfaceMethod": "print",
+          "evidence": [
+            "synthetic"
+          ],
+          "sampleCheck": "FAIL"
+        },
+        "evidence": {},
+        "output": {
+          "status": "CONFLICT",
+          "candidates": [],
+          "technique": null,
+          "evidence": [],
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "placement": "structure",
+            "surfaceMethod": "print",
+            "evidence": [
+              "synthetic"
+            ],
+            "sampleCheck": "FAIL"
+          }
+        }
+      }
+    ],
+    "outcome": {
+      "status": "CONFLICT",
+      "candidates": [],
+      "technique": null,
+      "evidence": [],
+      "unknowns": [
+        "local production availability",
+        "cost",
+        "MOQ",
+        "lead time",
+        "machine suitability",
+        "commercial feasibility"
+      ],
+      "brief": {
+        "domain": "textile-pattern",
+        "placement": "structure",
+        "surfaceMethod": "print",
+        "evidence": [
+          "synthetic"
+        ],
+        "sampleCheck": "FAIL"
+      }
+    },
+    "termination": {
+      "action": "CLARIFY",
+      "status": "CONFLICT",
+      "nodeId": "recognize",
+      "unitId": "textile.recognizer"
+    }
+  },
+  {
+    "id": "request-disambiguates",
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "either",
+      "requestedProcess": "embroidery",
+      "evidence": [
+        "synthetic"
+      ]
+    },
+    "packageIdentity": {
+      "packageId": "textile.pattern",
+      "revision": "1.0.0",
+      "standardVersion": "0.1.0",
+      "authority": "REFERENCE",
+      "resourceClosurePath": "domain/resource-closure.json",
+      "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "selectionLock": {
+        "packageId": "textile.pattern",
+        "packageRevision": "1.0.0",
+        "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+        "target": "node24",
+        "consumerProfile": "textile-synthetic-sampling/1.0.0",
+        "referencePolicy": {
+          "id": "textile-reference-only",
+          "revision": "1.0.0",
+          "scope": "SYNTHETIC_REFERENCE_ONLY",
+          "production": false,
+          "activation": false,
+          "allowUnpromoted": true
+        },
+        "assets": [
+          {
+            "kind": "unit",
+            "id": "textile.knowledge",
+            "revision": "1.0.0",
+            "path": "domain/units/knowledge.json",
+            "sha256": "f7bdd61dd7cf384e9f0d4bab2e85559e868a1500948134181a7b593fb0b46fd6"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.recognizer",
+            "revision": "1.0.0",
+            "path": "domain/units/recognizer.json",
+            "sha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.decision",
+            "revision": "1.0.0",
+            "path": "domain/units/decision.json",
+            "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.validator",
+            "revision": "1.0.0",
+            "path": "domain/units/validator.json",
+            "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850"
+          },
+          {
+            "kind": "unit",
+            "id": "textile.workflow",
+            "revision": "1.0.0",
+            "path": "domain/units/workflow.json",
+            "sha256": "301f71c9056d1df28f3f41702085a397914d2af033d280ca988b06a916a3f81f"
+          },
+          {
+            "kind": "graph",
+            "id": "textile.pattern-selection",
+            "revision": "1.0.0",
+            "path": "domain/textile-pattern-selection.graph.json",
+            "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          },
+          {
+            "kind": "knowledge",
+            "id": "textile.process-knowledge",
+            "revision": "1.0.0",
+            "path": "fixtures/textile-knowledge.json",
+            "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+          }
+        ]
+      },
+      "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
+    },
+    "trace": [
+      {
+        "nodeId": "recognize",
+        "unitId": "textile.recognizer",
+        "unitRevision": "1.0.0",
+        "unitSha256": "c6d0abe6b50a4e00e1ba6e854157b77bc2eb1b9a3a8eb4aa7be2ba66d52053b8",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
+        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
+        "implementationRef": "registry:textile.recognizer@1.0.0",
+        "input": {
+          "domain": "textile-pattern",
+          "placement": "surface",
+          "surfaceMethod": "either",
+          "requestedProcess": "embroidery",
+          "evidence": [
+            "synthetic"
+          ]
+        },
+        "evidence": {},
+        "output": {
+          "status": "KNOWN",
+          "candidates": [
+            "embroidery"
+          ],
+          "technique": null,
+          "evidence": [
+            "gwu-traditions"
+          ],
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "placement": "surface",
+            "surfaceMethod": "either",
+            "requestedProcess": "embroidery",
+            "evidence": [
+              "synthetic"
+            ]
+          }
+        }
+      },
+      {
+        "nodeId": "decide",
+        "unitId": "textile.decision",
+        "unitRevision": "1.0.0",
+        "unitSha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
+        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
+        "implementationRef": "registry:textile.decision@1.0.0",
+        "input": {
+          "status": "KNOWN",
+          "candidates": [
+            "embroidery"
+          ],
+          "technique": null,
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "placement": "surface",
+            "surfaceMethod": "either",
+            "requestedProcess": "embroidery",
+            "evidence": [
+              "synthetic"
+            ]
+          }
+        },
+        "evidence": {
+          "sourceEvidence": [
+            "gwu-traditions"
+          ]
+        },
+        "output": {
+          "status": "READY",
+          "candidates": [
+            "embroidery"
+          ],
+          "technique": "embroidery",
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "placement": "surface",
+            "surfaceMethod": "either",
+            "requestedProcess": "embroidery",
+            "evidence": [
+              "synthetic"
+            ]
+          },
+          "evidence": [
+            "gwu-traditions"
+          ]
+        }
+      },
+      {
+        "nodeId": "validate",
+        "unitId": "textile.validator",
+        "unitRevision": "1.0.0",
+        "unitSha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850",
+        "graphSha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
+        "knowledgeSha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf",
+        "implementationRef": "registry:textile.validator@1.0.0",
+        "input": {
+          "status": "READY",
+          "candidates": [
+            "embroidery"
+          ],
+          "technique": "embroidery",
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "placement": "surface",
+            "surfaceMethod": "either",
+            "requestedProcess": "embroidery",
+            "evidence": [
+              "synthetic"
+            ]
+          }
+        },
+        "evidence": {
+          "sourceEvidence": [
+            "gwu-traditions"
+          ]
+        },
+        "output": {
+          "status": "READY",
+          "candidates": [
+            "embroidery"
+          ],
+          "technique": "embroidery",
+          "unknowns": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "brief": {
+            "domain": "textile-pattern",
+            "placement": "surface",
+            "surfaceMethod": "either",
+            "requestedProcess": "embroidery",
+            "evidence": [
+              "synthetic"
+            ]
+          },
+          "evidence": [
+            "gwu-traditions"
+          ]
+        }
+      }
+    ],
+    "outcome": {
+      "status": "READY",
+      "candidates": [
+        "embroidery"
+      ],
+      "technique": "embroidery",
+      "unknowns": [
+        "local production availability",
+        "cost",
+        "MOQ",
+        "lead time",
+        "machine suitability",
+        "commercial feasibility"
+      ],
+      "brief": {
+        "domain": "textile-pattern",
+        "placement": "surface",
+        "surfaceMethod": "either",
+        "requestedProcess": "embroidery",
+        "evidence": [
+          "synthetic"
+        ]
+      },
+      "evidence": [
+        "gwu-traditions"
+      ]
     }
   }
 ]

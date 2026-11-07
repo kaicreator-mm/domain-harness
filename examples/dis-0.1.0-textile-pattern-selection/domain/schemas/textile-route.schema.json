@@ -136,143 +136,127 @@
     },
     {
       "type": "object",
-      "required": [
-        "prior"
-      ],
       "additionalProperties": false,
+      "required": [
+        "status",
+        "candidates",
+        "technique",
+        "unknowns",
+        "brief"
+      ],
       "properties": {
-        "prior": {
+        "status": {
+          "enum": [
+            "KNOWN",
+            "UNKNOWN",
+            "AMBIGUOUS",
+            "CONFLICT",
+            "NEEDS_INPUT",
+            "FAILED",
+            "OUT_OF_SCOPE",
+            "READY"
+          ]
+        },
+        "candidates": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "jacquard",
+              "block-printing",
+              "embroidery"
+            ]
+          }
+        },
+        "technique": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "jacquard",
+            "block-printing",
+            "embroidery",
+            null
+          ]
+        },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "brief": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "status",
-            "candidates",
-            "technique",
-            "evidence",
-            "unknowns",
-            "brief"
-          ],
           "properties": {
-            "status": {
+            "domain": {
+              "type": "string"
+            },
+            "placement": {
               "enum": [
-                "KNOWN",
-                "UNKNOWN",
-                "AMBIGUOUS",
-                "CONFLICT",
-                "NEEDS_INPUT",
-                "FAILED",
-                "OUT_OF_SCOPE",
-                "READY"
+                "structure",
+                "surface",
+                "unknown"
               ]
             },
-            "candidates": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "enum": [
-                  "jacquard",
-                  "block-printing",
-                  "embroidery"
-                ]
-              }
-            },
-            "technique": {
-              "type": [
-                "string",
-                "null"
-              ],
+            "surfaceMethod": {
               "enum": [
-                "jacquard",
-                "block-printing",
-                "embroidery",
-                null
+                "print",
+                "stitch",
+                "either",
+                "unknown"
               ]
             },
             "evidence": {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               }
             },
-            "unknowns": {
+            "claims": {
               "type": "array",
               "items": {
-                "type": "string"
-              }
-            },
-            "brief": {
-              "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "domain": {
-                  "type": "string"
-                },
-                "placement": {
-                  "enum": [
-                    "structure",
-                    "surface",
-                    "unknown"
-                  ]
-                },
-                "surfaceMethod": {
-                  "enum": [
-                    "print",
-                    "stitch",
-                    "either",
-                    "unknown"
-                  ]
-                },
-                "evidence": {
-                  "type": "array",
-                  "items": {
+                "type": "object",
+                "required": [
+                  "source",
+                  "placement"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "source": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "placement": {
+                    "enum": [
+                      "structure",
+                      "surface"
+                    ]
                   }
-                },
-                "claims": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "source",
-                      "placement"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                      "source": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "placement": {
-                        "enum": [
-                          "structure",
-                          "surface"
-                        ]
-                      }
-                    }
-                  }
-                },
-                "requestedProcess": {
-                  "type": "string"
-                },
-                "machineControl": {
-                  "type": "boolean"
-                },
-                "sampleCheck": {
-                  "enum": [
-                    "PASS",
-                    "FAIL",
-                    "UNKNOWN"
-                  ]
                 }
-              },
-              "required": [
-                "domain",
-                "evidence"
+              }
+            },
+            "requestedProcess": {
+              "type": "string"
+            },
+            "machineControl": {
+              "type": "boolean"
+            },
+            "sampleCheck": {
+              "enum": [
+                "PASS",
+                "FAIL",
+                "UNKNOWN"
               ]
             }
-          }
+          },
+          "required": [
+            "domain",
+            "evidence"
+          ]
         }
       }
     }

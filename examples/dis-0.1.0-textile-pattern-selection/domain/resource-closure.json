@@ -61,7 +61,7 @@
     },
     {
       "path": "domain/schemas/textile-route.schema.json",
-      "sha256": "00a86958e58b925077f59c941b442bf1df2cba3af5623b81c5cc1bc01440b926",
+      "sha256": "ee0d288dc6e59b6d8af8c03c7491796f899281460700f771188b0e3defe2bbb9",
       "kind": "schema",
       "owners": [
         "textile.pattern"
@@ -70,7 +70,7 @@
     },
     {
       "path": "domain/textile-pattern-selection.graph.json",
-      "sha256": "d7954cc176a9b61f02214c3bcfa85b2b0d05ffd3a6f16bed31cc7b1076b8697f",
+      "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
       "kind": "graph",
       "owners": [
         "textile.pattern"
@@ -79,7 +79,7 @@
     },
     {
       "path": "domain/units/decision.json",
-      "sha256": "1993cac4803fd95547e2089588aa2acb73aa685ba6f32f830fc7be5518e36bd6",
+      "sha256": "270e2885dc55de884e8da3418ca5b6b3588950cea2a1711863a2180938c33d60",
       "kind": "unit",
       "owners": [
         "textile.pattern"
@@ -106,7 +106,7 @@
     },
     {
       "path": "domain/units/validator.json",
-      "sha256": "542e900f8a640bd2c23b21a4eb674a48763da5d52d658ec80a57431ebc0e3c04",
+      "sha256": "5dfe4aefde0fceb502092aaffa761e3012babd125b674c49c0203d6cee3c3850",
       "kind": "unit",
       "owners": [
         "textile.pattern"
@@ -124,7 +124,7 @@
     },
     {
       "path": "fixtures/scenarios.json",
-      "sha256": "83d79200670af0d87e4187173ebdf4868646357e9bb5e59d02bab9694c6025cd",
+      "sha256": "2fada8fec1e938a397fd8cc08229a67c92ecd5aadf9d74cfa0edd868cd2839df",
       "kind": "fixture",
       "owners": [
         "textile.pattern"
@@ -142,7 +142,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "1c073c6657025a33d94f1339c60f36f5956afa41239de4f98a6d4fbedc1ace1d",
+      "sha256": "66ae1d045b09c4ce4f88b4be723f023c57df372b64c7a0700262eb426b7707b2",
       "kind": "conformance",
       "owners": [
         "textile.pattern"
@@ -160,7 +160,7 @@
     },
     {
       "path": "scripts/validate.py",
-      "sha256": "9a13fff126dc84ad843db12af03ccb48b5080530f8175b37cc109e778d68e959",
+      "sha256": "bfb807ca249f43e42c06167d64c4db385ec70472d9471244e5c2b336c182c83d",
       "kind": "conformance",
       "owners": [
         "textile.pattern"
@@ -169,7 +169,7 @@
     },
     {
       "path": "src/runner.mjs",
-      "sha256": "1e895974e3df52f1e18cb260cb7864ed985a98528fabe06e1b440f84371c772a",
+      "sha256": "488fd28b6170373851af111b85060ae9e099d60e602ce4343bae047c9711b1f1",
       "kind": "implementation",
       "owners": [
         "textile.pattern"
@@ -178,7 +178,7 @@
     },
     {
       "path": "test/runner.test.mjs",
-      "sha256": "b0f89cfae3a693153c75706a0d57dcfda3ea17ef6001d4284a4c3249f0af1120",
+      "sha256": "ed12d04e54106646ccfdca1b0db858da254de57560917610600adc1b3d5ed1de",
       "kind": "conformance",
       "owners": [
         "textile.pattern"
