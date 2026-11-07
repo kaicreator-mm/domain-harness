@@ -1,0 +1,32 @@
+# Domain Intelligence Standard (DIS) v0.2.0 — Element-first restart R1
+
+> **STATUS: NEW PRODUCT/L1 CANDIDATE; NOT FROZEN.**
+>
+> Owner decision 2026-11-08: the old Data/Processing/Composite Intelligence Unit draft (#1494 / draft PR #1493) is **SUPERSEDED, NOT MERGED**. This new candidate is independently based on frozen DIS 0.1.0 at \`9504c78f4651f6c1ebc48c7858fca2d8b061544b\`. The old files and discussion are retained in GitHub history, not silently rewritten.
+>
+> Product/L1 successor authority: [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496). Boot/KDP: #1484; Package boundaries: #1480; Harness gap: #1478; original task/meta evolution: #1398; Runtime consumption proof: #1486.
+
+## New R1 model
+
+- Domain = **Element dependency DAG**. DAG edges are static dependencies, NOT runtime control/dataflow. No mandatory Element type.
+- Element = cohesive domain/service micro-library with natural-language Description, 0..N public Functions, per-function implementations, typed dependencies and optional self-owned state/knowledge consumption. All SDK, Business, State, CLI/API/interaction service Elements follow the **same** core contract.
+- Function = semantically described, callable public contract. Multiple Functions may bind distinct Query/Rule/Code/Workflow/LLM/Harness implementations. AOT locks exact target/provenance/version.
+- Boot -> KDP Primary -> SDK (SDP) + Business Package technical initialization -> exactly one **App Init Element.init(context)** for every runnable Domain App -> published ingress bindings. No mandatory Main Workflow or generic physical Host abstraction.
+- Runtime consumes selected Domain Intelligence. Knowledge-graph creation and asset management belong to Forge. Domain-specific state belongs to the Domain; optional SDK SQLite/JSON/etc. provide business-neutral functions.
+- Harness/LLM and Meta evolution are **optional profiles** with standardized evidence and boundaries, not mandatory engines or an automatically self-modifying runtime.
+
+## Candidate documents
+
+1. [Chinese complete standard](DIS-0.2.0.zh-CN.md)
+2. [English architecture parity candidate](DIS-0.2.0.en.md)
+3. [Element / Function Contract R1](ELEMENT_FUNCTION_CONTRACT_R1.zh-CN.md)
+4. [App Init Contract R1](APP_INIT_CONTRACT_R1.zh-CN.md)
+5. [LLM / Harness / Two-Layer Evolution R1](LLM_HARNESS_EVOLUTION_R1.zh-CN.md)
+6. [Migration and supersession ledger](MIGRATION_LEDGER_R1.zh-CN.md)
+7. [Five-consumer conformance scenarios](CONSUMER_SCENARIOS_R1.zh-CN.md)
+
+All examples and schema expressions are **illustrative, not validated machine-readable schemas**. English parity for focused R1 documents, executable JSON/YAML schemas, demos, independent review and CI are future acceptance work, not claimed completed here.
+
+## Gates
+
+PRODUCT_L1=REVIEW_PENDING; L2=NOT_FROZEN; MACHINE_SCHEMA=NOT_DONE; CONSUMER_DEMO=NOT_RUN; CONFORMANCE=NOT_RUN; RUNTIME_ADOPTION=NOT_PROVEN; SDK_ABI_CHANGE=NOT_AUTHORIZED; MERGE=NO; RELEASE=NO.
