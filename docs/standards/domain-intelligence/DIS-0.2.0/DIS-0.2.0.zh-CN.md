@@ -1,6 +1,6 @@
 # Domain Intelligence Standard（DIS）0.2.0
 
-<escape>**状态：ARCHITECTURE_CANDIDATE / NOT_FROZEN**</escape>  
+**状态：ARCHITECTURE_CANDIDATE / NOT_FROZEN**  
 **控制 Issue：** [domain-harness#1493](https://github.com/kaicreator-mm/domain-harness/issues/1493)  
 **前序标准：** DIS 0.1.0，冻结 HEAD `9504c78f4651f6c1ebc48c7858fca2d8b061544b`  
 **上位权威：** Product/L1 #1477；Boot/KDP 后继权威检查点 #1484
