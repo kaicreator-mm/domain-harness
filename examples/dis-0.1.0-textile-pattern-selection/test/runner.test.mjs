@@ -34,12 +34,20 @@ test('exact pin is mandatory and wrong pin fails closed', async () => {
 test('invalid structured brief rejects instead of choosing a process', () => {
   for(const input of [null,{}, {domain:'textile-pattern',evidence:[42]}, {domain:'textile-pattern',evidence:[],placement:'laser'}, {domain:'textile-pattern',evidence:[],claims:[{source:'x',placement:'structure',extra:true}]}]) assert.throws(()=>runPipeline(input,loaded),(error)=>error.message==='INVALID_INPUT' && error.trace.length===1 && error.trace[0].nodeId==='recognize' && error.trace[0].failure.code==='INVALID_INPUT' && error.trace[0].failure.inputStatus==='INVALID_INPUT' && assert.deepEqual(error.trace[0].input,input)===undefined);
 });
-test('recognition retains evidence and distinguishes derived, observed and unconfirmed values',()=>{
+test('recognition retains untrusted submissions without inventing provenance',()=>{
   const conflict=runPipeline(scenarios.find((s)=>s.id==='requested-structure-with-missing-surface-method').input,loaded).outcome.recognition;
   assert.deepEqual(conflict.inputEvidence,['user-brief']);assert.deepEqual(conflict.confirmedValues,[]);assert.deepEqual(conflict.inferredValues,[]);
-  assert.equal(conflict.observedValues.find((v)=>v.field==='requestedProcess').source,'SYSTEM_OBSERVED');assert.ok(conflict.conflicts[0].evidence.includes('user-brief'));
+  assert.deepEqual(conflict.observedValues,[]);assert.equal(conflict.submittedValues.find((v)=>v.field==='requestedProcess').source,null);assert.ok(conflict.conflicts[0].evidence.includes('user-brief'));
   const scope=runPipeline(scenarios.find((s)=>s.id==='out-of-scope').input,loaded).outcome.recognition;assert.equal(scope.inputStatus,'OUT_OF_SCOPE');assert.deepEqual(scope.inputEvidence,['synthetic-design-brief']);
   const ambiguity=runPipeline(scenarios.find((s)=>s.id==='ambiguous').input,loaded).outcome.recognition;assert.equal(ambiguity.candidateValues.length,2);assert.equal(ambiguity.ambiguities.length,1);
+  const unverified=runPipeline({domain:'textile-pattern',placement:'surface',surfaceMethod:'unknown',requestedProcess:'laser',evidence:['untrusted'],claims:[{source:'MODEL_INFERRED',placement:'surface'}]},loaded).outcome.recognition;
+  assert.deepEqual(unverified.observedValues,[]);const claim=unverified.submittedValues.find((v)=>v.field==='claims.placement');assert.equal(claim.source,null);assert.equal(claim.sourceClaim,'MODEL_INFERRED');assert.equal(claim.status,'CANDIDATE');
+  assert.ok(unverified.unknownValues.some((v)=>v.field==='surfaceMethod' && v.status==='UNKNOWN'));assert.ok(unverified.unknownValues.some((v)=>v.field==='requestedProcess' && v.status==='UNKNOWN'));
+  assert.ok(runPipeline(scenarios.find((s)=>s.id==='unknown').input,loaded).outcome.recognition.unknownValues.some((v)=>v.field==='placement' && v.status==='UNKNOWN'));
+});
+test('invalid input emits independent rejection trace',()=>{
+  const input={domain:'textile-pattern',placement:'structure',evidence:['untrusted'],extra:true};
+  assert.throws(()=>runPipeline(input,loaded),(error)=>{if(process.env.TEXTILE_EMIT_INVALID==='1')console.log('TEXTILE_INVALID='+JSON.stringify(error.trace));return error.message==='INVALID_INPUT' && error.trace.length===1 && error.trace[0].failure.inputStatus==='INVALID_INPUT';});
 });
 async function fixture(action) {
   const dir=await fs.mkdtemp(path.join(process.env.DIS_TEXTILE_TEMP_DIR,'textile-profile-'));

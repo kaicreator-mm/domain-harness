@@ -291,5 +291,28 @@
       "status": "CONFLICT",
       "technique": null
     }
+  },
+  {
+    "id": "unverified-model-claim",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "unknown",
+      "requestedProcess": "laser",
+      "evidence": [
+        "untrusted"
+      ],
+      "claims": [
+        {
+          "source": "MODEL_INFERRED",
+          "placement": "surface"
+        }
+      ]
+    },
+    "expected": {
+      "status": "UNKNOWN",
+      "technique": null
+    }
   }
 ]

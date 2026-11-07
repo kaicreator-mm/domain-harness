@@ -16,11 +16,11 @@
     "standardVersion": "0.1.0",
     "authority": "REFERENCE",
     "resourceClosurePath": "domain/resource-closure.json",
-    "resourceClosureSha256": "5a7fd3ca0ba04a5fde1796749fcb35a98bd80f525c1e40fe5523852b2ce8f010",
+    "resourceClosureSha256": "b0c2351b737604e48c323398f02c44b9020d30cc33f6328ce162ae23d3a0040f",
     "selectionLock": {
       "packageId": "textile.pattern",
       "packageRevision": "1.0.0",
-      "closureSha256": "5a7fd3ca0ba04a5fde1796749fcb35a98bd80f525c1e40fe5523852b2ce8f010",
+      "closureSha256": "b0c2351b737604e48c323398f02c44b9020d30cc33f6328ce162ae23d3a0040f",
       "target": "node24",
       "consumerProfile": "textile-synthetic-sampling/1.0.0",
       "referencePolicy": {
@@ -83,6 +83,6 @@
         }
       ]
     },
-    "selectionLockSha256": "dae9a5f9402453ae3bf55c89c18a26f5b80d2bd62c52b3581fb63b5a39e32d84"
+    "selectionLockSha256": "2bb77703cae5c50abaf2d061e6da504e5f0ef8a3586d75160ee853617e7c8ff7"
   }
 }

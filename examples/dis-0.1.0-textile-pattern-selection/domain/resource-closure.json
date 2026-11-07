@@ -61,7 +61,7 @@
     },
     {
       "path": "domain/schemas/textile-route.schema.json",
-      "sha256": "a36c4ab9f129cb6428d4a0d9e6b6cbf7bcb7b94e9d6c38c3ce70f42680f0c3dd",
+      "sha256": "e53a53f8b6242fd601aceee5c86628174b2988cdbe799927ca71d7d0ba1989ed",
       "kind": "schema",
       "owners": [
         "textile.pattern"
@@ -124,7 +124,7 @@
     },
     {
       "path": "fixtures/scenarios.json",
-      "sha256": "1f1935dab4595166507b509f3da5792fe364d0fb29646f0e0d06767bdc9e2509",
+      "sha256": "c5a27fdbcabd6252dccadcf328304a520ad950fc17bc1b6c44bf8f0224d9ecef",
       "kind": "fixture",
       "owners": [
         "textile.pattern"
@@ -142,7 +142,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "66b99218e3ee36e18af0088db37855d72d4e4c5a1959cd8356c10635a879cf4f",
+      "sha256": "24a7563d59c7f0208d356e1c502362528b2ce6a7f0ab74e3bc575a7ce7cc1415",
       "kind": "conformance",
       "owners": [
         "textile.pattern"
@@ -160,7 +160,7 @@
     },
     {
       "path": "scripts/validate.py",
-      "sha256": "9b3f20d1075a9f8504cee1c9878a748f44ee0bf7ec82aaca3cac5c5a963dcb4b",
+      "sha256": "5a75e4db15a79f4d558ae9042320de0dd08e01b9e2c1417e064e6618b19cd1de",
       "kind": "conformance",
       "owners": [
         "textile.pattern"
@@ -169,7 +169,7 @@
     },
     {
       "path": "src/runner.mjs",
-      "sha256": "e6e0f2529d66c69b7642281ad491105560a0bb86238c27a6bdf0c527e910e37a",
+      "sha256": "1c0fe8ec5fa1f79bdb80fa490d7a99e1b689c184e6ac14a85c6e90c0583c1388",
       "kind": "implementation",
       "owners": [
         "textile.pattern"
@@ -178,7 +178,7 @@
     },
     {
       "path": "test/runner.test.mjs",
-      "sha256": "5eb6b64b25cbfc30e05468dea8cfacb30c6aee0909d84becf43ab423dfb9fcaf",
+      "sha256": "3275c89808003b728cd45ccc91bc54184ba10832ec859f440d5016fe24d97a33",
       "kind": "conformance",
       "owners": [
         "textile.pattern"

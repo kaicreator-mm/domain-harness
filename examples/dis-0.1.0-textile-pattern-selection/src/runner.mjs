@@ -109,25 +109,29 @@ function recognizeCore(brief, knowledge) {
 function recognize(brief, knowledge) {
   const result = recognizeCore(brief, knowledge);
   const provenance = [...new Set([...brief.evidence, ...(brief.claims || []).map((claim) => claim.source)])];
-  const item = (field,value,source,evidence) => ({field,value:clone(value),source,evidence:clone(evidence)});
-  const observedValues = Object.entries(brief).filter(([field]) => !['evidence','claims'].includes(field)).map(([field,value]) => item(field,value,'SYSTEM_OBSERVED',brief.evidence));
-  for (const claim of brief.claims || []) observedValues.push(item('claims.placement',claim.placement,'SYSTEM_OBSERVED',[claim.source]));
+  const item = (field,value,source,evidence,status='CANDIDATE',sourceClaim=null) => ({field,value:clone(value),source,status,sourceClaim,evidence:clone(evidence)});
+  const submittedValues = Object.entries(brief).filter(([field]) => !['evidence','claims'].includes(field)).map(([field,value]) => item(field,value,null,brief.evidence));
+  for (const claim of brief.claims || []) submittedValues.push(item('claims.placement',claim.placement,null,[claim.source],'CANDIDATE',claim.source));
   const candidateValues = result.candidates.map((value) => item('technique',value,'DERIVED',knowledge.rules.find((rule) => rule.id === value).sources));
   const missingFields = [];
   if (result.status === 'NEEDS_INPUT') {
-    if (!brief.evidence.length) missingFields.push(item('evidence',null,'DERIVED',provenance));
-    if (!brief.placement) missingFields.push(item('placement',null,'DERIVED',provenance));
-    if (brief.placement === 'surface' && !brief.surfaceMethod) missingFields.push(item('surfaceMethod',null,'DERIVED',provenance));
+    if (!brief.evidence.length) missingFields.push(item('evidence',null,'DERIVED',provenance,'UNKNOWN'));
+    if (!brief.placement) missingFields.push(item('placement',null,'DERIVED',provenance,'UNKNOWN'));
+    if (brief.placement === 'surface' && !brief.surfaceMethod) missingFields.push(item('surfaceMethod',null,'DERIVED',provenance,'UNKNOWN'));
   }
   const requested = knowledge.rules.find((rule) => rule.id === brief.requestedProcess && rule.enabled);
+  const unknownValues = result.unknowns.map((value) => item('unresolved',value,'DERIVED',[],'UNKNOWN'));
+  if (brief.placement === 'unknown') unknownValues.push(item('placement','unknown',null,brief.evidence,'UNKNOWN'));
+  if (brief.surfaceMethod === 'unknown') unknownValues.push(item('surfaceMethod','unknown',null,brief.evidence,'UNKNOWN'));
+  if (brief.requestedProcess && !requested) unknownValues.push(item('requestedProcess',brief.requestedProcess,null,brief.evidence,'UNKNOWN'));
   result.recognition = {
     normalizedIntent:item('intent',result.status === 'OUT_OF_SCOPE' ? 'out-of-scope' : 'textile-pattern-process-selection','DERIVED',provenance),
-    confirmedValues:[], inferredValues:[], observedValues, candidateValues,
-    unknownValues:result.unknowns.map((value) => item('unresolved',value,'DERIVED',[])),
+    confirmedValues:[], inferredValues:[], observedValues:[], submittedValues, candidateValues,
+    unknownValues,
     missingFields,
     ambiguities:result.status === 'AMBIGUOUS' ? [item('technique',result.candidates,'DERIVED',result.evidence)] : [],
     conflicts:result.status === 'CONFLICT' ? [item('brief',brief,'DERIVED',[...new Set([...provenance,...(requested?.sources || [])])])] : [],
-    uncertainty:result.unknowns.map((value) => item('unresolved',value,'DERIVED',[])),
+    uncertainty:clone(unknownValues),
     inputStatus:result.status === 'OUT_OF_SCOPE' ? 'OUT_OF_SCOPE' : 'VALID', inputEvidence:clone(brief.evidence)
   };
   return result;
