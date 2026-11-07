@@ -31,23 +31,23 @@ export function consumeDis(input: unknown, selection: Selection) {
       case 'registry:xdownload.player.recognizer@1.0.0':
       case 'registry:xdownload.player.recognizer-normalized@1.0.0': {
         const normalized = provider.includes('-normalized@');
-        const compare = (signal: string, marker: string) => (normalized ? signal.toLowerCase() : signal).includes(marker);
+        const compare = (signal: string, marker: string) => (normalized ? signal.toLowerCase() : signal).includes(normalized ? marker.toLowerCase() : marker);
         const signals = payload.signals as string[];
         const claims = (payload.claims ?? []) as {sourceId: string; playerId: string}[];
-        const matches = selection.signatures.patterns.filter((rule) => rule.markers.some((marker) => signals.some((signal) => compare(signal, marker))));
+        const matches = selection.signatures.patterns.filter((rule) => rule.markers.some((marker) => [sourceUrl,...signals].some((signal) => compare(signal, marker))));
         const matchedIds = [...new Set(matches.map((match) => match.playerId))];
         const claimIds = [...new Set(claims.map((claim) => claim.playerId))];
         const outside = !/^https?:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:[/?#]|$)/i.test(sourceUrl)
           || payload.encryptedPlayer === true || payload.unsupportedPlayerFamily === true;
-        const candidates = outside ? [] : [...new Set([...matchedIds, ...claimIds])];
+        const candidates = outside ? [] : matchedIds;
         const conflict = claimIds.length > 1 || claimIds.length === 1 && matchedIds.some((id) => id !== claimIds[0]);
         const status = outside ? 'out_of_scope' : conflict ? 'conflict' : candidates.length > 1 ? 'ambiguous' : candidates.length === 1 ? 'recognized' : 'unknown';
         const observedEvidence = [evidenceItem('page', sourceUrl, 'Bounded page observation'),
           ...matches.map((item) => evidenceItem('marker:' + item.playerId, sourceUrl, 'Selected Knowledge matched a marker')),
-          ...claims.map((claim) => evidenceItem(claim.sourceId, sourceUrl, 'Observed player claim: ' + claim.playerId))];
+          ...claims.map((claim) => evidenceItem(claim.sourceId, sourceUrl, 'Submitted unverified player claim: ' + claim.playerId))];
         const conflictClaims = [...claims, ...matchedIds.map((playerId) => ({ sourceId: 'marker:' + playerId, playerId }))];
         return { status, candidates, evidence: observedEvidence, sourceUrl, values: {
-          playerId: { value: status === 'recognized' ? candidates[0] : null, source: 'SYSTEM_OBSERVED', status: status === 'recognized' ? 'CANDIDATE' : 'UNKNOWN', evidence: observedEvidence.map((item) => item.sourceId) },
+          playerId: { value: status === 'recognized' ? candidates[0] : null, source: 'DERIVED', status: status === 'recognized' ? 'INFERRED' : 'UNKNOWN', evidence: observedEvidence.map((item) => item.sourceId) },
         }, missingFields: status === 'unknown' ? ['playerId'] : [],
         ambiguities: status === 'ambiguous' ? [{ field: 'playerId', candidates }] : [],
         conflicts: status === 'conflict' ? [{ field: 'playerId', claims: conflictClaims }] : [],
@@ -113,7 +113,7 @@ export function consumeDis(input: unknown, selection: Selection) {
       outputs.set(nodeId, output);
       const pin = selection.unitRefs[unit.id];
       trace.push({ nodeId, unitId: unit.id, unitRevision: unit.revision, unitSha256: pin.sha256,
-        provider, input: payload, evidence, output });
+        requestedProvider:provider, actualImplementation:'capability-dis-player@0.11.0-dev.0', bindingStatus:'UNVERIFIED', input: payload, evidence, output });
       if (nodeId === graph.entryNode) {
         recognitionStatus = String(output.status);
         const actions: Record<string, string> = { unknown: 'PRESERVE_UNKNOWN', ambiguous: 'CLARIFY', conflict: 'CLARIFY', out_of_scope: 'REJECT' };

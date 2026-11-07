@@ -1,11 +1,14 @@
 import { load } from '@kaicreator/domain-harness-microkernel';
 import { openSqliteCasStore } from '@kaicreator/domain-harness/v8/host';
 import type { V10BuiltApp, V10DocStore } from '@kaicreator/domain-harness-contracts';
+import { digest } from './knowledge.js';
 
 /** Boot selects the single KDP assembly. The selected Kernel retains CAS and Journal ownership. */
 export async function bootKdp(app: V10BuiltApp, sqlitePath: string) {
   const kernels = app.modules.filter((module) => module.role === 'kernel-primary');
   if (kernels.length !== 1) throw new Error('KDP_REQUIRES_ONE_SELECTED_KERNEL');
+  if (kernels[0].moduleSha256 !== 'e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7'
+      || digest(kernels[0].moduleSource) !== kernels[0].moduleSha256) throw new Error('UNTRUSTED_SELECTED_KERNEL');
   const tenantId = 'tenant:dis-reference';
   const host = await openSqliteCasStore({ path: sqlitePath });
   const store: V10DocStore = {

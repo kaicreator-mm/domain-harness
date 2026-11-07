@@ -1,9 +1,9 @@
-# xDownload through the selected DomainHarness Runtime
+# xDownload DomainHarness integration probe — blocked
 
-This reference proof takes a bounded structured Page observation and returns an actual K-owned occurrence receipt. The receipt's executed local operation carries recognition candidates and their provenance, the deterministic route, validated Outcome and selected Graph trace. Missing Page URL or signals prompts for input. Ambiguity and conflict produce clarification, unknown produces review, scope exclusions reject, malformed inputs fail, and absent strategy evidence remains partial.
+This bounded probe returns an actual K-owned occurrence receipt for a separately implemented local capability. It does not execute the frozen selected provider artifact and is not an adoption or conformance proof. See the [contract blocker](../../validation/dis-0.1.0/RUNTIME_CONSUMER_PROOF.md).
 
 Use Node 24.21.0 and locked workspace dependencies. First check syntax with `node --check examples/dis-0.1.0-runtime-consumer/build.mjs` and the corresponding checks for `app.mjs` and `test/consumer.test.mjs`. Build the workspaces with `npm run build --workspaces --if-present`. Run the private workspace's tests using `npm test -w @kaicreator/domain-harness-dis-v011-runtime`. For manual execution run `node examples/dis-0.1.0-runtime-consumer/app.mjs <SQLite evidence file>`. Provide a fresh local evidence filename. Set `DIS_RUNTIME_EVIDENCE_DIR` to an existing task evidence directory for native test temporary databases.
 
-The entry uses the frozen selected xDownload Package at revision 1.0.0. It does not import the standalone Demo handler. An isolated strategy-catalog revision 2.0.0 is resealed as a separate reference Package in tests. The same observation yields a changed strategy under the different BUILD and still yields the original strategy under the previous BUILD. That test fixture is synthetic and claims no promotion or applicability of the historical validation to its new closure.
+The entry reads the frozen xDownload Package at revision 1.0.0 but executes a separately identified private adapter rather than the selected frozen handler. An isolated strategy-catalog revision 2.0.0 is resealed as a synthetic reference Package in tests. This does not establish a valid promotion or a fully governed successor Package selection.
 
 The demo fetches no URLs and downloads no media. SQLite persists only the selected Kernel's local control and evidence documents. See the [conformance proof](../../validation/dis-0.1.0/RUNTIME_CONSUMER_PROOF.md).

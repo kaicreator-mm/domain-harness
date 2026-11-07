@@ -17,7 +17,8 @@ export interface Unit {
   id: string;
   revision: string;
   role: string;
-  implementation: { ref: string; artifactRef: string; candidates?: { candidateId: string; ref: string; artifactRef: string; artifactDigest: string }[] };
+  implementation: { ref: string; artifactRef: string; candidates?: { candidateId: string; ref: string; artifactRef: string; artifactDigest: string; target: string; contractDigest: string }[] };
+  capabilities?: { provides: { capabilityId: string; owner: string; authorityRef: string; version: string; contractDigest: string }[] };
   failure: { handling: Record<string, { action: string }> };
   input: { schemaRef: string };
   output: { schemaRef: string };

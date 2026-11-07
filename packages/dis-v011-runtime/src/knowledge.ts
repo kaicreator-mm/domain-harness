@@ -19,6 +19,11 @@ function canonical(value: unknown): unknown {
 export function canonicalDigest(value: unknown): string {
   return digest(JSON.stringify(canonical(value)));
 }
+const verifiedSelections = new WeakMap<object, string>();
+export function assertVerifiedSelection(selection: Selection): void {
+  const pin = verifiedSelections.get(selection);
+  if (!pin || canonicalDigest(selection) !== pin) throw new Error('SELECTION_NOT_VERIFIED');
+}
 
 function requirePin(actual: string | undefined, expected: string, code: string): void {
   if (!/^[a-f0-9]{64}$/.test(expected) || actual !== expected) throw new Error(code);
@@ -34,7 +39,8 @@ interface PackageIdentity {
     packageId: string;
     packageRevision: string;
     selectedAssets: (UnitRef & { kind: string; sha256: string })[];
-    selectedCapabilities: { provider: { unitId: string; unitRevision: string; candidateId: string; implementationRef: string; artifactRef: string; artifactDigest: string } }[];
+    target: string;
+    selectedCapabilities: { capabilityId: string; owner: string; authorityRef: string; version: string; contractDigest: string; provider: { unitId: string; unitRevision: string; candidateId: string; implementationRef: string; artifactRef: string; artifactDigest: string; target: string; contractDigest: string } }[];
   };
 }
 interface Manifest {
@@ -104,12 +110,15 @@ export async function selectKnowledge(root: string, expected: { descriptor: stri
   if (!workflow || workflow.role !== 'workflow' || workflow.revision !== definition.workflowRef.unitRef.revision
       || workflow.implementation.ref !== 'graph:' + graph.id + '@' + graph.revision || workflow.implementation.artifactRef !== asset.path) throw new Error('WORKFLOW_BINDING');
   const providers = Object.fromEntries(Object.values(units).map((unit) => [unit.id, unit.implementation.ref]));
+  if (identity.selectionLock.target !== 'node24' || identity.selectionLock.selectedCapabilities.length !== 1) throw new Error('CAPABILITY_SELECTION_MISMATCH');
   for (const capability of identity.selectionLock.selectedCapabilities) {
     const provider = capability.provider;
     const unit = units[provider.unitId];
     const candidate = unit?.implementation.candidates?.find((item) => item.candidateId === provider.candidateId);
+    const contract = unit?.capabilities?.provides.filter((item) => item.capabilityId === capability.capabilityId && item.owner === capability.owner && item.authorityRef === capability.authorityRef && item.version === capability.version && item.contractDigest === capability.contractDigest) ?? [];
     if (!candidate || provider.unitRevision !== unit.revision || candidate.ref !== provider.implementationRef || candidate.artifactRef !== provider.artifactRef
-        || candidate.artifactDigest !== provider.artifactDigest) throw new Error('PROVIDER_LOCK_MISMATCH');
+        || candidate.artifactDigest !== provider.artifactDigest || provider.target !== 'node24' || candidate.target !== provider.target
+        || candidate.contractDigest !== provider.contractDigest || provider.contractDigest !== capability.contractDigest || contract.length !== 1) throw new Error('PROVIDER_LOCK_MISMATCH');
     requirePin(resources[candidate.artifactRef], candidate.artifactDigest, 'PROVIDER_ARTIFACT_MISMATCH');
     providers[unit.id] = candidate.ref;
   }
@@ -120,5 +129,7 @@ export async function selectKnowledge(root: string, expected: { descriptor: stri
   const signatures = parse<Selection['signatures'] & { catalogId: string; revision: string }>(signaturesRef.path);
   const strategies = parse<Selection['strategies'] & { catalogId: string; revision: string }>(strategiesRef);
   if (signatures.catalogId !== signaturesRef.id || signatures.revision !== signaturesRef.revision || strategies.catalogId !== 'xdownload.player-strategies' || !/^[0-9]+[.][0-9]+[.][0-9]+$/.test(strategies.revision)) throw new Error('KNOWLEDGE_IDENTITY_MISMATCH');
-  return { packageId: identity.packageId, revision: identity.revision, closureSha256: expected.closure, lockSha256: expected.lock, graphSha256: asset.sha256, graph, units, unitRefs, providers, resources, signatures, strategies };
+  const selected = { packageId: identity.packageId, revision: identity.revision, closureSha256: expected.closure, lockSha256: expected.lock, graphSha256: asset.sha256, graph, units, unitRefs, providers, resources, signatures, strategies };
+  verifiedSelections.set(selected, canonicalDigest(selected));
+  return selected;
 }

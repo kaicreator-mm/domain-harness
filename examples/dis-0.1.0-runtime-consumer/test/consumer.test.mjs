@@ -6,7 +6,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { buildDemo, frozenPins } from '../build.mjs';
 import { openDemo } from '../app.mjs';
-import { canonicalDigest, digest } from '../../../packages/dis-v011-runtime/dist/index.js';
+import { bootKdp, buildConsumer, canonicalDigest, digest } from '../../../packages/dis-v011-runtime/dist/index.js';
 import { readDisResult, verifyTrace } from '../../../packages/dis-v011-runtime/dist/trace.js';
 
 const frozen = fileURLToPath(new URL('../../dis-0.1.0-player-recognition/',import.meta.url));
@@ -67,7 +67,7 @@ async function assertHostReceipt(app, observation, message, expected, recognitio
   return receipt;
 }
 
-test('selected BUILD, one KDP DomainApp, actual DIS outcome and SQLite journal', () => withEvidence(async (dir) => {
+test('selected BUILD, one DomainApp, private adapter output and SQLite journal', () => withEvidence(async (dir) => {
   const sqlite = path.join(dir,'physical.sqlite');
   const app = await openDemo(sqlite);
   let receipt;
@@ -76,6 +76,10 @@ test('selected BUILD, one KDP DomainApp, actual DIS outcome and SQLite journal',
     receipt = await assertHostReceipt(app,{...known,url:' ' + url + ' '},'known','READY','recognized');
     assert.equal(readDisResult(receipt).outcome.playerId,'jwplayer');
     assert.equal(readDisResult(receipt).outcome.strategyId,'jwplayer.extract.v1');
+    const forged = structuredClone(readDisResult(receipt));forged.trace[0].output.candidates=['videojs'];
+    assert.throws(()=>verifyTrace(forged,{...known,url:' ' + url + ' '},app.selected.selection,schemas),/recognizer candidate evidence/);
+    const forgedFailure = {...structuredClone(readDisResult(receipt)),status:'FAILED',outcome:null,trace:[]};
+    assert.throws(()=>verifyTrace(forgedFailure,known,app.selected.selection,schemas),/valid input cannot terminate before recognition/);
     const cases = [
       ['unknown',{url,signals:['unrecognized']},'NEEDS_REVIEW','unknown'],
       ['ambiguous',{url,signals:['jwplayer','videojs']},'NEEDS_INPUT','ambiguous'],
@@ -84,7 +88,8 @@ test('selected BUILD, one KDP DomainApp, actual DIS outcome and SQLite journal',
       ['missing-input',{url},'NEEDS_INPUT'],
       ['failed',{url,signals:[7]},'FAILED'],
       ['tool-refused',{...known,tool:'download'},'FAILED'],
-      ['partial',{url,signals:[],claims:[{sourceId:'observation',playerId:'no-selected-strategy'}]},'PARTIAL','recognized'],
+      ['claims-only',{url,signals:[],claims:[{sourceId:'unverified',playerId:'jwplayer'}]},'NEEDS_REVIEW','unknown'],
+      ['url-signature',{url:'https://example.test/jwplayer.setup',signals:[]},'READY','recognized'],
     ];
     for (const [id,brief,status,recognition] of cases) await assertHostReceipt(app,brief,id,status,recognition);
   } finally { await app.close(); }
@@ -100,13 +105,14 @@ test('selected BUILD, one KDP DomainApp, actual DIS outcome and SQLite journal',
   } finally { await reopened.close(); }
 }));
 
-test('versioned selected Knowledge mutation changes the actual Kernel result', () => withEvidence(async (dir) => {
+test('versioned probe Knowledge mutation changes the Kernel operation result', () => withEvidence(async (dir) => {
   const root = path.join(dir,'separate-reference-package');
   await cp(frozen,root,{recursive:true});
   const strategiesPath = path.join(root,'fixtures/player-strategies.json');
   const catalog = await readJson(strategiesPath);
   catalog.revision = '2.0.0';
   catalog.strategies.jwplayer = 'jwplayer.reference-review.v2';
+  delete catalog.strategies.videojs;
   await writeJson(strategiesPath,catalog);
   await assert.rejects(buildDemo(root),/RESOURCE_DIGEST_MISMATCH/);
   const descriptorPath = path.join(root,'package.json');
@@ -128,6 +134,7 @@ test('versioned selected Knowledge mutation changes the actual Kernel result', (
   try {
     const changed = await assertHostReceipt(variant,known,'changed-knowledge','READY','recognized');
     assert.equal(readDisResult(changed).outcome.strategyId,'jwplayer.reference-review.v2');
+    await assertHostReceipt(variant,{url,signals:['videojs']},'partial-no-strategy','PARTIAL','recognized');
     assert.notEqual(variant.selected.app.subjectDigest,original.selected.app.subjectDigest);
     const unchanged = await assertHostReceipt(original,known,'original-after-variant','READY','recognized');
     assert.equal(readDisResult(unchanged).outcome.strategyId,'jwplayer.extract.v1');
@@ -139,3 +146,24 @@ test('wrong independent lock or descriptor pin rejects before activation', async
   await assert.rejects(buildDemo(undefined,{...frozenPins, lock:'0'.repeat(64)}),/LOCK_PIN_MISMATCH/);
   await assert.rejects(buildDemo(undefined,{...frozenPins, descriptor:'0'.repeat(64)}),/DESCRIPTOR_PIN_MISMATCH/);
 });
+test('selected provider target and contract are checked even under new descriptor and lock pins',()=>withEvidence(async(dir)=>{
+  const root=path.join(dir,'invalid-package');await cp(frozen,root,{recursive:true});
+  const file=path.join(root,'package.json');const descriptor=await readJson(file);
+  for(const [field,value] of [['target','other-target'],['contractDigest','0'.repeat(64)]]){
+    const mutated=structuredClone(descriptor);mutated.dis.selectionLock.selectedCapabilities[0].provider[field]=value;
+    mutated.dis.selectionLockSha256=canonicalDigest(mutated.dis.selectionLock);await writeJson(file,mutated);
+    const pins={descriptor:digest(await readFile(file)),closure:mutated.dis.resourceClosureSha256,lock:mutated.dis.selectionLockSha256};
+    await assert.rejects(buildDemo(root,pins),/PROVIDER_LOCK_MISMATCH/);
+  }
+}));
+test('BUILD rejects forged or modified selection snapshots',async()=>{
+  const built=await buildDemo(), selected=built.selection;
+  assert.throws(()=>buildConsumer(structuredClone(selected),{}),/SELECTION_NOT_VERIFIED/);
+  assert.throws(()=>buildConsumer(selected,{kernel:'forged',standard:'forged',router:'forged'}),/UNTRUSTED_HOST_MODULE/);
+  selected.signatures.patterns[0].markers=['forged'];
+  assert.throws(()=>buildConsumer(selected,{}),/SELECTION_NOT_VERIFIED/);
+});
+test('legacy boot refuses a changed selected Kernel before opening storage',()=>withEvidence(async(dir)=>{
+  const app=structuredClone((await buildDemo()).app);app.modules.find((module)=>module.role==='kernel-primary').moduleSource='forged';
+  await assert.rejects(bootKdp(app,path.join(dir,'untrusted.sqlite')),/UNTRUSTED_SELECTED_KERNEL/);
+}));

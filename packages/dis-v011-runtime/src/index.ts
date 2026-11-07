@@ -1,7 +1,7 @@
 import { buildV10App } from '@kaicreator/domain-harness-build';
 import { V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
 import { consumeDis } from './dis-consumer.js';
-import { canonicalDigest, digest } from './knowledge.js';
+import { assertVerifiedSelection, canonicalDigest, digest } from './knowledge.js';
 import type { Selection } from './types.js';
 
 export { bootKdp } from './kdp.js';
@@ -34,6 +34,10 @@ export function getPolicy() {
 /** One selected BUILD. The frozen registry reference is an interface, while the
  * executed private adapter is identified by the capability's actual BUILD digest. */
 export function buildConsumer(selection: Selection, payload: { kernel: string; standard: string; router: string }) {
+  assertVerifiedSelection(selection);
+  if (digest(payload.kernel) !== 'e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7'
+      || digest(payload.standard) !== 'dec042cacee70a8762b693f02b80ce14844b52bdf12969ff2250c7013c67c8bf'
+      || digest(payload.router) !== 'd9f9c33f08951aacebe1648fb44554ecacb70db6292f02367035d99ea1c112b5') throw new Error('UNTRUSTED_HOST_MODULE');
   const selectedDigest = canonicalDigest(selection);
   const kernelId = 'v08-kernel-mechanism@1.0.0';
   const standardId = 'standard-sdk@v08.1.0.0';

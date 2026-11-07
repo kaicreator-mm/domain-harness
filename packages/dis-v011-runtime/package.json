@@ -5,7 +5,9 @@
   "type": "module",
   "exports": "./dist/index.js",
   "scripts": {
+    "prebuild": "npm run build -w @kaicreator/domain-harness",
     "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "npm run build -w @kaicreator/domain-harness",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --experimental-strip-types --test tests/*.test.ts ../../examples/dis-0.1.0-runtime-consumer/test/*.test.mjs"
   },
