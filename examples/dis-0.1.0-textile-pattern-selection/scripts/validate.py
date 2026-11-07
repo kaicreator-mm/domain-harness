@@ -27,7 +27,7 @@ def resolve(relative):
     path = (ROOT / relative).resolve()
     require(path.is_relative_to(ROOT), 'resource escaped package')
     return path
-def expected_recognition(brief, knowledge):
+def expected_recognition_core(brief, knowledge):
     Draft202012Validator(read(ROOT/'domain/schemas/textile-brief.schema.json')).validate(brief)
     result = {'status':'UNKNOWN', 'candidates':[], 'technique':None, 'evidence':[], 'unknowns':copy.deepcopy(knowledge['unresolved']), 'brief':copy.deepcopy(brief)}
     if brief['domain'] != 'textile-pattern' or brief.get('machineControl', False):
@@ -39,6 +39,10 @@ def expected_recognition(brief, knowledge):
     elif brief.get('requestedProcess') and not any(rule['enabled'] and rule['id'] == brief['requestedProcess'] for rule in knowledge['rules']):
         pass
     elif brief['placement'] != 'unknown':
+        requested = next((rule for rule in knowledge['rules'] if rule['enabled'] and rule['id'] == brief.get('requestedProcess')), None)
+        if requested and requested['placement'] != brief['placement']:
+            result['status'] = 'CONFLICT'
+            return result
         matches = [rule for rule in knowledge['rules'] if rule['enabled'] and rule['placement'] == brief['placement'] and (rule['placement'] == 'structure' or brief.get('surfaceMethod') == 'either' or rule['surfaceMethod'] == brief.get('surfaceMethod'))]
         if brief.get('requestedProcess') and matches and not any(rule['id'] == brief['requestedProcess'] for rule in matches):
             result['status'] = 'CONFLICT'
@@ -47,6 +51,23 @@ def expected_recognition(brief, knowledge):
         result['candidates'] = list(dict.fromkeys(rule['id'] for rule in matches))
         result['evidence'] = list(dict.fromkeys(source for rule in matches for source in rule['sources']))
         result['status'] = 'AMBIGUOUS' if len(result['candidates']) > 1 else 'KNOWN' if result['candidates'] else 'NEEDS_INPUT' if brief['placement'] == 'surface' and 'surfaceMethod' not in brief else 'UNKNOWN'
+    return result
+def expected_recognition(brief, knowledge):
+    result = expected_recognition_core(brief, knowledge)
+    provenance = list(dict.fromkeys(brief['evidence'] + [claim['source'] for claim in brief.get('claims', [])]))
+    def item(field, value, source, evidence):
+        return {'field':field,'value':copy.deepcopy(value),'source':source,'evidence':copy.deepcopy(evidence)}
+    observed = [item(field,value,'SYSTEM_OBSERVED',brief['evidence']) for field,value in brief.items() if field not in ('evidence','claims')]
+    observed += [item('claims.placement',claim['placement'],'SYSTEM_OBSERVED',[claim['source']]) for claim in brief.get('claims',[])]
+    candidates = [item('technique',value,'DERIVED',next(rule['sources'] for rule in knowledge['rules'] if rule['id']==value)) for value in result['candidates']]
+    missing = []
+    if result['status'] == 'NEEDS_INPUT':
+        if not brief['evidence']: missing.append(item('evidence',None,'DERIVED',provenance))
+        if not brief.get('placement'): missing.append(item('placement',None,'DERIVED',provenance))
+        if brief.get('placement') == 'surface' and not brief.get('surfaceMethod'): missing.append(item('surfaceMethod',None,'DERIVED',provenance))
+    requested = next((rule for rule in knowledge['rules'] if rule['enabled'] and rule['id']==brief.get('requestedProcess')),None)
+    unknown = [item('unresolved',value,'DERIVED',[]) for value in result['unknowns']]
+    result['recognition'] = {'normalizedIntent':item('intent','out-of-scope' if result['status']=='OUT_OF_SCOPE' else 'textile-pattern-process-selection','DERIVED',provenance),'confirmedValues':[],'inferredValues':[],'observedValues':observed,'candidateValues':candidates,'unknownValues':copy.deepcopy(unknown),'missingFields':missing,'ambiguities':[item('technique',result['candidates'],'DERIVED',result['evidence'])] if result['status']=='AMBIGUOUS' else [],'conflicts':[item('brief',brief,'DERIVED',list(dict.fromkeys(provenance+(requested['sources'] if requested else []))))] if result['status']=='CONFLICT' else [],'uncertainty':unknown,'inputStatus':'OUT_OF_SCOPE' if result['status']=='OUT_OF_SCOPE' else 'VALID','inputEvidence':copy.deepcopy(brief['evidence'])}
     return result
 def expected_decision(prior, knowledge, evidence):
     result = copy.deepcopy(prior)
@@ -132,7 +153,7 @@ def main():
     require(definition['domainId'] == manifest['definitionRef']['id'] and definition['revision'] == manifest['definitionRef']['revision'], 'definition identity')
     require(definition['workflowRef']['graphRef'] == manifest['graphRef'] and definition['workflowRef']['unitRef'] == {'id':'textile.workflow','revision':'1.0.0'}, 'workflow ref')
     require(len(graph['nodes']) == 3 and [node['nodeId'] for node in graph['nodes']] == ['recognize','decide','validate'] and graph['cyclePolicy'] == 'DAG_ONLY', 'graph topology')
-    require(len(graph['edges']) == 14 and len([edge for edge in graph['edges'] if edge['kind'] == 'data']) == 10 and len([edge for edge in graph['edges'] if edge['kind'] == 'evidence']) == 2, 'graph edge inventory')
+    require(len(graph['edges']) == 16 and len([edge for edge in graph['edges'] if edge['kind'] == 'data']) == 12 and len([edge for edge in graph['edges'] if edge['kind'] == 'evidence']) == 2, 'graph edge inventory')
     for node in graph['nodes']: require(units[node['unitRef']['id']]['revision'] == node['unitRef']['revision'] and units[node['unitRef']['id']]['role'] == {'recognize':'recognizer','decide':'decision','validate':'validator'}[node['nodeId']], 'node role/revision')
     knowledge = read(ROOT/'fixtures/textile-knowledge.json')
     selected = [dict(kind='unit',id=ref['id'],revision=ref['revision'],path=ref['path'],sha256=resources[ref['path']]) for ref in manifest['units']]
@@ -154,6 +175,11 @@ def main():
         require(result['id'] == scenario['id'] and result['input'] == scenario['input'] and scenario['synthetic'] is True, 'case identity')
         verify_result(result,scenario['input'],knowledge,graph,units,resources,identity)
         require(result['outcome']['status'] == scenario['expected']['status'] and result['outcome']['technique'] == scenario['expected']['technique'], 'case expected result')
+    policy = subprocess.run(['node','--test','--test-name-pattern=unsupported failure action','test/runner.test.mjs'],cwd=ROOT,env=dict(os.environ,TEXTILE_EMIT_POLICY='1'),check=True,capture_output=True,text=True,encoding='utf-8')
+    policy_lines = [line.split('TEXTILE_POLICY=',1)[1] for line in policy.stdout.splitlines() if 'TEXTILE_POLICY=' in line]
+    require(len(policy_lines)==1, 'failure-policy trace absent')
+    policy_trace = json.loads(policy_lines[0]); policy_input = next(scenario['input'] for scenario in scenarios if scenario['id']=='unknown')
+    require(len(policy_trace)==1 and policy_trace[0]['nodeId']=='recognize' and policy_trace[0]['input']==policy_input and policy_trace[0]['evidence']=={} and policy_trace[0]['output']==expected_recognition(policy_input,knowledge) and policy_trace[0]['failure']=={'code':'UNSUPPORTED_FAILURE_POLICY','status':'UNKNOWN'}, 'failure-policy trace mismatch')
     # Independently change the admitted Knowledge rule and verify an actual Node result.
     env = dict(os.environ, TEXTILE_EMIT_CHANGED='1')
     changed = subprocess.run(['node','--test','--test-name-pattern=selected Knowledge mutation','test/runner.test.mjs'],cwd=ROOT,env=env,check=True,capture_output=True,text=True,encoding='utf-8')

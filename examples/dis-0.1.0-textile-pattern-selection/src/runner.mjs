@@ -27,8 +27,9 @@ export async function loadPackage({ root = packageRoot, expectedClosureSha256, e
   assert(/^[a-f0-9]{64}$/.test(expectedClosureSha256 || '') && digest === expectedClosureSha256 && descriptor.dis.resourceClosureSha256 === digest, 'CLOSURE_PIN_MISMATCH');
   const selection = descriptor.dis.selectionLock;
   assert(/^[a-f0-9]{64}$/.test(expectedSelectionSha256 || '') && selection && lockDigest(selection) === expectedSelectionSha256 && descriptor.dis.selectionLockSha256 === expectedSelectionSha256, 'SELECTION_PIN_MISMATCH');
-  assert(descriptor.dis.authority === 'REFERENCE' && descriptor.dis.standardVersion === '0.1.0' && selection.packageId === descriptor.dis.packageId && selection.packageRevision === descriptor.dis.revision && selection.closureSha256 === digest && selection.target === 'node24' && selection.consumerProfile === 'textile-synthetic-sampling/1.0.0' && JSON.stringify(selection.referencePolicy) === JSON.stringify({id:'textile-reference-only',revision:'1.0.0',scope:'SYNTHETIC_REFERENCE_ONLY',production:false,activation:false,allowUnpromoted:true}), 'UNAUTHORIZED_REFERENCE_SELECTION');
+  assert(descriptor.dis.authority === 'REFERENCE' && descriptor.dis.standardVersion === '0.1.0' && selection.packageId === descriptor.dis.packageId && selection.packageRevision === descriptor.dis.revision && selection.closureSha256 === digest && selection.target === 'node24' && selection.consumerProfile === 'textile-synthetic-sampling/1.0.0' && JSON.stringify(canonical(selection.referencePolicy)) === JSON.stringify(canonical({id:'textile-reference-only',revision:'1.0.0',scope:'SYNTHETIC_REFERENCE_ONLY',production:false,activation:false,allowUnpromoted:true})), 'UNAUTHORIZED_REFERENCE_SELECTION');
   const manifest = JSON.parse(bytes), raw = new Map();
+  assert(manifest.schemaVersion === 'dis.resource-closure/0.1.0' && manifest.standardVersion === descriptor.dis.standardVersion && manifest.standardVersion === '0.1.0', 'UNSUPPORTED_STANDARD_VERSION');
   assert(manifest.packageId === descriptor.dis.packageId && manifest.packageRevision === descriptor.dis.revision, 'PACKAGE_IDENTITY_MISMATCH');
   assert(manifest.resources.length === new Set(manifest.resources.map((x) => x.path)).size, 'DUPLICATE_RESOURCE');
   for (const entry of manifest.resources) {
@@ -37,7 +38,7 @@ export async function loadPackage({ root = packageRoot, expectedClosureSha256, e
     raw.set(entry.path, data);
   }
   const selectedAssets = [...manifest.units.map((ref) => ({kind:'unit',id:ref.id,revision:ref.revision,path:ref.path,sha256:sha256(raw.get(ref.path))})), {kind:'graph',id:manifest.graphRef.id,revision:manifest.graphRef.revision,path:manifest.graphRef.path,sha256:sha256(raw.get(manifest.graphRef.path))}, {kind:'knowledge',id:'textile.process-knowledge',revision:JSON.parse(raw.get('fixtures/textile-knowledge.json')).revision,path:'fixtures/textile-knowledge.json',sha256:sha256(raw.get('fixtures/textile-knowledge.json'))}];
-  assert(JSON.stringify(selection.assets) === JSON.stringify(selectedAssets), 'SELECTION_ASSET_MISMATCH');
+  assert(JSON.stringify(canonical(selection.assets)) === JSON.stringify(canonical(selectedAssets)), 'SELECTION_ASSET_MISMATCH');
   const json = (ref) => { assert(raw.has(ref), 'UNDECLARED_RESOURCE'); return JSON.parse(raw.get(ref)); };
   const units = new Map(manifest.units.map((ref) => {
     const unit = json(ref.path);
@@ -62,7 +63,7 @@ export async function loadPackage({ root = packageRoot, expectedClosureSha256, e
   const knowledge = json(contentRef.path);
   assert(knowledge.id === contentRef.id && knowledge.revision === contentRef.revision && sha256(raw.get(contentRef.path)) === contentRef.sha256, 'KNOWLEDGE_IDENTITY_MISMATCH');
   for (const unit of units.values()) {
-    assert(unit.scope.domain === 'textile-pattern' && JSON.stringify(unit.knowledgeRefs) === JSON.stringify([contentRef]), 'UNIT_KNOWLEDGE_SCOPE_MISMATCH');
+    assert(unit.scope.domain === 'textile-pattern' && JSON.stringify(canonical(unit.knowledgeRefs)) === JSON.stringify(canonical([contentRef])), 'UNIT_KNOWLEDGE_SCOPE_MISMATCH');
   }
   const sourceIds = new Set(knowledge.sources.map((source) => source.id));
   assert(sourceIds.size === 4 && knowledge.rules.length > 0 && knowledge.rules.every((rule) => ['jacquard','block-printing','embroidery'].includes(rule.id) && typeof rule.enabled === 'boolean' && rule.sources.length && rule.sources.every((id) => sourceIds.has(id))), 'INVALID_KNOWLEDGE');
@@ -70,9 +71,9 @@ export async function loadPackage({ root = packageRoot, expectedClosureSha256, e
   const expectedNodes = ['recognize', 'decide', 'validate'];
   assert(JSON.stringify(graph.nodes.map((node) => node.nodeId)) === JSON.stringify(expectedNodes) && graph.entryNode === 'recognize' && JSON.stringify(graph.terminalNodes) === '["validate"]', 'UNSUPPORTED_GRAPH');
   for (const node of graph.nodes) assert(node.unitRef.id === 'textile.' + ({recognize:'recognizer',decide:'decision',validate:'validator'})[node.nodeId] && units.get(node.unitRef.id)?.revision === node.unitRef.revision, 'GRAPH_UNIT_MISMATCH');
-  const fields = ['status','candidates','technique','unknowns','brief'];
+  const fields = ['status','candidates','technique','unknowns','brief','recognition'];
   const expectedEdges = [{kind:'control',from:'recognize',to:'decide'}, {kind:'control',from:'decide',to:'validate'}, ...['recognize','decide'].flatMap((from, i) => fields.map((field) => ({kind:'data',from:{node:from,pointer:'/'+field},to:{node:i ? 'validate':'decide',pointer:'/'+field}}))), {kind:'evidence',from:{node:'recognize',pointer:'/evidence'},to:{node:'decide',slot:'sourceEvidence'}}, {kind:'evidence',from:{node:'decide',pointer:'/evidence'},to:{node:'validate',slot:'sourceEvidence'}}];
-  assert(JSON.stringify(graph.edges) === JSON.stringify(expectedEdges) && ['decision','validator'].every((role) => JSON.stringify(units.get('textile.'+role).evidence.consumes) === '["sourceEvidence"]'), 'UNSUPPORTED_GRAPH_EDGES');
+  assert(JSON.stringify(canonical(graph.edges)) === JSON.stringify(canonical(expectedEdges)) && ['decision','validator'].every((role) => JSON.stringify(units.get('textile.'+role).evidence.consumes) === '["sourceEvidence"]'), 'UNSUPPORTED_GRAPH_EDGES');
   const handle = Object.freeze({ identity: clone(descriptor.dis), manifest: clone(manifest) });
   snapshots.set(handle, { descriptor, manifest, graph, units, knowledge, digests: Object.fromEntries(manifest.resources.map((entry) => [entry.path, entry.sha256])) });
   return handle;
@@ -87,7 +88,7 @@ function validateBrief(input) {
   assert(input.machineControl === undefined || typeof input.machineControl === 'boolean', 'INVALID_INPUT');
   assert(input.claims === undefined || Array.isArray(input.claims) && input.claims.every((c) => c && Object.keys(c).length === 2 && typeof c.source === 'string' && c.source && ['structure','surface'].includes(c.placement)), 'INVALID_INPUT');
 }
-function recognize(brief, knowledge) {
+function recognizeCore(brief, knowledge) {
   validateBrief(brief);
   const base = { status:'UNKNOWN', candidates:[], technique:null, evidence:[], unknowns:clone(knowledge.unresolved), brief:clone(brief) };
   if (brief.domain !== 'textile-pattern' || brief.machineControl) return { ...base, status:'OUT_OF_SCOPE' };
@@ -96,12 +97,40 @@ function recognize(brief, knowledge) {
   if (placements.size > 1 || brief.placement === 'structure' && ['print','stitch'].includes(brief.surfaceMethod)) return { ...base, status:'CONFLICT' };
   if (brief.requestedProcess && !knowledge.rules.some((rule) => rule.enabled && rule.id === brief.requestedProcess)) return base;
   if (brief.placement === 'unknown') return base;
+  const requestedRule = knowledge.rules.find((rule) => rule.enabled && rule.id === brief.requestedProcess);
+  if (requestedRule && requestedRule.placement !== brief.placement) return { ...base, status:'CONFLICT' };
   const matches = knowledge.rules.filter((rule) => rule.enabled && rule.placement === brief.placement && (rule.placement === 'structure' || brief.surfaceMethod === 'either' || rule.surfaceMethod === brief.surfaceMethod));
   if (brief.requestedProcess && matches.length && !matches.some((rule) => rule.id === brief.requestedProcess)) return { ...base, status:'CONFLICT' };
   const selected = matches.filter((rule) => !brief.requestedProcess || rule.id === brief.requestedProcess);
   const candidates = [...new Set(selected.map((rule) => rule.id))];
   const evidence = [...new Set(selected.flatMap((rule) => rule.sources))];
   return { ...base, candidates, evidence, status: candidates.length > 1 ? 'AMBIGUOUS' : candidates.length === 1 ? 'KNOWN' : brief.placement === 'surface' && !brief.surfaceMethod ? 'NEEDS_INPUT' : 'UNKNOWN' };
+}
+function recognize(brief, knowledge) {
+  const result = recognizeCore(brief, knowledge);
+  const provenance = [...new Set([...brief.evidence, ...(brief.claims || []).map((claim) => claim.source)])];
+  const item = (field,value,source,evidence) => ({field,value:clone(value),source,evidence:clone(evidence)});
+  const observedValues = Object.entries(brief).filter(([field]) => !['evidence','claims'].includes(field)).map(([field,value]) => item(field,value,'SYSTEM_OBSERVED',brief.evidence));
+  for (const claim of brief.claims || []) observedValues.push(item('claims.placement',claim.placement,'SYSTEM_OBSERVED',[claim.source]));
+  const candidateValues = result.candidates.map((value) => item('technique',value,'DERIVED',knowledge.rules.find((rule) => rule.id === value).sources));
+  const missingFields = [];
+  if (result.status === 'NEEDS_INPUT') {
+    if (!brief.evidence.length) missingFields.push(item('evidence',null,'DERIVED',provenance));
+    if (!brief.placement) missingFields.push(item('placement',null,'DERIVED',provenance));
+    if (brief.placement === 'surface' && !brief.surfaceMethod) missingFields.push(item('surfaceMethod',null,'DERIVED',provenance));
+  }
+  const requested = knowledge.rules.find((rule) => rule.id === brief.requestedProcess && rule.enabled);
+  result.recognition = {
+    normalizedIntent:item('intent',result.status === 'OUT_OF_SCOPE' ? 'out-of-scope' : 'textile-pattern-process-selection','DERIVED',provenance),
+    confirmedValues:[], inferredValues:[], observedValues, candidateValues,
+    unknownValues:result.unknowns.map((value) => item('unresolved',value,'DERIVED',[])),
+    missingFields,
+    ambiguities:result.status === 'AMBIGUOUS' ? [item('technique',result.candidates,'DERIVED',result.evidence)] : [],
+    conflicts:result.status === 'CONFLICT' ? [item('brief',brief,'DERIVED',[...new Set([...provenance,...(requested?.sources || [])])])] : [],
+    uncertainty:result.unknowns.map((value) => item('unresolved',value,'DERIVED',[])),
+    inputStatus:result.status === 'OUT_OF_SCOPE' ? 'OUT_OF_SCOPE' : 'VALID', inputEvidence:clone(brief.evidence)
+  };
+  return result;
 }
 function decide(input, knowledge, evidence) {
   const prior = { ...clone(input), evidence:clone(evidence.sourceEvidence || []) };
@@ -131,13 +160,16 @@ export function runPipeline(input, handle) {
     for (const edge of graph.edges.filter((e) => e.kind === 'evidence' && e.to.node === nodeId)) evidence[edge.to.slot] = clone(outputs.get(edge.from.node)[edge.from.pointer.slice(1)]);
     let output;
     try { output = handlers[unit.implementation.ref](payload,evidence); } catch (error) {
-      trace.push({nodeId,unitId:unit.id,unitRevision:unit.revision,unitSha256:digests[manifest.units.find((ref) => ref.id === unit.id).path],graphSha256:digests[manifest.graphRef.path],knowledgeSha256:digests['fixtures/textile-knowledge.json'],implementationRef:unit.implementation.ref,input:clone(payload),evidence:clone(evidence),failure:{code:error.message}});
+      trace.push({nodeId,unitId:unit.id,unitRevision:unit.revision,unitSha256:digests[manifest.units.find((ref) => ref.id === unit.id).path],graphSha256:digests[manifest.graphRef.path],knowledgeSha256:digests['fixtures/textile-knowledge.json'],implementationRef:unit.implementation.ref,input:clone(payload),evidence:clone(evidence),failure:{code:error.message,inputStatus:error.message === 'INVALID_INPUT' ? 'INVALID_INPUT' : 'ERROR'}});
       error.trace = clone(trace); throw error;
     }
     const actions = {UNKNOWN:'PRESERVE_UNKNOWN',AMBIGUOUS:'CLARIFY',CONFLICT:'CLARIFY',NEEDS_INPUT:'WAIT',FAILED:'FAIL',OUT_OF_SCOPE:'REJECT'};
-    if (actions[output.status]) assert(unit.failure.handling[output.status]?.action === actions[output.status], 'UNSUPPORTED_FAILURE_POLICY');
     outputs.set(nodeId,output);
     trace.push({ nodeId, unitId:unit.id, unitRevision:unit.revision, unitSha256:digests[manifest.units.find((ref) => ref.id === unit.id).path], graphSha256:digests[manifest.graphRef.path], knowledgeSha256:digests['fixtures/textile-knowledge.json'], implementationRef:unit.implementation.ref, input:clone(payload), evidence:clone(evidence), output:clone(output) });
+    if (actions[output.status] && unit.failure.handling[output.status]?.action !== actions[output.status]) {
+      trace[trace.length-1].failure = {code:'UNSUPPORTED_FAILURE_POLICY',status:output.status};
+      const error = new Error('UNSUPPORTED_FAILURE_POLICY');error.trace=clone(trace);throw error;
+    }
     if (actions[output.status]) return { packageIdentity:clone(descriptor.dis), trace, outcome:output, termination:{action:actions[output.status],status:output.status,nodeId,unitId:unit.id} };
     if (graph.terminalNodes.includes(nodeId)) return { packageIdentity:clone(descriptor.dis), trace, outcome:output };
     const next = graph.edges.filter((edge) => edge.kind === 'control' && edge.from === nodeId); assert(next.length === 1, 'CONTROL_FLOW'); nodeId = next[0].to;

@@ -2,10 +2,10 @@
   "result": "PASS",
   "standardSchemas": 5,
   "units": 5,
-  "scenarios": 16,
-  "traceEntries": 26,
+  "scenarios": 18,
+  "traceEntries": 28,
   "closureResources": 16,
-  "manifestSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+  "manifestSha256": "5a7fd3ca0ba04a5fde1796749fcb35a98bd80f525c1e40fe5523852b2ce8f010",
   "changedKnowledge": "PASS",
   "scope": "REFERENCE_ONLY"
 }

@@ -10,7 +10,8 @@
         "technique",
         "evidence",
         "unknowns",
-        "brief"
+        "brief",
+        "recognition"
       ],
       "properties": {
         "status": {
@@ -131,6 +132,365 @@
             "domain",
             "evidence"
           ]
+        },
+        "recognition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "normalizedIntent",
+            "confirmedValues",
+            "inferredValues",
+            "observedValues",
+            "candidateValues",
+            "unknownValues",
+            "missingFields",
+            "ambiguities",
+            "conflicts",
+            "uncertainty",
+            "inputStatus",
+            "inputEvidence"
+          ],
+          "properties": {
+            "normalizedIntent": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "value",
+                "source",
+                "evidence"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "value": {},
+                "source": {
+                  "enum": [
+                    "USER_CONFIRMED",
+                    "SYSTEM_OBSERVED",
+                    "MODEL_INFERRED",
+                    "DERIVED"
+                  ]
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "confirmedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "inferredValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "observedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "candidateValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "unknownValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "missingFields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "ambiguities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "conflicts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "uncertainty": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "inputStatus": {
+              "enum": [
+                "VALID",
+                "OUT_OF_SCOPE"
+              ]
+            },
+            "inputEvidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
@@ -142,7 +502,8 @@
         "candidates",
         "technique",
         "unknowns",
-        "brief"
+        "brief",
+        "recognition"
       ],
       "properties": {
         "status": {
@@ -257,6 +618,365 @@
             "domain",
             "evidence"
           ]
+        },
+        "recognition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "normalizedIntent",
+            "confirmedValues",
+            "inferredValues",
+            "observedValues",
+            "candidateValues",
+            "unknownValues",
+            "missingFields",
+            "ambiguities",
+            "conflicts",
+            "uncertainty",
+            "inputStatus",
+            "inputEvidence"
+          ],
+          "properties": {
+            "normalizedIntent": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "value",
+                "source",
+                "evidence"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "value": {},
+                "source": {
+                  "enum": [
+                    "USER_CONFIRMED",
+                    "SYSTEM_OBSERVED",
+                    "MODEL_INFERRED",
+                    "DERIVED"
+                  ]
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "confirmedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "inferredValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "observedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "candidateValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "unknownValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "missingFields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "ambiguities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "conflicts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "uncertainty": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value",
+                  "source",
+                  "evidence"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {},
+                  "source": {
+                    "enum": [
+                      "USER_CONFIRMED",
+                      "SYSTEM_OBSERVED",
+                      "MODEL_INFERRED",
+                      "DERIVED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "inputStatus": {
+              "enum": [
+                "VALID",
+                "OUT_OF_SCOPE"
+              ]
+            },
+            "inputEvidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     }

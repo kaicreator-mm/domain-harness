@@ -32,7 +32,14 @@ test('exact pin is mandatory and wrong pin fails closed', async () => {
   await assert.rejects(loadPackage({...pins,expectedSelectionSha256:'0'.repeat(64)}),/SELECTION_PIN_MISMATCH/);
 });
 test('invalid structured brief rejects instead of choosing a process', () => {
-  for(const input of [null,{}, {domain:'textile-pattern',evidence:[42]}, {domain:'textile-pattern',evidence:[],placement:'laser'}, {domain:'textile-pattern',evidence:[],claims:[{source:'x',placement:'structure',extra:true}]}]) assert.throws(()=>runPipeline(input,loaded),(error)=>error.message==='INVALID_INPUT' && error.trace.length===1 && error.trace[0].nodeId==='recognize' && error.trace[0].failure.code==='INVALID_INPUT');
+  for(const input of [null,{}, {domain:'textile-pattern',evidence:[42]}, {domain:'textile-pattern',evidence:[],placement:'laser'}, {domain:'textile-pattern',evidence:[],claims:[{source:'x',placement:'structure',extra:true}]}]) assert.throws(()=>runPipeline(input,loaded),(error)=>error.message==='INVALID_INPUT' && error.trace.length===1 && error.trace[0].nodeId==='recognize' && error.trace[0].failure.code==='INVALID_INPUT' && error.trace[0].failure.inputStatus==='INVALID_INPUT' && assert.deepEqual(error.trace[0].input,input)===undefined);
+});
+test('recognition retains evidence and distinguishes derived, observed and unconfirmed values',()=>{
+  const conflict=runPipeline(scenarios.find((s)=>s.id==='requested-structure-with-missing-surface-method').input,loaded).outcome.recognition;
+  assert.deepEqual(conflict.inputEvidence,['user-brief']);assert.deepEqual(conflict.confirmedValues,[]);assert.deepEqual(conflict.inferredValues,[]);
+  assert.equal(conflict.observedValues.find((v)=>v.field==='requestedProcess').source,'SYSTEM_OBSERVED');assert.ok(conflict.conflicts[0].evidence.includes('user-brief'));
+  const scope=runPipeline(scenarios.find((s)=>s.id==='out-of-scope').input,loaded).outcome.recognition;assert.equal(scope.inputStatus,'OUT_OF_SCOPE');assert.deepEqual(scope.inputEvidence,['synthetic-design-brief']);
+  const ambiguity=runPipeline(scenarios.find((s)=>s.id==='ambiguous').input,loaded).outcome.recognition;assert.equal(ambiguity.candidateValues.length,2);assert.equal(ambiguity.ambiguities.length,1);
 });
 async function fixture(action) {
   const dir=await fs.mkdtemp(path.join(process.env.DIS_TEXTILE_TEMP_DIR,'textile-profile-'));
@@ -56,6 +63,18 @@ async function reseal(dir) {
   const desc=await read('package.json');desc.dis.revision='2.0.0';desc.dis.resourceClosureSha256=digest;const lock=desc.dis.selectionLock;lock.packageRevision='2.0.0';lock.closureSha256=digest;for(const asset of lock.assets){asset.revision='2.0.0';asset.sha256=manifest.resources.find((entry)=>entry.path===asset.path).sha256;}desc.dis.selectionLockSha256=lockDigest(lock);await write('package.json',desc);
   return {expectedClosureSha256:digest,expectedSelectionSha256:desc.dis.selectionLockSha256};
 }
+async function resealCurrent(dir) {
+  const read=async(name)=>JSON.parse(await fs.readFile(path.join(dir,name)));
+  const write=async(name,value)=>fs.writeFile(path.join(dir,name),JSON.stringify(value,null,2)+'\n');
+  const manifest=await read('domain/resource-closure.json');for(const entry of manifest.resources)entry.sha256=sha256(await fs.readFile(path.join(dir,entry.path)));await write('domain/resource-closure.json',manifest);
+  const desc=await read('package.json');desc.dis.resourceClosureSha256=sha256(await fs.readFile(path.join(dir,'domain/resource-closure.json')));desc.dis.selectionLock.closureSha256=desc.dis.resourceClosureSha256;for(const asset of desc.dis.selectionLock.assets)asset.sha256=manifest.resources.find((entry)=>entry.path===asset.path).sha256;desc.dis.selectionLockSha256=lockDigest(desc.dis.selectionLock);await write('package.json',desc);
+  return {expectedClosureSha256:desc.dis.resourceClosureSha256,expectedSelectionSha256:desc.dis.selectionLockSha256};
+}
+test('unsupported failure action retains executed node trace',async()=>fixture(async(dir)=>{
+  const file=path.join(dir,'domain/units/recognizer.json'),unit=JSON.parse(await fs.readFile(file));unit.failure.handling.UNKNOWN.action='FAIL';await fs.writeFile(file,JSON.stringify(unit,null,2)+'\n');
+  const admitted=await loadPackage({root:dir,...await resealCurrent(dir)}), input=scenarios.find((s)=>s.id==='unknown').input;
+  assert.throws(()=>runPipeline(input,admitted),(error)=>{if(process.env.TEXTILE_EMIT_POLICY==='1')console.log('TEXTILE_POLICY='+JSON.stringify(error.trace));return error.message==='UNSUPPORTED_FAILURE_POLICY' && error.trace.length===1 && error.trace[0].output.status==='UNKNOWN' && error.trace[0].failure.status==='UNKNOWN' && assert.deepEqual(error.trace[0].input,input)===undefined;});
+}));
 test('selected Knowledge mutation changes actual execution under new exact pin', async()=>fixture(async(dir)=>{
   const file=path.join(dir,'fixtures/textile-knowledge.json'), knowledge=JSON.parse(await fs.readFile(file));
   knowledge.revision='2.0.0';knowledge.rules.find((rule)=>rule.id==='jacquard').enabled=false;
@@ -76,6 +95,15 @@ test('path traversal fails even with externally admitted malicious envelope',asy
 test('reference policy denies production even when newly pinned',async()=>fixture(async(dir)=>{
   const file=path.join(dir,'package.json'), desc=JSON.parse(await fs.readFile(file));desc.dis.selectionLock.referencePolicy.production=true;desc.dis.selectionLockSha256=lockDigest(desc.dis.selectionLock);await fs.writeFile(file,JSON.stringify(desc));
   await assert.rejects(loadPackage({root:dir,expectedClosureSha256:pin,expectedSelectionSha256:desc.dis.selectionLockSha256}),/UNAUTHORIZED_REFERENCE_SELECTION/);
+}));
+test('selection object key order does not change lock acceptance',async()=>fixture(async(dir)=>{
+  const file=path.join(dir,'package.json'), desc=JSON.parse(await fs.readFile(file));desc.dis.selectionLock.referencePolicy=Object.fromEntries(Object.entries(desc.dis.selectionLock.referencePolicy).reverse());desc.dis.selectionLock.assets=desc.dis.selectionLock.assets.map((asset)=>Object.fromEntries(Object.entries(asset).reverse()));await fs.writeFile(file,JSON.stringify(desc));
+  const admitted=await loadPackage({root:dir,...pins});assert.equal(runPipeline(scenarios[0].input,admitted).outcome.technique,'jacquard');
+}));
+test('unsupported manifest standard is rejected even under new pins',async()=>fixture(async(dir)=>{
+  const file=path.join(dir,'domain/resource-closure.json'), manifest=JSON.parse(await fs.readFile(file));manifest.standardVersion='9.0.0';await fs.writeFile(file,JSON.stringify(manifest));
+  const descriptorPath=path.join(dir,'package.json'), desc=JSON.parse(await fs.readFile(descriptorPath));desc.dis.resourceClosureSha256=sha256(await fs.readFile(file));desc.dis.selectionLock.closureSha256=desc.dis.resourceClosureSha256;desc.dis.selectionLockSha256=lockDigest(desc.dis.selectionLock);await fs.writeFile(descriptorPath,JSON.stringify(desc));
+  await assert.rejects(loadPackage({root:dir,expectedClosureSha256:desc.dis.resourceClosureSha256,expectedSelectionSha256:desc.dis.selectionLockSha256}),/UNSUPPORTED_STANDARD_VERSION/);
 }));
 test('resource modification is rejected',async()=>fixture(async(dir)=>{
   await fs.appendFile(path.join(dir,'domain/units/decision.json'),' ');

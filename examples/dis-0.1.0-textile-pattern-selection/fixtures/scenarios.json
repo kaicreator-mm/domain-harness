@@ -258,5 +258,38 @@
       "status": "READY",
       "technique": "embroidery"
     }
+  },
+  {
+    "id": "requested-structure-with-missing-surface-method",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "requestedProcess": "jacquard",
+      "evidence": [
+        "user-brief"
+      ]
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
+  },
+  {
+    "id": "requested-structure-with-unknown-surface-method",
+    "synthetic": true,
+    "input": {
+      "domain": "textile-pattern",
+      "placement": "surface",
+      "surfaceMethod": "unknown",
+      "requestedProcess": "jacquard",
+      "evidence": [
+        "user-brief"
+      ]
+    },
+    "expected": {
+      "status": "CONFLICT",
+      "technique": null
+    }
   }
 ]

@@ -97,6 +97,17 @@
     {
       "kind": "data",
       "from": {
+        "node": "recognize",
+        "pointer": "/recognition"
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/recognition"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
         "node": "decide",
         "pointer": "/status"
       },
@@ -147,6 +158,17 @@
       "to": {
         "node": "validate",
         "pointer": "/brief"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": "/recognition"
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/recognition"
       }
     },
     {

@@ -61,7 +61,7 @@
     },
     {
       "path": "domain/schemas/textile-route.schema.json",
-      "sha256": "ee0d288dc6e59b6d8af8c03c7491796f899281460700f771188b0e3defe2bbb9",
+      "sha256": "a36c4ab9f129cb6428d4a0d9e6b6cbf7bcb7b94e9d6c38c3ce70f42680f0c3dd",
       "kind": "schema",
       "owners": [
         "textile.pattern"
@@ -70,7 +70,7 @@
     },
     {
       "path": "domain/textile-pattern-selection.graph.json",
-      "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d",
+      "sha256": "782ef0517f5fb8e1811f805447a1f538c7f3a22f026d116ee78c24fa107663d0",
       "kind": "graph",
       "owners": [
         "textile.pattern"
@@ -124,7 +124,7 @@
     },
     {
       "path": "fixtures/scenarios.json",
-      "sha256": "2fada8fec1e938a397fd8cc08229a67c92ecd5aadf9d74cfa0edd868cd2839df",
+      "sha256": "1f1935dab4595166507b509f3da5792fe364d0fb29646f0e0d06767bdc9e2509",
       "kind": "fixture",
       "owners": [
         "textile.pattern"
@@ -142,7 +142,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "66ae1d045b09c4ce4f88b4be723f023c57df372b64c7a0700262eb426b7707b2",
+      "sha256": "66b99218e3ee36e18af0088db37855d72d4e4c5a1959cd8356c10635a879cf4f",
       "kind": "conformance",
       "owners": [
         "textile.pattern"
@@ -160,7 +160,7 @@
     },
     {
       "path": "scripts/validate.py",
-      "sha256": "bfb807ca249f43e42c06167d64c4db385ec70472d9471244e5c2b336c182c83d",
+      "sha256": "9b3f20d1075a9f8504cee1c9878a748f44ee0bf7ec82aaca3cac5c5a963dcb4b",
       "kind": "conformance",
       "owners": [
         "textile.pattern"
@@ -169,7 +169,7 @@
     },
     {
       "path": "src/runner.mjs",
-      "sha256": "488fd28b6170373851af111b85060ae9e099d60e602ce4343bae047c9711b1f1",
+      "sha256": "e6e0f2529d66c69b7642281ad491105560a0bb86238c27a6bdf0c527e910e37a",
       "kind": "implementation",
       "owners": [
         "textile.pattern"
@@ -178,7 +178,7 @@
     },
     {
       "path": "test/runner.test.mjs",
-      "sha256": "ed12d04e54106646ccfdca1b0db858da254de57560917610600adc1b3d5ed1de",
+      "sha256": "5eb6b64b25cbfc30e05468dea8cfacb30c6aee0909d84becf43ab423dfb9fcaf",
       "kind": "conformance",
       "owners": [
         "textile.pattern"

@@ -16,11 +16,11 @@
     "standardVersion": "0.1.0",
     "authority": "REFERENCE",
     "resourceClosurePath": "domain/resource-closure.json",
-    "resourceClosureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+    "resourceClosureSha256": "5a7fd3ca0ba04a5fde1796749fcb35a98bd80f525c1e40fe5523852b2ce8f010",
     "selectionLock": {
       "packageId": "textile.pattern",
       "packageRevision": "1.0.0",
-      "closureSha256": "c9680dcd3840f23fae182e21ecc86786d7b35633f2da0ece3d3d110d3d3dac45",
+      "closureSha256": "5a7fd3ca0ba04a5fde1796749fcb35a98bd80f525c1e40fe5523852b2ce8f010",
       "target": "node24",
       "consumerProfile": "textile-synthetic-sampling/1.0.0",
       "referencePolicy": {
@@ -72,7 +72,7 @@
           "id": "textile.pattern-selection",
           "revision": "1.0.0",
           "path": "domain/textile-pattern-selection.graph.json",
-          "sha256": "a43b35a6a03243f163908f732b150a0857d81c08abb9d1e655d423198502db0d"
+          "sha256": "782ef0517f5fb8e1811f805447a1f538c7f3a22f026d116ee78c24fa107663d0"
         },
         {
           "kind": "knowledge",
@@ -83,6 +83,6 @@
         }
       ]
     },
-    "selectionLockSha256": "81c2f47ef26dc6b54cf0d67769f2c87de1a8fb3104a1319ca68497ec436686fe"
+    "selectionLockSha256": "dae9a5f9402453ae3bf55c89c18a26f5b80d2bd62c52b3581fb63b5a39e32d84"
   }
 }
