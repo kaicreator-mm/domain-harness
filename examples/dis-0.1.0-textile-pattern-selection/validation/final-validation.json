@@ -1,0 +1,11 @@
+{
+  "result": "PASS",
+  "standardSchemas": 5,
+  "units": 5,
+  "scenarios": 11,
+  "traceEntries": 33,
+  "closureResources": 16,
+  "manifestSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e",
+  "changedKnowledge": "PASS",
+  "scope": "REFERENCE_ONLY"
+}

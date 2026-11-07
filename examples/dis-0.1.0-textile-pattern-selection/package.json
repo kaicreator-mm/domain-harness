@@ -1,0 +1,21 @@
+{
+  "name": "dis-textile-pattern-reference",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.21.0"
+  },
+  "scripts": {
+    "test": "node --test test/runner.test.mjs",
+    "demo": "node src/runner.mjs --demo",
+    "validate": "python scripts/validate.py"
+  },
+  "dis": {
+    "packageId": "textile.pattern",
+    "revision": "1.0.0",
+    "standardVersion": "0.1.0",
+    "authority": "REFERENCE",
+    "resourceClosurePath": "domain/resource-closure.json",
+    "resourceClosureSha256": "cf3d40ce3a3555dc5e7b3e34a2113e4c667ec72ba89a70c6f3e7ccc5025f837e"
+  }
+}

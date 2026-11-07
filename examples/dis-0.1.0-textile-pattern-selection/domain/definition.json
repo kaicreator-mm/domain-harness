@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "dis.definition/0.1.0",
+  "domainId": "textile.pattern",
+  "revision": "1.0.0",
+  "components": [
+    {
+      "family": "semantic",
+      "componentId": "textile.recognizer",
+      "unitRef": {
+        "id": "textile.recognizer",
+        "revision": "1.0.0"
+      }
+    },
+    {
+      "family": "semantic",
+      "componentId": "textile.decision",
+      "unitRef": {
+        "id": "textile.decision",
+        "revision": "1.0.0"
+      }
+    },
+    {
+      "family": "semantic",
+      "componentId": "textile.validator",
+      "unitRef": {
+        "id": "textile.validator",
+        "revision": "1.0.0"
+      }
+    },
+    {
+      "family": "semantic",
+      "componentId": "textile.workflow",
+      "unitRef": {
+        "id": "textile.workflow",
+        "revision": "1.0.0"
+      }
+    }
+  ],
+  "privateUnits": [],
+  "workflowRef": {
+    "unitRef": {
+      "id": "textile.workflow",
+      "revision": "1.0.0"
+    },
+    "graphRef": {
+      "id": "textile.pattern-selection",
+      "revision": "1.0.0",
+      "path": "domain/textile-pattern-selection.graph.json"
+    }
+  }
+}

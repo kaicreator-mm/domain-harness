@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "dis.graph/0.1.0",
+  "id": "textile.pattern-selection",
+  "revision": "1.0.0",
+  "inputSchemaRef": "domain/schemas/textile-brief.schema.json",
+  "outputSchemaRef": "domain/schemas/textile-route.schema.json",
+  "entryNode": "recognize",
+  "nodes": [
+    {
+      "nodeId": "recognize",
+      "unitRef": {
+        "id": "textile.recognizer",
+        "revision": "1.0.0"
+      }
+    },
+    {
+      "nodeId": "decide",
+      "unitRef": {
+        "id": "textile.decision",
+        "revision": "1.0.0"
+      }
+    },
+    {
+      "nodeId": "validate",
+      "unitRef": {
+        "id": "textile.validator",
+        "revision": "1.0.0"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "kind": "control",
+      "from": "recognize",
+      "to": "decide"
+    },
+    {
+      "kind": "control",
+      "from": "decide",
+      "to": "validate"
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "recognize",
+        "pointer": ""
+      },
+      "to": {
+        "node": "decide",
+        "pointer": "/prior"
+      }
+    },
+    {
+      "kind": "data",
+      "from": {
+        "node": "decide",
+        "pointer": ""
+      },
+      "to": {
+        "node": "validate",
+        "pointer": "/prior"
+      }
+    }
+  ],
+  "terminalNodes": [
+    "validate"
+  ],
+  "cyclePolicy": "DAG_ONLY"
+}
