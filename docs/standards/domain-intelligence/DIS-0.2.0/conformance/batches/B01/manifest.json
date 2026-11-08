@@ -1,0 +1,122 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B01",
+  "status": "PLANNED",
+  "mode": "DELIVERY_FIRST_SEQUENTIAL_COMMITS_WITH_INDEPENDENT_EXACT_SHA_ROUND_RECEIPTS",
+  "masterIssue": 1499,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "4d3e52bc1a14a7c6d1557fd0589f8de3afe600c8",
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1,
+    "r30CI": {
+      "commit": "4d3e52bc1a14a7c6d1557fd0589f8de3afe600c8",
+      "contexts": [
+        "ci/woodpecker/pr/dis-v020-integration",
+        "ci/woodpecker/pr/verify-min-node",
+        "ci/woodpecker/pr/verify"
+      ],
+      "all": "SUCCESS"
+    }
+  },
+  "target": "C2: CORE-003 Function ABI/schema/evidence and CORE-006 domain-owned Knowledge/Rule/Stateful native behavior",
+  "roundCount": 3,
+  "roundIdentity": "Batch local IDs B01-01..B01-03 are reserved; global Rxx IDs allocated on each start after fresh PR HEAD, never inferred or pre-passed.",
+  "rounds": [
+    {
+      "batchRoundId": "B01-01",
+      "status": "PLANNED",
+      "theme": "Source-grounded Function input/output Schema, typed outcome and Evidence obligations across applicable Knowledge/Rule/Workflow/Interaction",
+      "requirements": [
+        "DIS020-CORE-003"
+      ],
+      "prerequisites": [
+        "Current native R30 qualifier and selected fixture version migration"
+      ],
+      "result": "PENDING",
+      "sourceHead": null,
+      "receipt": null,
+      "checks": []
+    },
+    {
+      "batchRoundId": "B01-02",
+      "status": "PLANNED",
+      "theme": "Domain-owned Stateful Function handle lifecycle, Knowledge/Rule state isolation and no KDP/Effect authority leakage",
+      "requirements": [
+        "DIS020-CORE-006",
+        "DIS020-CORE-003"
+      ],
+      "prerequisites": [
+        "B01-01 contract shape or independent pre-existing fixture"
+      ],
+      "result": "PENDING",
+      "sourceHead": null,
+      "receipt": null,
+      "checks": []
+    },
+    {
+      "batchRoundId": "B01-03",
+      "status": "PLANNED",
+      "theme": "Cross-Function/Element ABI compatibility regressions and native C2 qualification, preserving prior adversarial suite",
+      "requirements": [
+        "DIS020-CORE-003",
+        "DIS020-CORE-006"
+      ],
+      "prerequisites": [
+        "B01-01 and B01-02 relevant exact-SHA source review"
+      ],
+      "result": "PENDING",
+      "sourceHead": null,
+      "receipt": null,
+      "checks": []
+    }
+  ],
+  "roundArtifactContract": {
+    "gitCommits": "One or more immutable repair commits per round, but the round receipt must bind final exact HEAD/TREE/BLOB and active Branch at that round completion.",
+    "perRoundFolder": "docs/standards/domain-intelligence/DIS-0.2.0/conformance/batches/B01/rounds/<batchRoundId>/",
+    "requiredPerRoundFiles": [
+      "ROUND.md",
+      "round.json"
+    ],
+    "receipts": "docs/standards/domain-intelligence/DIS-0.2.0/conformance/receipts/<actual-Rxx>-<scope>-ci.json",
+    "mustInclude": [
+      "aim/assumptions",
+      "source/fixture immutable identity",
+      "independent positive and adversarial cases",
+      "actual selected native consumption",
+      "test commands and real CI URLs",
+      "exact SHA/TREE and source Git Blob",
+      "defects and same-writer repairs",
+      "evidence/learning",
+      "unqualified/unknown/failure semantics",
+      "matrix cross-links and status"
+    ],
+    "acceptance": "Only a final exact-SHA SUCCESS for every applicable CI context can qualify a round. Pending/ERROR/FAILURE is not PASS; inherited earlier PASS is scoped only to its exact SHA.",
+    "versioning": "Do not rewrite previous round conclusions: append a superseding repair receipt referencing the former SHA if needed.",
+    "machineMatrix": "Only link real test names and verified receipts; do not set Core VERIFIED without every normative obligation and relevant independent semantic authority."
+  },
+  "batchAcceptance": {
+    "successfulRoundsRequired": 3,
+    "closeOutFiles": [
+      "BATCH_SUMMARY.md",
+      "manifest.json",
+      "DEMO_INDEX.md",
+      "validation-summary.md",
+      "matrix.json"
+    ],
+    "partialOrBlocked": "If a round remains BLOCKED, keep it BLOCKED with evidence, close no Core, and record remaining dependencies; unrelated rounds may continue.",
+    "noAutomaticRelease": true
+  },
+  "currentKnownConstraints": [
+    "SAP/source owner independent review absent for C1; B01 C2 is non-overlapping work, do not fabricate independent semantic acceptance.",
+    "No arbitrary Node major conformance gate.",
+    "No GitHub Actions.",
+    "No physical/local Host requirements unless actual native gap proves necessary."
+  ],
+  "futureBatches": "B02 may take C3/Target+Interaction after Product/L1 applicability decision, or finish C1 prerequisites; B03+ for final matrix and governance as dependencies resolve. Optional profiles only if in approved scope.",
+  "automationScope": "Batch execution occurs only during active delegated chat/tool work; no background job is implied."
+}
