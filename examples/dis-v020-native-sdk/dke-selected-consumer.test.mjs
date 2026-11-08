@@ -72,8 +72,9 @@ async function makeDkeSelectedFixture(){
  for(const variant of VARIANTS){
   const suffix=variant.toLowerCase().replace('_','-'),fnId='dke.ed06.'+suffix+'.consume';
   program.elements.push({
-   id:'dke.ed06.'+suffix,domainId:'dke-ed06',kind:'knowledge',
+   id:'dke.ed06.'+suffix,domainId:'dke-ed06',version:'1.0.0',kind:'knowledge',
    description:'DKE '+variant+' source-pinned evidence consumer: no effect, no semantic attestation',
+   validation:{schema:'dis.v0.2.element-validation/1',sourceIds:[DATA_ID],authority:'NONE'},
    dependsOn:[],
    functions:[{
     id:fnId,kind:'knowledge',effect:'none',binding:{type:'local',sourceId:CORE_ID},
@@ -272,7 +273,7 @@ async function makeR23DualReaderFixture(){
   repositories:['kaicreator-mm/domain-harness']
  });
  program.elements.push({
-  id:'dke.crossview.audit.element',domainId:'dke-crossview-audit',
+  id:'dke.crossview.audit.element',domainId:'dke-crossview-audit',version:'1.0.0',
   kind:'knowledge',description:'Independent source-backed cross-Element invariant observer',
   dependsOn:[],functions:[{
    id:CROSS_FUNCTION_ID,kind:'knowledge',effect:'none',

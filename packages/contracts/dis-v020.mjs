@@ -198,6 +198,42 @@ export function classifyDisV020FunctionOutcome(contract,value){
  return Object.freeze({disposition,evidenceRefs:Object.freeze(valid?[...refs]:[])});
 }
 
+
+/**
+ * R30: bounded same-major Element ABI comparison. This checks stable public
+ * identity/function membership, not domain-semantic equivalence or an
+ * authorization to install an AOT with a changed contract.
+ */
+export function compareDisV020ElementContracts(previous,next){
+ const allowed=['id','domainId','kind','description','version','packageId','dependsOn','functions','validation'];
+ keys(previous,allowed);keys(next,allowed);
+ if(!SEMVER.test(previous.version)||!SEMVER.test(next.version))
+  fail('DIS_ELEMENT_VERSION_INVALID');
+ const a=previous.version.split('.').map(Number),b=next.version.split('.').map(Number);
+ if(previous.id!==next.id||previous.domainId!==next.domainId||
+    previous.kind!==next.kind||previous.packageId!==next.packageId||
+    a[0]!==b[0]||b[1]<a[1]||(b[1]===a[1]&&b[2]<a[2]))
+  fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+ if(previous.version===next.version){
+  if(sha256Canonical(previous)!==sha256Canonical(next))
+   fail('DIS_ELEMENT_UNVERSIONED_DRIFT');
+  return Object.freeze({compatible:true,from:previous.version,to:next.version});
+ }
+ if(!arr(previous.functions,true)||!arr(next.functions,true)||
+    !arr(previous.dependsOn,true)||!arr(next.dependsOn,true))
+  fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+ const nextFunctions=new Map(next.functions.map(f=>[f.id,f]));
+ for(const f of previous.functions){
+  const target=nextFunctions.get(f.id);
+  if(!target||f.kind!==target.kind||f.effect!==target.effect||
+     sha256Canonical(f.binding)!==sha256Canonical(target.binding))
+   fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+ }
+ if(previous.dependsOn.some(id=>!next.dependsOn.includes(id)))
+  fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+ return Object.freeze({compatible:true,from:previous.version,to:next.version});
+}
+
 export class DisV020Error extends Error{
  constructor(code){super(code);this.name='DisV020Error';this.code=code}
 }
@@ -262,7 +298,8 @@ export function qualifyDisV020Artifact(artifact){
  // NOT from external dynamic knowledge truth or a fabricated ECP closure.
  const sourceConsumers=new Map([...pins.keys()].map(sourceId=>[sourceId,[]]));
  for(const e of program.elements){
-  keys(e,['id','domainId','kind','description','packageId','dependsOn','functions']);
+  keys(e,['id','domainId','kind','version','description','packageId','dependsOn','functions','validation']);
+  if(!SEMVER.test(e.version))fail('DIS_ELEMENT_VERSION_INVALID');
   if(!id(e.id)||!domains.has(e.domainId)||!ELEMENT_KINDS.has(e.kind)||
      typeof e.description!=='string'||!e.description.trim()||
      !arr(e.dependsOn,true)||!arr(e.functions,e.kind==='global')||
@@ -326,6 +363,23 @@ export function qualifyDisV020Artifact(artifact){
    if(b.type==='local'){
     sourceConsumers.get(b.sourceId).push(f.id);
     for(const sourceId of f.sourceDependencies??[])sourceConsumers.get(sourceId).push(f.id);
+   }
+  }
+  // A source-referenced validation declaration is not independent truth.
+  // Each selected source must really be read by this Element's bound Functions.
+  if(e.validation!==undefined){
+   keys(e.validation,['schema','sourceIds','authority']);
+   if(e.validation.schema!=='dis.v0.2.element-validation/1'||
+      e.validation.authority!=='NONE'||!arr(e.validation.sourceIds)||
+      new Set(e.validation.sourceIds).size!==e.validation.sourceIds.length)
+    fail('DIS_ELEMENT_VALIDATION_INVALID');
+   for(const sid of e.validation.sourceIds){
+    const pin=pins.get(sid);
+    if(!pin||!domains.get(e.domainId).repositories.includes(pin.origin.repository))
+     fail('DIS_ELEMENT_VALIDATION_SOURCE_INVALID');
+    if(!e.functions.some(f=>f.binding.type==='local'&&
+       (f.binding.sourceId===sid||f.sourceDependencies?.includes(sid))))
+     fail('DIS_ELEMENT_VALIDATION_UNBOUND');
    }
   }
  }

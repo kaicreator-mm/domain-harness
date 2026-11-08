@@ -107,8 +107,9 @@ async function fixture(){
    repositories:['kaicreator-mm/domain-harness']
   });
   program.elements.push({
-   id:'dke.r24.'+r.id,domainId:domain,kind:'knowledge',
+   id:'dke.r24.'+r.id,domainId:domain,version:'1.0.0',kind:'knowledge',
    description:'Own source code, actual BUILD-selected Business; read-only Knowledge Function',
+   validation:{schema:'dis.v0.2.element-validation/1',sourceIds:[DATA_ID],authority:'NONE'},
    packageId:r.packageId,dependsOn:[],
    functions:[{
     id:r.functionId,kind:'knowledge',effect:'none',

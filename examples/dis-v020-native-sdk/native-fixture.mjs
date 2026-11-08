@@ -39,23 +39,27 @@ export async function makeNativeFixture(){
    {id:'shared',description:'Cross-domain relationship/constraint semantics',repositories:['kaicreator-mm/domain-harness']},
   ],
   elements:[
-   {id:'shared.semantics',domainId:'shared',kind:'global',description:'Global observation/authorization boundary',dependsOn:[],functions:[]},
-   {id:'orders.init',domainId:'orders',kind:'workflow',description:'Unique trusted Business App Init',packageId:'business-order-approval@v08.1.0.0',dependsOn:[],functions:[
+   {id:'shared.semantics',domainId:'shared',version:'1.0.0',kind:'global',description:'Global observation/authorization boundary',dependsOn:[],functions:[]},
+   {id:'orders.init',domainId:'orders',version:'1.0.0',kind:'workflow',description:'Unique trusted Business App Init',packageId:'business-order-approval@v08.1.0.0',dependsOn:[],functions:[
     {id:'orders.appInit',kind:'init',effect:'none',binding:{type:'local',sourceId:'orders-init'}}]},
-   {id:'orders.approval',domainId:'orders',kind:'workflow',description:'Selected orders KDP route',packageId:'business-order-approval@v08.1.0.0',dependsOn:[],functions:[
+   {id:'orders.approval',domainId:'orders',version:'1.0.0',kind:'workflow',description:'Selected orders KDP route',packageId:'business-order-approval@v08.1.0.0',dependsOn:[],functions:[
     {id:'orders.approve',kind:'workflow',effect:'none',binding:{type:'kdp-intent',intentId:'submitQuoteDecisionDynamic'}}]},
-   {id:'tally.tasks',domainId:'tally',kind:'rule',description:'Task evidence is observation, not Claim authority',packageId:'business-tally-task-readiness@v2.0.0',dependsOn:[],functions:[
+   {id:'tally.tasks',domainId:'tally',version:'1.0.0',kind:'rule',description:'Task evidence is observation, not Claim authority',
+    validation:{schema:'dis.v0.2.element-validation/1',sourceIds:['tally-business'],authority:'NONE'},
+    packageId:'business-tally-task-readiness@v2.0.0',dependsOn:[],functions:[
     {id:'tally.assessTaskEvidence',kind:'rule',effect:'none',binding:{type:'local',sourceId:'tally-business'}}]},
-   {id:'tally.release',domainId:'tally',kind:'rule',description:'Release readiness without RQ authorization',packageId:'business-tally-task-readiness@v2.0.0',dependsOn:['tally.tasks'],functions:[
+   {id:'tally.release',domainId:'tally',version:'1.0.0',kind:'rule',description:'Release readiness without RQ authorization',packageId:'business-tally-task-readiness@v2.0.0',dependsOn:['tally.tasks'],functions:[
     {id:'tally.projectReleaseReadiness',kind:'rule',effect:'none',binding:{type:'local',sourceId:'tally-release'}}]},
-   {id:'runx.agent.presence',domainId:'runx',kind:'stateful',description:'Stateful Agent presence, not execution lease',dependsOn:[],functions:[
+   {id:'runx.agent.presence',domainId:'runx',version:'1.0.0',kind:'stateful',description:'Stateful Agent presence, not execution lease',dependsOn:[],functions:[
     {id:'runx.createPresenceObserver',kind:'stateful',effect:'none',binding:{type:'local',sourceId:'runx-presence'}}]},
-   {id:'xdownload.policy',domainId:'xdownload',kind:'knowledge',description:'Download guard/effect policy knowledge',packageId:'business-download@0.2.0-t03',dependsOn:[],functions:[
+   {id:'xdownload.policy',domainId:'xdownload',version:'1.0.0',kind:'knowledge',description:'Download guard/effect policy knowledge',packageId:'business-download@0.2.0-t03',dependsOn:[],functions:[
     {id:'xdownload.describePolicy',kind:'knowledge',effect:'none',binding:{type:'local',sourceId:'xdownload-business'}}]},
-   {id:'xdownload.interaction',domainId:'xdownload',kind:'interaction',description:'Two public local Functions normalize Chat/Form/CLI download intent and confirmation without issuing an Effect',dependsOn:['xdownload.policy'],functions:[
+   {id:'xdownload.interaction',domainId:'xdownload',version:'1.0.0',kind:'interaction',description:'Two public local Functions normalize Chat/Form/CLI download intent and confirmation without issuing an Effect',
+    validation:{schema:'dis.v0.2.element-validation/1',sourceIds:['xdownload-interaction'],authority:'NONE'},
+    dependsOn:['xdownload.policy'],functions:[
     {id:'xdownload.interaction.inspect',kind:'interaction',effect:'none',binding:{type:'local',sourceId:'xdownload-interaction'}},
     {id:'xdownload.interaction.confirm',kind:'interaction',effect:'none',binding:{type:'local',sourceId:'xdownload-interaction'}}]},
-   {id:'xdownload.acquire',domainId:'xdownload',kind:'effect',description:'Non-idempotent acquisition requires KDP permit',packageId:'business-download@0.2.0-t03',dependsOn:['xdownload.policy'],functions:[
+   {id:'xdownload.acquire',domainId:'xdownload',version:'1.0.0',kind:'effect',description:'Non-idempotent acquisition requires KDP permit',packageId:'business-download@0.2.0-t03',dependsOn:['xdownload.policy'],functions:[
     {id:'xdownload.confirmDownload',kind:'effect',effect:'governed',binding:{type:'kdp-intent',intentId:'confirmDownload'}}]},
   ],
   relations:[

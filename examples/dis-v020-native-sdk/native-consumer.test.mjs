@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sha256Canonical} from '@kaicreator/domain-harness-contracts';
-import {qualifyDisV020Artifact,classifyDisV020KdpReceipt,compareDisV020FunctionContracts} from '@kaicreator/domain-harness-contracts/dis-v020';
+import {qualifyDisV020Artifact,classifyDisV020KdpReceipt,compareDisV020FunctionContracts,compareDisV020ElementContracts} from '@kaicreator/domain-harness-contracts/dis-v020';
 import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
 import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
@@ -841,4 +841,85 @@ test('R20 AOT rejects forged Handle method, banned prototype and KDP-to-LOCAL au
  runx.handleContract.methods=['observe','list','latest'];
  runx.binding={type:'kdp-intent',intentId:'submitQuoteDecisionDynamic'};
  assert.throws(()=>compile(f,p),reject('DIS_LOCAL_HANDLE_BINDING_UNSUPPORTED'));
+});
+
+
+// R30 C1: ALL selected Elements need a stable version; source-linked
+// validation metadata is structurally checked but grants no SAP authority.
+test('R30 native selected heterogeneous Elements all have a version; multi-Function Interaction shares source-pinned validation',async()=>{
+ const f=await fixturePromise,q=qualifyDisV020Artifact(f.artifact);
+ assert.equal(q.elements.size,f.program.elements.length);
+ assert.equal(q.elements.size,9);
+ for(const e of q.elements.values())assert.equal(e.version,'1.0.0');
+ const multi=q.elements.get('xdownload.interaction');
+ assert.equal(multi.functions.length,2);
+ assert.deepEqual(multi.validation,{
+  schema:'dis.v0.2.element-validation/1',
+  sourceIds:['xdownload-interaction'],authority:'NONE'
+ });
+ assert.deepEqual(q.elements.get('tally.tasks').validation.sourceIds,['tally-business']);
+ assert.equal(q.functions.get('xdownload.interaction.inspect').element.id,multi.id);
+ assert.equal(q.functions.get('xdownload.interaction.confirm').element.id,multi.id);
+ const app=await activate(f);
+ try{
+  assert.equal(app.state,'READY');
+  const r=await app.invoke('tally.assessTaskEvidence',{});
+  assert.equal(r.kind,'OBSERVATION');assert.equal(r.authority,'NONE');
+ }finally{app.stop()}
+});
+test('R30 missing, malformed and silently unversioned Element identity is denied before native KDP boot',async()=>{
+ const f=await fixturePromise;
+ const invalid=version=>{
+  const p=clone(f.program);
+  if(version===undefined)delete p.elements[3].version;
+  else p.elements[3].version=version;
+  return()=>compile(f,p);
+ };
+ assert.throws(invalid(undefined),reject('DIS_ELEMENT_VERSION_INVALID'));
+ assert.throws(invalid('0.1.0'),reject('DIS_ELEMENT_VERSION_INVALID'));
+ assert.throws(invalid('1.00.0'),reject('DIS_ELEMENT_VERSION_INVALID'));
+ assert.throws(invalid('1.0'),reject('DIS_ELEMENT_VERSION_INVALID'));
+ assert.throws(invalid({major:1}),reject('DIS_ELEMENT_VERSION_INVALID'));
+});
+test('R30 selected Element validation references only sources consumed by its own Functions, never foreign claims or business attestations',async()=>{
+ const f=await fixturePromise;
+ const mutate=(fn,code)=>{
+  const p=clone(f.program),e=p.elements.find(x=>x.id==='tally.tasks');
+  fn(e);
+  assert.throws(()=>compile(f,p),reject(code));
+ };
+ mutate(e=>{e.validation.authority='INDEPENDENT_VERIFIED'},'DIS_ELEMENT_VALIDATION_INVALID');
+ mutate(e=>{e.validation.sourceIds=[]},'DIS_ELEMENT_VALIDATION_INVALID');
+ mutate(e=>{e.validation.sourceIds=['tally-business','tally-business']},'DIS_ELEMENT_VALIDATION_INVALID');
+ mutate(e=>{e.validation.sourceIds=['nonselected-source']},'DIS_ELEMENT_VALIDATION_SOURCE_INVALID');
+ mutate(e=>{e.validation.sourceIds=['xdownload-business']},'DIS_ELEMENT_VALIDATION_SOURCE_INVALID');
+ mutate(e=>{e.validation.sourceIds=['tally-release']},'DIS_ELEMENT_VALIDATION_UNBOUND');
+ mutate(e=>{e.validation.semanticOracle=true},'DIS_UNKNOWN_FIELD');
+});
+test('R30 same-major Element ABI comparator denies unversioned description drift, removed public Function, missing dependency and changed owner',async()=>{
+ const f=await fixturePromise;
+ const e=clone(f.program.elements.find(x=>x.id==='xdownload.interaction'));
+ assert.deepEqual(compareDisV020ElementContracts(e,clone(e)),
+  {compatible:true,from:'1.0.0',to:'1.0.0'});
+ const unversioned=clone(e);
+ unversioned.description+=' fabricated semantic guarantee';
+ assert.throws(()=>compareDisV020ElementContracts(e,unversioned),reject('DIS_ELEMENT_UNVERSIONED_DRIFT'));
+ const raised=clone(e);
+ raised.version='1.1.0';
+ assert.deepEqual(compareDisV020ElementContracts(e,raised),
+  {compatible:true,from:'1.0.0',to:'1.1.0'});
+ const dropped=clone(raised);
+ dropped.functions.pop();
+ assert.throws(()=>compareDisV020ElementContracts(e,dropped),reject('DIS_ELEMENT_ABI_INCOMPATIBLE'));
+ const displaced=clone(raised);
+ displaced.domainId='tally';
+ assert.throws(()=>compareDisV020ElementContracts(e,displaced),reject('DIS_ELEMENT_ABI_INCOMPATIBLE'));
+ const major=clone(raised);major.version='2.0.0';
+ assert.throws(()=>compareDisV020ElementContracts(e,major),reject('DIS_ELEMENT_ABI_INCOMPATIBLE'));
+ const previousRelease=clone(f.program.elements.find(x=>x.id==='tally.release'));
+ const withoutDependency=clone(previousRelease);
+ withoutDependency.version='1.1.0';
+ withoutDependency.dependsOn=[];
+ assert.throws(()=>compareDisV020ElementContracts(previousRelease,withoutDependency),
+  reject('DIS_ELEMENT_ABI_INCOMPATIBLE'));
 });

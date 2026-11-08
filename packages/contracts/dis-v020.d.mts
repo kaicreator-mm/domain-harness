@@ -55,8 +55,16 @@ export interface DisV020Function {
  readonly binding: {readonly type:'local'; readonly sourceId:string} |
   {readonly type:'kdp-intent'; readonly intentId:string};
 }
+export interface DisV020ElementValidation {
+ /** Structural source pinning only; never independently attested Knowledge. */
+ readonly schema:'dis.v0.2.element-validation/1';
+ readonly sourceIds:readonly string[];
+ readonly authority:'NONE';
+}
 export interface DisV020Element {
  readonly id:string;
+ readonly version:string;
+ readonly validation?:DisV020ElementValidation;
  readonly domainId:string;
  readonly kind:'global'|'knowledge'|'rule'|'stateful'|'workflow'|'effect'|'interaction';
  readonly description:string;
@@ -64,6 +72,8 @@ export interface DisV020Element {
  readonly dependsOn:readonly string[];
  readonly functions:readonly DisV020Function[];
 }
+/** Bounded same-major Element ABI evolution, not semantic qualification. */
+export declare function compareDisV020ElementContracts(previous:DisV020Element,next:DisV020Element):Readonly<{compatible:true;from:string;to:string}>;
 export interface DisV020Program {
  readonly format:typeof DIS_V020_PROGRAM;
  readonly appId:string;

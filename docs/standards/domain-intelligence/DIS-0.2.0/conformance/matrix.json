@@ -23,7 +23,8 @@
     "r19.1-integration-blocked",
     "r18-r20-native-integration-repaired",
     "r21-native-dke-semantic-ci",
-    "r27-native-impact-ci"
+    "r27-native-impact-ci",
+    "r29-native-source-first-ci"
   ],
   "requirements": [
     {
@@ -71,14 +72,40 @@
         {
           "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
           "case": "native Contracts + canonical BUILD select 4 heterogeneous domains and explicit global semantics"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R29 original source-first ledger identifies two Case-owned Elements and two selected Business readers, but never accepts unreviewed SAP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R30 native selected heterogeneous Elements all have a version; multi-Function Interaction shares source-pinned validation"
         }
       ],
-      "negative": [],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R29 original reviewer/source gap and proposed decomposition cannot mint independent domain authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R30 missing, malformed and silently unversioned Element identity is denied before native KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R30 selected Element validation references only sources consumed by its own Functions, never foreign claims or business attestations"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R30 same-major Element ABI comparator denies unversioned description drift, removed public Function, missing dependency and changed owner"
+        }
+      ],
       "receiptIds": [
         "r9.5-baseline",
-        "r15-d02-d03-native"
+        "r15-d02-d03-native",
+        "r29-native-source-first-ci"
       ],
-      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 source-pinned DKE ED06 native selected LOCAL Knowledge functions across three decomposition variants; identity and Function selection bounded, not an independently verified cohesive Element-owner decision."
+      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 source-pinned DKE ED06 native selected LOCAL Knowledge functions across three decomposition variants; identity and Function selection bounded, not an independently verified cohesive Element-owner decision. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN. R30 candidate changes native ABI: every selected Element version is mandatory; opt-in source-linked validation has authority NONE; same-major comparator rejects unversioned Element drift and binding/owner breaks. Not yet exact-SHA CI qualified, no SAP acceptance or C1 closure."
     },
     {
       "id": "DIS020-CORE-003",
@@ -165,7 +192,8 @@
         "r17-bounded-schema-ci",
         "r18-r20-native-integration-repaired",
         "r21-native-dke-semantic-ci",
-        "r27-native-impact-ci"
+        "r27-native-impact-ci",
+        "r29-native-source-first-ci"
       ],
       "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility. R16 candidate adds a separately AOT-locked KDP receipt admission profile (actual selected orders KDP Intent), not a completed Effect/business evidence attestation; pending new exact-SHA CI. R16 exact SHA db10ddbc / Woodpecker #2237 three contexts SUCCESS; KDP admission classified, not executed Effect or independent Evidence. R17 draft tests bounded opt-in record Schema and same-major structural reader compatibility; pending exact-SHA CI. R17 bounded record/optional/closed Schema and structural same-major comparator passed exact-SHA Woodpecker #2238 at fe51db3. R18 uses original Tally release advisory source, adds all-reported-PASS but never independently attested negative and forged local Release status guard; not yet current CI-verified. R19 #2240 dedicated integration FAILURE with other contexts SUCCESS (blocked historical receipt; root cause not demonstrated). R19.1 addresses a separate source-backed zero-argument public Knowledge ABI compatibility regression with allowAbsent on closed empty records and negative tests. Await new exact HEAD CI. R19.1 dedicated #2241 integration FAILURE (2 other contexts SUCCESS) is preserved as blocked historical receipt, not a verifier. R20 proposes source-real Runx PROCESS_LOCAL Handle method contract; no serialized record lie, Host lease or independent evidence verification. New CI pending. R18-R20 native integration repair: authenticated Woodpecker step logs show #2240/#2241/#2242 each failed exactly one legacy test (native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule) because R19's new receipt contract on xdownload.confirmDownload tripped the earlier R16 receipt-binding guard (DIS_KDP_RECEIPT_BINDING_UNSUPPORTED) before DIS_LOCAL_NOT_QUALIFIED; repair dfba82a7 completes the fixture mutation by stripping receiptContract in the clone, keeping the load-bearing R16 guard order pinned by its own dedicated test. Exact HEAD dfba82a7723d709ee22acd65b079fdcc98000f69 / TREE 57b789dff8039888f39e7045e0216b9962ae87fb qualified by Woodpecker #2243/1-3 all SUCCESS (65/65 native tests incl. R18/R19/R19.1/R20 plus the two previously unreached lane tail commands; receipt r18-r20-native-integration-repaired). CORE-003 stays PARTIAL. R21 true AOT-selected DKE source consumer qualified by exact-SHA #2249/1 DIS Integration SUCCESS + #2249/3 General Verify SUCCESS; #2249/2 engine-only CI ERROR is recorded but not a semantic gate per Owner. 24 true selected Function CQ calls and source/currentness negatives, no independent Knowledge Oracle/Package inverse registry. Historical mixed-CI receipt r21-native-dke-semantic-ci. R22 candidate adds optional per-LOCAL-Function sourceDependencies in AOT, reverse sourceConsumers lookup for DKE original execution + data projection, fail-closed missing/duplicate/foreign source and forged KDP_INTENT cases. Not a CQ→SAP→external Package/ECP change-currentness proof; awaiting own exact-SHA native integration CI. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven."
     },
@@ -220,6 +248,10 @@
         {
           "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
           "case": "R27 actual Tally 14-record source delta maps into two CQs, two unqualified SAP proposals and two selected Business packages"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R29 original source-first ledger identifies two Case-owned Elements and two selected Business readers, but never accepts unreviewed SAP"
         }
       ],
       "negative": [
@@ -230,14 +262,19 @@
         {
           "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
           "case": "R27 false SAP approval, unknown selected package, omitted reader, forged source and stable-CQ claims fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R29 original reviewer/source gap and proposed decomposition cannot mint independent domain authority"
         }
       ],
       "receiptIds": [
         "r9.5-baseline",
         "r15-d02-d03-native",
-        "r27-native-impact-ci"
+        "r27-native-impact-ci",
+        "r29-native-source-first-ci"
       ],
-      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 24 CQ native AOT source-consumption confirmed on real original Tally KG projection/Textile reference. No registered complete CQ→SAP→external Package inverse dependency or independent semantic oracle; remains PARTIAL. R22 first bounded static reverse provenance edge source→selected LOCAL Function, distinctly not Element DAG cycle, automatic SAP invalidation or ECP dependent closure. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven."
+      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 24 CQ native AOT source-consumption confirmed on real original Tally KG projection/Textile reference. No registered complete CQ→SAP→external Package inverse dependency or independent semantic oracle; remains PARTIAL. R22 first bounded static reverse provenance edge source→selected LOCAL Function, distinctly not Element DAG cycle, automatic SAP invalidation or ECP dependent closure. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN."
     },
     {
       "id": "DIS020-CORE-006",
@@ -568,7 +605,8 @@
       "receiptIds": [
         "r9.5-baseline",
         "r21-native-dke-semantic-ci",
-        "r27-native-impact-ci"
+        "r27-native-impact-ci",
+        "r29-native-source-first-ci"
       ],
       "note": "R9.5 exact-SHA CI is verified; version-wide Requirement matrix and receipts only being established in this commit. R21 native Exact-SHA semantic receipt documents dedicated Integration and Verify SUCCESS while preserving engine-only context ERROR; main version conformance remains incomplete. R22 extra AOT source dependencies structurally registered, must be CI-qualified on newer exact SHA; previous R21 receipt remains historical. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven."
     },
