@@ -54,3 +54,7 @@ Demo pipeline 需依次运行：`npm ci`、`npm run build`、原模块 import/�
 ### R3.2a 按能力而非按 Node 主版本准入
 
 对抗复核发现：如果隔离特性不存在，原测试以 SKIP 终止而整条 CI 仍可绿，容易被误认为生产隔离 PASS。现给专用 Woodpecker 流水线传入 `DIS_REQUIRE_CONFINEMENT=1`，要求隔离特性存在、正反边界测试实际执行，未支持则此专项门禁失败。**没有限制 Node 精确或主版本**。严格模式在本地测试为 4/4 PASS（包括特性必需断言），具体生产级 OS 沙箱/任意 Native Addon 保护仍然 OPEN。
+
+## 7. R4 信任边界更改
+
+Product/L1 当前裁定将自建封闭代码闭包中的原生模块视为可信，任意敌意 Native Addon 的 OS 级隔离不属于 DIS v0.2.0 必需范围；此前 R3.2/R3.2a Demo 保留历史，但从专用 CI 强制门禁移除。KDP 对合法外部 Effect 的准入/Journal/回执、原始资源闭包仍不可绕过。实际接入见 [R4 BUILD/SDK/App Init 桥接](REAL_AOT_APP_INIT_BRIDGE_R4.zh-CN.md)。

@@ -58,3 +58,7 @@ PRODUCT_L1=REVIEW_PENDING; L2=NOT_FROZEN; MACHINE_SCHEMA=NOT_DONE; CONSUMER_DEMO
 - [Reproducible real-code import and physical temporary-file gate tests](../../../../examples/dis-v020-sdk-integration/README.md) (11 Node tests; **not executed with a full repository checkout** yet).
 - `.woodpecker/dis-v020-integration.yaml` invokes the existing **real selected-K C01 assembly suite** in addition to the new seam demo, with **no exact Node major check inside this new workflow**. Original v0.10 release CI restrictions remain separate.
 - Real existing gate source blob `4e76f700769eb24ff15cbcb0dfd0e6f696fe3ad2` executed in isolated V8: **8/8 source-level assertion PASS**. This is *not* full KDP/SDK/OS sandbox conformance and not a Woodpecker PASS receipt.
+
+## R4 — Real BUILD/SDK Element–Function + Business App Init bridge
+
+See [R4 bridge semantics and revised sealed-code trust scope](REAL_AOT_APP_INIT_BRIDGE_R4.zh-CN.md). [Demo source and tests](../../../../examples/dis-v020-real-aot-bridge/) consume real v0.10 BUILD+Microkernel. The prior strict OS native confinement test is archived as optional research and no longer blocks DIS CI under the product's self-built trusted closure model.

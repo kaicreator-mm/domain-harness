@@ -18,5 +18,5 @@ steps:
       - npm run build
       - node --check examples/dis-v020-sdk-integration/test.mjs
       - node --test examples/dis-v020-sdk-integration/test.mjs
-      - DIS_REQUIRE_CONFINEMENT=1 node --test examples/dis-v020-sdk-integration/native-isolation.test.mjs
+      - node --import tsx --test examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs
       - node --import tsx --test tests/assembly/v010-c01-external-effect.test.ts
