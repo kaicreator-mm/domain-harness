@@ -7,7 +7,7 @@ export interface DisV020Pin { readonly id:string; readonly sha256:string; readon
 export interface DisV020SourceInput { readonly id:string; readonly sourceText:string; readonly origin:DisV020Origin; }
 export interface DisV020Function {
  readonly id:string;
- readonly kind:'init'|'knowledge'|'rule'|'stateful'|'workflow'|'effect';
+ readonly kind:'init'|'knowledge'|'rule'|'stateful'|'workflow'|'effect'|'interaction';
  readonly effect:'none'|'governed';
  readonly optional?:boolean;
  readonly binding: {readonly type:'local'; readonly sourceId:string} |
@@ -16,7 +16,7 @@ export interface DisV020Function {
 export interface DisV020Element {
  readonly id:string;
  readonly domainId:string;
- readonly kind:'global'|'knowledge'|'rule'|'stateful'|'workflow'|'effect';
+ readonly kind:'global'|'knowledge'|'rule'|'stateful'|'workflow'|'effect'|'interaction';
  readonly description:string;
  readonly packageId?:string|null;
  readonly dependsOn:readonly string[];

@@ -200,3 +200,82 @@ test('declared semantic depends-on relationship must agree with the sealed Eleme
  program.relations.push({from:'runx.agent.presence',to:'tally.tasks',kind:'depends-on'});
  assert.throws(()=>compile(f,program),reject('DIS_RELATION_DEPENDENCY_MISMATCH'));
 });
+
+test('native AOT selects one Interaction Element with two independently bound public Functions',async()=>{
+ const f=await fixturePromise,qualified=qualifyDisV020Artifact(f.artifact);
+ const element=f.artifact.program.elements.find(e=>e.id==='xdownload.interaction');
+ assert.equal(element.kind,'interaction');assert.equal(element.functions.length,2);
+ assert.deepEqual(element.functions.map(fn=>fn.binding.sourceId),['xdownload-interaction','xdownload-interaction']);
+ assert.equal(qualified.functions.get('xdownload.interaction.inspect').definition.effect,'none');
+ assert.equal(qualified.functions.get('xdownload.interaction.confirm').definition.binding.type,'local');
+});
+test('Chat, Form and CLI share native progressive clarification without triggering xDownload Effect',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  for(const channel of ['chat','form','cli']){
+   const first=await app.invoke('xdownload.interaction.inspect',{
+    channel,requestId:'R-'+channel,url:'https://example.org/clip.mp4'
+   });
+   assert.equal(first.kind,'OBSERVATION');assert.equal(first.authority,'NONE');
+   assert.equal(first.value.status,'CLARIFICATION_REQUIRED');
+   assert.deepEqual(first.value.missing,['declaredBytes']);
+   const pending=await app.invoke('xdownload.interaction.confirm',{
+    draft:first.value,answers:{declaredBytes:512},confirmed:false
+   });
+   assert.equal(pending.value.status,'AWAITING_CONFIRMATION');
+   const confirmed=await app.invoke('xdownload.interaction.confirm',{
+    draft:first.value,answers:{declaredBytes:512},confirmed:true
+   });
+   assert.equal(confirmed.kind,'OBSERVATION');assert.equal(confirmed.authority,'NONE');
+   assert.equal(confirmed.value.status,'READY_FOR_KDP');
+   assert.equal(confirmed.value.permittedEffect,false);
+   assert.equal(confirmed.value.effectDispatched,false);
+   assert.equal(confirmed.value.prerequisite,'A_SEPARATE_SELECTED_KDP_INTENT_CALL_IS_REQUIRED');
+  }
+ }finally{app.stop()}
+});
+test('interaction refuses oversized payload and unsafe URL even when user claims confirmation',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const big=await app.invoke('xdownload.interaction.inspect',{
+   channel:'form',requestId:'B1',url:'https://example.org/a',declaredBytes:1048577
+  });
+  assert.equal(big.value.status,'REJECTED');assert.equal(big.value.reason,'INVALID_SIZE_OR_LIMIT');
+  const unsafe=await app.invoke('xdownload.interaction.inspect',{
+   channel:'cli',requestId:'C1',url:'http://example.org/unsafe',declaredBytes:3
+  });
+  assert.equal(unsafe.value.status,'REJECTED');
+  const injected=await app.invoke('xdownload.interaction.inspect',{
+   channel:'chat',requestId:'H1',url:'https://example.org/a',declaredBytes:3,execute:true
+  });
+  assert.equal(injected.value.status,'REJECTED');
+  assert.equal(injected.authority,'NONE');assert.equal(injected.value.effectDispatched,false);
+ }finally{app.stop()}
+});
+test('interaction cannot forge a READY state or smuggle additional answers into Function binding',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const forged=await app.invoke('xdownload.interaction.confirm',{
+   draft:{status:'READY_FOR_KDP',proposal:{channel:'form',requestId:'FORGED'}},
+   answers:{sizeBytes:10},confirmed:true
+  });
+  assert.equal(forged.value.status,'REJECTED');
+  const incomplete=await app.invoke('xdownload.interaction.confirm',{
+   draft:{status:'READY_FOR_KDP',proposal:{channel:'form',requestId:'FORGED'}},
+   answers:{},confirmed:true
+  });
+  assert.equal(incomplete.value.status,'CLARIFICATION_REQUIRED');
+ }finally{app.stop()}
+});
+test('AOT refuses interaction with KDP_INTENT or governed Effect reclassification',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const interact=p.elements.find(e=>e.id==='xdownload.interaction').functions[0];
+ interact.binding={type:'kdp-intent',intentId:'confirmDownload'};
+ interact.effect='governed';
+ assert.throws(()=>compile(f,p),reject('DIS_INTERACTION_EFFECT_FORBIDDEN'));
+});
+test('stopping real SDK closes Interaction ingress before any new clarification',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ app.stop();
+ await assert.rejects(app.invoke('xdownload.interaction.inspect',{channel:'cli',requestId:'STOP'}),reject('DIS_APP_NOT_READY'));
+});

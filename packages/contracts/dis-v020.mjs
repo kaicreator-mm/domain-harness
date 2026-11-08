@@ -11,8 +11,8 @@ export const DIS_V020_AOT='dis.v0.2.aot/1';
 const ID=/^[A-Za-z][A-Za-z0-9._:@/-]{0,127}$/;
 const HEX=/^[a-f0-9]{64}$/;
 const GIT=/^[a-f0-9]{40}$/;
-const ELEMENT_KINDS=new Set(['global','knowledge','rule','stateful','workflow','effect']);
-const FUNCTION_KINDS=new Set(['init','knowledge','rule','stateful','workflow','effect']);
+const ELEMENT_KINDS=new Set(['global','knowledge','rule','stateful','workflow','effect','interaction']);
+const FUNCTION_KINDS=new Set(['init','knowledge','rule','stateful','workflow','effect','interaction']);
 const REL_KINDS=new Set(['depends-on','constrains','cooperates','defines']);
 const MAX=256;
 export class DisV020Error extends Error{
@@ -92,6 +92,8 @@ export function qualifyDisV020Artifact(artifact){
       !['none','governed'].includes(f.effect))fail('DIS_FUNCTION_INVALID');
    keys(f.binding,['type','sourceId','intentId']);
    const b=f.binding;
+   // Interaction is an ordinary Element service, never a new Effect authority.
+   if(f.kind==='interaction'&&(f.effect!=='none'||b.type!=='local'))fail('DIS_INTERACTION_EFFECT_FORBIDDEN');
    if(b.type==='local'){
     if(f.effect!=='none'||typeof b.sourceId!=='string'||!pins.has(b.sourceId)||
        Object.hasOwn(b,'intentId')||f.kind==='effect')fail('DIS_LOCAL_NOT_QUALIFIED');

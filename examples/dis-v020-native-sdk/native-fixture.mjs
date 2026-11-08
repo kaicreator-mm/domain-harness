@@ -12,6 +12,7 @@ import {init as ordersBusinessInit} from '../dis-v020-real-aot-bridge/business-a
 import * as tallyBusiness from '../dis-v020-cross-project/snapshots/tally/business.mjs';
 import * as tallyRelease from '../dis-v020-cross-project/snapshots/tally/release-readiness.mjs';
 import * as xdownloadBusiness from '../dis-v020-cross-project/snapshots/xdownload/business-download.mjs';
+import {inspectDownloadGoal,confirmDownloadGoal} from '../dis-v020-interaction/download-goal.mjs';
 import {EnvironmentAgentPresence} from '../dis-v020-cross-project/snapshots/runx/environment-agent-presence.ts';
 
 const sourceDescriptors=[
@@ -20,6 +21,7 @@ const sourceDescriptors=[
  {id:'tally-release',path:'../dis-v020-cross-project/snapshots/tally/release-readiness.mjs',repository:'kaicreator-mm/tally',commit:'e988321439f65b55936a691c02250b6d62a29409',originalPath:'packages/tally-engineering-business/src/release-readiness.mjs',gitBlob:'2d4d6e7462156e4466192a0ed3207ac76fd288e1'},
  {id:'runx-presence',path:'../dis-v020-cross-project/snapshots/runx/environment-agent-presence.ts',repository:'kaicreator-mm/runx',commit:'b9e0c953d9bfd5834315012426fd8e10c21bdd7c',originalPath:'packages/control-plane/src/environment-agent-presence.ts',gitBlob:'b2c669537a56638aeead4f55914533b00fe3935e'},
  {id:'xdownload-business',path:'../dis-v020-cross-project/snapshots/xdownload/business-download.mjs',repository:'kaicreator-mm/xDownload',commit:'e904f08c478b15147b1c07fbe53c610d2d81851f',originalPath:'packages/download-domain-app/src/business/business-download.mjs',gitBlob:'a7dba9a896de0b84fc6d54093563adca2ccbcdfc'},
+ {id:'xdownload-interaction',path:'../dis-v020-interaction/download-goal.mjs',repository:'kaicreator-mm/domain-harness',commit:'7011b3fe3faa177ba9bc8679cc5884479ca52159',originalPath:'examples/dis-v020-interaction/download-goal.mjs',gitBlob:'f57747aa7996c88833e72288a0acd594a7ce5468'},
 ];
 export async function makeNativeFixture(){
  const {built}=await buildRealCrossProjectSelection();
@@ -33,7 +35,7 @@ export async function makeNativeFixture(){
    {id:'orders',description:'Existing selected approved orders Business',repositories:['kaicreator-mm/domain-harness']},
    {id:'tally',description:'Tally engineering Claim observation and release evidence',repositories:['kaicreator-mm/tally']},
    {id:'runx',description:'Runx non-authoritative Agent incarnation presence',repositories:['kaicreator-mm/runx']},
-   {id:'xdownload',description:'xDownload guarded acquisition Workflow',repositories:['kaicreator-mm/xDownload']},
+   {id:'xdownload',description:'xDownload guarded acquisition Workflow with a trusted demo-only interaction adapter',repositories:['kaicreator-mm/xDownload','kaicreator-mm/domain-harness']},
    {id:'shared',description:'Cross-domain relationship/constraint semantics',repositories:['kaicreator-mm/domain-harness']},
   ],
   elements:[
@@ -50,6 +52,9 @@ export async function makeNativeFixture(){
     {id:'runx.createPresenceObserver',kind:'stateful',effect:'none',binding:{type:'local',sourceId:'runx-presence'}}]},
    {id:'xdownload.policy',domainId:'xdownload',kind:'knowledge',description:'Download guard/effect policy knowledge',packageId:'business-download@0.2.0-t03',dependsOn:[],functions:[
     {id:'xdownload.describePolicy',kind:'knowledge',effect:'none',binding:{type:'local',sourceId:'xdownload-business'}}]},
+   {id:'xdownload.interaction',domainId:'xdownload',kind:'interaction',description:'Two public local Functions normalize Chat/Form/CLI download intent and confirmation without issuing an Effect',dependsOn:['xdownload.policy'],functions:[
+    {id:'xdownload.interaction.inspect',kind:'interaction',effect:'none',binding:{type:'local',sourceId:'xdownload-interaction'}},
+    {id:'xdownload.interaction.confirm',kind:'interaction',effect:'none',binding:{type:'local',sourceId:'xdownload-interaction'}}]},
    {id:'xdownload.acquire',domainId:'xdownload',kind:'effect',description:'Non-idempotent acquisition requires KDP permit',packageId:'business-download@0.2.0-t03',dependsOn:['xdownload.policy'],functions:[
     {id:'xdownload.confirmDownload',kind:'effect',effect:'governed',binding:{type:'kdp-intent',intentId:'confirmDownload'}}]},
   ],
@@ -57,6 +62,8 @@ export async function makeNativeFixture(){
    {from:'shared.semantics',to:'tally.tasks',kind:'defines'},
    {from:'shared.semantics',to:'runx.agent.presence',kind:'constrains'},
    {from:'xdownload.policy',to:'xdownload.acquire',kind:'depends-on'},
+   {from:'xdownload.policy',to:'xdownload.interaction',kind:'depends-on'},
+   {from:'xdownload.interaction',to:'xdownload.acquire',kind:'cooperates'},
    {from:'tally.tasks',to:'tally.release',kind:'depends-on'},
    {from:'runx.agent.presence',to:'tally.tasks',kind:'cooperates'},
   ],
@@ -80,6 +87,8 @@ export async function makeNativeFixture(){
   'tally.projectReleaseReadiness':get('tally-release',input=>tallyRelease.projectReleaseReadiness(input)),
   'runx.createPresenceObserver':get('runx-presence',clock=>new EnvironmentAgentPresence(clock)),
   'xdownload.describePolicy':get('xdownload-business',()=>xdownloadBusiness.getPolicy()),
+  'xdownload.interaction.inspect':get('xdownload-interaction',input=>inspectDownloadGoal(input)),
+  'xdownload.interaction.confirm':get('xdownload-interaction',input=>confirmDownloadGoal(input)),
  };
  return {artifact,program,sources,registry,expectedSourceOrigins};
 }

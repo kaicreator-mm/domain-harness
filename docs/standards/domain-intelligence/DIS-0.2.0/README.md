@@ -82,3 +82,7 @@ See [R4 bridge semantics and revised sealed-code trust scope](REAL_AOT_APP_INIT_
 ## Version-level conformance and demo receipts
 
 **Version master [#1499](https://github.com/kaicreator-mm/domain-harness/issues/1499).** The machine [coverage matrix](conformance/matrix.json), [human summary](conformance/validation-summary.md) and [pinned historical receipts](conformance/receipts/) live in Git alongside DIS 0.2.0. Existing Demo paths are preserved; `node --test examples/dis-v020-conformance/validate.test.mjs` enforces that a VERIFIED claim has real positive/negative test references and an exact historical CI receipt. Missing Interaction / I/O / Harness / Evolution coverage stays visible as PARTIAL/NOT_RUN until executed and independently validated.
+
+## R10 — Native Interaction without invented KDP authority
+
+[Download Intent clarification Demo](../../../../examples/dis-v020-interaction/download-goal.mjs) uses actual SDK public `LOCAL` Function consumption across Chat/Form/CLI input views. The two Function Interaction Element is source-pinned to a trusted domain-harness Demo commit; the original xDownload Business remains unchanged. `READY_FOR_KDP` is only an `OBSERVATION/NONE`, never a permit or download receipt. See [version conformance matrix](conformance/matrix.json), CORE-014, currently PARTIAL.

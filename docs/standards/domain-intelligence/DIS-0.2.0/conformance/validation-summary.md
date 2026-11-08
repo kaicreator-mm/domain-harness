@@ -6,7 +6,7 @@
 
 | Scope | VERIFIED | PARTIAL | NOT_RUN | OUT_OF_SCOPE | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Core | 9 | 5 | 2 | 0 | 16 |
+| Core | 9 | 6 | 1 | 0 | 16 |
 | Optional profiles | 0 | 0 | 4 | 0 | 4 |
 | Governance | 0 | 0 | 1 | 0 | 1 |
 
@@ -25,3 +25,9 @@ A `VERIFIED` row means the **stated narrow requirement** has a positive+negative
 Machine validation from monorepo root: `node --test examples/dis-v020-conformance/validate.test.mjs`. This verifies IDs, statuses, source/test paths, named cases, fixed receipt integrity and honest evidence states.
 
 Sub-issues are created only for genuinely independent write sets; the version index owns the final acceptance, Git owns immutable artifacts, Woodpecker owns execution proof.
+
+### R10 new native Interaction coverage (candidate)
+
+- Source-pinned `xdownload.interaction` has **two LOCAL public Functions**; one normalizes bounded Chat/Form/CLI Intent and one merges clarification + explicit user confirmation. Both return `OBSERVATION/NONE` and never issue an Effect permit. The existing real KDP `confirmDownload` remains a distinct call.
+- Contract protects `kind=interaction` from `KDP_INTENT` / governed-Effect reclassification; no new OS trust gate or generic UI engine.
+- New 6-case native SDK regression is wired through existing `native-consumer.test.mjs` and Woodpecker. **CORE-014 changes NOT_RUN → PARTIAL, not VERIFIED** until matching exact-SHA CI, actual UI adapters and cross-mode conformance are demonstrated.

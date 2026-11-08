@@ -375,18 +375,30 @@
       "id": "DIS020-CORE-014",
       "title": "Progressive Intent Interaction Element across Form/Chat/CLI and no implicit Effect",
       "profile": "core",
-      "state": "NOT_RUN",
+      "state": "PARTIAL",
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "7"
       },
       "implementation": [
-        "packages/contracts/dis-v020.mjs"
+        "packages/contracts/dis-v020.mjs",
+        "packages/microkernel/dis-v020.mjs",
+        "examples/dis-v020-interaction/download-goal.mjs"
       ],
-      "positive": [],
-      "negative": [],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "Chat, Form and CLI share native progressive clarification without triggering xDownload Effect"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "AOT refuses interaction with KDP_INTENT or governed Effect reclassification"
+        }
+      ],
       "receiptIds": [],
-      "note": "R9 core enum does not support INTERACTION as native typed Element; no end-to-end native SDK clarification Demo."
+      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption are added on this candidate HEAD; no CI receipt is yet assigned and no real Chat/Form UI transport or external download Host was executed. PARTIAL until exact-SHA CI and broader Interaction profile coverage."
     },
     {
       "id": "DIS020-CORE-015",
