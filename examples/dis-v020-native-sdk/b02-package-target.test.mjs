@@ -46,7 +46,7 @@ test('B02-01 R35 install refuses tampered selected module bytes or unbound sourc
 test('B02-01 R35 undeclared runtime Target selection is rejected, not implicitly treated as Windows/Linux/Android conformance',async()=>{
  const f=await fixture,forged=clone(f.artifact);
  forged.program.target='windows-x64';
- assert.throws(()=>qualifyDisV020Artifact(forged),reject('DIS_UNKNOWN_FIELD'));
+ assert.throws(()=>qualifyDisV020Artifact(forged),reject('DIS_INVALID_RECORD'));
  const app=await loadDisV020Aot(f.artifact,{
   expectedDigest:f.artifact.digest,registry:f.registry,
   store:new PlainCasDocStore(),tenantId:'tenant:b02-selected-package'

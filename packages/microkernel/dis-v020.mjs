@@ -12,10 +12,24 @@ import {
 
 const refuse=code=>{throw new DisV020Error(code)};
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&Object.getPrototypeOf(x)===Object.prototype;
-export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins,registry,store,tenantId,deploymentIdentity}={}){
+export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins,expectedTarget,registry,store,tenantId,deploymentIdentity}={}){
  if(typeof expectedDigest!=='string'||expectedDigest.length!==64)refuse('DIS_TRUST_ANCHOR_REQUIRED');
  const qualified=qualifyDisV020Artifact(artifact);
  if(expectedDigest!==artifact.digest)refuse('DIS_INSTALLED_AOT_MISMATCH');
+ // Exact installer Target is independent of AOT-declared Target, pre-KDP.
+ // Node/platform labels do not verify physical execution environments.
+ if(qualified.target===null){
+  if(expectedTarget!==undefined)refuse('DIS_TARGET_UNSELECTED');
+ }else{
+  if(!plain(expectedTarget)||Object.keys(expectedTarget).sort().join(',')!=='architecture,platform,runtime')
+   refuse('DIS_TARGET_TRUST_ANCHOR_REQUIRED');
+  if(!['linux','windows','android'].includes(expectedTarget.platform)||
+     !['x64','arm64'].includes(expectedTarget.architecture)||expectedTarget.runtime!=='node')
+   refuse('DIS_TARGET_TRUST_ANCHOR_REQUIRED');
+  if(['platform','architecture','runtime'].some(k=>expectedTarget[k]!==qualified.target[k]))
+   refuse('DIS_TARGET_INSTALLED_MISMATCH');
+ }
+
  // R26: an optional independent installer pin for named AOT-selected sources.
  // It is supplied by a trusted caller, NEVER read as authority from the AOT.
  // This is a load-time checkpoint, not a live watch, semantic oracle or Effect.
@@ -82,6 +96,7 @@ export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins
   open=true;
   return Object.freeze({
    aotDigest:artifact.digest,
+   selectedTarget:qualified.target===null?null:Object.freeze({platform:qualified.target.platform,architecture:qualified.target.architecture,runtime:qualified.target.runtime}),
    get state(){return open?result.status:'STOPPED'},
    functions:Object.freeze([...qualified.functions.keys()].filter(x=>x!==artifact.program.appInit)),
    contractVersions:Object.freeze(Object.fromEntries([...qualified.functions]

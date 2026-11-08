@@ -251,6 +251,31 @@ export const sourceGitBlob=value=>{
  const bytes=Buffer.from(value,'utf8');
  return createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
 };
+// B03 R38: a declared Target is a digest-bound installed selection claim, not
+// automatic host compatibility or evidence that a native OS variant exists.
+const DIS_TARGET_PLATFORMS=new Set(['linux','windows','android']);
+const DIS_TARGET_ARCHITECTURES=new Set(['x64','arm64']);
+function validateDisV020Target(target,selected){
+ if(target===undefined)return null; // legacy experimental v0.2 artifacts
+ keys(target,['schema','platform','architecture','runtime','selectedModules']);
+ if(target.schema!=='dis.v0.2.selected-target/1'||
+    !DIS_TARGET_PLATFORMS.has(target.platform)||
+    !DIS_TARGET_ARCHITECTURES.has(target.architecture)||
+    target.runtime!=='node')fail('DIS_TARGET_INVALID');
+ if(!arr(target.selectedModules)||target.selectedModules.length!==selected.size)
+  fail('DIS_TARGET_CLOSURE_INCOMPLETE');
+ const seen=new Set();
+ for(const entry of target.selectedModules){
+  keys(entry,['packageId','moduleSha256']);
+  if(!id(entry.packageId)||!HEX.test(entry.moduleSha256))fail('DIS_TARGET_MODULE_INVALID');
+  if(seen.has(entry.packageId))fail('DIS_TARGET_MODULE_DUPLICATE');
+  seen.add(entry.packageId);
+  const chosen=selected.get(entry.packageId);
+  if(!chosen)fail('DIS_TARGET_MODULE_UNSELECTED');
+  if(chosen.moduleSha256!==entry.moduleSha256)fail('DIS_TARGET_MODULE_DRIFT');
+ }
+ return target;
+}
 function validateBuilt(built){
  if(!record(built)||built.formatVersion!=='dh.v10.build/1'||!id(built.appId)||
    !HEX.test(built.subjectDigest)||!arr(built.modules)||!arr(built.routes)||!arr(built.loadOrder))fail('DIS_BUILD_INVALID');
@@ -282,7 +307,8 @@ export function qualifyDisV020Artifact(artifact){
  if(artifact.format!==DIS_V020_AOT||!HEX.test(artifact.digest))fail('DIS_AOT_FORMAT_INVALID');
  const {built,program,sources}=artifact;
  const selected=validateBuilt(built),pins=validatePins(sources);
- keys(program,['format','appId','domains','elements','relations','appInit']);
+ const target=validateDisV020Target(program?.target,selected);
+ keys(program,['format','appId','domains','elements','relations','appInit','target']);
  if(program.format!==DIS_V020_PROGRAM||program.appId!==built.appId||
    !arr(program.domains)||!arr(program.elements)||!arr(program.relations,true)||!id(program.appInit))fail('DIS_PROGRAM_INVALID');
  const domains=new Map();
@@ -401,7 +427,7 @@ export function qualifyDisV020Artifact(artifact){
  }
  const data={format:artifact.format,built,program,sources};
  if(sha256Canonical(data)!==artifact.digest)fail('DIS_AOT_DIGEST_DRIFT');
- return {functions,elements,selected,pins,
+ return {functions,elements,selected,pins,target,
   sourceConsumers:new Map([...sourceConsumers].map(([sourceId,ids])=>
     [sourceId,Object.freeze(ids.sort())]))};
 }

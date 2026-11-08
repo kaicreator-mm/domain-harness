@@ -7,6 +7,8 @@ export interface DisV020Implementation {
 }
 export interface DisV020LoadOptions {
  readonly expectedDigest:string;
+ /** Independent installed Target identity, mandatory for target-locked AOT. */
+ readonly expectedTarget?:Readonly<{platform:'linux'|'windows'|'android';architecture:'x64'|'arm64';runtime:'node'}>;
  /** Optional trusted installer source-currentness checkpoint, independent of the AOT. */
  readonly expectedSourcePins?:Readonly<Record<string,Readonly<{
   sha256:string;origin:DisV020Origin
@@ -18,6 +20,8 @@ export interface DisV020LoadOptions {
 }
 export interface DisV020App {
  readonly aotDigest:string;
+
+ readonly selectedTarget:Readonly<{platform:'linux'|'windows'|'android';architecture:'x64'|'arm64';runtime:'node'}>|null;
  readonly state:'READY'|'DEGRADED'|'STOPPED';
  readonly functions:readonly string[];
  readonly contractVersions:Readonly<Record<string,string>>;

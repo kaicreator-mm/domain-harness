@@ -74,6 +74,16 @@ export interface DisV020Element {
 }
 /** Bounded same-major Element ABI evolution, not semantic qualification. */
 export declare function compareDisV020ElementContracts(previous:DisV020Element,next:DisV020Element):Readonly<{compatible:true;from:string;to:string}>;
+/** Builder-declared selected target with full canonical BUILD module digest roster.
+ * Structural selected-Target assertion only, independently installer-pinned.
+ * Not proof of actual Windows/Linux/Android execution. */
+export interface DisV020SelectedTarget {
+ readonly schema:'dis.v0.2.selected-target/1';
+ readonly platform:'linux'|'windows'|'android';
+ readonly architecture:'x64'|'arm64';
+ readonly runtime:'node';
+ readonly selectedModules:readonly Readonly<{packageId:string;moduleSha256:string}>[];
+}
 export interface DisV020Program {
  readonly format:typeof DIS_V020_PROGRAM;
  readonly appId:string;
@@ -81,6 +91,7 @@ export interface DisV020Program {
  readonly elements:readonly DisV020Element[];
  readonly relations:readonly {readonly from:string;readonly to:string;readonly kind:'depends-on'|'constrains'|'cooperates'|'defines'}[];
  readonly appInit:string;
+ readonly target?:DisV020SelectedTarget;
 }
 export interface DisV020Aot {
  readonly format:typeof DIS_V020_AOT;
@@ -94,6 +105,7 @@ export interface DisV020Qualified {
  readonly elements:ReadonlyMap<string,DisV020Element>;
  readonly selected:ReadonlyMap<string,V10BuiltApp['modules'][number]>;
  readonly pins:ReadonlyMap<string,DisV020Pin>;
+ readonly target:DisV020SelectedTarget|null;
  /** AOT-declared source → selected LOCAL Function reverse lookup, not ECP closure. */
  readonly sourceConsumers:ReadonlyMap<string,readonly string[]>;
 }

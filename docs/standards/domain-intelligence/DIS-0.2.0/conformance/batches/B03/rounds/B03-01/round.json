@@ -1,0 +1,25 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B03",
+  "roundId": "B03-01",
+  "globalRoundId": "R38",
+  "status": "CI_PENDING",
+  "startParent": "44ab1177f0c8c7f5a66a258feba1fcfbb7228bbe",
+  "sourceHead": null,
+  "testBlob": "c2323cfa3e307bf8f4bd3729870663c45d3e8b90",
+  "receipt": null,
+  "tests": {
+    "positive": [
+      "B03-01 R38 selected canonical Tally/xDownload and KDP modules have exact source-locked Target digest roster"
+    ],
+    "negative": [
+      "B03-01 R38 Target claim cannot omit selected original KDP/C or Business modules",
+      "B03-01 R38 forged Target source SHA, unknown package, duplicate and unsupported architecture fail closed"
+    ]
+  },
+  "limitations": [
+    "Only target claim / module digest closure, no OS-specific native executable verified.",
+    "Previously unversioned v0.2 Draft program remains supported when target omitted, but target installer option requires target-qualified AOT.",
+    "No independent semantic source owner, SAP or Effect permit."
+  ]
+}
