@@ -6,6 +6,7 @@ import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
 import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
 import {makeNativeFixture} from './native-fixture.mjs';
+import {RELEASE_READINESS_REQUIRED_GATES} from '../dis-v020-cross-project/snapshots/tally/release-readiness.mjs';
 import {chatInitial,chatFollowUp,formInitial,formFollowUp,cliInitial,cliFollowUp,consumeDownloadSession} from '../dis-v020-interaction/channel-adapters.mjs';
 
 const fixturePromise=makeNativeFixture();
@@ -594,4 +595,82 @@ test('R17 ABI comparator refuses status remap, evidence weakening, major drift a
  const major=clone(prev);major.version='2.0.0';major.compatibility.major=2;
  assert.throws(()=>compareDisV020FunctionContracts(prev,major),
   reject('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+});
+
+
+// R18: the original, pinned Tally Release Function is a LOCAL observation.
+test('R18 real Tally release Function treats all 13 reported PASS gates as UNKNOWN, never Release authorization',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ const sha='e988321439f65b55936a691c02250b6d62a29409';
+ const ref='https://github.com/kaicreator-mm/tally/issues/284';
+ const gates=Object.fromEntries(RELEASE_READINESS_REQUIRED_GATES.map(name=>[name,{
+  status:'PASS',subjectSha:sha,observedAsOf:'2026-11-08T12:00:00Z',evidenceRef:ref
+ }]));
+ try{
+  const r=await app.invoke('tally.projectReleaseReadiness',{
+   repository:'kaicreator-mm/tally',sourceSha:sha,
+   observedAsOf:'2026-11-08T13:00:00Z',gates
+  },{expectedContractVersion:'1.0.0'});
+  assert.equal(r.kind,'OBSERVATION');assert.equal(r.authority,'NONE');
+  assert.equal(r.contractVersion,'1.0.0');
+  assert.equal(r.disposition,'UNKNOWN');
+  assert.equal(r.value.observedEvidence,'REPORTED_COMPLETE_UNVERIFIED');
+  assert.equal(r.value.gateCounts.reportedPass,RELEASE_READINESS_REQUIRED_GATES.length);
+  assert.equal(r.value.status,'BLOCKED');
+  assert.equal(r.value.reason,'INDEPENDENT_RQ_AND_AUTHORITY_NOT_ATTESTED');
+  assert.equal(r.value.authorization,'NONE');
+  assert.equal(r.value.independentRQRequired,true);
+  assert.equal(r.value.canMerge,false);assert.equal(r.value.canTag,false);
+  assert.equal(r.value.canPublish,false);assert.equal(r.value.releasePass,false);
+  assert.equal(r.evidence.attested,false);assert.deepEqual(r.evidence.declaredRefs,[]);
+ }finally{app.stop()}
+});
+test('R18 mismatched GitHub subject and impossible observation date are never independently verified',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ const sha='e988321439f65b55936a691c02250b6d62a29409';
+ const ref='https://github.com/kaicreator-mm/tally/issues/284';
+ try{
+  const wrongSubject=await app.invoke('tally.projectReleaseReadiness',{
+   repository:'kaicreator-mm/tally',sourceSha:sha,
+   observedAsOf:'2026-11-08T13:00:00Z',
+   gates:{productFreeze:{status:'PASS',subjectSha:'f'.repeat(40),
+    observedAsOf:'2026-11-08T12:00:00Z',evidenceRef:ref}}
+  });
+  assert.equal(wrongSubject.disposition,'UNKNOWN');
+  assert.equal(wrongSubject.value.gates.find(g=>g.name==='productFreeze').status,'STALE');
+  assert.equal(wrongSubject.value.canMerge,false);
+  const impossibleFuture=await app.invoke('tally.projectReleaseReadiness',{
+   repository:'kaicreator-mm/tally',sourceSha:sha,
+   observedAsOf:'2026-11-08T13:00:00Z',
+   gates:{productFreeze:{status:'PASS',subjectSha:sha,
+    observedAsOf:'2026-11-09T12:00:00Z',evidenceRef:ref}}
+  });
+  assert.equal(impossibleFuture.value.gates.find(g=>g.name==='productFreeze').reason,'OBSERVATION_TIME_INVALID');
+  assert.equal(impossibleFuture.disposition,'UNKNOWN');
+  assert.equal(impossibleFuture.evidence.attested,false);
+ }finally{app.stop()}
+});
+test('R18 malformed source identity is UNKNOWN while a locally forged RELEASE_PASS cannot pass typed outcomes',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const unknown=await app.invoke('tally.projectReleaseReadiness',{
+   repository:'kaicreator-mm/tally',sourceSha:'bad',observedAsOf:'bad',gates:{}
+  });
+  assert.equal(unknown.value.reason,'RELEASE_SOURCE_UNVERIFIED');
+  assert.equal(unknown.disposition,'UNKNOWN');assert.equal(unknown.authority,'NONE');
+ }finally{app.stop()}
+ const registry={...f.registry};
+ registry['tally.projectReleaseReadiness']={
+  ...registry['tally.projectReleaseReadiness'],
+  execute:()=>({
+   status:'RELEASE_PASS',reason:'FORGED',authorization:'KDP',
+   advisoryOnly:false,independentRQRequired:false,
+   taskPass:true,releasePass:true,canMerge:true,canTag:true,canPublish:true
+  })
+ };
+ const forged=await activate(f,{registry});
+ try{
+  await assert.rejects(forged.invoke('tally.projectReleaseReadiness',{}),
+   reject('DIS_OUTCOME_UNDECLARED'));
+ }finally{forged.stop()}
 });

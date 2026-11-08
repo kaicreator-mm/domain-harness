@@ -90,6 +90,16 @@ export async function makeNativeFixture(){
  find('tally.assessTaskEvidence').contract=r11({
   UNQUALIFIED_INPUT:'UNKNOWN',OBSERVED_INPUT_ONLY:'OBSERVED'
  },{state:'string',admitted:'boolean',taskPass:'boolean'});
+ // R18: the real source-pinned Tally release projection remains advisory.
+ // Its reported gate PASS is NOT independent GitHub/RQ evidence.
+ find('tally.projectReleaseReadiness').contract=r11({
+  UNKNOWN:'UNKNOWN',BLOCKED:'UNKNOWN'
+ },{
+  status:'string',reason:'string',authorization:'string',
+  advisoryOnly:'boolean',independentRQRequired:'boolean',
+  taskPass:'boolean',releasePass:'boolean',
+  canMerge:'boolean',canTag:'boolean',canPublish:'boolean'
+ });
  for(const id of ['xdownload.interaction.inspect','xdownload.interaction.confirm']){
   find(id).contract=r11({
    REJECTED:'FAILED',CLARIFICATION_REQUIRED:'NEEDS_INPUT',
