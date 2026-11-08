@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "dis.unit/0.1.0",
+  "id": "textile.validator",
+  "revision": "1.0.0",
+  "role": "validator",
+  "purpose": "Bounded textile sample-planning validator",
+  "scope": {
+    "domain": "textile-pattern",
+    "appliesTo": [
+      "synthetic-structured-design-brief"
+    ],
+    "excludes": [
+      "machine-control",
+      "supplier-selection",
+      "production-commitment"
+    ]
+  },
+  "owner": "textile-reference-demo",
+  "authority": "REFERENCE",
+  "qualification": {
+    "profile": "textile-reference/1.0.0",
+    "limitations": [
+      "Experimental reference only; no production promotion or Runtime adoption."
+    ]
+  },
+  "evidence": {
+    "sources": [
+      {
+        "sourceId": "ncsu-studio",
+        "kind": "reference",
+        "ref": "https://textiles.ncsu.edu/industry/labs-and-facilities/weaving-studio/",
+        "claim": "Teaching and sampling equipment including individual-thread-control Jacquard."
+      },
+      {
+        "sourceId": "ncsu-lab",
+        "kind": "reference",
+        "ref": "https://textiles.ncsu.edu/zte/weaving-lab/",
+        "claim": "Shedding distinguishes cam, dobby and individual-warp Jacquard control."
+      },
+      {
+        "sourceId": "gwu-traditions",
+        "kind": "reference",
+        "ref": "https://museum.gwu.edu/textile-traditions",
+        "claim": "Printing applies pattern to cloth, embroidery uses stitching, and Jacquard forms design during weaving."
+      },
+      {
+        "sourceId": "nps-weaves",
+        "kind": "reference",
+        "ref": "https://www.nps.gov/articles/000/weaving-patterns.htm",
+        "claim": "Warp/weft interlacing and weave structure affect cloth properties."
+      }
+    ],
+    "absenceReason": null,
+    "consumes": [
+      "sourceEvidence"
+    ]
+  },
+  "validation": {
+    "profile": "textile-conformance",
+    "profileRevision": "1.0.0",
+    "casesRef": "test/runner.test.mjs",
+    "validator": {
+      "id": "textile-python-conformance",
+      "version": "1.0.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
+  },
+  "input": {
+    "schemaRef": "domain/schemas/textile-route.schema.json"
+  },
+  "output": {
+    "schemaRef": "domain/schemas/textile-route.schema.json"
+  },
+  "implementation": {
+    "strategy": "function",
+    "ref": "registry:textile.validator@1.0.0",
+    "exposure": "semantic",
+    "artifactRef": "src/runner.mjs"
+  },
+  "failure": {
+    "handling": {
+      "UNKNOWN": {
+        "action": "PRESERVE_UNKNOWN",
+        "reason": "Bounded reference consumer handling."
+      },
+      "AMBIGUOUS": {
+        "action": "CLARIFY",
+        "reason": "Bounded reference consumer handling."
+      },
+      "CONFLICT": {
+        "action": "CLARIFY",
+        "reason": "Bounded reference consumer handling."
+      },
+      "NEEDS_INPUT": {
+        "action": "WAIT",
+        "reason": "Bounded reference consumer handling."
+      },
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Bounded reference consumer handling."
+      },
+      "OUT_OF_SCOPE": {
+        "action": "REJECT",
+        "reason": "Bounded reference consumer handling."
+      },
+      "FAILED": {
+        "action": "FAIL",
+        "reason": "Bounded reference consumer handling."
+      }
+    }
+  },
+  "knowledgeRefs": [
+    {
+      "id": "textile.process-knowledge",
+      "revision": "1.0.0",
+      "kind": "rule-set",
+      "path": "fixtures/textile-knowledge.json",
+      "sha256": "8e8a399350013f6316eb690464ef6b98b554a8bf89b08248f53cae50490f7acf"
+    }
+  ]
+}

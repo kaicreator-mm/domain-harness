@@ -1,0 +1,9 @@
+{
+  "format": "dis-reference-boot/1",
+  "primary": "dis-kdp-primary@0.11.0-dev.0",
+  "kernel": "v08-kernel-mechanism@1.0.0",
+  "target": "node24",
+  "package": "xdownload.web-media-runtime",
+  "runtimePackage": "runtime-package.json",
+  "runtimeLock": "runtime-lock.json"
+}

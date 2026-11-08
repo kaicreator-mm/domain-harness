@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "dis.unit/0.1.0",
+  "id": "xdownload.player.outcome-validator",
+  "revision": "1.0.0",
+  "role": "validator",
+  "purpose": "Validate that the final player-recognition outcome is consistent with evidence and resolution.",
+  "scope": {
+    "domain": "web-media",
+    "appliesTo": [
+      "player-recognition-outcome"
+    ],
+    "excludes": [
+      "download-result-validation"
+    ]
+  },
+  "owner": "xdownload-demo",
+  "authority": "CONTROLLED",
+  "qualification": {
+    "profile": "xdownload.player.outcome-validator.qualification/0.1.0",
+    "limitations": [
+      "Validates the demo result contract, not a production catalog."
+    ]
+  },
+  "input": {
+    "schemaRef": "domain/schemas/validator-input.schema.json"
+  },
+  "output": {
+    "schemaRef": "domain/schemas/outcome.schema.json"
+  },
+  "implementation": {
+    "strategy": "function",
+    "ref": "registry:xdownload.player.outcome-validator@1.0.0",
+    "exposure": "semantic",
+    "artifactRef": "src/runner.mjs"
+  },
+  "evidence": {
+    "sources": [
+      {
+        "sourceId": "recognition-evidence-contract",
+        "kind": "authority",
+        "ref": "domain/units/recognizer.json",
+        "claim": "Recognized results retain matched evidence."
+      }
+    ],
+    "absenceReason": null,
+    "consumes": [
+      "recognitionEvidence"
+    ]
+  },
+  "failure": {
+    "handling": {
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Declared INVALID_INPUT handling for the reference Consumer."
+      },
+      "CONFLICT": {
+        "action": "REVIEW",
+        "reason": "Declared CONFLICT handling for the reference Consumer."
+      },
+      "NEEDS_INPUT": {
+        "action": "WAIT",
+        "reason": "Preserve the declared clarification outcome."
+      },
+      "NEEDS_REVIEW": {
+        "action": "REVIEW",
+        "reason": "Preserve the declared review outcome."
+      },
+      "FAILED": {
+        "action": "FAIL",
+        "reason": "Declared FAILED handling for the reference Consumer."
+      }
+    }
+  },
+  "validation": {
+    "profile": "player-outcome-conformance/0.1.0",
+    "profileRevision": "0.1.0",
+    "casesRef": "test/runner.test.mjs",
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
+  }
+}

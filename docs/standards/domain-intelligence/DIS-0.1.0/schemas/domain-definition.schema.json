@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/domain-definition.schema.json",
+  "title": "DIS 0.1.0 Domain Definition Binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "domainId",
+    "revision",
+    "components",
+    "privateUnits",
+    "workflowRef"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "dis.definition/0.1.0"
+    },
+    "domainId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family",
+          "componentId",
+          "unitRef"
+        ],
+        "properties": {
+          "family": {
+            "enum": [
+              "semantic",
+              "tool"
+            ]
+          },
+          "componentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unitRef": {
+            "$ref": "#/$defs/unitRef"
+          }
+        }
+      }
+    },
+    "privateUnits": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unitRef"
+      }
+    },
+    "workflowRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unitRef",
+        "graphRef"
+      ],
+      "properties": {
+        "unitRef": {
+          "$ref": "#/$defs/unitRef"
+        },
+        "graphRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision",
+            "path"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+            },
+            "path": {
+              "$ref": "#/$defs/packageRelativePath"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "unitRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        }
+      }
+    },
+    "packageRelativePath": {
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@kaicreator/domain-harness-dis-v011-runtime",
+  "version": "0.11.0-dev.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./dist/index.js", "./boot": "./dist/boot.js" },
+  "scripts": {
+    "prebuild": "npm run build -w @kaicreator/domain-harness",
+    "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "npm run build -w @kaicreator/domain-harness",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --experimental-strip-types --test tests/*.test.ts ../../examples/dis-0.1.0-runtime-consumer/test/*.test.mjs"
+  },
+  "dependencies": {
+    "@kaicreator/domain-harness": "0.2.0",
+    "@kaicreator/domain-harness-build": "0.10.3",
+    "@kaicreator/domain-harness-contracts": "0.10.3",
+    "ajv": "^8.17.1"
+  }
+}

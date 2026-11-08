@@ -1,0 +1,8 @@
+{
+  "catalogId":"xdownload.player-signatures","revision":"1.0.0",
+  "patterns":[
+    {"playerId":"jwplayer","markers":["jwplayer"]},
+    {"playerId":"videojs","markers":["videojs","video.js"]},
+    {"playerId":"hlsjs","markers":["hls.js","hlsjs"]}
+  ]
+}

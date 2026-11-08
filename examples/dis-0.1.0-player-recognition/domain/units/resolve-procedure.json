@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "dis.unit/0.1.0",
+  "id": "xdownload.player.resolve-procedure",
+  "revision": "1.0.0",
+  "role": "procedure",
+  "purpose": "Resolve a recognized player into a deterministic extraction strategy descriptor.",
+  "scope": {
+    "domain": "web-media",
+    "appliesTo": [
+      "one-supported-player-candidate"
+    ],
+    "excludes": [
+      "network-request",
+      "media-download",
+      "credential-access"
+    ]
+  },
+  "owner": "xdownload-demo",
+  "authority": "CONTROLLED",
+  "qualification": {
+    "profile": "xdownload.player.resolve-procedure.qualification/0.1.0",
+    "limitations": [
+      "Returns a strategy descriptor only."
+    ]
+  },
+  "input": {
+    "schemaRef": "domain/schemas/resolve-input.schema.json"
+  },
+  "output": {
+    "schemaRef": "domain/schemas/resolution.schema.json"
+  },
+  "implementation": {
+    "strategy": "function",
+    "ref": "registry:xdownload.player.resolve-procedure@1.0.0",
+    "exposure": "private",
+    "artifactRef": "src/runner.mjs"
+  },
+  "evidence": {
+    "sources": [
+      {
+        "sourceId": "strategy-map",
+        "kind": "reference",
+        "ref": "fixtures/player-strategies.json",
+        "claim": "Maps supported player IDs to local strategy identifiers."
+      }
+    ],
+    "absenceReason": null
+  },
+  "failure": {
+    "handling": {
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Declared INVALID_INPUT handling for the reference Consumer."
+      },
+      "UNKNOWN": {
+        "action": "REJECT",
+        "reason": "Declared UNKNOWN handling for the reference Consumer."
+      }
+    }
+  },
+  "validation": {
+    "profile": "player-resolution-conformance/0.1.0",
+    "profileRevision": "0.1.0",
+    "casesRef": "test/runner.test.mjs",
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
+  }
+}

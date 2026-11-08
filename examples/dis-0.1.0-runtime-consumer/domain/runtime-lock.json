@@ -1,0 +1,34 @@
+{
+  "format": "dis-runtime-qualification-index/1",
+  "scope": "PRIVATE_REFERENCE_ONLY",
+  "appSha256": "69291116a5a90f05bbaf217763f0bf2972485541a8d3949b1eed3464d89dbea9",
+  "primarySha256": "7b1214c568c329d2fd998dcb2485ad3cef05aca4e51683b7b9709e8f15e51f07",
+  "variants": {
+    "baseline": {
+      "packageId": "xdownload.web-media-runtime",
+      "revision": "2.0.0",
+      "target": "node24",
+      "descriptor": "4c3dad789e2e53430c91f73096f3887213ef5f4617659b6dc24aa36c3b9fa841",
+      "closure": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lock": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "provider": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "knowledge": "039bd05b6fc8f9b2e963112f36005bee045df3a7c0cd8b530879044c0105d947",
+      "graph": "b5021fb72765de7f94fbba310dc4608f0e7f84e38bfe4a93527ee5018513d978",
+      "validationEvidence": "9a1c9fc9aacd5d79940fcfb3a3eb4c6e374ac87d821f181b913207c753876a9c",
+      "promotionDecision": "4d6e54ccf3819a173cc0b8f3518acde483d2973767a256aefb396ec98f638876"
+    },
+    "reselected": {
+      "packageId": "xdownload.web-media-runtime",
+      "revision": "2.1.0",
+      "target": "node24",
+      "descriptor": "81b64d1251919df159d0daee2feefef064f44bd81d0590dc148c955f7748cda6",
+      "closure": "8c96cb1ec99599d233feffed0ceda8c1f7f4ddeadba989cc650ce000f12d244c",
+      "lock": "0db702e64ebe3bd9c79e159824c4b888621fb892aedb6bab21e4487dae8a0700",
+      "provider": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "knowledge": "fe56692e61e4d252f1bcbdacce561b774fec19e8612ee9262bdd4116e529d765",
+      "graph": "c54ebf7ed04ffefd661d40923ae323c326da8e53df72882e6859ec5b484a68c3",
+      "validationEvidence": "621da2ab7c606ec199dcce75429e3b6705f0d8d2ecd7abe16268fe4f37c7ec36",
+      "promotionDecision": "cdb39623ccd05df2aff23c3873ecdabb311e339a9d0eb9cfb93512ec4512f715"
+    }
+  }
+}

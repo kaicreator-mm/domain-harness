@@ -1,0 +1,134 @@
+{
+  "reportId": "DIS-0.1.0-FINAL-XDOWNLOAD-PLAYER-RECOGNITION",
+  "standard": {
+    "version": "0.1.0",
+    "revision": "d8c516e7b564db8572631d2d2d435491b8f43b33"
+  },
+  "demo": {
+    "id": "xdownload.player-recognition",
+    "revision": "1.0.0",
+    "commit": "d8c516e7b564db8572631d2d2d435491b8f43b33"
+  },
+  "environment": {
+    "runtime": "Node.js v22.16.0; npm 10.9.2; Python 3.13.5; jsonschema 4.26.0",
+    "platform": "Linux x86_64 container"
+  },
+  "command": "npm test && npm run demo && python scripts/validate.py (after python -m pip install -r requirements-validation.txt)",
+  "result": "PASS",
+  "tests": [
+    {
+      "id": "NODE-TEST-SUITE",
+      "result": "PASS",
+      "detail": "15 tests passed; 0 failed."
+    },
+    {
+      "id": "DEMO-KNOWN-PLAYER",
+      "result": "PASS",
+      "detail": "jwplayer reached READY via Recognizer -> Decision -> private Procedure -> Validator."
+    },
+    {
+      "id": "DEMO-AMBIGUOUS-PLAYER",
+      "result": "PASS",
+      "detail": "jwplayer + videojs returned NEEDS_INPUT without guessing."
+    },
+    {
+      "id": "DEMO-UNKNOWN-PLAYER",
+      "result": "PASS",
+      "detail": "Unsupported marker returned NEEDS_REVIEW."
+    },
+    {
+      "id": "DEMO-FIXTURE-HLS",
+      "result": "PASS",
+      "detail": "hls.js fixture catalog produced READY with hlsjs.extract.v1."
+    },
+    {
+      "id": "STANDARD-SCHEMA-SELF-VALIDATION",
+      "result": "PASS",
+      "detail": "All five DIS 0.1.0 JSON Schemas passed Draft 2020-12 meta-schema checks."
+    },
+    {
+      "id": "UNIT-CONFORMANCE",
+      "result": "PASS",
+      "detail": "All six demo Intelligence Units validated against the Unit Schema."
+    },
+    {
+      "id": "GRAPH-DEFINITION-CLOSURE",
+      "result": "PASS",
+      "detail": "Composition Graph, Domain Definition and Resource Closure validated."
+    },
+    {
+      "id": "NODE-INPUT-SCHEMA",
+      "result": "PASS",
+      "detail": "All 16 inputs across the four executed demo paths validated against the executing Unit input Schema."
+    },
+    {
+      "id": "NODE-OUTPUT-SCHEMA",
+      "result": "PASS",
+      "detail": "All 16 outputs across the four executed demo paths validated against the executing Unit output Schema."
+    },
+    {
+      "id": "UNSAFE-RESOURCE-REF-NEGATIVES",
+      "result": "PASS",
+      "detail": "Traversal, empty segment, dot segment, remote URI, absolute path and backslash references were rejected."
+    },
+    {
+      "id": "NESTED-POINTER-NEGATIVE",
+      "result": "PASS",
+      "detail": "Nested Graph pointers were rejected under the explicit DIS 0.1.0 top-level pointer profile."
+    },
+    {
+      "id": "RESOURCE-DIGEST-PINNING",
+      "result": "PASS",
+      "detail": "All nine schema resources matched the manifest SHA-256 values; tampering was rejected."
+    },
+    {
+      "id": "PRIVATE-PROCEDURE-BOUNDARY",
+      "result": "PASS",
+      "detail": "Private Procedures remained private and were not represented as Tool Components."
+    },
+    {
+      "id": "EVIDENCE-INDEPENDENCE",
+      "result": "PASS",
+      "detail": "Recognizer evidence reached Validator through a dedicated evidence edge, independent of Decision and Procedure outputs."
+    }
+  ],
+  "findings": [
+    {
+      "id": "DIS-F-001",
+      "severity": "P1",
+      "description": "Initial Edge combined control routing and data mapping, forcing upstream payload pass-through.",
+      "resolution": "Replaced with mutually exclusive control, data and evidence edge kinds; verified independent execution and evidence flow."
+    },
+    {
+      "id": "DIS-F-002",
+      "severity": "P2",
+      "description": "Initial schemaRef validation accepted unresolved schema resource strings.",
+      "resolution": "Added package-relative closure resolution, nested local $ref traversal, path safety, digest manifest and fail-closed negative tests."
+    },
+    {
+      "id": "DIS-F-003",
+      "severity": "P1",
+      "description": "Decision and Procedure output Schemas contradicted the separated data/evidence runtime behavior.",
+      "resolution": "Corrected output Schemas and validated every executed Node input and output against its declared Unit Schema."
+    },
+    {
+      "id": "DIS-F-004",
+      "severity": "P1",
+      "description": "Validation Report Schema contained invalid JSON syntax.",
+      "resolution": "Corrected the schema and included it in five-schema Draft 2020-12 self-validation."
+    },
+    {
+      "id": "DIS-F-005",
+      "severity": "P2",
+      "description": "The previous safe-path patterns did not reject empty and dot path segments.",
+      "resolution": "Aligned Unit, Graph, Definition and Resource Closure path patterns and added negative cases."
+    },
+    {
+      "id": "DIS-F-006",
+      "severity": "P2",
+      "description": "Unit Evidence referenced fixture catalogs that the demo implementation did not actually consume.",
+      "resolution": "Recognizer and Procedure now load and consume the package fixture catalogs; a fixture-backed HLS path is tested."
+    }
+  ],
+  "validatedAt": "2026-11-05T10:44:24Z"
+}

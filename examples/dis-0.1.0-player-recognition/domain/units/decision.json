@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "dis.unit/0.1.0",
+  "id": "xdownload.player.route-decision",
+  "revision": "1.0.0",
+  "role": "decision",
+  "purpose": "Choose the deterministic resolution path for a recognition result.",
+  "scope": {
+    "domain": "web-media",
+    "appliesTo": [
+      "player-recognition-result"
+    ],
+    "excludes": [
+      "download-execution",
+      "external-side-effects"
+    ]
+  },
+  "owner": "xdownload-demo",
+  "authority": "CONTROLLED",
+  "qualification": {
+    "profile": "xdownload.player.route-decision.qualification/0.1.0",
+    "limitations": [
+      "Deterministic routing for the three demo statuses."
+    ]
+  },
+  "input": {
+    "schemaRef": "domain/schemas/decision-input.schema.json"
+  },
+  "output": {
+    "schemaRef": "domain/schemas/decision-output.schema.json"
+  },
+  "implementation": {
+    "strategy": "declarative",
+    "ref": "registry:xdownload.player.route-decision@1.0.0",
+    "exposure": "semantic",
+    "artifactRef": "src/runner.mjs"
+  },
+  "evidence": {
+    "sources": [
+      {
+        "sourceId": "recognition-status-contract",
+        "kind": "authority",
+        "ref": "domain/units/recognizer.json",
+        "claim": "Only one recognized candidate enters the known-player procedure."
+      }
+    ],
+    "absenceReason": null
+  },
+  "failure": {
+    "handling": {
+      "UNKNOWN": {
+        "action": "BOUNDED_FALLBACK",
+        "reason": "Declared UNKNOWN handling for the reference Consumer."
+      },
+      "AMBIGUOUS": {
+        "action": "CLARIFY",
+        "reason": "Declared AMBIGUOUS handling for the reference Consumer."
+      },
+      "CONFLICT": {
+        "action": "CLARIFY",
+        "reason": "Conflicting observations require clarification."
+      },
+      "INVALID_INPUT": {
+        "action": "REJECT",
+        "reason": "Declared INVALID_INPUT handling for the reference Consumer."
+      }
+    }
+  },
+  "validation": {
+    "profile": "player-route-conformance/0.1.0",
+    "profileRevision": "0.1.0",
+    "casesRef": "test/runner.test.mjs",
+    "validator": {
+      "id": "xdownload-dis-independent-conformance",
+      "version": "0.1.0"
+    },
+    "requiredCoverage": [
+      "positive",
+      "negative",
+      "boundary"
+    ]
+  },
+  "capabilities": {
+    "requires": [
+      {
+        "capabilityId": "xdownload.player.recognition",
+        "owner": "xdownload-demo",
+        "authorityRef": "xdownload-demo/domain-authority@1.0.0",
+        "version": "1.0.0",
+        "inputSchemaRef": "domain/schemas/page-observation.schema.json",
+        "inputSchemaDigest": "cc2de5a55a31cb7a5a7a7232f690ae6dbf5658d30a1a3fc79cfc3d8a3aa011f8",
+        "outputSchemaRef": "domain/schemas/recognition-result.schema.json",
+        "outputSchemaDigest": "53b180d3fae2b228a960f66cca5c3d3c0c744fc53dcba5169ead791b3a17f623",
+        "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518",
+        "compatibility": {
+          "policy": "EXACT",
+          "accepted": [
+            {
+              "version": "1.0.0",
+              "contractDigest": "4e07133c8ce6bd683f4bf4f1ccaaf5adac05c6c8fac452aac03349746afec518"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "preconditions": {
+    "inputSchemaRef": "domain/schemas/decision-input.schema.json",
+    "all": [
+      {
+        "path": "/recognition",
+        "operator": "exists"
+      }
+    ]
+  }
+}

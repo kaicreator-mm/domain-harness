@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaicreator-mm.github.io/domain-harness/dis/0.1.0/composition-graph.schema.json",
+  "title": "DIS 0.1.0 Typed Composition Graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "revision",
+    "inputSchemaRef",
+    "outputSchemaRef",
+    "entryNode",
+    "nodes",
+    "edges",
+    "terminalNodes",
+    "cyclePolicy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "dis.graph/0.1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "inputSchemaRef": {
+      "$ref": "#/$defs/resourceRef"
+    },
+    "outputSchemaRef": {
+      "$ref": "#/$defs/resourceRef"
+    },
+    "entryNode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nodeId",
+          "unitRef"
+        ],
+        "properties": {
+          "nodeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unitRef": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "revision"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/controlEdge"
+          },
+          {
+            "$ref": "#/$defs/dataEdge"
+          },
+          {
+            "$ref": "#/$defs/evidenceEdge"
+          }
+        ]
+      }
+    },
+    "terminalNodes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "cyclePolicy": {
+      "const": "DAG_ONLY"
+    }
+  },
+  "$defs": {
+    "resourceRef": {
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)(?!.*\\\\)[A-Za-z0-9._/-]+\\.schema\\.json$"
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "operator"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?:|/(?:[^~/]|~[01])+$)"
+        },
+        "operator": {
+          "enum": [
+            "equals",
+            "notEquals",
+            "exists"
+          ]
+        },
+        "value": {}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operator": {
+                "enum": [
+                  "equals",
+                  "notEquals"
+                ]
+              }
+            },
+            "required": [
+              "operator"
+            ]
+          },
+          "then": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operator": {
+                "const": "exists"
+              }
+            },
+            "required": [
+              "operator"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "value"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "controlEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "kind": {
+          "const": "control"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "when": {
+          "$ref": "#/$defs/condition"
+        }
+      }
+    },
+    "dataEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "pointer"
+      ],
+      "properties": {
+        "node": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pointer": {
+          "type": "string",
+          "pattern": "^(?:|/(?:[^~/]|~[01])+$)"
+        }
+      }
+    },
+    "dataEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "kind": {
+          "const": "data"
+        },
+        "from": {
+          "$ref": "#/$defs/dataEndpoint"
+        },
+        "to": {
+          "$ref": "#/$defs/dataTargetEndpoint"
+        }
+      }
+    },
+    "evidenceTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "slot"
+      ],
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidenceEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "kind": {
+          "const": "evidence"
+        },
+        "from": {
+          "$ref": "#/$defs/evidenceSourceEndpoint"
+        },
+        "to": {
+          "$ref": "#/$defs/evidenceTarget"
+        }
+      }
+    },
+    "dataTargetEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "pointer"
+      ],
+      "properties": {
+        "node": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pointer": {
+          "type": "string",
+          "pattern": "^/(?:[^~/]|~[01])+$"
+        }
+      }
+    },
+    "evidenceSourceEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "pointer"
+      ],
+      "properties": {
+        "node": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pointer": {
+          "type": "string",
+          "pattern": "^/(?:[^~/]|~[01])+$"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "dis-runtime-consumer-proof",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "node app.mjs",
+    "test": "node --test test/consumer.test.mjs"
+  }
+}
