@@ -58,3 +58,62 @@ test('R21 semantic receipt permits engine-only ERROR but fails closed on native 
   await assert.rejects(validateVersionMatrix(clone(matrix),forged),rejects('MATRIX_RECEIPT_INVALID'));
  }
 });
+
+
+// R28: audited exact-SHA R27 Woodpecker result becomes machine-checkable
+// evidence without promoting the incomplete SAP/Oracle Core requirement.
+test('R28 R27 exact-source native receipt is referenced only as bounded PARTIAL evidence',async()=>{
+ const id='r27-native-impact-ci';
+ assert.ok(matrix.receipts.includes(id));
+ const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async rid=>[
+  rid,JSON.parse(await readFile(new URL('receipts/'+rid+'.json',base),'utf8'))
+ ])));
+ const receipt=receipts[id];
+ assert.equal(receipt.status,'SUCCESS');
+ assert.equal(receipt.source.head,'349b58f985970aeeaf77621a4451154e4cd6a353');
+ assert.equal(receipt.source.tree,'d310878eeb2127adbfc4fa9d2bb368446e6d203b');
+ assert.deepEqual(receipt.ci.map(x=>x.context).sort(),[
+  'ci/woodpecker/pr/dis-v020-integration',
+  'ci/woodpecker/pr/verify',
+  'ci/woodpecker/pr/verify-min-node'
+ ]);
+ assert.ok(receipt.ci.every(x=>x.state==='SUCCESS'));
+ for(const core of ['003','005','016']){
+  const r=matrix.requirements.find(x=>x.id==='DIS020-CORE-'+core);
+  assert.equal(r.state,'PARTIAL','R27 scoped evidence is not full DIS Core acceptance');
+  assert.ok(r.receiptIds.includes(id));
+  assert.ok(r.positive.some(x=>x.case.startsWith('R27 actual Tally 14-record')));
+  assert.ok(r.negative.some(x=>x.case.startsWith('R27 false SAP approval')));
+ }
+ assert.equal((await validateVersionMatrix(clone(matrix),receipts)).requirements,21);
+ const forged=clone(receipts);
+ forged[id].ci.find(x=>x.context==='ci/woodpecker/pr/dis-v020-integration').state='FAILURE';
+ await assert.rejects(validateVersionMatrix(clone(matrix),forged),rejects('MATRIX_RECEIPT_INVALID'));
+ const wrong=clone(matrix);
+ wrong.requirements.find(x=>x.id==='DIS020-CORE-005').negative
+  .find(x=>x.case.startsWith('R27 false SAP approval')).case='fictional R27 native failure';
+ await assert.rejects(validateVersionMatrix(wrong,receipts),rejects('MATRIX_CASE_NOT_FOUND'));
+});
+test('R28 remaining-core closure groups account for seven PARTIAL requirements exactly once',async()=>{
+ const plan=JSON.parse(await readFile(new URL('closure-plan-r28.json',base),'utf8'));
+ assert.equal(plan.schema,'dis.v0.2.closure-plan/1');
+ assert.equal(plan.version,'0.2.0');
+ const unfinished=matrix.requirements.filter(x=>x.profile==='core'&&x.state==='PARTIAL')
+  .map(x=>x.id).sort();
+ assert.equal(unfinished.length,7);
+ const planned=plan.coreAndGovernance.flatMap(g=>g.requirementIds)
+  .filter(x=>x.startsWith('DIS020-CORE-')).sort();
+ assert.deepEqual(planned,unfinished);
+ assert.equal(new Set(planned).size,unfinished.length);
+ const optional=matrix.requirements.filter(x=>x.profile==='optional-profile'&&x.state==='NOT_RUN')
+  .map(x=>x.id).sort();
+ assert.deepEqual(plan.optionalProfiles.flatMap(g=>g.requirementIds).sort(),optional);
+ assert.deepEqual(plan.coreAndGovernance.flatMap(g=>g.requirementIds)
+  .filter(x=>x.startsWith('DIS020-GOV-')),['DIS020-GOV-001']);
+ assert.equal(plan.baseline.coreVerified,9);
+ assert.equal(plan.baseline.corePartial,7);
+ assert.deepEqual(plan.estimates.coreAndGovernancePracticalRange,[5,8]);
+ assert.deepEqual(plan.estimates.allProfilesAndGovernancePracticalRange,[7,12]);
+ assert.equal(plan.scopeProtection.coreStatesNotPromoted,true);
+ assert.equal(plan.scopeProtection.noFreeze,true);
+});

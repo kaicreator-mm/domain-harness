@@ -1,0 +1,153 @@
+{
+  "schema": "dis.v0.2.closure-plan/1",
+  "version": "0.2.0",
+  "masterIssue": 1499,
+  "pr": 1497,
+  "baseline": {
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1,
+    "latestQualifiedR27": "349b58f985970aeeaf77621a4451154e4cd6a353",
+    "fixedReceipt": "r27-native-impact-ci",
+    "evidenceIsHistorical": true
+  },
+  "definitionOfRound": "One bounded real native/demo scope with its own exact-SHA CI and Git evidence, including repair; not one isolated test.",
+  "coreAndGovernance": [
+    {
+      "group": "C1",
+      "theme": "Element cohesion/version/validation and semantic collaboration",
+      "requirementIds": [
+        "DIS020-CORE-002",
+        "DIS020-CORE-005"
+      ],
+      "prerequisites": [
+        "Independent source-first Element/SAP owner qualification",
+        "Clear normative Element version/validation constraints"
+      ],
+      "doneWhen": "Selected multi-Function Element version and validation metadata plus executable constraint/collaboration references have positive/negative native proof and independent reviewer qualifications; avoid invented SAP approval"
+    },
+    {
+      "group": "C2",
+      "theme": "Public Function ABI, evidence/compatibility, and Element-owned state",
+      "requirementIds": [
+        "DIS020-CORE-003",
+        "DIS020-CORE-006"
+      ],
+      "prerequisites": [
+        "Agreed minimal complete ABI/schema vocabulary",
+        "Real Knowledge/Rule/Stateful owner boundaries"
+      ],
+      "doneWhen": "All applicable public Function categories have checked contracts, typed UNKNOWN/Evidence, negative compatibility obligations, and selected domain-owned state behavior on native SDK"
+    },
+    {
+      "group": "C3",
+      "theme": "Target applicability and actual interaction transports",
+      "requirementIds": [
+        "DIS020-CORE-008",
+        "DIS020-CORE-014"
+      ],
+      "prerequisites": [
+        "Product/L1 approves which Target variants actually apply",
+        "Decision on Form/Chat UI transport vs UI-neutral adapter requirements"
+      ],
+      "doneWhen": "Required Target-specific selected package/implementation and Chat/Form/CLI semantics each have actual source-grounded positive and negative native tests, or explicit Product/L1 scope decisions"
+    },
+    {
+      "group": "C4",
+      "theme": "Version conformance matrix and final complete native coverage",
+      "requirementIds": [
+        "DIS020-CORE-016"
+      ],
+      "prerequisites": [
+        "C1-C3 required applicable Core tests accepted"
+      ],
+      "doneWhen": "All applicable Core MUSTs verified, source-linked native positive/negative tests and exact-SHA receipts validated by machine matrix without false promotion"
+    },
+    {
+      "group": "C5",
+      "theme": "Independent exact-SHA audit and formal L1/L2 Freeze decision",
+      "requirementIds": [
+        "DIS020-GOV-001"
+      ],
+      "prerequisites": [
+        "C4 exact candidate complete",
+        "Independent qualification scope reviewed"
+      ],
+      "doneWhen": "Fresh independent review and repairs bound to latest SHA, Product/L1/L2 decisions explicitly recorded; no automatic merge, freeze or publication"
+    }
+  ],
+  "optionalProfiles": [
+    {
+      "group": "O1",
+      "requirementIds": [
+        "DIS020-OPT-001"
+      ],
+      "theme": "Bounded Harness/LLM selection, budget, UNKNOWN, fallback"
+    },
+    {
+      "group": "O2",
+      "requirementIds": [
+        "DIS020-OPT-002",
+        "DIS020-OPT-003"
+      ],
+      "theme": "Experience holdout verification and local data-only evolution slot atomic pin/revoke"
+    },
+    {
+      "group": "O3",
+      "requirementIds": [
+        "DIS020-OPT-004"
+      ],
+      "theme": "Server Promotion, new AOT, privacy/scope and activation"
+    }
+  ],
+  "estimates": {
+    "coreAndGovernanceMinimum": 5,
+    "coreAndGovernancePracticalRange": [
+      5,
+      8
+    ],
+    "optionalAdditionalRange": [
+      2,
+      4
+    ],
+    "allProfilesAndGovernancePracticalRange": [
+      7,
+      12
+    ],
+    "conditions": "Estimate assumes multi-requirement integrated rounds, owner promptly resolves target/scope decisions, independent semantic reviewer can qualify bounded SAP; blockers or P1 failures can add rounds.",
+    "advisoryOnly": true
+  },
+  "blockers": [
+    {
+      "code": "SAP_INDEPENDENT_QUALIFICATION_MISSING",
+      "blocks": [
+        "DIS020-CORE-002",
+        "DIS020-CORE-005"
+      ],
+      "requires": "DKE or original source owner independent semantic authority, no synthetic approval"
+    },
+    {
+      "code": "TARGET_APPLICABILITY_NOT_APPROVED",
+      "blocks": [
+        "DIS020-CORE-008"
+      ],
+      "requires": "Product/L1 targeted supported variants; Node major not semantic gate"
+    },
+    {
+      "code": "INTERACTION_REAL_TRANSPORT_SCOPE_UNDECIDED",
+      "blocks": [
+        "DIS020-CORE-014"
+      ],
+      "requires": "Product/L1 clarification about UI-neutral vs concrete UI transport obligations"
+    }
+  ],
+  "scopeProtection": {
+    "coreStatesNotPromoted": true,
+    "optionalStatesNotPromoted": true,
+    "noMerge": true,
+    "noFreeze": true,
+    "noRelease": true,
+    "nodeMajorIsNotSemanticGate": true
+  }
+}
