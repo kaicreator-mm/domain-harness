@@ -63,7 +63,14 @@ test('B01-02 R33 Domain-owned Stateful presence does not mutate Tally Rule or xD
   const afterRule=await app.invoke('tally.assessTaskEvidence',{});
   const afterKnowledge=await app.invoke('xdownload.describePolicy',{});
   assert.deepEqual(beforeRule.value,afterRule.value);
-  assert.deepEqual(beforeKnowledge.value,afterKnowledge.value);
+  // The original xDownload getPolicy() returns fresh callback functions on
+  // every call (decisionSchema.isValid / effectBindings.handler). They are
+  // identity-distinct even when business policy is semantically unchanged.
+  // Compare stable source-owned policy data, not ephemeral function identity.
+  for(const field of ['packageId','policyId','domainId','workflowDefinition','intentBindings'])
+   assert.deepEqual(beforeKnowledge.value[field],afterKnowledge.value[field]);
+  assert.equal(beforeKnowledge.value.effectBindings['effect:acquire'].semantics,
+   afterKnowledge.value.effectBindings['effect:acquire'].semantics);
   for(const r of [afterRule,afterKnowledge]){
    assert.equal(r.kind,'OBSERVATION');assert.equal(r.authority,'NONE');
    assert.equal(r.evidence.attested,false);
