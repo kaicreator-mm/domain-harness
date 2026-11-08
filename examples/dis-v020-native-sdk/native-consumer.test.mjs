@@ -152,3 +152,40 @@ test('native SDK Business App Init refusal blocks every Function without exposin
  registry['orders.appInit']={...registry['orders.appInit'],execute:()=>({status:'BLOCKED'})};
  await assert.rejects(activate(f,{registry}),reject('DIS_INIT_BLOCKED'));
 });
+
+test('native SDK DEGRADED explicitly disables absent optional Tally Function without weakening mandatory KDP',async()=>{
+ const f=await fixturePromise,program=clone(f.program);
+ program.elements.find(e=>e.id==='tally.release').functions[0].optional=true;
+ const artifact=compile(f,program);
+ const registry={...f.registry};
+ delete registry['tally.projectReleaseReadiness'];
+ registry['orders.appInit']={...registry['orders.appInit'],
+  execute:()=>({status:'DEGRADED',unavailable:['tally.projectReleaseReadiness']})};
+ const app=await loadDisV020Aot(artifact,{
+  store:new PlainCasDocStore(),expectedDigest:artifact.digest,registry
+ });
+ try{
+  assert.equal(app.state,'DEGRADED');
+  await assert.rejects(app.invoke('tally.projectReleaseReadiness',{}),
+   reject('DIS_FUNCTION_UNAVAILABLE'));
+  const r=await app.invoke('tally.assessTaskEvidence',{});
+  assert.equal(r.authority,'NONE');
+  const receipt=await app.invoke('orders.approve',{
+   messageId:'msg:dis-optional-native',instanceKey:'instance:dis-optional-native',
+   input:{amount:30,requestId:'DIS-R9-OPTIONAL'}});
+  assert.equal(receipt.receipt.status,'admitted');
+ }finally{app.stop()}
+});
+test('native SDK refuses silent optional Function omission or optional Business App Init',async()=>{
+ const f=await fixturePromise,program=clone(f.program);
+ program.elements.find(e=>e.id==='tally.release').functions[0].optional=true;
+ const artifact=compile(f,program);
+ const registry={...f.registry};
+ delete registry['tally.projectReleaseReadiness'];
+ await assert.rejects(loadDisV020Aot(artifact,{
+  store:new PlainCasDocStore(),expectedDigest:artifact.digest,registry
+ }),reject('DIS_INIT_OPTIONAL_UNDECLARED'));
+ const invalid=clone(f.program);
+ invalid.elements.find(e=>e.id==='orders.init').functions[0].optional=true;
+ assert.throws(()=>compile(f,invalid),reject('DIS_INIT_OPTIONAL_FORBIDDEN'));
+});

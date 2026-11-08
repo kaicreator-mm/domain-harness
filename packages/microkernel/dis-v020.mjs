@@ -17,7 +17,7 @@ export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,ten
  const qualified=qualifyDisV020Artifact(artifact);
  if(expectedDigest!==artifact.digest)refuse('DIS_INSTALLED_AOT_MISMATCH');
  if(!plain(registry)||!store)refuse('DIS_RUNTIME_INPUT_INVALID');
- const delegates=new Map();
+ const delegates=new Map(),absentOptional=new Set();
  // Preflight every bounded LOCAL Function before bootstrapping the Kernel.
  // The registry belongs to the *trusted sealed consumer application*, never
  // user-supplied Intent content, remote evidence or an LLM response.
@@ -25,6 +25,9 @@ export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,ten
   if(f.binding.type!=='local')continue;
   const pin=qualified.pins.get(f.binding.sourceId);
   const impl=registry[id];
+  if(impl===undefined&&f.optional===true&&f.kind!=='init'){
+   absentOptional.add(id);continue;
+  }
   if(!plain(impl)||impl.sourceId!==f.binding.sourceId||
      impl.sha256!==pin.sha256||impl.gitBlob!==pin.origin.gitBlob||
      !plain(impl.origin)||['repository','commit','path','gitBlob'].some(k=>impl.origin[k]!==pin.origin[k])||
@@ -44,6 +47,9 @@ export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,ten
   if(!result||!['READY','DEGRADED'].includes(result.status))refuse('DIS_INIT_BLOCKED');
   const unavailable=result.unavailable??[];
   if(!Array.isArray(unavailable)||new Set(unavailable).size!==unavailable.length)refuse('DIS_INIT_INVALID');
+  for(const id of absentOptional){
+   if(!unavailable.includes(id))refuse('DIS_INIT_OPTIONAL_UNDECLARED');
+  }
   if(result.status==='READY'&&unavailable.length)refuse('DIS_INIT_INVALID');
   for(const id of unavailable){
    const fn=qualified.functions.get(id)?.definition;

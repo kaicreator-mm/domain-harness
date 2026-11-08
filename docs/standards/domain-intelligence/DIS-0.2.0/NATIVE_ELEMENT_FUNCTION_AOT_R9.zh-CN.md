@@ -52,3 +52,9 @@ import {qualifyDisV020Artifact, DIS_V020_AOT}
 ## 6. R9.1 真实 TypeScript SDK 包消费准入
 
 三个公共包子路径各包含可以随 npm Package 发布的 `.mjs` 实现和 `.d.mts` API 声明；新增 `examples/dis-v020-native-sdk/types-smoke.mts` 用 TypeScript `moduleResolution=NodeNext` 直接从三个正式 npm 包入口导入 `DisV020Aot`、`compileDisV020Aot`、`loadDisV020Aot` 与相关输入/输出类型，并检查 `KDP_RECEIPT` / `OBSERVATION` 的联合结果收窄。在 Woodpecker 的实际 `npm ci && npm run build` 后运行 `tsc -p examples/dis-v020-native-sdk/tsconfig.json`；此项是**包声明兼容性**而不是新模拟 Domain。不得以纯 JS 通过就宣称 `.d.mts` 对外可编译；真实结果须以该次 exact-SHA CI 回执为准。
+
+## 7. R9.2 降级语义的真实修复
+
+进一步对抗审核发现：初版 SDK 对每个 LOCAL 都强制要求实现，实际上让 `optional` Function 无法通过 `DEGRADED` 进入有界的降级模式，可能让一个可选 Runx/Tally 观察者阻塞必需的 KDP 业务。现修复为：**仅可选非 Init LOCAL 实现允许缺席**；Business App Init 必须以 `DEGRADED` 和完整的 `unavailable` Function ID 列表明确承认该缺席，SDK 禁用对应 Function，保留其它真实 Function/KDP 权限的原始语义。未明确声明缺席、把必需 Function 降级、或企图将唯一 Business Init 标成 optional 均 fail-closed。不允许静默将缺席改为 READY。
+
+基于真实 Tally Release Function 和订单 KDP Intent 增加两项用例，不新增虚构 Domain；因此原生 SDK Suite 增至 19 项，DIS 专项总计 95 项。对应每次只认最新提交精确 SHA 的 Woodpecker 成功回执。

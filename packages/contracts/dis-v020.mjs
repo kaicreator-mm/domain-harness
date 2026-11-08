@@ -107,6 +107,7 @@ export function qualifyDisV020Artifact(artifact){
     if(f.kind==='effect'&&f.effect!=='governed')fail('DIS_EFFECT_CLASS_MISMATCH');
    }else fail('DIS_BINDING_UNKNOWN');
    if(f.kind==='init'){
+    if(f.optional===true)fail('DIS_INIT_OPTIONAL_FORBIDDEN');
     if(e.packageId===undefined||e.packageId===null||selected.get(e.packageId)?.role!=='business')fail('DIS_INIT_BUSINESS_REQUIRED');
     inits.push(f.id);
    }
