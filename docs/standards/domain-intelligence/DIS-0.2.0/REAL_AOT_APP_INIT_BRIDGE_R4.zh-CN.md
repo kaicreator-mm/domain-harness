@@ -59,3 +59,14 @@ Woodpecker 专用 dis-v020-integration 流水线增加该 Demo，移除不再符
 在 R4.2 的 24 项测试基础上新增 3 项：合格投影构建完成后修改预算、调换选定 Package `loadOrder`、放宽单个 Package 原生导入许可。三者都必须在实际 SDK 激活前返回 `AOT_ACTIVATION_DRIFT`。因此本次桥接 Suite 共 **27 项**，与专用 Woodpecker 现有真实 KDP Effect Gate/C01 回归一起运行。
 
 此处的 `selectedFingerprint` 是对**同一进程中可信、封闭构建产物**的短期一致性校验，不能替代正式的跨进程签发、持久化安装证明及 DIS 0.2.0 原生 AOT/SDK 契约。只在精确提交对应 CI PASS 时记录 `REAL_BRIDGE_DEMO_PASS`。
+
+## 8. R5 Demo-first：可持久化 AOT Projection 恢复及真实 KDP 状态复用
+
+R4.3 的资格基于进程内 `WeakMap`；一旦进程退出，该标记必然消失。**不能将序列化后的 Projection 对象直接当作有执行资格的 Runtime 票据**。本轮补上两个分别受信任的输入：
+
+- **可持久化声明**：`exportProjectionRecord(qualifiedProjection)` 输出仅含已编译 DIS Manifest、Projection Digest 与选定 BUILD 完整指纹的普通 JSON 数据。不是新可执行模块、不是第二 Kernel，也不自带授权。
+- **独立安装信任锚**：`restoreProjectionRecord(record,freshBuilt,{expectedProjectionDigest})` 必须从**独立可信安装/部署记录**取得预期 digest；缺失锚点/篡改记录/版本或 BUILD 内容漂移全部拒绝。恢复时重新执行真实 `compileProjection` 对选定 BUILD/Package Function/Resource 进行完整核验并重建**当前进程内部资格**，不得接受从外部恢复的 WeakMap 标记。
+
+新增 7 项 Demo 测试：普通 JSON 往返与新 BUILD 激活、缺独立锚点、修改 Element.Function、安装锚不匹配、重建 BUILD 预算漂移、**同一真实 KDP 内存 CAS 状态下停止并重新激活后验证旧 message idempotent replay**，以及**单独 Node 进程通过已保存 Projection JSON + 真实 BUILD 重建资格并完成 Business App Init**。此测试仍采用 `PlainCasDocStore` 共享进程内存；跨进程持久性只证明 Projection 恢复，**不冒称已经验证物理 SQLite/Journal 重启恢复**。对应后续测试可复用现有 KDP Host SQLite 的实际 Consumer，但本次不再创造新的持久存储或 Host 机制。
+
+这是一项 Demo 用兼容性接口，不等于 v0.10 BUILD 已原生封装 DIS v0.2.0 Projection；生产晋升仍需要正式打包签发/部署信任锚、真实存储与恢复/撤销策略及独立审核。R5 预期桥接测试总数 **34**，实际 PASS 以匹配当前精确 SHA 的 Woodpecker 回执为准，不继承 R4.3 的 27/27 回执。

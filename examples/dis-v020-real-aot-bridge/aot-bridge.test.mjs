@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import {buildV10App} from '../../tooling/build/dist/index.js';
 import {load} from '../../packages/microkernel/dist/index.js';
 import {basicComposition,PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
-import {makeManifest,compileProjection,createActivation} from './bridge.mjs';
+import {makeManifest,compileProjection,createActivation,exportProjectionRecord,restoreProjectionRecord} from './bridge.mjs';
+import {spawnSync} from 'node:child_process';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 let built;
 async function setup(){
  built??=buildV10App(await basicComposition());
@@ -162,4 +167,76 @@ test('AOT import allowance changes after qualification cannot silently expand Fu
  const a=createActivation({projection,built:candidate,load,store:new PlainCasDocStore()});
  candidate.modules[0].externalImports={node:['node:fs'],npm:[],native:[]};
  await assert.rejects(a.start(),code('AOT_ACTIVATION_DRIFT'));assert.equal(a.state,'FAILED');
+});
+
+test('portable projection record must be requalified against fresh real BUILD',async()=>{
+ const {projection}=await setup();
+ const record=JSON.parse(JSON.stringify(exportProjectionRecord(projection)));
+ const rebuilt=buildV10App(await basicComposition());
+ assert.equal(rebuilt.subjectDigest,built.subjectDigest);
+ const restored=await restoreProjectionRecord(record,rebuilt,{expectedProjectionDigest:projection.projectionDigest});
+ assert.equal(restored.routes.get('approveQuote').intentType,'submitQuoteDecisionDynamic');
+ const a=createActivation({projection:restored,built:rebuilt,load,store:new PlainCasDocStore()});
+ try{assert.equal((await a.start()).status,'READY')}finally{a.stop()}
+});
+test('serialized projection cannot grant itself an AOT trust anchor',async()=>{
+ const {projection}=await setup();
+ const record=JSON.parse(JSON.stringify(exportProjectionRecord(projection)));
+ await assert.rejects(restoreProjectionRecord(record,buildV10App(await basicComposition())),code('AOT_TRUST_ANCHOR_REQUIRED'));
+});
+test('tampering serialized Element.Function fails despite unchanged claimed digest',async()=>{
+ const {projection}=await setup();
+ const record=JSON.parse(JSON.stringify(exportProjectionRecord(projection)));
+ record.manifest.elements[1].functions[0].id='forged';
+ const rebuilt=buildV10App(await basicComposition());
+ await assert.rejects(restoreProjectionRecord(record,rebuilt,{expectedProjectionDigest:projection.projectionDigest}),
+   code('FUNCTION_UNBOUND'));
+});
+test('wrong installed trusted projection digest cannot restore even a valid record',async()=>{
+ const {projection}=await setup(),record=JSON.parse(JSON.stringify(exportProjectionRecord(projection)));
+ await assert.rejects(restoreProjectionRecord(record,buildV10App(await basicComposition()),
+   {expectedProjectionDigest:'untrusted-digest'}),code('AOT_PROJECTION_RECORD_DRIFT'));
+});
+test('reconstructed BUILD budget drift refuses persisted projection',async()=>{
+ const {projection}=await setup(),record=JSON.parse(JSON.stringify(exportProjectionRecord(projection)));
+ const rebuilt=structuredClone(buildV10App(await basicComposition()));
+ rebuilt.hardBudget.maxStepsPerTurn+=1;
+ await assert.rejects(restoreProjectionRecord(record,rebuilt,{expectedProjectionDigest:projection.projectionDigest}),
+   code('AOT_BUILD_SNAPSHOT_DRIFT'));
+});
+test('real KDP CAS state and idempotent replay survive closed App and new qualified activation',async()=>{
+ const {projection}=await setup();
+ const record=JSON.parse(JSON.stringify(exportProjectionRecord(projection)));
+ const store=new PlainCasDocStore();
+ const first=createActivation({projection,built,load,store});
+ const input={messageId:'msg:dis-restart',instanceKey:'instance:dis-restart',input:{amount:30,requestId:'DIS-RESTORE'}};
+ try{
+   await first.start();
+   const admitted=await first.invoke('approveQuote',input);
+   assert.equal(admitted.status,'admitted');
+ }finally{first.stop()}
+ const rebuilt=buildV10App(await basicComposition());
+ const requalified=await restoreProjectionRecord(record,rebuilt,{expectedProjectionDigest:projection.projectionDigest});
+ const restored=createActivation({projection:requalified,built:rebuilt,load,store});
+ try{
+   await restored.start();
+   const receipt=await restored.invoke('approveQuote',input);
+   assert.equal(receipt.idempotentReplay,true,'existing KDP Journal must replay the old receipt');
+ }finally{restored.stop()}
+});
+test('a separate Node process requalifies a persisted projection with real BUILD',async()=>{
+ const {projection}=await setup();
+ const record=JSON.parse(JSON.stringify(exportProjectionRecord(projection)));
+ const dir=await mkdtemp(join(tmpdir(),'dis-v020-restore-'));
+ const path=join(dir,'projection.json');
+ try{
+   await writeFile(path,JSON.stringify(record),'utf8');
+   const child=fileURLToPath(new URL('./projection-restart-child.mjs',import.meta.url));
+   const result=spawnSync(process.execPath,['--import','tsx',child,path,projection.projectionDigest],
+     {encoding:'utf8'});
+   assert.equal(result.status,0,result.stderr);
+   const verified=JSON.parse(result.stdout.trim());
+   assert.equal(verified.status,'RESTORED_REAL_BUILD');
+   assert.equal(verified.subjectDigest,built.subjectDigest);
+ }finally{await rm(dir,{recursive:true,force:true})}
 });

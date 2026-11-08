@@ -65,6 +65,28 @@ export async function compileProjection(manifest,built){
  qualifiedProjections.set(projection,Object.freeze({built,selectedFingerprint:selectedFingerprint(built)}));
  return projection;
 }
+// Portable record is *data*, never a trusted runtime token. The trusted digest
+// anchor MUST be provisioned separately from this record (installed AOT lock).
+export function exportProjectionRecord(projection){
+ const qualification=qualifiedProjections.get(projection);
+ if(!qualification)reject('PROJECTION_NOT_QUALIFIED');
+ return Object.freeze({
+   schema:'dis.v0.2.demo-projection-record/1',
+   manifest:structuredClone(projection.manifest),
+   projectionDigest:projection.projectionDigest,
+   selectedBuildFingerprint:qualification.selectedFingerprint
+ });
+}
+export async function restoreProjectionRecord(record,built,{expectedProjectionDigest}={}){
+ if(typeof expectedProjectionDigest!=='string'||!expectedProjectionDigest)reject('AOT_TRUST_ANCHOR_REQUIRED');
+ if(!record||record.schema!=='dis.v0.2.demo-projection-record/1'||!record.manifest||
+   typeof record.projectionDigest!=='string'||typeof record.selectedBuildFingerprint!=='string')reject('AOT_PROJECTION_RECORD_INVALID');
+ if(record.projectionDigest!==expectedProjectionDigest)reject('AOT_PROJECTION_RECORD_DRIFT');
+ if(record.selectedBuildFingerprint!==selectedFingerprint(built))reject('AOT_BUILD_SNAPSHOT_DRIFT');
+ const projection=await compileProjection(record.manifest,built);
+ if(projection.projectionDigest!==expectedProjectionDigest)reject('AOT_PROJECTION_RECORD_DRIFT');
+ return projection;
+}
 export function createActivation({projection,built,load,store,testMode='demo'}){
  const qualification=qualifiedProjections.get(projection);
  if(!qualification)reject('PROJECTION_NOT_QUALIFIED');
