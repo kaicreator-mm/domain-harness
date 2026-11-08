@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "check": "node --check bridge.mjs && node --check business-app-init.mjs && node --check aot-bridge.test.mjs",
-    "test": "node --import tsx --test aot-bridge.test.mjs"
+    "check": "node --check bridge.mjs && node --check business-app-init.mjs && node --check aot-bridge.test.mjs && node --check two-domain-physical.test.mjs && node --check physical-restart-child.mjs",
+    "test": "node --import tsx --test aot-bridge.test.mjs two-domain-physical.test.mjs"
   }
 }

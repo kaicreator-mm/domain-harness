@@ -1,4 +1,4 @@
-# DIS v0.2.0 R3: actual selected K/SDK seam and native temp-file negative tests.
+# DIS 0.2 R6 real KDP/SDK seam, physical SQLite Journal and two-Business Domain tests.
 # Deliberately no exact Node major gate: exercise the actual worker runtime.
 # Independent of the older 'verify' required-status context and release pin.
 when:
@@ -19,4 +19,5 @@ steps:
       - node --check examples/dis-v020-sdk-integration/test.mjs
       - node --test examples/dis-v020-sdk-integration/test.mjs
       - node --import tsx --test examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs
+      - node --import tsx --test examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs
       - node --import tsx --test tests/assembly/v010-c01-external-effect.test.ts

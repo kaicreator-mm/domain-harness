@@ -70,3 +70,7 @@ R4.3 的资格基于进程内 `WeakMap`；一旦进程退出，该标记必然�
 新增 7 项 Demo 测试：普通 JSON 往返与新 BUILD 激活、缺独立锚点、修改 Element.Function、安装锚不匹配、重建 BUILD 预算漂移、**同一真实 KDP 内存 CAS 状态下停止并重新激活后验证旧 message idempotent replay**，以及**单独 Node 进程通过已保存 Projection JSON + 真实 BUILD 重建资格并完成 Business App Init**。此测试仍采用 `PlainCasDocStore` 共享进程内存；跨进程持久性只证明 Projection 恢复，**不冒称已经验证物理 SQLite/Journal 重启恢复**。对应后续测试可复用现有 KDP Host SQLite 的实际 Consumer，但本次不再创造新的持久存储或 Host 机制。
 
 这是一项 Demo 用兼容性接口，不等于 v0.10 BUILD 已原生封装 DIS v0.2.0 Projection；生产晋升仍需要正式打包签发/部署信任锚、真实存储与恢复/撤销策略及独立审核。R5 预期桥接测试总数 **34**，实际 PASS 以匹配当前精确 SHA 的 Woodpecker 回执为准，不继承 R4.3 的 27/27 回执。
+
+## 9. R6：两个真正不同的 Business Domain 与物理 SQLite KDP Journal
+
+见 [PHYSICAL_TWO_DOMAIN_R6.zh-CN.md](PHYSICAL_TWO_DOMAIN_R6.zh-CN.md)：在已有 R5 投影恢复机制上，以原有订单审批 Business + 独立库存预留 Business 的同一真实 BUILD，验证不同 Function/Policy/Workflow 受同一 KDP 管理；真实 SQLite CAS 写入、彻底关闭、第二 Node 进程再构建和恢复原始消息与 KDP Journal。所有原生 I/O 限制在临时 SQLite 文件；仍不要求用户已排除的任意敌意 Native 代码 OS 沙箱。

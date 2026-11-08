@@ -62,3 +62,7 @@ PRODUCT_L1=REVIEW_PENDING; L2=NOT_FROZEN; MACHINE_SCHEMA=NOT_DONE; CONSUMER_DEMO
 ## R4 — Real BUILD/SDK Element–Function + Business App Init bridge
 
 See [R4 bridge semantics and revised sealed-code trust scope](REAL_AOT_APP_INIT_BRIDGE_R4.zh-CN.md). [Demo source and tests](../../../../examples/dis-v020-real-aot-bridge/) consume real v0.10 BUILD+Microkernel. The prior strict OS native confinement test is archived as optional research and no longer blocks DIS CI under the product's self-built trusted closure model.
+
+## R6 — Real physical KDP Journal and two Business Domain consumer
+
+[R6 cross-process SQLite / orders + inventory consumer evidence](PHYSICAL_TWO_DOMAIN_R6.zh-CN.md) describes actual selected two Business Package compilation, guarded Function dispatch, file-backed WAL/CAS KDP Journal, two-process original receipt replay and negative AOT-restore vectors. The full real demo is under [examples/dis-v020-real-aot-bridge/](../../../../examples/dis-v020-real-aot-bridge/); evidence requires a matching Woodpecker exact-SHA PASS.
