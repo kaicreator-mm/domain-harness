@@ -40,3 +40,21 @@ test('blocked R11 integration receipt cannot qualify a VERIFIED requirement',asy
  v.requirements[0].receiptIds=['r11-integration-blocked'];
  await assert.rejects(validateVersionMatrix(v,{'r11-integration-blocked':blocked}),rejects('MATRIX_RECEIPT_INVALID'));
 });
+
+// R21: content-scoped receipt keeps a real engine CI error visible without
+// allowing either native integration or generic verification to be skipped.
+test('R21 semantic receipt permits engine-only ERROR but fails closed on native and general content checks',async()=>{
+ const id='r21-native-dke-semantic-ci';
+ const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async rid=>[
+  rid,JSON.parse(await readFile(new URL('receipts/'+rid+'.json',base),'utf8'))
+ ])));
+ assert.equal(receipts[id].qualification,'DIS_SEMANTIC_ONLY');
+ assert.equal(receipts[id].ci.find(x=>x.context==='ci/woodpecker/pr/verify-min-node').state,'ERROR');
+ const valid=await validateVersionMatrix(clone(matrix),receipts);
+ assert.equal(valid.requirements,21);
+ for(const context of ['ci/woodpecker/pr/dis-v020-integration','ci/woodpecker/pr/verify']){
+  const forged=clone(receipts);
+  forged[id].ci.find(x=>x.context===context).state='FAILURE';
+  await assert.rejects(validateVersionMatrix(clone(matrix),forged),rejects('MATRIX_RECEIPT_INVALID'));
+ }
+});

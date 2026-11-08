@@ -45,7 +45,22 @@ export async function validateVersionMatrix(matrix,receipts){
    const rec=receipts[rid];
    if(!rec||rec.status!=='SUCCESS'||rec.disVersion!=='0.2.0'||
      !sha.test(rec.source?.head)||!sha.test(rec.source?.tree)||
-     rec.ci?.length!==3||rec.ci.some(x=>x.state!=='SUCCESS'||!x.url?.startsWith('https://ci.kaicreator.com/')))fail('MATRIX_RECEIPT_INVALID');
+     rec.ci?.length!==3||rec.ci.some(x=>!x.url?.startsWith('https://ci.kaicreator.com/')))
+    fail('MATRIX_RECEIPT_INVALID');
+   if(rec.qualification==='DIS_SEMANTIC_ONLY'){
+    // Owner decision: the Node-version compatibility lane is observed but
+    // does not determine Domain Function/Element semantic qualification.
+    // Integration AND general verification must both succeed at the same SHA.
+    const contexts=new Map(rec.ci.map(x=>[x.context,x.state]));
+    if(contexts.size!==3||
+      contexts.get('ci/woodpecker/pr/dis-v020-integration')!=='SUCCESS'||
+      contexts.get('ci/woodpecker/pr/verify')!=='SUCCESS'||
+      !['SUCCESS','ERROR','FAILURE','PENDING'].includes(contexts.get('ci/woodpecker/pr/verify-min-node')))
+      fail('MATRIX_RECEIPT_INVALID');
+   }else if(rec.qualification!==undefined||rec.ci.some(x=>x.state!=='SUCCESS')){
+    // Preserve all previous strict 3/3 required-status receipt semantics.
+    fail('MATRIX_RECEIPT_INVALID');
+   }
   }
   const key=r.profile+':'+r.state;tallies[key]=(tallies[key]??0)+1;
  }

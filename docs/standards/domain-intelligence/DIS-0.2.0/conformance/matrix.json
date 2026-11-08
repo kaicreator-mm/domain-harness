@@ -21,7 +21,8 @@
     "r17-bounded-schema-ci",
     "r19-native-integration-blocked",
     "r19.1-integration-blocked",
-    "r18-r20-native-integration-repaired"
+    "r18-r20-native-integration-repaired",
+    "r21-native-dke-semantic-ci"
   ],
   "requirements": [
     {
@@ -76,7 +77,7 @@
         "r9.5-baseline",
         "r15-d02-d03-native"
       ],
-      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only."
+      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 source-pinned DKE ED06 native selected LOCAL Knowledge functions across three decomposition variants; identity and Function selection bounded, not an independently verified cohesive Element-owner decision."
     },
     {
       "id": "DIS020-CORE-003",
@@ -108,6 +109,10 @@
         {
           "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
           "case": "R17 AOT-selected Tally bounded optional and closed record schema preserves UNKNOWN and refuses extra keys"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R21 selected AOT native SDK consumes 24 DKE CQ Functions with SOURCE status and no authority"
         }
       ],
       "negative": [
@@ -130,15 +135,20 @@
         {
           "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
           "case": "R17 ABI comparator refuses unversioned drift, required-input addition and output loss"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R21 source drift, forged registry, stale Function and missing real Evidence fail closed"
         }
       ],
       "receiptIds": [
         "r14-d01-ci-recovered",
         "r16-kdp-admission-ci",
         "r17-bounded-schema-ci",
-        "r18-r20-native-integration-repaired"
+        "r18-r20-native-integration-repaired",
+        "r21-native-dke-semantic-ci"
       ],
-      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility. R16 candidate adds a separately AOT-locked KDP receipt admission profile (actual selected orders KDP Intent), not a completed Effect/business evidence attestation; pending new exact-SHA CI. R16 exact SHA db10ddbc / Woodpecker #2237 three contexts SUCCESS; KDP admission classified, not executed Effect or independent Evidence. R17 draft tests bounded opt-in record Schema and same-major structural reader compatibility; pending exact-SHA CI. R17 bounded record/optional/closed Schema and structural same-major comparator passed exact-SHA Woodpecker #2238 at fe51db3. R18 uses original Tally release advisory source, adds all-reported-PASS but never independently attested negative and forged local Release status guard; not yet current CI-verified. R19 #2240 dedicated integration FAILURE with other contexts SUCCESS (blocked historical receipt; root cause not demonstrated). R19.1 addresses a separate source-backed zero-argument public Knowledge ABI compatibility regression with allowAbsent on closed empty records and negative tests. Await new exact HEAD CI. R19.1 dedicated #2241 integration FAILURE (2 other contexts SUCCESS) is preserved as blocked historical receipt, not a verifier. R20 proposes source-real Runx PROCESS_LOCAL Handle method contract; no serialized record lie, Host lease or independent evidence verification. New CI pending. R18-R20 native integration repair: authenticated Woodpecker step logs show #2240/#2241/#2242 each failed exactly one legacy test (native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule) because R19's new receipt contract on xdownload.confirmDownload tripped the earlier R16 receipt-binding guard (DIS_KDP_RECEIPT_BINDING_UNSUPPORTED) before DIS_LOCAL_NOT_QUALIFIED; repair dfba82a7 completes the fixture mutation by stripping receiptContract in the clone, keeping the load-bearing R16 guard order pinned by its own dedicated test. Exact HEAD dfba82a7723d709ee22acd65b079fdcc98000f69 / TREE 57b789dff8039888f39e7045e0216b9962ae87fb qualified by Woodpecker #2243/1-3 all SUCCESS (65/65 native tests incl. R18/R19/R19.1/R20 plus the two previously unreached lane tail commands; receipt r18-r20-native-integration-repaired). CORE-003 stays PARTIAL."
+      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility. R16 candidate adds a separately AOT-locked KDP receipt admission profile (actual selected orders KDP Intent), not a completed Effect/business evidence attestation; pending new exact-SHA CI. R16 exact SHA db10ddbc / Woodpecker #2237 three contexts SUCCESS; KDP admission classified, not executed Effect or independent Evidence. R17 draft tests bounded opt-in record Schema and same-major structural reader compatibility; pending exact-SHA CI. R17 bounded record/optional/closed Schema and structural same-major comparator passed exact-SHA Woodpecker #2238 at fe51db3. R18 uses original Tally release advisory source, adds all-reported-PASS but never independently attested negative and forged local Release status guard; not yet current CI-verified. R19 #2240 dedicated integration FAILURE with other contexts SUCCESS (blocked historical receipt; root cause not demonstrated). R19.1 addresses a separate source-backed zero-argument public Knowledge ABI compatibility regression with allowAbsent on closed empty records and negative tests. Await new exact HEAD CI. R19.1 dedicated #2241 integration FAILURE (2 other contexts SUCCESS) is preserved as blocked historical receipt, not a verifier. R20 proposes source-real Runx PROCESS_LOCAL Handle method contract; no serialized record lie, Host lease or independent evidence verification. New CI pending. R18-R20 native integration repair: authenticated Woodpecker step logs show #2240/#2241/#2242 each failed exactly one legacy test (native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule) because R19's new receipt contract on xdownload.confirmDownload tripped the earlier R16 receipt-binding guard (DIS_KDP_RECEIPT_BINDING_UNSUPPORTED) before DIS_LOCAL_NOT_QUALIFIED; repair dfba82a7 completes the fixture mutation by stripping receiptContract in the clone, keeping the load-bearing R16 guard order pinned by its own dedicated test. Exact HEAD dfba82a7723d709ee22acd65b079fdcc98000f69 / TREE 57b789dff8039888f39e7045e0216b9962ae87fb qualified by Woodpecker #2243/1-3 all SUCCESS (65/65 native tests incl. R18/R19/R19.1/R20 plus the two previously unreached lane tail commands; receipt r18-r20-native-integration-repaired). CORE-003 stays PARTIAL. R21 true AOT-selected DKE source consumer qualified by exact-SHA #2249/1 DIS Integration SUCCESS + #2249/3 General Verify SUCCESS; #2249/2 engine-only CI ERROR is recorded but not a semantic gate per Owner. 24 true selected Function CQ calls and source/currentness negatives, no independent Knowledge Oracle/Package inverse registry. Historical mixed-CI receipt r21-native-dke-semantic-ci."
     },
     {
       "id": "DIS020-CORE-004",
@@ -198,7 +208,7 @@
         "r9.5-baseline",
         "r15-d02-d03-native"
       ],
-      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only."
+      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 24 CQ native AOT source-consumption confirmed on real original Tally KG projection/Textile reference. No registered complete CQ→SAP→external Package inverse dependency or independent semantic oracle; remains PARTIAL."
     },
     {
       "id": "DIS020-CORE-006",
@@ -505,13 +515,23 @@
         {
           "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
           "case": "native SDK requires a separately provisioned AOT digest, not an artifact self-declaration"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R21 DKE source projections are exact AOT-selected source pins, no unselected function"
         }
       ],
-      "negative": [],
-      "receiptIds": [
-        "r9.5-baseline"
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R21 source drift, forged registry, stale Function and missing real Evidence fail closed"
+        }
       ],
-      "note": "R9.5 exact-SHA CI is verified; version-wide Requirement matrix and receipts only being established in this commit."
+      "receiptIds": [
+        "r9.5-baseline",
+        "r21-native-dke-semantic-ci"
+      ],
+      "note": "R9.5 exact-SHA CI is verified; version-wide Requirement matrix and receipts only being established in this commit. R21 native Exact-SHA semantic receipt documents dedicated Integration and Verify SUCCESS while preserving engine-only context ERROR; main version conformance remains incomplete."
     },
     {
       "id": "DIS020-OPT-001",
