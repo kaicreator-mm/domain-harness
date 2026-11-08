@@ -50,3 +50,7 @@ Demo pipeline 需依次运行：`npm ci`、`npm run build`、原模块 import/�
 在本次本地 Node v22.16.0 上运行 **3/3 PASS**。没有要求特定 Node 版本：若目标 Worker 不支持所需权限特性，对应测试应标记 SKIP，生产隔离门禁记录 `NOT_VERIFIED`，绝不能把普通 CI SUCCESS 当作物理隔离 PASS。Node permission 是**受限演示机制**，并非对恶意 Node native addons、任意进程外逃或实际 OS 权限模型的通用安全证明。正式 F02 P0 仍需真实 Target 信任根、闭合加载/原生模块策略和独立安全验证。
 
 相关用例追加到 `.woodpecker/dis-v020-integration.yaml`，与前述真实 KDP/SDK C01 回归同一验证 lane。
+
+### R3.2a 按能力而非按 Node 主版本准入
+
+对抗复核发现：如果隔离特性不存在，原测试以 SKIP 终止而整条 CI 仍可绿，容易被误认为生产隔离 PASS。现给专用 Woodpecker 流水线传入 `DIS_REQUIRE_CONFINEMENT=1`，要求隔离特性存在、正反边界测试实际执行，未支持则此专项门禁失败。**没有限制 Node 精确或主版本**。严格模式在本地测试为 4/4 PASS（包括特性必需断言），具体生产级 OS 沙箱/任意 Native Addon 保护仍然 OPEN。
