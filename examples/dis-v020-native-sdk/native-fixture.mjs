@@ -96,7 +96,7 @@ export async function makeNativeFixture(){
   packageId:'string',policyId:'string',domainId:'string',
   workflowDefinition:'record',intentBindings:'record',effectBindings:'record'
  });
- policy.input={type:'record',fields:{},additionalProperties:false};
+ policy.input={type:'record',fields:{},additionalProperties:false,allowAbsent:true};
  policy.outcomes={field:'domainId',classes:{downloads:'OBSERVED'}};
  find('xdownload.describePolicy').contract=policy;
  // R19: install a typed receipt *for* the selected xDownload KDP route,

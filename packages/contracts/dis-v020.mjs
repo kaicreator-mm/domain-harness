@@ -55,9 +55,10 @@ export function classifyDisV020KdpReceipt(contract,receipt){
 }
 
 function validateShape(shape){
- keys(shape,['type','fields','optional','additionalProperties']);
+ keys(shape,['type','fields','optional','additionalProperties','allowAbsent']);
  if(shape.type!=='record'||(shape.fields!==undefined&&!record(shape.fields))||
-    (shape.additionalProperties!==undefined&&typeof shape.additionalProperties!=='boolean'))
+    (shape.additionalProperties!==undefined&&typeof shape.additionalProperties!=='boolean')||
+    (shape.allowAbsent!==undefined&&typeof shape.allowAbsent!=='boolean'))
   fail('DIS_FUNCTION_SCHEMA_INVALID');
  const fields=shape.fields??{},optional=shape.optional??[];
  if(Object.keys(fields).length>MAX||!arr(optional,true)||new Set(optional).size!==optional.length)
@@ -65,13 +66,16 @@ function validateShape(shape){
  for(const [name,type] of Object.entries(fields)){
   if(!FIELD.test(name)||!VALUE_TYPES.has(type))fail('DIS_FUNCTION_SCHEMA_INVALID');
  }
- if(optional.some(name=>typeof name!=='string'||!Object.hasOwn(fields,name)))
+ if(optional.some(name=>typeof name!=='string'||!Object.hasOwn(fields,name))||
+    (shape.allowAbsent===true&&(Object.keys(fields).length!==0||
+      shape.additionalProperties!==false)))
   fail('DIS_FUNCTION_SCHEMA_INVALID');
 }
 function validateFunctionContract(c){
  keys(c,['schema','version','input','output','outcomes','evidence','compatibility']);
  if(c.schema!=='dis.v0.2.function-contract/1'||!/^[1-9][0-9]*\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/.test(c.version))fail('DIS_FUNCTION_CONTRACT_INVALID');
  validateShape(c.input);validateShape(c.output);
+ if(c.output.allowAbsent===true)fail('DIS_FUNCTION_SCHEMA_INVALID');
  keys(c.outcomes,['field','classes']);
  if(!FIELD.test(c.outcomes.field)||!record(c.outcomes.classes)||
   !Object.keys(c.outcomes.classes).length||Object.keys(c.outcomes.classes).length>MAX)fail('DIS_FUNCTION_OUTCOMES_INVALID');
@@ -114,6 +118,7 @@ export function compareDisV020FunctionContracts(previous,next){
  const prevInOptional=new Set(prevIn.optional??[]),nextInOptional=new Set(nextIn.optional??[]);
  const prevOutOptional=new Set(prevOut.optional??[]),nextOutOptional=new Set(nextOut.optional??[]);
  if(prevIn.additionalProperties!==false&&nextIn.additionalProperties===false)broken();
+ if(prevIn.allowAbsent===true&&nextIn.allowAbsent!==true)broken();
  for(const [name,type] of Object.entries(nextInFields)){
   if(Object.hasOwn(prevInFields,name)){
    if(prevInFields[name]!==type||(prevInOptional.has(name)&&!nextInOptional.has(name)))broken();
@@ -143,7 +148,11 @@ export function compareDisV020FunctionContracts(previous,next){
 export function validateDisV020FunctionValue(contract,phase,value){
  if(phase!=='input'&&phase!=='output')fail('DIS_FUNCTION_PHASE_INVALID');
  const shape=contract?.[phase];
- if(!shape||!record(value))fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
+ if(!shape)fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
+ // An explicitly zero-parameter LOCAL Function accepts no argument as well
+ // as {}. This is not the same as accepting unknown/unvalidated fields.
+ if(phase==='input'&&value===undefined&&shape.allowAbsent===true)return true;
+ if(!record(value))fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
  const fields=shape.fields??{},optional=new Set(shape.optional??[]);
  for(const [name,type] of Object.entries(fields)){
   if(!Object.hasOwn(value,name)&&optional.has(name))continue;

@@ -19,6 +19,8 @@ export interface DisV020RecordShape {
  readonly fields?:Readonly<Record<string,'string'|'boolean'|'number'|'record'|'array'>>;
  readonly optional?:readonly string[];
  readonly additionalProperties?:boolean;
+ /** Only a closed, zero-field input may explicitly accept an omitted argument. */
+ readonly allowAbsent?:boolean;
 }
 export interface DisV020FunctionContract {
  readonly schema:'dis.v0.2.function-contract/1';

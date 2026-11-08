@@ -745,3 +745,42 @@ test('R19 AOT rejects a forged xDownload Effect receipt map without touching KDP
  x.receiptContract.statusMap.complete='ADMITTED';
  assert.throws(()=>compile(f,p),reject('DIS_KDP_RECEIPT_ADMISSION_WEAK'));
 });
+
+
+// R19.1: Preserve the pre-existing zero-argument public Knowledge ABI.
+test('R19.1 original source-real xDownload Knowledge Function accepts zero arguments without weakening the closed input',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const empty=await app.invoke('xdownload.describePolicy',{});
+  const omitted=await app.invoke('xdownload.describePolicy');
+  assert.equal(omitted.kind,'OBSERVATION');assert.equal(omitted.disposition,'OBSERVED');
+  assert.equal(omitted.authority,'NONE');assert.equal(omitted.contractVersion,'1.0.0');
+  assert.equal(omitted.value.packageId,empty.value.packageId);
+  assert.equal(omitted.value.policyId,empty.value.policyId);
+  assert.equal(omitted.evidence.attested,false);
+  await assert.rejects(app.invoke('xdownload.describePolicy',null),reject('DIS_FUNCTION_INPUT_INVALID'));
+  await assert.rejects(app.invoke('xdownload.describePolicy',{startEffect:true}),reject('DIS_FUNCTION_INPUT_INVALID'));
+ }finally{app.stop()}
+});
+test('R19.1 AOT rejects allowAbsent on nonempty or open inputs and on outputs',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const knowledge=p.elements.flatMap(e=>e.functions).find(x=>x.id==='xdownload.describePolicy');
+ knowledge.contract.output.allowAbsent=true;
+ assert.throws(()=>compile(f,p),reject('DIS_FUNCTION_SCHEMA_INVALID'));
+ delete knowledge.contract.output.allowAbsent;
+ knowledge.contract.input.fields={targetRef:'string'};
+ assert.throws(()=>compile(f,p),reject('DIS_FUNCTION_SCHEMA_INVALID'));
+ knowledge.contract.input.fields={};
+ knowledge.contract.input.additionalProperties=true;
+ assert.throws(()=>compile(f,p),reject('DIS_FUNCTION_SCHEMA_INVALID'));
+});
+test('R19.1 same-major Function comparator refuses revoking the original zero-argument consumer',async()=>{
+ const f=await fixturePromise;
+ const prev=clone(f.program.elements.flatMap(e=>e.functions)
+   .find(x=>x.id==='xdownload.describePolicy').contract);
+ const next=clone(prev);next.version='1.1.0';next.input.allowAbsent=false;
+ assert.throws(()=>compareDisV020FunctionContracts(prev,next),
+  reject('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+ next.input.allowAbsent=true;
+ assert.equal(compareDisV020FunctionContracts(prev,next).compatible,true);
+});
