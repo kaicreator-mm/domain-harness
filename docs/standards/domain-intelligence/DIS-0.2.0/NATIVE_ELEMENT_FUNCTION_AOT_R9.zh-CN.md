@@ -68,3 +68,9 @@ import {qualifyDisV020Artifact, DIS_V020_AOT}
 ## 9. R9.4 通用 `verify` 静态校验修复
 
 R9.3 精确 SHA `8f78d389ed813a39a8576cfbc329934ef1e59a41` 的 DIS 集成流水线 `2221/1` 和 `verify-min-node` `2221/2` 均 SUCCESS，通用 `verify` `2221/3` FAIL。结合通用 `verify` 包含 `npm run lint` 且 eslint.config.mjs Node 全局定义缺少 `structuredClone`，定位新增 BUILD 子路径三个裸全局调用为可疑失败点。R9.4 在**原 BUILD 单文件写集**中将其改为 `globalThis.structuredClone`，不修改现有 Node 版本规则、ESLint 配置、其他包业务 ABI，也不重跑或派发仅验证任务。本次原因属于源码静态分析，最终是否关闭以 R9.4 精确 SHA **全部三项 CI** 结果为准，不将上一提交的失败误报成已修复。
+
+## 10. R9.5 v0.10 分发清单与 v0.2 增量子路径的精确兼容性修复
+
+通用 `verify` 包含 `v0102-tarball-inventory.test.ts`，其 v0.10 公开包 `exports` **固定白名单**与本次新 `./dis-v020` 增量导出发生冲突。此项是本次原生正式 ABI 修改所必需的分发契约升级，不应为通过验证而放宽导出集合。R9.5 将三个包 Contracts / BUILD / Microkernel 的白名单精确更新为包含 `./dis-v020`，并且独立断言三个包的 subpath 类型路径必须是 `./dis-v020.d.mts`、实现路径必须是 `./dis-v020.mjs`，`files` 白名单和真实 `npm pack --dry-run --json` 清单都必须包含这两份文件。旧 `.` 入口、host-seam、Host Node Provider 的导出完全保留，任意其它导出仍被拒绝。
+
+前一提交还修复新 BUILD 中 ESLint 非白名单裸全局 `structuredClone` 为 `globalThis.structuredClone`；不改全仓库 lint 设置或用户已排除的 OS 沙箱。**原始 `2221/3` verify FAIL 的具体日志在本连接不可读，因此两处是源码与检查规则确认的真实不兼容点，不能冒称已看过日志。全部工作以最新 SHA 的 DIS / Node / 通用 verify 三项 PASS 为准。**
