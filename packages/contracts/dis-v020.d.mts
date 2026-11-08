@@ -5,6 +5,14 @@ export declare class DisV020Error extends Error { readonly code:string; construc
 export interface DisV020Origin { readonly repository:string; readonly commit:string; readonly path:string; readonly gitBlob:string; }
 export interface DisV020Pin { readonly id:string; readonly sha256:string; readonly origin:DisV020Origin; }
 export interface DisV020SourceInput { readonly id:string; readonly sourceText:string; readonly origin:DisV020Origin; }
+export type DisV020Admission='ADMITTED'|'DENIED'|'UNKNOWN';
+export interface DisV020KdpReceiptContract {
+ readonly schema:'dis.v0.2.kdp-receipt-contract/1';
+ readonly version:string;
+ readonly statusMap:Readonly<Record<string,DisV020Admission>>;
+ readonly compatibility:Readonly<{major:number;minReader:'0.2.0';maxReaderExclusive:'0.3.0'}>;
+}
+export declare function classifyDisV020KdpReceipt(contract:DisV020KdpReceiptContract,receipt:unknown):Readonly<{admission:DisV020Admission;execution:'NOT_PROVEN';businessEvidenceAttested:false}>;
 export type DisV020Disposition='OBSERVED'|'UNKNOWN'|'FAILED'|'NEEDS_INPUT'|'NEEDS_CONFIRMATION'|'PENDING_AUTHORIZATION'|'SUCCEEDED';
 export interface DisV020FunctionContract {
  readonly schema:'dis.v0.2.function-contract/1';
@@ -23,6 +31,7 @@ export interface DisV020Function {
  readonly effect:'none'|'governed';
  readonly optional?:boolean;
  readonly contract?:DisV020FunctionContract;
+ readonly receiptContract?:DisV020KdpReceiptContract;
  readonly binding: {readonly type:'local'; readonly sourceId:string} |
   {readonly type:'kdp-intent'; readonly intentId:string};
 }

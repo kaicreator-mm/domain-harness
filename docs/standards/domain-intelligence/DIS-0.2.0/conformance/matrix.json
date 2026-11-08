@@ -15,7 +15,8 @@
     "r10-candidate-blocked",
     "r10-ci-recovery",
     "r11-integration-blocked",
-    "r14-d01-ci-recovered"
+    "r14-d01-ci-recovered",
+    "r15-d02-d03-native"
   ],
   "requirements": [
     {
@@ -67,9 +68,10 @@
       ],
       "negative": [],
       "receiptIds": [
-        "r9.5-baseline"
+        "r9.5-baseline",
+        "r15-d02-d03-native"
       ],
-      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance."
+      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only."
     },
     {
       "id": "DIS020-CORE-003",
@@ -112,7 +114,7 @@
       "receiptIds": [
         "r14-d01-ci-recovered"
       ],
-      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility."
+      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility. R16 candidate adds a separately AOT-locked KDP receipt admission profile (actual selected orders KDP Intent), not a completed Effect/business evidence attestation; pending new exact-SHA CI."
     },
     {
       "id": "DIS020-CORE-004",
@@ -169,9 +171,10 @@
         }
       ],
       "receiptIds": [
-        "r9.5-baseline"
+        "r9.5-baseline",
+        "r15-d02-d03-native"
       ],
-      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation."
+      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only."
     },
     {
       "id": "DIS020-CORE-006",
@@ -428,9 +431,10 @@
         }
       ],
       "receiptIds": [
-        "r10-ci-recovery"
+        "r10-ci-recovery",
+        "r15-d02-d03-native"
       ],
-      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance. D03 deterministic Chat text/Form URLSearchParams/CLI argv adapters added as native SDK consumer candidates; pending next exact-SHA CI and external UI transport/Host validation."
+      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance. D03 deterministic Chat text/Form URLSearchParams/CLI argv adapters added as native SDK consumer candidates; pending next exact-SHA CI and external UI transport/Host validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only."
     },
     {
       "id": "DIS020-CORE-015",

@@ -80,6 +80,13 @@ export async function makeNativeFixture(){
   compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
  });
  const find=id=>program.elements.flatMap(e=>e.functions).find(fn=>fn.id===id);
+ // R16: typed KDP admission contract is separate from a LOCAL observation.
+ // A real KDP admitted receipt is NOT evidence that an Effect completed.
+ find('orders.approve').receiptContract={
+  schema:'dis.v0.2.kdp-receipt-contract/1',version:'1.0.0',
+  statusMap:{admitted:'ADMITTED',denied:'DENIED',rejected:'DENIED'},
+  compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
+ };
  find('tally.assessTaskEvidence').contract=r11({
   UNQUALIFIED_INPUT:'UNKNOWN',OBSERVED_INPUT_ONLY:'OBSERVED'
  },{state:'string',admitted:'boolean',taskPass:'boolean'});

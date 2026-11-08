@@ -7,7 +7,7 @@
  */
 import {load} from './dist/domain-app.js';
 import {
- DisV020Error,qualifyDisV020Artifact,validateDisV020FunctionValue,classifyDisV020FunctionOutcome
+ DisV020Error,qualifyDisV020Artifact,validateDisV020FunctionValue,classifyDisV020FunctionOutcome,classifyDisV020KdpReceipt
 } from '@kaicreator/domain-harness-contracts/dis-v020';
 
 const refuse=code=>{throw new DisV020Error(code)};
@@ -62,8 +62,8 @@ export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,ten
    get state(){return open?result.status:'STOPPED'},
    functions:Object.freeze([...qualified.functions.keys()].filter(x=>x!==artifact.program.appInit)),
    contractVersions:Object.freeze(Object.fromEntries([...qualified.functions]
-    .filter(([,x])=>x.definition.contract!==undefined)
-    .map(([id,x])=>[id,x.definition.contract.version]))),
+    .filter(([,x])=>x.definition.contract!==undefined||x.definition.receiptContract!==undefined)
+    .map(([id,x])=>[id,x.definition.contract?.version??x.definition.receiptContract.version]))),
    async invoke(id,input,options={}){
     if(!open)refuse('DIS_APP_NOT_READY');
     const entry=qualified.functions.get(id);
@@ -72,8 +72,9 @@ export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,ten
     const f=entry.definition;
     if(!plain(options)||Object.keys(options).some(x=>x!=='expectedContractVersion'))
      refuse('DIS_INVOKE_OPTIONS_INVALID');
-    if(f.contract&&options.expectedContractVersion!==undefined&&
-       options.expectedContractVersion!==f.contract.version)refuse('DIS_FUNCTION_VERSION_MISMATCH');
+    const currentContractVersion=f.contract?.version??f.receiptContract?.version;
+    if(currentContractVersion&&options.expectedContractVersion!==undefined&&
+       options.expectedContractVersion!==currentContractVersion)refuse('DIS_FUNCTION_VERSION_MISMATCH');
     if(f.contract)validateDisV020FunctionValue(f.contract,'input',input);
     if(f.binding.type==='local'){
      const value=await delegates.get(id)(input);
@@ -102,6 +103,17 @@ export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,ten
      intentType:f.binding.intentId,
      messageId:input.messageId,instanceKey:input.instanceKey,input:input.input
     });
+    if(f.receiptContract){
+     const typed=classifyDisV020KdpReceipt(f.receiptContract,receipt);
+     return Object.freeze({
+      kind:'KDP_RECEIPT',authority:'KDP',receipt,
+      admission:typed.admission,execution:typed.execution,
+      contractVersion:f.receiptContract.version,
+      // KDP admission is real authority over admission, NOT independent proof
+      // of a completed Effect, current Domain fact, Claim, Review or release.
+      evidence:Object.freeze({receiptAuthority:'KDP',businessAttested:false})
+     });
+    }
     return Object.freeze({kind:'KDP_RECEIPT',authority:'KDP',receipt});
    },
    stop(){

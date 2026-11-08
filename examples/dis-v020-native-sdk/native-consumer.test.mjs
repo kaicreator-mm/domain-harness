@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sha256Canonical} from '@kaicreator/domain-harness-contracts';
-import {qualifyDisV020Artifact} from '@kaicreator/domain-harness-contracts/dis-v020';
+import {qualifyDisV020Artifact,classifyDisV020KdpReceipt} from '@kaicreator/domain-harness-contracts/dis-v020';
 import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
 import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
@@ -443,5 +443,70 @@ test('D03 absence of explicit confirmation leaves parsed CLI session without KDP
   });
   assert.equal(final.value.status,'AWAITING_CONFIRMATION');
   assert.equal(final.authority,'NONE');
+ }finally{app.stop()}
+});
+
+
+// R16: real KDP receipt typing is independent from LOCAL typed observations.
+test('R16 selected native KDP Intent has typed ADMITTED without pretending Effect completion',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  assert.equal(app.contractVersions['orders.approve'],'1.0.0');
+  const result=await app.invoke('orders.approve',{
+   messageId:'msg:r16-kdp-typed',instanceKey:'instance:r16-kdp-typed',
+   input:{amount:30,requestId:'DIS-R16-KDP'}
+  },{expectedContractVersion:'1.0.0'});
+  assert.equal(result.kind,'KDP_RECEIPT');assert.equal(result.authority,'KDP');
+  assert.equal(result.receipt.status,'admitted');
+  assert.equal(result.admission,'ADMITTED');assert.equal(result.execution,'NOT_PROVEN');
+  assert.equal(result.contractVersion,'1.0.0');
+  assert.equal(result.evidence.receiptAuthority,'KDP');
+  assert.equal(result.evidence.businessAttested,false);
+ }finally{app.stop()}
+});
+test('R16 KDP admission profile refuses a forged success / unrelated accepted status',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const fn=p.elements.flatMap(e=>e.functions).find(x=>x.id==='orders.approve');
+ fn.receiptContract.statusMap.admitted='SUCCEEDED';
+ assert.throws(()=>compile(f,p),reject('DIS_KDP_RECEIPT_CONTRACT_INVALID'));
+ fn.receiptContract.statusMap.admitted='ADMITTED';
+ fn.receiptContract.statusMap.completed='ADMITTED';
+ assert.throws(()=>compile(f,p),reject('DIS_KDP_RECEIPT_ADMISSION_WEAK'));
+});
+test('R16 KDP receipt contract refuses stale caller before selecting native Intent',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  await assert.rejects(app.invoke('orders.approve',{
+   messageId:'msg:r16-stale',instanceKey:'instance:r16-stale',
+   input:{amount:30,requestId:'DIS-R16-STALE'}
+  },{expectedContractVersion:'0.9.0'}),reject('DIS_FUNCTION_VERSION_MISMATCH'));
+ }finally{app.stop()}
+});
+test('R16 unknown or malformed receipt cannot become admitted or self-attested evidence',async()=>{
+ const f=await fixturePromise;
+ const contract=f.program.elements.flatMap(e=>e.functions).find(fn=>fn.id==='orders.approve').receiptContract;
+ const unknown=classifyDisV020KdpReceipt(contract,{status:'unexpected-terminal'});
+ assert.deepEqual(unknown,{admission:'UNKNOWN',execution:'NOT_PROVEN',businessEvidenceAttested:false});
+ assert.throws(()=>classifyDisV020KdpReceipt(contract,{status:123}),reject('DIS_KDP_RECEIPT_INVALID'));
+});
+test('R16 a LOCAL Function cannot take an authority-bearing KDP receipt contract',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const from=p.elements.flatMap(e=>e.functions).find(x=>x.id==='orders.approve');
+ const target=p.elements.flatMap(e=>e.functions).find(x=>x.id==='tally.assessTaskEvidence');
+ target.receiptContract=structuredClone(from.receiptContract);
+ assert.throws(()=>compile(f,p),reject('DIS_KDP_RECEIPT_BINDING_UNSUPPORTED'));
+});
+test('R16 source-pinned Tally rule never attests self-declared business evidence',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const r=await app.invoke('tally.assessTaskEvidence',{
+   issueRef:'https://github.com/kaicreator-mm/tally/issues/37',issueNumber:37,
+   sourceSha:'e988321439f65b55936a691c02250b6d62a29409',
+   claimRef:'claim:self-declared-not-proven',dependenciesComplete:true
+  });
+  assert.equal(r.disposition,'OBSERVED');assert.equal(r.authority,'NONE');
+  assert.equal(r.value.taskPass,false);
+  assert.equal(r.evidence.attested,false);
+  assert.deepEqual(r.evidence.declaredRefs,[]);
  }finally{app.stop()}
 });

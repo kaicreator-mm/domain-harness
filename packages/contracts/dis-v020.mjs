@@ -19,7 +19,41 @@ const MAX=256;
 /** R11 bounded Function Contract — source evidence is NOT business attestation. */
 const OUTCOMES=new Set(['OBSERVED','UNKNOWN','FAILED','NEEDS_INPUT','NEEDS_CONFIRMATION','PENDING_AUTHORIZATION','SUCCEEDED']);
 const VALUE_TYPES=new Set(['string','boolean','number','record','array']);
+const KDP_ADMISSIONS=new Set(['ADMITTED','DENIED','UNKNOWN']);
+const SEMVER=/^[1-9][0-9]*\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$/;
+
 const FIELD=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+function validateKdpReceiptContract(contract){
+ keys(contract,['schema','version','statusMap','compatibility']);
+ if(contract.schema!=='dis.v0.2.kdp-receipt-contract/1'||!SEMVER.test(contract.version))
+  fail('DIS_KDP_RECEIPT_CONTRACT_INVALID');
+ if(!record(contract.statusMap)||Object.keys(contract.statusMap).length===0||
+    Object.keys(contract.statusMap).length>MAX||contract.statusMap.admitted!=='ADMITTED')
+  fail('DIS_KDP_RECEIPT_CONTRACT_INVALID');
+ for(const [status,admission] of Object.entries(contract.statusMap)){
+  if(!FIELD.test(status)||!KDP_ADMISSIONS.has(admission)||
+     (status!=='admitted'&&admission==='ADMITTED'))
+   fail('DIS_KDP_RECEIPT_ADMISSION_WEAK');
+ }
+ keys(contract.compatibility,['major','minReader','maxReaderExclusive']);
+ if(!Number.isSafeInteger(contract.compatibility.major)||contract.compatibility.major<1||
+    Number(contract.version.split('.')[0])!==contract.compatibility.major||
+    contract.compatibility.minReader!=='0.2.0'||
+    contract.compatibility.maxReaderExclusive!=='0.3.0')
+   fail('DIS_KDP_RECEIPT_COMPATIBILITY_INVALID');
+}
+/** Only a genuine KDP send() result carries KDP authority; this helper alone grants none. */
+export function classifyDisV020KdpReceipt(contract,receipt){
+ validateKdpReceiptContract(contract);
+ if(!record(receipt)||typeof receipt.status!=='string'||!receipt.status)
+  fail('DIS_KDP_RECEIPT_INVALID');
+ // Unrecognized statuses fail closed to UNKNOWN, never SUCCEEDED or ADMITTED.
+ return Object.freeze({
+  admission:contract.statusMap[receipt.status]??'UNKNOWN',
+  execution:'NOT_PROVEN',businessEvidenceAttested:false
+ });
+}
+
 function validateShape(shape){
  keys(shape,['type','fields']);
  if(shape.type!=='record'||(shape.fields!==undefined&&!record(shape.fields)))fail('DIS_FUNCTION_SCHEMA_INVALID');
@@ -145,16 +179,19 @@ export function qualifyDisV020Artifact(artifact){
   unique(e.dependsOn,'DIS_DEPENDENCY_DUPLICATE');
   elements.set(e.id,e);
   for(const f of e.functions){
-   keys(f,['id','kind','effect','binding','optional','contract']);
+   keys(f,['id','kind','effect','binding','optional','contract','receiptContract']);
    if(f.optional!==undefined&&typeof f.optional!=='boolean')fail('DIS_FUNCTION_INVALID');
    if(!id(f.id)||functions.has(f.id)||!FUNCTION_KINDS.has(f.kind)||
       !['none','governed'].includes(f.effect))fail('DIS_FUNCTION_INVALID');
    if(f.contract!==undefined)validateFunctionContract(f.contract);
+   if(f.receiptContract!==undefined)validateKdpReceiptContract(f.receiptContract);
    keys(f.binding,['type','sourceId','intentId']);
    const b=f.binding;
    // Interaction is an ordinary Element service, never a new Effect authority.
    if(f.kind==='interaction'&&(f.effect!=='none'||b.type!=='local'))fail('DIS_INTERACTION_EFFECT_FORBIDDEN');
    if(f.contract!==undefined&&b.type!=='local')fail('DIS_FUNCTION_CONTRACT_BINDING_UNSUPPORTED');
+   if(f.receiptContract!==undefined&&(b.type!=='kdp-intent'||f.contract!==undefined))
+    fail('DIS_KDP_RECEIPT_BINDING_UNSUPPORTED');
    if(b.type==='local'){
     if(f.effect!=='none'||typeof b.sourceId!=='string'||!pins.has(b.sourceId)||
        Object.hasOwn(b,'intentId')||f.kind==='effect')fail('DIS_LOCAL_NOT_QUALIFIED');
