@@ -64,7 +64,7 @@
     },
     {
       "batchRoundId": "B01-03",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "theme": "Cross-Function/Element ABI compatibility regressions and native C2 qualification, preserving prior adversarial suite",
       "requirements": [
         "DIS020-CORE-003",
@@ -73,10 +73,12 @@
       "prerequisites": [
         "B01-01 and B01-02 relevant exact-SHA source review"
       ],
-      "result": "PENDING",
+      "result": "AWAIT_EXACT_SHA_CI",
       "sourceHead": null,
       "receipt": null,
-      "checks": []
+      "checks": [],
+      "globalRoundId": "R34",
+      "test": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs"
     }
   ],
   "roundArtifactContract": {

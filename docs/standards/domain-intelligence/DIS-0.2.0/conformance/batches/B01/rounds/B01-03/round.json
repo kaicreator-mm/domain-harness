@@ -1,0 +1,42 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B01",
+  "roundId": "B01-03",
+  "globalRoundId": "R34",
+  "status": "CI_PENDING",
+  "requirements": [
+    "DIS020-CORE-003",
+    "DIS020-CORE-006"
+  ],
+  "startParent": "0a404d343827d95ee6c08d962a369dc44c52f98b",
+  "sourceHead": null,
+  "finalTree": null,
+  "receipt": null,
+  "testPath": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+  "positive": [
+    "B01-03 R34 same-major Function ABI preserves selected Tally rule required output and optional reader contract",
+    "B01-03 R34 Element public Function membership and ownership cannot silently drift at unchanged source version"
+  ],
+  "negative": [
+    "B01-03 R34 an internally valid rebuilt AOT is denied by stale installed digest before KDP boot",
+    "B01-03 R34 authoritative caller source change denies old AOT; false semantic claims cannot appear in Element source validation"
+  ],
+  "sourceExamples": [
+    "Tally source-pinned original Rule",
+    "xDownload two-Public-Function Interaction Element"
+  ],
+  "resultBoundary": "Only structural same-major compatibility and opt-in installer source-currentness is asserted; no independent semantic equivalence, accepted Evidence or dynamic source watch.",
+  "ciContexts": [
+    "ci/woodpecker/pr/dis-v020-integration",
+    "ci/woodpecker/pr/verify-min-node",
+    "ci/woodpecker/pr/verify"
+  ],
+  "ciUrls": [],
+  "findings": [],
+  "lessons": [
+    "A valid new AOT digest cannot make an old installed digest current.",
+    "A stable Element version cannot hide a changed public Function roster."
+  ],
+  "fullCorePromoted": false,
+  "metadata": "Exact R34 final HEAD/TREE and CI URLs recorded in separate receipt after native CI."
+}
