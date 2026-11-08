@@ -240,7 +240,7 @@ const R25_CONTRACT={
  output:{type:'record',fields:{
   status:'string',cqId:'string',sourceStatus:'string',sourceRefs:'array',
   evidenceRefs:'array',reason:'string',consumerId:'string'
- },additionalProperties:false},
+ },optional:['evidenceRefs'],additionalProperties:false},
  outcomes:{field:'status',classes:{UNKNOWN:'UNKNOWN',OBSERVED:'OBSERVED'}},
  evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']},
  compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
@@ -375,7 +375,7 @@ test('R25 old and new selected AOT actually replay both Business readers, changi
      assert.equal(x.authority,'NONE');assert.equal(x.evidence.attested,false);
      assert.equal(x.disposition,version==='before'?'UNKNOWN':'OBSERVED');
      assert.equal(x.value.sourceStatus,version==='before'?'ABSENT':'PENDING_REVIEW');
-     assert.equal(x.value.evidenceRefs.length>0,version==='after');
+     assert.equal((x.value.evidenceRefs?.length??0)>0,version==='after');
      assert.equal(x.evidence.source.gitBlob,reader.blob);
      outcomes.push({version,cqId,reader:reader.functionId,status:x.disposition});
     }

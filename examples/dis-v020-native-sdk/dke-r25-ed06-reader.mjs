@@ -11,7 +11,7 @@ export function inspectR25(data,{cqId}){
  if(!id)fail('DKE_R25_CQ_NOT_SELECTED');
  const nodes=new Map(data.records.map(x=>[x['@id'],x]));
  const kase=nodes.get(id);
- if(!kase)return{status:'UNKNOWN',cqId,sourceStatus:'ABSENT',sourceRefs:[id],evidenceRefs:[],
+ if(!kase)return{status:'UNKNOWN',cqId,sourceStatus:'ABSENT',sourceRefs:[id],
   reason:'NOT_IN_PINNED_SOURCE_VERSION',consumerId:'dke.r25.ed06'};
  if(kase['@type']!=='se:Case'||kase['se:lifecycle_status']!=='PENDING_REVIEW'||kase['se:synthetic']!==false)
   fail('DKE_R25_CASE_INVALID');

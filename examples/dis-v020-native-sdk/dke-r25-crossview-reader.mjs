@@ -13,7 +13,7 @@ export function inspectR25(data,{cqId}){
  const cases=data.records.filter(x=>x['@type']==='se:Case'&&x['@id']===caseId);
  if(cases.length>1)refuse('DKE_R25_CASE_NOT_UNIQUE');
  if(cases.length===0)return{status:'UNKNOWN',cqId,sourceStatus:'ABSENT',sourceRefs:[caseId],
-  evidenceRefs:[],reason:'NOT_IN_PINNED_SOURCE_VERSION',consumerId:'dke.r25.crossview'};
+  reason:'NOT_IN_PINNED_SOURCE_VERSION',consumerId:'dke.r25.crossview'};
  const kase=cases[0];
  if(kase['se:lifecycle_status']!=='PENDING_REVIEW'||kase['se:synthetic']!==false)
   refuse('DKE_R25_CASE_INVALID');
