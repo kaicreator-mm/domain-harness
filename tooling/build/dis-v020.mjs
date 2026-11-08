@@ -29,12 +29,12 @@ export function compileDisV020Aot({built,program,sources,expectedSourceOrigins}=
   if(!plain(trusted)||Object.keys(trusted).length!==4||
     ['repository','commit','path','gitBlob'].some(k=>trusted[k]!==origin[k]))refuse('DIS_SOURCE_ORIGIN_UNTRUSTED');
   if(sourceGitBlob(sourceText)!==origin.gitBlob)refuse('DIS_BUILD_SOURCE_BYTES_DRIFT');
-  pins.push({id,origin:structuredClone(origin),sha256:sourceSha256(sourceText)});
+  pins.push({id,origin:globalThis.structuredClone(origin),sha256:sourceSha256(sourceText)});
  }
  if(Object.keys(expectedSourceOrigins).length!==pins.length)refuse('DIS_SOURCE_ORIGIN_UNTRUSTED');
  const data={
-  format:DIS_V020_AOT,built:structuredClone(built),
-  program:structuredClone(program),sources:pins
+  format:DIS_V020_AOT,built:globalThis.structuredClone(built),
+  program:globalThis.structuredClone(program),sources:pins
  };
  const artifact={...data,digest:sha256Canonical(data)};
  // Validate *after* canonical BUILD selection and before any runtime touches

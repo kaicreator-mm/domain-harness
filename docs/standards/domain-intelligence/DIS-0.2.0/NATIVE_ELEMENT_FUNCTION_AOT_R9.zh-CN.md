@@ -64,3 +64,7 @@ import {qualifyDisV020Artifact, DIS_V020_AOT}
 规范的 Domain 不只是代码 Element 集合，也有明确的**来源范围与跨 Element 协作语义**。初版 `sourcePin` 已锁定来源四元组，但仍可把真实 Tally 的 LOCAL Implementation 错误声明在 Runx 领域；同理，`relations[]` 的 `depends-on` 可以与 `dependsOn[]` DAG 相互矛盾。R9.3 为每个 `domains[]` 条目加入非空的 `repositories[]`（允许一域由多个经批准仓库共同生产），任何 LOCAL Function 的 `sourcePin.origin.repository` 必须属于它所在 Domain 的已声明来源范围；否则 `DIS_SOURCE_DOMAIN_MISMATCH`。并要求每条 `from → to`、`kind=depends-on` 的关系必须得到 `to.dependsOn` 精确支持，否则 `DIS_RELATION_DEPENDENCY_MISMATCH`，确保全局语义不能在 AOT 编译时与依赖 DAG 冲突。
 
 这两项来自 Tally/Runx/xDownload 实际不同源码归属的反事实验证，属于**真实领域约束修复**而非增加模拟产品。R9.3 原生 Suite 为 21 项，连同先前 R6/R7/R8 的 76 项共 **97 项**；必须在最新 Exact-SHA Woodpecker 中通过才能标记完成。这里的 `effect=none` 严格指没有 KDP 外部 Host Effect 的执行权限，并不否认 KDP 内部 Workflow 可以更新其自身状态；不应把它解释成所有内部计算均无状态。
+
+## 9. R9.4 通用 `verify` 静态校验修复
+
+R9.3 精确 SHA `8f78d389ed813a39a8576cfbc329934ef1e59a41` 的 DIS 集成流水线 `2221/1` 和 `verify-min-node` `2221/2` 均 SUCCESS，通用 `verify` `2221/3` FAIL。结合通用 `verify` 包含 `npm run lint` 且 eslint.config.mjs Node 全局定义缺少 `structuredClone`，定位新增 BUILD 子路径三个裸全局调用为可疑失败点。R9.4 在**原 BUILD 单文件写集**中将其改为 `globalThis.structuredClone`，不修改现有 Node 版本规则、ESLint 配置、其他包业务 ABI，也不重跑或派发仅验证任务。本次原因属于源码静态分析，最终是否关闭以 R9.4 精确 SHA **全部三项 CI** 结果为准，不将上一提交的失败误报成已修复。
