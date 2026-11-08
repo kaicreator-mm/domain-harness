@@ -20,7 +20,7 @@ const MAX=256;
 const OUTCOMES=new Set(['OBSERVED','UNKNOWN','FAILED','NEEDS_INPUT','NEEDS_CONFIRMATION','PENDING_AUTHORIZATION','SUCCEEDED']);
 const VALUE_TYPES=new Set(['string','boolean','number','record','array']);
 const KDP_ADMISSIONS=new Set(['ADMITTED','DENIED','UNKNOWN']);
-const SEMVER=/^[1-9][0-9]*\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$/;
+const SEMVER=/^[1-9][0-9]*\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/;
 
 const FIELD=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 function validateKdpReceiptContract(contract){
