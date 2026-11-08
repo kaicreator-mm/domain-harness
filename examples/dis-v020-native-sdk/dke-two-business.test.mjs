@@ -647,3 +647,96 @@ test('R29 missing original Evidence chain and forged canonical source fail close
  f3.sourceData.source.gitBlob='0'.repeat(40);
  assert.throws(()=>r29Eval(f3,ledger,patch),reject('DKE_R29_ORIGINAL_SOURCE_DRIFT'));
 });
+
+
+// R31 native source→two selected Business Functions→unqualified SAP
+// fails closed. This is consumer-owned experimental policy, not a generic
+// semantic oracle or newly qualified DIS ECP.
+import {evaluateR31NoAuthority} from './dke-r31-authority-gate.mjs';
+const R31_R30_BLOB='2bf705e32138fe14ecc9beec9f5dc477fb13f9f4';
+function r31Ledger(){
+ const bytes=readFileSync(new URL('./fixtures/dke-r31-r30-source-first.json',import.meta.url));
+ assert.equal(gitBlob(bytes),R31_R30_BLOB,'R31 must use the exact DKE R30 original reviewer facts');
+ return JSON.parse(bytes.toString('utf8'));
+}
+function r31Check(f,observation,cqId,functionId,overrides={}){
+ return evaluateR31NoAuthority({
+  selectedAot:f.artifact,originalProjection:f.sourceData,
+  catalog:r27Catalog(),
+  review:r29Source('dke-r29-source-first-review.json',R29_REVIEW_BLOB),
+  proposal:r29Source('dke-r29-gh-locator-proposal.json',R29_PROPOSAL_BLOB),
+  r30:r31Ledger(),observation,cqId,functionId,...overrides
+ });
+}
+test('R31 native selected KDP/SDK two Business readers preserve UNKNOWN semantic authority for two original PENDING cases',async()=>{
+ const f=await fixtureR25('after'),pin=qualifyDisV020Artifact(f.artifact).pins.get(R25_SNAPSHOT_ID);
+ assert.ok(pin);
+ const app=await loadDisV020Aot(f.artifact,{
+  expectedDigest:f.artifact.digest,
+  expectedSourcePins:{[R25_SNAPSHOT_ID]:{sha256:pin.sha256,origin:{...pin.origin}}},
+  registry:f.registry,store:new PlainCasDocStore(),
+  tenantId:'tenant:dke-r31-sap-fail-closed'
+ });
+ let n=0;
+ try{
+  assert.equal(app.state,'READY');
+  for(const cqId of ['CQ-09F-CF','CQ-09F-GH']){
+   for(const reader of R25_READERS){
+    const observation=await app.invoke(reader.functionId,{cqId},{expectedContractVersion:'1.0.0'});
+    const verdict=r31Check(f,observation,cqId,reader.functionId);
+    assert.equal(observation.disposition,'OBSERVED');
+    assert.equal(verdict.observedDisposition,'OBSERVED');
+    assert.equal(verdict.semanticDecision,'UNKNOWN_NOT_QUALIFIED');
+    assert.equal(verdict.sourceAuthority,'NONE');
+    assert.equal(verdict.sapQualified,false);
+    assert.equal(verdict.ecpAuthorized,false);
+    assert.equal(verdict.effectsAllowed,false);
+    assert.equal(verdict.originalGraphAccepted,false);
+    assert.equal(verdict.proposedOverlayInstalled,false);
+    assert.equal(verdict.externalConsumerClosure,'UNKNOWN');
+    n++;
+   }
+  }
+ }finally{app.stop()}
+ assert.equal(n,4);
+});
+test('R31 native selected read-only consumer policy rejects fabricated SAP, reviewer, source-owner and execution authority',async()=>{
+ const f=await fixtureR25('after'),app=await f.activate();
+ let observation;
+ try{observation=await app.invoke(R25_READERS[0].functionId,{cqId:'CQ-09F-GH'},
+  {expectedContractVersion:'1.0.0'})}finally{app.stop()}
+ const cqId='CQ-09F-GH',functionId=R25_READERS[0].functionId;
+ const check=(overrides,code)=>assert.throws(
+  ()=>r31Check(f,observation,cqId,functionId,overrides),reject(code)
+ );
+ const catalog=r27Catalog();
+ catalog.registrations.find(x=>x.cqId===cqId).sapCandidate.qualified=true;
+ check({catalog},'DKE_R31_SAP_NOT_AUTHORIZED');
+ const owner=r31Ledger();owner.cases.find(x=>x.cq===cqId).claimedSemanticOracle=true;
+ check({r30:owner},'DKE_R31_SAP_NOT_AUTHORIZED');
+ const fakeReview=r29Source('dke-r29-source-first-review.json',R29_REVIEW_BLOB);
+ fakeReview.globalSAPQualification='QUALIFIED';
+ check({review:fakeReview},'DKE_R31_INDEPENDENT_REVIEW_MISSING');
+ const claimedExternal=r31Ledger();claimedExternal.reviewerAuthority='QUALIFIED';
+ check({r30:claimedExternal},'DKE_R31_R30_UNQUALIFIED_SOURCE');
+ const accepted=r29Source('dke-r29-gh-locator-proposal.json',R29_PROPOSAL_BLOB);
+ accepted.canonicalSourceAmended=true;
+ check({proposal:accepted},'DKE_R31_SOURCE_OWNER_NOT_ACCEPTED');
+ const changed=structuredClone(f.sourceData);
+ changed.source.gitBlob='0'.repeat(40);
+ check({originalProjection:changed},'DKE_R31_ORIGINAL_SOURCE_DRIFT');
+ const missing=r27Catalog();
+ missing.registrations.find(x=>x.cqId===cqId).readers.pop();
+ check({catalog:missing},'DKE_R31_UNSELECTED_OR_EFFECTFUL_CONSUMER');
+ const fakeObs=structuredClone(observation);fakeObs.authority='APPROVED';
+ check({observation:fakeObs},'DKE_R31_OBSERVATION_CANNOT_GRANT_AUTHORITY');
+ const fakeEvidence=structuredClone(observation);fakeEvidence.evidence.attested=true;
+ check({observation:fakeEvidence},'DKE_R31_OBSERVATION_CANNOT_GRANT_AUTHORITY');
+ const fakeSuccess=structuredClone(observation);fakeSuccess.disposition='SUCCEEDED';
+ check({observation:fakeSuccess},'DKE_R31_OBSERVATION_CANNOT_GRANT_AUTHORITY');
+ const r30Drift=r31Ledger();r30Drift.publisherBytesPinned=true;
+ check({r30:r30Drift},'DKE_R31_R30_UNQUALIFIED_SOURCE');
+ const stale=structuredClone(f.sourceData);
+ stale.records.find(x=>x['@id']==='se:CASE-09F-GH-DB-FAILOVER')['se:lifecycle_status']='ACCEPTED';
+ check({originalProjection:stale},'DKE_R31_SAP_NOT_AUTHORIZED');
+});
