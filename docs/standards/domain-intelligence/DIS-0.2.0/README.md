@@ -70,3 +70,7 @@ See [R4 bridge semantics and revised sealed-code trust scope](REAL_AOT_APP_INIT_
 ## R7 — Cross-project source-real consumer Demo
 
 [Three-project fixed-source Tally / Runx / xDownload qualification](CROSS_PROJECT_CONSUMER_R7.zh-CN.md). [23-case test suite](../../../../examples/dis-v020-cross-project/consumer.test.mjs) verifies byte-identical original source blobs, actual Function behavior and explicit Effect/authority boundaries. This is a scoped Demo and does not mutate the three originating repositories or claim full native ABI adoption.
+
+## R8 — Original Tally/xDownload Business source inside canonical BUILD
+
+[Real original-source selected BUILD/KDP/SDK with Runx stateful observer boundary](CROSS_PROJECT_BUILD_R8.zh-CN.md) extends verified R7.1. New [nine-case selected-build tests](../../../../examples/dis-v020-cross-project/selected-build.test.mjs) exercise canonical BUILD, xDownload KDP Effect declaration and refusal of unselected Tally native Claim authority.

@@ -21,4 +21,5 @@ steps:
       - node --import tsx --test examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs
       - node --import tsx --test examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs
       - node --import tsx --test examples/dis-v020-cross-project/consumer.test.mjs
+      - node --import tsx --test examples/dis-v020-cross-project/selected-build.test.mjs
       - node --import tsx --test tests/assembly/v010-c01-external-effect.test.ts
