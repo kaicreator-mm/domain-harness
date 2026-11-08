@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {sourceSha256} from '@kaicreator/domain-harness-contracts/dis-v020';
+import {sourceSha256,qualifyDisV020Artifact} from '@kaicreator/domain-harness-contracts/dis-v020';
 import {validateDisV020FunctionValue,classifyDisV020FunctionOutcome} from '@kaicreator/domain-harness-contracts/dis-v020';
 import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
@@ -76,7 +76,9 @@ async function makeDkeSelectedFixture(){
    dependsOn:[],
    functions:[{
     id:fnId,kind:'knowledge',effect:'none',binding:{type:'local',sourceId:CORE_ID},
-    contract:structuredClone(CONTRACT)
+    contract:structuredClone(CONTRACT),
+    // The original DKE logic reads the second, exact source-pinned projection.
+    sourceDependencies:[DATA_ID]
    }]
   });
   registry[fnId]={
@@ -185,4 +187,49 @@ test('R21 real DIS typed evidence presence is not domain source qualification or
  assert.equal(s.disposition,'SUCCEEDED');
  // This proves *only* the shape-based classifier behavior; it cannot attest
  // "fake:reference", a valid KnowledgeClaim or an approved DKE SAP.
+});
+
+
+// R22: bounded SOURCE → actual selected Function inverse edge; NOT ECP closure.
+test('R22 each AOT-selected DKE Knowledge Function registers its exact data source dependency',async()=>{
+ const f=await makeDkeSelectedFixture();
+ const q=qualifyDisV020Artifact(f.artifact);
+ const expected=VARIANTS.map(v=>'dke.ed06.'+v.toLowerCase().replace('_','-')+'.consume').sort();
+ assert.deepEqual(q.sourceConsumers.get(DATA_ID),expected);
+ assert.deepEqual(q.sourceConsumers.get(CORE_ID),expected);
+ for(const id of expected){
+  const definition=q.functions.get(id)?.definition;
+  assert.deepEqual(definition.sourceDependencies,[DATA_ID]);
+  assert.equal(definition.binding.sourceId,CORE_ID);
+  assert.equal(q.pins.get(DATA_ID).origin.gitBlob,DATA_SOURCE.gitBlob);
+ }
+ // Source-to-Function provenance is registered, but does not invent an ECP.
+ assert.equal(f.artifact.program.elements.filter(e=>e.domainId==='dke-ed06')
+   .every(e=>e.packageId===undefined),true);
+});
+test('R22 unknown, duplicate and cross-origin source dependencies are rejected before KDP boot',async()=>{
+ const f=await makeDkeSelectedFixture(),orig=structuredClone(f.program);
+ const fn=orig.elements.flatMap(e=>e.functions)
+  .find(x=>x.id==='dke.ed06.reviewer-root.consume');
+ const compile=()=>compileDisV020Aot({
+  built:f.artifact.built,program:orig,sources:f.sources,
+  expectedSourceOrigins:f.expectedSourceOrigins
+ });
+ fn.sourceDependencies=['missing-project-source'];
+ assert.throws(compile,reject('DIS_FUNCTION_SOURCE_DEPENDENCY_INVALID'));
+ fn.sourceDependencies=[DATA_ID,DATA_ID];
+ assert.throws(compile,reject('DIS_FUNCTION_SOURCE_DEPENDENCY_INVALID'));
+ fn.sourceDependencies=[CORE_ID];
+ assert.throws(compile,reject('DIS_FUNCTION_SOURCE_DEPENDENCY_INVALID'));
+ fn.sourceDependencies=['tally-business'];
+ assert.throws(compile,reject('DIS_SOURCE_DOMAIN_MISMATCH'));
+});
+test('R22 KDP_INTENT cannot claim a LOCAL source reverse dependency as execution authority',async()=>{
+ const f=await makeDkeSelectedFixture(),program=structuredClone(f.program);
+ const fn=program.elements.flatMap(e=>e.functions).find(x=>x.id==='orders.approve');
+ fn.sourceDependencies=[DATA_ID];
+ assert.throws(()=>compileDisV020Aot({
+  built:f.artifact.built,program,sources:f.sources,
+  expectedSourceOrigins:f.expectedSourceOrigins
+ }),reject('DIS_FUNCTION_SOURCE_DEPENDENCY_INVALID'));
 });

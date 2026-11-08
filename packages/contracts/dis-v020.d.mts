@@ -49,6 +49,9 @@ export interface DisV020Function {
  readonly contract?:DisV020FunctionContract;
  readonly receiptContract?:DisV020KdpReceiptContract;
  readonly handleContract?:DisV020LocalHandleContract;
+ /** Optional additional AOT-pinned source IDs read by this LOCAL Function.
+  * These are structural provenance edges, not accepted business evidence. */
+ readonly sourceDependencies?:readonly string[];
  readonly binding: {readonly type:'local'; readonly sourceId:string} |
   {readonly type:'kdp-intent'; readonly intentId:string};
 }
@@ -81,6 +84,8 @@ export interface DisV020Qualified {
  readonly elements:ReadonlyMap<string,DisV020Element>;
  readonly selected:ReadonlyMap<string,V10BuiltApp['modules'][number]>;
  readonly pins:ReadonlyMap<string,DisV020Pin>;
+ /** AOT-declared source → selected LOCAL Function reverse lookup, not ECP closure. */
+ readonly sourceConsumers:ReadonlyMap<string,readonly string[]>;
 }
 export declare function sourceSha256(value:string):string;
 export declare function sourceGitBlob(value:string):string;

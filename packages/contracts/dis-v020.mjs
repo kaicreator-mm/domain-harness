@@ -258,6 +258,9 @@ export function qualifyDisV020Artifact(artifact){
   domains.set(d.id,d);
  }
  const elements=new Map(),functions=new Map(),inits=[];
+ // Reverse dependency is derived from the exact AOT-selected Function graph,
+ // NOT from external dynamic knowledge truth or a fabricated ECP closure.
+ const sourceConsumers=new Map([...pins.keys()].map(sourceId=>[sourceId,[]]));
  for(const e of program.elements){
   keys(e,['id','domainId','kind','description','packageId','dependsOn','functions']);
   if(!id(e.id)||!domains.has(e.domainId)||!ELEMENT_KINDS.has(e.kind)||
@@ -269,7 +272,7 @@ export function qualifyDisV020Artifact(artifact){
   unique(e.dependsOn,'DIS_DEPENDENCY_DUPLICATE');
   elements.set(e.id,e);
   for(const f of e.functions){
-   keys(f,['id','kind','effect','binding','optional','contract','receiptContract','handleContract']);
+   keys(f,['id','kind','effect','binding','optional','contract','receiptContract','handleContract','sourceDependencies']);
    if(f.optional!==undefined&&typeof f.optional!=='boolean')fail('DIS_FUNCTION_INVALID');
    if(!id(f.id)||functions.has(f.id)||!FUNCTION_KINDS.has(f.kind)||
       !['none','governed'].includes(f.effect))fail('DIS_FUNCTION_INVALID');
@@ -287,6 +290,16 @@ export function qualifyDisV020Artifact(artifact){
    if(f.handleContract!==undefined&&(f.kind!=='stateful'||f.effect!=='none'||
       b.type!=='local'||f.contract!==undefined))
     fail('DIS_LOCAL_HANDLE_BINDING_UNSUPPORTED');
+   if(f.sourceDependencies!==undefined){
+    if(b.type!=='local'||!arr(f.sourceDependencies)||
+       new Set(f.sourceDependencies).size!==f.sourceDependencies.length||
+       f.sourceDependencies.some(sourceId=>!id(sourceId)||sourceId===b.sourceId||!pins.has(sourceId)))
+      fail('DIS_FUNCTION_SOURCE_DEPENDENCY_INVALID');
+    for(const sourceId of f.sourceDependencies){
+     if(!domains.get(e.domainId).repositories.includes(pins.get(sourceId).origin.repository))
+      fail('DIS_SOURCE_DOMAIN_MISMATCH');
+    }
+   }
    if(b.type==='local'){
     if(f.effect!=='none'||typeof b.sourceId!=='string'||!pins.has(b.sourceId)||
        Object.hasOwn(b,'intentId')||f.kind==='effect')fail('DIS_LOCAL_NOT_QUALIFIED');
@@ -310,6 +323,10 @@ export function qualifyDisV020Artifact(artifact){
     inits.push(f.id);
    }
    functions.set(f.id,Object.freeze({definition:f,element:e}));
+   if(b.type==='local'){
+    sourceConsumers.get(b.sourceId).push(f.id);
+    for(const sourceId of f.sourceDependencies??[])sourceConsumers.get(sourceId).push(f.id);
+   }
   }
  }
  if(inits.length!==1||inits[0]!==program.appInit)fail('DIS_INIT_NOT_UNIQUE');
@@ -330,5 +347,7 @@ export function qualifyDisV020Artifact(artifact){
  }
  const data={format:artifact.format,built,program,sources};
  if(sha256Canonical(data)!==artifact.digest)fail('DIS_AOT_DIGEST_DRIFT');
- return {functions,elements,selected,pins};
+ return {functions,elements,selected,pins,
+  sourceConsumers:new Map([...sourceConsumers].map(([sourceId,ids])=>
+    [sourceId,Object.freeze(ids.sort())]))};
 }
