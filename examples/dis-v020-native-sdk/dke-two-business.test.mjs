@@ -203,7 +203,7 @@ import {inspectR25 as inspectEd06R25} from './dke-r25-ed06-reader.mjs';
 import {inspectR25 as inspectCrossviewR25} from './dke-r25-crossview-reader.mjs';
 
 const R25_SNAPSHOT_ID='dke-r25-tally-change';
-const R25_SRC_COMMIT='58971e8c7123d062821060f11ef821aa8dad82e7';
+const R25_SRC_COMMIT='c3c178786d0ebb23d749e6ef051036af374f8147';
 const R25_VERSIONS=Object.freeze({
  before:Object.freeze({
   filename:'dke-r25-tally-793.json',
@@ -223,14 +223,14 @@ const R25_READERS=Object.freeze([
   packageId:'business-dke-ed06-observation@0.0.1-demo',
   id:'dke-r25-ed06-source',functionId:'dke.r25.ed06.inspect',
   file:'dke-r25-ed06-reader.mjs',
-  blob:'5df4d7777ca2cb559c65f030d20b05e6e73a9c41',
+  blob:'ad50f202209f2312b22d8e46697274d5537318c0',
   execute:inspectEd06R25
  }),
  Object.freeze({
   packageId:'business-dke-crossview-observation@0.0.1-demo',
   id:'dke-r25-crossview-source',functionId:'dke.r25.crossview.inspect',
   file:'dke-r25-crossview-reader.mjs',
-  blob:'5e98149b50cca5a83749a737bf1817c5065a060f',
+  blob:'81a991f4dc404d4d31ddbfb643dbd209a7036278',
   execute:inspectCrossviewR25
  })
 ]);
