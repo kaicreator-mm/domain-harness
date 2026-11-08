@@ -1,0 +1,141 @@
+{
+  "schema": "dke.r27.source-first-sap-ownership-review/1",
+  "date": "2026-11-09",
+  "normative": false,
+  "reviewerRole": "ONE_MODEL_SEPARATE_SOURCE_FIRST_REVIEW_AND_SCRIPT_CHECK",
+  "independentHumanOrSecondModel": false,
+  "sourcePins": {
+    "repository": "kaicreator-mm/tally",
+    "commit": "a8f4986b099aba27cd86ce6a78e1c19159d1de55",
+    "blob": "b6dc804d3ccc3aac7ce818533c2948f54b34644a",
+    "fullNodeCount": 807,
+    "projectionBlob": "3849e4c96aa4abc3a87cd845511b12726e601689",
+    "projectionCount": 14,
+    "reviewerAlternativesBlob": "d8a273cf6e964d9ba79ea8e364374abba2c0cc71"
+  },
+  "externalSourceReads": {
+    "readDate": "2026-11-09",
+    "htmlContentHash": null,
+    "mode": "LIVE_FIRST_PARTY_PUBLISHER_PAGE_READING",
+    "sourceObservations": [
+      {
+        "id": "se:SRC-09F-CF-OUTAGE-2025",
+        "url": "https://blog.cloudflare.com/cloudflare-service-outage-june-12-2025/",
+        "section": "Opening and impact; incident timeline; remediation",
+        "observation": "Publisher reports 2h28m shared Workers KV dependency impact and no data loss",
+        "limit": "PUBLISHER_REPORT_NOT_INDEPENDENT_TELEMETRY"
+      },
+      {
+        "id": "se:SRC-09F-CF-KV-REDESIGN-2025",
+        "url": "https://blog.cloudflare.com/rearchitecting-workers-kv-for-redundancy/",
+        "section": "Original architecture; tradeoffs; results",
+        "observation": "Temporary migration from two providers to one then a revised redundancy design",
+        "limit": "MEASURED_PERFORMANCE_NOT_FUTURE_OUTAGE_GUARANTEE"
+      },
+      {
+        "id": "se:SRC-09F-GH-POSTMORTEM-2018",
+        "url": "https://github.blog/news-insights/company-news/oct21-post-incident-analysis/",
+        "section": "Oct 21 22:52; Oct 22 16:24; Oct 22 23:03",
+        "observation": "Region-divergent MySQL writes and integrity-first recovery followed by backlog completion",
+        "limit": "FIRST_PARTY_HISTORICAL_TOPOLOGY"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "id": "se:EVD-09F-CF-REDESIGN",
+      "locator": "se:LOC-09F-CF-REDESIGN",
+      "source": "se:SRC-09F-CF-KV-REDESIGN-2025",
+      "verdict": "SUPPORTED_WITH_SCOPE_BOUNDARY",
+      "limit": "DESIGN_CHANGE_IS_NOT_FUTURE_AVAILABILITY_GUARANTEE"
+    },
+    {
+      "id": "se:EVD-09F-CF-REMEDIATION",
+      "locator": "se:LOC-09F-CF-INCIDENT-TIMELINE",
+      "source": "se:SRC-09F-CF-OUTAGE-2025",
+      "verdict": "SUPPORTED_WITH_SCOPE_BOUNDARY",
+      "limit": "PLANNED_AND_IN_PROGRESS_DISTINCT_FROM_COMPLETED"
+    },
+    {
+      "id": "se:EVD-09F-CF-SHARED-DEPENDENCY",
+      "locator": "se:LOC-09F-CF-INCIDENT-OVERVIEW",
+      "source": "se:SRC-09F-CF-OUTAGE-2025",
+      "verdict": "PUBLISHER_REPORTED_SUPPORT",
+      "limit": "ONLY_AFFECTED_CLOUDFLARE_SERVICES"
+    },
+    {
+      "id": "se:EVD-09F-GH-RECOVERY",
+      "locator": "se:LOC-09F-GH-REPLICATION",
+      "source": "se:SRC-09F-GH-POSTMORTEM-2018",
+      "verdict": "SUPPORTED_WITH_SCOPE_BOUNDARY",
+      "limit": "INCIDENT_RECOVERY_AND_BACKLOG_NEED_SEPARATE_LOCATORS"
+    },
+    {
+      "id": "se:EVD-09F-GH-REPLICATION",
+      "locator": "se:LOC-09F-GH-REPLICATION",
+      "source": "se:SRC-09F-GH-POSTMORTEM-2018",
+      "verdict": "PUBLISHER_REPORTED_SUPPORT",
+      "limit": "GITHUB_2018_MYSQL_TOPOLOGY_ONLY"
+    }
+  ],
+  "cases": [
+    {
+      "id": "se:CASE-09F-CF-KV-DEPENDENCY",
+      "cq": "CQ-09F-CF",
+      "owner": "tally.resilience.shared-dependency-case",
+      "proposedSap": "R26-PROPOSAL-CF",
+      "sourceReview": "BOUNDED_FIRST_PARTY_SUPPORT",
+      "readiness": "REQUIRES_INDEPENDENT_DOMAIN_REVIEW",
+      "sapQualified": false,
+      "oracle": "NOT_VERIFIED",
+      "acceptance": "PENDING_REVIEW"
+    },
+    {
+      "id": "se:CASE-09F-GH-DB-FAILOVER",
+      "cq": "CQ-09F-GH",
+      "owner": "tally.consistency.cross-region-failover-case",
+      "proposedSap": "R26-PROPOSAL-GH",
+      "sourceReview": "RECOVERY_LOCATOR_COVERAGE_GAP",
+      "readiness": "REQUIRES_GH_LOCATOR_REPAIR_AND_INDEPENDENT_REVIEW",
+      "sapQualified": false,
+      "oracle": "NOT_VERIFIED",
+      "acceptance": "PENDING_REVIEW"
+    }
+  ],
+  "strategies": [
+    {
+      "id": "SEPARATE_CASE_ELEMENTS",
+      "elements": [
+        "tally.resilience.shared-dependency-case",
+        "tally.consistency.cross-region-failover-case"
+      ],
+      "cqCount": 2,
+      "ownerAmbiguity": "LOW",
+      "independentQualified": false,
+      "verdict": "PREFERRED_BOUNDED_PROPOSAL"
+    },
+    {
+      "id": "SINGLE_GENERIC_INCIDENT_ELEMENT",
+      "elements": [
+        "tally.generic.incident-case"
+      ],
+      "cqCount": 2,
+      "ownerAmbiguity": "HIGH",
+      "independentQualified": false,
+      "verdict": "FALLBACK_NEEDS_OWNER_JUSTIFICATION"
+    }
+  ],
+  "crossCaseCausality": "NOT_ATTESTED",
+  "globalSAPQualification": "UNRESOLVED",
+  "pendingSourceRepair": [
+    {
+      "id": "R27-P1-GH-LOCATOR-TIMESPAN",
+      "sourceLocator": "se:LOC-09F-GH-REPLICATION",
+      "currentCoverageEnd": "2018-10-22 16:24 UTC",
+      "sourceNarrativeContinuesThrough": "2018-10-22 23:03 UTC",
+      "target": "se:CASE-09F-GH-DB-FAILOVER",
+      "resolution": "EXTEND_CASE_OUTCOME_SOURCE_LOCATOR_OR_NARROW_CLAIM",
+      "status": "OPEN"
+    }
+  ]
+}

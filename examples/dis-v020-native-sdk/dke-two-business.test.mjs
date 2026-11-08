@@ -548,3 +548,98 @@ test('R27 missing Evidence, orphan selected record, duplicated source identity a
   d.records[0]['se:lifecycle_status']='ACCEPTED';
  },'DKE_R27_CASE_SOURCE_INVALID');
 });
+
+
+// R29 C1: replay DKE's immutable original source-first reviewer ledger
+// against real AOT-selected Business Functions without granting SAP authority.
+import {evaluateR29C1} from './dke-r29-source-first.mjs';
+const R29_REVIEW_BLOB='0b7d514cc297a07952b2cd536c2dafd3e47bda45';
+const R29_PROPOSAL_BLOB='9dc978f5138c561efabe503f254e565aa5f5700a';
+function r29Source(name,blob){
+ const bytes=readFileSync(new URL('./fixtures/'+name,import.meta.url));
+ assert.equal(gitBlob(bytes),blob,'source-first review must preserve original Git Blob');
+ return JSON.parse(bytes.toString('utf8'));
+}
+function r29Eval(f,review,proposal){
+ return evaluateR29C1({
+  review:review??r29Source('dke-r29-source-first-review.json',R29_REVIEW_BLOB),
+  proposal:proposal??r29Source('dke-r29-gh-locator-proposal.json',R29_PROPOSAL_BLOB),
+  originalProjection:f.sourceData,selectedAot:f.artifact
+ });
+}
+test('R29 original source-first ledger identifies two Case-owned Elements and two selected Business readers, but never accepts unreviewed SAP',async()=>{
+ const f=await fixtureR25('after');
+ const verdict=r29Eval(f);
+ assert.equal(verdict.schema,'dis.r29.c1.source-first-element-qualification/1');
+ assert.deepEqual(verdict.comparedStrategies,['SEPARATE_CASE_ELEMENTS','SINGLE_GENERIC_INCIDENT_ELEMENT']);
+ assert.equal(verdict.preferredDecomposition,'SEPARATE_CASE_ELEMENTS');
+ assert.deepEqual(verdict.proposedElements.map(x=>x.proposedElement),[
+  'tally.resilience.shared-dependency-case',
+  'tally.consistency.cross-region-failover-case'
+ ]);
+ assert.deepEqual(verdict.proposedElements.map(x=>x.cq),['CQ-09F-CF','CQ-09F-GH']);
+ assert.deepEqual(verdict.selectedBusinessFunctions,R25_READER_IDS);
+ assert.deepEqual(verdict.selectedBusinessPackages,R25_READERS.map(x=>x.packageId).sort());
+ assert.equal(verdict.stableCQ,'CQ-T-CROSSCUT');
+ assert.equal(verdict.GHSourceGap,'OPEN');
+ assert.equal(verdict.candidatePatchImpact,'CQ-09F-GH');
+ assert.equal(verdict.independentQualified,false);
+ assert.equal(verdict.canonicalTallyGraphChanged,false);
+ assert.equal(verdict.nativeAotWithCandidateOverlayBuilt,false);
+ assert.equal(verdict.SAPAuthority,'NONE');
+ assert.equal(verdict.effectAuthority,'NONE');
+ assert.equal(verdict.wholeAppConsumerCompleteness,'UNKNOWN');
+ const app=await f.activate();
+ try{
+  for(const cqId of ['CQ-09F-CF','CQ-09F-GH']){
+   for(const reader of R25_READERS){
+    const observation=await app.invoke(reader.functionId,{cqId},{expectedContractVersion:'1.0.0'});
+    assert.equal(observation.kind,'OBSERVATION');
+    assert.equal(observation.authority,'NONE');
+    assert.equal(observation.disposition,'OBSERVED');
+    assert.equal(observation.value.sourceStatus,'PENDING_REVIEW');
+    assert.equal(observation.evidence.attested,false);
+   }
+  }
+ }finally{app.stop()}
+});
+test('R29 original reviewer/source gap and proposed decomposition cannot mint independent domain authority',async()=>{
+ const f=await fixtureR25('after');
+ const ledger=()=>r29Source('dke-r29-source-first-review.json',R29_REVIEW_BLOB);
+ const proposal=()=>r29Source('dke-r29-gh-locator-proposal.json',R29_PROPOSAL_BLOB);
+ const mutateReview=(change,code)=>{
+  const x=ledger();change(x);
+  assert.throws(()=>r29Eval(f,x,proposal()),reject(code));
+ };
+ const mutatePatch=(change,code)=>{
+  const x=proposal();change(x);
+  assert.throws(()=>r29Eval(f,ledger(),x),reject(code));
+ };
+ mutateReview(x=>{x.independentHumanOrSecondModel=true},'DKE_R29_REVIEW_AUTHORITY_FORGED');
+ mutateReview(x=>{x.globalSAPQualification='ACCEPTED'},'DKE_R29_REVIEW_AUTHORITY_FORGED');
+ mutateReview(x=>{x.cases[0].sapQualified=true},'DKE_R29_SAP_OWNER_UNQUALIFIED');
+ mutateReview(x=>{x.cases[1].readiness='READY'},'DKE_R29_SAP_OWNER_UNQUALIFIED');
+ mutateReview(x=>{x.cases[1].owner=x.cases[0].owner},'DKE_R29_SAP_OWNER_UNQUALIFIED');
+ mutateReview(x=>{x.pendingSourceRepair[0].status='CLOSED'},'DKE_R29_GH_LOCATOR_GAP_DENIED');
+ mutateReview(x=>{x.strategies[0].ownerAmbiguity='LOW_WITH_INDEPENDENT_AUTHORITY'},'DKE_R29_DECOMPOSITION_STRATEGY_INVALID');
+ mutateReview(x=>{x.strategies[1].independentQualified=true},'DKE_R29_DECOMPOSITION_STRATEGY_INVALID');
+ mutatePatch(x=>{x.canonicalSourceAmended=true},'DKE_R29_UNAPPROVED_SOURCE_PATCH');
+ mutatePatch(x=>{x.independentOracle=true},'DKE_R29_UNAPPROVED_SOURCE_PATCH');
+ mutatePatch(x=>{x.added[0]['se:synthetic']=false},'DKE_R29_UNAPPROVED_SOURCE_PATCH');
+ mutatePatch(x=>{x.publisher.allWebhooksDelivered=true},'DKE_R29_UNAPPROVED_SOURCE_PATCH');
+ mutatePatch(x=>{x.impact.affectedCQs=['CQ-09F-CF']},'DKE_R29_UNAPPROVED_SOURCE_PATCH');
+});
+test('R29 missing original Evidence chain and forged canonical source fail closed instead of widening generic Element ownership',async()=>{
+ const f=await fixtureR25('after');
+ const ledger=r29Source('dke-r29-source-first-review.json',R29_REVIEW_BLOB);
+ const patch=r29Source('dke-r29-gh-locator-proposal.json',R29_PROPOSAL_BLOB);
+ const f1={...f,sourceData:structuredClone(f.sourceData)};
+ f1.sourceData.records=f1.sourceData.records.filter(x=>x['@id']!=='se:EVD-09F-GH-REPLICATION');
+ assert.throws(()=>r29Eval(f1,ledger,patch),reject('DKE_R29_SOURCE_RECORDS_INVALID'));
+ const f2={...f,sourceData:structuredClone(f.sourceData)};
+ f2.sourceData.records.find(x=>x['@id']==='se:CASE-09F-GH-DB-FAILOVER')['se:evidence_refs'].push({'@id':'se:FAKE-UNSELECTED'});
+ assert.throws(()=>r29Eval(f2,ledger,patch),reject('DKE_R29_EVIDENCE_CLOSURE_MISSING'));
+ const f3={...f,sourceData:structuredClone(f.sourceData)};
+ f3.sourceData.source.gitBlob='0'.repeat(40);
+ assert.throws(()=>r29Eval(f3,ledger,patch),reject('DKE_R29_ORIGINAL_SOURCE_DRIFT'));
+});
