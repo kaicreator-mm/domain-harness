@@ -25,5 +25,6 @@ steps:
       - node --check packages/contracts/dis-v020.mjs
       - node --check tooling/build/dis-v020.mjs
       - node --check packages/microkernel/dis-v020.mjs
+      - ./node_modules/.bin/tsc -p examples/dis-v020-native-sdk/tsconfig.json
       - node --import tsx --test examples/dis-v020-native-sdk/native-consumer.test.mjs
       - node --import tsx --test tests/assembly/v010-c01-external-effect.test.ts

@@ -48,3 +48,7 @@ import {qualifyDisV020Artifact, DIS_V020_AOT}
 本仓库 `examples/dis-v020-native-sdk/native-consumer.test.mjs` 使用 R7 精确原始 Tally/Runx/xDownload 源码、R8 真实 canonical BUILD 和**新的公开 SDK 子路径**执行 17 项真正的 AOT 编译/执行/拒绝/恢复用例；继续在同一 Woodpecker 里执行 R6 物理 SQLite/C01 回归。该测试不是重新发明三个 Domain 的行为，直接调用原始实现并仅提供必要的可信本地注册函数。
 
 本次已实现**正式机器 Contract + BUILD/SDK 原生消费入口**，但仍为 DIS v0.2 R9 候选，不等于三个原产品应用已经迁移到该 SDK；外部真实下载/Agent 执行/GitHub Claim 授权仍归各自 Provider。发布前还须独立 Fresh Exact-SHA Review、Product/L1 冻结与 L2 准入。成功的旧 Demo CI 不能替代当前 R9 精确 SHA 的新流水线。
+
+## 6. R9.1 真实 TypeScript SDK 包消费准入
+
+三个公共包子路径各包含可以随 npm Package 发布的 `.mjs` 实现和 `.d.mts` API 声明；新增 `examples/dis-v020-native-sdk/types-smoke.mts` 用 TypeScript `moduleResolution=NodeNext` 直接从三个正式 npm 包入口导入 `DisV020Aot`、`compileDisV020Aot`、`loadDisV020Aot` 与相关输入/输出类型，并检查 `KDP_RECEIPT` / `OBSERVATION` 的联合结果收窄。在 Woodpecker 的实际 `npm ci && npm run build` 后运行 `tsc -p examples/dis-v020-native-sdk/tsconfig.json`；此项是**包声明兼容性**而不是新模拟 Domain。不得以纯 JS 通过就宣称 `.d.mts` 对外可编译；真实结果须以该次 exact-SHA CI 回执为准。
