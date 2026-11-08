@@ -74,3 +74,7 @@ See [R4 bridge semantics and revised sealed-code trust scope](REAL_AOT_APP_INIT_
 ## R8 — Original Tally/xDownload Business source inside canonical BUILD
 
 [Real original-source selected BUILD/KDP/SDK with Runx stateful observer boundary](CROSS_PROJECT_BUILD_R8.zh-CN.md) extends verified R7.1. New [nine-case selected-build tests](../../../../examples/dis-v020-cross-project/selected-build.test.mjs) exercise canonical BUILD, xDownload KDP Effect declaration and refusal of unselected Tally native Claim authority.
+
+## R9 — Native DIS 0.2 Element / Function / AOT contract & SDK consumption
+
+[Formal machine contract and native package exports](NATIVE_ELEMENT_FUNCTION_AOT_R9.zh-CN.md) use real Contracts, canonical BUILD and Microkernel SDK public subpaths, not the compatibility Sidecar. [Native original-source consumer tests](../../../../examples/dis-v020-native-sdk/native-consumer.test.mjs) exercise Tally, Runx and xDownload semantics with a single installed AOT and real KDP/SDK; success requires the same exact-SHA Woodpecker receipt.

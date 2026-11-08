@@ -1,0 +1,85 @@
+/**
+ * DIS v0.2.0 native API conformance fixture using original Tally, Runx and
+ * xDownload source bytes, never an invented "mock domain". The selected BUILD
+ * is produced by the existing canonical v0.10 BUILD and qualified by the new
+ * public DIS v0.2 BUILD subpath before native Microkernel SDK consumption.
+ */
+import {readFile} from 'node:fs/promises';
+import {sourceSha256} from '@kaicreator/domain-harness-contracts/dis-v020';
+import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
+import {buildRealCrossProjectSelection} from '../dis-v020-cross-project/selected-build.mjs';
+import {init as ordersBusinessInit} from '../dis-v020-real-aot-bridge/business-app-init.mjs';
+import * as tallyBusiness from '../dis-v020-cross-project/snapshots/tally/business.mjs';
+import * as tallyRelease from '../dis-v020-cross-project/snapshots/tally/release-readiness.mjs';
+import * as xdownloadBusiness from '../dis-v020-cross-project/snapshots/xdownload/business-download.mjs';
+import {EnvironmentAgentPresence} from '../dis-v020-cross-project/snapshots/runx/environment-agent-presence.ts';
+
+const sourceDescriptors=[
+ {id:'orders-init',path:'../dis-v020-real-aot-bridge/business-app-init.mjs',repository:'kaicreator-mm/domain-harness',commit:'ea3b6ef1c633e743d107bf47391afeb2f1f55cac',originalPath:'examples/dis-v020-real-aot-bridge/business-app-init.mjs',gitBlob:'dbc4e44125958ada77bc95c0231560f9f3d64a60'},
+ {id:'tally-business',path:'../dis-v020-cross-project/snapshots/tally/business.mjs',repository:'kaicreator-mm/tally',commit:'e988321439f65b55936a691c02250b6d62a29409',originalPath:'packages/tally-engineering-business/src/index.mjs',gitBlob:'54015fb63ffb13b4f4e562f660d2172098b5f7f4'},
+ {id:'tally-release',path:'../dis-v020-cross-project/snapshots/tally/release-readiness.mjs',repository:'kaicreator-mm/tally',commit:'e988321439f65b55936a691c02250b6d62a29409',originalPath:'packages/tally-engineering-business/src/release-readiness.mjs',gitBlob:'2d4d6e7462156e4466192a0ed3207ac76fd288e1'},
+ {id:'runx-presence',path:'../dis-v020-cross-project/snapshots/runx/environment-agent-presence.ts',repository:'kaicreator-mm/runx',commit:'b9e0c953d9bfd5834315012426fd8e10c21bdd7c',originalPath:'packages/control-plane/src/environment-agent-presence.ts',gitBlob:'b2c669537a56638aeead4f55914533b00fe3935e'},
+ {id:'xdownload-business',path:'../dis-v020-cross-project/snapshots/xdownload/business-download.mjs',repository:'kaicreator-mm/xDownload',commit:'e904f08c478b15147b1c07fbe53c610d2d81851f',originalPath:'packages/download-domain-app/src/business/business-download.mjs',gitBlob:'a7dba9a896de0b84fc6d54093563adca2ccbcdfc'},
+];
+export async function makeNativeFixture(){
+ const {built}=await buildRealCrossProjectSelection();
+ const sources=await Promise.all(sourceDescriptors.map(async x=>({
+   id:x.id,sourceText:await readFile(new URL(x.path,import.meta.url),'utf8'),
+   origin:{repository:x.repository,commit:x.commit,path:x.originalPath,gitBlob:x.gitBlob},
+ })));
+ const program={
+  format:'dis.v0.2.program/1',appId:built.appId,
+  domains:[
+   {id:'orders',description:'Existing selected approved orders Business'},
+   {id:'tally',description:'Tally engineering Claim observation and release evidence'},
+   {id:'runx',description:'Runx non-authoritative Agent incarnation presence'},
+   {id:'xdownload',description:'xDownload guarded acquisition Workflow'},
+   {id:'shared',description:'Cross-domain relationship/constraint semantics'},
+  ],
+  elements:[
+   {id:'shared.semantics',domainId:'shared',kind:'global',description:'Global observation/authorization boundary',dependsOn:[],functions:[]},
+   {id:'orders.init',domainId:'orders',kind:'workflow',description:'Unique trusted Business App Init',packageId:'business-order-approval@v08.1.0.0',dependsOn:[],functions:[
+    {id:'orders.appInit',kind:'init',effect:'none',binding:{type:'local',sourceId:'orders-init'}}]},
+   {id:'orders.approval',domainId:'orders',kind:'workflow',description:'Selected orders KDP route',packageId:'business-order-approval@v08.1.0.0',dependsOn:[],functions:[
+    {id:'orders.approve',kind:'workflow',effect:'none',binding:{type:'kdp-intent',intentId:'submitQuoteDecisionDynamic'}}]},
+   {id:'tally.tasks',domainId:'tally',kind:'rule',description:'Task evidence is observation, not Claim authority',packageId:'business-tally-task-readiness@v2.0.0',dependsOn:[],functions:[
+    {id:'tally.assessTaskEvidence',kind:'rule',effect:'none',binding:{type:'local',sourceId:'tally-business'}}]},
+   {id:'tally.release',domainId:'tally',kind:'rule',description:'Release readiness without RQ authorization',packageId:'business-tally-task-readiness@v2.0.0',dependsOn:['tally.tasks'],functions:[
+    {id:'tally.projectReleaseReadiness',kind:'rule',effect:'none',binding:{type:'local',sourceId:'tally-release'}}]},
+   {id:'runx.agent.presence',domainId:'runx',kind:'stateful',description:'Stateful Agent presence, not execution lease',dependsOn:[],functions:[
+    {id:'runx.createPresenceObserver',kind:'stateful',effect:'none',binding:{type:'local',sourceId:'runx-presence'}}]},
+   {id:'xdownload.policy',domainId:'xdownload',kind:'knowledge',description:'Download guard/effect policy knowledge',packageId:'business-download@0.2.0-t03',dependsOn:[],functions:[
+    {id:'xdownload.describePolicy',kind:'knowledge',effect:'none',binding:{type:'local',sourceId:'xdownload-business'}}]},
+   {id:'xdownload.acquire',domainId:'xdownload',kind:'effect',description:'Non-idempotent acquisition requires KDP permit',packageId:'business-download@0.2.0-t03',dependsOn:['xdownload.policy'],functions:[
+    {id:'xdownload.confirmDownload',kind:'effect',effect:'governed',binding:{type:'kdp-intent',intentId:'confirmDownload'}}]},
+  ],
+  relations:[
+   {from:'shared.semantics',to:'tally.tasks',kind:'defines'},
+   {from:'shared.semantics',to:'runx.agent.presence',kind:'constrains'},
+   {from:'xdownload.policy',to:'xdownload.acquire',kind:'depends-on'},
+   {from:'tally.tasks',to:'tally.release',kind:'depends-on'},
+   {from:'runx.agent.presence',to:'tally.tasks',kind:'cooperates'},
+  ],
+  appInit:'orders.appInit',
+ };
+ const expectedSourceOrigins=Object.fromEntries(sourceDescriptors.map(s=>[s.id,{
+  repository:s.repository,commit:s.commit,path:s.originalPath,gitBlob:s.gitBlob
+ }]));
+ const artifact=compileDisV020Aot({built,program,sources,expectedSourceOrigins});
+ const get=(sourceId,execute)=>{
+  const source=sources.find(s=>s.id===sourceId);
+  if(!source)throw new Error('fixture source not selected');
+  return {sourceId,sha256:sourceSha256(source.sourceText),
+   gitBlob:source.origin.gitBlob,origin:source.origin,execute};
+ };
+ const registry={
+  'orders.appInit':get('orders-init',ctx=>ordersBusinessInit(Object.freeze({
+   ...ctx,config:Object.freeze({mode:'demo'}),bindings:Object.freeze(['approveQuote'])
+  }))),
+  'tally.assessTaskEvidence':get('tally-business',input=>tallyBusiness.assessTaskEvidence(input)),
+  'tally.projectReleaseReadiness':get('tally-release',input=>tallyRelease.projectReleaseReadiness(input)),
+  'runx.createPresenceObserver':get('runx-presence',clock=>new EnvironmentAgentPresence(clock)),
+  'xdownload.describePolicy':get('xdownload-business',()=>xdownloadBusiness.getPolicy()),
+ };
+ return {artifact,program,sources,registry,expectedSourceOrigins};
+}

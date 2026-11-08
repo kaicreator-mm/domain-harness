@@ -1,0 +1,9 @@
+{
+  "name": "@kaicreator-example/dis-v020-native-sdk",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check native-fixture.mjs && node --check native-consumer.test.mjs",
+    "test": "node --import tsx --test native-consumer.test.mjs"
+  }
+}

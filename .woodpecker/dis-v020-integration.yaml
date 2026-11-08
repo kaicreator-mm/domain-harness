@@ -22,4 +22,8 @@ steps:
       - node --import tsx --test examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs
       - node --import tsx --test examples/dis-v020-cross-project/consumer.test.mjs
       - node --import tsx --test examples/dis-v020-cross-project/selected-build.test.mjs
+      - node --check packages/contracts/dis-v020.mjs
+      - node --check tooling/build/dis-v020.mjs
+      - node --check packages/microkernel/dis-v020.mjs
+      - node --import tsx --test examples/dis-v020-native-sdk/native-consumer.test.mjs
       - node --import tsx --test tests/assembly/v010-c01-external-effect.test.ts

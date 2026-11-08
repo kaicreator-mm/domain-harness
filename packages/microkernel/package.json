@@ -13,11 +13,17 @@
     "./host-seam": {
       "types": "./dist/host-seam.d.ts",
       "import": "./dist/host-seam.js"
+    },
+    "./dis-v020": {
+      "types": "./dis-v020.d.mts",
+      "import": "./dis-v020.mjs"
     }
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "dis-v020.mjs",
+    "dis-v020.d.mts"
   ],
   "engines": {
     "node": ">=24.0.0"
