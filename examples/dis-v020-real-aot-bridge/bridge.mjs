@@ -5,6 +5,12 @@ import {init as selectedBusinessInit} from './business-app-init.mjs';
 const reject=code=>{throw Object.assign(new Error(code),{code})};
 const digest=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
 const key=(e,f)=>e+'.'+f;
+// An opaque in-process proof that this projection came from validation against the
+// exact selected BUILD object; a cloned plain-data projection has no authority.
+const qualifiedProjections=new WeakMap();
+const selectedFingerprint=built=>digest({subject:built.subjectDigest,app:built.appId,target:built.targetProfile,
+ routes:built.routes,modules:built.modules.map(m=>({packageId:m.packageId,role:m.role,abiVersion:m.abiVersion,
+ moduleSha256:m.moduleSha256,provides:m.provides,requires:m.requires,capabilityId:m.capabilityId,handlers:m.handlers}))});
 function deepFreeze(value){if(value!==null&&typeof value==='object'){for(const v of Object.values(value))deepFreeze(v);Object.freeze(value)}return value}
 const initModuleURL=new URL('./business-app-init.mjs',import.meta.url);
 export async function initSourceHash(){return digest(await readFile(initModuleURL,'utf8'))}
@@ -53,19 +59,29 @@ export async function compileProjection(manifest,built){
  }
  for(const pkg of built.modules){if(digest(pkg.moduleSource)!==pkg.moduleSha256)reject('AOT_MODULE_BYTES_DRIFT')}
  const routeView=Object.freeze({get:id=>routes.get(id),keys:()=>Object.freeze([...routes.keys()])});
- return Object.freeze({manifest:deepFreeze(structuredClone(manifest)),buildSubject:built.subjectDigest,projectionDigest:digest({manifest,build:built.subjectDigest}),routes:routeView});
+ const projection=Object.freeze({manifest:deepFreeze(structuredClone(manifest)),buildSubject:built.subjectDigest,
+  projectionDigest:digest({manifest,build:built.subjectDigest}),routes:routeView});
+ qualifiedProjections.set(projection,Object.freeze({built,selectedFingerprint:selectedFingerprint(built)}));
+ return projection;
 }
 export function createActivation({projection,built,load,store,testMode='demo'}){
+ const qualification=qualifiedProjections.get(projection);
+ if(!qualification)reject('PROJECTION_NOT_QUALIFIED');
+ if(qualification.built!==built)reject('PROJECTION_BUILD_INSTANCE_MISMATCH');
  let state='NEW',sdkApp=null,attempt=0,available=new Set();
  return Object.freeze({
  get state(){return state},
  async start(){
   if(state!=='NEW')reject('APP_INIT_REPEATED');state='STARTING';attempt++;
   try{
+   if(selectedFingerprint(built)!==qualification.selectedFingerprint||
+     built.modules.some(m=>digest(m.moduleSource)!==m.moduleSha256))reject('AOT_ACTIVATION_DRIFT');
    sdkApp=await load(built,{store,tenantId:'tenant:dis-v020-bridge'});
+   if(state!=='STARTING')reject('APP_START_CANCELLED');
    const context=Object.freeze({appIdentity:built.appId,activationIdentity:'demo:'+built.subjectDigest+':'+attempt,
      buildPin:built.subjectDigest,config:Object.freeze({mode:testMode}),bindings:Object.freeze([...projection.routes.keys()])});
    const result=await selectedBusinessInit(context);
+   if(state!=='STARTING')reject('APP_START_CANCELLED');
    if(!result||!['READY','DEGRADED'].includes(result.status))reject('APP_INIT_BLOCKED');
    const missing=result.unavailableOptionalServices??[];
    if(result.status==='READY'&&missing.length)reject('APP_INIT_INVALID_READY');
@@ -73,11 +89,13 @@ export function createActivation({projection,built,load,store,testMode='demo'}){
    if(!missing.every(id=>projection.routes.get(id)?.optional===true))reject('APP_INIT_MANDATORY_DEGRADED');
    available=new Set([...projection.routes.keys()].filter(id=>!missing.includes(id)));
    state=result.status;return result;
-  }catch(e){state='FAILED';sdkApp?.stop();throw e}
+  }catch(e){if(state!=='STOPPED')state='FAILED';sdkApp?.stop();throw e}
  },
- async invoke(id,{messageId,instanceKey,input}){
+ async invoke(id,params){
   if(!['READY','DEGRADED'].includes(state))reject('APP_NOT_READY');
   if(!available.has(id))reject('INGRESS_UNAVAILABLE');
+  if(!params||typeof params!=='object'||Array.isArray(params))reject('INGRESS_INPUT_INVALID');
+  const {messageId,instanceKey,input}=params;
   if(typeof messageId!=='string'||typeof instanceKey!=='string'||!input||typeof input!=='object')reject('INGRESS_INPUT_INVALID');
   const route=projection.routes.get(id);
   return await sdkApp.send({intentType:route.intentType,messageId,instanceKey,input});

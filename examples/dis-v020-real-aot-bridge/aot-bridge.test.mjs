@@ -107,3 +107,37 @@ test('unselected business-init callback is ignored: selected bytes own initializ
  const a=createActivation({projection,built,load,store:new PlainCasDocStore(),appInit:async()=>{unselectedCalls++;return {status:'BLOCKED'}}});
  try{assert.equal((await a.start()).status,'READY');assert.equal(unselectedCalls,0)}finally{a.stop()}
 });
+
+test('caller-cloned or forged projection cannot activate a trusted BUILD',async()=>{
+ const {projection}=await setup();
+ assert.throws(()=>createActivation({projection:{...projection},built,load,store:new PlainCasDocStore()}),code('PROJECTION_NOT_QUALIFIED'));
+});
+test('same-identities cloned BUILD cannot replace selected compiled instance',async()=>{
+ const {projection}=await setup();
+ assert.throws(()=>createActivation({projection,built:{...built},load,store:new PlainCasDocStore()}),code('PROJECTION_BUILD_INSTANCE_MISMATCH'));
+});
+test('business ingress missing input has a typed denial',async()=>{
+ const {activation}=await setup();
+ try{await activation.start();await assert.rejects(activation.invoke('approveQuote'),code('INGRESS_INPUT_INVALID'))}finally{activation.stop()}
+});
+test('stopped real SDK facade cannot re-open business ingress',async()=>{
+ const {activation}=await setup();
+ await activation.start();activation.stop();
+ await assert.rejects(activation.invoke('approveQuote',{messageId:'msg:stopped',instanceKey:'instance:stopped',input:{}}),code('APP_NOT_READY'));
+});
+test('stop racing an in-flight real Microkernel load cancels App Init and closes facade',async()=>{
+ const {projection}=await setup();let release;const pending=new Promise(resolve=>{release=resolve});let closes=0;
+ const delayedLoad=async(...args)=>{const app=await load(...args);await pending;return {...app,stop(){closes++;app.stop()}}};
+ const a=createActivation({projection,built,load:delayedLoad,store:new PlainCasDocStore()});
+ const starting=a.start();assert.equal(a.state,'STARTING');a.stop();release();
+ await assert.rejects(starting,code('APP_START_CANCELLED'));
+ assert.equal(a.state,'STOPPED');assert.equal(closes,1);
+ await assert.rejects(a.invoke('approveQuote',{messageId:'msg:cancelled',instanceKey:'instance:cancelled',input:{}}),code('APP_NOT_READY'));
+});
+test('two concurrent App Init attempts cannot double-start the selected Package',async()=>{
+ const {projection}=await setup();let release;const pending=new Promise(resolve=>{release=resolve});
+ const deferred=async(...args)=>{const app=await load(...args);await pending;return app};
+ const a=createActivation({projection,built,load:deferred,store:new PlainCasDocStore()});
+ const first=a.start();await assert.rejects(a.start(),code('APP_INIT_REPEATED'));
+ a.stop();release();await assert.rejects(first,code('APP_START_CANCELLED'));
+});

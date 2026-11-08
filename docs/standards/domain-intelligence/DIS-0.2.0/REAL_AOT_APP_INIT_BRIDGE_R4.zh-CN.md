@@ -40,3 +40,14 @@ Woodpecker 专用 dis-v020-integration 流水线增加该 Demo，移除不再符
 - **P1：App Init 被当作调用方可替换 callback。** SHA256 虽锁定了原始 Business Init 源码，但调用方仍能传入另一段函数，造成“锁定 A、运行 B”。修复为桥接运行时**仅调用所选 Business Init 模块的固定导出**；拒绝把外部 callback 当作权威。阻塞/降级负例由被锁定模块自身的 Demo 配置触发，保留完整可测性。
 
 原先 16 项测试保留，并新增 2 项负面验证：Route/Manifest 的不可变性，以及尝试注入外部 Business Init callback 无法改变已选源码行为。**R4.1 精确 HEAD 的 18 项测试须重新取得 Woodpecker PASS，不能把 R4 的旧 PASS 继承给变更后代码**。本阶段仍是 Sidecar Bridge 而非已发布 SDK ABI。
+
+## 6. R4.2 Demo 自对抗：投影资格与初始化竞态
+
+本轮在 R4.1 的真实 `buildV10App → load → App Init` 成功证据上继续审查，发现两个跨越编译与激活边界的缺陷：
+
+1. **P1：只读路由对象可以被整体伪造或在激活时换用另一份 Built App。** 仅比较 `subjectDigest` 的公开字符串无法证明某个调用方提供的投影确实由编译/验证步骤生成。修复：由 `compileProjection()` 在模块私有 WeakMap 中给原始投影登记可信构建对象及选定 Function/Package/Handler 指纹；`createActivation()` 只接受已登记的原投影与同一 `V10BuiltApp` 实例，`start()` 在真正 `load` 前再次比对选定构建闭包指纹和模块源码摘要。不能从外部输入自颁证据。这个 WeakMap 只是进程内 Demo 的真实性证明，**不是跨进程签名或正式 AOT 发布凭据**。
+2. **P1：`stop()` 与异步 `load()` 并发时可能将已停止的 App 重新置为 READY，或未关闭迟到返回的 SDK facade。** 修复：在真实 SDK `load` 完成后及 Business Init 完成后分别检查启动状态；已停止则以 `APP_START_CANCELLED` 拒绝，关闭真实 SDK facade，保持 STOPPED；二次启动也不可重复初始化。
+
+同时修复 `invoke` 未提供参数时抛原生解构 TypeError 的问题，统一为 `INGRESS_INPUT_INVALID`。保留 R4.1 原有 18 项测试，新增 6 项负面/竞态用例，合计 **24 项**。它们在同一 `dis-v020-integration` Woodpecker lane 中通过真实 BUILD/SDK 路径验证。
+
+**验证边界**：在本 R4.2 精确 SHA 对应 CI 得到成功回执之前，只记录 `COMMITTED_PENDING_CI`，不继承前一提交的 PASS。示例中依赖闭包内自建代码仍视为可信；不恢复 OS 级任意敌意原生代码隔离门禁。业务权限、KDP Effect 与回执、Package 源码真实性和失败清理保持强制约束。真实进程重启/持久化投影资格和正式 DIS v0.2.0 SDK 原生 ABI 仍需后续实现。
