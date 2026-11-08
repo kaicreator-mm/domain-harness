@@ -1,0 +1,24 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B02",
+  "roundId": "B02-02",
+  "globalRoundId": "R36",
+  "status": "CI_PENDING",
+  "startParent": "2181072c1a5101366b90ec8aa2c65dde9c571b15",
+  "sourceHead": null,
+  "finalTree": null,
+  "receipt": null,
+  "testPath": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+  "positive": [
+    "B02-02 R36 Chat Form and CLI real native consumers converge on the same authorized-by-none structured Intent",
+    "B02-02 R36 no confirmation in any channel remains pending and never starts a KDP Effect"
+  ],
+  "negative": [
+    "B02-02 R36 all adapters refuse invented execution or ambiguous repeated Form fields before native dispatch"
+  ],
+  "requirements": [
+    "DIS020-CORE-014"
+  ],
+  "sourceBoundary": "Real UI-neutral adapters use Chat message, HTML Form URLSearchParams, CLI argv. No actual browser UI or external device. READY_FOR_KDP is not an Effect permit.",
+  "ciStatus": "PENDING"
+}

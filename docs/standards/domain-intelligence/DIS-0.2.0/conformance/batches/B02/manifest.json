@@ -32,7 +32,7 @@
     {
       "batchRoundId": "B02-02",
       "globalRoundId": "R36",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "requirementIds": [
         "DIS020-CORE-014"
       ],
