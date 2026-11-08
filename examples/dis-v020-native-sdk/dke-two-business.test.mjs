@@ -194,3 +194,248 @@ test('R24 source-currentness and reverse dependencies fail closed across both se
  await assert.rejects(f.activate({registry:fake}),reject('DIS_LOCAL_REGISTRY_MISMATCH'));
  await assert.rejects(f.activate({expectedDigest:'0'.repeat(64)}),reject('DIS_INSTALLED_AOT_MISMATCH'));
 });
+
+
+// R25: upstream Tally graph has a REAL 793→807 source evolution (14 records).
+// This bounded input retains only the changed records, NOT the full 807-node KG.
+// Independent selected Business readers have source-pinned R25 Function implementations.
+import {inspectR25 as inspectEd06R25} from './dke-r25-ed06-reader.mjs';
+import {inspectR25 as inspectCrossviewR25} from './dke-r25-crossview-reader.mjs';
+
+const R25_SNAPSHOT_ID='dke-r25-tally-change';
+const R25_SRC_COMMIT='58971e8c7123d062821060f11ef821aa8dad82e7';
+const R25_VERSIONS=Object.freeze({
+ before:Object.freeze({
+  filename:'dke-r25-tally-793.json',
+  blob:'617e494118c31bebeafab0300d5bd8469e44e6b2',
+  tallyBlob:'2d4498dfa5f90bcf57cc81e9c155fb9ede31bf00',
+  tallyCommit:'ab5c8231e871fb3df18df05176943d2a97c997f5',count:793
+ }),
+ after:Object.freeze({
+  filename:'dke-r25-tally-807.json',
+  blob:'3849e4c96aa4abc3a87cd845511b12726e601689',
+  tallyBlob:'b6dc804d3ccc3aac7ce818533c2948f54b34644a',
+  tallyCommit:'a8f4986b099aba27cd86ce6a78e1c19159d1de55',count:807
+ })
+});
+const R25_READERS=Object.freeze([
+ Object.freeze({
+  packageId:'business-dke-ed06-observation@0.0.1-demo',
+  id:'dke-r25-ed06-source',functionId:'dke.r25.ed06.inspect',
+  file:'dke-r25-ed06-reader.mjs',
+  blob:'5df4d7777ca2cb559c65f030d20b05e6e73a9c41',
+  execute:inspectEd06R25
+ }),
+ Object.freeze({
+  packageId:'business-dke-crossview-observation@0.0.1-demo',
+  id:'dke-r25-crossview-source',functionId:'dke.r25.crossview.inspect',
+  file:'dke-r25-crossview-reader.mjs',
+  blob:'5e98149b50cca5a83749a737bf1817c5065a060f',
+  execute:inspectCrossviewR25
+ })
+]);
+const R25_CONTRACT={
+ schema:'dis.v0.2.function-contract/1',version:'1.0.0',
+ input:{type:'record',fields:{cqId:'string'},additionalProperties:false},
+ output:{type:'record',fields:{
+  status:'string',cqId:'string',sourceStatus:'string',sourceRefs:'array',
+  evidenceRefs:'array',reason:'string',consumerId:'string'
+ },additionalProperties:false},
+ outcomes:{field:'status',classes:{UNKNOWN:'UNKNOWN',OBSERVED:'OBSERVED'}},
+ evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']},
+ compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
+};
+const R25_READER_IDS=R25_READERS.map(r=>r.functionId).sort();
+const r25Origin=(filename)=>({
+ repository:'kaicreator-mm/domain-harness',commit:R25_SRC_COMMIT,
+ path:'examples/dis-v020-native-sdk/'+filename
+});
+function readR25Version(version){
+ const d=R25_VERSIONS[version];
+ if(!d)throw Error('R25_UNKNOWN_VERSION');
+ const bytes=readFileSync(new URL('./fixtures/'+d.filename,import.meta.url));
+ assert.equal(gitBlob(bytes),d.blob);
+ const data=JSON.parse(bytes.toString('utf8'));
+ assert.equal(data.source.repository,'kaicreator-mm/tally');
+ assert.equal(data.source.path,'docs/versions/v2.1.1/knowledge/generated/graph.jsonld');
+ assert.equal(data.source.commit,d.tallyCommit);
+ assert.equal(data.source.gitBlob,d.tallyBlob);
+ assert.equal(data.source.totalGraphNodes,d.count);
+ assert.equal(data.sourceQualification,'PENDING_INDEPENDENT_REVIEW');
+ assert.equal(data.records.length,version==='before'?0:14);
+ assert.equal(data.stableOriginalProjection.gitBlob,'47cd14bd7ddaeb45c46f445e5f59ff3b5338d23a');
+ assert.equal(data.stableOriginalProjection.existingIds.length,19);
+ return{data,sourceText:bytes.toString('utf8'),source:{
+  ...r25Origin('fixtures/'+d.filename),gitBlob:d.blob
+ }};
+}
+function assertR25SelectedConsumers(artifact){
+ const q=qualifyDisV020Artifact(artifact);
+ const names=q.sourceConsumers.get(R25_SNAPSHOT_ID);
+ if(JSON.stringify(names)!==JSON.stringify(R25_READER_IDS)){
+  const error=new Error('DKE_R25_SOURCE_CONSUMER_CLOSURE_MISSING');
+  error.code=error.message;
+  throw error;
+ }
+ for(const r of R25_READERS){
+  assert.equal(q.functions.get(r.functionId)?.element.packageId,r.packageId);
+  assert.deepEqual(q.functions.get(r.functionId)?.definition.sourceDependencies,[R25_SNAPSHOT_ID]);
+ }
+ return q;
+}
+async function fixtureR25(version){
+ const baseline=await fixture(),selected=readR25Version(version);
+ const program=structuredClone(baseline.program);
+ const sources=[...baseline.sources,{
+  id:R25_SNAPSHOT_ID,sourceText:selected.sourceText,origin:selected.source
+ }];
+ const expectedSourceOrigins={...baseline.expectedSourceOrigins,
+  [R25_SNAPSHOT_ID]:selected.source
+ };
+ const registry={...baseline.registry};
+ for(const reader of R25_READERS){
+  const bytes=readFileSync(new URL('./'+reader.file,import.meta.url));
+  assert.equal(gitBlob(bytes),reader.blob);
+  const code=bytes.toString('utf8');
+  const origin={...r25Origin(reader.file),gitBlob:reader.blob};
+  sources.push({id:reader.id,sourceText:code,origin});
+  expectedSourceOrigins[reader.id]=origin;
+  const element=program.elements.find(e=>e.packageId===reader.packageId&&e.kind==='knowledge');
+  assert.ok(element,'R25 must attach only to an ACTUALLY selected Business package');
+  element.functions.push({
+   id:reader.functionId,kind:'knowledge',effect:'none',
+   binding:{type:'local',sourceId:reader.id},
+   contract:structuredClone(R25_CONTRACT),
+   sourceDependencies:[R25_SNAPSHOT_ID]
+  });
+  registry[reader.functionId]={
+   sourceId:reader.id,sha256:sourceSha256(code),
+   gitBlob:reader.blob,origin,
+   execute:input=>reader.execute(selected.data,input)
+  };
+ }
+ const artifact=compileDisV020Aot({
+  built:baseline.built,program,sources,expectedSourceOrigins
+ });
+ assertR25SelectedConsumers(artifact);
+ const activate=(options={})=>loadDisV020Aot(artifact,{
+  expectedDigest:options.expectedDigest??artifact.digest,
+  registry:options.registry??registry,store:new PlainCasDocStore(),
+  tenantId:'tenant:dke-r25-versioned-two-business'
+ });
+ return{...baseline,version,sourceData:selected.data,sources,expectedSourceOrigins,
+  registry,program,artifact,activate};
+}
+function demandCurrentRevision(artifact,currentFixture){
+ // Consumer-application / installer-owned trust anchor, not a dynamic LLM
+ // authority. Generic DIS SDK already needs expectedDigest from installer.
+ const actual=qualifyDisV020Artifact(artifact).pins.get(R25_SNAPSHOT_ID);
+ const expected=qualifyDisV020Artifact(currentFixture.artifact).pins.get(R25_SNAPSHOT_ID);
+ if(!actual||!expected||actual.sha256!==expected.sha256||
+    actual.origin.gitBlob!==expected.origin.gitBlob||
+    actual.origin.commit!==expected.origin.commit){
+  const e=new Error('DKE_R25_SOURCE_REVISION_STALE');e.code=e.message;throw e;
+ }
+ return true;
+}
+
+test('R25 authentic Tally 793→807 Git corpus content difference is 14 original PENDING_REVIEW nodes',()=>{
+ const before=readR25Version('before').data,after=readR25Version('after').data;
+ assert.equal(before.records.length,0);
+ assert.equal(after.records.length,14);
+ assert.notEqual(before.source.gitBlob,after.source.gitBlob);
+ const oldSelected=new Set(before.records.map(n=>n['@id']));
+ assert.equal(after.records.filter(n=>!oldSelected.has(n['@id'])).length,14);
+ assert.equal(after.records.filter(n=>n['@type']==='se:Case').length,2);
+ assert.equal(after.records.filter(n=>n['@type']==='se:Evidence').length,5);
+ const byId=new Map(after.records.map(n=>[n['@id'],n]));
+ for(const [cqId,caseId] of Object.entries(after.selectedCqs)){
+  assert.equal(before.selectedCqs[cqId],caseId);
+  assert.equal(byId.get(caseId)['se:lifecycle_status'],'PENDING_REVIEW');
+  assert.equal(byId.get(caseId)['se:synthetic'],false);
+ }
+ assert.equal(before.stableOriginalProjection.existingIds.join(','),
+  after.stableOriginalProjection.existingIds.join(','));
+});
+test('R25 old and new selected AOT actually replay both Business readers, changing only source-bound incident CQs',async()=>{
+ const old=await fixtureR25('before'),fresh=await fixtureR25('after');
+ assert.notEqual(old.artifact.digest,fresh.artifact.digest);
+ assert.equal(old.artifact.built.subjectDigest,fresh.artifact.built.subjectDigest);
+ assert.deepEqual(assertR25SelectedConsumers(old.artifact).sourceConsumers.get(R25_SNAPSHOT_ID),R25_READER_IDS);
+ assert.deepEqual(assertR25SelectedConsumers(fresh.artifact).sourceConsumers.get(R25_SNAPSHOT_ID),R25_READER_IDS);
+ const outcomes=[];
+ for(const [version,f] of [['before',old],['after',fresh]]){
+  const app=await f.activate();
+  try{
+   assert.equal(app.state,'READY');
+   for(const cqId of ['CQ-09F-CF','CQ-09F-GH']){
+    for(const reader of R25_READERS){
+     const x=await app.invoke(reader.functionId,{cqId},{expectedContractVersion:'1.0.0'});
+     assert.equal(x.kind,'OBSERVATION');
+     assert.equal(x.authority,'NONE');assert.equal(x.evidence.attested,false);
+     assert.equal(x.disposition,version==='before'?'UNKNOWN':'OBSERVED');
+     assert.equal(x.value.sourceStatus,version==='before'?'ABSENT':'PENDING_REVIEW');
+     assert.equal(x.value.evidenceRefs.length>0,version==='after');
+     assert.equal(x.evidence.source.gitBlob,reader.blob);
+     outcomes.push({version,cqId,reader:reader.functionId,status:x.disposition});
+    }
+   }
+   // The original 19-node projection + R24 crossview CQ did NOT change.
+   for(const pkg of materialized){
+    const x=await app.invoke(pkg.functionId,
+     {domain:'tally',cqId:'CQ-T-CROSSCUT'},{expectedContractVersion:'1.0.0'});
+    assert.equal(x.disposition,'UNKNOWN');
+    assert.equal(x.value.sourceStatus,'PENDING_REVIEW');
+    assert.equal(x.evidence.attested,false);
+   }
+  }finally{app.stop()}
+ }
+ assert.equal(outcomes.length,8);
+ assert.equal(outcomes.filter(x=>x.status==='OBSERVED').length,4);
+ assert.equal(outcomes.filter(x=>x.status==='UNKNOWN').length,4);
+});
+test('R25 installer refuses stale old AOT after real source selection changes, but builds fresh selected AOT',async()=>{
+ const old=await fixtureR25('before'),fresh=await fixtureR25('after');
+ assert.throws(()=>demandCurrentRevision(old.artifact,fresh),
+  reject('DKE_R25_SOURCE_REVISION_STALE'));
+ assert.equal(demandCurrentRevision(fresh.artifact,fresh),true);
+ await assert.rejects(old.activate({expectedDigest:fresh.artifact.digest}),
+  reject('DIS_INSTALLED_AOT_MISMATCH'));
+ const now=await fresh.activate();
+ try{
+  const r=await now.invoke(R25_READERS[0].functionId,{cqId:'CQ-09F-CF'});
+  assert.equal(r.disposition,'OBSERVED');
+  assert.equal(r.evidence.attested,false);
+ }finally{now.stop()}
+});
+test('R25 source selection, real evidence closure and independent reverse registration reject invalid updates',async()=>{
+ const f=await fixtureR25('after');
+ const omitted=structuredClone(f.program);
+ const second=omitted.elements.flatMap(e=>e.functions)
+  .find(x=>x.id===R25_READERS[1].functionId);
+ delete second.sourceDependencies; // valid omission but incomplete impact closure
+ const drift=compileDisV020Aot({
+  built:f.built,program:omitted,sources:f.sources,expectedSourceOrigins:f.expectedSourceOrigins
+ });
+ assert.equal(qualifyDisV020Artifact(drift).sourceConsumers.get(R25_SNAPSHOT_ID).length,1);
+ assert.throws(()=>assertR25SelectedConsumers(drift),
+  reject('DKE_R25_SOURCE_CONSUMER_CLOSURE_MISSING'));
+ const tampered=structuredClone(f.sources);
+ tampered.find(x=>x.id===R25_SNAPSHOT_ID).sourceText+=' ';
+ assert.throws(()=>compileDisV020Aot({
+  built:f.built,program:f.program,sources:tampered,expectedSourceOrigins:f.expectedSourceOrigins
+ }),reject('DIS_BUILD_SOURCE_BYTES_DRIFT'));
+ const missing=structuredClone(f.sourceData);
+ missing.records=missing.records.filter(n=>n['@id']!=='se:EVD-09F-CF-SHARED-DEPENDENCY');
+ for(const reader of R25_READERS){
+  assert.throws(()=>reader.execute(missing,{cqId:'CQ-09F-CF'}),
+   reject('DKE_R25_EVIDENCE_CLOSURE_INVALID'));
+ }
+ const unreviewed=structuredClone(f.sourceData);
+ unreviewed.records.find(n=>n['@id']==='se:CASE-09F-CF-KV-DEPENDENCY')['se:lifecycle_status']='ACCEPTED';
+ for(const reader of R25_READERS){
+  assert.throws(()=>reader.execute(unreviewed,{cqId:'CQ-09F-CF'}),
+   reject('DKE_R25_CASE_INVALID'));
+ }
+});
+
