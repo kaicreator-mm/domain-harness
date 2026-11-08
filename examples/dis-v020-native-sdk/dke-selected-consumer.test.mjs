@@ -337,7 +337,9 @@ test('R23 two distinct AOT-selected LOCAL implementations read the same exact so
 test('R23 reverse dependency omission is detected by independent exact-selected-reader manifest',async()=>{
  const f=await makeR23DualReaderFixture(),program=structuredClone(f.program);
  const fn=program.elements.flatMap(e=>e.functions).find(x=>x.id===CROSS_FUNCTION_ID);
- fn.sourceDependencies=[];
+ // An explicit [] is already invalid under the public DIS sourceDependencies schema.
+ // Omitting the optional field is the actual representable missing-edge case.
+ delete fn.sourceDependencies;
  const bad=compileDisV020Aot({
   built:f.artifact.built,program,sources:f.sources,
   expectedSourceOrigins:f.expectedSourceOrigins
