@@ -1,0 +1,26 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B02",
+  "roundId": "B02-03",
+  "globalRoundId": "R37",
+  "status": "CI_PENDING",
+  "startParent": "d79e83c8536afee6aa406b090e1fa086f439f038",
+  "sourceHead": null,
+  "finalTree": null,
+  "receipt": null,
+  "testPath": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+  "positive": [
+    "B02-03 R37 selected Interaction and its governed Effect bind to distinct native Function authorities"
+  ],
+  "negative": [
+    "B02-03 R37 private token URL is rejected through all three native channels without Effect ingress",
+    "B02-03 R37 oversized confirmed intent and invented authorization are rejected before KDP",
+    "B02-03 R37 native SDK stop rejects further interaction with no hidden auto-resume"
+  ],
+  "requirements": [
+    "DIS020-CORE-008",
+    "DIS020-CORE-014"
+  ],
+  "sourceBoundary": "Bounded channel-adapter security and selected KDP Function, no physical Effect, no OS-target selection evidence.",
+  "ciStatus": "PENDING"
+}
