@@ -14,7 +14,13 @@ steps:
     commands:
       - git --version && node --version && npm --version
       - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
-      - npm ci
+      # better-sqlite3's install script downloads its prebuilt binary from
+      # github.com releases. That egress is unreliable on this worker (#2228:
+      # prebuild-install got 504s and fell back to node-gyp, which needs make
+      # the image does not ship). npmmirror mirrors every release asset 1:1 and
+      # prebuild-install honors npm_config_<pkg>_binary_host_mirror natively
+      # (lib/util.js getHostMirrorUrl).
+      - npm_config_better_sqlite3_binary_host_mirror=https://registry.npmmirror.com/-/binary/better-sqlite3 npm ci
       - npm run build
       - node --check examples/dis-v020-sdk-integration/test.mjs
       - node --test examples/dis-v020-sdk-integration/test.mjs

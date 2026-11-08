@@ -16,6 +16,8 @@ steps:
       - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
       - node --version && npm --version
       - node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(1);'
-      - npm ci
+      # See dis-v020-integration.yaml: pin the better-sqlite3 prebuild download
+      # to the npmmirror binary mirror; direct github.com egress is unreliable.
+      - npm_config_better_sqlite3_binary_host_mirror=https://registry.npmmirror.com/-/binary/better-sqlite3 npm ci
       - npm run build
       - node --import tsx --test tests/compiler/v010-import-hook-registry.test.ts tests/compiler/v010-public-api-boundary.test.ts
