@@ -98,6 +98,9 @@ test('native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCA
  const f=await fixturePromise,p=clone(f.program);
  const e=p.elements.find(x=>x.id==='xdownload.acquire').functions[0];
  e.binding={type:'local',sourceId:'xdownload-business'};
+ // R19 installs a typed receipt contract on this KDP Function. Strip it so the
+ // only violation here is the downgrade itself, not the receipt binding rule.
+ delete e.receiptContract;
  assert.throws(()=>compile(f,p),reject('DIS_LOCAL_NOT_QUALIFIED'));
 });
 test('native compiler refuses xDownload Function bound to a foreign Tally Business Package',async()=>{
