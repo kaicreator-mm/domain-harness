@@ -1,0 +1,27 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B02",
+  "roundId": "B02-01",
+  "globalRoundId": "R35",
+  "status": "CI_PENDING",
+  "startParent": "8ad01592e6f3d4ccc533be12b170a957e0da99ab",
+  "sourceHead": null,
+  "finalTree": null,
+  "receipt": null,
+  "testPath": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+  "positive": [
+    "B02-01 R35 real selected Tally and xDownload Business packages resolve original source and KDP implementation without target fiction"
+  ],
+  "negative": [
+    "B02-01 R35 install refuses tampered selected module bytes or unbound source before KDP boot",
+    "B02-01 R35 undeclared runtime Target selection is rejected, not implicitly treated as Windows/Linux/Android conformance"
+  ],
+  "requirements": [
+    "DIS020-CORE-008"
+  ],
+  "sourceBoundary": "Actual selected Tally/xDownload Business and capability route only; no target-specific multi-OS AOT. Real Host operations not invoked.",
+  "ciStatus": "PENDING",
+  "notes": [
+    "Source-pinned package and KDP Route selection is not a proof of Windows/Linux/Android Target specialization."
+  ]
+}

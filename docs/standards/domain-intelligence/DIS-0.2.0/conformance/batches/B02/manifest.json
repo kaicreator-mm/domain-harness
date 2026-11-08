@@ -1,0 +1,61 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B02",
+  "status": "IN_PROGRESS",
+  "mode": "DELIVERY_FIRST_SEQUENTIAL_COMMITS_WITH_INDEPENDENT_EXACT_SHA_ROUND_RECEIPTS",
+  "masterIssue": 1499,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "8ad01592e6f3d4ccc533be12b170a957e0da99ab",
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1,
+    "ci": "Woodpecker #2277/1-3 SUCCESS"
+  },
+  "target": "C3: real selected Package/Target applicability boundary and actual Chat/Form/CLI interaction without invented Effect or hardware target",
+  "roundCount": 3,
+  "rounds": [
+    {
+      "batchRoundId": "B02-01",
+      "globalRoundId": "R35",
+      "status": "CI_PENDING",
+      "requirementIds": [
+        "DIS020-CORE-008"
+      ],
+      "testPath": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+      "sourceHead": null,
+      "receipt": null
+    },
+    {
+      "batchRoundId": "B02-02",
+      "globalRoundId": "R36",
+      "status": "PLANNED",
+      "requirementIds": [
+        "DIS020-CORE-014"
+      ],
+      "testPath": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+      "sourceHead": null,
+      "receipt": null
+    },
+    {
+      "batchRoundId": "B02-03",
+      "globalRoundId": "R37",
+      "status": "PLANNED",
+      "requirementIds": [
+        "DIS020-CORE-008",
+        "DIS020-CORE-014"
+      ],
+      "testPath": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+      "sourceHead": null,
+      "receipt": null
+    }
+  ],
+  "roundArtifactContract": "Each round Git committed and records ROUND.md / round.json / source test Git Blob; exact-SHA three CI statuses in own receipts; no automatic Core promotion. Batch-level final replay may requalify unchanged earlier test Blob; original failed CI retained.",
+  "targetBoundary": "Current DIS AOT does not declare Target-specific OS/architecture. Do not equate actual Node Demo with complete Windows/Linux/Android Target selection. Product/L1 target applicability unresolved.",
+  "closure": "3/3 bounded rounds need exact source- and CI-qualified evidence, then write BATCH_SUMMARY.md plus matrix receipts; not full DIS Core closure",
+  "noAutomaticFreeze": true,
+  "noGitHubActions": true
+}
