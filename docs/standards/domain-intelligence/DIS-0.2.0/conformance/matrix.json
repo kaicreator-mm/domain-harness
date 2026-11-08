@@ -13,7 +13,8 @@
   "receipts": [
     "r9.5-baseline",
     "r10-candidate-blocked",
-    "r10-ci-recovery"
+    "r10-ci-recovery",
+    "r11-integration-blocked"
   ],
   "requirements": [
     {
@@ -108,7 +109,7 @@
         }
       ],
       "receiptIds": [],
-      "note": "R11 candidate attaches opt-in AOT-locked Function Contract to real Tally and xDownload native LOCAL Functions: bounded record I/O, declared typed outcome, source-pin provenance, declared evidence requirement and explicit reader/major version guard. NOT CI-VERIFIED YET. No complete schema vocabulary, independent domain evidence attestation, KDP_INTENT typing, all-Function profile or cross-version structural compatibility proof; PARTIAL."
+      "note": "R11 candidate attaches opt-in AOT-locked Function Contract to real Tally and xDownload native LOCAL Functions: bounded record I/O, declared typed outcome, source-pin provenance, declared evidence requirement and explicit reader/major version guard. Historical R11 integration CI FAILURE pinned by r11-integration-blocked; not a success receipt. Separate source audit found a stale conformance test state assumption, but the first failing CI step is unknown without logs. NOT CI-VERIFIED YET. No complete schema vocabulary, independent domain evidence attestation, KDP_INTENT typing, all-Function profile or cross-version structural compatibility proof; PARTIAL."
     },
     {
       "id": "DIS020-CORE-004",

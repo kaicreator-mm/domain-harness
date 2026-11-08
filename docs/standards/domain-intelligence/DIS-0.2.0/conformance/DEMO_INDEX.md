@@ -10,10 +10,10 @@
 
 本轮要回答的是：**DIS 0.2.0 的 Element/Function、AOT、SDK/KDP、真实 Domain 消费与被选择的可选 Profile 是否能在可复现的真实实现里满足各自的可证伪契约？** 不是“测试数量能否增加”、不是“模拟器能否输出 PASS”，也不是“所有生产应用都已迁移”。每次 study 使用 r0/r1 等**实验修订号**，不创建 DIS 0.2.1/新的 Product SemVer；测试/失败修复只更新现有 Draft PR 的 Git 产物，旧 commit/receipt 仍可从历史精确定位。
 
-- **输入**：优先复用 R7 的真实原项目源码 Pin（Tally @ \`e988321439f65b55936a691c02250b6d62a29409\`、Runx @ \`b9e0c953d9bfd5834315012426fd8e10c21bdd7c\`、xDownload @ \`e904f08c478b15147b1c07fbe53c610d2d81851f\`），及已选 KDP/真实 SQLite/C01 物理回归。固定输入只证明被 Pin 的提交，不是外部项目当日 HEAD、独立语义 Oracle 或生产资格。
+- **输入**：优先复用 R7 的真实原项目源码 Pin（Tally @ `e988321439f65b55936a691c02250b6d62a29409`、Runx @ `b9e0c953d9bfd5834315012426fd8e10c21bdd7c`、xDownload @ `e904f08c478b15147b1c07fbe53c610d2d81851f`），及已选 KDP/真实 SQLite/C01 物理回归。固定输入只证明被 Pin 的提交，不是外部项目当日 HEAD、独立语义 Oracle 或生产资格。
 - **真实/模拟分界**：R2 FakeLLM、fixture Oracle、in-memory 经验晋升属于自演示；R4 Sidecar、R6 SQLite、R7 源码重放、R9 Public SDK 的资格**只按对应精确 SHA 的真实 CI**认定，不能把桥接称为已发布的正式 ABI。
 - **Effect 与信任**：自建可信封闭原生代码的任意敌意 OS 沙箱明确 OUT_OF_SCOPE；KDP 真实 effect admission/Journal/receipt、Evidence currentness、未选 Function/Provider 拒绝、UNKNOWN fail-closed 继续在适用范围内验证。用户界面上的 READY 不等于 KDP 许可。
-- **证据不混算**：\`SOURCE_PIN / SEMANTIC_INTERPRETATION / NATIVE_EXECUTION / INDEPENDENT_AUTHORITY\` 是解释性维度，不是新 ADS enum。Runner 崩溃不是反例成功；CI 的一个 context PASS 不代表另一个失败 context PASS。
+- **证据不混算**：`SOURCE_PIN / SEMANTIC_INTERPRETATION / NATIVE_EXECUTION / INDEPENDENT_AUTHORITY` 是解释性维度，不是新 ADS enum。Runner 崩溃不是反例成功；CI 的一个 context PASS 不代表另一个失败 context PASS。
 
 ## 2. 必要 Demo 目录及可证伪停止条件
 
@@ -33,7 +33,7 @@
 
 ## 3. 证据依赖图（不是 Frozen Task DAG）
 
-\`\`\`text
+```text
 D00 — 原有 R9.5/R10 source/CI 固定基线
  ├── D01 — Function typed I/O / Evidence  ★ 当前最早门槛：R11 CI FAIL
  ├── D02 — Element / Semantic（源与方案可先行；终验依赖 D01）
@@ -44,7 +44,7 @@ D00 — 原有 R9.5/R10 source/CI 固定基线
 D01 ──> D06 — Experience / Evidence（确定性路径可与 D05 并行）
 D05 ──> D07（仅当 Evolution 使用真实 LLM 候选）
 D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式决策
-\`\`\`
+```
 
 - **可并行**：D02 的语义反例与颗粒度分析、D03 的 UI adapter 调研、D04 的 Target 适用性确认，以及 D01 CI 根因定位；同一写集必须单 Writer、验证与修复合并。
 - **不可越过**：D01 未通过本次 exact SHA 集成，不能标记 R11 新 native tests SUCCESS；没有独立 Evidence Oracle 不能称 D06 VERIFIED；D05/D06/D07 的旧 Mock 自测不等于真实可选 Profile 合格。
@@ -61,9 +61,9 @@ D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式�
 | R4–R5 | [REAL_AOT_APP_INIT_BRIDGE_R4](../REAL_AOT_APP_INIT_BRIDGE_R4.zh-CN.md)、[bridge suite](../../../../../examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs) | 从 Sidecar 真实 BUILD/SDK 过渡到恢复；R4.3 27 项曾获专项 exact-SHA CI，后 R5 扩至 34；不能称 Sidecar 已发布 ABI | D00、D04 |
 | R6 | [PHYSICAL_TWO_DOMAIN_R6](../PHYSICAL_TWO_DOMAIN_R6.zh-CN.md)、[physical suite](../../../../../examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs) | 两个 Business Domain，真实 SQLite WAL/CAS KDP Journal 跨进程 idempotent replay；不是外部库存修改 | D00、D04 |
 | R7–R8 | [CROSS_PROJECT_CONSUMER_R7](../CROSS_PROJECT_CONSUMER_R7.zh-CN.md)、[CROSS_PROJECT_BUILD_R8](../CROSS_PROJECT_BUILD_R8.zh-CN.md)、[source manifest](../../../../../examples/dis-v020-cross-project/manifest.json) | 三个原项目固定来源；实际 original-source Function 与 canonical BUILD，未执行产品真实 GitHub/Runx Host/xDownload transfer | D00、D02、D04 |
-| R9–R9.5 | [NATIVE_ELEMENT_FUNCTION_AOT_R9](../NATIVE_ELEMENT_FUNCTION_AOT_R9.zh-CN.md)、[native test](../../../../../examples/dis-v020-native-sdk/native-consumer.test.mjs)、[r9.5 receipt](receipts/r9.5-baseline.json) | Exact HEAD \`7954bd91d51eb13fbeab96385f37ac8d9cd35c5e\`、TREE \`9250ad08f500bc8924458af1c833947c99ad0d4c\`；[CI 2223/1](https://ci.kaicreator.com/repos/18/pipeline/2223/1)、[2223/2](https://ci.kaicreator.com/repos/18/pipeline/2223/2)、[2223/3](https://ci.kaicreator.com/repos/18/pipeline/2223/3) 3/3 SUCCESS，97 named cases；仅对应矩阵 9 项窄范围 VERIFIED | D00 |
-| R10 | [INTERACTION_NATIVE_R10](../INTERACTION_NATIVE_R10.zh-CN.md)、[blocked history](receipts/r10-candidate-blocked.json)、[recovery](receipts/r10-ci-recovery.json) | 原 CI 2227 失败保留；修复 npm 预编译依赖下载 + 本地 Node24 pack inventory；Exact HEAD \`c9cc8d63e13b150cf462af05a58daef5748f0030\` 的 [CI 2229/1–3](https://ci.kaicreator.com/repos/18/pipeline/2229/1) 为 SUCCESS（103 named，含 6 Interaction）；后文档 HEAD \`771c5d2e00e597acb55b5881e6921a8ea9709630\` 的 2230/1–3 另行 3/3 SUCCESS；CORE-014 仍 PARTIAL | D00、D03 |
-| R11 | [FUNCTION_IO_OUTCOME_R11](../FUNCTION_IO_OUTCOME_R11.zh-CN.md)、[native test](../../../../../examples/dis-v020-native-sdk/native-consumer.test.mjs) | Exact HEAD \`4632d5e0b331f0119da0c8d78249b7c1437856a1\`、TREE \`8f347807680db455cc8627590bc3c60778b9e953\`；[CI 2232/1 integration FAILURE](https://ci.kaicreator.com/repos/18/pipeline/2232/1)、[2232/2 min-node SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2232/2)、[2232/3 verify SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2232/3)。**失败原因 UNKNOWN（仅 GitHub status 可读）**；8 新测试已写入但不能计作本次集成 PASS，CORE-003 PARTIAL、无 R11 success receipt | D01 |
+| R9–R9.5 | [NATIVE_ELEMENT_FUNCTION_AOT_R9](../NATIVE_ELEMENT_FUNCTION_AOT_R9.zh-CN.md)、[native test](../../../../../examples/dis-v020-native-sdk/native-consumer.test.mjs)、[r9.5 receipt](receipts/r9.5-baseline.json) | Exact HEAD `7954bd91d51eb13fbeab96385f37ac8d9cd35c5e`、TREE `9250ad08f500bc8924458af1c833947c99ad0d4c`；[CI 2223/1](https://ci.kaicreator.com/repos/18/pipeline/2223/1)、[2223/2](https://ci.kaicreator.com/repos/18/pipeline/2223/2)、[2223/3](https://ci.kaicreator.com/repos/18/pipeline/2223/3) 3/3 SUCCESS，97 named cases；仅对应矩阵 9 项窄范围 VERIFIED | D00 |
+| R10 | [INTERACTION_NATIVE_R10](../INTERACTION_NATIVE_R10.zh-CN.md)、[blocked history](receipts/r10-candidate-blocked.json)、[recovery](receipts/r10-ci-recovery.json) | 原 CI 2227 失败保留；修复 npm 预编译依赖下载 + 本地 Node24 pack inventory；Exact HEAD `c9cc8d63e13b150cf462af05a58daef5748f0030` 的 [CI 2229/1–3](https://ci.kaicreator.com/repos/18/pipeline/2229/1) 为 SUCCESS（103 named，含 6 Interaction）；后文档 HEAD `771c5d2e00e597acb55b5881e6921a8ea9709630` 的 2230/1–3 另行 3/3 SUCCESS；CORE-014 仍 PARTIAL | D00、D03 |
+| R11 | [FUNCTION_IO_OUTCOME_R11](../FUNCTION_IO_OUTCOME_R11.zh-CN.md)、[native test](../../../../../examples/dis-v020-native-sdk/native-consumer.test.mjs) | Exact HEAD `4632d5e0b331f0119da0c8d78249b7c1437856a1`、TREE `8f347807680db455cc8627590bc3c60778b9e953`；[CI 2232/1 integration FAILURE](https://ci.kaicreator.com/repos/18/pipeline/2232/1)、[2232/2 min-node SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2232/2)、[2232/3 verify SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2232/3)。**失败原因 UNKNOWN（仅 GitHub status 可读）**；8 新测试已写入但不能计作本次集成 PASS；[R11 BLOCKED receipt](receipts/r11-integration-blocked.json) 记录三项 CI 的混合状态；CORE-003 PARTIAL、无 R11 success receipt | D01 |
 
 **样本数量 ≠ 要求数量**：R9.5 的 97 或 R10 的 103 是同一条真实集成 lane 的 named tests，不是 97/103 个独立 Requirement，也不是互相独立的 Domain Oracle。历史 R2/R3 测试不能与其简单相加作为当前完成率。源/语义/Native/Owner 是四种不同的证明维度。
 
@@ -71,5 +71,7 @@ D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式�
 
 - **Matrix readback（R11 候选）**：16 Core = 9 VERIFIED / 7 PARTIAL；4 optional = 4 NOT_RUN；1 governance = 1 NOT_RUN。Core 窄范围 VERIFIED 比率 9/16=56.25%，**不是整体完成率**。初次证据索引整理由此开始，原机器状态不因整理改动。
 - **下一最小可改变决策的步骤**：查 Woodpecker 2232/1 第一失败命令/日志，修复有证据的根因，在原写集复测并把新 SHA 的独立 context 结果写进新的 receipt。不能只因随后 docs-only HEAD 获得其他 green context 就借 R11 integration PASS。
-- **停止/复盘**：每项 Demo 结论包含 \`Question | input source+exact pin | execution+environment | positive/negative/UNKNOWN | result | what NOT proven | next smallest evidence | inherited scope/invalidated receipts\`。无必要时一个 Markdown 就够；不追求每项单独 Issue 或机器 Schema。
+- **停止/复盘**：每项 Demo 结论包含 `Question | input source+exact pin | execution+environment | positive/negative/UNKNOWN | result | what NOT proven | next smallest evidence | inherited scope/invalidated receipts`。无必要时一个 Markdown 就够；不追求每项单独 Issue 或机器 Schema。
 - **通用经验写回 [ADS #1361](https://github.com/kaicreator-mm/ai-development-standard/issues/1361)**：版本 Conformance 可借用 ADS #1362 的证据组织技术，但不得混淆 Stage 1/2 权威；历史成功的 exact SHA、领域来源 Pin、独立语义判定、Effect 权限与本轮 CI 必须分别表达；研究依赖图不等于 Frozen Task DAG。Issue 开销与时间/成本只有实际测量才声称节省。
+
+**R13 验证器反例修复**：旧 `validate.test.mjs` 要求 `core:NOT_RUN > 0`，与真实 Matrix 9 VERIFIED / 7 PARTIAL / 0 NOT_RUN 矛盾；现在以完整 16 Core 数和剩余未验证数核对，并新增“BLOCKED 收据不能为 VERIFIED 背书”的负例。此源级问题不等于确认 Woodpecker 的第一失败步骤；只认后续 exact-SHA CI。

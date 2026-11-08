@@ -7,11 +7,13 @@ const matrix=JSON.parse(await readFile(new URL('matrix.json',base),'utf8'));
 const baseline=JSON.parse(await readFile(new URL('receipts/r9.5-baseline.json',base),'utf8'));
 const clone=x=>structuredClone(x);
 const rejects=code=>e=>e?.code===code;
-test('version matrix tracks every initial core and optional gap without calling it full coverage',async()=>{
+test('version matrix accounts for all 16 core requirements without inventing an unrun gap',async()=>{
  const result=await validateCheckedInMatrix();
  assert.equal(result.requirements,21);
- assert.ok((result.tallies['core:PARTIAL']??0)>0);
- assert.ok((result.tallies['core:NOT_RUN']??0)>0);
+ const core=['VERIFIED','PARTIAL','NOT_RUN','OUT_OF_SCOPE']
+   .reduce((n,s)=>n+(result.tallies['core:'+s]??0),0);
+ assert.equal(core,16);
+ assert.ok((result.tallies['core:PARTIAL']??0)+(result.tallies['core:NOT_RUN']??0)>0);
  assert.ok((result.tallies['optional-profile:NOT_RUN']??0)>0);
 });
 test('machine validator rejects a VERIFIED requirement without positive or negative proof',async()=>{
@@ -30,4 +32,11 @@ test('version conformance is incomplete until all applicable MUST requirements a
  const r=await validateCheckedInMatrix();
  const complete=!(r.tallies['core:PARTIAL']||r.tallies['core:NOT_RUN']);
  assert.equal(complete,false);
+});
+
+test('blocked R11 integration receipt cannot qualify a VERIFIED requirement',async()=>{
+ const blocked=JSON.parse(await readFile(new URL('receipts/r11-integration-blocked.json',base),'utf8'));
+ const v=clone(matrix);
+ v.requirements[0].receiptIds=['r11-integration-blocked'];
+ await assert.rejects(validateVersionMatrix(v,{'r11-integration-blocked':blocked}),rejects('MATRIX_RECEIPT_INVALID'));
 });
