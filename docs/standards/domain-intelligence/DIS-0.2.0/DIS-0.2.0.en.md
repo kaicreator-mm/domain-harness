@@ -1,8 +1,8 @@
-# Domain Intelligence Standard (DIS) v0.2.0 — Element-first R1 with Evolution R2 addendum
+# Domain Intelligence Standard (DIS) v0.2.0 — Element-first full-scope R3 candidate
 
 **Status: new Product/L1 architecture candidate, NOT FROZEN.** Authority: [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496). This proposal replaces—not amends—the old #1494 / PR #1493 Intelligence Unit (Data/Processing/Composite) draft. DIS 0.1.0 stays frozen.
 
-The **current evolution architecture elaboration** is the Chinese R2 document [LLM_HARNESS_EVOLUTION_R2.zh-CN.md](LLM_HARNESS_EVOLUTION_R2.zh-CN.md) plus [self-adversarial review](ADVERSARIAL_REVIEW_R2.zh-CN.md) and [conformance cases](EVOLUTION_CONFORMANCE_R2.zh-CN.md). R2 supersedes the R1 evolution design, without claiming bilingual clause parity or independently validated implementation. This document mirrors the **architectural decisions** of the Chinese candidate. Focused R1 contract drafts currently have Chinese working text; a complete bilingual clause-level parity review and schemas are required before L2 freeze.
+The **current evolution architecture elaboration** is the Chinese R2 document [LLM_HARNESS_EVOLUTION_R2.zh-CN.md](LLM_HARNESS_EVOLUTION_R2.zh-CN.md) plus [self-adversarial review](ADVERSARIAL_REVIEW_R2.zh-CN.md) and [conformance cases](EVOLUTION_CONFORMANCE_R2.zh-CN.md). R2 supersedes the R1 evolution design, without claiming bilingual clause parity or independently validated implementation. Full-scope R3 Product/L1 review identified 24 design risks (P0=6/P1=14/P2=4), some overlapping earlier evolution review; design mitigations and the two-domain simulated test are documented in [R3 audit](FULL_SCOPE_ADVERSARIAL_REVIEW_R3.zh-CN.md), [R3 repairs](FULL_SCOPE_REPAIRS_R3.zh-CN.md) and [R3 self-demo](FULL_SCOPE_DEMO_SELF_VALIDATION_R3.zh-CN.md). These are **not** independent production verification. This document mirrors the **architectural decisions** of the Chinese candidate. Focused R1 contract drafts currently have Chinese working text; a complete bilingual clause-level parity review and schemas are required before L2 freeze.
 
 ## 1. Purpose and boundaries
 
@@ -10,7 +10,7 @@ DIS standardizes the **consumption and operationalization of domain intelligence
 
 ## 2. Domain and Elements
 
-**Domain = Element dependency DAG**. Edges are *static* compile-time Element/Function dependencies, not runtime execution, state or data-flow graphs. Elements are cohesive semantic/service micro-libraries and may offer multiple public Functions, private implementations, optional internal state, knowledge query requirements and cross-Element dependencies.
+**Domain = Elements + semantic relationships + constraints/invariants + collaboration semantics + a static Element dependency DAG**. Only the static dependency subgraph must be acyclic; semantic relations can be cyclic and are not execution edges. Elements are cohesive semantic/service micro-libraries and may offer multiple public Functions, private implementations, optional internal state, knowledge query requirements and cross-Element dependencies.
 
 No mandatory exclusive `Entity/Relationship/Knowledge/Rule/Operation/Process` type. Optional tags are descriptive only. A relation, invariant or collaboration concern may itself be represented by an Element; a fact or file does not automatically become one. A declarative-only Element may expose zero callable Functions.
 
@@ -69,3 +69,7 @@ The R2 single-author self-adversarial design review found 3 P0, 7 P1 and 2 P2 **
 ## 11. R2 adversarial design repair status
 
 [Chinese R2 design repair rules](EVOLUTION_DESIGN_REPAIRS_R2.zh-CN.md) define explicit fail-closed conditions for all 12 self-review findings. They are Product/L1 design constraints, not a verified production SDK implementation. In the absence of a verified constrained interpreter, atomic task-scoped activation, receipt provenance and secure revocation, local evolution is **candidate + shadow only**. The demo uses a fake model and fixture oracle, not a live Provider or real KDP/Forge integration.
+
+## 12. R3 full-scope restrictions and audit (supersedes conflicting earlier text)
+
+Target-specific native APIs remain valid, but external Effects MUST pass a trusted KDP-governed/admitted execution boundary; package metadata alone cannot sandbox arbitrary native/Node code. AOT must pin Element/Package/App/Function/Semantic/Knowledge/Resource actual bytes, Target, selected Providers and Effect policies. SDK must not become the Business state authority. The one Business App Init runs after all required technical Package initialization, with a strict optional-only DEGRADED ingress policy and failure cleanup. Unknown required extensions, wrong target, missing public Function/export, dynamic resource paths and false Evidence fail closed. See the Chinese R3 full-scope repairs for detailed clauses; English clause-level parity remains OPEN before L2 Freeze.

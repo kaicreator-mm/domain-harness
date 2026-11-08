@@ -1,4 +1,4 @@
-# Domain Intelligence Standard (DIS) v0.2.0 — Element-first R1 + Unified Evolution R2
+# Domain Intelligence Standard (DIS) v0.2.0 — Element-first R1 + Evolution R2 + full-scope adversarial R3
 
 > **STATUS: NEW PRODUCT/L1 CANDIDATE; NOT FROZEN.**
 >
@@ -18,6 +18,15 @@
 ## R2 convergence / self-adversarial review
 
 **Authoritative current evolution design:** [Unified LLM/Harness/Evolution R2](LLM_HARNESS_EVOLUTION_R2.zh-CN.md). It supersedes R1 advice on Experience, Function synthesis, local qualification, Evolution Slot, cache/evidence and two-layer evolution; R1 remains historical. [Self-adversarial findings](ADVERSARIAL_REVIEW_R2.zh-CN.md) and [negative/positive conformance cases](EVOLUTION_CONFORMANCE_R2.zh-CN.md) are design documents; this is NOT an independent review or executable certification. App may create locally scoped qualified **interpreted rule data** only if the AOT-selected SDK can safely support schema/interpreter/budget/atomic task pin/rollback; otherwise produce candidates and shadow only. Every Experience must have trusted verification; cache hits cannot manufacture independent samples.
+
+## Latest R3 authority / complete product review
+
+The earlier R1 statement “Domain = Element dependency DAG” is superseded: the Domain also contains semantic relationships, constraints and collaboration semantics; only the static dependency subgraph is a DAG. The R3 repair addendum is authoritative for design conflicts, including Target-specific native Effect admission, complete AOT content closure, App Init failure, model/Provider pins, domain State and Knowledge.
+
+- [Full-scope adversarial review R3](FULL_SCOPE_ADVERSARIAL_REVIEW_R3.zh-CN.md) — 24 grouped issues P0=6/P1=14/P2=4; overlaps earlier R2 findings.
+- [Full-scope design repairs R3](FULL_SCOPE_REPAIRS_R3.zh-CN.md) — Product/L1 restrictive clarification.
+- [Two-Domain self-demo and repair log R3](FULL_SCOPE_DEMO_SELF_VALIDATION_R3.zh-CN.md) — 74 Node cases (27 POS/47 NEG), including one invocation of the 25-case evolution fixture; no independent or production CI claims.
+- Complete modular demo available as a conversation artifact, SHA256 ZIP `d8e5740d478cbd38fae7b6d928d70d9ec2452668d4c0e81715bb2be1cd078c71` (not GitHub CI artifact).
 
 ## Candidate documents
 

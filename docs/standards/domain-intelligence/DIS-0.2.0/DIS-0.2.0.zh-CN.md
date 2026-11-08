@@ -1,8 +1,12 @@
-# Domain Intelligence Standard（DIS）v0.2.0 — Element-first 架构 R1 · 进化专题 R2
+# Domain Intelligence Standard（DIS）v0.2.0 — Element-first 全范围 R3 候选
 
-**状态：新 Product/L1 候选，非冻结标准。** 权威 Issue [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)。本候选**取代**旧 #1494 / PR #1493 的 Intelligence Unit + Data/Processing/Composite 设计；原候选不应合并或视为规范。保留 DIS 0.1.0 冻结基线不变。
+**状态：全范围自对抗审核 R3 / Product/L1 候选，非冻结标准。** 权威 Issue [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)。本候选**取代**旧 #1494 / PR #1493 的 Intelligence Unit + Data/Processing/Composite 设计；原候选不应合并或视为规范。保留 DIS 0.1.0 冻结基线不变。
 
 本文的 MUST/SHOULD 属于待审核的规范建议，不暗示 DomainHarness v0.10.3 已实现新 ABI。Element/Function 与 App Init 仍见 R1 候选；**LLM/Harness/进化以 [LLM_HARNESS_EVOLUTION_R2.zh-CN.md](LLM_HARNESS_EVOLUTION_R2.zh-CN.md) 为当前细化建议**，R1 相关建议保留历史。R2 已完成自对抗设计审核，但尚未独立验证、Schema 化或冻结。
+
+## 当前修订权威（R3）
+
+全版本审核发现原文将 Domain 误简化成了 Element 依赖 DAG，还存在 Target 原生 Effect 准入、资源/AOT 完整闭包、App Init readiness 等边界未充分明确。**现以 [FULL_SCOPE_REPAIRS_R3.zh-CN.md](FULL_SCOPE_REPAIRS_R3.zh-CN.md) 作为最新限制性规范建议**；全文反向审查见 [FULL_SCOPE_ADVERSARIAL_REVIEW_R3.zh-CN.md](FULL_SCOPE_ADVERSARIAL_REVIEW_R3.zh-CN.md)，双领域模拟验证见 [FULL_SCOPE_DEMO_SELF_VALIDATION_R3.zh-CN.md](FULL_SCOPE_DEMO_SELF_VALIDATION_R3.zh-CN.md)。旧 R1/R2 文件保留审计历史，冲突时从严采用 R3，不把自验证当独立验证。
 
 ## 1. 目标和责任边界
 
@@ -12,7 +16,7 @@ Domain-Harness 是消费领域智能的运行与编排产品，不是通用 Agen
 
 ## 2. 概念和最小模型
 
-- **Domain = Element Dependency DAG**。节点为 Element，边为静态依赖；DAG 不表示业务运行时的数据流、状态机、Workflow 或 Task DAG。
+- **Domain = Elements + Semantic Relations + Constraints/Invariants + Collaboration Semantics + Element Dependency DAG**。只有用于 AOT 解析的静态依赖子图必须无环。Domain 语义关系可以合法成环；二者都不等于 Runtime Task/Workflow 的数据流、状态机或执行 DAG。
 - **Element** 是内聚的领域语义 / 服务职责微型 Library，可包含多个公开 Function、私有实现、知识查询需求和自有状态。颗粒度由内聚职责、可复用性及独立版本/验证边界决定，非“一函数一 Element”或“一文件一 Element”。
 - **Function** 是对外可调用的稳定语义契约，其 Description、参数/结果、适用条件、typed outcomes、验证义务与兼容性供人、LLM、构建器和消费者共同理解。
 - **Capability** 仅是对外稳定的 Function Contract 视图/兼容性接口，可从 Function 导出或引用，不能维护可漂移的第二份重复定义。
