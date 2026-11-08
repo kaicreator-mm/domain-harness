@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { buildDemo, frozenPins, readFrozen } from '../build.mjs';
-import { openDemo } from '../app.mjs';
+import { deployment, openDemo } from '../app.mjs';
 import { buildConsumer, canonicalDigest, digest } from '../../../packages/dis-v011-runtime/dist/index.js';
 import { readDisResult, verifyTrace } from '../../../packages/dis-v011-runtime/dist/trace.js';
 
@@ -79,7 +79,7 @@ async function assertHostReceipt(app, observation, message, expected, recognitio
   assert.equal(record.effectId,effect.effectId);
   assert.equal(record.status,'completed');
   assert.deepEqual(record.output,result);
-  assert.deepEqual(record.target,{workflowId:'kdp-qualified-read',instanceKey:'page:demo'});
+  assert.deepEqual(record.target,{workflowId:'kdp-local-read',instanceKey:'page:demo'});
   assert.equal(journal.permit,null);
   assert.deepEqual(journal.dispatchClaims,[]);
   if (process.env.DIS_RUNTIME_EMIT === '1') console.log(JSON.stringify({
@@ -118,6 +118,8 @@ test('selected BUILD, one KDP and Domain App, exact provider output and SQLite J
       ['out-of-scope',{url,signals:['jwplayer'],encryptedPlayer:true},'OUT_OF_SCOPE','out_of_scope'],
       ['missing-input',{url},'NEEDS_INPUT'],
       ['failed',{url,signals:[7]},'FAILED'],
+      ['bad-port',{url:'https://example.test:99999/jwplayer',signals:[]},'FAILED'],
+      ['bad-percent',{url:'https://example.test/jwplayer%ZZ',signals:[]},'FAILED'],
       ['malformed-with-missing',{url,tool:'download'},'FAILED'],
       ['tool-refused',{...known,tool:'download'},'FAILED'],
       ['claims-only',{url,signals:[],claims:[{sourceId:'unverified',playerId:'jwplayer'}]},'NEEDS_REVIEW','unknown'],
@@ -173,7 +175,8 @@ test('invalid Graphs fail closed even with recomputed external pins',()=>withEvi
   }
 }));
 test('BUILD rejects forged or modified selection snapshots',async()=>{
-  const built=await buildDemo(), selected=built.selection;
+  const plan=await deployment('baseline');
+  const built=await buildDemo('baseline',plan.expected), selected=built.selection;
   assert.throws(()=>buildConsumer(structuredClone(selected),{}),/SELECTION_NOT_VERIFIED/);
   assert.throws(()=>buildConsumer(selected,{kernel:'forged',standard:'forged',router:'forged'}),/UNTRUSTED_HOST_MODULE/);
   selected.signatures.patterns[0].markers=['forged'];

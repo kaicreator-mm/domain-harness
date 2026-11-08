@@ -9,7 +9,8 @@ export { selectKnowledge, canonicalDigest, digest } from './knowledge.js';
 
 function businessModule(selection: Selection): string {
   const policy = { packageId: 'business-dis-player@0.11.0-dev.0', packageRevision: selection.revision,
-    definitionId: selection.packageId, graphSha256: selection.graphSha256 };
+    definitionId: selection.packageId, graphSha256: selection.graphSha256,
+    readBinding:selection.businessPolicy };
   return `
 export const MODULE_ID = 'business-dis-player@0.11.0-dev.0';
 export const PACKAGE_KIND = 'business';

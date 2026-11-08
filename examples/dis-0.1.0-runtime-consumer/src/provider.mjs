@@ -26,7 +26,9 @@ export function consumeObservation(input, selection) {
         return result('NEEDS_INPUT', null, 'Supply the Page URL and observed signals');
     // Domain App accepts a bounded observation and normalizes only outer URL whitespace.
     const sourceUrl = brief.url.trim();
-    if (!/^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+$/.test(sourceUrl))
+    let validUrl = /^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+$/.test(sourceUrl) && !/%(?![0-9A-Fa-f]{2})/.test(sourceUrl);
+    try { if (validUrl) new URL(sourceUrl); } catch { validUrl = false; }
+    if (!validUrl)
         return result('FAILED', null, 'Invalid Page URL');
     const observed = { ...brief, url: sourceUrl };
     const graphRole = (provider, payload, evidence) => {

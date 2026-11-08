@@ -41,6 +41,7 @@ interface PackageIdentity {
     packageRevision: string;
     selectedAssets: (UnitRef & { kind: string; sha256: string })[];
     target: string;
+    businessPolicy?: { intentId: string; operationId: string; capabilityId: string; handlerId: string; scope: string };
     validationEvidence?: { path: string; sha256: string };
     promotionDecision?: {
       kind: string; scope: string; authority: string; authorizationEvidence: string;
@@ -205,11 +206,16 @@ export async function selectKnowledge(root: string, expected: { descriptor: stri
     providers[unit.id] = candidate.ref;
   }
   const signaturesRef = units[graph.nodes.find((node) => node.nodeId === graph.entryNode)!.unitRef.id].knowledgeRefs?.[0];
+  if (!signaturesRef) throw new Error('SELECTED_SIGNATURES_MISSING');
+  const signatureAssets = identity.selectionLock.selectedAssets.filter((item) => item.kind === 'rule' && item.id === signaturesRef.id);
+  if (signatureAssets.length !== 1 || signatureAssets[0].revision !== signaturesRef.revision || signatureAssets[0].path !== signaturesRef.path || signatureAssets[0].sha256 !== signaturesRef.sha256) throw new Error('SIGNATURE_RULE_LOCK_MISMATCH');
+  requirePin(resources[signaturesRef.path],signaturesRef.sha256,'SIGNATURE_RULE_DIGEST');
   const resolveUnit = parse<Unit & { evidence: { sources: { sourceId: string; ref: string }[] } }>(unitRefs['xdownload.player.resolve-procedure'].path);
   const runtimeReader = identity.runtimeReader;
   const strategyKnowledge = resolveUnit.knowledgeRefs?.[0];
   let providerArtifact: Selection['providerArtifact'];
   if (runtimeReader) {
+    if (!identity.selectionLock.businessPolicy || canonicalDigest(identity.selectionLock.businessPolicy) !== canonicalDigest({intentId:'recognizePlayer',operationId:'dis.consume',capabilityId:'dis-player',handlerId:'consumeObservation',scope:'PRIVATE_LOCAL_READ_ONLY'})) throw new Error('RUNTIME_BUSINESS_POLICY_INVALID');
     const provider = identity.selectionLock.selectedCapabilities[0].provider;
     const strategiesAsset = identity.selectionLock.selectedAssets.find((item) => item.kind === 'knowledge');
     const definitionAsset = identity.selectionLock.selectedAssets.find((item) => item.kind === 'definition');
@@ -255,7 +261,7 @@ export async function selectKnowledge(root: string, expected: { descriptor: stri
       || !strategies.strategies || Array.isArray(strategies.strategies) || typeof strategies.strategies !== 'object'
       || Object.values(strategies.strategies).some((value) => typeof value !== 'string' || !value)) throw new Error('KNOWLEDGE_IDENTITY_MISMATCH');
   const selected = { packageId: identity.packageId, revision: identity.revision, closureSha256: expected.closure, lockSha256: expected.lock, graphSha256: asset.sha256, graph, units, unitRefs, providers, resources, signatures, strategies,
-    ...(providerArtifact ? { providerArtifact, strategyKnowledge } : {}) };
+    ...(providerArtifact ? { providerArtifact, strategyKnowledge, businessPolicy:identity.selectionLock.businessPolicy } : {}) };
   verifiedSelections.set(selected, canonicalDigest(selected));
   return selected;
 }

@@ -5,13 +5,13 @@ import type { attachConsumer } from './provider-bindings.js';
 import type { ObjectData } from './types.js';
 
 const kernelId = 'v08-kernel-mechanism@1.0.0';
-const workflowId = 'kdp-qualified-read';
-const operation = 'dis.consume';
-const capability = 'dis-player';
+const workflowId = 'kdp-local-read';
+const operation = 'read';
+const capability = 'kdp-local-read';
 const event = 'QUALIFIED_READ_REQUESTED';
 const ruleId = 'rule:kdp-read';
-const intentType = 'recognizePlayer';
-const effect = 'effect:dis-read';
+const intentType = 'kdp.read';
+const effect = 'effect:kdp-read';
 
 type Target = { workflowId: string; instanceKey: string };
 type PhysicalCondition = Parameters<Awaited<ReturnType<typeof openSqliteCasStore>>['put']>[2];
@@ -119,7 +119,7 @@ export async function startKdpPrimary(options: {
     },
     async send(intent: V10PublicIntent) {
       const active = getAttachment();
-      if (intent.intentType !== intentType || Object.keys(intent).some((key) => !['intentType','instanceKey','messageId','input'].includes(key))) {
+      if (typeof intent.intentType !== 'string' || Object.keys(intent).some((key) => !['intentType','instanceKey','messageId','input'].includes(key))) {
         throw new Error('KDP_OPERATION_UNAUTHORIZED');
       }
       active.authorize(intent.intentType);

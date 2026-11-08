@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import { buildConsumer, canonicalDigest, digest, selectKnowledge } from '../../packages/dis-v011-runtime/dist/index.js';
+import { canonicalDigest, digest, selectKnowledge } from '../../packages/dis-v011-runtime/dist/knowledge.js';
 
 const frozenRoot = fileURLToPath(new URL('../dis-0.1.0-player-recognition/', import.meta.url));
 export const frozenPins = Object.freeze({
@@ -19,30 +19,11 @@ const payloads = {
 export function readFrozen(root = frozenRoot, expectedPins = frozenPins) {
   return selectKnowledge(root, expectedPins);
 }
-export async function loadKernelSource() {
-  const [relative,pin] = payloads.kernel;
-  const raw = await readFile(new URL('../../domain-packages/' + relative, import.meta.url));
-  if (digest(raw) !== pin) throw new Error('TRUSTED_MODULE_BYTES_CHANGED:kernel');
-  return raw.toString('utf8');
-}
 const appUrl = new URL('./domain/domain-app.yaml', import.meta.url);
 const recipeUrl = new URL('./domain/runtime-package.json', import.meta.url);
-const lockUrl = new URL('./domain/runtime-lock.json', import.meta.url);
 const providerPath = 'src/provider.mjs';
 const knowledgeUrl = new URL('./fixtures/runtime-knowledge.json', import.meta.url);
 const serialize = (value) => Buffer.from(JSON.stringify(value) + '\n');
-export async function deployment(variant) {
-  const [appRaw, qualifiedRaw] = await Promise.all([readFile(appUrl),readFile(lockUrl)]);
-  const app = JSON.parse(appRaw);
-  const qualified = JSON.parse(qualifiedRaw);
-  const expected = qualified.variants[variant];
-  if (app.format !== 'dis-reference-boot/1' || app.target !== 'node24' || app.kernel !== 'v08-kernel-mechanism@1.0.0'
-      || app.package !== 'xdownload.web-media-runtime' || app.runtimePackage !== 'runtime-package.json'
-      || app.runtimeLock !== 'runtime-lock.json' || qualified.appSha256 !== digest(appRaw)
-      || qualified.format !== 'dis-runtime-qualification-index/1' || qualified.scope !== 'PRIVATE_REFERENCE_ONLY'
-      || !Object.hasOwn(qualified.variants,variant)) throw new Error('DEPLOYMENT_NOT_QUALIFIED');
-  return { primary: app.primary, primarySha256: qualified.primarySha256, lockSha256: expected.lock, expected };
-}
 
 /** Deterministic derivative AOT assembly. It never reads the runtime qualification index. */
 export async function generatePackage(variant, overrides = {}) {
@@ -159,10 +140,14 @@ export async function generatePackage(variant, overrides = {}) {
   const promotionDecision = { kind:'PRIVATE_REFERENCE_SELECTION', scope:recipe.qualification.scope,
     authority:recipe.qualification.authority, authorizationEvidence:recipe.qualification.authorizationEvidence,
     prior, subject:report.subject, validationEvidence };
+  const recognizerRef = closure.units.find((unit) => unit.id === graph.nodes.find((node) => node.nodeId === graph.entryNode).unitRef.id);
+  const signaturesRef = JSON.parse(resources.get(recognizerRef.path)).knowledgeRefs[0];
   const selectionLock = {packageId:recipe.packageId,packageRevision:revision,target:recipe.target,
+    businessPolicy:{intentId:'recognizePlayer',operationId:'dis.consume',capabilityId:'dis-player',handlerId:'consumeObservation',scope:'PRIVATE_LOCAL_READ_ONLY'},
     selectedAssets:[{kind:'graph',...closure.graphRef,sha256:digest(resources.get(closure.graphRef.path))},
       {kind:'definition',...closure.definitionRef,sha256:digest(resources.get(closure.definitionRef.path))},
       ...closure.units.map((item) => ({kind:'unit',...item,sha256:digest(resources.get(item.path))})),
+      {kind:'rule',id:signaturesRef.id,revision:signaturesRef.revision,path:signaturesRef.path,sha256:signaturesRef.sha256},
       {kind:'knowledge',id:knowledgeRef.id,revision:knowledgeRef.revision,path:resourcePath,sha256:knowledgeRef.sha256}],
     selectedCapabilities,validationEvidence,promotionDecision};
   const pins = {closure:closureSha256,lock:canonicalDigest(selectionLock)};
@@ -213,8 +198,8 @@ export async function loadGenerated(generated, expected) {
   }
 }
 
-export async function buildDemo(variant = 'baseline') {
-  const { expected } = await deployment(variant);
+export async function buildDemo(variant, expected) {
+  const { buildConsumer } = await import('../../packages/dis-v011-runtime/dist/index.js');
   const generated = await generatePackage(variant);
   const selection = await loadGenerated(generated,expected);
   const payload = Object.fromEntries(await Promise.all(Object.entries(payloads).map(async ([key,[relative,pin]]) => {

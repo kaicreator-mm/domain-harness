@@ -43,4 +43,5 @@ export interface Selection {
   resources: Record<string, string>;
   signatures: { patterns: { playerId: string; markers: string[] }[] };
   strategies: { strategies: Record<string, string> };
+  businessPolicy?: { intentId: string; operationId: string; capabilityId: string; handlerId: string; scope: string };
 }

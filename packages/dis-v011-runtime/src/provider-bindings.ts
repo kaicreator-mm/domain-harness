@@ -51,16 +51,20 @@ export async function attachConsumer(built: QualifiedBuild, lockSha256: string, 
   const policy = getPolicy() as ObjectData;
   if (policy.packageId !== business?.packageId || policy.packageRevision !== selection.revision
       || policy.definitionId !== selection.packageId || policy.graphSha256 !== selection.graphSha256) throw new Error('BUILD_APP_POLICY_MISMATCH');
+  const binding = policy.readBinding as {intentId:string;operationId:string;capabilityId:string;handlerId:string;scope:string};
+  if (!binding || !selection.businessPolicy || canonicalDigest(binding) !== canonicalDigest(selection.businessPolicy) || binding.scope !== 'PRIVATE_LOCAL_READ_ONLY' || binding.intentId !== 'recognizePlayer'
+      || binding.operationId !== 'dis.consume' || binding.capabilityId !== 'dis-player' || binding.handlerId !== 'consumeObservation') throw new Error('BUILD_APP_READ_POLICY_INVALID');
   const basisDigest = v10RouterBasisDigest(app.subjectDigest);
   return {
     authorize(intentId: string) {
+      if (intentId !== binding.intentId) throw new Error('BUILD_ROUTE_UNAUTHORIZED');
       const bindings = app.routes.filter((row) => row.intentId === intentId);
       const candidates = bindings.map((row) => ({ operationId: row.operationId, capabilityId: row.capabilityId,
         priority: V10_ROUTER_PRIORITY, eligibility: V10_ROUTER_ELIGIBILITY }));
       const selected = route({ intentId, basisDigest, bindings, candidates }) as ObjectData;
       if (selected.kind !== 'selected' || selected.basisDigest !== basisDigest
-          || selected.operationId !== 'dis.consume' || selected.capabilityId !== 'dis-player'
-          || selected.handlerId !== 'consumeObservation') throw new Error('BUILD_ROUTE_UNAUTHORIZED');
+          || selected.operationId !== binding.operationId || selected.capabilityId !== binding.capabilityId
+          || selected.handlerId !== binding.handlerId) throw new Error('BUILD_ROUTE_UNAUTHORIZED');
     },
     consume(input: unknown) {
       const result = consumeObservation(input, selection);

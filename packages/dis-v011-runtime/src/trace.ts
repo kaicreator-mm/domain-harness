@@ -27,7 +27,7 @@ export function readDisResult(receipt: ObjectData): DisResult {
   const admitted = receipt.admitted as { effects: { disposition: string; output: DisResult; effectType: string }[] };
   assert.equal(receipt.status, 'admitted', 'original Kernel receipt must be admitted');
   assert.equal(admitted.effects.length, 1);
-  assert.equal(admitted.effects[0].effectType, 'effect:dis-read');
+  assert.equal(admitted.effects[0].effectType, 'effect:kdp-read');
   assert.equal(admitted.effects[0].disposition, 'executed');
   return admitted.effects[0].output;
 }
@@ -45,7 +45,11 @@ export function verifyTrace(actual: DisResult, observation: unknown, selection: 
     lockSha256: selection.lockSha256, graphId: graph.id, graphRevision: graph.revision, graphSha256: selection.graphSha256,
   });
   const ajv = new Ajv2020({ strict: false });
-  ajv.addFormat('uri', /^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+$/);
+  const independentlyValidUri = (value: string) => {
+    if (!/^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+$/.test(value) || /%(?![0-9A-Fa-f]{2})/.test(value)) return false;
+    try { return Boolean(new URL(value).protocol); } catch { return false; }
+  };
+  ajv.addFormat('uri', independentlyValidUri);
   for (const [name, schema] of schemas) ajv.addSchema(schema, name);
   const pointer = (value: ObjectData, expression: string) =>
     expression === '' ? value : value[expression.substring(1)];
@@ -145,7 +149,7 @@ export function verifyTrace(actual: DisResult, observation: unknown, selection: 
     const partial = {...inputSchema, required:[], properties:{...properties, url:{type:'string'}}};
     const validShape = ajv.validate(partial, observation);
     const missing = validShape && record !== null && (!record.url || record.signals === undefined);
-    const validUrl = validShape && record !== null && typeof record.url === 'string' && /^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+$/.test(record.url.trim());
+    const validUrl = validShape && record !== null && typeof record.url === 'string' && independentlyValidUri(record.url.trim());
     assert.ok(!validShape || missing || !validUrl, 'valid input cannot terminate before recognition');
     assert.equal(actual.status, missing ? 'NEEDS_INPUT' : 'FAILED', 'invalid input classification');
     assert.equal(actual.reason, missing ? 'Supply the Page URL and observed signals' : validShape ? 'Invalid Page URL' : 'Invalid structured observation', 'invalid input reason');

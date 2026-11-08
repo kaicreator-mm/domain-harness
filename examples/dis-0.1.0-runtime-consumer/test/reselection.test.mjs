@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { openDemo } from '../app.mjs';
-import { deployment, generatePackage, loadGenerated, readFrozen } from '../build.mjs';
+import { deployment, openDemo } from '../app.mjs';
+import { generatePackage, loadGenerated, readFrozen } from '../build.mjs';
 import { canonicalDigest, digest } from '../../../packages/dis-v011-runtime/dist/index.js';
 import { readDisResult } from '../../../packages/dis-v011-runtime/dist/trace.js';
 
@@ -49,6 +49,7 @@ test('qualified separately versioned Knowledge changes the real Kernel result wi
 });
 
 test('separate frozen provenance and qualified provider byte identity with fail-closed mutations', async () => {
+  await assert.rejects(deployment('baseline','0'.repeat(64)),/QUALIFICATION_INDEX_PIN_MISMATCH/);
   const reference = await readFrozen();
   const generated = await generatePackage('baseline');
   const { expected } = await deployment('baseline');
@@ -63,11 +64,26 @@ test('separate frozen provenance and qualified provider byte identity with fail-
   assert.equal(selected.resources['fixtures/selected-player-strategies.json'],expected.knowledge);
   assert.equal(Object.keys(selected.resources).length,generated.closure.resources.length);
   assert.equal(selected.units['xdownload.player.resolve-procedure'].knowledgeRefs[0].sha256,expected.knowledge);
+  assert.equal(selected.resources['fixtures/player-signatures.json'],reference.resources['fixtures/player-signatures.json']);
   await assert.rejects(loadGenerated(await generatePackage('baseline',{provider:Buffer.concat([sourceProvider,Buffer.from('\n// drift\n')])}),expected),/RUNTIME_QUALIFICATION_MISMATCH/);
   const wrongTarget = await generatePackage('baseline',{target:'node22'});
   await assert.rejects(loadGenerated(wrongTarget,wrongTarget.qualification),/PROVIDER_LOCK_MISMATCH/);
   const stale = await generatePackage('baseline',{staleKnowledge:true});
   await assert.rejects(loadGenerated(stale,stale.qualification),/KNOWLEDGE_PIN_MISMATCH/);
+  const missingSignature = await generatePackage('baseline');
+  const changedDescriptor = JSON.parse(missingSignature.resources.get('package.json'));
+  changedDescriptor.dis.selectionLock.selectedAssets = changedDescriptor.dis.selectionLock.selectedAssets.filter((asset)=>asset.kind!=='rule');
+  changedDescriptor.dis.selectionLockSha256 = canonicalDigest(changedDescriptor.dis.selectionLock);
+  const changedBytes = Buffer.from(JSON.stringify(changedDescriptor)+'\n');missingSignature.resources.set('package.json',changedBytes);
+  missingSignature.qualification.descriptor=digest(changedBytes);missingSignature.qualification.lock=changedDescriptor.dis.selectionLockSha256;
+  await assert.rejects(loadGenerated(missingSignature,missingSignature.qualification),/SIGNATURE_RULE_LOCK_MISMATCH/);
+  const wrongPolicy = await generatePackage('baseline');
+  const policyDescriptor = JSON.parse(wrongPolicy.resources.get('package.json'));
+  policyDescriptor.dis.selectionLock.businessPolicy.scope='GLOBAL_WRITE';
+  policyDescriptor.dis.selectionLockSha256=canonicalDigest(policyDescriptor.dis.selectionLock);
+  const policyBytes=Buffer.from(JSON.stringify(policyDescriptor)+'\n');wrongPolicy.resources.set('package.json',policyBytes);
+  wrongPolicy.qualification.descriptor=digest(policyBytes);wrongPolicy.qualification.lock=policyDescriptor.dis.selectionLockSha256;
+  await assert.rejects(loadGenerated(wrongPolicy,wrongPolicy.qualification),/RUNTIME_BUSINESS_POLICY_INVALID/);
   const reportPath = 'domain/private-aot-validation.json';
   const report = JSON.parse(generated.resources.get(reportPath));
   report.reportId += '.tampered';
