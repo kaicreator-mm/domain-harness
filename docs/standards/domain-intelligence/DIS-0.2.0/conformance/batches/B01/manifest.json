@@ -46,7 +46,7 @@
     },
     {
       "batchRoundId": "B01-02",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "theme": "Domain-owned Stateful Function handle lifecycle, Knowledge/Rule state isolation and no KDP/Effect authority leakage",
       "requirements": [
         "DIS020-CORE-006",
@@ -55,10 +55,12 @@
       "prerequisites": [
         "B01-01 contract shape or independent pre-existing fixture"
       ],
-      "result": "PENDING",
+      "result": "AWAIT_EXACT_SHA_CI",
       "sourceHead": null,
       "receipt": null,
-      "checks": []
+      "checks": [],
+      "globalRoundId": "R33",
+      "test": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs"
     },
     {
       "batchRoundId": "B01-03",

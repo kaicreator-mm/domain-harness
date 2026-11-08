@@ -1,0 +1,42 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B01",
+  "roundId": "B01-02",
+  "globalRoundId": "R33",
+  "status": "CI_PENDING",
+  "requirements": [
+    "DIS020-CORE-006",
+    "DIS020-CORE-003"
+  ],
+  "startParent": "af2ebeaaa66c9701a82dd063b6b1d6816a3049a8",
+  "sourceHead": null,
+  "finalTree": null,
+  "receipt": null,
+  "testPath": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+  "positive": [
+    "B01-02 R33 real Runx Stateful handles isolate each invocation, source and process-local ownership",
+    "B01-02 R33 Domain-owned Stateful presence does not mutate Tally Rule or xDownload Knowledge outputs"
+  ],
+  "negative": [
+    "B01-02 R33 source-real Runx token mismatch cannot create presence or grant lease",
+    "B01-02 R33 SDK stop denies new Stateful and Effect ingress, but existing in-process handles are not remotely revoked"
+  ],
+  "sourceExamples": [
+    "Runx environment-agent-presence.ts pinned by native-fixture",
+    "Tally original Business Rule and xDownload original Business Knowledge"
+  ],
+  "resultBoundary": "A returned process-local handle remains usable after app.stop; only SDK ingress is stopped. This is not KDP execution lease, persistent Domain storage, or remote revocation.",
+  "ciContexts": [
+    "ci/woodpecker/pr/dis-v020-integration",
+    "ci/woodpecker/pr/verify-min-node",
+    "ci/woodpecker/pr/verify"
+  ],
+  "ciUrls": [],
+  "findings": [],
+  "lessons": [
+    "Own state at the returned Domain Function handle, not KDP claim or arbitrary Host lease.",
+    "Distinguish stop() ingress closure from revocation of previously returned in-process references."
+  ],
+  "fullCorePromoted": false,
+  "metadata": "Round-specific final source SHA and CI receipt written after exact status readback."
+}
