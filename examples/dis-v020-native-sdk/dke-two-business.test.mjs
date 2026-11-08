@@ -635,7 +635,11 @@ test('R29 missing original Evidence chain and forged canonical source fail close
  const patch=r29Source('dke-r29-gh-locator-proposal.json',R29_PROPOSAL_BLOB);
  const f1={...f,sourceData:structuredClone(f.sourceData)};
  f1.sourceData.records=f1.sourceData.records.filter(x=>x['@id']!=='se:EVD-09F-GH-REPLICATION');
- assert.throws(()=>r29Eval(f1,ledger,patch),reject('DKE_R29_SOURCE_RECORDS_INVALID'));
+ // Keep the exact 14-record bounded source view so this negative reaches
+ // the Evidence→Locator→Source closure rather than only the count guard.
+ f1.sourceData.records.push({'@id':'se:UNOWNED-COUNTERFACTUAL','@type':'se:Source'});
+ assert.equal(f1.sourceData.records.length,14);
+ assert.throws(()=>r29Eval(f1,ledger,patch),reject('DKE_R29_EVIDENCE_CLOSURE_MISSING'));
  const f2={...f,sourceData:structuredClone(f.sourceData)};
  f2.sourceData.records.find(x=>x['@id']==='se:CASE-09F-GH-DB-FAILOVER')['se:evidence_refs'].push({'@id':'se:FAKE-UNSELECTED'});
  assert.throws(()=>r29Eval(f2,ledger,patch),reject('DKE_R29_EVIDENCE_CLOSURE_MISSING'));
