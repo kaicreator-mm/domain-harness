@@ -7,6 +7,10 @@ export interface DisV020Implementation {
 }
 export interface DisV020LoadOptions {
  readonly expectedDigest:string;
+ /** Optional trusted installer source-currentness checkpoint, independent of the AOT. */
+ readonly expectedSourcePins?:Readonly<Record<string,Readonly<{
+  sha256:string;origin:DisV020Origin
+ }>>>;
  readonly registry:Readonly<Record<string,DisV020Implementation>>;
  readonly store:V10DocStore;
  readonly tenantId?:string;

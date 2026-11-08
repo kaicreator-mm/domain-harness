@@ -12,10 +12,33 @@ import {
 
 const refuse=code=>{throw new DisV020Error(code)};
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&Object.getPrototypeOf(x)===Object.prototype;
-export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,tenantId,deploymentIdentity}={}){
+export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins,registry,store,tenantId,deploymentIdentity}={}){
  if(typeof expectedDigest!=='string'||expectedDigest.length!==64)refuse('DIS_TRUST_ANCHOR_REQUIRED');
  const qualified=qualifyDisV020Artifact(artifact);
  if(expectedDigest!==artifact.digest)refuse('DIS_INSTALLED_AOT_MISMATCH');
+ // R26: an optional independent installer pin for named AOT-selected sources.
+ // It is supplied by a trusted caller, NEVER read as authority from the AOT.
+ // This is a load-time checkpoint, not a live watch, semantic oracle or Effect.
+ if(expectedSourcePins!==undefined){
+  if(!plain(expectedSourcePins)||Object.keys(expectedSourcePins).length===0)
+   refuse('DIS_SOURCE_ANCHORS_INVALID');
+  for(const [sourceId,expect] of Object.entries(expectedSourcePins)){
+   const actual=qualified.pins.get(sourceId);
+   if(!actual||!(qualified.sourceConsumers.get(sourceId)?.length>0))
+    refuse('DIS_SOURCE_ANCHOR_NOT_CONSUMED');
+   if(!plain(expect)||Object.keys(expect).sort().join(',')!=='origin,sha256'||
+      typeof expect.sha256!=='string'||!/^[a-f0-9]{64}$/.test(expect.sha256)||
+      !plain(expect.origin)||Object.keys(expect.origin).sort().join(',')!=='commit,gitBlob,path,repository'||
+      typeof expect.origin.repository!=='string'||!expect.origin.repository||
+      typeof expect.origin.path!=='string'||!expect.origin.path||
+      typeof expect.origin.commit!=='string'||!/^[a-f0-9]{40}$/.test(expect.origin.commit)||
+      typeof expect.origin.gitBlob!=='string'||!/^[a-f0-9]{40}$/.test(expect.origin.gitBlob))
+    refuse('DIS_SOURCE_ANCHORS_INVALID');
+   if(actual.sha256!==expect.sha256||
+      ['repository','commit','path','gitBlob'].some(k=>actual.origin[k]!==expect.origin[k]))
+    refuse('DIS_SOURCE_ANCHOR_STALE');
+  }
+ }
  if(!plain(registry)||!store)refuse('DIS_RUNTIME_INPUT_INVALID');
  const delegates=new Map(),absentOptional=new Set();
  // Preflight every bounded LOCAL Function before bootstrapping the Kernel.
