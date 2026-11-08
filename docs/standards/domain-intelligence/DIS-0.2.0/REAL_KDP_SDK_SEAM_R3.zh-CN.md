@@ -42,3 +42,11 @@ Demo pipeline 需依次运行：`npm ci`、`npm run build`、原模块 import/�
 ## 5. 下一阶段剩余工作
 
 最重要的是在真实仓库中落地 Element/Function → selected build manifest/AOT mappings，生成有唯一 App Init 的可运行 Package，并用 **实际 KDP/SDK ABI** 实验；然后做进程崩溃/并发/重放、权限旁路、原子 Slot 更新/回滚。若没有跨进程与 Host 权限证据，**不要将风险 F02 P0 标为生产验证 CLOSED**。
+
+## 6. R3.2 原生旁路对抗 Demo（Feature-first / 不锁定 Node 大版本）
+
+新增 `examples/dis-v020-sdk-integration/native-isolation.test.mjs` 和 `dis-native-isolation-worker.mjs`。第一个场景用未隔离的子进程绕过 Library Gate，尝试直接 `fs.writeFileSync` 覆盖**临时目录内**的受保护文件，证实单靠 Host Gate 无法封堵原生旁路。第二个场景在**特性探测**成功的情况下使用 Node `--permission` 将子进程限制在受控只读源和只写 scratch；同样的直写/读取被 `ERR_ACCESS_DENIED` 拒绝，受控 scratch 写入成功。第三个场景验证默认不允许 child-process 派生。这不是攻击真实设备，也不对真实用户目录操作。
+
+在本次本地 Node v22.16.0 上运行 **3/3 PASS**。没有要求特定 Node 版本：若目标 Worker 不支持所需权限特性，对应测试应标记 SKIP，生产隔离门禁记录 `NOT_VERIFIED`，绝不能把普通 CI SUCCESS 当作物理隔离 PASS。Node permission 是**受限演示机制**，并非对恶意 Node native addons、任意进程外逃或实际 OS 权限模型的通用安全证明。正式 F02 P0 仍需真实 Target 信任根、闭合加载/原生模块策略和独立安全验证。
+
+相关用例追加到 `.woodpecker/dis-v020-integration.yaml`，与前述真实 KDP/SDK C01 回归同一验证 lane。

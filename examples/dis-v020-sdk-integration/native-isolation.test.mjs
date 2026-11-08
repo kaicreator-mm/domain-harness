@@ -1,0 +1,16 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, writeFile, rm, access } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const worker = fileURLToPath(new URL('./dis-native-isolation-worker.mjs', import.meta.url));
+const run=(args)=>spawnSync(process.execPath,args,{encoding:'utf8',env:{PATH:process.env.PATH||'',HOME:process.env.HOME||'',TMPDIR:process.env.TMPDIR||'/tmp'}});
+const probe=run(['--permission','-e','console.log("PERMISSIONS_SUPPORTED")']);
+const supported=probe.status===0 && probe.stdout.includes('PERMISSIONS_SUPPORTED');
+const trial=async(fn)=>{const dir=await mkdtemp(join(tmpdir(),'dis-native-'));const protectedFile=join(dir,'protected.txt'),scratchDir=join(dir,'scratch'),scratchFile=join(scratchDir,'ok.txt');const {mkdir}=await import('node:fs/promises');await mkdir(scratchDir);await writeFile(protectedFile,'ORIGINAL');try{return await fn({dir,protectedFile,scratchDir,scratchFile})}finally{await rm(dir,{recursive:true,force:true})}};
+test('fixture demonstrates bypass of a library-only KDP Effect gate without OS isolation',async()=>trial(async({protectedFile,scratchFile})=>{const p=run([worker,protectedFile,scratchFile]);assert.equal(p.status,0,p.stderr);const data=JSON.parse(p.stdout.trim());assert.equal(data.protectedWrite.ok,true);assert.equal(await readFile(protectedFile,'utf8'),'OVERWRITTEN')}));
+test('restricted Node worker refuses direct protected write/read even without using KDP gate', {skip:!supported?'permission model unavailable; physical isolation NOT VERIFIED':false},async()=>trial(async({protectedFile,scratchDir,scratchFile})=>{const p=run(['--permission',`--allow-fs-read=${worker}`,`--allow-fs-write=${scratchDir}`,worker,protectedFile,scratchFile]);assert.equal(p.status,0,p.stderr);const data=JSON.parse(p.stdout.trim());assert.equal(data.protectedWrite.code,'ERR_ACCESS_DENIED');assert.equal(data.protectedRead.code,'ERR_ACCESS_DENIED');assert.equal(data.scratchWrite.ok,true);assert.equal(await readFile(protectedFile,'utf8'),'ORIGINAL');assert.equal(await readFile(scratchFile,'utf8'),'SCRATCH_OK')}));
+test('restricted worker cannot launch an unrestricted child process', {skip:!supported?'permission model unavailable; subprocess isolation NOT VERIFIED':false},async()=>trial(async({protectedFile,scratchDir,scratchFile})=>{const p=run(['--permission',`--allow-fs-read=${worker}`,`--allow-fs-write=${scratchDir}`,worker,protectedFile,scratchFile]);assert.equal(p.status,0,p.stderr);const data=JSON.parse(p.stdout.trim());assert.equal(data.spawn.code,'ERR_ACCESS_DENIED')}));
+console.log('DIS_NATIVE_ISOLATION_FEATURE',JSON.stringify({permissionModelSupported:supported,probeError: supported ? undefined : probe.stderr.slice(0,160)}));

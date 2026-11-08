@@ -24,3 +24,9 @@ Current self-verification limits: the exact **existing Microkernel dist gate Git
 **Status:** DESIGN_INTEGRATION_READY / LIVE_SOURCE_GATE_8_PASS / REAL_CHECKOUT_TEST_NOT_RUN / WOODPECKER_NOT_CONFIRMED.
 
 See [DIS v0.2.0 R3 source mapping](../../docs/standards/domain-intelligence/DIS-0.2.0/REAL_KDP_SDK_SEAM_R3.zh-CN.md).
+
+## R3.2 — Native bypass vs restricted process Demo
+
+Run `node --test examples/dis-v020-sdk-integration/native-isolation.test.mjs`. It uses real child Node processes and only temporary files, deliberately proving that **code which bypasses the SDK Gate can write files if run unrestricted**. Under the runtime's feature-detected `--permission` model, the same child is denied protected reads/writes and launching a child process while permitted scratch writes succeed. **The permission model is NOT treated as a complete OS sandbox or containment for arbitrary native addons**; full production isolation requires separate target-specific trusted process/OS boundary evidence.
+
+No Node major version is hardcoded. If the permission model is unavailable, tests 2 and 3 intentionally SKIP and log `permissionModelSupported:false`; this means **PHYSICAL_CONFINEMENT=NOT_VERIFIED**, not that isolation passed. A production-qualified package may not use untrusted raw code until isolation has proven its enforcement on the target. Existing KDP Effect gate checks remain necessary independently.
