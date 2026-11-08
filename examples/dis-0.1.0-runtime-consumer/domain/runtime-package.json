@@ -1,0 +1,407 @@
+{
+  "format": "dis-runtime-package-recipe/1",
+  "packageId": "xdownload.web-media-runtime",
+  "standardVersion": "0.1.0",
+  "qualification": {
+    "profile": "xdownload-private-read-only-runtime/1",
+    "scope": "PRIVATE_REFERENCE_ONLY",
+    "authority": "kaicreator-mm/dis-private-runtime-reference",
+    "authorizationEvidence": "https://github.com/kaicreator-mm/domain-harness/pull/1498#issuecomment-6714146893",
+    "recordedAt": "2026-11-08T00:00:00Z",
+    "behaviorCapture": {
+      "sha256": "cf9ceac3d9b4f683a721538473f2d7f39bdd643c269a488a4056958c8f1f5720",
+      "capture": {
+        "inputHead": "b9d923e4d43a3a4bcd1d655c52117dcf381e33d3",
+        "validatedAt": "2026-11-08T06:42:27Z",
+        "runtime": "v24.21.0",
+        "platform": "win32",
+        "cases": {
+          "baseline": {
+            "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+            "providerSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+            "exercisedLockSha256": "3431b9201ff60c625a64146e22e95d161aa580137dd1ba37f423291e0a7b29d8",
+            "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+            "primarySha256": "7b1214c568c329d2fd998dcb2485ad3cef05aca4e51683b7b9709e8f15e51f07",
+            "scenarios": [
+              {
+                "id": "known",
+                "category": "positive",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer.setup"
+                  ]
+                },
+                "status": "READY",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "resolve-known",
+                  "validate"
+                ],
+                "strategyId": "jwplayer.extract.v1",
+                "receiptSha256": "e464fe31745c3685d0eb2714b812418abe7c3cab11bdfff66e9c9d371299fba6",
+                "journalOutputSha256": "63a864bdc0eae7fb3fadfcb04f92d1b621c46595c8df5407a65b79c8fa47d369"
+              },
+              {
+                "id": "unknown",
+                "category": "negative",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "nothing"
+                  ]
+                },
+                "status": "NEEDS_REVIEW",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "bounded-fallback",
+                  "validate"
+                ],
+                "strategyId": null,
+                "receiptSha256": "d31f2edfc49a282dff578717e69a9ea54910ea7a92392e9cc33e1f732ef3337d",
+                "journalOutputSha256": "91b929e869da0614e23e2085b4269b283d1b933b566c5cb1f40dc80ab87cfd0c"
+              },
+              {
+                "id": "ambiguous",
+                "category": "boundary",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer",
+                    "videojs"
+                  ]
+                },
+                "status": "NEEDS_INPUT",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "bounded-fallback",
+                  "validate"
+                ],
+                "strategyId": null,
+                "receiptSha256": "01e00a7afd505431ee29fd9daae7afacc922d0e900c90fda090337c0e501482d",
+                "journalOutputSha256": "54f3675254ab56f52e22597cee41ee334c344560ac109d11224c4ff1f133cbd0"
+              },
+              {
+                "id": "conflict",
+                "category": "negative",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer"
+                  ],
+                  "claims": [
+                    {
+                      "sourceId": "claim",
+                      "playerId": "videojs"
+                    }
+                  ]
+                },
+                "status": "NEEDS_INPUT",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "bounded-fallback",
+                  "validate"
+                ],
+                "strategyId": null,
+                "receiptSha256": "aaa049b6bf02e16e4119b737b2f1cf5d5edc6d90ac76aaf3bc690751674927f4",
+                "journalOutputSha256": "581d33ff76913c14ced07dd7cd742c4dfeb67f61605f8ff5495e3518779f76df"
+              },
+              {
+                "id": "scope",
+                "category": "boundary",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer"
+                  ],
+                  "encryptedPlayer": true
+                },
+                "status": "OUT_OF_SCOPE",
+                "control": [
+                  "recognize"
+                ],
+                "strategyId": null,
+                "receiptSha256": "57b76eed777bd4167929576fdc9544644a0a2bd3eae4da58bcb5ff31d66259ad",
+                "journalOutputSha256": "2c24f4dae6bc722e331965565d01481456c9dead410083bb2b9b1a7086a33e5f"
+              },
+              {
+                "id": "missing",
+                "category": "boundary",
+                "observation": {
+                  "url": "https://example.test/video"
+                },
+                "status": "NEEDS_INPUT",
+                "control": [],
+                "strategyId": null,
+                "receiptSha256": "9f3ed62265e8dd33cd84a20baacc89e8d516e438a01b8a62eade0749e5ef6fa0",
+                "journalOutputSha256": "7471e6c4dcf6db303658528ae68f6ad75e15a92df913122059c47f75ea16e9b7"
+              },
+              {
+                "id": "malformed",
+                "category": "negative",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    7
+                  ]
+                },
+                "status": "FAILED",
+                "control": [],
+                "strategyId": null,
+                "receiptSha256": "0a750bc47787bbc1f700ea8925165cf911d2eec729d38a411032592e82c8e448",
+                "journalOutputSha256": "d002bdc68f52d21cf8a04ba0d5d6f2b75f24a97a450c7377369582ecd84500c0"
+              },
+              {
+                "id": "strategy-coverage",
+                "category": "boundary",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "videojs"
+                  ]
+                },
+                "status": "READY",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "resolve-known",
+                  "validate"
+                ],
+                "strategyId": "videojs.extract.v1",
+                "receiptSha256": "30dc6aef15cd746187cf583dc5df6b91c083bfe47506652aebdc116e480be9d1",
+                "journalOutputSha256": "a4adc305b914dffb271289011078cca728151efaedc3a0ad31fb943820de3cb8"
+              },
+              {
+                "id": "unauthorized-field",
+                "category": "negative",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer"
+                  ],
+                  "tool": "download"
+                },
+                "status": "FAILED",
+                "control": [],
+                "strategyId": null,
+                "receiptSha256": "5cae4e15dac0192dd018ac06f32ddb2f4e05dc30b223b14f61ca44b313cf23b3",
+                "journalOutputSha256": "d002bdc68f52d21cf8a04ba0d5d6f2b75f24a97a450c7377369582ecd84500c0"
+              }
+            ]
+          },
+          "reselected": {
+            "closureSha256": "8c96cb1ec99599d233feffed0ceda8c1f7f4ddeadba989cc650ce000f12d244c",
+            "providerSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+            "exercisedLockSha256": "55f2f9e15f30613e1e002b6a3c656ff31024802c1031dc881489972b5ce335c3",
+            "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+            "primarySha256": "7b1214c568c329d2fd998dcb2485ad3cef05aca4e51683b7b9709e8f15e51f07",
+            "scenarios": [
+              {
+                "id": "known",
+                "category": "positive",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer.setup"
+                  ]
+                },
+                "status": "READY",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "resolve-known",
+                  "validate"
+                ],
+                "strategyId": "jwplayer.reference-review.v2",
+                "receiptSha256": "2dccbece87f6fa8314248bfd6a1666087d7bb1e4ea232ccd6477b5c2fda20e29",
+                "journalOutputSha256": "a67ad7762bb5248861bb8ae7c091b02bb13429777fd198dfad8a870a4d5353e0"
+              },
+              {
+                "id": "unknown",
+                "category": "negative",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "nothing"
+                  ]
+                },
+                "status": "NEEDS_REVIEW",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "bounded-fallback",
+                  "validate"
+                ],
+                "strategyId": null,
+                "receiptSha256": "f1726014aec014543eb10926c392f1c0b580bbff777fb2595901e9c3648fa729",
+                "journalOutputSha256": "3d598a724b5c951fbd7b9dac4aca41db05d0c492e7fbe7c6fa503258d2e32c50"
+              },
+              {
+                "id": "ambiguous",
+                "category": "boundary",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer",
+                    "videojs"
+                  ]
+                },
+                "status": "NEEDS_INPUT",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "bounded-fallback",
+                  "validate"
+                ],
+                "strategyId": null,
+                "receiptSha256": "029fe4da8d24aa5924f03d2464fe12cdb3e4900d860eb316301a45d940de73b2",
+                "journalOutputSha256": "eb6d73f5109f5338b4b86f4234321e809f0421373bb229a138b566f827e6dc0c"
+              },
+              {
+                "id": "conflict",
+                "category": "negative",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer"
+                  ],
+                  "claims": [
+                    {
+                      "sourceId": "claim",
+                      "playerId": "videojs"
+                    }
+                  ]
+                },
+                "status": "NEEDS_INPUT",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "bounded-fallback",
+                  "validate"
+                ],
+                "strategyId": null,
+                "receiptSha256": "78065cb12223924eb0f424840c89b3ff9d037a96b1a06a2137afd4e3a203a31e",
+                "journalOutputSha256": "2b533e99f32dc9f14a3017a4b4ba3bf64342ae6bbf04fcc010bf83d376df6f68"
+              },
+              {
+                "id": "scope",
+                "category": "boundary",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer"
+                  ],
+                  "encryptedPlayer": true
+                },
+                "status": "OUT_OF_SCOPE",
+                "control": [
+                  "recognize"
+                ],
+                "strategyId": null,
+                "receiptSha256": "2bb0e02225f6be8381113c0f67ed58dee965b56039e76460282e2f757f12f8cd",
+                "journalOutputSha256": "8d6a17559149a90c3e6bbdea260278147386c9da940dd2b9256bdcdcd8302c2f"
+              },
+              {
+                "id": "missing",
+                "category": "boundary",
+                "observation": {
+                  "url": "https://example.test/video"
+                },
+                "status": "NEEDS_INPUT",
+                "control": [],
+                "strategyId": null,
+                "receiptSha256": "c43a94cee055faa4c27b5d379eec1f27a86016b16294f5dcc2c0d635c2382af7",
+                "journalOutputSha256": "3c255648d8d9017143a5e102d857f64d2b5eb5ee11186366a96157bb8ae56a7b"
+              },
+              {
+                "id": "malformed",
+                "category": "negative",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    7
+                  ]
+                },
+                "status": "FAILED",
+                "control": [],
+                "strategyId": null,
+                "receiptSha256": "4dcc79a383983f4361cd49ac91a247e5ffd68fa694728dc26c41f8eb5aae7d7e",
+                "journalOutputSha256": "3f2f675bb37b2dea9046e19ed7160cd3f5cc5c771306b4a8a133fbd2d5390973"
+              },
+              {
+                "id": "strategy-coverage",
+                "category": "boundary",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "videojs"
+                  ]
+                },
+                "status": "PARTIAL",
+                "control": [
+                  "recognize",
+                  "decide",
+                  "resolve-known",
+                  "validate"
+                ],
+                "strategyId": null,
+                "receiptSha256": "f22bec8ef47480d91a6f6155c195c0c68a44bf22192caccbaaca5a0a204c554b",
+                "journalOutputSha256": "0c95d2fe62216cf8b7ed6c96f685482593e7e77e04c8be4b5e5c08ff477af6e8"
+              },
+              {
+                "id": "unauthorized-field",
+                "category": "negative",
+                "observation": {
+                  "url": "https://example.test/video",
+                  "signals": [
+                    "jwplayer"
+                  ],
+                  "tool": "download"
+                },
+                "status": "FAILED",
+                "control": [],
+                "strategyId": null,
+                "receiptSha256": "aaf491bbc8f74d0e05014534bf8a3c975eca4287c2ea87be1d0f57c2589fd9e6",
+                "journalOutputSha256": "3f2f675bb37b2dea9046e19ed7160cd3f5cc5c771306b4a8a133fbd2d5390973"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "fixturePolicy": {
+      "id": "xdownload-private-reference-lifecycle",
+      "revision": "1.0.0",
+      "scope": "PRIVATE_REFERENCE_ONLY",
+      "authority": "fixture-reference-governance",
+      "authorizationEvidence": "https://github.com/kaicreator-mm/domain-harness/pull/1498#issuecomment-6714146893",
+      "validatorBinding": {
+        "id": "xdownload-dis-independent-conformance",
+        "version": "0.1.0",
+        "sourceHead": "b9d923e4d43a3a4bcd1d655c52117dcf381e33d3",
+        "path": "packages/dis-v011-runtime/src/trace.ts",
+        "sha256": "d73b54769f1aaa78310beda6ce6f45b871a7da6ccfc99197883ca6c90df71fd6"
+      },
+      "materializedAt": "2026-11-08T07:00:20Z"
+    }
+  },
+  "target": "node24",
+  "provider": {
+    "path": "src/provider.mjs",
+    "candidate": "runtime-signature-exact-v2",
+    "implementationRevision": "2.0.0"
+  },
+  "reader": {
+    "knowledgeKind": "rule-set",
+    "processor": "exact-player-strategy-map/1",
+    "resourcePath": "fixtures/selected-player-strategies.json"
+  },
+  "revisions": {
+    "baseline": "2.0.0",
+    "reselected": "2.1.0"
+  }
+}

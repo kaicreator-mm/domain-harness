@@ -1,0 +1,521 @@
+{
+  "result": "PASS",
+  "scope": "LOCAL_PRIVATE_REFERENCE_CONFORMANCE",
+  "issue": 1486,
+  "pr": 1498,
+  "repair": "R1",
+  "inputHead": "b9d923e4d43a3a4bcd1d655c52117dcf381e33d3",
+  "inputTree": "d7b734f1a980da0250c93d78005ff2945ac92784",
+  "base": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+  "frozenDis": "9504c78f4651f6c1ebc48c7858fca2d8b061544b",
+  "node": "v24.21.0",
+  "platform": "win32",
+  "privateVersion": "0.11.0-dev.0",
+  "qualification": {
+    "format": "dis-runtime-qualification-index/1",
+    "scope": "PRIVATE_REFERENCE_ONLY",
+    "appSha256": "69291116a5a90f05bbaf217763f0bf2972485541a8d3949b1eed3464d89dbea9",
+    "primarySha256": "7b1214c568c329d2fd998dcb2485ad3cef05aca4e51683b7b9709e8f15e51f07",
+    "variants": {
+      "baseline": {
+        "packageId": "xdownload.web-media-runtime",
+        "revision": "2.0.0",
+        "target": "node24",
+        "descriptor": "4c3dad789e2e53430c91f73096f3887213ef5f4617659b6dc24aa36c3b9fa841",
+        "closure": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+        "lock": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+        "provider": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+        "knowledge": "039bd05b6fc8f9b2e963112f36005bee045df3a7c0cd8b530879044c0105d947",
+        "graph": "b5021fb72765de7f94fbba310dc4608f0e7f84e38bfe4a93527ee5018513d978",
+        "validationEvidence": "9a1c9fc9aacd5d79940fcfb3a3eb4c6e374ac87d821f181b913207c753876a9c",
+        "promotionDecision": "4d6e54ccf3819a173cc0b8f3518acde483d2973767a256aefb396ec98f638876"
+      },
+      "reselected": {
+        "packageId": "xdownload.web-media-runtime",
+        "revision": "2.1.0",
+        "target": "node24",
+        "descriptor": "81b64d1251919df159d0daee2feefef064f44bd81d0590dc148c955f7748cda6",
+        "closure": "8c96cb1ec99599d233feffed0ceda8c1f7f4ddeadba989cc650ce000f12d244c",
+        "lock": "0db702e64ebe3bd9c79e159824c4b888621fb892aedb6bab21e4487dae8a0700",
+        "provider": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+        "knowledge": "fe56692e61e4d252f1bcbdacce561b774fec19e8612ee9262bdd4116e529d765",
+        "graph": "c54ebf7ed04ffefd661d40923ae323c326da8e53df72882e6859ec5b484a68c3",
+        "validationEvidence": "621da2ab7c606ec199dcce75429e3b6705f0d8d2ecd7abe16268fe4f37c7ec36",
+        "promotionDecision": "cdb39623ccd05df2aff23c3873ecdabb311e339a9d0eb9cfb93512ec4512f715"
+      }
+    }
+  },
+  "resourceClosure": {
+    "frozen": 25,
+    "baseline": 20,
+    "reselected": 20
+  },
+  "checks": [
+    {
+      "id": "syntax:build.mjs",
+      "args": [
+        "--check",
+        "examples/dis-0.1.0-runtime-consumer/build.mjs"
+      ],
+      "exit": 0
+    },
+    {
+      "id": "syntax:app.mjs",
+      "args": [
+        "--check",
+        "examples/dis-0.1.0-runtime-consumer/app.mjs"
+      ],
+      "exit": 0
+    },
+    {
+      "id": "syntax:src/provider.mjs",
+      "args": [
+        "--check",
+        "examples/dis-0.1.0-runtime-consumer/src/provider.mjs"
+      ],
+      "exit": 0
+    },
+    {
+      "id": "syntax:test/consumer.test.mjs",
+      "args": [
+        "--check",
+        "examples/dis-0.1.0-runtime-consumer/test/consumer.test.mjs"
+      ],
+      "exit": 0
+    },
+    {
+      "id": "syntax:test/reselection.test.mjs",
+      "args": [
+        "--check",
+        "examples/dis-0.1.0-runtime-consumer/test/reselection.test.mjs"
+      ],
+      "exit": 0
+    },
+    {
+      "id": "typecheck",
+      "args": [
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/dis-v011-runtime/tsconfig.json",
+        "--noEmit"
+      ],
+      "exit": 0
+    },
+    {
+      "id": "build",
+      "args": [
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/dis-v011-runtime/tsconfig.build.json"
+      ],
+      "exit": 0
+    },
+    {
+      "id": "lint",
+      "args": [
+        "node_modules/eslint/bin/eslint.js",
+        "packages/dis-v011-runtime"
+      ],
+      "exit": 0
+    },
+    {
+      "id": "native-host-independent-conformance",
+      "args": [
+        "--experimental-strip-types",
+        "--test",
+        "packages/dis-v011-runtime/tests/*.test.ts",
+        "examples/dis-0.1.0-runtime-consumer/test/*.test.mjs"
+      ],
+      "exit": 0
+    },
+    {
+      "id": "domain-app-manual",
+      "args": [
+        "examples/dis-0.1.0-runtime-consumer/app.mjs",
+        "C:/xDev/kAiCreator/_tmp/dh-i1486-runtime/r1-manual-final.sqlite"
+      ],
+      "exit": 0
+    }
+  ],
+  "focusedTests": {
+    "pass": 13,
+    "fail": 0
+  },
+  "lifecycleEvidence": {
+    "sourceHead": "b9d923e4d43a3a4bcd1d655c52117dcf381e33d3",
+    "captureSha256": "cf9ceac3d9b4f683a721538473f2d7f39bdd643c269a488a4056958c8f1f5720",
+    "historicalCases": 18,
+    "finalLockReplays": 18,
+    "dataset": "AUTHORING",
+    "heldOut": 0
+  },
+  "negativeChecks": [
+    "provider digest",
+    "wrong target",
+    "stale Knowledge pin",
+    "missing selected signature rule",
+    "untrusted qualification index",
+    "re-sealed lifecycle record, authority, report, source, capture and history tampering",
+    "wrong Primary digest",
+    "wrong Kernel digest",
+    "SDK/Business import before Core",
+    "unattached Core",
+    "duplicate attachment",
+    "unauthorized intent and caller",
+    "unauthorized Business policy",
+    "invalid URI port and percent escape",
+    "malformed Graph",
+    "forged conformance result"
+  ],
+  "manualDemo": {
+    "buildId": "dis-xdownload-2d798085181c3e2ea6bd06d2",
+    "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+    "admittedEffectId": "turn:kdp-local-read:page%3Ademo:message:c8abce31-67b4-4728-9b13-107a836691bf/effect/1",
+    "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:c8abce31-67b4-4728-9b13-107a836691bf/effect/1"
+  },
+  "cases": [
+    {
+      "case": "known",
+      "status": "READY",
+      "recognition": "recognized",
+      "control": [
+        "recognize",
+        "decide",
+        "resolve-known",
+        "validate"
+      ],
+      "outcome": "READY",
+      "playerId": "jwplayer",
+      "strategyId": "jwplayer.extract.v1",
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:known/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:known/effect/1",
+      "originalReceiptSha256": "257dfc6fff10c42306eb2745e85cb37a56c0c55a7e788b574e5e18ed3e232178",
+      "journalOutputSha256": "dd7fad94259a24aea8bb076793a77ff90749cf2d44bea030e72fc1a971e3bf34",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "unknown",
+      "status": "NEEDS_REVIEW",
+      "recognition": "unknown",
+      "control": [
+        "recognize",
+        "decide",
+        "bounded-fallback",
+        "validate"
+      ],
+      "outcome": "NEEDS_REVIEW",
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:unknown/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:unknown/effect/1",
+      "originalReceiptSha256": "1352e700381f90d3a8018d25be49484529535744465878c7ceafc7b87a66efd9",
+      "journalOutputSha256": "da6169058b61853bc88dca72317ff31eb4872882f295c2f910b3b920c7db5b6e",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "ambiguous",
+      "status": "NEEDS_INPUT",
+      "recognition": "ambiguous",
+      "control": [
+        "recognize",
+        "decide",
+        "bounded-fallback",
+        "validate"
+      ],
+      "outcome": "NEEDS_INPUT",
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:ambiguous/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:ambiguous/effect/1",
+      "originalReceiptSha256": "8a8235e0d64f5ada1d26b460b17bd460eceb189478316cdc8ec7908f8d429f04",
+      "journalOutputSha256": "ce866c76b11df8ed448bf1d4341a590fea85998a2a6ea7ffbc57b4d759cc4c18",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "conflict",
+      "status": "NEEDS_INPUT",
+      "recognition": "conflict",
+      "control": [
+        "recognize",
+        "decide",
+        "bounded-fallback",
+        "validate"
+      ],
+      "outcome": "NEEDS_INPUT",
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:conflict/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:conflict/effect/1",
+      "originalReceiptSha256": "1e8b4f86c5a2a7a28c3091efc54c91fc5a50eb800b9b2cea6c84e0e7f6bfca6b",
+      "journalOutputSha256": "212d76be5c7c19baffeba45a6f40e8d34ef4e680dbdbba955ddef4a557b1fe55",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "out-of-scope",
+      "status": "OUT_OF_SCOPE",
+      "recognition": "out_of_scope",
+      "control": [
+        "recognize"
+      ],
+      "outcome": null,
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:out-of-scope/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:out-of-scope/effect/1",
+      "originalReceiptSha256": "92cbef076b7fe1e6bba6420646b373b01f371a8e75720ef2095f1fe6f804b95d",
+      "journalOutputSha256": "d060dddacd7d51b385c7397b3ff018d35250f59cca801303a8492af93ac4d325",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "missing-input",
+      "status": "NEEDS_INPUT",
+      "recognition": null,
+      "control": [],
+      "outcome": null,
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:missing-input/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:missing-input/effect/1",
+      "originalReceiptSha256": "395cbe89ac3c2ae804f831b57b6dd67646a4df6ee95159acc738db526e7ca9da",
+      "journalOutputSha256": "ae58efe245b77f8533e1485ee892626e30293f952b9fa4ccfdc9c5acb07eff4e",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "failed",
+      "status": "FAILED",
+      "recognition": null,
+      "control": [],
+      "outcome": null,
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:failed/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:failed/effect/1",
+      "originalReceiptSha256": "ca29764e6dd12e61497a4484620a5a1ac9daa4a0c9482d3c2f228c61e9fc1ca8",
+      "journalOutputSha256": "7a77c58cc31c04f22e7992420a2f6b912b5560b9c39c59caa4d7cfda894967ea",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "bad-port",
+      "status": "FAILED",
+      "recognition": null,
+      "control": [],
+      "outcome": null,
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:bad-port/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:bad-port/effect/1",
+      "originalReceiptSha256": "f2a6e200a92dcf30f5797603f07d4e12c192f4850eb7a22a393e0f31158602ca",
+      "journalOutputSha256": "b6da365b22ff1d1777113a4f1900ec8270e41ffa89bce91e0922c46ce5fa8649",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "bad-percent",
+      "status": "FAILED",
+      "recognition": null,
+      "control": [],
+      "outcome": null,
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:bad-percent/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:bad-percent/effect/1",
+      "originalReceiptSha256": "56a66af49d465f82b9a05ea303db510532bcca489ad20414d8a1aa494ab7b4c0",
+      "journalOutputSha256": "b6da365b22ff1d1777113a4f1900ec8270e41ffa89bce91e0922c46ce5fa8649",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "malformed-with-missing",
+      "status": "FAILED",
+      "recognition": null,
+      "control": [],
+      "outcome": null,
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:malformed-with-missing/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:malformed-with-missing/effect/1",
+      "originalReceiptSha256": "b412729e111ef35de089c3fcf802cf0de5295544d29c785b9f08613537a85511",
+      "journalOutputSha256": "7a77c58cc31c04f22e7992420a2f6b912b5560b9c39c59caa4d7cfda894967ea",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "tool-refused",
+      "status": "FAILED",
+      "recognition": null,
+      "control": [],
+      "outcome": null,
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:tool-refused/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:tool-refused/effect/1",
+      "originalReceiptSha256": "0479e21fd0af2147a617bd698d0a782929542c41716c5c733d7c6ddcc3ef0de9",
+      "journalOutputSha256": "7a77c58cc31c04f22e7992420a2f6b912b5560b9c39c59caa4d7cfda894967ea",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "claims-only",
+      "status": "NEEDS_REVIEW",
+      "recognition": "unknown",
+      "control": [
+        "recognize",
+        "decide",
+        "bounded-fallback",
+        "validate"
+      ],
+      "outcome": "NEEDS_REVIEW",
+      "playerId": null,
+      "strategyId": null,
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:claims-only/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:claims-only/effect/1",
+      "originalReceiptSha256": "fbdd10fcfed2df5eb4648c9775e41c41403d0a225d884734930b9fba6058aab7",
+      "journalOutputSha256": "235a3745305d049650ed3924eeead9ffc5760435b53db79650596cd48e893e61",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "url-signature",
+      "status": "READY",
+      "recognition": "recognized",
+      "control": [
+        "recognize",
+        "decide",
+        "resolve-known",
+        "validate"
+      ],
+      "outcome": "READY",
+      "playerId": "jwplayer",
+      "strategyId": "jwplayer.extract.v1",
+      "buildSubjectDigest": "72319e41e7cb63c6798dfdfd80d0b15d04c3753f1a1549d6d40f432675b589e8",
+      "selectedDigest": "2d798085181c3e2ea6bd06d2751eb5e4877ba5919b7a7454342189c9bbe37188",
+      "adapterSha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+      "kernelSha256": "e1ed59556f8b447b5f559302a893738eeae1d272e3a30ac4545fedfb1da8a3e7",
+      "effectId": "turn:kdp-local-read:page%3Ademo:message:url-signature/effect/1",
+      "journalKey": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:url-signature/effect/1",
+      "originalReceiptSha256": "dada74f6d6e1628978041b88d693ba2924f58bc2b05958f6b18d6b1902f91e3d",
+      "journalOutputSha256": "3f064be03e3464b9b4dcf4901735baa809fb69f9e157580f10450a9ae4e9f3f1",
+      "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+      "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+      "externalPermit": false,
+      "externalDispatchClaims": 0
+    },
+    {
+      "case": "reselected-knowledge",
+      "baseline": "jwplayer.extract.v1",
+      "changed": "jwplayer.reference-review.v2",
+      "oldSelection": {
+        "closureSha256": "cf640993408902713e4adbd60a9330a998bc1c9efefde03938b64be924d5db26",
+        "graphId": "xdownload.player-recognition",
+        "graphRevision": "2.0.0",
+        "graphSha256": "b5021fb72765de7f94fbba310dc4608f0e7f84e38bfe4a93527ee5018513d978",
+        "lockSha256": "78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99",
+        "packageId": "xdownload.web-media-runtime",
+        "revision": "2.0.0"
+      },
+      "newSelection": {
+        "closureSha256": "8c96cb1ec99599d233feffed0ceda8c1f7f4ddeadba989cc650ce000f12d244c",
+        "graphId": "xdownload.player-recognition",
+        "graphRevision": "2.1.0",
+        "graphSha256": "c54ebf7ed04ffefd661d40923ae323c326da8e53df72882e6859ec5b484a68c3",
+        "lockSha256": "0db702e64ebe3bd9c79e159824c4b888621fb892aedb6bab21e4487dae8a0700",
+        "packageId": "xdownload.web-media-runtime",
+        "revision": "2.1.0"
+      },
+      "provider": {
+        "path": "src/provider.mjs",
+        "sha256": "b0b569add67a6403895c73f9692d22e752c64af2e7fd342c5e920e05b58a1617",
+        "target": "node24"
+      },
+      "originalJournal": "dis-kdp/tenant:dis-reference/78aa12e524a3ccd7c724bc066917cee25639cb4ef1e28f4267c5e38c8031af99/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:same-message/effect/1",
+      "variantJournal": "dis-kdp/tenant:dis-reference/0db702e64ebe3bd9c79e159824c4b888621fb892aedb6bab21e4487dae8a0700/v08-kernel:effect-journal:turn:kdp-local-read:page%3Ademo:message:same-message/effect/1",
+      "originalReceiptSha256": "132b732dfd02a5e4ee0842c77eda4a1bbb99209a7f596ce69ede3588f24c152f",
+      "variantReceiptSha256": "34048d395590c405ff8bb1077b89a95d0f126698d02ff713aa2739ae07f3a4f5"
+    }
+  ],
+  "pendingExternalGates": [
+    "final HEAD/TREE task-check receipt",
+    "fresh independent review",
+    "Woodpecker",
+    "separate Verifier"
+  ]
+}
