@@ -1,9 +1,11 @@
 /** DIS 0.2.0 bridge over existing real BUILD+Microkernel, not a native SDK ABI. */
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
+import {init as selectedBusinessInit} from './business-app-init.mjs';
 const reject=code=>{throw Object.assign(new Error(code),{code})};
 const digest=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
 const key=(e,f)=>e+'.'+f;
+function deepFreeze(value){if(value!==null&&typeof value==='object'){for(const v of Object.values(value))deepFreeze(v);Object.freeze(value)}return value}
 const initModuleURL=new URL('./business-app-init.mjs',import.meta.url);
 export async function initSourceHash(){return digest(await readFile(initModuleURL,'utf8'))}
 export async function makeManifest(built,{sourceHash,target=built.targetProfile}={}){
@@ -50,9 +52,10 @@ export async function compileProjection(manifest,built){
   routes.set(ing.id,Object.freeze({intentType:f.intentId,optional:ing.optional===true,element:ing.element,function:f.id}));
  }
  for(const pkg of built.modules){if(digest(pkg.moduleSource)!==pkg.moduleSha256)reject('AOT_MODULE_BYTES_DRIFT')}
- return Object.freeze({manifest:structuredClone(manifest),buildSubject:built.subjectDigest,projectionDigest:digest({manifest,build:built.subjectDigest}),routes});
+ const routeView=Object.freeze({get:id=>routes.get(id),keys:()=>Object.freeze([...routes.keys()])});
+ return Object.freeze({manifest:deepFreeze(structuredClone(manifest)),buildSubject:built.subjectDigest,projectionDigest:digest({manifest,build:built.subjectDigest}),routes:routeView});
 }
-export function createActivation({projection,built,load,store,appInit}){
+export function createActivation({projection,built,load,store,testMode='demo'}){
  let state='NEW',sdkApp=null,attempt=0,available=new Set();
  return Object.freeze({
  get state(){return state},
@@ -61,8 +64,8 @@ export function createActivation({projection,built,load,store,appInit}){
   try{
    sdkApp=await load(built,{store,tenantId:'tenant:dis-v020-bridge'});
    const context=Object.freeze({appIdentity:built.appId,activationIdentity:'demo:'+built.subjectDigest+':'+attempt,
-     buildPin:built.subjectDigest,config:Object.freeze({mode:'demo'}),bindings:Object.freeze([...projection.routes.keys()])});
-   const result=await appInit(context);
+     buildPin:built.subjectDigest,config:Object.freeze({mode:testMode}),bindings:Object.freeze([...projection.routes.keys()])});
+   const result=await selectedBusinessInit(context);
    if(!result||!['READY','DEGRADED'].includes(result.status))reject('APP_INIT_BLOCKED');
    const missing=result.unavailableOptionalServices??[];
    if(result.status==='READY'&&missing.length)reject('APP_INIT_INVALID_READY');

@@ -3,13 +3,12 @@ import assert from 'node:assert/strict';
 import {buildV10App} from '../../tooling/build/dist/index.js';
 import {load} from '../../packages/microkernel/dist/index.js';
 import {basicComposition,PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
-import {init as businessInit} from './business-app-init.mjs';
 import {makeManifest,compileProjection,createActivation} from './bridge.mjs';
 let built;
 async function setup(){
  built??=buildV10App(await basicComposition());
  const m=await makeManifest(built),projection=await compileProjection(m,built);
- return {m,projection,activation:createActivation({projection,built,load,store:new PlainCasDocStore(),appInit:businessInit})};
+ return {m,projection,activation:createActivation({projection,built,load,store:new PlainCasDocStore(),})};
 }
 const code=c=>e=>e?.code===c;
 test('real canonical BUILD emits selected KDP, SDK and Business Package closure',async()=>{
@@ -48,7 +47,7 @@ test('real selected KDP denies an incompatible business decision',async()=>{
 });
 test('failed Business App Init closes real SDK activation and leaves ingress unavailable',async()=>{
  const {projection}=await setup();
- const a=createActivation({projection,built,load,store:new PlainCasDocStore(),appInit:async()=>({status:'BLOCKED'})});
+ const a=createActivation({projection,built,load,store:new PlainCasDocStore(),testMode:'test-blocked'});
  await assert.rejects(a.start(),code('APP_INIT_BLOCKED'));
  assert.equal(a.state,'FAILED');
  await assert.rejects(a.invoke('approveQuote',{messageId:'msg:bad',instanceKey:'instance:bad',input:{}}),code('APP_NOT_READY'));
@@ -56,7 +55,7 @@ test('failed Business App Init closes real SDK activation and leaves ingress una
 });
 test('DEGRADED cannot conceal mandatory ingress',async()=>{
  const {projection}=await setup();
- const a=createActivation({projection,built,load,store:new PlainCasDocStore(),appInit:async()=>({status:'DEGRADED',unavailableOptionalServices:['approveQuote']})});
+ const a=createActivation({projection,built,load,store:new PlainCasDocStore(),testMode:'test-degraded-mandatory'});
  await assert.rejects(a.start(),code('APP_INIT_MANDATORY_DEGRADED'));
  a.stop();
 });
@@ -95,4 +94,16 @@ test('Element must bind to a selected Business Package',async()=>{
 test('actual BUILD module bytes are checked, not only declared digest',async()=>{
  const {m}=await setup();const tampered={...built,modules:built.modules.map((p,i)=>i===0?{...p,moduleSource:p.moduleSource+'\n// tampered'}:p)};
  await assert.rejects(compileProjection(m,tampered),code('AOT_MODULE_BYTES_DRIFT'));
+});
+
+test('AOT ingress routes are immutable after compilation',async()=>{
+ const {projection}=await setup();
+ assert.equal(projection.routes.set,undefined);
+ assert.throws(()=>{projection.manifest.ingress[0].id='forged'},TypeError);
+ assert.equal(projection.routes.get('approveQuote').intentType,'submitQuoteDecisionDynamic');
+});
+test('unselected business-init callback is ignored: selected bytes own initialization',async()=>{
+ const {projection}=await setup();let unselectedCalls=0;
+ const a=createActivation({projection,built,load,store:new PlainCasDocStore(),appInit:async()=>{unselectedCalls++;return {status:'BLOCKED'}}});
+ try{assert.equal((await a.start()).status,'READY');assert.equal(unselectedCalls,0)}finally{a.stop()}
 });

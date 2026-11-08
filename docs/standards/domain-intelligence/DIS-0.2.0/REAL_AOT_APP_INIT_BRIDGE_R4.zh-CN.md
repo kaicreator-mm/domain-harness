@@ -31,3 +31,12 @@ node --import tsx --test examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs
 Woodpecker 专用 dis-v020-integration 流水线增加该 Demo，移除不再符合最新信任边界的强制 OS 权限模型测试。**没有新增 Node 主版本检查**；旧 v0.10 ABI 的 Target Profile 和历史 CI 保持原有身份，不在此次 Demo 里改写。
 
 **诚实状态：** 源码已静态检查，实际 BUILD/SDK 端到端 16 项结果以最终对应 HEAD 的 Woodpecker 回执为准。无回执不能标为 PASS。后续仍需将 Element/Function/App Init 真正纳入下一代 AOT 与 SDK 的正式 Contract/ABI，并验证重启、持久化、真实多 Domain 消费。
+
+## 5. R4.1 Demo 自对抗后直接修复
+
+在最初 16 项真实 BUILD/SDK 桥接测试对应的 Woodpecker PASS（精确 HEAD `59f5fbc1fbe7f8970ba91cafc708d6bff0c0c12f`，pipeline https://ci.kaicreator.com/repos/18/pipeline/2206/1）后，再次检查版本锁定可信性发现：
+
+- **P1：投影内 Route Map 仍可通过其 `.set()` 直接修改。** 单层 `Object.freeze({routes: map})` 不会冻结 Map 内容；修复为无 setter 的只读 Route View，且返回的声明 Manifest 递归冻结。
+- **P1：App Init 被当作调用方可替换 callback。** SHA256 虽锁定了原始 Business Init 源码，但调用方仍能传入另一段函数，造成“锁定 A、运行 B”。修复为桥接运行时**仅调用所选 Business Init 模块的固定导出**；拒绝把外部 callback 当作权威。阻塞/降级负例由被锁定模块自身的 Demo 配置触发，保留完整可测性。
+
+原先 16 项测试保留，并新增 2 项负面验证：Route/Manifest 的不可变性，以及尝试注入外部 Business Init callback 无法改变已选源码行为。**R4.1 精确 HEAD 的 18 项测试须重新取得 Woodpecker PASS，不能把 R4 的旧 PASS 继承给变更后代码**。本阶段仍是 Sidecar Bridge 而非已发布 SDK ABI。
