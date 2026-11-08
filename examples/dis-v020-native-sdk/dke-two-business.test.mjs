@@ -439,3 +439,112 @@ test('R25 source selection, real evidence closure and independent reverse regist
  }
 });
 
+
+
+// R27: consume the DKE R26 Git-authored impact catalog with exactly the
+// R25 selected native BUILD/Package/Function registry, never a generic
+// mock or implicitly qualified SAP.
+import {qualifyR27Impact} from './dke-r27-impact.mjs';
+const R27_CATALOG_BLOB='e710997c3b4a1abbe33287f7b79596385c8382d3';
+function r27Catalog(){
+ const bytes=readFileSync(new URL('./fixtures/dke-r27-impact-catalog.json',import.meta.url));
+ assert.equal(gitBlob(bytes),R27_CATALOG_BLOB);
+ return JSON.parse(bytes.toString('utf8'));
+}
+const r27Impact=(catalog,old,fresh)=>qualifyR27Impact({
+ catalog,before:old.sourceData,after:fresh.sourceData,
+ oldAot:old.artifact,newAot:fresh.artifact
+});
+test('R27 actual Tally 14-record source delta maps into two CQs, two unqualified SAP proposals and two selected Business packages',async()=>{
+ const old=await fixtureR25('before'),fresh=await fixtureR25('after');
+ const summary=r27Impact(r27Catalog(),old,fresh);
+ assert.equal(summary.schema,'dis.r27.bounded-selected-impact/1');
+ assert.deepEqual(summary.changedSourceIds,[R25_SNAPSHOT_ID]);
+ assert.equal(summary.addedRecordIds.length,14);
+ assert.deepEqual(summary.impacts.map(x=>x.cqId),['CQ-09F-CF','CQ-09F-GH']);
+ assert.deepEqual(summary.impacts.map(x=>x.sapProposal),['R26-PROPOSAL-CF','R26-PROPOSAL-GH']);
+ assert.deepEqual(summary.staleFunctions,R25_READER_IDS);
+ assert.deepEqual(summary.affectedPackages,R25_READERS.map(x=>x.packageId).sort());
+ assert.deepEqual(summary.stableCqIds,['CQ-T-CROSSCUT']);
+ assert.equal(summary.registeredSelectedClosure,'BOUNDED_ONLY');
+ assert.equal(summary.globalAotReselectionRequired,true);
+ assert.notEqual(summary.previousAotDigest,summary.candidateAotDigest);
+ assert.deepEqual(summary.qualifiedSAPs,[]);
+ assert.equal(summary.independentOracle,'NOT_VERIFIED');
+ assert.equal(summary.authority,'NONE');
+ assert.equal(summary.effectsAllowed,false);
+ assert.equal(summary.activeProcessRevoked,false);
+ for(const c of summary.impacts){
+  assert.equal(c.affectedFunctions.length,2);
+  assert.equal(c.affectedPackages.length,2);
+  assert.equal(c.sapQualified,false);
+  assert.equal(c.semanticAuthority,'NONE');
+  assert.equal(c.effectAuthority,'NONE');
+ }
+});
+test('R27 R26 native loader enforces new external original-source checkpoint against old AOT despite valid old digest',async()=>{
+ const old=await fixtureR25('before'),fresh=await fixtureR25('after');
+ const current=qualifyDisV020Artifact(fresh.artifact).pins.get(R25_SNAPSHOT_ID);
+ assert.ok(current);
+ const expectedSourcePins={
+  [R25_SNAPSHOT_ID]:{sha256:current.sha256,origin:{...current.origin}}
+ };
+ await assert.rejects(loadDisV020Aot(old.artifact,{
+  expectedDigest:old.artifact.digest,expectedSourcePins,
+  registry:old.registry,store:new PlainCasDocStore(),
+  tenantId:'tenant:dis-r27-upstream-source-currentness'
+ }),reject('DIS_SOURCE_ANCHOR_STALE'));
+ const app=await loadDisV020Aot(fresh.artifact,{
+  expectedDigest:fresh.artifact.digest,expectedSourcePins,
+  registry:fresh.registry,store:new PlainCasDocStore(),
+  tenantId:'tenant:dis-r27-upstream-source-currentness'
+ });
+ try{
+  const response=await app.invoke(R25_READERS[0].functionId,
+   {cqId:'CQ-09F-CF'},{expectedContractVersion:'1.0.0'});
+  assert.equal(response.kind,'OBSERVATION');
+  assert.equal(response.disposition,'OBSERVED');
+  assert.equal(response.value.sourceStatus,'PENDING_REVIEW');
+  assert.equal(response.authority,'NONE');
+  assert.equal(response.evidence.attested,false);
+ }finally{app.stop()}
+});
+test('R27 false SAP approval, unknown selected package, omitted reader, forged source and stable-CQ claims fail closed',async()=>{
+ const old=await fixtureR25('before'),fresh=await fixtureR25('after');
+ const mutate=change=>{
+  const c=structuredClone(r27Catalog());change(c);
+  return()=>r27Impact(c,old,fresh);
+ };
+ assert.throws(mutate(c=>{c.registrations[0].readers.pop()}),
+  reject('DKE_R27_SELECTED_CONSUMERS_INCOMPLETE'));
+ assert.throws(mutate(c=>{c.registrations[0].readers[0].packageId='business-forged@0.0.1'}),
+  reject('DKE_R27_SELECTED_CONSUMERS_INCOMPLETE'));
+ assert.throws(mutate(c=>{c.registrations[0].sapCandidate.qualified=true}),
+  reject('DKE_R27_SAP_UNQUALIFIED'));
+ assert.throws(mutate(c=>{c.registrations[0].sapCandidate.oracle='ACCEPTED'}),
+  reject('DKE_R27_SAP_UNQUALIFIED'));
+ assert.throws(mutate(c=>{c.sourcePair.after.blob='0'.repeat(40)}),
+  reject('DKE_R27_SOURCE_VERSION_DRIFT'));
+ assert.throws(mutate(c=>{c.stableObservation.qualified=true}),
+  reject('DKE_R27_STABLE_CQ_CLOSURE_INVALID'));
+});
+test('R27 missing Evidence, orphan selected record, duplicated source identity and invented old presence fail closed',async()=>{
+ const old=await fixtureR25('before'),fresh=await fixtureR25('after');
+ const change=(key,fn,code)=>{
+  const f={...fresh,sourceData:structuredClone(fresh.sourceData)};
+  const b={...old,sourceData:structuredClone(old.sourceData)};
+  fn(key==='before'?b.sourceData:f.sourceData);
+  assert.throws(()=>r27Impact(r27Catalog(),b,f),reject(code));
+ };
+ change('after',d=>{d.records=d.records.filter(n=>
+  n['@id']!=='se:EVD-09F-GH-REPLICATION');
+  d.records.push({'@id':'se:FORGED-ORPHAN','@type':'se:Source'});
+ },'DKE_R27_EVIDENCE_CLOSURE_MISSING');
+ change('after',d=>{d.records[13]={...d.records[12]}},
+  'DKE_R27_DUPLICATE_SOURCE_RECORD');
+ change('before',d=>{d.records.push({...fresh.sourceData.records[0]})},
+  'DKE_R27_SOURCE_DELTA_INVALID');
+ change('after',d=>{
+  d.records[0]['se:lifecycle_status']='ACCEPTED';
+ },'DKE_R27_CASE_SOURCE_INVALID');
+});
