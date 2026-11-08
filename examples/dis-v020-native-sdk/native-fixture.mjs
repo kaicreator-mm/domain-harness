@@ -90,6 +90,19 @@ export async function makeNativeFixture(){
  find('tally.assessTaskEvidence').contract=r11({
   UNQUALIFIED_INPUT:'UNKNOWN',OBSERVED_INPUT_ONLY:'OBSERVED'
  },{state:'string',admitted:'boolean',taskPass:'boolean'});
+ // R19: a selected knowledge Function's native output is a bounded
+ // observation. The nested policy/Effect binding remains KDP governed.
+ const policy=r11({downloads:'OBSERVED'},{
+  packageId:'string',policyId:'string',domainId:'string',
+  workflowDefinition:'record',intentBindings:'record',effectBindings:'record'
+ });
+ policy.input={type:'record',fields:{},additionalProperties:false};
+ policy.outcomes={field:'domainId',classes:{downloads:'OBSERVED'}};
+ find('xdownload.describePolicy').contract=policy;
+ // R19: install a typed receipt *for* the selected xDownload KDP route,
+ // without invoking its non-idempotent acquire Effect in this test.
+ find('xdownload.confirmDownload').receiptContract=
+  structuredClone(find('orders.approve').receiptContract);
  // R18: the real source-pinned Tally release projection remains advisory.
  // Its reported gate PASS is NOT independent GitHub/RQ evidence.
  find('tally.projectReleaseReadiness').contract=r11({

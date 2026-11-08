@@ -69,7 +69,7 @@ test('Runx native stateful observer is not reclassified as a Business or executi
 test('xDownload original policy is exposed as knowledge without providing direct acquisition authority',async()=>{
  const f=await fixturePromise,app=await activate(f);
  try{
-  const p=await app.invoke('xdownload.describePolicy');
+  const p=await app.invoke('xdownload.describePolicy',{});
   assert.equal(p.kind,'OBSERVATION');assert.equal(p.authority,'NONE');
   assert.equal(p.value.domainId,'downloads');
   assert.equal(p.value.effectBindings['effect:acquire'].external.await,'terminal');
@@ -673,4 +673,75 @@ test('R18 malformed source identity is UNKNOWN while a locally forged RELEASE_PA
   await assert.rejects(forged.invoke('tally.projectReleaseReadiness',{}),
    reject('DIS_OUTCOME_UNDECLARED'));
  }finally{forged.stop()}
+});
+
+
+// R19: cover the selected xDownload Knowledge query and a non-invoked real Effect.
+test('R19 xDownload source-real knowledge Function is typed OBSERVED, never an Effect authority',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const policy=await app.invoke('xdownload.describePolicy',{},
+   {expectedContractVersion:'1.0.0'});
+  assert.equal(policy.kind,'OBSERVATION');assert.equal(policy.authority,'NONE');
+  assert.equal(policy.disposition,'OBSERVED');assert.equal(policy.contractVersion,'1.0.0');
+  assert.equal(policy.value.packageId,'business-download@0.2.0-t03');
+  assert.equal(policy.value.domainId,'downloads');
+  assert.equal(policy.value.effectBindings['effect:acquire'].external.await,'terminal');
+  assert.equal(policy.value.effectBindings['effect:acquire'].semantics,'non-idempotent');
+  assert.equal(policy.evidence.attested,false);
+  assert.deepEqual(policy.evidence.declaredRefs,[]);
+ }finally{app.stop()}
+});
+test('R19 bounded Knowledge query rejects unrequested Effect payload and fabricated Domain or shape',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  await assert.rejects(app.invoke('xdownload.describePolicy',{acquire:true}),
+   reject('DIS_FUNCTION_INPUT_INVALID'));
+ }finally{app.stop()}
+ const registry={...f.registry};
+ registry['xdownload.describePolicy']={
+  ...registry['xdownload.describePolicy'],
+  execute:()=>({packageId:'business-download@0.2.0-t03',policyId:'forged',
+   domainId:'foreign',workflowDefinition:{},intentBindings:{},effectBindings:{}})
+ };
+ const fake=await activate(f,{registry});
+ try{
+  await assert.rejects(fake.invoke('xdownload.describePolicy',{}),
+   reject('DIS_OUTCOME_UNDECLARED'));
+ }finally{fake.stop()}
+ const malformed={...f.registry};
+ malformed['xdownload.describePolicy']={
+  ...malformed['xdownload.describePolicy'],
+  execute:()=>({packageId:'business-download@0.2.0-t03',policyId:'bad',
+   domainId:'downloads',workflowDefinition:1,intentBindings:{},effectBindings:{}})
+ };
+ const bad=await activate(f,{registry:malformed});
+ try{
+  await assert.rejects(bad.invoke('xdownload.describePolicy',{}),
+   reject('DIS_FUNCTION_OUTPUT_INVALID'));
+ }finally{bad.stop()}
+});
+test('R19 xDownload real KDP Effect is versioned, source-selected and never invoked in a preflight refusal',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const selected=f.artifact.program.elements.find(e=>e.id==='xdownload.acquire').functions[0];
+  assert.equal(selected.binding.type,'kdp-intent');
+  assert.equal(selected.binding.intentId,'confirmDownload');
+  assert.equal(selected.effect,'governed');
+  assert.equal(selected.receiptContract.schema,'dis.v0.2.kdp-receipt-contract/1');
+  assert.equal(app.contractVersions['xdownload.confirmDownload'],'1.0.0');
+  await assert.rejects(app.invoke('xdownload.confirmDownload',{
+   messageId:'msg:r19-do-not-send',instanceKey:'r19-effect-disabled',
+   input:{requestId:'r19-not-authorized'}
+  },{expectedContractVersion:'0.9.0'}),reject('DIS_FUNCTION_VERSION_MISMATCH'));
+  await assert.rejects(app.invoke('xdownload.confirmDownload',{
+   input:{requestId:'r19-not-authorized'}
+  },{expectedContractVersion:'1.0.0'}),reject('DIS_INTENT_INPUT_INVALID'));
+ }finally{app.stop()}
+});
+test('R19 AOT rejects a forged xDownload Effect receipt map without touching KDP Host',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const x=p.elements.flatMap(e=>e.functions).find(fn=>fn.id==='xdownload.confirmDownload');
+ x.receiptContract.statusMap.complete='ADMITTED';
+ assert.throws(()=>compile(f,p),reject('DIS_KDP_RECEIPT_ADMISSION_WEAK'));
 });
