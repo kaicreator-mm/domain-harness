@@ -189,3 +189,14 @@ test('native SDK refuses silent optional Function omission or optional Business 
  invalid.elements.find(e=>e.id==='orders.init').functions[0].optional=true;
  assert.throws(()=>compile(f,invalid),reject('DIS_INIT_OPTIONAL_FORBIDDEN'));
 });
+
+test('actual Runx Element cannot silently import Tally source as its LOCAL stateful implementation',async()=>{
+ const f=await fixturePromise,program=clone(f.program);
+ program.elements.find(e=>e.id==='runx.agent.presence').functions[0].binding.sourceId='tally-business';
+ assert.throws(()=>compile(f,program),reject('DIS_SOURCE_DOMAIN_MISMATCH'));
+});
+test('declared semantic depends-on relationship must agree with the sealed Element DAG',async()=>{
+ const f=await fixturePromise,program=clone(f.program);
+ program.relations.push({from:'runx.agent.presence',to:'tally.tasks',kind:'depends-on'});
+ assert.throws(()=>compile(f,program),reject('DIS_RELATION_DEPENDENCY_MISMATCH'));
+});

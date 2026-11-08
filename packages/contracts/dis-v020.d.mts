@@ -25,7 +25,7 @@ export interface DisV020Element {
 export interface DisV020Program {
  readonly format:typeof DIS_V020_PROGRAM;
  readonly appId:string;
- readonly domains:readonly {readonly id:string;readonly description:string}[];
+ readonly domains:readonly {readonly id:string;readonly description:string;readonly repositories:readonly string[]}[];
  readonly elements:readonly DisV020Element[];
  readonly relations:readonly {readonly from:string;readonly to:string;readonly kind:'depends-on'|'constrains'|'cooperates'|'defines'}[];
  readonly appInit:string;

@@ -30,11 +30,11 @@ export async function makeNativeFixture(){
  const program={
   format:'dis.v0.2.program/1',appId:built.appId,
   domains:[
-   {id:'orders',description:'Existing selected approved orders Business'},
-   {id:'tally',description:'Tally engineering Claim observation and release evidence'},
-   {id:'runx',description:'Runx non-authoritative Agent incarnation presence'},
-   {id:'xdownload',description:'xDownload guarded acquisition Workflow'},
-   {id:'shared',description:'Cross-domain relationship/constraint semantics'},
+   {id:'orders',description:'Existing selected approved orders Business',repositories:['kaicreator-mm/domain-harness']},
+   {id:'tally',description:'Tally engineering Claim observation and release evidence',repositories:['kaicreator-mm/tally']},
+   {id:'runx',description:'Runx non-authoritative Agent incarnation presence',repositories:['kaicreator-mm/runx']},
+   {id:'xdownload',description:'xDownload guarded acquisition Workflow',repositories:['kaicreator-mm/xDownload']},
+   {id:'shared',description:'Cross-domain relationship/constraint semantics',repositories:['kaicreator-mm/domain-harness']},
   ],
   elements:[
    {id:'shared.semantics',domainId:'shared',kind:'global',description:'Global observation/authorization boundary',dependsOn:[],functions:[]},

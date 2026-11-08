@@ -58,3 +58,9 @@ import {qualifyDisV020Artifact, DIS_V020_AOT}
 进一步对抗审核发现：初版 SDK 对每个 LOCAL 都强制要求实现，实际上让 `optional` Function 无法通过 `DEGRADED` 进入有界的降级模式，可能让一个可选 Runx/Tally 观察者阻塞必需的 KDP 业务。现修复为：**仅可选非 Init LOCAL 实现允许缺席**；Business App Init 必须以 `DEGRADED` 和完整的 `unavailable` Function ID 列表明确承认该缺席，SDK 禁用对应 Function，保留其它真实 Function/KDP 权限的原始语义。未明确声明缺席、把必需 Function 降级、或企图将唯一 Business Init 标成 optional 均 fail-closed。不允许静默将缺席改为 READY。
 
 基于真实 Tally Release Function 和订单 KDP Intent 增加两项用例，不新增虚构 Domain；因此原生 SDK Suite 增至 19 项，DIS 专项总计 95 项。对应每次只认最新提交精确 SHA 的 Woodpecker 成功回执。
+
+## 8. R9.3 三真实项目的 Domain 来源与关系一致性修复
+
+规范的 Domain 不只是代码 Element 集合，也有明确的**来源范围与跨 Element 协作语义**。初版 `sourcePin` 已锁定来源四元组，但仍可把真实 Tally 的 LOCAL Implementation 错误声明在 Runx 领域；同理，`relations[]` 的 `depends-on` 可以与 `dependsOn[]` DAG 相互矛盾。R9.3 为每个 `domains[]` 条目加入非空的 `repositories[]`（允许一域由多个经批准仓库共同生产），任何 LOCAL Function 的 `sourcePin.origin.repository` 必须属于它所在 Domain 的已声明来源范围；否则 `DIS_SOURCE_DOMAIN_MISMATCH`。并要求每条 `from → to`、`kind=depends-on` 的关系必须得到 `to.dependsOn` 精确支持，否则 `DIS_RELATION_DEPENDENCY_MISMATCH`，确保全局语义不能在 AOT 编译时与依赖 DAG 冲突。
+
+这两项来自 Tally/Runx/xDownload 实际不同源码归属的反事实验证，属于**真实领域约束修复**而非增加模拟产品。R9.3 原生 Suite 为 21 项，连同先前 R6/R7/R8 的 76 项共 **97 项**；必须在最新 Exact-SHA Woodpecker 中通过才能标记完成。这里的 `effect=none` 严格指没有 KDP 外部 Host Effect 的执行权限，并不否认 KDP 内部 Workflow 可以更新其自身状态；不应把它解释成所有内部计算均无状态。

@@ -68,8 +68,10 @@ export function qualifyDisV020Artifact(artifact){
    !arr(program.domains)||!arr(program.elements)||!arr(program.relations,true)||!id(program.appInit))fail('DIS_PROGRAM_INVALID');
  const domains=new Map();
  for(const d of program.domains){
-  keys(d,['id','description']);
-  if(!id(d.id)||typeof d.description!=='string'||!d.description.trim()||domains.has(d.id))fail('DIS_DOMAIN_INVALID');
+  keys(d,['id','description','repositories']);
+  if(!id(d.id)||typeof d.description!=='string'||!d.description.trim()||domains.has(d.id)||
+     !arr(d.repositories)||new Set(d.repositories).size!==d.repositories.length||
+     d.repositories.some(repo=>typeof repo!=='string'||!/^[-\w]+\/[-\w.]+$/.test(repo)))fail('DIS_DOMAIN_INVALID');
   domains.set(d.id,d);
  }
  const elements=new Map(),functions=new Map(),inits=[];
@@ -93,6 +95,7 @@ export function qualifyDisV020Artifact(artifact){
    if(b.type==='local'){
     if(f.effect!=='none'||typeof b.sourceId!=='string'||!pins.has(b.sourceId)||
        Object.hasOwn(b,'intentId')||f.kind==='effect')fail('DIS_LOCAL_NOT_QUALIFIED');
+    if(!domains.get(e.domainId).repositories.includes(pins.get(b.sourceId).origin.repository))fail('DIS_SOURCE_DOMAIN_MISMATCH');
    }else if(b.type==='kdp-intent'){
     if(f.kind==='init'||!id(b.intentId)||Object.hasOwn(b,'sourceId')||!e.packageId)fail('DIS_INTENT_INVALID');
     const business=selected.get(e.packageId);
@@ -128,6 +131,7 @@ export function qualifyDisV020Artifact(artifact){
  for(const r of program.relations){
   keys(r,['from','to','kind']);
   if(!elements.has(r.from)||!elements.has(r.to)||!REL_KINDS.has(r.kind))fail('DIS_RELATION_INVALID');
+  if(r.kind==='depends-on'&&!elements.get(r.to).dependsOn.includes(r.from))fail('DIS_RELATION_DEPENDENCY_MISMATCH');
  }
  const data={format:artifact.format,built,program,sources};
  if(sha256Canonical(data)!==artifact.digest)fail('DIS_AOT_DIGEST_DRIFT');
