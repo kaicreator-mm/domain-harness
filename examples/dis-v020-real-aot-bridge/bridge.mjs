@@ -8,9 +8,10 @@ const key=(e,f)=>e+'.'+f;
 // An opaque in-process proof that this projection came from validation against the
 // exact selected BUILD object; a cloned plain-data projection has no authority.
 const qualifiedProjections=new WeakMap();
-const selectedFingerprint=built=>digest({subject:built.subjectDigest,app:built.appId,target:built.targetProfile,
- routes:built.routes,modules:built.modules.map(m=>({packageId:m.packageId,role:m.role,abiVersion:m.abiVersion,
- moduleSha256:m.moduleSha256,provides:m.provides,requires:m.requires,capabilityId:m.capabilityId,handlers:m.handlers}))});
+// Demo runtime readback locks the *whole* selected BUILD record, not merely its
+// public Function routes: budgets, load order, import allowances and sealed bytes
+// are all part of the activation identity. Existing v0.10 BUILD owns their ABI.
+const selectedFingerprint=built=>digest(built);
 function deepFreeze(value){if(value!==null&&typeof value==='object'){for(const v of Object.values(value))deepFreeze(v);Object.freeze(value)}return value}
 const initModuleURL=new URL('./business-app-init.mjs',import.meta.url);
 export async function initSourceHash(){return digest(await readFile(initModuleURL,'utf8'))}
@@ -76,6 +77,7 @@ export function createActivation({projection,built,load,store,testMode='demo'}){
   try{
    if(selectedFingerprint(built)!==qualification.selectedFingerprint||
      built.modules.some(m=>digest(m.moduleSource)!==m.moduleSha256))reject('AOT_ACTIVATION_DRIFT');
+   if(projection.manifest.init.sourceSha256!==await initSourceHash())reject('BUSINESS_INIT_BYTES_DRIFT');
    sdkApp=await load(built,{store,tenantId:'tenant:dis-v020-bridge'});
    if(state!=='STARTING')reject('APP_START_CANCELLED');
    const context=Object.freeze({appIdentity:built.appId,activationIdentity:'demo:'+built.subjectDigest+':'+attempt,

@@ -141,3 +141,25 @@ test('two concurrent App Init attempts cannot double-start the selected Package'
  const first=a.start();await assert.rejects(a.start(),code('APP_INIT_REPEATED'));
  a.stop();release();await assert.rejects(first,code('APP_START_CANCELLED'));
 });
+
+test('AOT budget changes after qualification refuse the real SDK load',async()=>{
+ const candidate=structuredClone(built??buildV10App(await basicComposition()));
+ const projection=await compileProjection(await makeManifest(candidate),candidate);
+ const a=createActivation({projection,built:candidate,load,store:new PlainCasDocStore()});
+ candidate.hardBudget.maxStepsPerTurn+=1;
+ await assert.rejects(a.start(),code('AOT_ACTIVATION_DRIFT'));assert.equal(a.state,'FAILED');
+});
+test('AOT selected module load order changes after qualification refuse startup',async()=>{
+ const candidate=structuredClone(built??buildV10App(await basicComposition()));
+ const projection=await compileProjection(await makeManifest(candidate),candidate);
+ const a=createActivation({projection,built:candidate,load,store:new PlainCasDocStore()});
+ candidate.loadOrder.reverse();
+ await assert.rejects(a.start(),code('AOT_ACTIVATION_DRIFT'));assert.equal(a.state,'FAILED');
+});
+test('AOT import allowance changes after qualification cannot silently expand Function behavior',async()=>{
+ const candidate=structuredClone(built??buildV10App(await basicComposition()));
+ const projection=await compileProjection(await makeManifest(candidate),candidate);
+ const a=createActivation({projection,built:candidate,load,store:new PlainCasDocStore()});
+ candidate.modules[0].externalImports={node:['node:fs'],npm:[],native:[]};
+ await assert.rejects(a.start(),code('AOT_ACTIVATION_DRIFT'));assert.equal(a.state,'FAILED');
+});

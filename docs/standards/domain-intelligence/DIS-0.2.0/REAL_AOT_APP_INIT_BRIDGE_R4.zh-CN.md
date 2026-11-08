@@ -51,3 +51,11 @@ Woodpecker 专用 dis-v020-integration 流水线增加该 Demo，移除不再符
 同时修复 `invoke` 未提供参数时抛原生解构 TypeError 的问题，统一为 `INGRESS_INPUT_INVALID`。保留 R4.1 原有 18 项测试，新增 6 项负面/竞态用例，合计 **24 项**。它们在同一 `dis-v020-integration` Woodpecker lane 中通过真实 BUILD/SDK 路径验证。
 
 **验证边界**：在本 R4.2 精确 SHA 对应 CI 得到成功回执之前，只记录 `COMMITTED_PENDING_CI`，不继承前一提交的 PASS。示例中依赖闭包内自建代码仍视为可信；不恢复 OS 级任意敌意原生代码隔离门禁。业务权限、KDP Effect 与回执、Package 源码真实性和失败清理保持强制约束。真实进程重启/持久化投影资格和正式 DIS v0.2.0 SDK 原生 ABI 仍需后续实现。
+
+## 7. R4.3 全 AOT 闭包读回与负面回归
+
+继续对 R4.2 的 selected BUILD fingerprint 做逆向检查，发现只记录部分 module/route 字段会遗漏 `hardBudget`、`loadOrder`、`externalImports` 等重要编译选择。R4.3 改为对**整个选定 `V10BuiltApp` Plain Data** 计算一次编译时指纹，并在调用真实 SDK `load` 前重新计算；所有选定模块源字节摘要与当前已锁定 Business Init 源摘要也再次核对。保留真实 BUILD 自己的 `subjectDigest` 原语义，**没有伪造一个新原生 SDK Digest**。
+
+在 R4.2 的 24 项测试基础上新增 3 项：合格投影构建完成后修改预算、调换选定 Package `loadOrder`、放宽单个 Package 原生导入许可。三者都必须在实际 SDK 激活前返回 `AOT_ACTIVATION_DRIFT`。因此本次桥接 Suite 共 **27 项**，与专用 Woodpecker 现有真实 KDP Effect Gate/C01 回归一起运行。
+
+此处的 `selectedFingerprint` 是对**同一进程中可信、封闭构建产物**的短期一致性校验，不能替代正式的跨进程签发、持久化安装证明及 DIS 0.2.0 原生 AOT/SDK 契约。只在精确提交对应 CI PASS 时记录 `REAL_BRIDGE_DEMO_PASS`。
