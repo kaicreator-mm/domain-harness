@@ -28,7 +28,7 @@
     {
       "batchRoundId": "B03-02",
       "globalRoundId": "R39",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "test": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
       "originalHead": null,
       "receipt": null

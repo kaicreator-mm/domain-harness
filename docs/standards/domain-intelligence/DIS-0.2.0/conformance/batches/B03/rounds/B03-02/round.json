@@ -1,0 +1,25 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B03",
+  "roundId": "B03-02",
+  "globalRoundId": "R39",
+  "status": "CI_PENDING",
+  "startParent": "1ad7748842bb02693790e0f3cd2081cfb0fd113f",
+  "testBlob": "f10a3b8f4452d8bf6db7343d10085590df69d3f9",
+  "sourceHead": null,
+  "receipt": null,
+  "tests": {
+    "positive": [
+      "B03-02 R39 independently installed exact Target accepts original Tally xDownload canonical BUILD without Effect",
+      "B03-02 R39 legacy unqualified Target cannot be interpreted as independently pinned"
+    ],
+    "negative": [
+      "B03-02 R39 targeted AOT requires independent installed Target, not a self-authorizing program label",
+      "B03-02 R39 correct Target identity never overrides stale installer AOT or source pin"
+    ]
+  },
+  "limitations": [
+    "Installer expectedTarget is a trusted caller-provided exact selection identity, not physical OS detection or product certification.",
+    "Target selection does not supersede installer digest/source anchor or KDP Effect authority."
+  ]
+}
