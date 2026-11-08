@@ -12,7 +12,8 @@
   },
   "receipts": [
     "r9.5-baseline",
-    "r10-candidate-blocked"
+    "r10-candidate-blocked",
+    "r10-ci-recovery"
   ],
   "requirements": [
     {
@@ -398,8 +399,10 @@
           "case": "AOT refuses interaction with KDP_INTENT or governed Effect reclassification"
         }
       ],
-      "receiptIds": [],
-      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption are added on this candidate HEAD; no CI receipt is yet assigned and no real Chat/Form UI transport or external download Host was executed. PARTIAL until exact-SHA CI and broader Interaction profile coverage."
+      "receiptIds": [
+        "r10-ci-recovery"
+      ],
+      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance."
     },
     {
       "id": "DIS020-CORE-015",
