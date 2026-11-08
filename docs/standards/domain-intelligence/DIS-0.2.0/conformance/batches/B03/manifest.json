@@ -36,7 +36,7 @@
     {
       "batchRoundId": "B03-03",
       "globalRoundId": "R40",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "test": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
       "originalHead": null,
       "receipt": null
