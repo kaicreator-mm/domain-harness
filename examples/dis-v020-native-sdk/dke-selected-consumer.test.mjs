@@ -1,0 +1,188 @@
+/**
+ * R21: Actual selected AOT → native SDK → source-locked DKE ED06 consumer.
+ * The projection is a bounded read-only copy of real pinned Tally KG nodes and
+ * Textile F012 reference data. It is NOT an independent Domain Oracle or KDP Effect.
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {sourceSha256} from '@kaicreator/domain-harness-contracts/dis-v020';
+import {validateDisV020FunctionValue,classifyDisV020FunctionOutcome} from '@kaicreator/domain-harness-contracts/dis-v020';
+import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
+import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
+import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
+import {makeNativeFixture} from './native-fixture.mjs';
+import {CONTRACT,consume as consumeDke} from './dke-consumer-core.mjs';
+
+const BINDING_SOURCE=Object.freeze({
+ repository:'kaicreator-mm/domain-harness',
+ commit:'35477769acee85059a240bf229e789e8362f46a1',
+ path:'examples/dis-v020-native-sdk/dke-consumer-core.mjs',
+ gitBlob:'1bfc1358409fa8851fefcdb4696858b6b6a8e360'
+});
+const DATA_SOURCE=Object.freeze({
+ repository:'kaicreator-mm/domain-harness',
+ commit:'f1412d728e4d26eafabfb1c0f5d711fa0de929ea',
+ path:'examples/dis-v020-native-sdk/fixtures/dke-ed06-source-projection.json',
+ gitBlob:'47cd14bd7ddaeb45c46f445e5f59ff3b5338d23a'
+});
+const CORE_ID='dke-ed06-consumer',DATA_ID='dke-ed06-projection';
+const VARIANTS=['REVIEWER_ROOT','CONTEXT','GLOBAL'];
+const sourceIdentity={
+ tally:'0f6007315fd7352fe6fd218effcfecf672cb4961',
+ textile:'d53125358455057d9315240e05b6bc038f515241',
+ dkeCore:'1bfc1358409fa8851fefcdb4696858b6b6a8e360'
+};
+const gitBlob=b=>createHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex');
+const refuse=(code)=>{const e=new Error(code);e.code=code;throw e};
+const reject=code=>error=>error?.code===code;
+function sourceTexts(){
+ const executable=readFileSync(new URL('./dke-consumer-core.mjs',import.meta.url));
+ const data=readFileSync(new URL('./fixtures/dke-ed06-source-projection.json',import.meta.url));
+ if(gitBlob(executable)!==BINDING_SOURCE.gitBlob||gitBlob(data)!==DATA_SOURCE.gitBlob)refuse('DKE_EXACT_SOURCE_DRIFT');
+ const projection=JSON.parse(data.toString('utf8'));
+ if(projection.sourcePins.dkeCoreBlob!==sourceIdentity.dkeCore||
+    projection.sourcePins.tallyGraphBlob!==sourceIdentity.tally||
+    projection.sourcePins.textileFixtureBlob!==sourceIdentity.textile)refuse('DKE_UPSTREAM_SOURCE_DRIFT');
+ const graph=new Map(projection.graph['@graph'].map(n=>[n['@id'],n]));
+ const rel=graph.get('se:REL-TVV-0020');
+ if(rel?.['se:lifecycle_status']!=='PENDING_REVIEW'||
+    !['se:subject_ref','se:object_ref'].every(k=>graph.get(rel[k]?.['@id'])?.['@type']==='se:TaxonomyNode')||
+    !rel['se:evidence_refs'].every(e=>graph.get(e['@id'])?.['@type']==='se:Evidence')||
+    projection.textile.authority!=='REFERENCE')refuse('DKE_UPSTREAM_SOURCE_SEMANTICS_DRIFT');
+ return{executable:executable.toString('utf8'),sourceText:data.toString('utf8'),projection};
+}
+const fixturePromise=makeNativeFixture();
+const contractApi={validateDisV020FunctionValue,classifyDisV020FunctionOutcome};
+async function makeDkeSelectedFixture(){
+ const base=await fixturePromise,{executable,sourceText,projection}=sourceTexts();
+ const sources=[
+  ...base.sources,
+  {id:CORE_ID,sourceText:executable,origin:{...BINDING_SOURCE}},
+  {id:DATA_ID,sourceText,origin:{...DATA_SOURCE}}
+ ];
+ const program=structuredClone(base.program);
+ program.domains.push({
+  id:'dke-ed06',description:'Bounded source-locked DKE Element CQ consumer research',
+  repositories:['kaicreator-mm/domain-harness']
+ });
+ const registry={...base.registry};
+ for(const variant of VARIANTS){
+  const suffix=variant.toLowerCase().replace('_','-'),fnId='dke.ed06.'+suffix+'.consume';
+  program.elements.push({
+   id:'dke.ed06.'+suffix,domainId:'dke-ed06',kind:'knowledge',
+   description:'DKE '+variant+' source-pinned evidence consumer: no effect, no semantic attestation',
+   dependsOn:[],
+   functions:[{
+    id:fnId,kind:'knowledge',effect:'none',binding:{type:'local',sourceId:CORE_ID},
+    contract:structuredClone(CONTRACT)
+   }]
+  });
+  registry[fnId]={
+   sourceId:CORE_ID,sha256:sourceSha256(executable),gitBlob:BINDING_SOURCE.gitBlob,
+   origin:{...BINDING_SOURCE},
+   execute:({domain,cqId})=>consumeDke(projection,contractApi,{domain,cqId,variant}).output
+  };
+ }
+ const expectedSourceOrigins={
+  ...base.expectedSourceOrigins,
+  [CORE_ID]:{...BINDING_SOURCE},
+  [DATA_ID]:{...DATA_SOURCE}
+ };
+ const artifact=compileDisV020Aot({
+  built:base.artifact.built,program,sources,expectedSourceOrigins
+ });
+ const activate=(options={})=>loadDisV020Aot(artifact,{
+  expectedDigest:options.expectedDigest??artifact.digest,
+  registry:options.registry??registry,store:new PlainCasDocStore(),
+  tenantId:'tenant:dke-ed06-native-source-consumer'
+ });
+ return {artifact,program,sources,expectedSourceOrigins,registry,projection,activate};
+}
+test('R21 DKE source projections are exact AOT-selected source pins, no unselected function',async()=>{
+ const f=await makeDkeSelectedFixture();
+ const pins=new Map(f.artifact.sources.map(x=>[x.id,x]));
+ assert.equal(pins.get(CORE_ID).origin.gitBlob,BINDING_SOURCE.gitBlob);
+ assert.equal(pins.get(DATA_ID).origin.gitBlob,DATA_SOURCE.gitBlob);
+ assert.equal(pins.get(DATA_ID).sha256,sourceSha256(sourceTexts().sourceText));
+ assert.equal(f.artifact.program.elements.filter(e=>e.domainId==='dke-ed06').length,3);
+ assert.equal(f.artifact.program.elements.flatMap(e=>e.functions)
+   .filter(fn=>fn.id.startsWith('dke.ed06.')).length,3);
+ assert.equal(f.artifact.program.elements.find(e=>e.id==='shared.semantics').functions.length,0);
+});
+test('R21 selected AOT native SDK consumes 24 DKE CQ Functions with SOURCE status and no authority',async()=>{
+ const f=await makeDkeSelectedFixture(),app=await f.activate();
+ try{
+  assert.equal(app.state,'READY');
+  const statuses={tally:{UNKNOWN:0,OBSERVED:0},textile:{UNKNOWN:0,OBSERVED:0}};
+  let calls=0;
+  for(const variant of VARIANTS){
+   const suffix=variant.toLowerCase().replace('_','-');
+   for(const domain of ['tally','textile']){
+    const cqList=f.projection.cases.sourceData[domain].cq;
+    for(const q of cqList){
+     const out=await app.invoke('dke.ed06.'+suffix+'.consume',{domain,cqId:q.id},
+      {expectedContractVersion:'1.0.0'});
+     assert.equal(out.kind,'OBSERVATION');assert.equal(out.authority,'NONE');
+     assert.equal(out.contractVersion,'1.0.0');assert.equal(out.evidence.attested,false);
+     assert.equal(out.value.domain,domain);assert.equal(out.value.cqId,q.id);
+     assert.equal(out.disposition,out.value.status);
+     assert.ok(out.evidence.declaredRefs.length>0);
+     assert.equal(out.evidence.source.gitBlob,BINDING_SOURCE.gitBlob);
+     assert.notEqual(out.disposition,'SUCCEEDED');
+     statuses[domain][out.disposition]++;
+     calls++;
+    }
+   }
+  }
+  assert.equal(calls,24);
+  assert.deepEqual(statuses,{tally:{UNKNOWN:12,OBSERVED:0},textile:{UNKNOWN:6,OBSERVED:6}});
+ }finally{app.stop()}
+});
+test('R21 source drift, forged registry, stale Function and missing real Evidence fail closed',async()=>{
+ const f=await makeDkeSelectedFixture();
+ const changed=structuredClone(f.sources);
+ changed.find(s=>s.id===DATA_ID).sourceText+=' ';
+ assert.throws(()=>compileDisV020Aot({
+  built:f.artifact.built,program:f.program,sources:changed,
+  expectedSourceOrigins:f.expectedSourceOrigins
+ }),reject('DIS_BUILD_SOURCE_BYTES_DRIFT'));
+ const forged={...f.registry};
+ const key='dke.ed06.reviewer-root.consume';
+ forged[key]={...forged[key],gitBlob:'0'.repeat(40)};
+ await assert.rejects(f.activate({registry:forged}),reject('DIS_LOCAL_REGISTRY_MISMATCH'));
+ await assert.rejects(f.activate({expectedDigest:'0'.repeat(64)}),
+  reject('DIS_INSTALLED_AOT_MISMATCH'));
+ const app=await f.activate();
+ try{
+  await assert.rejects(app.invoke(key,{domain:'tally',cqId:'CQ-T-CROSSCUT',effect:true}),
+   reject('DIS_FUNCTION_INPUT_INVALID'));
+  await assert.rejects(app.invoke(key,{domain:'tally',cqId:'CQ-T-CROSSCUT'},
+    {expectedContractVersion:'0.9.0'}),reject('DIS_FUNCTION_VERSION_MISMATCH'));
+ }finally{app.stop()}
+ const bad=structuredClone(f.projection);
+ bad.textile.rules.find(x=>x.id==='jacquard').sources=['forged-source'];
+ assert.throws(()=>consumeDke(bad,contractApi,{
+  domain:'textile',cqId:'CQ-X-STRUCTURE',variant:'REVIEWER_ROOT'
+ }),/TEXTILE_REFERENCE_EVIDENCE_MISSING/);
+});
+test('R21 real DIS typed evidence presence is not domain source qualification or KDP permit',async()=>{
+ const f=await makeDkeSelectedFixture(),app=await f.activate();
+ try{
+  const result=await app.invoke('dke.ed06.reviewer-root.consume',{
+   domain:'tally',cqId:'CQ-T-CROSSCUT'
+  },{expectedContractVersion:'1.0.0'});
+  assert.equal(result.disposition,'UNKNOWN');
+  assert.equal(result.value.sourceStatus,'PENDING_REVIEW');
+  assert.equal(result.evidence.attested,false);
+  assert.equal(result.authority,'NONE');
+  assert.notEqual(result.kind,'KDP_RECEIPT');
+  assert.equal(result.value.reason,'UNACCEPTED_GRAPH_CLAIM_OR_RELATION');
+ }finally{app.stop()}
+ const synthetic={status:'SUCCEEDED',evidenceRefs:['fake:reference']};
+ const s=classifyDisV020FunctionOutcome(CONTRACT,synthetic);
+ assert.equal(s.disposition,'SUCCEEDED');
+ // This proves *only* the shape-based classifier behavior; it cannot attest
+ // "fake:reference", a valid KnowledgeClaim or an approved DKE SAP.
+});
