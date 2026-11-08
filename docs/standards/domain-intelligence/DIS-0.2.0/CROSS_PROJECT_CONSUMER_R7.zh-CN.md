@@ -36,3 +36,7 @@ No fixed Node major required in this dedicated DIS validation lane. Five snapsho
 **Current rule:** report R7 tests PASS only after exact matching domain-harness Git HEAD Woodpecker `dis-v020-integration` success. Do not attribute any previous R6.1 CI receipt to this change. The three original source repos themselves are unmodified.
 
 **Potential DIS standard refinement:** an Element may represent an immutable pure Function family (Tally), stateful but non-authoritative observer (Runx), or a declared external-effect pipeline (xDownload). The Function contract must explicitly differentiate **OBSERVED**, **AUTHORIZED** and **EXECUTED**; never infer execution permission from a source-matched Function or from a fresh-looking untrusted observation. Formalization belongs to Product/L1→L2, not instant SDK ABI mutation.
+
+## R7.1 源码来源反事实审查与修复
+
+对抗审核发现只校验 Git Blob 不足以固定 **仓库/提交/原始路径**：相同字节可以被 Manifest 错报为另一项目的实现。现将 `source pin` 扩展为代码内的不可由 Manifest 自颁的四元组 `(repo, commit, originalPath, gitBlob)`，对 Project Identity 和每份 Source 单独比对后再使用 Node 实际 import。新增三项反例：伪造仓库、伪造 commit、伪造原文件路径必须拒绝。R7 的实名源码 Demo 由原 23 项增至 **26 项**。它固定的是当前选定 Git 提交，**不自动声称是未来某天三个项目的最新 HEAD**。

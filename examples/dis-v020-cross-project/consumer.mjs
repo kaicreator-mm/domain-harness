@@ -8,12 +8,32 @@ import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 
 const deny=code=>{const e=new Error(code);e.code=code;throw e};
+const PROJECTS=Object.freeze({
+ tally:{repository:'kaicreator-mm/tally',commit:'e988321439f65b55936a691c02250b6d62a29409'},
+ runx:{repository:'kaicreator-mm/runx',commit:'b9e0c953d9bfd5834315012426fd8e10c21bdd7c'},
+ xdownload:{repository:'kaicreator-mm/xDownload',commit:'e904f08c478b15147b1c07fbe53c610d2d81851f'},
+});
 const PINNED=Object.freeze({
- 'tally/business.mjs':'54015fb63ffb13b4f4e562f660d2172098b5f7f4',
- 'tally/release-readiness.mjs':'2d4d6e7462156e4466192a0ed3207ac76fd288e1',
- 'runx/environment-agent-presence.ts':'b2c669537a56638aeead4f55914533b00fe3935e',
- 'xdownload/business-download.mjs':'a7dba9a896de0b84fc6d54093563adca2ccbcdfc',
- 'xdownload/capability-acquisition-stub.mjs':'2bfa722f88abade392b33964820ea178c072ef39',
+ 'tally/business.mjs':{
+  repository:'kaicreator-mm/tally',
+  originalPath:'packages/tally-engineering-business/src/index.mjs',
+  gitBlob:'54015fb63ffb13b4f4e562f660d2172098b5f7f4'},
+ 'tally/release-readiness.mjs':{
+  repository:'kaicreator-mm/tally',
+  originalPath:'packages/tally-engineering-business/src/release-readiness.mjs',
+  gitBlob:'2d4d6e7462156e4466192a0ed3207ac76fd288e1'},
+ 'runx/environment-agent-presence.ts':{
+  repository:'kaicreator-mm/runx',
+  originalPath:'packages/control-plane/src/environment-agent-presence.ts',
+  gitBlob:'b2c669537a56638aeead4f55914533b00fe3935e'},
+ 'xdownload/business-download.mjs':{
+  repository:'kaicreator-mm/xDownload',
+  originalPath:'packages/download-domain-app/src/business/business-download.mjs',
+  gitBlob:'a7dba9a896de0b84fc6d54093563adca2ccbcdfc'},
+ 'xdownload/capability-acquisition-stub.mjs':{
+  repository:'kaicreator-mm/xDownload',
+  originalPath:'packages/download-domain-app/src/business/capability-acquisition-stub.mjs',
+  gitBlob:'2bfa722f88abade392b33964820ea178c072ef39'},
 });
 const KINDS=new Set(['rule','knowledge','stateful','external-effect']);
 export const gitBlobSha=buffer=>createHash('sha1').update(Buffer.concat([
@@ -33,11 +53,14 @@ export async function qualifyProjectConsumers(declaration){
  const manifest=clone(declaration),modules=new Map(),functions=new Map(),elements=new Map(),owners=new Set(),verified=[];
  for(const project of manifest.consumers){
   if(owners.has(project.id))deny('DIS_DUP_CONSUMER');owners.add(project.id);
-  if(!/^kaicreator-mm\/[a-zA-Z-]+$/.test(project.repository)||!project.domainId||
-      !/^[a-f0-9]{40}$/.test(project.sourceCommit))deny('DIS_CONSUMER_IDENTITY');
+  const pinnedProject=PROJECTS[project.id];
+  if(!pinnedProject||project.repository!==pinnedProject.repository||
+     project.sourceCommit!==pinnedProject.commit||!project.domainId)deny('DIS_CONSUMER_IDENTITY');
   for(const entry of project.sources){
-   if(!Object.hasOwn(PINNED,entry.file)||PINNED[entry.file]!==entry.gitBlob)deny('DIS_SOURCE_NOT_PINNED');
-   if(!entry.originalPath||!entry.originalPath.startsWith('packages/'))deny('DIS_SOURCE_ORIGIN_INVALID');
+   const origin=PINNED[entry.file];
+   if(!origin||origin.gitBlob!==entry.gitBlob)deny('DIS_SOURCE_NOT_PINNED');
+   if(origin.repository!==project.repository||origin.originalPath!==entry.originalPath)
+    deny('DIS_SOURCE_ORIGIN_INVALID');
    if(modules.has(entry.file))deny('DIS_DUP_SOURCE');
    const sourcePath=fileURLToPath(new URL('./snapshots/'+entry.file,import.meta.url));
    const bytes=await readFile(sourcePath);

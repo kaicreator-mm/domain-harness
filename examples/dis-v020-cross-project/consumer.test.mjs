@@ -172,3 +172,15 @@ test('DIS source-pinned consumer does not manufacture Package, KDP or Provider a
  assert.equal(Object.hasOwn(a,'loadNativeKdp'),false);
  assert.equal(Object.hasOwn(a,'claimRelease'),false);
 });
+test('source identity is pinned to the originating repository, not just Git blob',async()=>{
+ const v=changed(x=>x.consumers[0].repository='kaicreator-mm/xDownload');
+ await assert.rejects(qualifyProjectConsumers(v),denial('DIS_CONSUMER_IDENTITY'));
+});
+test('stale or fabricated source commit cannot masquerade as original project verification',async()=>{
+ const v=changed(x=>x.consumers[1].sourceCommit='c'.repeat(40));
+ await assert.rejects(qualifyProjectConsumers(v),denial('DIS_CONSUMER_IDENTITY'));
+});
+test('valid source bytes but incorrect original Git path cannot be qualified',async()=>{
+ const v=changed(x=>x.consumers[2].sources[1].originalPath='packages/misleading/source.mjs');
+ await assert.rejects(qualifyProjectConsumers(v),denial('DIS_SOURCE_ORIGIN_INVALID'));
+});
