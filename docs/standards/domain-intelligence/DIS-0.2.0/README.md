@@ -78,3 +78,7 @@ See [R4 bridge semantics and revised sealed-code trust scope](REAL_AOT_APP_INIT_
 ## R9 — Native DIS 0.2 Element / Function / AOT contract & SDK consumption
 
 [Formal machine contract and native package exports](NATIVE_ELEMENT_FUNCTION_AOT_R9.zh-CN.md) use real Contracts, canonical BUILD and Microkernel SDK public subpaths, not the compatibility Sidecar. [Native original-source consumer tests](../../../../examples/dis-v020-native-sdk/native-consumer.test.mjs) exercise Tally, Runx and xDownload semantics with a single installed AOT and real KDP/SDK; success requires the same exact-SHA Woodpecker receipt.
+
+## Version-level conformance and demo receipts
+
+**Version master [#1499](https://github.com/kaicreator-mm/domain-harness/issues/1499).** The machine [coverage matrix](conformance/matrix.json), [human summary](conformance/validation-summary.md) and [pinned historical receipts](conformance/receipts/) live in Git alongside DIS 0.2.0. Existing Demo paths are preserved; `node --test examples/dis-v020-conformance/validate.test.mjs` enforces that a VERIFIED claim has real positive/negative test references and an exact historical CI receipt. Missing Interaction / I/O / Harness / Evolution coverage stays visible as PARTIAL/NOT_RUN until executed and independently validated.

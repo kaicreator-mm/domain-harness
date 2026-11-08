@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {validateCheckedInMatrix,validateVersionMatrix} from './validate.mjs';
+const base=new URL('../../docs/standards/domain-intelligence/DIS-0.2.0/conformance/',import.meta.url);
+const matrix=JSON.parse(await readFile(new URL('matrix.json',base),'utf8'));
+const baseline=JSON.parse(await readFile(new URL('receipts/r9.5-baseline.json',base),'utf8'));
+const clone=x=>structuredClone(x);
+const rejects=code=>e=>e?.code===code;
+test('version matrix tracks every initial core and optional gap without calling it full coverage',async()=>{
+ const result=await validateCheckedInMatrix();
+ assert.equal(result.requirements,21);
+ assert.ok((result.tallies['core:PARTIAL']??0)>0);
+ assert.ok((result.tallies['core:NOT_RUN']??0)>0);
+ assert.ok((result.tallies['optional-profile:NOT_RUN']??0)>0);
+});
+test('machine validator rejects a VERIFIED requirement without positive or negative proof',async()=>{
+ const v=clone(matrix);v.requirements[0].negative=[];
+ await assert.rejects(validateVersionMatrix(v,{'r9.5-baseline':baseline}),rejects('MATRIX_UNSUPPORTED_VERIFIED'));
+});
+test('machine validator rejects a claimed old PASS with a missing or failed receipt',async()=>{
+ const receipts={'r9.5-baseline':{...baseline,status:'FAIL'}};
+ await assert.rejects(validateVersionMatrix(clone(matrix),receipts),rejects('MATRIX_RECEIPT_INVALID'));
+});
+test('machine validator rejects invented test names or silently changed required scope',async()=>{
+ const v=clone(matrix);v.requirements[0].positive[0].case='fictional non-existent native proof';
+ await assert.rejects(validateVersionMatrix(v,{'r9.5-baseline':baseline}),rejects('MATRIX_CASE_NOT_FOUND'));
+});
+test('version conformance is incomplete until all applicable MUST requirements are verified',async()=>{
+ const r=await validateCheckedInMatrix();
+ const complete=!(r.tallies['core:PARTIAL']||r.tallies['core:NOT_RUN']);
+ assert.equal(complete,false);
+});

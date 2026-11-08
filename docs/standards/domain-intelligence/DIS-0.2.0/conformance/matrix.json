@@ -1,0 +1,520 @@
+{
+  "schema": "dis.v0.2.conformance-matrix/1",
+  "version": "0.2.0",
+  "issue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+  "authority": "https://github.com/kaicreator-mm/domain-harness/issues/1496",
+  "pr": "https://github.com/kaicreator-mm/domain-harness/pull/1497",
+  "semantics": {
+    "VERIFIED": "Positive and negative executable cases confirmed by a referenced exact-SHA receipt, within stated scope only.",
+    "PARTIAL": "At least some supporting implementation/evidence, but the full named requirement not yet demonstrated.",
+    "NOT_RUN": "No native conformant executable proof, including design-only or simulation-only coverage.",
+    "OUT_OF_SCOPE": "Only after explicit Product/L1 decision with rationale and URL; none assumed."
+  },
+  "receipts": [
+    "r9.5-baseline"
+  ],
+  "requirements": [
+    {
+      "id": "DIS020-CORE-001",
+      "title": "Domain identity and trusted source ownership",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "2"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native Contracts + canonical BUILD select 4 heterogeneous domains and explicit global semantics"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "actual Runx Element cannot silently import Tally source as its LOCAL stateful implementation"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Original source repos pinned to exact origin; not a proof of semantic knowledge graph completeness."
+    },
+    {
+      "id": "DIS020-CORE-002",
+      "title": "Element identity, version, description and cohesive Function granularity",
+      "profile": "core",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "3"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native Contracts + canonical BUILD select 4 heterogeneous domains and explicit global semantics"
+        }
+      ],
+      "negative": [],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance."
+    },
+    {
+      "id": "DIS020-CORE-003",
+      "title": "Public Function I/O schema, typed outcomes, evidence obligations, compatibility",
+      "profile": "core",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "3"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "R9 bindings do not yet enforce complete input/output schema, unknown/failed outcomes, evidence or version compatibility."
+    },
+    {
+      "id": "DIS020-CORE-004",
+      "title": "LOCAL vs KDP_INTENT Function binding, effect classification, authority boundary",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "3"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs",
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native public SDK loads actual selected KDP, initializes one Business and executes admitted orders Intent"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Actual source-real Tally/Runx/xDownload consumer tests including forged Effect binding."
+    },
+    {
+      "id": "DIS020-CORE-005",
+      "title": "Static Element DAG and semantic relations/constraints/collaboration",
+      "profile": "core",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "2,4"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native Contracts + canonical BUILD select 4 heterogeneous domains and explicit global semantics"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "declared semantic depends-on relationship must agree with the sealed Element DAG"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts."
+    },
+    {
+      "id": "DIS020-CORE-006",
+      "title": "Knowledge query/Rule/Stateful implementations and Domain state ownership",
+      "profile": "core",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "3"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "Runx native stateful observer is not reclassified as a Business or execution lease"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-cross-project/consumer.test.mjs",
+          "case": "Runx: presence observation cannot be treated as a fresh lease or execution permit"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Actual Tally rule and Runx observer run as LOCAL, but general per-Element state ownership and knowledge query contract do not have complete executable profile."
+    },
+    {
+      "id": "DIS020-CORE-007",
+      "title": "Canonical AOT full BUILD identity, source provenance, selected route/handler",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "5"
+      },
+      "implementation": [
+        "tooling/build/dis-v020.mjs",
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-cross-project/selected-build.test.mjs",
+          "case": "R8 canonical BUILD selects byte-locked Tally and xDownload real Business packages"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "installed independent digest catches altered but rehashed and internally valid AOT semantics"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Current built target closure + independent digest verified; cross-Target packaging handled by another requirement."
+    },
+    {
+      "id": "DIS020-CORE-008",
+      "title": "Target-specific package dependency and implementation selection",
+      "profile": "core",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "5"
+      },
+      "implementation": [
+        "tooling/build/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs",
+          "case": "AOT target drift fails closed"
+        }
+      ],
+      "negative": [],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "BUILD target digest/check exists; no independent Windows/Linux/Android selected package conformance matrix."
+    },
+    {
+      "id": "DIS020-CORE-009",
+      "title": "Two-layer boot/package initialization and exactly one Business App Init",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native public SDK loads actual selected KDP, initializes one Business and executes admitted orders Intent"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK Business App Init refusal blocks every Function without exposing a facade"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Real KDP load then unique Business Init, denied ingress on blocked/invalid init."
+    },
+    {
+      "id": "DIS020-CORE-010",
+      "title": "Ingress direct Function dispatch without mandatory Main Workflow",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "Tally actual Task evidence Function stays OBSERVATION, never mints Task Claim or authorization"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK stop closes all Function ingress, including stateful LOCAL functions"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Native SDK exposes LOCAL and governed KDP function calls without a mandatory Main Workflow."
+    },
+    {
+      "id": "DIS020-CORE-011",
+      "title": "Optional service readiness, bounded DEGRADED, mandatory ingress denied",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK DEGRADED explicitly disables absent optional Tally Function without weakening mandatory KDP"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK refuses silent optional Function omission or optional Business App Init"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Original Tally optional Function is disabled only on explicit Business Init DEGRADED."
+    },
+    {
+      "id": "DIS020-CORE-012",
+      "title": "KDP Effect permit/Journal/UNKNOWN and no fabricated success",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6,8"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-sdk-integration/test.mjs",
+          "case": "trusted K view allows a real bounded temporary-file effect"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-sdk-integration/test.mjs",
+          "case": "after dispatch error is UNKNOWN, not pre-handler refusal"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Original selected-K real gate and negative unknown receipts."
+    },
+    {
+      "id": "DIS020-CORE-013",
+      "title": "Physical KDP Journal recovery and idempotent dual-domain replay",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6"
+      },
+      "implementation": [
+        "examples/dis-v020-real-aot-bridge/physical-store.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs",
+          "case": "physical SQLite Journal survives close and a real second Node process without duplicated Effects"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs",
+          "case": "untrusted persisted Projection cannot restore physical KDP Journal with wrong installed digest"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Actual file-backed SQLite reopened from second Node process."
+    },
+    {
+      "id": "DIS020-CORE-014",
+      "title": "Progressive Intent Interaction Element across Form/Chat/CLI and no implicit Effect",
+      "profile": "core",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "7"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "R9 core enum does not support INTERACTION as native typed Element; no end-to-end native SDK clarification Demo."
+    },
+    {
+      "id": "DIS020-CORE-015",
+      "title": "Deterministic / LLM-disabled native Consumer path",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "8"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "xDownload original policy is exposed as knowledge without providing direct acquisition authority"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Tally rules and Runx stateful observer run without selecting model provider."
+    },
+    {
+      "id": "DIS020-CORE-016",
+      "title": "Version-specific reproducible traceable Demo and positive/negative evidence",
+      "profile": "core",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "10"
+      },
+      "implementation": [
+        ".woodpecker/dis-v020-integration.yaml"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK requires a separately provisioned AOT digest, not an artifact self-declaration"
+        }
+      ],
+      "negative": [],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "R9.5 exact-SHA CI is verified; version-wide Requirement matrix and receipts only being established in this commit."
+    },
+    {
+      "id": "DIS020-OPT-001",
+      "title": "Bounded Harness/LLM selected provider, budget and UNKNOWN handling",
+      "profile": "optional-profile",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "8"
+      },
+      "implementation": [],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "R2 design/negative vectors exist; no native v0.2 AOT + SDK integrated resolver/budget Demo."
+    },
+    {
+      "id": "DIS020-OPT-002",
+      "title": "Experience provenance, validator, exact reuse and independent holdout",
+      "profile": "optional-profile",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "9"
+      },
+      "implementation": [],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "R2 planned E01-E06,N01-N12 not executed as native profile."
+    },
+    {
+      "id": "DIS020-OPT-003",
+      "title": "Local data-only Evolution Slot activation, task pin, rollback, revoke",
+      "profile": "optional-profile",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "9"
+      },
+      "implementation": [],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "R2 E07,N02,N09,N13,N14 not executed in selected SDK."
+    },
+    {
+      "id": "DIS020-OPT-004",
+      "title": "Server Promotion and new AOT lifecycle, privacy/scope governance",
+      "profile": "optional-profile",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "9"
+      },
+      "implementation": [],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "R2 E08-E10,N08,N11,N15 not executed."
+    },
+    {
+      "id": "DIS020-GOV-001",
+      "title": "Independent exact-SHA review and Product/L1 L2 Freeze",
+      "profile": "governance",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "10"
+      },
+      "implementation": [],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "Version delivery governance separate from Demo CI; PR remains Draft."
+    }
+  ]
+}
