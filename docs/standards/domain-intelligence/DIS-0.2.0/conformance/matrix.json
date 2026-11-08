@@ -14,7 +14,8 @@
     "r9.5-baseline",
     "r10-candidate-blocked",
     "r10-ci-recovery",
-    "r11-integration-blocked"
+    "r11-integration-blocked",
+    "r14-d01-ci-recovered"
   ],
   "requirements": [
     {
@@ -108,8 +109,10 @@
           "case": "R11 AOT rejects incompatible Function contract reader/major and weak success evidence policy"
         }
       ],
-      "receiptIds": [],
-      "note": "R11 candidate attaches opt-in AOT-locked Function Contract to real Tally and xDownload native LOCAL Functions: bounded record I/O, declared typed outcome, source-pin provenance, declared evidence requirement and explicit reader/major version guard. Historical R11 integration CI FAILURE pinned by r11-integration-blocked; not a success receipt. Separate source audit found a stale conformance test state assumption, but the first failing CI step is unknown without logs. NOT CI-VERIFIED YET. No complete schema vocabulary, independent domain evidence attestation, KDP_INTENT typing, all-Function profile or cross-version structural compatibility proof; PARTIAL."
+      "receiptIds": [
+        "r14-d01-ci-recovered"
+      ],
+      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility."
     },
     {
       "id": "DIS020-CORE-004",
@@ -168,7 +171,7 @@
       "receiptIds": [
         "r9.5-baseline"
       ],
-      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts."
+      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation."
     },
     {
       "id": "DIS020-CORE-006",
@@ -251,7 +254,7 @@
       "receiptIds": [
         "r9.5-baseline"
       ],
-      "note": "BUILD target digest/check exists; no independent Windows/Linux/Android selected package conformance matrix."
+      "note": "BUILD target digest/check exists; no independent Windows/Linux/Android selected package conformance matrix. D04 applicability review: Product/L1 has not approved an applicable Target list; no implicit Linux/Windows/Android PASS from one selected BUILD."
     },
     {
       "id": "DIS020-CORE-009",
@@ -427,7 +430,7 @@
       "receiptIds": [
         "r10-ci-recovery"
       ],
-      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance."
+      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance. D03 deterministic Chat text/Form URLSearchParams/CLI argv adapters added as native SDK consumer candidates; pending next exact-SHA CI and external UI transport/Host validation."
     },
     {
       "id": "DIS020-CORE-015",

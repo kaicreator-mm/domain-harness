@@ -6,6 +6,7 @@ import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
 import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
 import {makeNativeFixture} from './native-fixture.mjs';
+import {chatInitial,chatFollowUp,formInitial,formFollowUp,cliInitial,cliFollowUp,consumeDownloadSession} from '../dis-v020-interaction/channel-adapters.mjs';
 
 const fixturePromise=makeNativeFixture();
 const clone=value=>structuredClone(value);
@@ -353,5 +354,94 @@ test('R11 installed AOT contract version rejects stale explicit consumer expecta
  try{
   await assert.rejects(app.invoke('tally.assessTaskEvidence',{}, {expectedContractVersion:'2.0.0'}),
    reject('DIS_FUNCTION_VERSION_MISMATCH'));
+ }finally{app.stop()}
+});
+
+
+// D02: source-real parent-vs-split counterfactual, not an independent semantic oracle.
+test('D02 parent-vs-split Tally rule Elements preserve two source-real advisory Function outputs',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const parent=p.elements.find(e=>e.id==='tally.tasks');
+ const child=p.elements.find(e=>e.id==='tally.release');
+ parent.functions.push(...child.functions);
+ p.elements=p.elements.filter(e=>e.id!=='tally.release');
+ p.relations=p.relations.filter(r=>r.from!=='tally.release'&&r.to!=='tally.release');
+ const fused=compile(f,p);
+ const splitApp=await activate(f),fusedApp=await activate(f,{artifact:fused,digest:fused.digest});
+ const taskInput={issueRef:'https://github.com/kaicreator-mm/tally/issues/37',issueNumber:37,
+  sourceSha:'e988321439f65b55936a691c02250b6d62a29409',claimRef:'claim:unattested',
+  dependenciesComplete:true};
+ const releaseInput={repository:'kaicreator-mm/tally',sourceSha:taskInput.sourceSha,
+  observedAsOf:'2026-11-08T12:00:00Z',gates:{}};
+ try{
+  for(const [fn,input] of [['tally.assessTaskEvidence',taskInput],
+                            ['tally.projectReleaseReadiness',releaseInput]]){
+   const a=await splitApp.invoke(fn,input),b=await fusedApp.invoke(fn,input);
+   assert.deepEqual(a,b);
+   assert.equal(a.kind,'OBSERVATION');assert.equal(a.authority,'NONE');
+   assert.equal(a.value.admitted??false,false);
+   assert.equal(a.value.canMerge??false,false);
+  }
+ }finally{splitApp.stop();fusedApp.stop()}
+});
+test('D02 semantic cooperation may be cyclic while static Element dependency DAG remains acyclic',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ p.relations.push({from:'tally.tasks',to:'runx.agent.presence',kind:'cooperates'});
+ assert.doesNotThrow(()=>compile(f,p));
+ const invalid=clone(p);
+ invalid.elements.find(e=>e.id==='tally.tasks').dependsOn=['tally.release'];
+ assert.throws(()=>compile(f,invalid),reject('DIS_DEPENDENCY_CYCLE'));
+});
+test('D02 cross-Element constraint relation cannot nominate an absent owner',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ p.relations.push({from:'absent.owner',to:'tally.tasks',kind:'constrains'});
+ assert.throws(()=>compile(f,p),reject('DIS_RELATION_INVALID'));
+});
+
+// D03: parse three genuinely distinct client representations and call the same native SDK.
+test('D03 Chat message, Form URLSearchParams and CLI argv adapters consume actual native Interaction',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const rows=[
+   [chatInitial('download https://example.org/media.mp4','ADAPTER-CHAT'),
+    chatFollowUp('bytes 512 confirm'),'chat'],
+   [formInitial(new URLSearchParams({url:'https://example.org/media.mp4'}),'ADAPTER-FORM'),
+    formFollowUp(new URLSearchParams({declaredBytes:'512',confirmed:'on'})),'form'],
+   [cliInitial(['download','https://example.org/media.mp4'],'ADAPTER-CLI'),
+    cliFollowUp(['--bytes','512','--confirm']),'cli']
+  ];
+  for(const [initial,followUp,channel] of rows){
+   const {inspected,final}=await consumeDownloadSession(app,{initial,followUp});
+   assert.equal(inspected.value.status,'CLARIFICATION_REQUIRED');
+   assert.equal(inspected.disposition,'NEEDS_INPUT');
+   assert.equal(final.value.status,'READY_FOR_KDP');
+   assert.equal(final.disposition,'PENDING_AUTHORIZATION');
+   assert.equal(final.value.proposal.channel,channel);
+   assert.equal(final.authority,'NONE');
+   assert.equal(final.value.effectDispatched,false);
+   assert.equal(final.value.permittedEffect,false);
+  }
+ }finally{app.stop()}
+});
+test('D03 adapters refuse extra effect fields, unsupported commands and fabricated chat confirmation',()=>{
+ assert.throws(()=>chatInitial('execute https://example.org/a','BAD'),reject('DIS_ADAPTER_INVALID'));
+ assert.throws(()=>chatFollowUp('approve all effects'),reject('DIS_ADAPTER_INVALID'));
+ assert.throws(()=>formInitial(new URLSearchParams('url=https%3A%2F%2Fexample.org%2Fa&execute=1'),'BAD'),
+  reject('DIS_ADAPTER_INVALID'));
+ assert.throws(()=>formFollowUp(new URLSearchParams('declaredBytes=2&confirmed=true')),
+  reject('DIS_ADAPTER_INVALID'));
+ assert.throws(()=>cliInitial(['download','https://example.org/a','--execute'],'BAD'),
+  reject('DIS_ADAPTER_INVALID'));
+ assert.throws(()=>cliFollowUp(['--bytes','3','--execute']),reject('DIS_ADAPTER_INVALID'));
+});
+test('D03 absence of explicit confirmation leaves parsed CLI session without KDP authority',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const {final}=await consumeDownloadSession(app,{
+   initial:cliInitial(['download','https://example.org/a'],'CLI-NO-CONFIRM'),
+   followUp:cliFollowUp(['--bytes','256'])
+  });
+  assert.equal(final.value.status,'AWAITING_CONFIRMATION');
+  assert.equal(final.authority,'NONE');
  }finally{app.stop()}
 });

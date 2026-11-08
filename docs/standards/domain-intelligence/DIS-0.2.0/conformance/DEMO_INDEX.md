@@ -75,3 +75,14 @@ D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式�
 - **通用经验写回 [ADS #1361](https://github.com/kaicreator-mm/ai-development-standard/issues/1361)**：版本 Conformance 可借用 ADS #1362 的证据组织技术，但不得混淆 Stage 1/2 权威；历史成功的 exact SHA、领域来源 Pin、独立语义判定、Effect 权限与本轮 CI 必须分别表达；研究依赖图不等于 Frozen Task DAG。Issue 开销与时间/成本只有实际测量才声称节省。
 
 **R13 验证器反例修复**：旧 `validate.test.mjs` 要求 `core:NOT_RUN > 0`，与真实 Matrix 9 VERIFIED / 7 PARTIAL / 0 NOT_RUN 矛盾；现在以完整 16 Core 数和剩余未验证数核对，并新增“BLOCKED 收据不能为 VERIFIED 背书”的负例。此源级问题不等于确认 Woodpecker 的第一失败步骤；只认后续 exact-SHA CI。
+
+## 6. R14–R15 incremental evidence update
+
+
+### R14 — D01 recovered; D02/D03 native consumer candidate; D04 applicability boundary
+
+- **D01 verified limited execution:** matching exact SHA `51a39d293c06402835a28ac9a766f94d4933eccc`, TREE `9c1676c446f30e2b150b1d1b4dd047d1aac6eb30`, Woodpecker #2234 contexts **3/3 SUCCESS**. Checked-in [r14-d01-ci-recovered](receipts/r14-d01-ci-recovered.json) is a **historical success**, not a verdict for the commit adding this record. R11 original mixed-status failure remains immutable. `CORE-003` stays **PARTIAL**, despite now having a narrow successful source+typed test receipt.
+- **D02 candidate (NOT YET CI-QUALIFIED):** using the actual source-pinned Tally task/rule and release projection, compare intact split Elements vs a fused parent Element with identical two public Functions, outcome-by-outcome. Add the distinct negative cases: static DAG cycle fails, semantic cooperation cycle is allowed, and an absent constraint owner is refused. This is a structural/observable counterfactual, **not** an independent semantic oracle or a generalized invariant ownership algorithm.
+- **D03 candidate (NOT YET CI-QUALIFIED):** distinct deterministic Chat text, browser-form `URLSearchParams` and CLI `argv` parsing adapters call the **real selected native SDK Function** twice (inspect → confirm); bypass/unknown options fail. No production UI deployment or authorized external transfer is claimed.
+- **D04:** current original-source selected BUILD/KDP evidence does not establish a complete Target applicability matrix. Windows/Android/Linux-specific execution is **NOT PROVEN** unless individually pinned and executed; Product/L1 #1496 retains the actual applicable Target set decision. No invented OUT_OF_SCOPE verdict.
+- **Current commit boundary:** the newly added D02/D03 tests and D04 report require *new* matching Woodpecker context results before being treated as executed; current Core/Optional/Governance counts stay **9 VERIFIED / 7 PARTIAL; 4 NOT_RUN; 1 NOT_RUN**.
