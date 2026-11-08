@@ -66,3 +66,7 @@ See [R4 bridge semantics and revised sealed-code trust scope](REAL_AOT_APP_INIT_
 ## R6 — Real physical KDP Journal and two Business Domain consumer
 
 [R6 cross-process SQLite / orders + inventory consumer evidence](PHYSICAL_TWO_DOMAIN_R6.zh-CN.md) describes actual selected two Business Package compilation, guarded Function dispatch, file-backed WAL/CAS KDP Journal, two-process original receipt replay and negative AOT-restore vectors. The full real demo is under [examples/dis-v020-real-aot-bridge/](../../../../examples/dis-v020-real-aot-bridge/); evidence requires a matching Woodpecker exact-SHA PASS.
+
+## R7 — Cross-project source-real consumer Demo
+
+[Three-project fixed-source Tally / Runx / xDownload qualification](CROSS_PROJECT_CONSUMER_R7.zh-CN.md). [23-case test suite](../../../../examples/dis-v020-cross-project/consumer.test.mjs) verifies byte-identical original source blobs, actual Function behavior and explicit Effect/authority boundaries. This is a scoped Demo and does not mutate the three originating repositories or claim full native ABI adoption.
