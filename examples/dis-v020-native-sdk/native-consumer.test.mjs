@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sha256Canonical} from '@kaicreator/domain-harness-contracts';
-import {qualifyDisV020Artifact,classifyDisV020KdpReceipt} from '@kaicreator/domain-harness-contracts/dis-v020';
+import {qualifyDisV020Artifact,classifyDisV020KdpReceipt,compareDisV020FunctionContracts} from '@kaicreator/domain-harness-contracts/dis-v020';
 import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
 import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
@@ -509,4 +509,89 @@ test('R16 source-pinned Tally rule never attests self-declared business evidence
   assert.equal(r.evidence.attested,false);
   assert.deepEqual(r.evidence.declaredRefs,[]);
  }finally{app.stop()}
+});
+
+
+// R17: use real source-locked Tally Function; no invented business oracle.
+test('R17 AOT-selected Tally bounded optional and closed record schema preserves UNKNOWN and refuses extra keys',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const fn=p.elements.flatMap(e=>e.functions).find(x=>x.id==='tally.assessTaskEvidence');
+ fn.contract.version='2.0.0';fn.contract.compatibility.major=2;
+ fn.contract.input={type:'record',fields:{
+  issueRef:'string',issueNumber:'number',sourceSha:'string',
+  claimRef:'string',dependenciesComplete:'boolean'
+ },optional:['issueRef','issueNumber','sourceSha','claimRef','dependenciesComplete'],
+  additionalProperties:false};
+ fn.contract.output={type:'record',fields:{
+  state:'string',reason:'string',admitted:'boolean',taskPass:'boolean',
+  issueRef:'string',sourceSha:'string'
+ },optional:['issueRef','sourceSha'],additionalProperties:false};
+ const artifact=compile(f,p),app=await activate(f,{artifact,digest:artifact.digest});
+ try{
+  const unknown=await app.invoke('tally.assessTaskEvidence',{}, {expectedContractVersion:'2.0.0'});
+  assert.equal(unknown.disposition,'UNKNOWN');assert.equal(unknown.evidence.attested,false);
+  const evidence=await app.invoke('tally.assessTaskEvidence',{
+   issueRef:'https://github.com/kaicreator-mm/tally/issues/37',issueNumber:37,
+   sourceSha:'e988321439f65b55936a691c02250b6d62a29409',
+   claimRef:'claim:r17-unattested',dependenciesComplete:true
+  },{expectedContractVersion:'2.0.0'});
+  assert.equal(evidence.disposition,'OBSERVED');
+  assert.equal(evidence.authority,'NONE');assert.equal(evidence.value.taskPass,false);
+  await assert.rejects(app.invoke('tally.assessTaskEvidence',{execute:true},
+   {expectedContractVersion:'2.0.0'}),reject('DIS_FUNCTION_INPUT_INVALID'));
+  await assert.rejects(app.invoke('tally.assessTaskEvidence',{issueNumber:Infinity},
+   {expectedContractVersion:'2.0.0'}),reject('DIS_FUNCTION_INPUT_INVALID'));
+  await assert.rejects(app.invoke('tally.assessTaskEvidence',{issueRef:22},
+   {expectedContractVersion:'2.0.0'}),reject('DIS_FUNCTION_INPUT_INVALID'));
+ }finally{app.stop()}
+});
+test('R17 same-major structural compatibility allows additive existing Tally output from real source',async()=>{
+ const f=await fixturePromise;
+ const prev=clone(f.program.elements.flatMap(e=>e.functions)
+  .find(x=>x.id==='tally.assessTaskEvidence').contract);
+ const next=clone(prev);next.version='1.1.0';next.output.fields.reason='string';
+ assert.deepEqual(compareDisV020FunctionContracts(prev,next),{
+  compatible:true,from:'1.0.0',to:'1.1.0'
+ });
+ const p=clone(f.program);
+ p.elements.flatMap(e=>e.functions).find(x=>x.id==='tally.assessTaskEvidence').contract=next;
+ const artifact=compile(f,p),app=await activate(f,{artifact,digest:artifact.digest});
+ try{
+  const r=await app.invoke('tally.assessTaskEvidence',{}, {expectedContractVersion:'1.1.0'});
+  assert.equal(r.disposition,'UNKNOWN');
+  assert.equal(r.value.reason,'MISSING_SOURCE_IDENTITY');
+ }finally{app.stop()}
+});
+test('R17 ABI comparator refuses unversioned drift, required-input addition and output loss',async()=>{
+ const f=await fixturePromise;
+ const prev=clone(f.program.elements.flatMap(e=>e.functions)
+  .find(x=>x.id==='tally.assessTaskEvidence').contract);
+ const mutate=(version,fn)=>{const n=clone(prev);n.version=version;fn(n);return n};
+ assert.throws(()=>compareDisV020FunctionContracts(prev,
+  mutate('1.0.0',n=>{n.output.fields.reason='string'})),
+  reject('DIS_FUNCTION_ABI_UNVERSIONED_DRIFT'));
+ assert.throws(()=>compareDisV020FunctionContracts(prev,
+  mutate('1.1.0',n=>{n.input.fields={mustBePresent:'string'}})),
+  reject('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+ assert.throws(()=>compareDisV020FunctionContracts(prev,
+  mutate('1.1.0',n=>{delete n.output.fields.taskPass})),
+  reject('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+});
+test('R17 ABI comparator refuses status remap, evidence weakening, major drift and narrowing open input',async()=>{
+ const f=await fixturePromise;
+ const prev=clone(f.program.elements.flatMap(e=>e.functions)
+  .find(x=>x.id==='tally.assessTaskEvidence').contract);
+ const mutate=fn=>{const n=clone(prev);n.version='1.1.0';fn(n);return n};
+ assert.throws(()=>compareDisV020FunctionContracts(prev,
+  mutate(n=>{n.outcomes.classes.UNQUALIFIED_INPUT='FAILED'})),
+  reject('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+ assert.throws(()=>compareDisV020FunctionContracts(prev,
+  mutate(n=>{n.evidence.requiredFor=[]})),
+  reject('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+ assert.throws(()=>compareDisV020FunctionContracts(prev,
+  mutate(n=>{n.input.additionalProperties=false})),
+  reject('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+ const major=clone(prev);major.version='2.0.0';major.compatibility.major=2;
+ assert.throws(()=>compareDisV020FunctionContracts(prev,major),
+  reject('DIS_FUNCTION_ABI_INCOMPATIBLE'));
 });

@@ -55,13 +55,18 @@ export function classifyDisV020KdpReceipt(contract,receipt){
 }
 
 function validateShape(shape){
- keys(shape,['type','fields']);
- if(shape.type!=='record'||(shape.fields!==undefined&&!record(shape.fields)))fail('DIS_FUNCTION_SCHEMA_INVALID');
- const fields=shape.fields??{};
- if(Object.keys(fields).length>MAX)fail('DIS_FUNCTION_SCHEMA_INVALID');
+ keys(shape,['type','fields','optional','additionalProperties']);
+ if(shape.type!=='record'||(shape.fields!==undefined&&!record(shape.fields))||
+    (shape.additionalProperties!==undefined&&typeof shape.additionalProperties!=='boolean'))
+  fail('DIS_FUNCTION_SCHEMA_INVALID');
+ const fields=shape.fields??{},optional=shape.optional??[];
+ if(Object.keys(fields).length>MAX||!arr(optional,true)||new Set(optional).size!==optional.length)
+  fail('DIS_FUNCTION_SCHEMA_INVALID');
  for(const [name,type] of Object.entries(fields)){
   if(!FIELD.test(name)||!VALUE_TYPES.has(type))fail('DIS_FUNCTION_SCHEMA_INVALID');
  }
+ if(optional.some(name=>typeof name!=='string'||!Object.hasOwn(fields,name)))
+  fail('DIS_FUNCTION_SCHEMA_INVALID');
 }
 function validateFunctionContract(c){
  keys(c,['schema','version','input','output','outcomes','evidence','compatibility']);
@@ -85,15 +90,70 @@ function validateFunctionContract(c){
   c.compatibility.minReader!=='0.2.0'||c.compatibility.maxReaderExclusive!=='0.3.0')
   fail('DIS_FUNCTION_COMPATIBILITY_INVALID');
 }
+/**
+ * Bounded structural consumer-compatibility check, NOT independent evidence or
+ * an authorization to replace an installed AOT. No recursive schema claims.
+ * Same-version ABI drift and same-major breaking changes fail closed.
+ */
+export function compareDisV020FunctionContracts(previous,next){
+ validateFunctionContract(previous);validateFunctionContract(next);
+ const v1=previous.version.split('.').map(Number),v2=next.version.split('.').map(Number);
+ if(v1[0]!==v2[0]||v2[1]<v1[1]||
+    (v2[1]===v1[1]&&v2[2]<v1[2]))
+  fail('DIS_FUNCTION_ABI_INCOMPATIBLE');
+ if(previous.version===next.version){
+  if(sha256Canonical(previous)!==sha256Canonical(next))
+   fail('DIS_FUNCTION_ABI_UNVERSIONED_DRIFT');
+  return Object.freeze({compatible:true,from:previous.version,to:next.version});
+ }
+ const broken=()=>fail('DIS_FUNCTION_ABI_INCOMPATIBLE');
+ const prevIn=previous.input,nextIn=next.input;
+ const prevOut=previous.output,nextOut=next.output;
+ const prevInFields=prevIn.fields??{},nextInFields=nextIn.fields??{};
+ const prevOutFields=prevOut.fields??{},nextOutFields=nextOut.fields??{};
+ const prevInOptional=new Set(prevIn.optional??[]),nextInOptional=new Set(nextIn.optional??[]);
+ const prevOutOptional=new Set(prevOut.optional??[]),nextOutOptional=new Set(nextOut.optional??[]);
+ if(prevIn.additionalProperties!==false&&nextIn.additionalProperties===false)broken();
+ for(const [name,type] of Object.entries(nextInFields)){
+  if(Object.hasOwn(prevInFields,name)){
+   if(prevInFields[name]!==type||(prevInOptional.has(name)&&!nextInOptional.has(name)))broken();
+  }else if(!nextInOptional.has(name)||prevIn.additionalProperties!==false)broken();
+ }
+ for(const name of Object.keys(prevInFields)){
+  if(!Object.hasOwn(nextInFields,name)&&nextIn.additionalProperties===false)broken();
+ }
+ for(const [name,type] of Object.entries(prevOutFields)){
+  if(nextOutFields[name]!==type||(!prevOutOptional.has(name)&&nextOutOptional.has(name)))broken();
+ }
+ if(prevOut.additionalProperties===false&&
+    (nextOut.additionalProperties!==false||
+      Object.keys(nextOutFields).some(name=>!Object.hasOwn(prevOutFields,name))))broken();
+ if(previous.outcomes.field!==next.outcomes.field||
+    previous.evidence.refField!==next.evidence.refField||
+    previous.compatibility.minReader!==next.compatibility.minReader||
+    previous.compatibility.maxReaderExclusive!==next.compatibility.maxReaderExclusive)broken();
+ for(const [status,disposition] of Object.entries(previous.outcomes.classes)){
+  if(next.outcomes.classes[status]!==disposition)broken();
+ }
+ for(const disposition of previous.evidence.requiredFor){
+  if(!next.evidence.requiredFor.includes(disposition))broken();
+ }
+ return Object.freeze({compatible:true,from:previous.version,to:next.version});
+}
 export function validateDisV020FunctionValue(contract,phase,value){
  if(phase!=='input'&&phase!=='output')fail('DIS_FUNCTION_PHASE_INVALID');
  const shape=contract?.[phase];
  if(!shape||!record(value))fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
- for(const [name,type] of Object.entries(shape.fields??{})){
+ const fields=shape.fields??{},optional=new Set(shape.optional??[]);
+ for(const [name,type] of Object.entries(fields)){
+  if(!Object.hasOwn(value,name)&&optional.has(name))continue;
   const v=value[name];
-  if(type==='record'?!record(v):type==='array'?!Array.isArray(v):typeof v!==type)
+  if(type==='record'?!record(v):type==='array'?!Array.isArray(v):
+     type==='number'?typeof v!=='number'||!Number.isFinite(v):typeof v!==type)
    fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
  }
+ if(shape.additionalProperties===false&&Object.keys(value).some(k=>!Object.hasOwn(fields,k)))
+  fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
  return true;
 }
 export function classifyDisV020FunctionOutcome(contract,value){
