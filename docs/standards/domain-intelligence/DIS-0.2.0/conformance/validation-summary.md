@@ -31,3 +31,9 @@ Sub-issues are created only for genuinely independent write sets; the version in
 - Source-pinned `xdownload.interaction` has **two LOCAL public Functions**; one normalizes bounded Chat/Form/CLI Intent and one merges clarification + explicit user confirmation. Both return `OBSERVATION/NONE` and never issue an Effect permit. The existing real KDP `confirmDownload` remains a distinct call.
 - Contract protects `kind=interaction` from `KDP_INTENT` / governed-Effect reclassification; no new OS trust gate or generic UI engine.
 - New 6-case native SDK regression is wired through existing `native-consumer.test.mjs` and Woodpecker. **CORE-014 changes NOT_RUN → PARTIAL, not VERIFIED** until matching exact-SHA CI, actual UI adapters and cross-mode conformance are demonstrated.
+
+### R10 exact-SHA blocked receipt (not PASS)
+
+- [R10 current candidate failure receipt](receipts/r10-candidate-blocked.json) pins HEAD `c043fdaf22074cbda8230a2d1c36226205beda17` and all three Woodpecker failures (pipelines 2227/1–3). The GitHub connector does not expose pipeline step logs, so the cause is **UNDETERMINED**, not assumed to be a test assertion.
+- Direct checked-out **Git Blob-identical** Interaction source (`f57747aa...`) passed 12 standalone Node22 assertions, and the 21-row matrix passed in-process reference validation; these are only targeted local checks, **not a native SDK/KDP CI qualification**.
+- R10 stays PARTIAL until the blocked CI is investigated and a new exact-SHA success receipt is committed. Do not freeze the version or borrow R9.5 green contexts for new code.

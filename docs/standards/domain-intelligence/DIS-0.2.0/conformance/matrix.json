@@ -11,7 +11,8 @@
     "OUT_OF_SCOPE": "Only after explicit Product/L1 decision with rationale and URL; none assumed."
   },
   "receipts": [
-    "r9.5-baseline"
+    "r9.5-baseline",
+    "r10-candidate-blocked"
   ],
   "requirements": [
     {
