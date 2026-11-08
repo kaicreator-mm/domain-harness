@@ -3,11 +3,11 @@
   "batchId": "B02",
   "roundId": "B02-03",
   "globalRoundId": "R37",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "startParent": "d79e83c8536afee6aa406b090e1fa086f439f038",
-  "sourceHead": null,
-  "finalTree": null,
-  "receipt": null,
+  "sourceHead": "1a803ac452348dc73afea1483a9283cfe527abfc",
+  "finalTree": "8a478066e61e304c77b9515ee6e92712734b61f4",
+  "receipt": "receipts/r37-b02-interaction-negative-ci.json",
   "testPath": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
   "positive": [
     "B02-03 R37 selected Interaction and its governed Effect bind to distinct native Function authorities"
@@ -22,5 +22,34 @@
     "DIS020-CORE-014"
   ],
   "sourceBoundary": "Bounded channel-adapter security and selected KDP Function, no physical Effect, no OS-target selection evidence.",
-  "ciStatus": "PENDING"
+  "ciStatus": "VERIFIED",
+  "originCommit": "1a803ac452348dc73afea1483a9283cfe527abfc",
+  "originTree": "8a478066e61e304c77b9515ee6e92712734b61f4",
+  "testGitBlob": "5c70916c66a4deecdc355258a931c2b58e2283ab",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "1a803ac452348dc73afea1483a9283cfe527abfc",
+      "native": "SUCCESS",
+      "minNode": "SUCCESS",
+      "verify": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    }
+  ]
 }

@@ -27,7 +27,10 @@
     "r29-native-source-first-ci",
     "r32-b01-function-ci",
     "r33-b01-state-ci",
-    "r34-b01-abi-ci"
+    "r34-b01-abi-ci",
+    "r35-b02-selected-target-ci",
+    "r36-b02-channel-parity-ci",
+    "r37-b02-interaction-negative-ci"
   ],
   "requirements": [
     {
@@ -403,19 +406,44 @@
         "section": "5"
       },
       "implementation": [
-        "tooling/build/dis-v020.mjs"
+        "tooling/build/dis-v020.mjs",
+        "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+        "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs"
       ],
       "positive": [
         {
           "path": "examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs",
           "case": "AOT target drift fails closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+          "case": "B02-01 R35 real selected Tally and xDownload Business packages resolve original source and KDP implementation without target fiction"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 selected Interaction and its governed Effect bind to distinct native Function authorities"
         }
       ],
-      "negative": [],
-      "receiptIds": [
-        "r9.5-baseline"
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+          "case": "B02-01 R35 install refuses tampered selected module bytes or unbound source before KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+          "case": "B02-01 R35 undeclared runtime Target selection is rejected, not implicitly treated as Windows/Linux/Android conformance"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 native SDK stop rejects further interaction with no hidden auto-resume"
+        }
       ],
-      "note": "BUILD target digest/check exists; no independent Windows/Linux/Android selected package conformance matrix. D04 applicability review: Product/L1 has not approved an applicable Target list; no implicit Linux/Windows/Android PASS from one selected BUILD."
+      "receiptIds": [
+        "r9.5-baseline",
+        "r35-b02-selected-target-ci",
+        "r37-b02-interaction-negative-ci"
+      ],
+      "note": "BUILD target digest/check exists; no independent Windows/Linux/Android selected package conformance matrix. D04 applicability review: Product/L1 has not approved an applicable Target list; no implicit Linux/Windows/Android PASS from one selected BUILD. B02 R35–R37 source-pinned native C3 positive+negative cases are versioned; still PARTIAL pending exact full-suite CI plus Product/L1 Target/transport applicability. The current DIS AOT lacks explicit OS Target selector. B02 R35/R37 bounded exact source #2280/1–3 3/3 SUCCESS; selection tied to Tally/xDownload original source/BUILD, but no OS-specific native Target variant contract; CORE remains PARTIAL."
     },
     {
       "id": "DIS020-CORE-009",
@@ -574,25 +602,57 @@
       "implementation": [
         "packages/contracts/dis-v020.mjs",
         "packages/microkernel/dis-v020.mjs",
-        "examples/dis-v020-interaction/download-goal.mjs"
+        "examples/dis-v020-interaction/download-goal.mjs",
+        "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+        "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs"
       ],
       "positive": [
         {
           "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
           "case": "Chat, Form and CLI share native progressive clarification without triggering xDownload Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+          "case": "B02-02 R36 Chat Form and CLI real native consumers converge on the same authorized-by-none structured Intent"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+          "case": "B02-02 R36 no confirmation in any channel remains pending and never starts a KDP Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 selected Interaction and its governed Effect bind to distinct native Function authorities"
         }
       ],
       "negative": [
         {
           "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
           "case": "AOT refuses interaction with KDP_INTENT or governed Effect reclassification"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+          "case": "B02-02 R36 all adapters refuse invented execution or ambiguous repeated Form fields before native dispatch"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 private token URL is rejected through all three native channels without Effect ingress"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 oversized confirmed intent and invented authorization are rejected before KDP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 native SDK stop rejects further interaction with no hidden auto-resume"
         }
       ],
       "receiptIds": [
         "r10-ci-recovery",
-        "r15-d02-d03-native"
+        "r15-d02-d03-native",
+        "r36-b02-channel-parity-ci",
+        "r37-b02-interaction-negative-ci"
       ],
-      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance. D03 deterministic Chat text/Form URLSearchParams/CLI argv adapters added as native SDK consumer candidates; pending next exact-SHA CI and external UI transport/Host validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only."
+      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance. D03 deterministic Chat text/Form URLSearchParams/CLI argv adapters added as native SDK consumer candidates; pending next exact-SHA CI and external UI transport/Host validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. B02 R35–R37 source-pinned native C3 positive+negative cases are versioned; still PARTIAL pending exact full-suite CI plus Product/L1 Target/transport applicability. The current DIS AOT lacks explicit OS Target selector. B02 R36/R37 actual UI-neutral Chat/Form/CLI adapter native #2280/1–3 3/3 SUCCESS, including negative consent, token URLs and no Effect; no deployed real transport; CORE remains PARTIAL."
     },
     {
       "id": "DIS020-CORE-015",

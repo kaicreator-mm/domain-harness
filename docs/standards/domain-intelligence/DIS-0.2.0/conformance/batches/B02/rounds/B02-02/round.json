@@ -3,11 +3,11 @@
   "batchId": "B02",
   "roundId": "B02-02",
   "globalRoundId": "R36",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "startParent": "2181072c1a5101366b90ec8aa2c65dde9c571b15",
-  "sourceHead": null,
-  "finalTree": null,
-  "receipt": null,
+  "sourceHead": "1a803ac452348dc73afea1483a9283cfe527abfc",
+  "finalTree": "8a478066e61e304c77b9515ee6e92712734b61f4",
+  "receipt": "receipts/r36-b02-channel-parity-ci.json",
   "testPath": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
   "positive": [
     "B02-02 R36 Chat Form and CLI real native consumers converge on the same authorized-by-none structured Intent",
@@ -20,5 +20,39 @@
     "DIS020-CORE-014"
   ],
   "sourceBoundary": "Real UI-neutral adapters use Chat message, HTML Form URLSearchParams, CLI argv. No actual browser UI or external device. READY_FOR_KDP is not an Effect permit.",
-  "ciStatus": "PENDING"
+  "ciStatus": "VERIFIED",
+  "originCommit": "d79e83c8536afee6aa406b090e1fa086f439f038",
+  "originTree": "af9897efbd32ff9f7dd8a48723d701925d911076",
+  "testGitBlob": "d48bd86fff26c534e6ed0199b1420718ddf096b0",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "d79e83c8536afee6aa406b090e1fa086f439f038",
+      "native": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2279/1"
+    },
+    {
+      "sourceHead": "1a803ac452348dc73afea1483a9283cfe527abfc",
+      "native": "SUCCESS",
+      "minNode": "SUCCESS",
+      "verify": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    }
+  ]
 }
