@@ -12,6 +12,10 @@
 
 **Current status: PARTIAL.** P0 gaps: Function version, I/O Schema / typed Outcome / Evidence; executable constraints and semantic collaboration; native progressive Interaction. P1 optional profiles: Harness+LLM, Experience/Local Evolution/Server promotion, cross-target variants. Governance: independent exact-SHA review and L2 Freeze.
 
+### Normalized Demo plan / history (ADS #1362 practice)
+
+See [Demo index, dependency map and R1–R11 historical evidence](DEMO_INDEX.md). It maps every Core/optional/governance requirement to D00–D08 evidence questions, preserves original files and exact historical receipts, and keeps the failed R11 integration context open. This index is not a second machine matrix or frozen implementation Task DAG.
+
 ### Historical verified baseline (do not roll forward implicitly)
 
 - [R9.5 pinned source/CI receipt](receipts/r9.5-baseline.json) — HEAD `7954bd91d51eb13fbeab96385f37ac8d9cd35c5e`, TREE `9250ad08f500bc8924458af1c833947c99ad0d4c`.

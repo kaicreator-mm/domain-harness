@@ -81,6 +81,9 @@ See [R4 bridge semantics and revised sealed-code trust scope](REAL_AOT_APP_INIT_
 
 ## Version-level conformance and demo receipts
 
+[Normalized version Demo Index, R1–R11 history, concrete D00–D08 plan and evidence dependencies](conformance/DEMO_INDEX.md) is the human entrypoint for the established #1499 master issue; [matrix.json](conformance/matrix.json) remains the authoritative 21-item machine coverage ledger. This is a provisional adoption of ADS Draft PR #1362's evidence-organization technique, not a new Task DAG or Stage 2 waiver.
+
+
 **Version master [#1499](https://github.com/kaicreator-mm/domain-harness/issues/1499).** The machine [coverage matrix](conformance/matrix.json), [human summary](conformance/validation-summary.md) and [pinned historical receipts](conformance/receipts/) live in Git alongside DIS 0.2.0. Existing Demo paths are preserved; `node --test examples/dis-v020-conformance/validate.test.mjs` enforces that a VERIFIED claim has real positive/negative test references and an exact historical CI receipt. Missing Interaction / I/O / Harness / Evolution coverage stays visible as PARTIAL/NOT_RUN until executed and independently validated.
 
 ## R10 — Native Interaction without invented KDP authority
