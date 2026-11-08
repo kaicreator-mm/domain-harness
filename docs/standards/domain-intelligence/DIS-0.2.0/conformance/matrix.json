@@ -30,7 +30,10 @@
     "r34-b01-abi-ci",
     "r35-b02-selected-target-ci",
     "r36-b02-channel-parity-ci",
-    "r37-b02-interaction-negative-ci"
+    "r37-b02-interaction-negative-ci",
+    "r38-b03-target-roster-ci",
+    "r39-b03-installer-target-ci",
+    "r40-b03-target-sap-boundary-ci"
   ],
   "requirements": [
     {
@@ -280,7 +283,8 @@
       },
       "implementation": [
         "packages/contracts/dis-v020.mjs",
-        "examples/dis-v020-native-sdk/dke-r27-impact.mjs"
+        "examples/dis-v020-native-sdk/dke-r27-impact.mjs",
+        "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs"
       ],
       "positive": [
         {
@@ -294,6 +298,10 @@
         {
           "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
           "case": "R29 original source-first ledger identifies two Case-owned Elements and two selected Business readers, but never accepts unreviewed SAP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+          "case": "B03-03 R40 one-model DKE reviewer and synthetic locator repair remain unqualified, independent of Target label"
         }
       ],
       "negative": [
@@ -308,15 +316,20 @@
         {
           "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
           "case": "R29 original reviewer/source gap and proposed decomposition cannot mint independent domain authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+          "case": "B03-03 R40 Target descriptor cannot grant Source or SAP approval via extra declared fields"
         }
       ],
       "receiptIds": [
         "r9.5-baseline",
         "r15-d02-d03-native",
         "r27-native-impact-ci",
-        "r29-native-source-first-ci"
+        "r29-native-source-first-ci",
+        "r40-b03-target-sap-boundary-ci"
       ],
-      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 24 CQ native AOT source-consumption confirmed on real original Tally KG projection/Textile reference. No registered complete CQ→SAP→external Package inverse dependency or independent semantic oracle; remains PARTIAL. R22 first bounded static reverse provenance edge source→selected LOCAL Function, distinctly not Element DAG cycle, automatic SAP invalidation or ECP dependent closure. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN."
+      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 24 CQ native AOT source-consumption confirmed on real original Tally KG projection/Textile reference. No registered complete CQ→SAP→external Package inverse dependency or independent semantic oracle; remains PARTIAL. R22 first bounded static reverse provenance edge source→selected LOCAL Function, distinctly not Element DAG cycle, automatic SAP invalidation or ECP dependent closure. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN. B03 R38–R40 candidate typed target/installer checks and DKE semantic authority negative are actual source-committed, new target identity is optional and bound to canonical module SHA roster; physical OS variant/independent SAP source owner not yet qualified. No automatic Core promotion. B03 R40 Git-Blob-pinned first-party DKE reviewer/locator status explicitly remains unqualified; no independent original source/SAP approval. R40 exact #2284/1–3 SUCCESS scoped negative only; CORE still PARTIAL."
     },
     {
       "id": "DIS020-CORE-006",
@@ -408,7 +421,12 @@
       "implementation": [
         "tooling/build/dis-v020.mjs",
         "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
-        "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs"
+        "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+        "examples/dis-v020-native-sdk/b03-target-closure.test.mjs",
+        "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+        "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+        "packages/microkernel/dis-v020.mjs",
+        "packages/contracts/dis-v020.mjs"
       ],
       "positive": [
         {
@@ -422,6 +440,22 @@
         {
           "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
           "case": "B02-03 R37 selected Interaction and its governed Effect bind to distinct native Function authorities"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-closure.test.mjs",
+          "case": "B03-01 R38 selected canonical Tally/xDownload and KDP modules have exact source-locked Target digest roster"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+          "case": "B03-02 R39 independently installed exact Target accepts original Tally xDownload canonical BUILD without Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+          "case": "B03-02 R39 legacy unqualified Target cannot be interpreted as independently pinned"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+          "case": "B03-03 R40 same canonical modules can self-claim distinct OS labels, which is not actual native Target qualification"
         }
       ],
       "negative": [
@@ -436,14 +470,37 @@
         {
           "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
           "case": "B02-03 R37 native SDK stop rejects further interaction with no hidden auto-resume"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-closure.test.mjs",
+          "case": "B03-01 R38 Target claim cannot omit selected original KDP/C or Business modules"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-closure.test.mjs",
+          "case": "B03-01 R38 forged Target source SHA, unknown package, duplicate and unsupported architecture fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+          "case": "B03-02 R39 targeted AOT requires independent installed Target, not a self-authorizing program label"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+          "case": "B03-02 R39 correct Target identity never overrides stale installer AOT or source pin"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+          "case": "B03-03 R40 Target descriptor cannot grant Source or SAP approval via extra declared fields"
         }
       ],
       "receiptIds": [
         "r9.5-baseline",
         "r35-b02-selected-target-ci",
-        "r37-b02-interaction-negative-ci"
+        "r37-b02-interaction-negative-ci",
+        "r38-b03-target-roster-ci",
+        "r39-b03-installer-target-ci",
+        "r40-b03-target-sap-boundary-ci"
       ],
-      "note": "BUILD target digest/check exists; no independent Windows/Linux/Android selected package conformance matrix. D04 applicability review: Product/L1 has not approved an applicable Target list; no implicit Linux/Windows/Android PASS from one selected BUILD. B02 R35–R37 source-pinned native C3 positive+negative cases are versioned; still PARTIAL pending exact full-suite CI plus Product/L1 Target/transport applicability. The current DIS AOT lacks explicit OS Target selector. B02 R35/R37 bounded exact source #2280/1–3 3/3 SUCCESS; selection tied to Tally/xDownload original source/BUILD, but no OS-specific native Target variant contract; CORE remains PARTIAL."
+      "note": "BUILD target digest/check exists; no independent Windows/Linux/Android selected package conformance matrix. D04 applicability review: Product/L1 has not approved an applicable Target list; no implicit Linux/Windows/Android PASS from one selected BUILD. B02 R35–R37 source-pinned native C3 positive+negative cases are versioned; still PARTIAL pending exact full-suite CI plus Product/L1 Target/transport applicability. The current DIS AOT lacks explicit OS Target selector. B02 R35/R37 bounded exact source #2280/1–3 3/3 SUCCESS; selection tied to Tally/xDownload original source/BUILD, but no OS-specific native Target variant contract; CORE remains PARTIAL. B03 R38–R40 candidate typed target/installer checks and DKE semantic authority negative are actual source-committed, new target identity is optional and bound to canonical module SHA roster; physical OS variant/independent SAP source owner not yet qualified. No automatic Core promotion. B03 exact final R38/R39/R40 new native target ABI and independent installer anchor qualified at 2d04fa512b5928c3796dbc6d1173a966c55a6286 / #2284/1–3 3/3 SUCCESS; same module bytes can still label linux/windows and cannot prove physical Target variants, so remains PARTIAL."
     },
     {
       "id": "DIS020-CORE-009",

@@ -3,11 +3,11 @@
   "batchId": "B03",
   "roundId": "B03-03",
   "globalRoundId": "R40",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "startParent": "b57c20126bcd6b64f2e5031486d1bab5a6dabc4f",
-  "sourceHead": null,
+  "sourceHead": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
   "testBlob": "e4e91b820bc4e551d3b40270102115524755f9bf",
-  "receipt": null,
+  "receipt": "receipts/r40-b03-target-sap-boundary-ci.json",
   "tests": {
     "positive": [
       "B03-03 R40 same canonical modules can self-claim distinct OS labels, which is not actual native Target qualification",
@@ -22,5 +22,49 @@
     "No physical Windows/Linux/Android executed; identical module digest roster can be labeled for different Targets without any per-Target source proof.",
     "Original Tally 807-node DKE evidence and SAP remain unqualified; GH SourceLocator gap unresolved.",
     "Pure Source/Target metadata never mint accepted business Evidence, SAP, KDP Effect or independent Oracle."
+  ],
+  "originCommit": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+  "originTree": "d2a4fa1bdb14a939067c551353de2e158ec6498d",
+  "finalTree": "d2a4fa1bdb14a939067c551353de2e158ec6498d",
+  "testGitBlob": "e4e91b820bc4e551d3b40270102115524755f9bf",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+    }
+  ],
+  "history": [
+    {
+      "head": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+        }
+      ],
+      "meaning": "Exact later full-suite requalification preserving original immutable source test Blob"
+    }
   ]
 }
