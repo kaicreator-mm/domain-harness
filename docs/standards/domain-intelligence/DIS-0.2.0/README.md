@@ -51,3 +51,10 @@ PRODUCT_L1=REVIEW_PENDING; L2=NOT_FROZEN; MACHINE_SCHEMA=NOT_DONE; CONSUMER_DEMO
 
 - [R2 adversarial design repair rules](EVOLUTION_DESIGN_REPAIRS_R2.zh-CN.md): all 12 risks have concrete design rejection rules. Design-mitigated does **not** mean production-verified.
 - [R2 reproducible reference demo](../../../../examples/dis-v020-evolution-demo/README.md) (repo-root path; see the PR file list): Mock LLM + fixture oracle + bounded interpreted rule slot; real SDK/LLM integration not implied.
+
+## R3.1 — actual KDP/SDK seam + Woodpecker demo
+
+- [Real selected-K/Host Effect seam source mapping and limits](REAL_KDP_SDK_SEAM_R3.zh-CN.md).
+- [Reproducible real-code import and physical temporary-file gate tests](../../../../examples/dis-v020-sdk-integration/README.md) (11 Node tests; **not executed with a full repository checkout** yet).
+- `.woodpecker/dis-v020-integration.yaml` invokes the existing **real selected-K C01 assembly suite** in addition to the new seam demo, with **no exact Node major check inside this new workflow**. Original v0.10 release CI restrictions remain separate.
+- Real existing gate source blob `4e76f700769eb24ff15cbcb0dfd0e6f696fe3ad2` executed in isolated V8: **8/8 source-level assertion PASS**. This is *not* full KDP/SDK/OS sandbox conformance and not a Woodpecker PASS receipt.
