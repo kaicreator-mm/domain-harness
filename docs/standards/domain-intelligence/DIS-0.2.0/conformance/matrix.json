@@ -24,7 +24,10 @@
     "r18-r20-native-integration-repaired",
     "r21-native-dke-semantic-ci",
     "r27-native-impact-ci",
-    "r29-native-source-first-ci"
+    "r29-native-source-first-ci",
+    "r32-b01-function-ci",
+    "r33-b01-state-ci",
+    "r34-b01-abi-ci"
   ],
   "requirements": [
     {
@@ -120,7 +123,9 @@
         "packages/contracts/dis-v020.mjs",
         "packages/microkernel/dis-v020.mjs",
         "examples/dis-v020-native-sdk/native-fixture.mjs",
-        "examples/dis-v020-native-sdk/dke-r27-impact.mjs"
+        "examples/dis-v020-native-sdk/dke-r27-impact.mjs",
+        "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+        "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs"
       ],
       "positive": [
         {
@@ -150,6 +155,22 @@
         {
           "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
           "case": "R27 actual Tally 14-record source delta maps into two CQs, two unqualified SAP proposals and two selected Business packages"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+          "case": "B01-01 R32 real selected Tally rule and xDownload Knowledge/Interaction Functions retain typed source and authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+          "case": "B01-01 R32 KDP admission remains typed separately from LOCAL evidence and never proves Effect success"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+          "case": "B01-03 R34 same-major Function ABI preserves selected Tally rule required output and optional reader contract"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+          "case": "B01-03 R34 Element public Function membership and ownership cannot silently drift at unchanged source version"
         }
       ],
       "negative": [
@@ -184,6 +205,22 @@
         {
           "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
           "case": "R27 false SAP approval, unknown selected package, omitted reader, forged source and stable-CQ claims fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+          "case": "B01-01 R32 a forged LOCAL output, undecared outcome or effect-bearing Knowledge input fails closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+          "case": "B01-01 R32 contract same-version drift and forged declared Evidence cannot qualify truth"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+          "case": "B01-03 R34 an internally valid rebuilt AOT is denied by stale installed digest before KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+          "case": "B01-03 R34 authoritative caller source change denies old AOT; false semantic claims cannot appear in Element source validation"
         }
       ],
       "receiptIds": [
@@ -193,9 +230,11 @@
         "r18-r20-native-integration-repaired",
         "r21-native-dke-semantic-ci",
         "r27-native-impact-ci",
-        "r29-native-source-first-ci"
+        "r29-native-source-first-ci",
+        "r32-b01-function-ci",
+        "r34-b01-abi-ci"
       ],
-      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility. R16 candidate adds a separately AOT-locked KDP receipt admission profile (actual selected orders KDP Intent), not a completed Effect/business evidence attestation; pending new exact-SHA CI. R16 exact SHA db10ddbc / Woodpecker #2237 three contexts SUCCESS; KDP admission classified, not executed Effect or independent Evidence. R17 draft tests bounded opt-in record Schema and same-major structural reader compatibility; pending exact-SHA CI. R17 bounded record/optional/closed Schema and structural same-major comparator passed exact-SHA Woodpecker #2238 at fe51db3. R18 uses original Tally release advisory source, adds all-reported-PASS but never independently attested negative and forged local Release status guard; not yet current CI-verified. R19 #2240 dedicated integration FAILURE with other contexts SUCCESS (blocked historical receipt; root cause not demonstrated). R19.1 addresses a separate source-backed zero-argument public Knowledge ABI compatibility regression with allowAbsent on closed empty records and negative tests. Await new exact HEAD CI. R19.1 dedicated #2241 integration FAILURE (2 other contexts SUCCESS) is preserved as blocked historical receipt, not a verifier. R20 proposes source-real Runx PROCESS_LOCAL Handle method contract; no serialized record lie, Host lease or independent evidence verification. New CI pending. R18-R20 native integration repair: authenticated Woodpecker step logs show #2240/#2241/#2242 each failed exactly one legacy test (native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule) because R19's new receipt contract on xdownload.confirmDownload tripped the earlier R16 receipt-binding guard (DIS_KDP_RECEIPT_BINDING_UNSUPPORTED) before DIS_LOCAL_NOT_QUALIFIED; repair dfba82a7 completes the fixture mutation by stripping receiptContract in the clone, keeping the load-bearing R16 guard order pinned by its own dedicated test. Exact HEAD dfba82a7723d709ee22acd65b079fdcc98000f69 / TREE 57b789dff8039888f39e7045e0216b9962ae87fb qualified by Woodpecker #2243/1-3 all SUCCESS (65/65 native tests incl. R18/R19/R19.1/R20 plus the two previously unreached lane tail commands; receipt r18-r20-native-integration-repaired). CORE-003 stays PARTIAL. R21 true AOT-selected DKE source consumer qualified by exact-SHA #2249/1 DIS Integration SUCCESS + #2249/3 General Verify SUCCESS; #2249/2 engine-only CI ERROR is recorded but not a semantic gate per Owner. 24 true selected Function CQ calls and source/currentness negatives, no independent Knowledge Oracle/Package inverse registry. Historical mixed-CI receipt r21-native-dke-semantic-ci. R22 candidate adds optional per-LOCAL-Function sourceDependencies in AOT, reverse sourceConsumers lookup for DKE original execution + data projection, fail-closed missing/duplicate/foreign source and forged KDP_INTENT cases. Not a CQ→SAP→external Package/ECP change-currentness proof; awaiting own exact-SHA native integration CI. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven."
+      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility. R16 candidate adds a separately AOT-locked KDP receipt admission profile (actual selected orders KDP Intent), not a completed Effect/business evidence attestation; pending new exact-SHA CI. R16 exact SHA db10ddbc / Woodpecker #2237 three contexts SUCCESS; KDP admission classified, not executed Effect or independent Evidence. R17 draft tests bounded opt-in record Schema and same-major structural reader compatibility; pending exact-SHA CI. R17 bounded record/optional/closed Schema and structural same-major comparator passed exact-SHA Woodpecker #2238 at fe51db3. R18 uses original Tally release advisory source, adds all-reported-PASS but never independently attested negative and forged local Release status guard; not yet current CI-verified. R19 #2240 dedicated integration FAILURE with other contexts SUCCESS (blocked historical receipt; root cause not demonstrated). R19.1 addresses a separate source-backed zero-argument public Knowledge ABI compatibility regression with allowAbsent on closed empty records and negative tests. Await new exact HEAD CI. R19.1 dedicated #2241 integration FAILURE (2 other contexts SUCCESS) is preserved as blocked historical receipt, not a verifier. R20 proposes source-real Runx PROCESS_LOCAL Handle method contract; no serialized record lie, Host lease or independent evidence verification. New CI pending. R18-R20 native integration repair: authenticated Woodpecker step logs show #2240/#2241/#2242 each failed exactly one legacy test (native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule) because R19's new receipt contract on xdownload.confirmDownload tripped the earlier R16 receipt-binding guard (DIS_KDP_RECEIPT_BINDING_UNSUPPORTED) before DIS_LOCAL_NOT_QUALIFIED; repair dfba82a7 completes the fixture mutation by stripping receiptContract in the clone, keeping the load-bearing R16 guard order pinned by its own dedicated test. Exact HEAD dfba82a7723d709ee22acd65b079fdcc98000f69 / TREE 57b789dff8039888f39e7045e0216b9962ae87fb qualified by Woodpecker #2243/1-3 all SUCCESS (65/65 native tests incl. R18/R19/R19.1/R20 plus the two previously unreached lane tail commands; receipt r18-r20-native-integration-repaired). CORE-003 stays PARTIAL. R21 true AOT-selected DKE source consumer qualified by exact-SHA #2249/1 DIS Integration SUCCESS + #2249/3 General Verify SUCCESS; #2249/2 engine-only CI ERROR is recorded but not a semantic gate per Owner. 24 true selected Function CQ calls and source/currentness negatives, no independent Knowledge Oracle/Package inverse registry. Historical mixed-CI receipt r21-native-dke-semantic-ci. R22 candidate adds optional per-LOCAL-Function sourceDependencies in AOT, reverse sourceConsumers lookup for DKE original execution + data projection, fail-closed missing/duplicate/foreign source and forged KDP_INTENT cases. Not a CQ→SAP→external Package/ECP change-currentness proof; awaiting own exact-SHA native integration CI. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. Batch B01 exact R32/R33/R34 source test blobs qualified at replay SHA 0e0d9ad8b227ed1f1ef90af648e423cd43214563 / Woodpecker #2276/1-3 3/3 SUCCESS, with original three round commits and prior FAILURE/ERROR retained; Function I/O and structural ABI are bounded, SAP/Oracle and full applicable ABI obligations still PARTIAL."
     },
     {
       "id": "DIS020-CORE-004",
@@ -286,24 +325,43 @@
         "section": "3"
       },
       "implementation": [
-        "packages/microkernel/dis-v020.mjs"
+        "packages/microkernel/dis-v020.mjs",
+        "examples/dis-v020-native-sdk/b01-state-owner.test.mjs"
       ],
       "positive": [
         {
           "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
           "case": "Runx native stateful observer is not reclassified as a Business or execution lease"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+          "case": "B01-02 R33 real Runx Stateful handles isolate each invocation, source and process-local ownership"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+          "case": "B01-02 R33 Domain-owned Stateful presence does not mutate Tally Rule or xDownload Knowledge outputs"
         }
       ],
       "negative": [
         {
           "path": "examples/dis-v020-cross-project/consumer.test.mjs",
           "case": "Runx: presence observation cannot be treated as a fresh lease or execution permit"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+          "case": "B01-02 R33 source-real Runx token mismatch cannot create presence or grant lease"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+          "case": "B01-02 R33 SDK stop denies new Stateful and Effect ingress, but existing in-process handles are not remotely revoked"
         }
       ],
       "receiptIds": [
-        "r9.5-baseline"
+        "r9.5-baseline",
+        "r33-b01-state-ci",
+        "r34-b01-abi-ci"
       ],
-      "note": "Actual Tally rule and Runx observer run as LOCAL, but general per-Element state ownership and knowledge query contract do not have complete executable profile."
+      "note": "Actual Tally rule and Runx observer run as LOCAL, but general per-Element state ownership and knowledge query contract do not have complete executable profile. B01 R33 real Runx Stateful handle independence, token mismatch, process-local boundary and separated Tally Rule/xDownload Knowledge sources PASS at exact replay #2276/1-3; closing SDK ingress does not revoke existing in-process handles or prove persistent Domain state or real KDP lease. Still PARTIAL."
     },
     {
       "id": "DIS020-CORE-007",

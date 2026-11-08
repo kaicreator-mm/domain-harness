@@ -3,15 +3,15 @@
   "batchId": "B01",
   "roundId": "B01-03",
   "globalRoundId": "R34",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "requirements": [
     "DIS020-CORE-003",
     "DIS020-CORE-006"
   ],
   "startParent": "0a404d343827d95ee6c08d962a369dc44c52f98b",
-  "sourceHead": null,
-  "finalTree": null,
-  "receipt": null,
+  "sourceHead": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+  "finalTree": "707a0b11b9a8691b7dc7efad7c5d91d3e735edda",
+  "receipt": "receipts/r34-b01-abi-ci.json",
   "testPath": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
   "positive": [
     "B01-03 R34 same-major Function ABI preserves selected Tally rule required output and optional reader contract",
@@ -38,5 +38,40 @@
     "A stable Element version cannot hide a changed public Function roster."
   ],
   "fullCorePromoted": false,
-  "metadata": "Exact R34 final HEAD/TREE and CI URLs recorded in separate receipt after native CI."
+  "metadata": "Exact R34 final HEAD/TREE and CI URLs recorded in separate receipt after native CI.",
+  "result": "EXACT_SHA_3_OF_3_SUCCESS_AFTER_PREDECESSOR_REPAIR",
+  "originCommit": "175851591eacbc2c5ca2d391e18f1e9adcdd34ba",
+  "testGitBlob": "f12549c3edc2f5f79895bcafcd7a402b23959249",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+    }
+  ],
+  "history": [
+    {
+      "commit": "175851591eacbc2c5ca2d391e18f1e9adcdd34ba",
+      "CI": "https://ci.kaicreator.com/repos/18/pipeline/2275/1",
+      "native": "FAILURE",
+      "note": "Full suite includes preceding uncorrected R33 comparison"
+    },
+    {
+      "commit": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+      "CI": "https://ci.kaicreator.com/repos/18/pipeline/2276/1",
+      "native": "SUCCESS",
+      "verifyMin": "SUCCESS",
+      "general": "SUCCESS"
+    }
+  ]
 }

@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B01",
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "mode": "DELIVERY_FIRST_SEQUENTIAL_COMMITS_WITH_INDEPENDENT_EXACT_SHA_ROUND_RECEIPTS",
   "masterIssue": 1499,
   "pr": 1497,
@@ -29,7 +29,7 @@
   "rounds": [
     {
       "batchRoundId": "B01-01",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "theme": "Source-grounded Function input/output Schema, typed outcome and Evidence obligations across applicable Knowledge/Rule/Workflow/Interaction",
       "requirements": [
         "DIS020-CORE-003"
@@ -37,16 +37,34 @@
       "prerequisites": [
         "Current native R30 qualifier and selected fixture version migration"
       ],
-      "result": "AWAIT_EXACT_SHA_CI",
-      "sourceHead": null,
-      "receipt": null,
-      "checks": [],
+      "result": "EXACT_SHA_3_OF_3_SUCCESS",
+      "sourceHead": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+      "receipt": "receipts/r32-b01-function-ci.json",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+        }
+      ],
       "globalRoundId": "R32",
-      "test": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs"
+      "test": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+      "originalSourceHead": "af2ebeaaa66c9701a82dd063b6b1d6816a3049a8",
+      "qualifyingTestGitBlob": "da74e6d1318f4746da6bc41779b2f591f3b9749a"
     },
     {
       "batchRoundId": "B01-02",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "theme": "Domain-owned Stateful Function handle lifecycle, Knowledge/Rule state isolation and no KDP/Effect authority leakage",
       "requirements": [
         "DIS020-CORE-006",
@@ -55,16 +73,34 @@
       "prerequisites": [
         "B01-01 contract shape or independent pre-existing fixture"
       ],
-      "result": "AWAIT_EXACT_SHA_CI",
-      "sourceHead": null,
-      "receipt": null,
-      "checks": [],
+      "result": "EXACT_SHA_3_OF_3_SUCCESS",
+      "sourceHead": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+      "receipt": "receipts/r33-b01-state-ci.json",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+        }
+      ],
       "globalRoundId": "R33",
-      "test": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs"
+      "test": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+      "originalSourceHead": "0a404d343827d95ee6c08d962a369dc44c52f98b",
+      "qualifyingTestGitBlob": "a460d8a199d735545b3ebb5e1c7c11588d683675"
     },
     {
       "batchRoundId": "B01-03",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "theme": "Cross-Function/Element ABI compatibility regressions and native C2 qualification, preserving prior adversarial suite",
       "requirements": [
         "DIS020-CORE-003",
@@ -73,12 +109,30 @@
       "prerequisites": [
         "B01-01 and B01-02 relevant exact-SHA source review"
       ],
-      "result": "AWAIT_EXACT_SHA_CI",
-      "sourceHead": null,
-      "receipt": null,
-      "checks": [],
+      "result": "EXACT_SHA_3_OF_3_SUCCESS",
+      "sourceHead": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+      "receipt": "receipts/r34-b01-abi-ci.json",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+        }
+      ],
       "globalRoundId": "R34",
-      "test": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs"
+      "test": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+      "originalSourceHead": "175851591eacbc2c5ca2d391e18f1e9adcdd34ba",
+      "qualifyingTestGitBlob": "f12549c3edc2f5f79895bcafcd7a402b23959249"
     }
   ],
   "roundArtifactContract": {
@@ -124,5 +178,18 @@
     "No physical/local Host requirements unless actual native gap proves necessary."
   ],
   "futureBatches": "B02 may take C3/Target+Interaction after Product/L1 applicability decision, or finish C1 prerequisites; B03+ for final matrix and governance as dependencies resolve. Optional profiles only if in approved scope.",
-  "automationScope": "Batch execution occurs only during active delegated chat/tool work; no background job is implied."
+  "automationScope": "Batch execution occurs only during active delegated chat/tool work; no background job is implied.",
+  "qualificationHead": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+  "qualificationTree": "707a0b11b9a8691b7dc7efad7c5d91d3e735edda",
+  "batchResult": "3/3 individually versioned round test blobs qualified by exact full native+min+verify replay at 0e0d9ad8; original CI failures/errors explicitly retained.",
+  "coreStateAfter": {
+    "verified": 9,
+    "partial": 7
+  },
+  "optionalStateAfter": {
+    "notRun": 4
+  },
+  "governanceStateAfter": {
+    "notRun": 1
+  }
 }

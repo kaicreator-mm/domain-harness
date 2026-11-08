@@ -3,15 +3,15 @@
   "batchId": "B01",
   "roundId": "B01-02",
   "globalRoundId": "R33",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "requirements": [
     "DIS020-CORE-006",
     "DIS020-CORE-003"
   ],
   "startParent": "af2ebeaaa66c9701a82dd063b6b1d6816a3049a8",
-  "sourceHead": null,
-  "finalTree": null,
-  "receipt": null,
+  "sourceHead": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+  "finalTree": "707a0b11b9a8691b7dc7efad7c5d91d3e735edda",
+  "receipt": "receipts/r33-b01-state-ci.json",
   "testPath": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
   "positive": [
     "B01-02 R33 real Runx Stateful handles isolate each invocation, source and process-local ownership",
@@ -48,5 +48,40 @@
     "Distinguish stop() ingress closure from revocation of previously returned in-process references."
   ],
   "fullCorePromoted": false,
-  "metadata": "Round-specific final source SHA and CI receipt written after exact status readback."
+  "metadata": "Round-specific final source SHA and CI receipt written after exact status readback.",
+  "result": "EXACT_SHA_3_OF_3_SUCCESS_AFTER_REPAIR",
+  "originCommit": "0a404d343827d95ee6c08d962a369dc44c52f98b",
+  "testGitBlob": "a460d8a199d735545b3ebb5e1c7c11588d683675",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+    }
+  ],
+  "history": [
+    {
+      "commit": "0a404d343827d95ee6c08d962a369dc44c52f98b",
+      "CI": "https://ci.kaicreator.com/repos/18/pipeline/2274/1",
+      "native": "FAILURE"
+    },
+    {
+      "commit": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+      "CI": "https://ci.kaicreator.com/repos/18/pipeline/2276/1",
+      "native": "SUCCESS",
+      "verifyMin": "SUCCESS",
+      "general": "SUCCESS",
+      "repair": "Source-owned xDownload getPolicy object equality now excludes recreated callback references"
+    }
+  ]
 }
