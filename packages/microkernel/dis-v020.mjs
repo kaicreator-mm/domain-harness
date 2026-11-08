@@ -7,7 +7,7 @@
  */
 import {load} from './dist/domain-app.js';
 import {
- DisV020Error,qualifyDisV020Artifact
+ DisV020Error,qualifyDisV020Artifact,validateDisV020FunctionValue,classifyDisV020FunctionOutcome
 } from '@kaicreator/domain-harness-contracts/dis-v020';
 
 const refuse=code=>{throw new DisV020Error(code)};
@@ -61,14 +61,36 @@ export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,ten
    aotDigest:artifact.digest,
    get state(){return open?result.status:'STOPPED'},
    functions:Object.freeze([...qualified.functions.keys()].filter(x=>x!==artifact.program.appInit)),
-   async invoke(id,input){
+   contractVersions:Object.freeze(Object.fromEntries([...qualified.functions]
+    .filter(([,x])=>x.definition.contract!==undefined)
+    .map(([id,x])=>[id,x.definition.contract.version]))),
+   async invoke(id,input,options={}){
     if(!open)refuse('DIS_APP_NOT_READY');
     const entry=qualified.functions.get(id);
     if(!entry||id===artifact.program.appInit)refuse('DIS_FUNCTION_UNBOUND');
     if(disabled.has(id))refuse('DIS_FUNCTION_UNAVAILABLE');
     const f=entry.definition;
+    if(!plain(options)||Object.keys(options).some(x=>x!=='expectedContractVersion'))
+     refuse('DIS_INVOKE_OPTIONS_INVALID');
+    if(f.contract&&options.expectedContractVersion!==undefined&&
+       options.expectedContractVersion!==f.contract.version)refuse('DIS_FUNCTION_VERSION_MISMATCH');
+    if(f.contract)validateDisV020FunctionValue(f.contract,'input',input);
     if(f.binding.type==='local'){
      const value=await delegates.get(id)(input);
+     if(f.contract){
+      validateDisV020FunctionValue(f.contract,'output',value);
+      const typed=classifyDisV020FunctionOutcome(f.contract,value);
+      const pin=qualified.pins.get(f.binding.sourceId);
+      return Object.freeze({
+       kind:'OBSERVATION',authority:'NONE',value,
+       disposition:typed.disposition,contractVersion:f.contract.version,
+       evidence:Object.freeze({
+        source:Object.freeze({sourceId:pin.id,sha256:pin.sha256,gitBlob:pin.origin.gitBlob}),
+        // Declared refs are unverified business claims, never KDP evidence.
+        declaredRefs:typed.evidenceRefs,attested:false
+       })
+      });
+     }
      // Observations, rule projections and stateful objects have NO ability to
      // mint an admitted Intent, live execution lease or Effect permit.
      return Object.freeze({kind:'OBSERVATION',authority:'NONE',value});

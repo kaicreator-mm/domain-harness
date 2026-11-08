@@ -69,6 +69,27 @@ export async function makeNativeFixture(){
   ],
   appInit:'orders.appInit',
  };
+
+ // R11: AOT-locked per-Function profiles on original Tally/xDownload sources.
+ const r11=(classes,fields)=>({
+  schema:'dis.v0.2.function-contract/1',version:'1.0.0',
+  input:{type:'record'},
+  output:{type:'record',fields},
+  outcomes:{field:Object.hasOwn(fields,'state')?'state':'status',classes},
+  evidence:{refField:'evidenceRefs',requiredFor:['SUCCEEDED']},
+  compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
+ });
+ const find=id=>program.elements.flatMap(e=>e.functions).find(fn=>fn.id===id);
+ find('tally.assessTaskEvidence').contract=r11({
+  UNQUALIFIED_INPUT:'UNKNOWN',OBSERVED_INPUT_ONLY:'OBSERVED'
+ },{state:'string',admitted:'boolean',taskPass:'boolean'});
+ for(const id of ['xdownload.interaction.inspect','xdownload.interaction.confirm']){
+  find(id).contract=r11({
+   REJECTED:'FAILED',CLARIFICATION_REQUIRED:'NEEDS_INPUT',
+   AWAITING_CONFIRMATION:'NEEDS_CONFIRMATION',
+   READY_FOR_KDP:'PENDING_AUTHORIZATION'
+  },{status:'string',authority:'string',effectDispatched:'boolean'});
+ }
  const expectedSourceOrigins=Object.fromEntries(sourceDescriptors.map(s=>[s.id,{
   repository:s.repository,commit:s.commit,path:s.originalPath,gitBlob:s.gitBlob
  }]));

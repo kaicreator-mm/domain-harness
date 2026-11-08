@@ -6,7 +6,7 @@
 
 | Scope | VERIFIED | PARTIAL | NOT_RUN | OUT_OF_SCOPE | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Core | 9 | 6 | 1 | 0 | 16 |
+| Core | 9 | 7 | 0 | 0 | 16 |
 | Optional profiles | 0 | 0 | 4 | 0 | 4 |
 | Governance | 0 | 0 | 1 | 0 | 1 |
 
@@ -44,3 +44,9 @@ Sub-issues are created only for genuinely independent write sets; the version in
 - Fix: the three PR workflows pin the prebuild download to the npmmirror binary mirror (`npm_config_better_sqlite3_binary_host_mirror`, a native prebuild-install option); a local Node24 full gate additionally surfaced a staged/live pack inventory divergence in the new-workspace test staging, fixed in the same candidate.
 - [R10 CI recovery receipt](receipts/r10-ci-recovery.json) pins HEAD `c9cc8d63e13b150cf462af05a58daef5748f0030` with all three Woodpecker contexts SUCCESS (pipelines 2229/1–3): 103 named demo cases (native consumer 27, including the 6 new Interaction cases; bridge 34; physical 7; source consumer 26; source selected 9), plus the 5-case matrix validator and the 12-case C01 assembly context.
 - CORE-014 remains **PARTIAL** (real Chat/Form/CLI UI transports, external download Host and cross-mode conformance still missing); the coverage table above is unchanged. The docs commit that adds this receipt is validated by its own separate pipeline and inherits nothing automatically.
+
+### R11 Function Contract candidate (no exact-SHA CI receipt yet)
+
+- `DIS020-CORE-003` is **PARTIAL**: real original-source Tally task assessment and both xDownload native Interaction Functions now carry `dis.v0.2.function-contract/1` checked by published Contracts/Microkernel subpaths. Added 8 targeted positive/negative native tests, with no new fake Domain.
+- Input/output record types are checked before typed disposition classification. Tally `UNQUALIFIED_INPUT` remains `UNKNOWN`; xDownload `READY_FOR_KDP` becomes `PENDING_AUTHORIZATION`, never Effect permission. The returned source pin is provenance, not independent business attestation; declared evidence references alone are never trusted as facts. `SUCCEEDED` without required references is rejected.
+- Strict compatible reader/major is included in AOT and optional explicit caller version expectation rejects a stale consumer. Existing unprofiled R9 Functions remain outside CORE-003 completion. This candidate **cannot inherit R10 CI SUCCESS**; retain PARTIAL until new exact-SHA Woodpecker receipt and all remaining functions/typed KDP receipts/full schema/evidence verification are covered.

@@ -1,4 +1,4 @@
-import type {DisV020Aot,DisV020Origin} from '@kaicreator/domain-harness-contracts/dis-v020';
+import type {DisV020Aot,DisV020Origin,DisV020Disposition} from '@kaicreator/domain-harness-contracts/dis-v020';
 import type {V10DocStore} from '@kaicreator/domain-harness-contracts';
 export interface DisV020Implementation {
  readonly sourceId:string; readonly sha256:string; readonly gitBlob:string;
@@ -16,8 +16,9 @@ export interface DisV020App {
  readonly aotDigest:string;
  readonly state:'READY'|'DEGRADED'|'STOPPED';
  readonly functions:readonly string[];
- invoke(id:string,input?:unknown):Promise<
-  |Readonly<{kind:'OBSERVATION';authority:'NONE';value:unknown}>
+ readonly contractVersions:Readonly<Record<string,string>>;
+ invoke(id:string,input?:unknown,options?:Readonly<{expectedContractVersion?:string}>):Promise<
+  |Readonly<{kind:'OBSERVATION';authority:'NONE';value:unknown;disposition?:DisV020Disposition;contractVersion?:string;evidence?:Readonly<{source:Readonly<{sourceId:string;sha256:string;gitBlob:string}>;declaredRefs:readonly string[];attested:false}>}>
   |Readonly<{kind:'KDP_RECEIPT';authority:'KDP';receipt:Record<string,unknown>}>>;
  stop():void;
 }

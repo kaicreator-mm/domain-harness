@@ -73,18 +73,42 @@
       "id": "DIS020-CORE-003",
       "title": "Public Function I/O schema, typed outcomes, evidence obligations, compatibility",
       "profile": "core",
-      "state": "NOT_RUN",
+      "state": "PARTIAL",
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "3"
       },
       "implementation": [
-        "packages/contracts/dis-v020.mjs"
+        "packages/contracts/dis-v020.mjs",
+        "packages/microkernel/dis-v020.mjs",
+        "examples/dis-v020-native-sdk/native-fixture.mjs"
       ],
-      "positive": [],
-      "negative": [],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 typed Function I/O and provenance preserve original Tally UNKNOWN advisory semantics"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 native xDownload clarification and confirmation remain typed and never authorize Effect"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 refuses malformed Function output rather than claiming a typed successful outcome"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 declared SUCCEEDED without required evidence fails closed even for source-pinned local code"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 AOT rejects incompatible Function contract reader/major and weak success evidence policy"
+        }
+      ],
       "receiptIds": [],
-      "note": "R9 bindings do not yet enforce complete input/output schema, unknown/failed outcomes, evidence or version compatibility."
+      "note": "R11 candidate attaches opt-in AOT-locked Function Contract to real Tally and xDownload native LOCAL Functions: bounded record I/O, declared typed outcome, source-pin provenance, declared evidence requirement and explicit reader/major version guard. NOT CI-VERIFIED YET. No complete schema vocabulary, independent domain evidence attestation, KDP_INTENT typing, all-Function profile or cross-version structural compatibility proof; PARTIAL."
     },
     {
       "id": "DIS020-CORE-004",

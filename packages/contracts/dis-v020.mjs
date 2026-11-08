@@ -15,6 +15,65 @@ const ELEMENT_KINDS=new Set(['global','knowledge','rule','stateful','workflow','
 const FUNCTION_KINDS=new Set(['init','knowledge','rule','stateful','workflow','effect','interaction']);
 const REL_KINDS=new Set(['depends-on','constrains','cooperates','defines']);
 const MAX=256;
+
+/** R11 bounded Function Contract — source evidence is NOT business attestation. */
+const OUTCOMES=new Set(['OBSERVED','UNKNOWN','FAILED','NEEDS_INPUT','NEEDS_CONFIRMATION','PENDING_AUTHORIZATION','SUCCEEDED']);
+const VALUE_TYPES=new Set(['string','boolean','number','record','array']);
+const FIELD=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+function validateShape(shape){
+ keys(shape,['type','fields']);
+ if(shape.type!=='record'||(shape.fields!==undefined&&!record(shape.fields)))fail('DIS_FUNCTION_SCHEMA_INVALID');
+ const fields=shape.fields??{};
+ if(Object.keys(fields).length>MAX)fail('DIS_FUNCTION_SCHEMA_INVALID');
+ for(const [name,type] of Object.entries(fields)){
+  if(!FIELD.test(name)||!VALUE_TYPES.has(type))fail('DIS_FUNCTION_SCHEMA_INVALID');
+ }
+}
+function validateFunctionContract(c){
+ keys(c,['schema','version','input','output','outcomes','evidence','compatibility']);
+ if(c.schema!=='dis.v0.2.function-contract/1'||!/^[1-9][0-9]*\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/.test(c.version))fail('DIS_FUNCTION_CONTRACT_INVALID');
+ validateShape(c.input);validateShape(c.output);
+ keys(c.outcomes,['field','classes']);
+ if(!FIELD.test(c.outcomes.field)||!record(c.outcomes.classes)||
+  !Object.keys(c.outcomes.classes).length||Object.keys(c.outcomes.classes).length>MAX)fail('DIS_FUNCTION_OUTCOMES_INVALID');
+ for(const [tag,disposition] of Object.entries(c.outcomes.classes)){
+  if(!FIELD.test(tag)||!OUTCOMES.has(disposition))fail('DIS_FUNCTION_OUTCOMES_INVALID');
+ }
+ keys(c.evidence,['refField','requiredFor']);
+ if(!FIELD.test(c.evidence.refField)||!arr(c.evidence.requiredFor,true)||
+  new Set(c.evidence.requiredFor).size!==c.evidence.requiredFor.length||
+  c.evidence.requiredFor.some(x=>!OUTCOMES.has(x)))fail('DIS_FUNCTION_EVIDENCE_INVALID');
+ if(Object.values(c.outcomes.classes).includes('SUCCEEDED')&&!c.evidence.requiredFor.includes('SUCCEEDED'))
+  fail('DIS_EVIDENCE_POLICY_WEAK');
+ keys(c.compatibility,['major','minReader','maxReaderExclusive']);
+ if(!Number.isSafeInteger(c.compatibility.major)||c.compatibility.major<1||
+  Number(c.version.split('.')[0])!==c.compatibility.major||
+  c.compatibility.minReader!=='0.2.0'||c.compatibility.maxReaderExclusive!=='0.3.0')
+  fail('DIS_FUNCTION_COMPATIBILITY_INVALID');
+}
+export function validateDisV020FunctionValue(contract,phase,value){
+ if(phase!=='input'&&phase!=='output')fail('DIS_FUNCTION_PHASE_INVALID');
+ const shape=contract?.[phase];
+ if(!shape||!record(value))fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
+ for(const [name,type] of Object.entries(shape.fields??{})){
+  const v=value[name];
+  if(type==='record'?!record(v):type==='array'?!Array.isArray(v):typeof v!==type)
+   fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
+ }
+ return true;
+}
+export function classifyDisV020FunctionOutcome(contract,value){
+ const tag=value[contract.outcomes.field];
+ const disposition=typeof tag==='string'?contract.outcomes.classes[tag]:undefined;
+ if(!disposition)fail('DIS_OUTCOME_UNDECLARED');
+ const refs=value[contract.evidence.refField];
+ const valid=Array.isArray(refs)&&refs.length>0&&refs.length<=MAX&&
+  refs.every(x=>typeof x==='string'&&x.length>0&&x.length<=2048);
+ if(refs!==undefined&&!valid)fail('DIS_EVIDENCE_INVALID');
+ if(contract.evidence.requiredFor.includes(disposition)&&!valid)fail('DIS_EVIDENCE_REQUIRED');
+ return Object.freeze({disposition,evidenceRefs:Object.freeze(valid?[...refs]:[])});
+}
+
 export class DisV020Error extends Error{
  constructor(code){super(code);this.name='DisV020Error';this.code=code}
 }
@@ -86,14 +145,16 @@ export function qualifyDisV020Artifact(artifact){
   unique(e.dependsOn,'DIS_DEPENDENCY_DUPLICATE');
   elements.set(e.id,e);
   for(const f of e.functions){
-   keys(f,['id','kind','effect','binding','optional']);
+   keys(f,['id','kind','effect','binding','optional','contract']);
    if(f.optional!==undefined&&typeof f.optional!=='boolean')fail('DIS_FUNCTION_INVALID');
    if(!id(f.id)||functions.has(f.id)||!FUNCTION_KINDS.has(f.kind)||
       !['none','governed'].includes(f.effect))fail('DIS_FUNCTION_INVALID');
+   if(f.contract!==undefined)validateFunctionContract(f.contract);
    keys(f.binding,['type','sourceId','intentId']);
    const b=f.binding;
    // Interaction is an ordinary Element service, never a new Effect authority.
    if(f.kind==='interaction'&&(f.effect!=='none'||b.type!=='local'))fail('DIS_INTERACTION_EFFECT_FORBIDDEN');
+   if(f.contract!==undefined&&b.type!=='local')fail('DIS_FUNCTION_CONTRACT_BINDING_UNSUPPORTED');
    if(b.type==='local'){
     if(f.effect!=='none'||typeof b.sourceId!=='string'||!pins.has(b.sourceId)||
        Object.hasOwn(b,'intentId')||f.kind==='effect')fail('DIS_LOCAL_NOT_QUALIFIED');

@@ -279,3 +279,79 @@ test('stopping real SDK closes Interaction ingress before any new clarification'
  app.stop();
  await assert.rejects(app.invoke('xdownload.interaction.inspect',{channel:'cli',requestId:'STOP'}),reject('DIS_APP_NOT_READY'));
 });
+
+// R11: original source-pinned Tally/xDownload native Function conformance.
+test('R11 typed Function I/O and provenance preserve original Tally UNKNOWN advisory semantics',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  assert.equal(app.contractVersions['tally.assessTaskEvidence'],'1.0.0');
+  const r=await app.invoke('tally.assessTaskEvidence',{}, {expectedContractVersion:'1.0.0'});
+  assert.equal(r.kind,'OBSERVATION');assert.equal(r.authority,'NONE');
+  assert.equal(r.disposition,'UNKNOWN');assert.equal(r.value.admitted,false);
+  assert.equal(r.evidence.source.sourceId,'tally-business');
+  assert.equal(r.evidence.source.sha256,f.artifact.sources.find(x=>x.id==='tally-business').sha256);
+  assert.deepEqual(r.evidence.declaredRefs,[]);assert.equal(r.evidence.attested,false);
+ }finally{app.stop()}
+});
+test('R11 native xDownload clarification and confirmation remain typed and never authorize Effect',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  const first=await app.invoke('xdownload.interaction.inspect',{channel:'chat',requestId:'R11',url:'https://example.org/a'});
+  assert.equal(first.disposition,'NEEDS_INPUT');assert.equal(first.authority,'NONE');
+  const ready=await app.invoke('xdownload.interaction.confirm',{
+   draft:first.value,answers:{declaredBytes:256},confirmed:true
+  },{expectedContractVersion:'1.0.0'});
+  assert.equal(ready.disposition,'PENDING_AUTHORIZATION');assert.equal(ready.value.permittedEffect,false);
+  assert.equal(ready.evidence.attested,false);assert.equal(ready.authority,'NONE');
+ }finally{app.stop()}
+});
+test('R11 rejects malformed Function input before executing sealed local implementation',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  await assert.rejects(app.invoke('xdownload.interaction.inspect','invalid'),reject('DIS_FUNCTION_INPUT_INVALID'));
+ }finally{app.stop()}
+});
+test('R11 refuses malformed Function output rather than claiming a typed successful outcome',async()=>{
+ const f=await fixturePromise,registry={...f.registry};
+ registry['tally.assessTaskEvidence']={...registry['tally.assessTaskEvidence'],execute:()=>({state:'OBSERVED_INPUT_ONLY',admitted:'yes',taskPass:false})};
+ const app=await activate(f,{registry});
+ try{
+  await assert.rejects(app.invoke('tally.assessTaskEvidence',{}),reject('DIS_FUNCTION_OUTPUT_INVALID'));
+ }finally{app.stop()}
+});
+test('R11 undeclared result status is not silently mapped to SUCCEEDED or UNKNOWN',async()=>{
+ const f=await fixturePromise,registry={...f.registry};
+ registry['tally.assessTaskEvidence']={...registry['tally.assessTaskEvidence'],execute:()=>({state:'FAKE_SUCCESS',admitted:false,taskPass:false})};
+ const app=await activate(f,{registry});
+ try{
+  await assert.rejects(app.invoke('tally.assessTaskEvidence',{}),reject('DIS_OUTCOME_UNDECLARED'));
+ }finally{app.stop()}
+});
+test('R11 declared SUCCEEDED without required evidence fails closed even for source-pinned local code',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const fn=p.elements.flatMap(e=>e.functions).find(fn=>fn.id==='tally.assessTaskEvidence');
+ fn.contract.outcomes.classes.OBSERVED_INPUT_ONLY='SUCCEEDED';
+ const artifact=compile(f,p),app=await activate(f,{artifact,digest:artifact.digest});
+ try{
+  const input={issueRef:'https://github.com/kaicreator-mm/tally/issues/37',issueNumber:37,
+   sourceSha:'a'.repeat(40),claimRef:'claim:r11',dependenciesComplete:true};
+  await assert.rejects(app.invoke('tally.assessTaskEvidence',input),reject('DIS_EVIDENCE_REQUIRED'));
+ }finally{app.stop()}
+});
+test('R11 AOT rejects incompatible Function contract reader/major and weak success evidence policy',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const fn=p.elements.flatMap(e=>e.functions).find(fn=>fn.id==='tally.assessTaskEvidence');
+ fn.contract.compatibility.minReader='0.3.0';
+ assert.throws(()=>compile(f,p),reject('DIS_FUNCTION_COMPATIBILITY_INVALID'));
+ fn.contract.compatibility.minReader='0.2.0';
+ fn.contract.outcomes.classes.OBSERVED_INPUT_ONLY='SUCCEEDED';
+ fn.contract.evidence.requiredFor=[];
+ assert.throws(()=>compile(f,p),reject('DIS_EVIDENCE_POLICY_WEAK'));
+});
+test('R11 installed AOT contract version rejects stale explicit consumer expectation',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  await assert.rejects(app.invoke('tally.assessTaskEvidence',{}, {expectedContractVersion:'2.0.0'}),
+   reject('DIS_FUNCTION_VERSION_MISMATCH'));
+ }finally{app.stop()}
+});

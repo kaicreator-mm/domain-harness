@@ -5,11 +5,24 @@ export declare class DisV020Error extends Error { readonly code:string; construc
 export interface DisV020Origin { readonly repository:string; readonly commit:string; readonly path:string; readonly gitBlob:string; }
 export interface DisV020Pin { readonly id:string; readonly sha256:string; readonly origin:DisV020Origin; }
 export interface DisV020SourceInput { readonly id:string; readonly sourceText:string; readonly origin:DisV020Origin; }
+export type DisV020Disposition='OBSERVED'|'UNKNOWN'|'FAILED'|'NEEDS_INPUT'|'NEEDS_CONFIRMATION'|'PENDING_AUTHORIZATION'|'SUCCEEDED';
+export interface DisV020FunctionContract {
+ readonly schema:'dis.v0.2.function-contract/1';
+ readonly version:string;
+ readonly input:Readonly<{type:'record';fields?:Readonly<Record<string,'string'|'boolean'|'number'|'record'|'array'>>}>;
+ readonly output:Readonly<{type:'record';fields?:Readonly<Record<string,'string'|'boolean'|'number'|'record'|'array'>>}>;
+ readonly outcomes:Readonly<{field:string;classes:Readonly<Record<string,DisV020Disposition>>}>;
+ readonly evidence:Readonly<{refField:string;requiredFor:readonly DisV020Disposition[]}>;
+ readonly compatibility:Readonly<{major:number;minReader:'0.2.0';maxReaderExclusive:'0.3.0'}>;
+}
+export declare function validateDisV020FunctionValue(contract:DisV020FunctionContract,phase:'input'|'output',value:unknown):true;
+export declare function classifyDisV020FunctionOutcome(contract:DisV020FunctionContract,value:Record<string,unknown>):Readonly<{disposition:DisV020Disposition;evidenceRefs:readonly string[]}>;
 export interface DisV020Function {
  readonly id:string;
  readonly kind:'init'|'knowledge'|'rule'|'stateful'|'workflow'|'effect'|'interaction';
  readonly effect:'none'|'governed';
  readonly optional?:boolean;
+ readonly contract?:DisV020FunctionContract;
  readonly binding: {readonly type:'local'; readonly sourceId:string} |
   {readonly type:'kdp-intent'; readonly intentId:string};
 }
