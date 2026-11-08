@@ -14,7 +14,7 @@ export async function loadKernelSource() {
   return raw.toString('utf8');
 }
 
-const defaultQualificationSha256 = '78dcb054edcbd5aa8c1b48afa339c799ab2d3ba2dfb29f5029383280491c4261';
+const defaultQualificationSha256 = '87e3cfced4a68f143d5ac97fc3724af6c52075e2f3c58e33eecf1eaa44eadb9b';
 export async function deployment(variant, expectedIndexSha256 = defaultQualificationSha256) {
   const [appRaw, qualifiedRaw] = await Promise.all([readFile(appUrl),readFile(lockUrl)]);
   if (!/^[a-f0-9]{64}$/.test(expectedIndexSha256) || digest(qualifiedRaw) !== expectedIndexSha256) throw new Error('QUALIFICATION_INDEX_PIN_MISMATCH');
