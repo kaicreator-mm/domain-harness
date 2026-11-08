@@ -1,0 +1,41 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B01",
+  "roundId": "B01-01",
+  "globalRoundId": "R32",
+  "status": "CI_PENDING",
+  "requirements": [
+    "DIS020-CORE-003"
+  ],
+  "startParent": "3fac3c4ff8d6af2d2c0bb91f7eae5a4849949c67",
+  "sourceHead": null,
+  "finalTree": null,
+  "receipt": null,
+  "testPath": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+  "positive": [
+    "B01-01 R32 real selected Tally rule and xDownload Knowledge/Interaction Functions retain typed source and authority",
+    "B01-01 R32 KDP admission remains typed separately from LOCAL evidence and never proves Effect success"
+  ],
+  "negative": [
+    "B01-01 R32 a forged LOCAL output, undecared outcome or effect-bearing Knowledge input fails closed",
+    "B01-01 R32 contract same-version drift and forged declared Evidence cannot qualify truth"
+  ],
+  "sourceExamples": [
+    "kaicreator-mm/tally original source pins in native-fixture.mjs",
+    "kaicreator-mm/xDownload selected Business source pins in native-fixture.mjs"
+  ],
+  "resultBoundary": "The selected native contract is structurally typed; UNKNOWN or OBSERVED does not produce SAP/ECP authority, and declared fake evidenceRefs are not attestation.",
+  "ciContexts": [
+    "ci/woodpecker/pr/dis-v020-integration",
+    "ci/woodpecker/pr/verify-min-node",
+    "ci/woodpecker/pr/verify"
+  ],
+  "ciUrls": [],
+  "findings": [],
+  "lessons": [
+    "Do not confuse typed EvidenceRef presence with accepted domain evidence.",
+    "Run real selected Knowledge/Rule/Interaction Functions with one actual KDP admission separated from Effect completion."
+  ],
+  "fullCorePromoted": false,
+  "metadata": "Actual Exact-SHA and CI receipt must be added after this round commit and status readback."
+}

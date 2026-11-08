@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B01",
-  "status": "PLANNED",
+  "status": "IN_PROGRESS",
   "mode": "DELIVERY_FIRST_SEQUENTIAL_COMMITS_WITH_INDEPENDENT_EXACT_SHA_ROUND_RECEIPTS",
   "masterIssue": 1499,
   "pr": 1497,
@@ -29,7 +29,7 @@
   "rounds": [
     {
       "batchRoundId": "B01-01",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "theme": "Source-grounded Function input/output Schema, typed outcome and Evidence obligations across applicable Knowledge/Rule/Workflow/Interaction",
       "requirements": [
         "DIS020-CORE-003"
@@ -37,10 +37,12 @@
       "prerequisites": [
         "Current native R30 qualifier and selected fixture version migration"
       ],
-      "result": "PENDING",
+      "result": "AWAIT_EXACT_SHA_CI",
       "sourceHead": null,
       "receipt": null,
-      "checks": []
+      "checks": [],
+      "globalRoundId": "R32",
+      "test": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs"
     },
     {
       "batchRoundId": "B01-02",
