@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {load} from '../../packages/microkernel/dist/index.js';
 import {getPolicy as inventoryPolicy} from './business-inventory-v1.mjs';
-import {makeTwoDomainBuilt,makeTwoDomainManifest,INVENTORY_PACKAGE,QUOTE_INPUT,INVENTORY_INPUT} from './two-domain-composition.mjs';
+import {makeTwoDomainBuilt,makeTwoDomainManifest,INVENTORY_PACKAGE,INVENTORY_CAPABILITY,QUOTE_INPUT,INVENTORY_INPUT} from './two-domain-composition.mjs';
 import {compileProjection,createActivation,exportProjectionRecord} from './bridge.mjs';
 import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
 import {openPhysicalStore,protectedKdpSnapshot} from './physical-store.mjs';
@@ -29,6 +29,9 @@ test('second Business is an actual independently compiled inventory Domain, not 
  const businesses=built.modules.filter(m=>m.role==='business');
  assert.equal(businesses.length,2);
  assert.ok(businesses.some(m=>m.packageId===INVENTORY_PACKAGE));
+ const stock=built.modules.find(m=>m.packageId===INVENTORY_CAPABILITY);
+ assert.ok(stock&&stock.role==='capability'&&stock.handlers.some(h=>h.operationId==='stock.preview'));
+ assert.equal(built.routes.find(r=>r.intentId==='reserveInventory')?.capabilityId,'stock');
  assert.ok(businesses.some(m=>m.packageId==='business-order-approval@v08.1.0.0'));
  assert.equal(projection.routes.get('reserveStock').intentType,'reserveInventory');
  assert.equal(projection.routes.get('approveQuote').intentType,'submitQuoteDecisionDynamic');

@@ -5,7 +5,7 @@
 ## 1. 两种真正不同的 Domain
 
 - **orders**：原有 `business-order-approval@v08.1.0.0`，已选 Function `orders.approval.requestDecision` → `submitQuoteDecisionDynamic` → `ledger.reserve`，触发真实 KDP Effect/Journal。
-- **inventory**：新增自建封闭的 `business-inventory@v08.1.0.0`，具有**独立的 `domainId=inventory`、`inventory-reservation` Workflow、`reserveInventory` Intent、SKU/quantity/approved 的领域约束**。公开 `inventory.stock.reserve` → `reserveInventory` 通过真正 BUILD 选中的 `ledger.preview` 路由受 KDP 调度；该 Domain 是 KDP 内部的库存预留**决策记录**，没有真实外部库存修改 Effect，不能将它说成库存已在仓库系统中扣减。
+- **inventory**：新增自建封闭的 `business-inventory@v08.1.0.0`，具有**独立的 `domainId=inventory`、`inventory-reservation` Workflow、`reserveInventory` Intent、SKU/quantity/approved 的领域约束**。公开 `inventory.stock.reserve` → `reserveInventory` 通过真正 BUILD 选中的独立 `capability-inventory` 的 `stock.preview` 纯读 Operation 受 KDP 调度；该 Domain 是 KDP 内部的库存预留**决策记录**，没有真实外部库存修改 Effect，不能将它说成库存已在仓库系统中扣减。
 
 两者共享已选 KDP/SDK、一个合法 Business App Init，但选中**两个独立 Business Package**，从而可用同一个 `instanceKey` 验证 KDP 物理记录的 Business ID 命名空间隔离。库存缺授权时由真实 KDP Guard 拒绝，不由桥接层模拟。
 
@@ -31,3 +31,10 @@
 这是两个**选中且实际执行的独立 Business Domain**，不是两份虚构的 Parser Mock。但第二个库存 Business 只声明/履行领域内决策，未执行外部设备、数据库库存扣减或真实用户授权，因此不宣称完整库存业务上线。跨进程恢复的是**真实 KDP SQLite Journal 原始结果**，而不是操作系统全程沙箱；自建可信原生代码无需 OS 隔离，业务 Effect 仍必须经过 KDP 的合法准入与回执。
 
 DIS v0.2.0 的最终 Element/Function/App Init 原生 SDK/AOT ABI、跨进程签名安装记录、正式双 Domain Package 的版本晋升、独立 Exact-SHA Review、L2 Freeze 仍需后继实施及审核。
+
+## R6.1 对抗修复：跨 Domain 的 Capability 可见性
+
+源码级对抗审核发现订单领域既有 `ledger.preview` 的 `OPERATIONS.visibility.intentType` 明确绑定到 `submitQuoteDecisionDynamic`；它**不能**因为“纯读”就默认被 `reserveInventory` 复用。把两个独立 Domain 都指向订单 Capability 会触发 selected BUILD/KDP 可见性不一致。
+修复为新增真正独立的 `capability-inventory@v08.1.0.0`，只声明一个 `effectClass=none` 的 `stock.preview`，其 visibility 只绑定 `reserveInventory`；业务库存 Function 仍通过原本 KDP Guard 执行，未新增外部库存 Effect/权限。双 Domain 实际 BUILD 闭包现在包含两个 Business Package 和**两个不同 Capability**，测试要求 `reserveInventory` 的选中 route 指向 `stock` 而不是订单 `ledger`。
+
+该修复必须由修复后 Exact HEAD 的 Woodpecker 真正验证，不能借用此前仍在运行或排队的结果。
