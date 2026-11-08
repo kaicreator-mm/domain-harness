@@ -7,7 +7,7 @@
  */
 import {load} from './dist/domain-app.js';
 import {
- DisV020Error,qualifyDisV020Artifact,validateDisV020FunctionValue,classifyDisV020FunctionOutcome,classifyDisV020KdpReceipt
+ DisV020Error,qualifyDisV020Artifact,validateDisV020FunctionValue,classifyDisV020FunctionOutcome,classifyDisV020KdpReceipt,validateDisV020LocalHandle
 } from '@kaicreator/domain-harness-contracts/dis-v020';
 
 const refuse=code=>{throw new DisV020Error(code)};
@@ -62,8 +62,10 @@ export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,ten
    get state(){return open?result.status:'STOPPED'},
    functions:Object.freeze([...qualified.functions.keys()].filter(x=>x!==artifact.program.appInit)),
    contractVersions:Object.freeze(Object.fromEntries([...qualified.functions]
-    .filter(([,x])=>x.definition.contract!==undefined||x.definition.receiptContract!==undefined)
-    .map(([id,x])=>[id,x.definition.contract?.version??x.definition.receiptContract.version]))),
+    .filter(([,x])=>x.definition.contract!==undefined||
+      x.definition.receiptContract!==undefined||x.definition.handleContract!==undefined)
+    .map(([id,x])=>[id,x.definition.contract?.version??
+       x.definition.receiptContract?.version??x.definition.handleContract.version]))),
    async invoke(id,input,options={}){
     if(!open)refuse('DIS_APP_NOT_READY');
     const entry=qualified.functions.get(id);
@@ -72,12 +74,27 @@ export async function loadDisV020Aot(artifact,{expectedDigest,registry,store,ten
     const f=entry.definition;
     if(!plain(options)||Object.keys(options).some(x=>x!=='expectedContractVersion'))
      refuse('DIS_INVOKE_OPTIONS_INVALID');
-    const currentContractVersion=f.contract?.version??f.receiptContract?.version;
+    const currentContractVersion=f.contract?.version??f.receiptContract?.version??f.handleContract?.version;
     if(currentContractVersion&&options.expectedContractVersion!==undefined&&
        options.expectedContractVersion!==currentContractVersion)refuse('DIS_FUNCTION_VERSION_MISMATCH');
     if(f.contract)validateDisV020FunctionValue(f.contract,'input',input);
     if(f.binding.type==='local'){
      const value=await delegates.get(id)(input);
+     if(f.handleContract){
+      validateDisV020LocalHandle(f.handleContract,value);
+      const pin=qualified.pins.get(f.binding.sourceId);
+      return Object.freeze({
+       kind:'OBSERVATION',authority:'NONE',value,
+       contractVersion:f.handleContract.version,
+       handle:Object.freeze({
+        lifetime:'PROCESS_LOCAL',methods:Object.freeze([...f.handleContract.methods])
+       }),
+       evidence:Object.freeze({
+        source:Object.freeze({sourceId:pin.id,sha256:pin.sha256,gitBlob:pin.origin.gitBlob}),
+        attested:false
+       })
+      });
+     }
      if(f.contract){
       validateDisV020FunctionValue(f.contract,'output',value);
       const typed=classifyDisV020FunctionOutcome(f.contract,value);

@@ -23,6 +23,27 @@ const KDP_ADMISSIONS=new Set(['ADMITTED','DENIED','UNKNOWN']);
 const SEMVER=/^[1-9][0-9]*\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/;
 
 const FIELD=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+const UNSAFE_METHODS=new Set(['constructor','prototype','__proto__','then']);
+function validateLocalHandleContract(c){
+ keys(c,['schema','version','methods','lifetime']);
+ if(c.schema!=='dis.v0.2.local-handle-contract/1'||!SEMVER.test(c.version)||
+    c.lifetime!=='PROCESS_LOCAL'||!arr(c.methods)||c.methods.length>16||
+    new Set(c.methods).size!==c.methods.length||
+    c.methods.some(m=>typeof m!=='string'||!FIELD.test(m)||UNSAFE_METHODS.has(m)))
+  fail('DIS_LOCAL_HANDLE_CONTRACT_INVALID');
+}
+/**
+ * The returned class instance may be used only in-process. Method shape is
+ * checked, not its business truth or delegated authority.
+ */
+export function validateDisV020LocalHandle(contract,value){
+ validateLocalHandleContract(contract);
+ if(value===null||typeof value!=='object'||Array.isArray(value)||
+    Object.getPrototypeOf(value)===null||record(value)||
+    contract.methods.some(name=>typeof value[name]!=='function'))
+  fail('DIS_LOCAL_HANDLE_INVALID');
+ return true;
+}
 function validateKdpReceiptContract(contract){
  keys(contract,['schema','version','statusMap','compatibility']);
  if(contract.schema!=='dis.v0.2.kdp-receipt-contract/1'||!SEMVER.test(contract.version))
@@ -248,19 +269,24 @@ export function qualifyDisV020Artifact(artifact){
   unique(e.dependsOn,'DIS_DEPENDENCY_DUPLICATE');
   elements.set(e.id,e);
   for(const f of e.functions){
-   keys(f,['id','kind','effect','binding','optional','contract','receiptContract']);
+   keys(f,['id','kind','effect','binding','optional','contract','receiptContract','handleContract']);
    if(f.optional!==undefined&&typeof f.optional!=='boolean')fail('DIS_FUNCTION_INVALID');
    if(!id(f.id)||functions.has(f.id)||!FUNCTION_KINDS.has(f.kind)||
       !['none','governed'].includes(f.effect))fail('DIS_FUNCTION_INVALID');
    if(f.contract!==undefined)validateFunctionContract(f.contract);
    if(f.receiptContract!==undefined)validateKdpReceiptContract(f.receiptContract);
+   if(f.handleContract!==undefined)validateLocalHandleContract(f.handleContract);
    keys(f.binding,['type','sourceId','intentId']);
    const b=f.binding;
    // Interaction is an ordinary Element service, never a new Effect authority.
    if(f.kind==='interaction'&&(f.effect!=='none'||b.type!=='local'))fail('DIS_INTERACTION_EFFECT_FORBIDDEN');
    if(f.contract!==undefined&&b.type!=='local')fail('DIS_FUNCTION_CONTRACT_BINDING_UNSUPPORTED');
-   if(f.receiptContract!==undefined&&(b.type!=='kdp-intent'||f.contract!==undefined))
+   if(f.receiptContract!==undefined&&(b.type!=='kdp-intent'||f.contract!==undefined||
+      f.handleContract!==undefined))
     fail('DIS_KDP_RECEIPT_BINDING_UNSUPPORTED');
+   if(f.handleContract!==undefined&&(f.kind!=='stateful'||f.effect!=='none'||
+      b.type!=='local'||f.contract!==undefined))
+    fail('DIS_LOCAL_HANDLE_BINDING_UNSUPPORTED');
    if(b.type==='local'){
     if(f.effect!=='none'||typeof b.sourceId!=='string'||!pins.has(b.sourceId)||
        Object.hasOwn(b,'intentId')||f.kind==='effect')fail('DIS_LOCAL_NOT_QUALIFIED');

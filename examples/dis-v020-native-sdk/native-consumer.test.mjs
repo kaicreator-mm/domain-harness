@@ -784,3 +784,58 @@ test('R19.1 same-major Function comparator refuses revoking the original zero-ar
  next.input.allowAbsent=true;
  assert.equal(compareDisV020FunctionContracts(prev,next).compatible,true);
 });
+
+
+// R20: real Runx source returns a process-local class instance, not a record.
+test('R20 selected Runx stateful LOCAL Handle has typed methods and no KDP lease authority',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  assert.equal(app.contractVersions['runx.createPresenceObserver'],'1.0.0');
+  const out=await app.invoke('runx.createPresenceObserver',
+   ()=>'2026-11-08T14:00:00Z',{expectedContractVersion:'1.0.0'});
+  assert.equal(out.kind,'OBSERVATION');assert.equal(out.authority,'NONE');
+  assert.equal(out.contractVersion,'1.0.0');
+  assert.equal(out.handle.lifetime,'PROCESS_LOCAL');
+  assert.deepEqual(out.handle.methods,['observe','list','latest']);
+  assert.equal(out.evidence.attested,false);
+  assert.equal(out.evidence.source.sourceId,'runx-presence');
+  const agent=out.value;
+  assert.equal(agent.latest(),null);
+  agent.observe({agent_id:'runx-agent',agent_incarnation_id:'runx-inc-1',
+   capability:{capability_id:'execute'}},{agent_id:'runx-agent'});
+  assert.equal(agent.list().length,1);
+  assert.equal(agent.latest().agent_incarnation_id,'runx-inc-1');
+  assert.equal(Object.hasOwn(agent.latest(),'execution_authorized'),false);
+ }finally{app.stop()}
+});
+test('R20 forged plain Handle with same method names is not a source-real stateful instance',async()=>{
+ const f=await fixturePromise,registry={...f.registry};
+ registry['runx.createPresenceObserver']={
+  ...registry['runx.createPresenceObserver'],
+  execute:()=>({observe(){},list(){return []},latest(){return null}})
+ };
+ const app=await activate(f,{registry});
+ try{
+  await assert.rejects(app.invoke('runx.createPresenceObserver',()=>''),reject('DIS_LOCAL_HANDLE_INVALID'));
+ }finally{app.stop()}
+});
+test('R20 stale Runx Handle consumer is rejected before it allocates a stateful instance',async()=>{
+ const f=await fixturePromise,app=await activate(f);
+ try{
+  await assert.rejects(app.invoke('runx.createPresenceObserver',()=>'',{
+   expectedContractVersion:'0.9.0'
+  }),reject('DIS_FUNCTION_VERSION_MISMATCH'));
+ }finally{app.stop()}
+});
+test('R20 AOT rejects forged Handle method, banned prototype and KDP-to-LOCAL authority confusion',async()=>{
+ const f=await fixturePromise,p=clone(f.program);
+ const runx=p.elements.flatMap(e=>e.functions).find(x=>x.id==='runx.createPresenceObserver');
+ runx.handleContract.methods.push('then');
+ assert.throws(()=>compile(f,p),reject('DIS_LOCAL_HANDLE_CONTRACT_INVALID'));
+ runx.handleContract.methods.pop();
+ runx.handleContract.methods=['observe','observe'];
+ assert.throws(()=>compile(f,p),reject('DIS_LOCAL_HANDLE_CONTRACT_INVALID'));
+ runx.handleContract.methods=['observe','list','latest'];
+ runx.binding={type:'kdp-intent',intentId:'submitQuoteDecisionDynamic'};
+ assert.throws(()=>compile(f,p),reject('DIS_LOCAL_HANDLE_BINDING_UNSUPPORTED'));
+});

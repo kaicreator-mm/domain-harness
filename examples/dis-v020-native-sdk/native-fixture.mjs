@@ -87,6 +87,12 @@ export async function makeNativeFixture(){
   statusMap:{admitted:'ADMITTED',denied:'DENIED',rejected:'DENIED'},
   compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
  };
+ // R20: Runx returns a genuine source-pinned stateful class instance, not JSON.
+ // Only method names and process-local lifetime are declared here.
+ find('runx.createPresenceObserver').handleContract={
+  schema:'dis.v0.2.local-handle-contract/1',version:'1.0.0',
+  methods:['observe','list','latest'],lifetime:'PROCESS_LOCAL'
+ };
  find('tally.assessTaskEvidence').contract=r11({
   UNQUALIFIED_INPUT:'UNKNOWN',OBSERVED_INPUT_ONLY:'OBSERVED'
  },{state:'string',admitted:'boolean',taskPass:'boolean'});

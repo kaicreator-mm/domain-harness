@@ -13,6 +13,13 @@ export interface DisV020KdpReceiptContract {
  readonly compatibility:Readonly<{major:number;minReader:'0.2.0';maxReaderExclusive:'0.3.0'}>;
 }
 export declare function classifyDisV020KdpReceipt(contract:DisV020KdpReceiptContract,receipt:unknown):Readonly<{admission:DisV020Admission;execution:'NOT_PROVEN';businessEvidenceAttested:false}>;
+export interface DisV020LocalHandleContract {
+ readonly schema:'dis.v0.2.local-handle-contract/1';
+ readonly version:string;
+ readonly methods:readonly string[];
+ readonly lifetime:'PROCESS_LOCAL';
+}
+export declare function validateDisV020LocalHandle(contract:DisV020LocalHandleContract,value:unknown):true;
 export type DisV020Disposition='OBSERVED'|'UNKNOWN'|'FAILED'|'NEEDS_INPUT'|'NEEDS_CONFIRMATION'|'PENDING_AUTHORIZATION'|'SUCCEEDED';
 export interface DisV020RecordShape {
  readonly type:'record';
@@ -41,6 +48,7 @@ export interface DisV020Function {
  readonly optional?:boolean;
  readonly contract?:DisV020FunctionContract;
  readonly receiptContract?:DisV020KdpReceiptContract;
+ readonly handleContract?:DisV020LocalHandleContract;
  readonly binding: {readonly type:'local'; readonly sourceId:string} |
   {readonly type:'kdp-intent'; readonly intentId:string};
 }

@@ -19,7 +19,8 @@ export interface DisV020App {
  readonly contractVersions:Readonly<Record<string,string>>;
  invoke(id:string,input?:unknown,options?:Readonly<{expectedContractVersion?:string}>):Promise<
   |Readonly<{kind:'OBSERVATION';authority:'NONE';value:unknown;disposition?:DisV020Disposition;contractVersion?:string;evidence?:Readonly<{source:Readonly<{sourceId:string;sha256:string;gitBlob:string}>;declaredRefs:readonly string[];attested:false}>}>
-  |Readonly<{kind:'KDP_RECEIPT';authority:'KDP';receipt:Record<string,unknown>;admission?:DisV020Admission;execution?:'NOT_PROVEN';contractVersion?:string;evidence?:Readonly<{receiptAuthority:'KDP';businessAttested:false}>}>>;
+  |Readonly<{kind:'KDP_RECEIPT';authority:'KDP';receipt:Record<string,unknown>;admission?:DisV020Admission;execution?:'NOT_PROVEN';contractVersion?:string;evidence?:Readonly<{receiptAuthority:'KDP';businessAttested:false}>}>
+  |Readonly<{kind:'OBSERVATION';authority:'NONE';value:unknown;contractVersion:string;handle:Readonly<{lifetime:'PROCESS_LOCAL';methods:readonly string[]}>;evidence:Readonly<{source:Readonly<{sourceId:string;sha256:string;gitBlob:string}>;attested:false}>}>>;
  stop():void;
 }
 export declare function loadDisV020Aot(artifact:DisV020Aot,options:DisV020LoadOptions):Promise<DisV020App>;
