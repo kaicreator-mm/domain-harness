@@ -1,0 +1,21 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B06",
+  "roundId": "B06-02",
+  "globalRoundId": "R48",
+  "status": "CI_PENDING",
+  "startParent": "b3b2fd993b74897f80142f8ca7afb3ee2855bdca",
+  "testPath": "examples/dis-v020-native-sdk/b06-http-negative.test.mjs",
+  "testGitBlob": "88ec4f70da84538537b4ba4d5b8815c02b61bb4d",
+  "receipt": null,
+  "positive": [],
+  "negative": [
+    "B06-02 R48 HTTP rejects forged Effect route, non-POST and unsupported mime before native KDP ingress",
+    "B06-02 R48 duplicate Form values and forged Chat authorization cannot reach selected Interaction",
+    "B06-02 R48 oversized body and credential-bearing URL fail closed over real network"
+  ],
+  "limitations": [
+    "Only loopback, no public exposure, production auth or external download Effect.",
+    "Domain REJECTED is surfaced as Observation, never an accepted Effect."
+  ]
+}

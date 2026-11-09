@@ -31,9 +31,10 @@
     {
       "batchRoundId": "B06-02",
       "globalRoundId": "R48",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b06-http-negative.test.mjs",
-      "receipt": null
+      "receipt": null,
+      "testGitBlob": "88ec4f70da84538537b4ba4d5b8815c02b61bb4d"
     },
     {
       "batchRoundId": "B06-03",
