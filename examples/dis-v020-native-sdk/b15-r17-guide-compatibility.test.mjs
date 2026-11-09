@@ -15,9 +15,9 @@ import {R17_ORIGINS,makeR17KnowledgeReader,gateR17,verifyR17SourceScope}
  from './dke-r17-guide-reader.mjs';
 const READER_ORIGIN=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'11a8ef0ffffdbc5945a93bdf3ad2856e302b85cb',
+ commit:'078a7675ff9302c840ec84cb9e79800b170aac31',
  path:'examples/dis-v020-native-sdk/dke-r17-guide-reader.mjs',
- gitBlob:'5e402d7194ad9cdb17c7599a8b693ade3b1f20d1'
+ gitBlob:'a599be27036b85194d1e64a88c87959987b16059'
 });
 const fail=code=>e=>e?.code===code;
 const clone=structuredClone;
@@ -175,4 +175,30 @@ test('R61 wrong installer DATA pin, JSON-as-code, unselected case and forged Fun
    {caseId:'real_cross_guide_two_conflicts'},{expectedContractVersion:'2.0.0'}),
    fail('DIS_FUNCTION_VERSION_MISMATCH'));
  }finally{app.stop()}
+});
+
+test('R61-R1 original Knowledge Reader returns immutable detached source-impact arrays across requests',async()=>{
+ const x=await ctxPromise;
+ const first=x.sourceReader.query({caseId:'real_cross_guide_two_conflicts'});
+ assert.equal(Object.isFrozen(first),true);
+ assert.equal(Object.isFrozen(first.affectedIds),true);
+ assert.equal(Object.isFrozen(first.unaffectedIds),true);
+ assert.deepEqual(first.affectedIds,['R16_METHOD_STEP4','D05_METHOD_CANDIDATE']);
+ assert.deepEqual(first.unaffectedIds,['R15_RTC_CONDITIONAL_SOURCE_FACT']);
+ assert.throws(()=>first.affectedIds.push('FORGED_EFFECT_ALLOWED'),TypeError);
+ assert.throws(()=>first.unaffectedIds.splice(0,1),TypeError);
+ const next=x.sourceReader.query({caseId:'real_cross_guide_two_conflicts'});
+ assert.notStrictEqual(first.affectedIds,next.affectedIds);
+ assert.notStrictEqual(first.unaffectedIds,next.unaffectedIds);
+ assert.deepEqual(next.affectedIds,['R16_METHOD_STEP4','D05_METHOD_CANDIDATE']);
+ assert.deepEqual(next.unaffectedIds,['R15_RTC_CONDITIONAL_SOURCE_FACT']);
+ const other=x.sourceReader.query({caseId:'different_model'});
+ assert.deepEqual(other.affectedIds,[]);
+ assert.deepEqual(other.unaffectedIds,[]);
+ assert.equal(Object.isFrozen(other.affectedIds),true);
+ assert.equal(Object.isFrozen(other.unaffectedIds),true);
+ assert.throws(()=>other.affectedIds.push('FORGED'),TypeError);
+ const after=x.sourceReader.query({caseId:'real_cross_guide_two_conflicts'});
+ assert.deepEqual(after.affectedIds,['R16_METHOD_STEP4','D05_METHOD_CANDIDATE']);
+ assert.deepEqual(after.unaffectedIds,['R15_RTC_CONDITIONAL_SOURCE_FACT']);
 });
