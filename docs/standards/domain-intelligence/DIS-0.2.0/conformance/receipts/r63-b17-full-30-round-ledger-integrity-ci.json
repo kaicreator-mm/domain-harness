@@ -5,12 +5,12 @@
   "status": "PENDING",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": "63ab73283c19cb3514a64f31aafe9375ee257a94",
-    "tree": "dbabb256551c242a64716ecd2bed51d028647d1a"
+    "head": "5b0f5733e8fbdbe9fde4cea1e3ac734cc9b42182",
+    "tree": "272148151e66b5580bff0ba81ad968a1ea019b32"
   },
-  "originCommit": "63ab73283c19cb3514a64f31aafe9375ee257a94",
+  "originCommit": "5b0f5733e8fbdbe9fde4cea1e3ac734cc9b42182",
   "testPath": "examples/dis-v020-conformance/full-ledger-30.test.mjs",
-  "testGitBlob": "40401696897956ffa142ee25e5281de66e480b50",
+  "testGitBlob": "3d5489badb3433b071e3c23255574242fddf78c8",
   "ci": [],
   "scopedHistory": {
     "batches": "B01–B16",
@@ -39,7 +39,8 @@
     "Current fixed R61 Reader/source test Git Blobs must stay distinguishable from original B15/R61 qualified source. Changed current Blob versus historical test Blob is reported, not silently rewritten.",
     "R62 now qualifies its current stronger edge-set reader/test against #2344, not merely the older #2333 source. Missing edge + mixed CI source + missing matrix receipt negatives are mandatory.",
     "Exact R63 source CI has not been executed/observed at this authoring commit and must remain CI_PENDING until all three required contexts succeed.",
-    "R63 initial exact source 1a7833aa4aadadc5d09f587624ba7aab7ed58f00 Woodpecker #2346/1 native FAILURE: source-level replay located preexisting B16 R62 receipt in matrix.receipts but absent from all requirements[].receiptIds, so FULL_LEDGER_MATRIX_UNLINKED fail-closed in R63 30-round audit. This is matrix bookkeeping, not failed original R62 native Function CI."
+    "R63 initial exact source 1a7833aa4aadadc5d09f587624ba7aab7ed58f00 Woodpecker #2346/1 native FAILURE: source-level replay located preexisting B16 R62 receipt in matrix.receipts but absent from all requirements[].receiptIds, so FULL_LEDGER_MATRIX_UNLINKED fail-closed in R63 30-round audit. This is matrix bookkeeping, not failed original R62 native Function CI.",
+    "R63 #2347/1 native FAILURE remained despite the R0 B16 orphaned receipt link repair; direct source replay found audit-only title literal false-negative. R2 correct exact source string is 'immutable detached source-impact arrays across requests', matching actual R61 repaired test. Current R63 R2 test Blob 3d5489badb3433b071e3c23255574242fddf78c8 awaits fresh CI. Old R0 test Blob 404016... and #2346/#2347 native failures retained."
   ],
   "limitations": [
     "R63 replays stored original exact source/CI receipts; it does NOT request a new live external Woodpecker status check for each old commit, and does not reexecute all 30 original historical source versions.",
@@ -50,13 +51,28 @@
   "repairHistory": [
     {
       "sourceHead": "1a7833aa4aadadc5d09f587624ba7aab7ed58f00",
-      "testGitBlob": "40401696897956ffa142ee25e5281de66e480b50",
-      "nativeCi": "https://ci.kaicreator.com/repos/18/pipeline/2346/1",
-      "nativeState": "FAILURE",
-      "finding": "B16/R62 receipt advertised top-level without per-Core requirement receipt linkage",
-      "upstreamR62QualifiedHead": "e16362004f3f40f763a733e2a3973d025898a26d",
-      "upstreamR62OriginalCi": "#2344/1-3 SUCCESS",
-      "status": "REPAIR_IN_PROGRESS"
+      "testBlob": "40401696897956ffa142ee25e5281de66e480b50",
+      "pipeline": "#2346",
+      "native": "FAILURE",
+      "finding": "Actual source input B16/R62 global matrix receipt lacked any applicable Core[].receiptIds link; fixed by R1 matrix-only repair",
+      "correction": "f169455c201c638585ec8af987889ad37a8adb36"
+    },
+    {
+      "sourceHead": "f169455c201c638585ec8af987889ad37a8adb36",
+      "testBlob": "40401696897956ffa142ee25e5281de66e480b50",
+      "pipeline": "#2347",
+      "native": "FAILURE",
+      "finding": "Separate R63 audit-only test expected literal 'immutable detached impact arrays across requests' but original R61 test title contains 'immutable detached source-impact arrays across requests'. Source-specific direct Git file readback returned false, not an R61 production bug.",
+      "correction": "5b0f5733e8fbdbe9fde4cea1e3ac734cc9b42182"
+    },
+    {
+      "sourceHead": "5b0f5733e8fbdbe9fde4cea1e3ac734cc9b42182",
+      "testBlob": "3d5489badb3433b071e3c23255574242fddf78c8",
+      "pipeline": "NOT_YET_OBSERVED",
+      "native": "CI_PENDING",
+      "finding": "R2 new audit test literal matches actual source; R0 source+both historical failures preserved and R62 Core matrix link repaired"
     }
-  ]
+  ],
+  "originalR0TestGitBlob": "40401696897956ffa142ee25e5281de66e480b50",
+  "originalR0SourceHead": "63ab73283c19cb3514a64f31aafe9375ee257a94"
 }

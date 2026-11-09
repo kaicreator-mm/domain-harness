@@ -4,12 +4,12 @@
   "roundId": "B17-01",
   "globalRoundId": "R63",
   "status": "CI_PENDING",
-  "originCommit": "63ab73283c19cb3514a64f31aafe9375ee257a94",
-  "originTree": "dbabb256551c242a64716ecd2bed51d028647d1a",
+  "originCommit": "5b0f5733e8fbdbe9fde4cea1e3ac734cc9b42182",
+  "originTree": "272148151e66b5580bff0ba81ad968a1ea019b32",
   "testPath": "examples/dis-v020-conformance/full-ledger-30.test.mjs",
-  "testGitBlob": "40401696897956ffa142ee25e5281de66e480b50",
+  "testGitBlob": "3d5489badb3433b071e3c23255574242fddf78c8",
   "receipt": "receipts/r63-b17-full-30-round-ledger-integrity-ci.json",
-  "sourceHead": "63ab73283c19cb3514a64f31aafe9375ee257a94",
+  "sourceHead": "5b0f5733e8fbdbe9fde4cea1e3ac734cc9b42182",
   "checks": [],
   "positive": [
     "R63 every B01-B16 source-qualified round (30/30) has unique historical Git+3-context CI receipt and matrix link, without SAP promotion",
@@ -25,5 +25,32 @@
     "Original R61 B15 test source qualified at #2331 while a separate source repair at #2335 fixed nested response-array alias, and R62 edge-integrity at #2344 qualified newer source; their historical Git Blobs must remain distinct.",
     "This round does not qualify original publisher Guide203/79 full raw bytes, domain source-owner independent semantic Critic, SAP, physical Effects, or Product/L1 required Target and UI applicability.",
     "CORE-016 conformance still PARTIAL pending other Core/independent governance requirements; no automatic version Freeze, merge, or release."
+  ],
+  "originalR0TestGitBlob": "40401696897956ffa142ee25e5281de66e480b50",
+  "originalR0SourceHead": "63ab73283c19cb3514a64f31aafe9375ee257a94",
+  "history": [
+    {
+      "sourceHead": "1a7833aa4aadadc5d09f587624ba7aab7ed58f00",
+      "testBlob": "40401696897956ffa142ee25e5281de66e480b50",
+      "pipeline": "#2346",
+      "native": "FAILURE",
+      "finding": "Actual source input B16/R62 global matrix receipt lacked any applicable Core[].receiptIds link; fixed by R1 matrix-only repair",
+      "correction": "f169455c201c638585ec8af987889ad37a8adb36"
+    },
+    {
+      "sourceHead": "f169455c201c638585ec8af987889ad37a8adb36",
+      "testBlob": "40401696897956ffa142ee25e5281de66e480b50",
+      "pipeline": "#2347",
+      "native": "FAILURE",
+      "finding": "Separate R63 audit-only test expected literal 'immutable detached impact arrays across requests' but original R61 test title contains 'immutable detached source-impact arrays across requests'. Source-specific direct Git file readback returned false, not an R61 production bug.",
+      "correction": "5b0f5733e8fbdbe9fde4cea1e3ac734cc9b42182"
+    },
+    {
+      "sourceHead": "5b0f5733e8fbdbe9fde4cea1e3ac734cc9b42182",
+      "testBlob": "3d5489badb3433b071e3c23255574242fddf78c8",
+      "pipeline": "NOT_YET_OBSERVED",
+      "native": "CI_PENDING",
+      "finding": "R2 new audit test literal matches actual source; R0 source+both historical failures preserved and R62 Core matrix link repaired"
+    }
   ]
 }
