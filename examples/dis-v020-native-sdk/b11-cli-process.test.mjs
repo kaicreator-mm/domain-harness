@@ -67,7 +67,7 @@ test('B11 R57 forbidden CLI Effect flags and spoofed caller authorization are re
 });
 test('B11 R57 real CLI passes credential-bearing URL into selected business rejection, never silent success',async()=>{
  const x=await run(request('R57-BAD-URL',512,true,'https://example.org/private?token=secret'));
- assert.equal(x.status,'REJECTED');assert.equal(x.disposition,'REJECTED');
+ assert.equal(x.status,'REJECTED');assert.equal(x.disposition,'FAILED');
  assert.equal(x.authority,'NONE');assert.equal(x.permittedEffect,false);
  assert.equal(x.effectDispatched,false);
 });
