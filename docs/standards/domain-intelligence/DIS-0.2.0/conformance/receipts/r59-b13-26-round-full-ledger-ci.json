@@ -1,0 +1,27 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r59-b13-26-round-full-ledger-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "57cd02b11ff532d093fa79c0780d0fdc82ba8a9c",
+    "tree": "2b762c4e0cc21294aa4e2dde6260f37bc0d85d99"
+  },
+  "originCommit": "57cd02b11ff532d093fa79c0780d0fdc82ba8a9c",
+  "testGitBlob": "e6164737fa1d37dcb3e2d51706c17a25f0e92455",
+  "testPath": "examples/dis-v020-conformance/full-ledger.test.mjs",
+  "ci": [],
+  "observations": [
+    "Historical R55 B09 manifest/receipt were VERIFIED/SUCCESS but standalone round.json remained CI_PENDING; repaired from original existing #2312 GitHub 3/3 exact-SHA statuses without changing the original test Blob.",
+    "New general ledger `full-ledger.mjs` independently replays 12 heterogeneous batch manifests and all 26 stored round/receipt/matrix/CI triples, with historical source drift visibility and negative mixed-ci source checks.",
+    "This R59 full-ledger audit source test itself remains CI_PENDING until all mandatory native + compatibility + verify checks report SUCCESS at exact current source HEAD."
+  ],
+  "limitations": [
+    "Universal ledger replay reads current checked-in historical receipts and original Git Blob identifiers; it does not fetch live GitHub CI for each historical SHA or independently re-execute all 26 old source commits.",
+    "Historical individual source qualification and original native/compatibility/verify jobs remain separate from current B13 audit source and its own CI.",
+    "Documentation B09 round metadata repair corrects stale CI_PENDING to true prior #2312 SUCCESS but does not add a new R55 test or semantic SAP authority.",
+    "Current source code Git Blob may differ from historical test Git Blob after later version changes; ledger reports drift without retroactively substituting an unrelated test Blob.",
+    "CORE-016 requires independent governance and complete other Core scopes; scoped CI ledger does not grant L2 Freeze, merge or release."
+  ]
+}
