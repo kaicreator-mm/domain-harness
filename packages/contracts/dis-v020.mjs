@@ -16,7 +16,7 @@ const FUNCTION_KINDS=new Set(['init','knowledge','rule','stateful','workflow','e
 const REL_KINDS=new Set(['depends-on','constrains','cooperates','defines']);
 // DKE producer JSON-LD/receipt content is a provenance DATA dependency,
 // never a Function executable. Keep the allowance narrow, Git-blob pinned.
-const DKE_DATA_ORIGIN=/^docs\/standards\/dke\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.json$/;
+const DKE_DATA_ORIGIN=/^docs\/standards\/dke\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:json|json\.zlib\.b64|mjs\.zlib\.b64)$/;
 const MAX=256;
 
 /** R11 bounded Function Contract — source evidence is NOT business attestation. */
