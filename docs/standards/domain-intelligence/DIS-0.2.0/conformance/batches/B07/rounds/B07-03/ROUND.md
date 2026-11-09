@@ -11,3 +11,7 @@ Actual original xDownload Policy's `xdownload.describePolicy` Function is the se
 Positive: real original source SHA/verified Function version, bounded relation catalog and native Policy Knowledge observation. Negative: false independent authority, wrong/unselected source, unrelated Function, altered Function version, malformed applicability and duplicate/invalid relation identity; semantic backlink does not introduce a static KDP route.
 
 **Status CI_PENDING.** This is structural/runtime observability of source-linked declared semantics, *not independent SAP acceptance or a production constraint engine*. CORE-005 remains PARTIAL; no Release/Freeze/merge.
+
+## Exact-source full-suite qualification (supersedes prior pending state)
+
+Original immutable test Git Blob preserved; cumulative native selected source HEAD `0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f`, TREE `6fecc2a8c48f69996113d4f4d4fce1f037d79bcf`, Woodpecker #2305/1-3 **3/3 SUCCESS**. The old #2304 incomplete/error attempt remains historic and is not used. This round is now VERIFIED for its narrow source-scoped claim, with no independent SAP/semantic authority or Product/L1 scope decision.

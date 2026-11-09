@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B07",
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -50,24 +50,58 @@
     {
       "batchRoundId": "B07-02",
       "globalRoundId": "R52",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
       "originalSourceHead": "f2130918d9863aeabd36227886c05cc44c5670cd",
       "testGitBlob": "c579299182569a5641683ec93a624eaba703e94b",
       "receipt": "receipts/r52-b07-function-dependency-ci.json",
-      "sourceHead": "f2130918d9863aeabd36227886c05cc44c5670cd",
-      "checks": []
+      "sourceHead": "0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/3"
+        }
+      ],
+      "qualificationTree": "6fecc2a8c48f69996113d4f4d4fce1f037d79bcf"
     },
     {
       "batchRoundId": "B07-03",
       "globalRoundId": "R53",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-native-sdk/b07-semantic-relation.test.mjs",
       "originalSourceHead": "0b4df62efa77e28fc9763f383706199074156170",
       "testGitBlob": "dc0a51bfbdae6aba620f7ed596aedcd862732d9b",
       "receipt": "receipts/r53-b07-source-semantic-relation-ci.json",
-      "sourceHead": "0b4df62efa77e28fc9763f383706199074156170",
-      "checks": []
+      "sourceHead": "0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/3"
+        }
+      ],
+      "qualificationTree": "6fecc2a8c48f69996113d4f4d4fce1f037d79bcf"
     }
   ],
   "constraints": [
@@ -76,8 +110,29 @@
     "No premature promotion of 9/16 Core or Optional/Governance from a ledger check.",
     "No GitHub Actions, Node-major semantic gate, physical effects, merge, Freeze or Release."
   ],
-  "verifiedRounds": 1,
+  "verifiedRounds": 3,
   "unstartedRounds": 0,
   "note": "B07-01 alone exact-SHA qualified; B07-02/03 NOT_STARTED, batch not complete.",
-  "pendingRounds": 2
+  "pendingRounds": 0,
+  "qualificationHead": "0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f",
+  "qualificationTree": "6fecc2a8c48f69996113d4f4d4fce1f037d79bcf",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/3"
+    }
+  ],
+  "noAutomaticCorePromotion": true,
+  "batchResult": "R51 stored-18-ledger exact #2302 all 3 SUCCESS, R52/53 original native test Git Blobs replay qualified together at #2305 all 3 SUCCESS; no independent domain semantic Oracle or Product/L1 applicability approval."
 }

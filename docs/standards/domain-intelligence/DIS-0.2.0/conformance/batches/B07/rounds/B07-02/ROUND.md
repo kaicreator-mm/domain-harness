@@ -13,3 +13,7 @@ The native fixture uses the original xDownload selected Business `xdownload.acqu
 Positive: original selected Function/Version closure, real Interaction consume/no-effect, semantic cycle accepted. Negative: nonexistent target Function, version missing/stale, duplicate binding, omitted coarse edge, static DAG cycle, same-version silent drift and same-major dependency removal. Historical B01–B06 tests remain mandatory.
 
 **State: CI_PENDING**. This source commit is not yet qualified by Woodpecker. New receipt is excluded from the machine matrix until exact CI. CORE-002/005 still PARTIAL because a static dependency does not replace independent semantic ownership and executable domain constraints.
+
+## Exact-source full-suite qualification (supersedes prior pending state)
+
+Original immutable test Git Blob preserved; cumulative native selected source HEAD `0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f`, TREE `6fecc2a8c48f69996113d4f4d4fce1f037d79bcf`, Woodpecker #2305/1-3 **3/3 SUCCESS**. The old #2304 incomplete/error attempt remains historic and is not used. This round is now VERIFIED for its narrow source-scoped claim, with no independent SAP/semantic authority or Product/L1 scope decision.

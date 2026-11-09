@@ -234,3 +234,8 @@ D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式�
 ### B07-01 / R51 — six-batch evidence-ledger generalization
 
 R51 stores its own [versioned round](batches/B07/rounds/B07-01/ROUND.md), original test Blob, [receipt](receipts/r51-b07-full-ledger-ci.json) and [B07 running manifest](batches/B07/manifest.json). It extends read-only source/CI-claim audit from 9 historic B01–B03 rounds to all 18 B01–B06 rounds, validating context identity independent of scheduled Woodpecker job number. Source `61f32bfc274b701f6b4d8ffcd66f58d4349f22fc`, TREE `1dbcc01229a75dbb259d3f0d96c93b8a33c11369`, #2302/1–3 3/3 SUCCESS. B07 is 1/3; CORE-016 remains PARTIAL, GOV-001 NOT_RUN. This does not confer live CI/status attestation, domain-owner SAP, Product/L1 Target applicability or full DIS conformance.
+
+
+### B07 R52/R53 — source-selected Function dependencies and semantic relation provenance
+
+R51 **historical 18-round read-only ledger** + R52 true multi-Function static dependency/ABI + R53 original xDownload Policy constraint/selected Knowledge verifier each have [individually versioned rounds](batches/B07/manifest.json) and separate exact source/test Blobs. Full cumulative R52/R53 source `0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f` / TREE `6fecc2a8c48f69996113d4f4d4fce1f037d79bcf` verified at Woodpecker **#2305/1–3 3/3 SUCCESS**; [B07 summary](batches/B07/BATCH_SUMMARY.md). Those scoped results strengthen CORE-002/003/005 but all remain PARTIAL awaiting complete normative semantics and genuinely independent SAP/source-owner authority. B01–B07 = **21/21 Demo rounds**, NOT 100% Core conformance.
