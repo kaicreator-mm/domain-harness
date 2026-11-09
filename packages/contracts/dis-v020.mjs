@@ -14,6 +14,9 @@ const GIT=/^[a-f0-9]{40}$/;
 const ELEMENT_KINDS=new Set(['global','knowledge','rule','stateful','workflow','effect','interaction']);
 const FUNCTION_KINDS=new Set(['init','knowledge','rule','stateful','workflow','effect','interaction']);
 const REL_KINDS=new Set(['depends-on','constrains','cooperates','defines']);
+// DKE producer JSON-LD/receipt content is a provenance DATA dependency,
+// never a Function executable. Keep the allowance narrow, Git-blob pinned.
+const DKE_DATA_ORIGIN=/^docs\/standards\/dke\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.json$/;
 const MAX=256;
 
 /** R11 bounded Function Contract — source evidence is NOT business attestation. */
@@ -307,7 +310,7 @@ function validatePins(pins){
   if(!id(p.id)||!HEX.test(p.sha256)||map.has(p.id))fail('DIS_SOURCE_PIN_INVALID');
   keys(p.origin,['repository','commit','path','gitBlob']);
   if(!/^[-\w]+\/[-\w.]+$/.test(p.origin.repository)||!GIT.test(p.origin.commit)||
-     typeof p.origin.path!=='string'||p.origin.path.includes('..')||!(p.origin.path.startsWith('packages/')||p.origin.path.startsWith('examples/'))||
+     typeof p.origin.path!=='string'||p.origin.path.includes('..')||!(p.origin.path.startsWith('packages/')||p.origin.path.startsWith('examples/')||DKE_DATA_ORIGIN.test(p.origin.path))||
      !GIT.test(p.origin.gitBlob))fail('DIS_SOURCE_ORIGIN_INVALID');
   map.set(p.id,p);
  }
@@ -375,6 +378,10 @@ export function qualifyDisV020Artifact(artifact){
     }
    }
    if(b.type==='local'){
+    // A selected producer DATA pin may be consumed as sourceDependencies only;
+    // it cannot be registered as trusted executable LOCAL code.
+    if(DKE_DATA_ORIGIN.test(pins.get(b.sourceId)?.origin.path??''))
+     fail('DIS_DATA_SOURCE_EXECUTION_FORBIDDEN');
     if(f.effect!=='none'||typeof b.sourceId!=='string'||!pins.has(b.sourceId)||
        Object.hasOwn(b,'intentId')||f.kind==='effect')fail('DIS_LOCAL_NOT_QUALIFIED');
     if(!domains.get(e.domainId).repositories.includes(pins.get(b.sourceId).origin.repository))fail('DIS_SOURCE_DOMAIN_MISMATCH');
