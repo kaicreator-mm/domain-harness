@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.validation-receipt/1",
   "id": "r62-b16-r18-native-transitive-knowledge-impact-ci",
   "disVersion": "0.2.0",
-  "status": "PENDING",
+  "status": "SUCCESS",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
     "head": "1da216faafb60b99f2cd75b74a10b294bd6ae16b",
@@ -13,7 +13,23 @@
   "testPath": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
   "readerSourceGitBlob": "71d55ad1e13cce255276794eec4afa417b139c45",
   "contractSourceGitBlob": "2b50608e764c9f586319aac497078f434b4184dc",
-  "ci": [],
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2333/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2333/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2333/3"
+    }
+  ],
   "upstreamDke": {
     "repo": "kaicreator-mm/domain-forge",
     "commit": "a9f02a31b86013435bf91a1b43755ad5fb52fd11",
@@ -26,7 +42,8 @@
   "observations": [
     "Original DKE R18 native Node 6 selected +18 adversarial cases, compressed original source/receipt Git Blobs and decoded SHA256 are distinct genuine upstream provenance. The source has not been re-executed by DIS R62; DIS independently replays DAG from frozen original source observations through new selected Knowledge Function.",
     "Scoped ten-node evidence DAG source-role conflict invalidates exactly four dependent ref/method/consumer nodes, while unaffected RTC Knowledge remains SOURCE_OBSERVED_NOT_SAP. Both synthetic-role correction and partial correction are source/semantic unqualified, no silent 16→26/17→28 Method replacement.",
-    "R62 source first commit preserves native reader, original compressed zlib Data, narrow contract DATA-source extension and actual adversarial tests. Full CI qualification is PENDING for exact native/min/general checks."
+    "R62 source first commit preserves native reader, original compressed zlib Data, narrow contract DATA-source extension and actual adversarial tests. Full CI qualification is PENDING for exact native/min/general checks.",
+    "Exact R62 source at a544ed57fb0bb69d7176e332c84f83e8889014d5 has Woodpecker #2333/1–3 three success contexts, original R62 native test and Reader Git Blobs unchanged, original DKE R18 data three package Blobs exact."
   ],
   "limitations": [
     "Original DKE R18 source+receipt were truly executed in native Node upstream and independently verified with Python, unlike original R17 hosted V8 only; DIS R62 consumes byte-identical compressed DATA and runs a separate, source-selected SDK/KDP native graph replay, not physical repair.",
@@ -35,5 +52,37 @@
     "Even hypothetical semantic alignment of step numbers remains BLOCKED_SOURCE_PIN until authentic source versions and independent reviewer, and a Function reporting UNKNOWN cannot authorize a KDP Effect.",
     "New narrow contract support for Git-pinned DKE .json.zlib.b64/.mjs.zlib.b64 origins as DATA only is required because original producer stored byte-exact zlib+base64 packages; it is forbidden to bind these DATA sources as LOCAL executables.",
     "CORE-002/003/005/006/016 remain PARTIAL; R62 cannot substitute Product/L1 scope approval, full domain semantic SAP, actual EV lifecycle closure or final independent review."
+  ],
+  "qualificationHead": "a544ed57fb0bb69d7176e332c84f83e8889014d5",
+  "qualificationMeaning": "Original R62 test and Reader Git Blobs unchanged at docs-only CI candidate; original qualified source at 1da... and historical CI at a544...; no independent semantics or SAP.",
+  "history": [
+    {
+      "sourceHead": "1da216faafb60b99f2cd75b74a10b294bd6ae16b",
+      "sourceTree": "41fe8711b6d484cad7bdebb4342947c558abcf38",
+      "status": "CI_PENDING_INITIAL_CANDIDATE",
+      "mean": "initial at original source receipt creation"
+    },
+    {
+      "qualifiedHead": "a544ed57fb0bb69d7176e332c84f83e8889014d5",
+      "status": "SUCCESS",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2333/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2333/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2333/3"
+        }
+      ],
+      "meaning": "B16/R62 genuine DKE R18 native ten-node DAG source-selected DIS AOT/SDK/KDP 3/3 SUCCESS"
+    }
   ]
 }
