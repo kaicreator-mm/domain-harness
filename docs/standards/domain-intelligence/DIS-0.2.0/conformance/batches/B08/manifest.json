@@ -24,11 +24,35 @@
       "globalRoundId": "R54",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
-      "originalSourceHead": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
-      "testGitBlob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
+      "originalSourceHead": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
+      "testGitBlob": "503d34cc3d5049c036ba590e66b4092c52958c9e",
       "receipt": "receipts/r54-b08-real-dke-knowledge-consumer-ci.json",
-      "sourceHead": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
-      "checks": []
+      "sourceHead": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
+      "checks": [],
+      "originalR0SourceHead": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+      "originalR0TestBlob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
+      "history": [
+        {
+          "head": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+          "blob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
+          "decision": "SOURCE_COMMITTED_R0; OLD-version UNKNOWN output mistakenly emitted empty evidenceRefs, forbidden by existing typed outcome validator"
+        },
+        {
+          "head": "ac1b5bea527a0df63bb75d08368cc0b202ceea2a",
+          "ci": "Woodpecker #2307/1 FAILURE",
+          "decision": "HISTORICAL_FAILURE; not qualified; no assumption about exact failing step without Woodpecker logs"
+        },
+        {
+          "head": "269804b8a4be9d262deb61e1764d9030612dc01e",
+          "readerGitBlob": "ab0cb7d9fed146f419ef7555fcdc8a406f25db10",
+          "decision": "R1 reader omits evidenceRefs on no-source UNKNOWN"
+        },
+        {
+          "head": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
+          "blob": "503d34cc3d5049c036ba590e66b4092c52958c9e",
+          "decision": "R1 test pin updated to repaired reader, output Schema evidenceRefs optional, asserts old version absence instead of false declared evidence"
+        }
+      ]
     }
   ],
   "verifiedRounds": 0,

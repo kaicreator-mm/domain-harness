@@ -11,3 +11,9 @@ DIS new local Knowledge Function `dke.provisional.query` has typed I/O, OBSERVED
 DKE's Git history and original upstream source are not changed. This is an actual **producer/consumer interoperability Demo**, not independent semantic acceptance, novel domain code execution, complete Product/L1 Target applicability, L2 Freeze or release.
 
 **Next exact gate:** Woodpecker full mandatory native+SDK+conformance suites on the cumulative PR source HEAD, then version this individual round, immutable test Blob and links into CORE-003/006 as PARTIAL only.
+
+## B08-01 R54 R0 → R1 same-Writer fail-closed repair
+
+R0 source `422e0e7c245bbb9d34916d471e243ac52a1ee3d5`, test Blob `f5d43f8c6080511241272124f2c8be2f7d8e2ab5`; Woodpecker #2307/1 native **FAILURE** (step logs not available via GitHub checks, so the exact failing test is not asserted). Builder independently found source-code contract bug: no-evidence UNKNOWN returned `evidenceRefs:[]`, which existing typed-outcome classifier rejects as `DIS_EVIDENCE_INVALID` when the ref field is present. This breaks legitimate old-version UNKNOWN.
+
+Same Writer repair: Reader `269804b8a4be9d262deb61e1764d9030612dc01e` / Git Blob `ab0cb7d9fed146f419ef7555fcdc8a406f25db10` now omits evidenceRefs when absent; R1 native test `79e62556ed799a52dc8a8437cc17a4da3a96f97f` / Blob `503d34cc3d5049c036ba590e66b4092c52958c9e` makes the public output evidenceRefs optional, asserts zero fabricated refs, and leaves mandatory Source receipt/hard URI checks unchanged. Only exact new CI can qualify R54; #2307 original failure preserved.
