@@ -1,0 +1,53 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B06",
+  "status": "CI_PENDING",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "mode": "BATCH_FINAL_CI_ONCE_THREE_SEPARATE_IMMUTABLE_ROUND_COMMITS",
+  "baseline": {
+    "sourceHead": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+    "tree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+    "exactWoodpecker": 2293,
+    "ci": "3/3 SUCCESS",
+    "priorBatches": "B01-B05: 15/15 exact source-scoped rounds QUALIFIED",
+    "core": {
+      "verified": 9,
+      "partial": 7
+    }
+  },
+  "goal": "C3: replace UI-neutral Form/Chat mock transports with actual Node loopback HTTP clients consuming AOT-selected native xDownload Interaction, with no Effect or false production deployment claim.",
+  "rounds": [
+    {
+      "batchRoundId": "B06-01",
+      "globalRoundId": "R47",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-native-sdk/b06-http-transport.test.mjs",
+      "testGitBlob": "5c127b88996b219ff90caf225b45d41f99d05ab8",
+      "receipt": null
+    },
+    {
+      "batchRoundId": "B06-02",
+      "globalRoundId": "R48",
+      "status": "PLANNED",
+      "testPath": "examples/dis-v020-native-sdk/b06-http-negative.test.mjs",
+      "receipt": null
+    },
+    {
+      "batchRoundId": "B06-03",
+      "globalRoundId": "R49",
+      "status": "PLANNED",
+      "testPath": "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
+      "receipt": null
+    }
+  ],
+  "technicalLimitations": [
+    "HTTP server binds 127.0.0.1 ephemeral port only, not real deployed browser or production Chat app.",
+    "AOT-selected Interaction exposes only LOCAL observation, no KDP permission or Host Effect.",
+    "No independent SAP semantic acceptance, Tally source locator owner or distinct Windows/Linux/Android implementation is conferred.",
+    "Current CORE-014 remains PARTIAL until normative applicability/coverage accepted."
+  ],
+  "archiveStrategy": "Per-round code/test Git Blob + ROUND.md/round.json are separate Git commits; update branch only after all 3, triggering one final exact CI."
+}

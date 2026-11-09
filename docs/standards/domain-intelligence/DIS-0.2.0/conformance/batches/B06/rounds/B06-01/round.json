@@ -1,0 +1,20 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B06",
+  "roundId": "B06-01",
+  "globalRoundId": "R47",
+  "status": "CI_PENDING",
+  "startParent": "11137b81f3bf715c665ffe30c45c992f9c68052e",
+  "testPath": "examples/dis-v020-native-sdk/b06-http-transport.test.mjs",
+  "testGitBlob": "5c127b88996b219ff90caf225b45d41f99d05ab8",
+  "receipt": null,
+  "positive": [
+    "B06-01 R47 actual loopback HTTP Form POST uses selected xDownload Interaction and remains unauthorized for Effects",
+    "B06-01 R47 actual loopback Chat JSON POST and Form produce equivalent source-selected structured Intent"
+  ],
+  "negative": [],
+  "limitations": [
+    "Loopback-only real HTTP, not publicly deployed production UI.",
+    "HTTP request merely calls selected LOCAL Interaction, not KDP governed Effect."
+  ]
+}
