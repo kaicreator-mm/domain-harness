@@ -168,3 +168,18 @@ test('B08-01 R54 independently installer-pinned DKE input, Function schema and f
    error('DIS_FUNCTION_INPUT_INVALID'));
  }finally{app.stop()}
 });
+
+test('B08-01 R54 producer DKE JSON source is selectable only as DATA, never executable LOCAL or unsafe docs path',async()=>{
+ const ctx=await ctxPromise;
+ const forged=clone(ctx.program);
+ const fn=forged.elements.find(x=>x.id==='dke.provisional.knowledge').functions[0];
+ fn.binding.sourceId='dke-receipt';
+ delete fn.sourceDependencies;
+ assert.throws(()=>ctx.compile(forged),error('DIS_DATA_SOURCE_EXECUTION_FORBIDDEN'));
+ for(const path of ['docs/standards/dke/../../evil.json','docs/standards/dke/unreviewed.js']){
+  const sources=clone(ctx.sources),expected=clone(ctx.expectedSourceOrigins);
+  sources.find(x=>x.id==='dke-receipt').origin.path=path;
+  expected['dke-receipt'].path=path;
+  assert.throws(()=>ctx.compile(ctx.program,sources,expected),error('DIS_SOURCE_ORIGIN_INVALID'));
+ }
+});
