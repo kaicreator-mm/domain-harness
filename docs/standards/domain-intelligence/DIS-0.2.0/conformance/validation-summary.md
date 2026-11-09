@@ -218,3 +218,8 @@ Selected `dke.r9.readProof` Function uses real BUILD/SDK/KDP and exact original 
 ### B10 R56 native complete SAT witness replay
 
 Real original DKE R10 11-variable SAT certificate through selected DIS SDK/KDP, 2048 assignments/64 models/18 full witnesses, exact 66d7024f551faa69fa432e19cc535ced8065abd0 #2320/1–3 3/3 SUCCESS. R55 summary-only proof remains separate, all seven unresolved questions UNKNOWN; no independent semantic SAP or Effect promotion. Total B01–B10 24/24 scoped rounds VERIFIED, Core 9/16, Optional 4 NOT_RUN, Governance 1 NOT_RUN.
+
+
+### B11 / R57 CLI child-process proof
+
+Actual OS subprocess via original DIS AOT selected xDownload Interaction, full #2323/1-3 SUCCESS at `b5762ae29ac7234d45d8bc1cbf974faebad39e2e`. 25/25 bounded rounds; Core 9/16; no SAP/Effect Product approval.

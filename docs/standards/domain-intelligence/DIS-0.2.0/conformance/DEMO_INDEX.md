@@ -258,3 +258,8 @@ Selected `dke.r9.readProof` Function uses real BUILD/SDK/KDP and exact original 
 ### B10 R56 full DKE SAT proof certificate native replay
 
 [Batch summary](batches/B10/BATCH_SUMMARY.md), [source-scoped round](batches/B10/rounds/B10-01/ROUND.md), [original receipt](receipts/r56-b10-r10-complete-witness-native-ci.json), exact source 66d7024f551faa69fa432e19cc535ced8065abd0 Woodpecker #2320/1-3 3/3 SUCCESS. Cumulative 24/24 bounded rounds. Core 9/16; independent SAP remains absent.
+
+
+### B11 / R57 actual OS CLI native Interaction
+
+[Batch](batches/B11/BATCH_SUMMARY.md), [round](batches/B11/rounds/B11-01/ROUND.md), [receipt](receipts/r57-b11-real-cli-native-ci.json), source `b5762ae29ac7234d45d8bc1cbf974faebad39e2e` #2323/1-3 SUCCESS. Cumulative 25/25, Core 9/16 (CORE-014 PARTIAL).
