@@ -39,9 +39,10 @@
     {
       "batchRoundId": "B06-03",
       "globalRoundId": "R49",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
-      "receipt": null
+      "receipt": null,
+      "testGitBlob": "a74e6631c22b7729665629490e637c60d9ded234"
     }
   ],
   "technicalLimitations": [
