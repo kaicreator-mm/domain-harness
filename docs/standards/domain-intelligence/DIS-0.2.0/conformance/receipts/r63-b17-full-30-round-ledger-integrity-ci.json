@@ -1,0 +1,49 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r63-b17-full-30-round-ledger-integrity-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "63ab73283c19cb3514a64f31aafe9375ee257a94",
+    "tree": "dbabb256551c242a64716ecd2bed51d028647d1a"
+  },
+  "originCommit": "63ab73283c19cb3514a64f31aafe9375ee257a94",
+  "testPath": "examples/dis-v020-conformance/full-ledger-30.test.mjs",
+  "testGitBlob": "40401696897956ffa142ee25e5281de66e480b50",
+  "ci": [],
+  "scopedHistory": {
+    "batches": "B01–B16",
+    "verifiedSourceRounds": 30,
+    "referenceSource": "40493f399817ffc26b8c18cff2046072fe2871e0",
+    "r61Original": {
+      "head": "2d331ec0aa38464808d419318422a86fa60c6d7a",
+      "testBlob": "3cb38ab938a531ae30ef00770488e086e63dff95",
+      "pipeline": 2331
+    },
+    "r61Repair": {
+      "head": "8a576dbfe69513df2def5a650a86ef4a3f7ede2b",
+      "readerBlob": "a599be27036b85194d1e64a88c87959987b16059",
+      "testBlob": "13b316ceac51227caa0c66c15ac430879fafa55e",
+      "pipeline": 2335
+    },
+    "r62Current": {
+      "head": "e16362004f3f40f763a733e2a3973d025898a26d",
+      "readerBlob": "0a51feffaec5119dff2bb3176fb00ae93bca7ed5",
+      "testBlob": "2a61a0ed371ea500ec05cc2e277dec5d25c4bd78",
+      "pipeline": 2344
+    }
+  },
+  "observations": [
+    "R63 test is a fresh native selected conformance suite command; unlike R59 it audits 16 completed batches/30 prior rounds rather than only B01–B12 26 rounds.",
+    "Current fixed R61 Reader/source test Git Blobs must stay distinguishable from original B15/R61 qualified source. Changed current Blob versus historical test Blob is reported, not silently rewritten.",
+    "R62 now qualifies its current stronger edge-set reader/test against #2344, not merely the older #2333 source. Missing edge + mixed CI source + missing matrix receipt negatives are mandatory.",
+    "Exact R63 source CI has not been executed/observed at this authoring commit and must remain CI_PENDING until all three required contexts succeed."
+  ],
+  "limitations": [
+    "R63 replays stored original exact source/CI receipts; it does NOT request a new live external Woodpecker status check for each old commit, and does not reexecute all 30 original historical source versions.",
+    "Original R61 B15 test source qualified at #2331 while a separate source repair at #2335 fixed nested response-array alias, and R62 edge-integrity at #2344 qualified newer source; their historical Git Blobs must remain distinct.",
+    "This round does not qualify original publisher Guide203/79 full raw bytes, domain source-owner independent semantic Critic, SAP, physical Effects, or Product/L1 required Target and UI applicability.",
+    "CORE-016 conformance still PARTIAL pending other Core/independent governance requirements; no automatic version Freeze, merge, or release."
+  ]
+}

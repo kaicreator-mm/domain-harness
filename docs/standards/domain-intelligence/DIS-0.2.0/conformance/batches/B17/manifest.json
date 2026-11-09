@@ -1,0 +1,42 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B17",
+  "status": "IN_PROGRESS",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "40493f399817ffc26b8c18cff2046072fe2871e0",
+    "verifiedRounds": 30,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "CORE-016: full 16-batch 30-scoped-round original Git source/CI/matrix evidence readback, R61 original→R1 alias source integrity and R62 exact #2344 DAG edge repair lineage",
+  "rounds": [
+    {
+      "batchRoundId": "B17-01",
+      "globalRoundId": "R63",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-conformance/full-ledger-30.test.mjs",
+      "originalSourceHead": "63ab73283c19cb3514a64f31aafe9375ee257a94",
+      "testGitBlob": "40401696897956ffa142ee25e5281de66e480b50",
+      "receipt": "receipts/r63-b17-full-30-round-ledger-integrity-ci.json",
+      "sourceHead": "63ab73283c19cb3514a64f31aafe9375ee257a94",
+      "checks": []
+    }
+  ],
+  "verifiedRounds": 0,
+  "pendingRounds": 1,
+  "unstartedRounds": 0,
+  "noAutomaticCorePromotion": true,
+  "limitations": [
+    "R63 replays stored original exact source/CI receipts; it does NOT request a new live external Woodpecker status check for each old commit, and does not reexecute all 30 original historical source versions.",
+    "Original R61 B15 test source qualified at #2331 while a separate source repair at #2335 fixed nested response-array alias, and R62 edge-integrity at #2344 qualified newer source; their historical Git Blobs must remain distinct.",
+    "This round does not qualify original publisher Guide203/79 full raw bytes, domain source-owner independent semantic Critic, SAP, physical Effects, or Product/L1 required Target and UI applicability.",
+    "CORE-016 conformance still PARTIAL pending other Core/independent governance requirements; no automatic version Freeze, merge, or release."
+  ]
+}

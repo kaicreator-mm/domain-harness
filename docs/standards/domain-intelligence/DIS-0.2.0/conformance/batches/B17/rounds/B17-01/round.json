@@ -1,0 +1,29 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B17",
+  "roundId": "B17-01",
+  "globalRoundId": "R63",
+  "status": "CI_PENDING",
+  "originCommit": "63ab73283c19cb3514a64f31aafe9375ee257a94",
+  "originTree": "dbabb256551c242a64716ecd2bed51d028647d1a",
+  "testPath": "examples/dis-v020-conformance/full-ledger-30.test.mjs",
+  "testGitBlob": "40401696897956ffa142ee25e5281de66e480b50",
+  "receipt": "receipts/r63-b17-full-30-round-ledger-integrity-ci.json",
+  "sourceHead": "63ab73283c19cb3514a64f31aafe9375ee257a94",
+  "checks": [],
+  "positive": [
+    "R63 every B01-B16 source-qualified round (30/30) has unique historical Git+3-context CI receipt and matrix link, without SAP promotion",
+    "R63 preserve R61 exact original CI separately from genuine R61-R1 immutable isolated-reader repair",
+    "R63 exact R62 revised 10-node graph edge checks and later #2344 CI are consistent across B16 manifest round and receipt"
+  ],
+  "negative": [
+    "R63 stale R62 standalone round or mismatched qualifying HEAD/TREE is rejected despite a green batch manifest",
+    "R63 forged Woodpecker source pipeline / missing matrix receipt / fake native test are rejected"
+  ],
+  "limits": [
+    "R63 replays stored original exact source/CI receipts; it does NOT request a new live external Woodpecker status check for each old commit, and does not reexecute all 30 original historical source versions.",
+    "Original R61 B15 test source qualified at #2331 while a separate source repair at #2335 fixed nested response-array alias, and R62 edge-integrity at #2344 qualified newer source; their historical Git Blobs must remain distinct.",
+    "This round does not qualify original publisher Guide203/79 full raw bytes, domain source-owner independent semantic Critic, SAP, physical Effects, or Product/L1 required Target and UI applicability.",
+    "CORE-016 conformance still PARTIAL pending other Core/independent governance requirements; no automatic version Freeze, merge, or release."
+  ]
+}
