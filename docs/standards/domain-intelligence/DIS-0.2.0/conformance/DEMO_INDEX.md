@@ -253,3 +253,8 @@ Original [DKE #209 R6](https://github.com/kaicreator-mm/domain-forge/issues/209)
 Selected `dke.r9.readProof` Function uses real BUILD/SDK/KDP and exact original upstream DKE R9 DATA Git Blobs `426c7d165c19b7aa459de82d5d776962dba13fb0` + `7387ca838e37d314e28a33e35ef21ba2f4358730`, with separately pinned LOCAL reader Git Blob `5aba024775a759ba992d1bd06f71770c408f3cec`. All 11 source-scoped logical queries preserve 2 ENTAILED, 2 REFUTED, 7 UNKNOWN and `authority:NONE`; the refuted outcome is an observation of refutation, not positive certified knowledge. Immutable R0 overbroad-source and R1 source-first repair histories remain auditable.
 
 **Demo count B01–B09 = 23/23 scoped VERIFIED; product Core 9/16 VERIFIED + 7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN.** Original DKE R9 source facts still same-model authored, SAP=0 and Effect denied. New DKE R10 complete replayable source-conditional SAT certificate is **not consumed by this R55 version** and must not inherit #2312 CI. This docs-only bookkeeping is not a fresh source CI run, Product/L2 Freeze or release.
+
+
+### B10 R56 full DKE SAT proof certificate native replay
+
+[Batch summary](batches/B10/BATCH_SUMMARY.md), [source-scoped round](batches/B10/rounds/B10-01/ROUND.md), [original receipt](receipts/r56-b10-r10-complete-witness-native-ci.json), exact source 66d7024f551faa69fa432e19cc535ced8065abd0 Woodpecker #2320/1-3 3/3 SUCCESS. Cumulative 24/24 bounded rounds. Core 9/16; independent SAP remains absent.

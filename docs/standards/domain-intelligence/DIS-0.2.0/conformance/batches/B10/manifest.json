@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B10",
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -22,17 +22,34 @@
     {
       "batchRoundId": "B10-01",
       "globalRoundId": "R56",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
       "originalSourceHead": "c3f8511d5df5b9642255d4ba57ee2115c8f75b9c",
       "testGitBlob": "dc20a458b3b0402d5545ccb35b38565179374be9",
       "receipt": "receipts/r56-b10-r10-complete-witness-native-ci.json",
-      "sourceHead": "c3f8511d5df5b9642255d4ba57ee2115c8f75b9c",
-      "checks": []
+      "sourceHead": "66d7024f551faa69fa432e19cc535ced8065abd0",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2320/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2320/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2320/3"
+        }
+      ],
+      "qualificationTree": "dd6ef2df59779567d29a358aa638bfe78f56cf69"
     }
   ],
-  "verifiedRounds": 0,
-  "pendingRounds": 1,
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
   "unstartedRounds": 0,
   "limitations": [
     "R10 11-variable complete SAT witnesses prove finite truth relative to same-model-authored frozen facts; no independent semantic/source owner reviewer or qualified SAP.",
@@ -40,5 +57,24 @@
     "Full certificate can strengthen evidence completeness without upgrading any of seven UNDERDETERMINED questions to accepted domain facts or permitting non-idempotent KDP Effects.",
     "History of B09 R55 original R9 summary-only countermodels is intact; no retroactive qualification by R55 CI."
   ],
-  "noAutomaticCorePromotion": true
+  "noAutomaticCorePromotion": true,
+  "qualificationHead": "66d7024f551faa69fa432e19cc535ced8065abd0",
+  "qualificationTree": "dd6ef2df59779567d29a358aa638bfe78f56cf69",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2320/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2320/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2320/3"
+    }
+  ]
 }
