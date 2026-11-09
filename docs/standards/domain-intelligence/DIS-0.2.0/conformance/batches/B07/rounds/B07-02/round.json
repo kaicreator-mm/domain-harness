@@ -1,0 +1,27 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B07",
+  "roundId": "B07-02",
+  "globalRoundId": "R52",
+  "status": "CI_PENDING",
+  "originCommit": "f2130918d9863aeabd36227886c05cc44c5670cd",
+  "originTree": "09553d57f6c33ca1a64469da0e59812f321ebbc1",
+  "testPath": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+  "testGitBlob": "c579299182569a5641683ec93a624eaba703e94b",
+  "receipt": "receipts/r52-b07-function-dependency-ci.json",
+  "sourceHead": "f2130918d9863aeabd36227886c05cc44c5670cd",
+  "checks": [],
+  "positive": [
+    "B07-02 R52 original xDownload acquisition statically pins two separate Interaction Functions and one Knowledge Function",
+    "B07-02 R52 static dependency cycles are refused while semantic collaboration cycles are legal metadata"
+  ],
+  "negative": [
+    "B07-02 R52 undeclared target Function, missing version and duplicate Function selection fail closed at AOT",
+    "B07-02 R52 same-version silent dependency drift and same-major Function binding removal are incompatible"
+  ],
+  "limits": [
+    "Function binding is compile-time static AOT declaration, not runtime invoke authorization, independent SAP or semantic Oracle.",
+    "Existing dependsOn-only AOTs remain compatible; selected Target, original source pins and existing KDP permission checks unchanged.",
+    "B07-02 is CI_PENDING; B07-03 NOT_STARTED; no Core state promotion."
+  ]
+}

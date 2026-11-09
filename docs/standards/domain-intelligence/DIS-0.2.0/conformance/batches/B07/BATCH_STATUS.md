@@ -11,3 +11,7 @@ Boundaries: stored-claim coherence is not live Woodpecker verification; no indep
 ## R51 closure (2026-11-09)
 
 B07-01/R51 **VERIFIED** by HEAD `61f32bfc274b701f6b4d8ffcd66f58d4349f22fc` / TREE `1dbcc01229a75dbb259d3f0d96c93b8a33c11369`, Woodpecker #2302/1–3 3/3 SUCCESS. Native 18/18 historical round *record* audit and all new negative tests qualified; earlier B06 context/slot mismatch no longer rejects valid reordered CI. B07 is **IN_PROGRESS (1/3)**; B07-02 and B07-03 are NOT_STARTED. No 100% Core claim or Product/L1/independent SAP acceptance.
+
+## B07-02 R52 Function-level dependency contract (candidate)
+
+At original Git source `f2130918d9863aeabd36227886c05cc44c5670cd` / test Blob `c579299182569a5641683ec93a624eaba703e94b`, the selected xDownload acquisition now declares both actual LOCAL Interaction Functions and its Knowledge Function as version-locked static dependencies, not as authority to execute an Effect. New valid/missing/duplicate/version/drift and static-cycle negative native cases are mandatory in the existing Woodpecker integration context. **CI_PENDING** pending real exact source status, so B07 is now 1 VERIFIED / 1 PENDING / 1 NOT_STARTED and CORE-002/005 remain PARTIAL.
