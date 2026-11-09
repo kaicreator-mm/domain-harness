@@ -13,6 +13,20 @@ export const R9_DATA_ORIGINS=Object.freeze({
  input:Object.freeze({repository:'kaicreator-mm/domain-forge',commit:R9_UPSTREAM_COMMIT,path:R9_ROOT+'FORMAL_INPUT.json',gitBlob:R9_INPUT_BLOB}),
  proof:Object.freeze({repository:'kaicreator-mm/domain-forge',commit:R9_UPSTREAM_COMMIT,path:R9_ROOT+'R9_FORMAL_RECEIPT.json',gitBlob:R9_PROOF_BLOB})
 });
+// Original upstream DKE R9 Node reader's explicit per-CQ publisher document
+// mapping, NOT a fabricated all-documents provenance set.
+const PUBLISHER_DOCS=Object.freeze({
+ CF_FAQ:'91443a1ba972ab4b172adf0cf2bda0d4594b9c29',
+ CF_HOW:'15370b3c521db075a3b36c72b0461fa0a0239349',
+ CF_CHANGE:'8124fd2d647578345d84664b1319b878e0760259',
+ GH_WEBHOOK:'0e04c366d80375dd377a2200b98962693d47dfba'
+});
+const CQ_SOURCES=Object.freeze({
+ S01:['CF_FAQ','CF_HOW'],S02:['CF_FAQ','CF_HOW'],S03:['CF_HOW'],
+ S04:['CF_CHANGE'],S05:['CF_CHANGE'],S06:['CF_CHANGE'],
+ S07:['GH_WEBHOOK'],S08:['GH_WEBHOOK'],S09:['GH_WEBHOOK'],
+ S10:['GH_WEBHOOK'],S11:['CF_FAQ','GH_WEBHOOK']
+});
 const OUTCOMES=Object.freeze({ENTAILED:'OBSERVED',REFUTED:'OBSERVED',UNDERDETERMINED:'UNKNOWN'});
 const fail=code=>{const e=new Error(code);e.code=code;throw e;};
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -32,7 +46,7 @@ export function makeR9ConditionalProofReader(inputText,proofText){
     input.qualification?.qualifiedSap!==false||
     input.qualification?.independentSemanticReviewer!==false||
     input.qualification?.sourceFactSelectionAuthoredByCurrentAssistant!==true||
-    !object(input.publisherGitBlobs)||Object.keys(input.publisherGitBlobs).length!==4)
+     !object(input.publisherGitBlobs)||JSON.stringify(input.publisherGitBlobs)!==JSON.stringify(PUBLISHER_DOCS))
   fail('DKE_R9_FORMAL_AUTHORITY_INVALID');
  if(!Array.isArray(input.challenges)||input.challenges.length!==11||
     !Array.isArray(proof.cases)||proof.cases.length!==11||
@@ -64,7 +78,7 @@ export function makeR9ConditionalProofReader(inputText,proofText){
    if(!object(request)||Object.keys(request).length!==1||typeof request.id!=='string'||
       !lookup.has(request.id))fail('DKE_R9_UNSELECTED_OR_FORGED_CALL');
    const c=lookup.get(request.id),status=OUTCOMES[c.verdict],unknown=status==='UNKNOWN';
-   const sourceRefs=Object.entries(input.publisherGitBlobs).map(([k,v])=>k+':git-blob:'+v);
+   const sourceRefs=CQ_SOURCES[request.id].map(k=>k+':git-blob:'+PUBLISHER_DOCS[k]);
    return Object.freeze({
     status,queryId:c.id,verdict:c.verdict,proposition:c.atom,
     propositionLogicallySupported:c.verdict==='ENTAILED',

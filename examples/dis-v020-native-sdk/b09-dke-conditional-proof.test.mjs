@@ -128,7 +128,13 @@ test('B09-01 R55 real selected SDK consumes 2 entailed + 2 refuted + 7 UNKNOWN w
    assert.equal(value.effectDispatched,false);
    assert.equal(value.formalInputGitBlob,R9_INPUT_BLOB);
    assert.equal(value.formalProofGitBlob,R9_PROOF_BLOB);
-   assert.equal(value.sourceRefs.length,4);
+   const expectedSourceCount=(['S01','S02','S11'].includes(id)?2:1);
+   assert.equal(value.sourceRefs.length,expectedSourceCount);
+   const allDocs=['91443a1ba972ab4b172adf0cf2bda0d4594b9c29',
+    '15370b3c521db075a3b36c72b0461fa0a0239349',
+    '8124fd2d647578345d84664b1319b878e0760259',
+    '0e04c366d80375dd377a2200b98962693d47dfba'];
+   for(const source of value.sourceRefs)assert.ok(allDocs.some(b=>source.endsWith(b)));
    assert.equal(value.propositionLogicallySupported,value.verdict==='ENTAILED');
    if(value.verdict==='UNDERDETERMINED'){
     assert.equal(out.disposition,'UNKNOWN');
