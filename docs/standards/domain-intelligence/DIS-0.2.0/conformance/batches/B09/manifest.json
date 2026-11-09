@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B09",
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -22,13 +22,29 @@
     {
       "batchRoundId": "B09-01",
       "globalRoundId": "R55",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-native-sdk/b09-dke-conditional-proof.test.mjs",
       "originalSourceHead": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
       "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
       "receipt": "receipts/r55-b09-dke-conditional-proof-native-ci.json",
-      "sourceHead": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
-      "checks": [],
+      "sourceHead": "2d96e16942dcff518619b37e4b6c0664ca032ae3",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/3"
+        }
+      ],
       "originalR0SourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
       "originalR0TestGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
       "history": [
@@ -49,18 +65,27 @@
           "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
           "status": "REPINNED_SOURCE_AND_TEST",
           "finding": "Selected DIS original reader commit/pin updated, each CQ verifies exact original publisher doc references; awaits real exact CI"
+        },
+        {
+          "head": "2d96e16942dcff518619b37e4b6c0664ca032ae3",
+          "tree": "f2d708c797216c94439e8b24d4e011699da266fe",
+          "status": "CI_VERIFIED",
+          "ci": "Woodpecker #2312/1–3 SUCCESS",
+          "finding": "R55 11 scoped read-only logical verdicts via real selected DIS native BUILD/SDK/KDP; original R9 original data+reader test Git Blob unchanged. No R10 proof certificate or independently qualified SAP."
         }
-      ]
+      ],
+      "qualificationTree": "f2d708c797216c94439e8b24d4e011699da266fe"
     }
   ],
-  "verifiedRounds": 0,
-  "pendingRounds": 1,
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
   "unstartedRounds": 0,
   "limitations": [
     "The upstream DKE R9 actual Python/SymPy formal proof is conditional on frozen same-model authored source facts; independent solver is NOT independent domain semantic reviewer or original publisher source owner.",
     "Original upstream R9 Node reader is not executed here; this uses the original actual FORMAL_INPUT and SymPy R9_FORMAL_RECEIPT under original Git Blob, via a new native DIS BUILD/SDK/KDP Knowledge Function.",
     "Logical REFUTED describes a refuted proposition in the selected source theory; it is not an accepted domain fact. UNKNOWN remains explicitly indeterminate with countermodels, no unqualified claims promoted.",
-    "Source Git Blob/installer locks and observations cannot authorize KDP Effect or Production Release. CORE-003/006/016 and CORE-002/005 remain PARTIAL until independent SAP and complete contract scope."
+    "Source Git Blob/installer locks and observations cannot authorize KDP Effect or Production Release. CORE-003/006/016 and CORE-002/005 remain PARTIAL until independent SAP and complete contract scope.",
+    "DKE R10 improved seven UNKNOWN's 11-variable countermodel evidence completeness but this R55 source still consumes original R9 proof only; R10 is not CI-qualified by R55."
   ],
   "noAutomaticCorePromotion": true
 }
