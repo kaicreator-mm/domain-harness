@@ -278,3 +278,8 @@ Selected `dke.r9.readProof` Function uses real BUILD/SDK/KDP and exact original 
 ### B14/R60 real DKE R16 source-authenticity receipt native Knowledge consumer
 
 [Summary](batches/B14/BATCH_SUMMARY.md), [round](batches/B14/rounds/B14-01/ROUND.md), [receipt](receipts/r60-b14-r16-source-authenticity-native-ci.json). Original exact source `9b761ad3628048706a6207deb645add5dc27eee1` #2329/1–3 3/3 SUCCESS; total B01–B14 **28/28 bounded demos VERIFIED**, Core 9/16 and SAP unqualified.
+
+
+### B15/R61 native Framework guide 203→79 source-version invalidation
+
+[Batch](batches/B15/BATCH_SUMMARY.md), [round](batches/B15/rounds/B15-01/ROUND.md), [receipt](receipts/r61-b15-r17-guide-version-native-ci.json). Original source `2d331ec0aa38464808d419318422a86fa60c6d7a` #2331/1–3 3/3 SUCCESS, all 20 source-bounded cases native DIS KDP, no automatic Method repair. Cumulative 29/29 bounded Demo rounds, Core 9/16.

@@ -238,3 +238,8 @@ Actual source-locked Runx Stateful through native KDP/SDK with reopened physical
 ### B14/R60 source-authenticity receipt via actual native DIS Knowledge Function
 
 Original DKE R16 4 publisher full files/14 anchors/25 mutations qualified only upstream, DIS consumes pinned source receipt at `9b761ad3628048706a6207deb645add5dc27eee1` #2329/1–3 3/3 SUCCESS. Four SOURCE-SCOPE-only OBSERVED, seven UNKNOWN; no independent semantic SAP. 28/28 scoped rounds, Core 9/16, Optional 4 NOT_RUN, Governance 1 NOT_RUN.
+
+
+### B15/R61 real original Framework Guide version dependency invalidation
+
+Real original DKE R17 observed version-specific cross-guide drift through source-selected native DIS Knowledge SDK at `2d331ec0aa38464808d419318422a86fa60c6d7a` #2331/1–3 3/3 SUCCESS; 20 upstream cases, two mismatched role references, dependent D05 Method invalidated while unrelated RTC facts unaffected. Unpinned full Guide pages, no independent semantic SAP/Effects. B01–B15 29/29 rounds, Core 9/16 VERIFIED, seven PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN.

@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B15",
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -20,17 +20,34 @@
     {
       "batchRoundId": "B15-01",
       "globalRoundId": "R61",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
       "originalSourceHead": "a54c37e37ce5bbf3a9eaf40a507ce174dc14896b",
       "testGitBlob": "3cb38ab938a531ae30ef00770488e086e63dff95",
       "receipt": "receipts/r61-b15-r17-guide-version-native-ci.json",
-      "sourceHead": "a54c37e37ce5bbf3a9eaf40a507ce174dc14896b",
-      "checks": []
+      "sourceHead": "2d331ec0aa38464808d419318422a86fa60c6d7a",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/3"
+        }
+      ],
+      "qualificationTree": "6da5420cbbadbbce4b7f0713b76ab2d6f32d5a3b"
     }
   ],
-  "verifiedRounds": 0,
-  "pendingRounds": 1,
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
   "unstartedRounds": 0,
   "noAutomaticCorePromotion": true,
   "limitations": [
@@ -39,5 +56,24 @@
     "Two web-line-located stale step-reference conflicts block the dependent D05 Method, but a proposed automatic 16→26 or 17→28 remap is not independently source-authorized. No physical repair or real hardware execution.",
     "All 20 cases return typed UNKNOWN for method qualification, even if syntax/model/authority input is explicitly rejected inside compatibility classification. An observed conflict is evidence of invalidation, not positive approved repair instruction.",
     "Source-owner independent semantic Critic remains NOT_RUN, SAP=0, Effects=0; CORE-002/003/005/006/016 remain PARTIAL."
+  ],
+  "qualificationHead": "2d331ec0aa38464808d419318422a86fa60c6d7a",
+  "qualificationTree": "6da5420cbbadbbce4b7f0713b76ab2d6f32d5a3b",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/3"
+    }
   ]
 }

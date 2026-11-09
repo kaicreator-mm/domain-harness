@@ -3,14 +3,30 @@
   "batchId": "B15",
   "roundId": "B15-01",
   "globalRoundId": "R61",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "originCommit": "a54c37e37ce5bbf3a9eaf40a507ce174dc14896b",
   "originTree": "3a475c881e07194a95547226be41448014700e5a",
   "testPath": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
   "testGitBlob": "3cb38ab938a531ae30ef00770488e086e63dff95",
   "receipt": "receipts/r61-b15-r17-guide-version-native-ci.json",
-  "sourceHead": "a54c37e37ce5bbf3a9eaf40a507ce174dc14896b",
-  "checks": [],
+  "sourceHead": "2d331ec0aa38464808d419318422a86fa60c6d7a",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/3"
+    }
+  ],
   "positive": [
     "R61 original DKE R17 publisher observations/cases/V8 receipt are three exact AOT DATA pins, Reader is a separate selected Knowledge LOCAL",
     "R61 actual native SDK replays all original DKE 20 cases, holds two real stale-step conflicts as typed UNKNOWN without physical KDP Effect",
@@ -26,5 +42,31 @@
     "Two web-line-located stale step-reference conflicts block the dependent D05 Method, but a proposed automatic 16→26 or 17→28 remap is not independently source-authorized. No physical repair or real hardware execution.",
     "All 20 cases return typed UNKNOWN for method qualification, even if syntax/model/authority input is explicitly rejected inside compatibility classification. An observed conflict is evidence of invalidation, not positive approved repair instruction.",
     "Source-owner independent semantic Critic remains NOT_RUN, SAP=0, Effects=0; CORE-002/003/005/006/016 remain PARTIAL."
+  ],
+  "finalTree": "6da5420cbbadbbce4b7f0713b76ab2d6f32d5a3b",
+  "history": [
+    {
+      "head": "2d331ec0aa38464808d419318422a86fa60c6d7a",
+      "tree": "6da5420cbbadbbce4b7f0713b76ab2d6f32d5a3b",
+      "status": "SUCCESS",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2331/3"
+        }
+      ],
+      "meaning": "Selected DKE R17 guide cross-version native DIS Function, all 20 original cases, exact Woodpecker #2331 3/3 SUCCESS"
+    }
   ]
 }

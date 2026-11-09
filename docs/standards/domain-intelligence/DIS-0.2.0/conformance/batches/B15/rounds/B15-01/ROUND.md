@@ -17,3 +17,8 @@ Negative tests reject fake raw source pin, missing/changed V8 case roster, forge
 ## Gate
 
 Before R61, B01–B14 **28/28 scoped Demo rounds VERIFIED**, Core **9/16 VERIFIED, 7 PARTIAL**. B15 0/1 **CI_PENDING** until actual Woodpecker native/compatibility/general Verify all three success at exact cumulative source. No Core promotion, Source-owner SAP, L2 Freeze/merge/release.
+
+
+## R61 native exact CI qualification
+
+Original source `2d331ec0aa38464808d419318422a86fa60c6d7a`, TREE `6da5420cbbadbbce4b7f0713b76ab2d6f32d5a3b`, original native test Git Blob `3cb38ab938a531ae30ef00770488e086e63dff95`, [#2331/1](https://ci.kaicreator.com/repos/18/pipeline/2331/1) native, [#2331/2](https://ci.kaicreator.com/repos/18/pipeline/2331/2) compatibility, [#2331/3](https://ci.kaicreator.com/repos/18/pipeline/2331/3) verify **3/3 SUCCESS**. This validates native read-only Knowledge consumer and 20 conditional version-compatibility cases, not independent manufacturer source semantics, full raw publisher bytes, approved D05 Method, SAP or KDP Effects.
