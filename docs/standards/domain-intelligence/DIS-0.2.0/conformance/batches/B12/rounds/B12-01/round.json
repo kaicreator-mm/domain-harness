@@ -1,0 +1,27 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B12",
+  "roundId": "B12-01",
+  "globalRoundId": "R58",
+  "status": "CI_PENDING",
+  "originCommit": "8a518e803db378e2e263527b25c647f6a656936c",
+  "originTree": "7ba22353207b0e4488cd002c18cc7d4dd10f0382",
+  "testPath": "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs",
+  "testGitBlob": "076d279acf5654c8ddea42d9e0a25211423bfb47",
+  "receipt": "receipts/r58-b12-runx-physical-process-state-ci.json",
+  "sourceHead": "8a518e803db378e2e263527b25c647f6a656936c",
+  "checks": [],
+  "positive": [
+    "B12 R58 original Runx Stateful local presence does NOT auto-resurrect through second Node process with same physical KDP SQLite file"
+  ],
+  "negative": [
+    "B12 R58 forged Runx agent token cannot put a fake execution lease into the physical KDP or Runx owner map",
+    "B12 R58 invalid OS process modes and source spoofed argument shape fail closed before KDP DB opening"
+  ],
+  "limits": [
+    "Original Runx source is a PROCESS_LOCAL stateful map by contract. A reopened physical KDP SQLite document file is not evidence that Domain-owned Runx facts have a persistence/rehydration contract.",
+    "Native process child opens real file-backed KDP SQLite with a shared tenant, yet deliberately has no automatic Domain State migration or Event replay; any durable Domain State implementation needs separate first-party spec and tests.",
+    "Physical SQLite file is a temp sandbox; no production Host/OS Effect, execution lease or external Tally/GitHub business fact is authorized.",
+    "CORE-006 full general State/Rule/Knowledge implementation coverage and independent SAP still require source-owner semantic and Product/L1 decisions; no auto Core promotion."
+  ]
+}
