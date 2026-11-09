@@ -1,0 +1,44 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B09",
+  "status": "IN_PROGRESS",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "f7574553343eae86362352ff19131851c91cfd1b",
+    "tree": "77ec51adebecc78020363c1b007f029d8ff26a36",
+    "ci": "Woodpecker #2310/1–3 SUCCESS",
+    "verifiedPriorRounds": 22,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "C2 + C4: source-bound DKE R9 native formal result → real DIS/KDP read-only Knowledge consumer, distinguish conditional logical verdict, typed UNKNOWN and independent SAP truth",
+  "rounds": [
+    {
+      "batchRoundId": "B09-01",
+      "globalRoundId": "R55",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-native-sdk/b09-dke-conditional-proof.test.mjs",
+      "originalSourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+      "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+      "receipt": "receipts/r55-b09-dke-conditional-proof-native-ci.json",
+      "sourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+      "checks": []
+    }
+  ],
+  "verifiedRounds": 0,
+  "pendingRounds": 1,
+  "unstartedRounds": 0,
+  "limitations": [
+    "The upstream DKE R9 actual Python/SymPy formal proof is conditional on frozen same-model authored source facts; independent solver is NOT independent domain semantic reviewer or original publisher source owner.",
+    "Original upstream R9 Node reader is not executed here; this uses the original actual FORMAL_INPUT and SymPy R9_FORMAL_RECEIPT under original Git Blob, via a new native DIS BUILD/SDK/KDP Knowledge Function.",
+    "Logical REFUTED describes a refuted proposition in the selected source theory; it is not an accepted domain fact. UNKNOWN remains explicitly indeterminate with countermodels, no unqualified claims promoted.",
+    "Source Git Blob/installer locks and observations cannot authorize KDP Effect or Production Release. CORE-003/006/016 and CORE-002/005 remain PARTIAL until independent SAP and complete contract scope."
+  ],
+  "noAutomaticCorePromotion": true
+}

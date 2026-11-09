@@ -1,0 +1,30 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B09",
+  "roundId": "B09-01",
+  "globalRoundId": "R55",
+  "status": "CI_PENDING",
+  "originCommit": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+  "originTree": "9d63590ea5964c95700141b5a53581c66a2cad4c",
+  "testPath": "examples/dis-v020-native-sdk/b09-dke-conditional-proof.test.mjs",
+  "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+  "receipt": "receipts/r55-b09-dke-conditional-proof-native-ci.json",
+  "sourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+  "checks": [],
+  "positive": [
+    "B09-01 R55 original source-pinned SymPy proof is a selected DIS Knowledge Function with exact two DATA sources",
+    "B09-01 R55 real selected SDK consumes 2 entailed + 2 refuted + 7 UNKNOWN with no independent SAP claim",
+    "B09-01 R55 a source-conditional REFUTED proof never means positive domain qualification or Effect permission"
+  ],
+  "negative": [
+    "B09-01 R55 original DKE formal input/receipt tampering or forged caller approval fail closed",
+    "B09-01 R55 original DATA path cannot become an executable Function or an unpinned installer source",
+    "B09-01 R55 forged LOCAL SUCCEEDED or fabricated semantic Oracle cannot pass typed outcome"
+  ],
+  "limits": [
+    "The upstream DKE R9 actual Python/SymPy formal proof is conditional on frozen same-model authored source facts; independent solver is NOT independent domain semantic reviewer or original publisher source owner.",
+    "Original upstream R9 Node reader is not executed here; this uses the original actual FORMAL_INPUT and SymPy R9_FORMAL_RECEIPT under original Git Blob, via a new native DIS BUILD/SDK/KDP Knowledge Function.",
+    "Logical REFUTED describes a refuted proposition in the selected source theory; it is not an accepted domain fact. UNKNOWN remains explicitly indeterminate with countermodels, no unqualified claims promoted.",
+    "Source Git Blob/installer locks and observations cannot authorize KDP Effect or Production Release. CORE-003/006/016 and CORE-002/005 remain PARTIAL until independent SAP and complete contract scope."
+  ]
+}

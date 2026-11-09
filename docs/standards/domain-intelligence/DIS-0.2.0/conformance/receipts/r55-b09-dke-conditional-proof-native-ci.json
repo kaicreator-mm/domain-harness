@@ -1,0 +1,26 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r55-b09-dke-conditional-proof-native-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+    "tree": "9d63590ea5964c95700141b5a53581c66a2cad4c"
+  },
+  "originCommit": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+  "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+  "testPath": "examples/dis-v020-native-sdk/b09-dke-conditional-proof.test.mjs",
+  "ci": [],
+  "observations": [
+    "DKE formal input Git Blob 426c7d165c19b7aa459de82d5d776962dba13fb0 and real Python/SymPy formal receipt Git Blob 7387ca838e37d314e28a33e35ef21ba2f4358730 are original immutable upstream DKE #209 sources under domain-forge@7aa5cf4afa625c19e9d9a59667d85b67d5bc1401.",
+    "R55 actual selected DIS v0.2 Knowledge Function invokes from a frozen LOCAL Reader + two original DATA sourceDependencies and independent installer pins; actual Woodpecker verification not yet qualified.",
+    "DKE original proof outcomes were 2 ENTAILED, 2 REFUTED, 7 UNDERDETERMINED with 64 satisfying worlds; no independent SAP/owner semantic acceptance."
+  ],
+  "limitations": [
+    "The upstream DKE R9 actual Python/SymPy formal proof is conditional on frozen same-model authored source facts; independent solver is NOT independent domain semantic reviewer or original publisher source owner.",
+    "Original upstream R9 Node reader is not executed here; this uses the original actual FORMAL_INPUT and SymPy R9_FORMAL_RECEIPT under original Git Blob, via a new native DIS BUILD/SDK/KDP Knowledge Function.",
+    "Logical REFUTED describes a refuted proposition in the selected source theory; it is not an accepted domain fact. UNKNOWN remains explicitly indeterminate with countermodels, no unqualified claims promoted.",
+    "Source Git Blob/installer locks and observations cannot authorize KDP Effect or Production Release. CORE-003/006/016 and CORE-002/005 remain PARTIAL until independent SAP and complete contract scope."
+  ]
+}
