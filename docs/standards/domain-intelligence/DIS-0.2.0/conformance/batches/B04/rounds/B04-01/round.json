@@ -6,10 +6,10 @@
   "status": "CI_PENDING",
   "startParent": "59b61aa69b785b3fdb1709d3bd9ebd118a764588",
   "testPath": "examples/dis-v020-conformance/batch-audit.test.mjs",
-  "sourceHead": null,
-  "finalTree": null,
+  "sourceHead": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
+  "finalTree": "91d6d4cfcaf0d726a6acec623db03776c95b1e2a",
   "testGitBlob": "3bc3f9703f303c48ad9841edece0d0bb209eb9cb",
-  "receipt": null,
+  "receipt": "receipts/r41-b04-source-ledger-ci.json",
   "positives": [
     "B04-01 R41 verify B01 B02 B03 recorded 9 individually versioned exact-SHA receipts without promoting Core"
   ],
@@ -18,5 +18,68 @@
     "B04-01 R41 negative three CI URLs must belong to a single exact source pipeline",
     "B04-01 R41 negative requirement receipt must be linked, and a source test must actually run in native CI"
   ],
-  "statusBoundary": "Git-backed independent per-round source/CI metadata coherence; not live CI response or semantic Oracle."
+  "statusBoundary": "Git-backed independent per-round source/CI metadata coherence; not live CI response or semantic Oracle.",
+  "originCommit": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
+  "originTree": "91d6d4cfcaf0d726a6acec623db03776c95b1e2a",
+  "candidateReplayHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "PENDING",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/3"
+    }
+  ],
+  "history": [
+    {
+      "head": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/3"
+        }
+      ]
+    },
+    {
+      "head": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/3"
+        }
+      ],
+      "description": "Later cumulative full-suite candidate"
+    }
+  ]
 }

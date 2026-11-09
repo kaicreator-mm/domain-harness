@@ -5,11 +5,11 @@
   "globalRoundId": "R43",
   "status": "CI_PENDING",
   "startParent": "9e6c05e4328614ea8a5e86a0ea201869eb4333a1",
-  "sourceHead": null,
-  "finalTree": null,
+  "sourceHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+  "finalTree": "0a06f79233b3404a32871c0efb7973fae1c0b2e1",
   "testPath": "examples/dis-v020-conformance/readiness-gate.test.mjs",
   "testGitBlob": "fe73afab74dce2d82f24f64b09c22f9aafba341f",
-  "receipt": null,
+  "receipt": "receipts/r43-b04-readiness-gate-ci.json",
   "positives": [
     "B04-03 R43 source-real C4 ledger says no auto Freeze Merge or Release with seven Core blockers"
   ],
@@ -17,5 +17,68 @@
     "B04-03 R43 a user or LLM-supplied self-attested independent review cannot grant release",
     "B04-03 R43 forged C4 finalization and incomplete historical exact-SHA audit are denied"
   ],
-  "boundary": "Read-only machine readiness BLOCKED, not independent C5 audit or Product/L1 Freeze."
+  "boundary": "Read-only machine readiness BLOCKED, not independent C5 audit or Product/L1 Freeze.",
+  "originCommit": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+  "originTree": "0a06f79233b3404a32871c0efb7973fae1c0b2e1",
+  "candidateReplayHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "PENDING",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "PENDING",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "PENDING",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/3"
+    }
+  ],
+  "history": [
+    {
+      "head": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/3"
+        }
+      ]
+    },
+    {
+      "head": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/3"
+        }
+      ],
+      "description": "Later cumulative full-suite candidate"
+    }
+  ]
 }

@@ -5,11 +5,11 @@
   "globalRoundId": "R42",
   "status": "CI_PENDING",
   "startParent": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
-  "sourceHead": null,
-  "finalTree": null,
+  "sourceHead": "9e6c05e4328614ea8a5e86a0ea201869eb4333a1",
+  "finalTree": "7d5ee77633a413c42fde24f245e6156d068337a8",
   "testPath": "examples/dis-v020-conformance/closure-audit.test.mjs",
   "testGitBlob": "77e6b427fabd3fc8b07a70b5ce72117294e7b570",
-  "receipt": null,
+  "receipt": "receipts/r42-b04-closure-dag-ci.json",
   "positives": [
     "B04-02 R42 exact historical source ledger and 21 requirement DAG leave 7 substantive Core blockers"
   ],
@@ -18,5 +18,68 @@
     "B04-02 R42 Core semantic or Target promotion without actual owner and approved scope is rejected",
     "B04-02 R42 skipped dependency, fake governance and incomplete prior round audit fail closed"
   ],
-  "boundary": "C4 ledger audit structurally proves 7 remaining, not that any pending SAP/Target issue is actually solved."
+  "boundary": "C4 ledger audit structurally proves 7 remaining, not that any pending SAP/Target issue is actually solved.",
+  "originCommit": "9e6c05e4328614ea8a5e86a0ea201869eb4333a1",
+  "originTree": "7d5ee77633a413c42fde24f245e6156d068337a8",
+  "candidateReplayHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "PENDING",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "PENDING",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/3"
+    }
+  ],
+  "history": [
+    {
+      "head": "9e6c05e4328614ea8a5e86a0ea201869eb4333a1",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/3"
+        }
+      ]
+    },
+    {
+      "head": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/3"
+        }
+      ],
+      "description": "Later cumulative full-suite candidate"
+    }
+  ]
 }

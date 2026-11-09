@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B04",
-  "status": "IN_PROGRESS",
+  "status": "CI_PENDING",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -25,21 +25,81 @@
       "globalRoundId": "R41",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-conformance/batch-audit.test.mjs",
-      "receipt": null
+      "receipt": "receipts/r41-b04-source-ledger-ci.json",
+      "originalSourceHead": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
+      "testGitBlob": "3bc3f9703f303c48ad9841edece0d0bb209eb9cb",
+      "latestCandidateHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+      "history": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/3"
+        }
+      ]
     },
     {
       "batchRoundId": "B04-02",
       "globalRoundId": "R42",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-conformance/closure-audit.test.mjs",
-      "receipt": null
+      "receipt": "receipts/r42-b04-closure-dag-ci.json",
+      "originalSourceHead": "9e6c05e4328614ea8a5e86a0ea201869eb4333a1",
+      "testGitBlob": "77e6b427fabd3fc8b07a70b5ce72117294e7b570",
+      "latestCandidateHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+      "history": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/3"
+        }
+      ]
     },
     {
       "batchRoundId": "B04-03",
       "globalRoundId": "R43",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-conformance/readiness-gate.test.mjs",
-      "receipt": null
+      "receipt": "receipts/r43-b04-readiness-gate-ci.json",
+      "originalSourceHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+      "testGitBlob": "fe73afab74dce2d82f24f64b09c22f9aafba341f",
+      "latestCandidateHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+      "history": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/3"
+        }
+      ]
     }
   ],
   "constraints": [
@@ -49,5 +109,13 @@
     "No provisional CI PENDING can become PASS automatically.",
     "No special Node-major content gate.",
     "No merge/freeze/release."
+  ],
+  "fullSuiteCandidateHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+  "fullSuiteCandidateTree": "0a06f79233b3404a32871c0efb7973fae1c0b2e1",
+  "batchResult": "Three independently versioned C4 audit scopes, code committed; full source #2288 still PENDING. No 3/3 exact native verification and no Core promotion.",
+  "blockers": [
+    "Tally source-independent acceptance negative; GH locator remains unapproved",
+    "Product/L1 real OS Target and UI transport applicability unresolved",
+    "Seven Core PARTIAL, Governance NOT_RUN, no release/freeze"
   ]
 }

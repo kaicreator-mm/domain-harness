@@ -1,0 +1,82 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r41-b04-source-ledger-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "scope": "B04_B04-01_C4_REVIEW_AND_PROVENANCE",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
+    "tree": "91d6d4cfcaf0d726a6acec623db03776c95b1e2a"
+  },
+  "originCommit": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
+  "originTree": "91d6d4cfcaf0d726a6acec623db03776c95b1e2a",
+  "candidateReplayHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+  "testGitBlob": "3bc3f9703f303c48ad9841edece0d0bb209eb9cb",
+  "testPath": "examples/dis-v020-conformance/batch-audit.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "PENDING",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/3"
+    }
+  ],
+  "history": [
+    {
+      "head": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/3"
+        }
+      ]
+    },
+    {
+      "head": "d451eb36b8c4058d14c501c8965c300bee88acd9",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/3"
+        }
+      ],
+      "description": "Later cumulative full-suite candidate"
+    }
+  ],
+  "limitations": [
+    "Stored CI claims/URLs do not independently verify remote run; live GitHub CI is separately re-read.",
+    "No SAP independent qualification or real Target-specific OS implementation.",
+    "CORE-016 and Governance remain non-accepted until all Core MUSTs and fresh independent final review."
+  ]
+}
