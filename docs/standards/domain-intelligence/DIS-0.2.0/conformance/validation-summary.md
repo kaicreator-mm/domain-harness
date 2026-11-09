@@ -185,3 +185,10 @@ Three individually committed source-locked rounds (11 named native cases) add **
 
 ### B06 R47–R49 real HTTP native Chat/Form transport — VERIFIED
 Three separate Git source commits introduce real loopback HTTP Form/Chat POST through original AOT-selected xDownload Interaction; negative parser/forged Effect/oversize tests and six-session concurrency/SDK STOP. Eight native cases qualified at exact source `272cc9e52df02a1261cc79b96fa2acd683e88680` / #2300/1-3 3/3 SUCCESS with the three original test Git Blobs unchanged. The #2294/#2295 native failures were root-caused to a B04/B05 receipt-field validator regression (prose in machine-reserved `qualification`), repaired in the same bounded write set without touching any assertion. No inflated Core-014 (still PARTIAL), no production HTTP UI or Host effects. [B06 status](batches/B06/BATCH_STATUS.md).
+
+
+## R51 exact-source CI qualification — B07-01 VERIFIED (2026-11-09)
+
+Qualification **source HEAD** [`61f32bfc274b701f6b4d8ffcd66f58d4349f22fc`](https://github.com/kaicreator-mm/domain-harness/commit/61f32bfc274b701f6b4d8ffcd66f58d4349f22fc), TREE `1dbcc01229a75dbb259d3f0d96c93b8a33c11369`. Native Integration [#2302/1](https://ci.kaicreator.com/repos/18/pipeline/2302/1), min compatibility [#2302/2](https://ci.kaicreator.com/repos/18/pipeline/2302/2), General Verify [#2302/3](https://ci.kaicreator.com/repos/18/pipeline/2302/3) **3/3 SUCCESS**; original test Git Blob `639cfbcaa09f829f1b0687fff961c99e04a9da9c` unchanged. R51 replays B01–B06 18 source-scoped round receipts and negative forgeries, accepts context/job reordering, and preserves B02 R35 later-source drift as historical. [B07 receipt](receipts/r51-b07-full-ledger-ci.json).
+
+**B07 now 1 VERIFIED / 2 NOT_STARTED**, without declaring three-round batch complete. Core **9/16 VERIFIED / 7 PARTIAL**; Optional 4 NOT_RUN, Governance 1 NOT_RUN. The observed CI confirms executable stored-evidence checks, NOT live independent CI attestation, independent Tally/SAP semantics, applicable Target/Interaction scope, or final L2 Freeze.

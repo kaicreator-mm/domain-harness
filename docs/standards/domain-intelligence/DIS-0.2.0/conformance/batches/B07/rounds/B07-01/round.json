@@ -3,10 +3,10 @@
   "batchId": "B07",
   "roundId": "B07-01",
   "globalRoundId": "R51",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "originCommit": "179e2127a884f6a10587563094f0a2d709af5300",
   "originTree": "8bd95bdbe1b209b5f1cb2ef339736a4ef964bd62",
-  "sourceHead": "179e2127a884f6a10587563094f0a2d709af5300",
+  "sourceHead": "61f32bfc274b701f6b4d8ffcd66f58d4349f22fc",
   "testPath": "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
   "testGitBlob": "639cfbcaa09f829f1b0687fff961c99e04a9da9c",
   "receipt": "receipts/r51-b07-full-ledger-ci.json",
@@ -19,10 +19,56 @@
     "B07-01 R51 forged test blob, stale exact TREE and missing matrix link never inherit earlier SUCCESS",
     "B07-01 R51 unexecuted original native test cannot qualify from a stored CI URL alone"
   ],
-  "checks": [],
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/3"
+    }
+  ],
   "limitations": [
     "Source-scoped stored Git/CI claim coherence, not live CI lookup; test original Git Blobs may differ from later checkout without retroactive overwrite.",
     "No independent Tally SAP/domain source-owner approval, Product/L1 Target or Interaction applicability decision, L2 Freeze or production Effect.",
     "Current status pending until exact current HEAD Woodpecker Integration+Verify succeeds."
+  ],
+  "finalTree": "1dbcc01229a75dbb259d3f0d96c93b8a33c11369",
+  "history": [
+    {
+      "sourceHead": "179e2127a884f6a10587563094f0a2d709af5300",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Original immutable R51 code commit, CI intentionally triggered at the later versioned metadata HEAD."
+    },
+    {
+      "head": "61f32bfc274b701f6b4d8ffcd66f58d4349f22fc",
+      "tree": "1dbcc01229a75dbb259d3f0d96c93b8a33c11369",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/3"
+        }
+      ],
+      "meaning": "Native full all-B01-B06 18-round audit, exactly the branch HEAD that ran #2302/1-3 all SUCCESS."
+    }
   ]
 }

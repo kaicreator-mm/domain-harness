@@ -7,3 +7,7 @@
 - Negative checks cover fabricated cross-pipeline results, duplicated job number, changed source Git blob/tree, lost matrix link and excluded native test.
 - Audit is **read-only stored record verification**, not independent GitHub CI status lookup or independent semantic Oracle; historical SHA evidence is not overwritten if current source differs.
 - **State: CI_PENDING**. No batch qualification / Core promotion / Merge / Freeze / Release. B01–B06 remain 18/18 previously qualified at their own exact historic successful commits. Product/L1 scope and independent Tally SAP unresolved.
+
+## Exact-source full CI result (supersedes above original PENDING snapshot)
+
+R51 qualified at HEAD `61f32bfc274b701f6b4d8ffcd66f58d4349f22fc`, TREE `1dbcc01229a75dbb259d3f0d96c93b8a33c11369`, Woodpecker #2302/1-3 **3/3 SUCCESS**. The original test blob `639cfbcaa09f829f1b0687fff961c99e04a9da9c` was unchanged at that exact source. [Machine receipt](../../../receipts/r51-b07-full-ledger-ci.json); no independent semantic Oracle or Freeze.

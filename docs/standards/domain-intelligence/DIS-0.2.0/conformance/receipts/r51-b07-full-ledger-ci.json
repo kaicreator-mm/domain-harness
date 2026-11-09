@@ -2,18 +2,46 @@
   "schema": "dis.v0.2.validation-receipt/1",
   "id": "r51-b07-full-ledger-ci",
   "disVersion": "0.2.0",
-  "status": "PENDING",
+  "status": "SUCCESS",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": "179e2127a884f6a10587563094f0a2d709af5300",
-    "tree": "8bd95bdbe1b209b5f1cb2ef339736a4ef964bd62"
+    "head": "61f32bfc274b701f6b4d8ffcd66f58d4349f22fc",
+    "tree": "1dbcc01229a75dbb259d3f0d96c93b8a33c11369"
   },
   "originCommit": "179e2127a884f6a10587563094f0a2d709af5300",
   "testGitBlob": "639cfbcaa09f829f1b0687fff961c99e04a9da9c",
   "testPath": "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
-  "ci": [],
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/3"
+    }
+  ],
   "observations": [
     "Git source R51 and 18-round ledger tests committed; no successful CI claim at this time.",
     "Await exact final branch HEAD and three actual Woodpecker contexts before qualification."
+  ],
+  "historical": [
+    {
+      "sourceHead": "179e2127a884f6a10587563094f0a2d709af5300",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Unchanged test Git Blob replayed in later exact source."
+    }
+  ],
+  "limitations": [
+    "Read-only stored Git receipt/CI context consistency, not a live CI API check or independent SAP/domain source-owner semantic acceptance.",
+    "Historic test blob drift in current files must be reported, never rewritten retroactively.",
+    "B07 overall batch not complete; no automatic Core-016 full conformance, L2 Freeze or release."
   ]
 }

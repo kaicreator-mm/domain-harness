@@ -22,13 +22,30 @@
     {
       "batchRoundId": "B07-01",
       "globalRoundId": "R51",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
       "originalSourceHead": "179e2127a884f6a10587563094f0a2d709af5300",
       "testGitBlob": "639cfbcaa09f829f1b0687fff961c99e04a9da9c",
       "receipt": "receipts/r51-b07-full-ledger-ci.json",
-      "sourceHead": "179e2127a884f6a10587563094f0a2d709af5300",
-      "checks": []
+      "sourceHead": "61f32bfc274b701f6b4d8ffcd66f58d4349f22fc",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2302/3"
+        }
+      ],
+      "qualificationTree": "1dbcc01229a75dbb259d3f0d96c93b8a33c11369"
     }
   ],
   "constraints": [
@@ -36,5 +53,8 @@
     "B07-01 is not VERIFIED until exact source CI; B07-02/B07-03 are NOT_STARTED.",
     "No premature promotion of 9/16 Core or Optional/Governance from a ledger check.",
     "No GitHub Actions, Node-major semantic gate, physical effects, merge, Freeze or Release."
-  ]
+  ],
+  "verifiedRounds": 1,
+  "unstartedRounds": 2,
+  "note": "B07-01 alone exact-SHA qualified; B07-02/03 NOT_STARTED, batch not complete."
 }

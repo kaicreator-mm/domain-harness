@@ -229,3 +229,8 @@ D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式�
 
 ### Batch B06 — real loopback HTTP Form/Chat native Interaction, 3 source rounds (VERIFIED)
 - [B06 source-scoped status](batches/B06/BATCH_STATUS.md), [manifest](batches/B06/manifest.json), separate [R47](batches/B06/rounds/B06-01/ROUND.md), [R48](batches/B06/rounds/B06-02/ROUND.md), [R49](batches/B06/rounds/B06-03/ROUND.md). Three immutable test Git Blobs unchanged, 8 native cases all PASS, qualified at `272cc9e52df02a1261cc79b96fa2acd683e88680` / #2300/1-3 3/3 SUCCESS after a root-caused r41-r46 receipt-field validator repair (#2294/#2295 native failures were that regression, not B06 tests). This is an actual loopback HTTP transport, not deployed public UI or KDP effect; CORE-014 stays PARTIAL.
+
+
+### B07-01 / R51 — six-batch evidence-ledger generalization
+
+R51 stores its own [versioned round](batches/B07/rounds/B07-01/ROUND.md), original test Blob, [receipt](receipts/r51-b07-full-ledger-ci.json) and [B07 running manifest](batches/B07/manifest.json). It extends read-only source/CI-claim audit from 9 historic B01–B03 rounds to all 18 B01–B06 rounds, validating context identity independent of scheduled Woodpecker job number. Source `61f32bfc274b701f6b4d8ffcd66f58d4349f22fc`, TREE `1dbcc01229a75dbb259d3f0d96c93b8a33c11369`, #2302/1–3 3/3 SUCCESS. B07 is 1/3; CORE-016 remains PARTIAL, GOV-001 NOT_RUN. This does not confer live CI/status attestation, domain-owner SAP, Product/L1 Target applicability or full DIS conformance.
