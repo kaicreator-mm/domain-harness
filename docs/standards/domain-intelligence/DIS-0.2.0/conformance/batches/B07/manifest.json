@@ -17,7 +17,7 @@
     "optionalNotRun": 4,
     "governanceNotRun": 1
   },
-  "target": "C4 evidence integrity and C1/D02 real Element Function-dependency completeness, no implicit Effect authority",
+  "target": "C1/C4: exact Function-level Element edge, typed source-linked semantic constraint and full historical 18-round provenance; no inferred business authority",
   "rounds": [
     {
       "batchRoundId": "B07-01",
@@ -57,6 +57,17 @@
       "receipt": "receipts/r52-b07-function-dependency-ci.json",
       "sourceHead": "f2130918d9863aeabd36227886c05cc44c5670cd",
       "checks": []
+    },
+    {
+      "batchRoundId": "B07-03",
+      "globalRoundId": "R53",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-native-sdk/b07-semantic-relation.test.mjs",
+      "originalSourceHead": "0b4df62efa77e28fc9763f383706199074156170",
+      "testGitBlob": "dc0a51bfbdae6aba620f7ed596aedcd862732d9b",
+      "receipt": "receipts/r53-b07-source-semantic-relation-ci.json",
+      "sourceHead": "0b4df62efa77e28fc9763f383706199074156170",
+      "checks": []
     }
   ],
   "constraints": [
@@ -66,7 +77,7 @@
     "No GitHub Actions, Node-major semantic gate, physical effects, merge, Freeze or Release."
   ],
   "verifiedRounds": 1,
-  "unstartedRounds": 1,
+  "unstartedRounds": 0,
   "note": "B07-01 alone exact-SHA qualified; B07-02/03 NOT_STARTED, batch not complete.",
-  "pendingRounds": 1
+  "pendingRounds": 2
 }

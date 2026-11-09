@@ -15,3 +15,7 @@ B07-01/R51 **VERIFIED** by HEAD `61f32bfc274b701f6b4d8ffcd66f58d4349f22fc` / TRE
 ## B07-02 R52 Function-level dependency contract (candidate)
 
 At original Git source `f2130918d9863aeabd36227886c05cc44c5670cd` / test Blob `c579299182569a5641683ec93a624eaba703e94b`, the selected xDownload acquisition now declares both actual LOCAL Interaction Functions and its Knowledge Function as version-locked static dependencies, not as authority to execute an Effect. New valid/missing/duplicate/version/drift and static-cycle negative native cases are mandatory in the existing Woodpecker integration context. **CI_PENDING** pending real exact source status, so B07 is now 1 VERIFIED / 1 PENDING / 1 NOT_STARTED and CORE-002/005 remain PARTIAL.
+
+## B07-03 R53 source-linked semantic constraint (candidate)
+
+Original source `0b4df62efa77e28fc9763f383706199074156170`, test Git Blob `dc0a51bfbdae6aba620f7ed596aedcd862732d9b`: optional AOT-linked Semantic Relation now carries exact version/source/selected verifier (original xDownload Knowledge Function); direct SDK consumption remains OBSERVATION/NONE. Mandatory native failures for fake independent authority, version drift, foreign source and duplicate identity. **CI_PENDING**; both R52 and R53 require exact cumulative Woodpecker results before B07 3/3 closure. No new Core promotions.

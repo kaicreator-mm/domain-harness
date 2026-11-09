@@ -1,0 +1,26 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B07",
+  "roundId": "B07-03",
+  "globalRoundId": "R53",
+  "status": "CI_PENDING",
+  "originCommit": "0b4df62efa77e28fc9763f383706199074156170",
+  "originTree": "ed14d0c8d805f17e5af90801cf9a404b53ae53aa",
+  "testPath": "examples/dis-v020-native-sdk/b07-semantic-relation.test.mjs",
+  "testGitBlob": "dc0a51bfbdae6aba620f7ed596aedcd862732d9b",
+  "receipt": "receipts/r53-b07-source-semantic-relation-ci.json",
+  "sourceHead": "0b4df62efa77e28fc9763f383706199074156170",
+  "checks": [],
+  "positive": [
+    "B07-03 R53 real xDownload source-owned policy constraint has versioned pinned non-authoritative relation and Knowledge verifier"
+  ],
+  "negative": [
+    "B07-03 R53 forged domain authority, missing source and invalid relation identity fail closed before selected SDK boot",
+    "B07-03 R53 a nonselected source or a semantic backlink cannot imply an unselected KDP permission"
+  ],
+  "limits": [
+    "Opt-in source-linked relation metadata is not independently verified domain truth or an unconditional runtime constraint engine.",
+    "Actual selected source Knowledge verifier is observed with authority NONE and cannot dispatch an Effect.",
+    "All seven Core partial remain PARTIAL pending Product/L1 ownership, independent SAP and remaining contract coverage."
+  ]
+}

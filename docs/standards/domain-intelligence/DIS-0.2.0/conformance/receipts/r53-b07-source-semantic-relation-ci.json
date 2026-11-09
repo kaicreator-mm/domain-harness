@@ -1,0 +1,24 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r53-b07-source-semantic-relation-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "0b4df62efa77e28fc9763f383706199074156170",
+    "tree": "ed14d0c8d805f17e5af90801cf9a404b53ae53aa"
+  },
+  "originCommit": "0b4df62efa77e28fc9763f383706199074156170",
+  "testGitBlob": "dc0a51bfbdae6aba620f7ed596aedcd862732d9b",
+  "testPath": "examples/dis-v020-native-sdk/b07-semantic-relation.test.mjs",
+  "ci": [],
+  "observations": [
+    "Source-backed xDownload Policy Knowledge verifier and semantic relation AOT pin implemented but no CI claim yet.",
+    "Relation identity, provenance, version, applicability and verifier Function exact version are validated at AOT; output authority remains NONE."
+  ],
+  "limitations": [
+    "Opt-in source-linked relation metadata is not independently verified domain truth or an unconditional runtime constraint engine.",
+    "Actual selected source Knowledge verifier is observed with authority NONE and cannot dispatch an Effect.",
+    "All seven Core partial remain PARTIAL pending Product/L1 ownership, independent SAP and remaining contract coverage."
+  ]
+}
