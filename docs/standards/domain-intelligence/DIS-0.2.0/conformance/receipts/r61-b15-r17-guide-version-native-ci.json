@@ -1,0 +1,46 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r61-b15-r17-guide-version-native-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "a54c37e37ce5bbf3a9eaf40a507ce174dc14896b",
+    "tree": "3a475c881e07194a95547226be41448014700e5a"
+  },
+  "originCommit": "a54c37e37ce5bbf3a9eaf40a507ce174dc14896b",
+  "testPath": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+  "testGitBlob": "3cb38ab938a531ae30ef00770488e086e63dff95",
+  "readerSourceGitBlob": "5e402d7194ad9cdb17c7599a8b693ade3b1f20d1",
+  "ci": [],
+  "upstreamDke": {
+    "repo": "kaicreator-mm/domain-forge",
+    "commit": "e74521dff040c78a83014b69f0b36e190bce80e3",
+    "data": [
+      {
+        "path": "PUBLISHER_OBSERVATIONS.json",
+        "gitBlob": "608c336f472b3f6eb979ae4ef13dcf3d133c86c5"
+      },
+      {
+        "path": "CASES.json",
+        "gitBlob": "1816b799c064d4793e055892c42b1c0fd0d77855"
+      },
+      {
+        "path": "RUN_RECEIPT_V8.json",
+        "gitBlob": "659eb8d9ab209bbcbf9d966ae3ee3fc16e6b7d18"
+      }
+    ]
+  },
+  "observations": [
+    "New R61 original DKE R17 case/observation/V8 receipt JSON are byte-identical to original producer Git data. 20 bounded cases; 2 source web-line-located stale Mainboard Guide step reference mismatches, but original publisher full HTML/PDF is not raw SHA-pinned.",
+    "Original source-selected DIS Knowledge Function is native Node/SDK/KDP, unlike DKE's initial hosted V8 executable; this is a separate new source run and not a retroactive upgrade to original R17 native claim.",
+    "All DIS Method qualification outcomes are typed UNKNOWN. No invented automatic step remap, independent semantic Critic/SAP, physical device repair or Effect; candidate requires own three Woodpecker CI statuses."
+  ],
+  "limitations": [
+    "The original Framework Guide 203/79 publisher HTML/PDF full bytes were NOT SHA-pinned by DKE R17; only the original RTCRework parent README is Git-blob pinned. DIS verifies original R17 JSON input/receipt Git blobs and independently replays all 20 source-bounded cases, not full publisher page authenticity.",
+    "Original DKE R17 gate executed only in hosted V8; DIS R61 runs a separate bounded equivalent reader in actual native Node/SDK/KDP CI. R61 does not falsely rewrite upstream R17 runtime as Node CLI PASS.",
+    "Two web-line-located stale step-reference conflicts block the dependent D05 Method, but a proposed automatic 16→26 or 17→28 remap is not independently source-authorized. No physical repair or real hardware execution.",
+    "All 20 cases return typed UNKNOWN for method qualification, even if syntax/model/authority input is explicitly rejected inside compatibility classification. An observed conflict is evidence of invalidation, not positive approved repair instruction.",
+    "Source-owner independent semantic Critic remains NOT_RUN, SAP=0, Effects=0; CORE-002/003/005/006/016 remain PARTIAL."
+  ]
+}

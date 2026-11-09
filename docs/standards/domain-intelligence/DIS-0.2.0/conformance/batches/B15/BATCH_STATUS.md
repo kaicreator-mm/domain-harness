@@ -1,0 +1,3 @@
+# DIS B15 — actual DKE R17 cross-guide version Method invalidation native consumer
+
+B15-01 / R61 candidate source `a54c37e37ce5bbf3a9eaf40a507ce174dc14896b` TREE `3a475c881e07194a95547226be41448014700e5a`, selected native test Git Blob `3cb38ab938a531ae30ef00770488e086e63dff95`, Reader Git Blob `5e402d7194ad9cdb17c7599a8b693ade3b1f20d1`. Original DKE R17 hosted V8 20 cases / 2 observed real guide step-role mismatches → native DIS Knowledge UNKNOWN (unapproved Method and missing full publisher raw pins), blocked auto-remap and Effect. **CI_PENDING**. Previous B01–B14 28/28 VERIFIED, new B15 0/1 pending; Core 9/16, 7 PARTIAL; Optional 4 NOT_RUN; Governance 1 NOT_RUN. No Freeze/merge/release.

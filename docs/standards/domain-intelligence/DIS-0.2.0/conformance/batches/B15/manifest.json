@@ -1,0 +1,43 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B15",
+  "status": "IN_PROGRESS",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "08daf8114de6504d0bc4ba8e63bf4af86213f685",
+    "qualifiedPriorRounds": 28,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "C1/C2: original DKE R17 Framework official Guide 203→79 version-semantic step conflict → real selected DIS native Knowledge Function invalidation, 20 bounded cases and fail-closed no automatic repair.",
+  "rounds": [
+    {
+      "batchRoundId": "B15-01",
+      "globalRoundId": "R61",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+      "originalSourceHead": "a54c37e37ce5bbf3a9eaf40a507ce174dc14896b",
+      "testGitBlob": "3cb38ab938a531ae30ef00770488e086e63dff95",
+      "receipt": "receipts/r61-b15-r17-guide-version-native-ci.json",
+      "sourceHead": "a54c37e37ce5bbf3a9eaf40a507ce174dc14896b",
+      "checks": []
+    }
+  ],
+  "verifiedRounds": 0,
+  "pendingRounds": 1,
+  "unstartedRounds": 0,
+  "noAutomaticCorePromotion": true,
+  "limitations": [
+    "The original Framework Guide 203/79 publisher HTML/PDF full bytes were NOT SHA-pinned by DKE R17; only the original RTCRework parent README is Git-blob pinned. DIS verifies original R17 JSON input/receipt Git blobs and independently replays all 20 source-bounded cases, not full publisher page authenticity.",
+    "Original DKE R17 gate executed only in hosted V8; DIS R61 runs a separate bounded equivalent reader in actual native Node/SDK/KDP CI. R61 does not falsely rewrite upstream R17 runtime as Node CLI PASS.",
+    "Two web-line-located stale step-reference conflicts block the dependent D05 Method, but a proposed automatic 16→26 or 17→28 remap is not independently source-authorized. No physical repair or real hardware execution.",
+    "All 20 cases return typed UNKNOWN for method qualification, even if syntax/model/authority input is explicitly rejected inside compatibility classification. An observed conflict is evidence of invalidation, not positive approved repair instruction.",
+    "Source-owner independent semantic Critic remains NOT_RUN, SAP=0, Effects=0; CORE-002/003/005/006/016 remain PARTIAL."
+  ]
+}
