@@ -239,3 +239,8 @@ R51 stores its own [versioned round](batches/B07/rounds/B07-01/ROUND.md), origin
 ### B07 R52/R53 — source-selected Function dependencies and semantic relation provenance
 
 R51 **historical 18-round read-only ledger** + R52 true multi-Function static dependency/ABI + R53 original xDownload Policy constraint/selected Knowledge verifier each have [individually versioned rounds](batches/B07/manifest.json) and separate exact source/test Blobs. Full cumulative R52/R53 source `0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f` / TREE `6fecc2a8c48f69996113d4f4d4fce1f037d79bcf` verified at Woodpecker **#2305/1–3 3/3 SUCCESS**; [B07 summary](batches/B07/BATCH_SUMMARY.md). Those scoped results strengthen CORE-002/003/005 but all remain PARTIAL awaiting complete normative semantics and genuinely independent SAP/source-owner authority. B01–B07 = **21/21 Demo rounds**, NOT 100% Core conformance.
+
+
+### B08 — actual upstream DKE → native DIS Knowledge consumer
+
+Original [DKE #209 R6](https://github.com/kaicreator-mm/domain-forge/issues/209) immutable Git producer receipt bound to DIS AOT native `dke.provisional.query` and KDP SDK; real Tally old/new source provenance, UNKNOWN/no-evidence, data-origin vs executable trust boundary, negative spoofed SAP. [B08 round](batches/B08/rounds/B08-01/ROUND.md), [summary](batches/B08/BATCH_SUMMARY.md) and [receipt](receipts/r54-b08-real-dke-knowledge-consumer-ci.json); exact source `23dbb0ea5dabe661fb2a309adba00e4dbffe0c89` / TREE `fab96c9328a7bae37336b30a18f3cdc8d131a396`, #2309/1-3 **3/3 SUCCESS**. B01–B08 **22/22 source-scoped**; Core **9/16**; complete source-owner/SAP acceptance remains missing.

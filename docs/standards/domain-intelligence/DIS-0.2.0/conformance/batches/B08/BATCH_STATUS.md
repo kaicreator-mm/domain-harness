@@ -14,3 +14,13 @@ Same Writer repair: Reader `269804b8a4be9d262deb61e1764d9030612dc01e` / Git Blob
 R1 branch candidate `c798f433ef9cffeb808b2c91b6c2923f5a406524` / Woodpecker #2308/1 native **FAILURE**. Source review found another real ABI defect: native `qualifyDisV020Artifact` disallows all `docs/` origins, while actual DKE #209 producer JSON comes from `docs/standards/dke/...`. The original Git path cannot be rewritten into a fake `examples/` path.
 
 R2 targeted Contract source `8c8b29713c3f7aed70d448e707ab65d9234582fa` / Git Blob `fa2fb30875653eaa1eeb32ffbbc97fbb01210c34` accepts only `docs/standards/dke/.../*.json` as selected source DATA, **not** executable LOCAL implementations. R2 native test `d20622f226e40ffe75981d3df75ad7ff941a215f` / Blob `80ecb069278d4112cf38098bfbcb5f5d1465e498` exercises valid DKE Git-origin pin and rejects JSON-as-code, `..` path traversal and `.js` origin. All R0/R1 commits, test Blobs and FAILED CI histories retained. **CI_PENDING** for new cumulative source; no self-qualified R54 or Core state promotion.
+
+## Exact R2 final source qualification (VERIFIED)
+
+Full source `23dbb0ea5dabe661fb2a309adba00e4dbffe0c89` / TREE `fab96c9328a7bae37336b30a18f3cdc8d131a396`: real [Woodpecker #2309/1](https://ci.kaicreator.com/repos/18/pipeline/2309/1), [#2309/2](https://ci.kaicreator.com/repos/18/pipeline/2309/2), [#2309/3](https://ci.kaicreator.com/repos/18/pipeline/2309/3) **3/3 SUCCESS**. Final test Git Blob `80ecb069278d4112cf38098bfbcb5f5d1465e498`. Original producer DKE receipt Git Blob `62a992b9d22332aefcbbcbb02cccb55f5ab25427` unchanged. R0/#2307 native FAILURE and R1/#2308 native FAILURE are immutable historical evidence, **not** retroactively PASS.
+
+The native DIS Function reads original DKE R6 *receipt* (not full original Tally graph in DIS), returns source-limited typed Knowledge `OBSERVED/UNKNOWN` with `authority:NONE`, `attested:false`, `qualified:false`. The DKE producer expressly had SAP_QUALIFIED=0; true first-party semantic authority and independent review remain blockers. Real DKE docs JSON original provenance is admitted as a DATA dependency only, never executable LOCAL code. CORE-003/006/016 remain PARTIAL.
+
+## B08 batch status
+
+**B08-01 R54 1/1 VERIFIED**; cumulative B01–B08 **22/22 scoped rounds VERIFIED**, with Core **9/16 VERIFIED (56.25%), seven PARTIAL**, Optional 4 NOT_RUN, Governance 1 NOT_RUN. No Freeze, Release, merge or independent semantic acceptance.

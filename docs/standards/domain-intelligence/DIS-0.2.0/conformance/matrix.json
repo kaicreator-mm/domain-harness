@@ -45,7 +45,8 @@
     "r49-b06-http-lifecycle-ci",
     "r51-b07-full-ledger-ci",
     "r52-b07-function-dependency-ci",
-    "r53-b07-source-semantic-relation-ci"
+    "r53-b07-source-semantic-relation-ci",
+    "r54-b08-real-dke-knowledge-consumer-ci"
   ],
   "requirements": [
     {
@@ -156,7 +157,8 @@
         "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
         "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
         "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
-        "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs"
+        "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+        "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs"
       ],
       "positive": [
         {
@@ -214,6 +216,14 @@
         {
           "path": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
           "case": "B07-02 R52 original xDownload acquisition statically pins two separate Interaction Functions and one Knowledge Function"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 original DKE #209 R6 Git receipt is actual selected native DIS Knowledge dependency"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 two actual Tally source versions distinguish new graph evidence without SAP upgrade"
         }
       ],
       "negative": [
@@ -288,6 +298,18 @@
         {
           "path": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
           "case": "B07-02 R52 same-version silent dependency drift and same-major Function binding removal are incompatible"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 changed DKE source, false producer approval and source-origin mismatch fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 independently installer-pinned DKE input, Function schema and forged outcome refuse privilege"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 producer DKE JSON source is selectable only as DATA, never executable LOCAL or unsafe docs path"
         }
       ],
       "receiptIds": [
@@ -302,9 +324,10 @@
         "r34-b01-abi-ci",
         "r45-b05-source-closure-ci",
         "r46-b05-target-original-consumer-ci",
-        "r52-b07-function-dependency-ci"
+        "r52-b07-function-dependency-ci",
+        "r54-b08-real-dke-knowledge-consumer-ci"
       ],
-      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility. R16 candidate adds a separately AOT-locked KDP receipt admission profile (actual selected orders KDP Intent), not a completed Effect/business evidence attestation; pending new exact-SHA CI. R16 exact SHA db10ddbc / Woodpecker #2237 three contexts SUCCESS; KDP admission classified, not executed Effect or independent Evidence. R17 draft tests bounded opt-in record Schema and same-major structural reader compatibility; pending exact-SHA CI. R17 bounded record/optional/closed Schema and structural same-major comparator passed exact-SHA Woodpecker #2238 at fe51db3. R18 uses original Tally release advisory source, adds all-reported-PASS but never independently attested negative and forged local Release status guard; not yet current CI-verified. R19 #2240 dedicated integration FAILURE with other contexts SUCCESS (blocked historical receipt; root cause not demonstrated). R19.1 addresses a separate source-backed zero-argument public Knowledge ABI compatibility regression with allowAbsent on closed empty records and negative tests. Await new exact HEAD CI. R19.1 dedicated #2241 integration FAILURE (2 other contexts SUCCESS) is preserved as blocked historical receipt, not a verifier. R20 proposes source-real Runx PROCESS_LOCAL Handle method contract; no serialized record lie, Host lease or independent evidence verification. New CI pending. R18-R20 native integration repair: authenticated Woodpecker step logs show #2240/#2241/#2242 each failed exactly one legacy test (native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule) because R19's new receipt contract on xdownload.confirmDownload tripped the earlier R16 receipt-binding guard (DIS_KDP_RECEIPT_BINDING_UNSUPPORTED) before DIS_LOCAL_NOT_QUALIFIED; repair dfba82a7 completes the fixture mutation by stripping receiptContract in the clone, keeping the load-bearing R16 guard order pinned by its own dedicated test. Exact HEAD dfba82a7723d709ee22acd65b079fdcc98000f69 / TREE 57b789dff8039888f39e7045e0216b9962ae87fb qualified by Woodpecker #2243/1-3 all SUCCESS (65/65 native tests incl. R18/R19/R19.1/R20 plus the two previously unreached lane tail commands; receipt r18-r20-native-integration-repaired). CORE-003 stays PARTIAL. R21 true AOT-selected DKE source consumer qualified by exact-SHA #2249/1 DIS Integration SUCCESS + #2249/3 General Verify SUCCESS; #2249/2 engine-only CI ERROR is recorded but not a semantic gate per Owner. 24 true selected Function CQ calls and source/currentness negatives, no independent Knowledge Oracle/Package inverse registry. Historical mixed-CI receipt r21-native-dke-semantic-ci. R22 candidate adds optional per-LOCAL-Function sourceDependencies in AOT, reverse sourceConsumers lookup for DKE original execution + data projection, fail-closed missing/duplicate/foreign source and forged KDP_INTENT cases. Not a CQ→SAP→external Package/ECP change-currentness proof; awaiting own exact-SHA native integration CI. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. Batch B01 exact R32/R33/R34 source test blobs qualified at replay SHA 0e0d9ad8b227ed1f1ef90af648e423cd43214563 / Woodpecker #2276/1-3 3/3 SUCCESS, with original three round commits and prior FAILURE/ERROR retained; Function I/O and structural ABI are bounded, SAP/Oracle and full applicable ABI obligations still PARTIAL. B05 native real process OS/arch preflight, optional complete installer original source locks and actual Tally/Runx/xDownload/KDP invocation candidate. It remains a bounded C2/C3 implementation; it is not distinct per-OS module source or independent Tally semantic SAP acceptance. No Core promotion without authoritative scope and exact CI. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B07 R52/R53 exact real selected xDownload Function-level static dependencies and source-version-linked semantic constraint qualified at source 0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f / #2305/1-3 all SUCCESS, with separate original test Git Blobs and negative cases. This is bounded structural provenance and advisory Knowledge consumption; complete domain semantic Oracle/SAP, full public ABI or Product/L1 Target applicability remains unproven; state PARTIAL."
+      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility. R16 candidate adds a separately AOT-locked KDP receipt admission profile (actual selected orders KDP Intent), not a completed Effect/business evidence attestation; pending new exact-SHA CI. R16 exact SHA db10ddbc / Woodpecker #2237 three contexts SUCCESS; KDP admission classified, not executed Effect or independent Evidence. R17 draft tests bounded opt-in record Schema and same-major structural reader compatibility; pending exact-SHA CI. R17 bounded record/optional/closed Schema and structural same-major comparator passed exact-SHA Woodpecker #2238 at fe51db3. R18 uses original Tally release advisory source, adds all-reported-PASS but never independently attested negative and forged local Release status guard; not yet current CI-verified. R19 #2240 dedicated integration FAILURE with other contexts SUCCESS (blocked historical receipt; root cause not demonstrated). R19.1 addresses a separate source-backed zero-argument public Knowledge ABI compatibility regression with allowAbsent on closed empty records and negative tests. Await new exact HEAD CI. R19.1 dedicated #2241 integration FAILURE (2 other contexts SUCCESS) is preserved as blocked historical receipt, not a verifier. R20 proposes source-real Runx PROCESS_LOCAL Handle method contract; no serialized record lie, Host lease or independent evidence verification. New CI pending. R18-R20 native integration repair: authenticated Woodpecker step logs show #2240/#2241/#2242 each failed exactly one legacy test (native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule) because R19's new receipt contract on xdownload.confirmDownload tripped the earlier R16 receipt-binding guard (DIS_KDP_RECEIPT_BINDING_UNSUPPORTED) before DIS_LOCAL_NOT_QUALIFIED; repair dfba82a7 completes the fixture mutation by stripping receiptContract in the clone, keeping the load-bearing R16 guard order pinned by its own dedicated test. Exact HEAD dfba82a7723d709ee22acd65b079fdcc98000f69 / TREE 57b789dff8039888f39e7045e0216b9962ae87fb qualified by Woodpecker #2243/1-3 all SUCCESS (65/65 native tests incl. R18/R19/R19.1/R20 plus the two previously unreached lane tail commands; receipt r18-r20-native-integration-repaired). CORE-003 stays PARTIAL. R21 true AOT-selected DKE source consumer qualified by exact-SHA #2249/1 DIS Integration SUCCESS + #2249/3 General Verify SUCCESS; #2249/2 engine-only CI ERROR is recorded but not a semantic gate per Owner. 24 true selected Function CQ calls and source/currentness negatives, no independent Knowledge Oracle/Package inverse registry. Historical mixed-CI receipt r21-native-dke-semantic-ci. R22 candidate adds optional per-LOCAL-Function sourceDependencies in AOT, reverse sourceConsumers lookup for DKE original execution + data projection, fail-closed missing/duplicate/foreign source and forged KDP_INTENT cases. Not a CQ→SAP→external Package/ECP change-currentness proof; awaiting own exact-SHA native integration CI. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. Batch B01 exact R32/R33/R34 source test blobs qualified at replay SHA 0e0d9ad8b227ed1f1ef90af648e423cd43214563 / Woodpecker #2276/1-3 3/3 SUCCESS, with original three round commits and prior FAILURE/ERROR retained; Function I/O and structural ABI are bounded, SAP/Oracle and full applicable ABI obligations still PARTIAL. B05 native real process OS/arch preflight, optional complete installer original source locks and actual Tally/Runx/xDownload/KDP invocation candidate. It remains a bounded C2/C3 implementation; it is not distinct per-OS module source or independent Tally semantic SAP acceptance. No Core promotion without authoritative scope and exact CI. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B07 R52/R53 exact real selected xDownload Function-level static dependencies and source-version-linked semantic constraint qualified at source 0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f / #2305/1-3 all SUCCESS, with separate original test Git Blobs and negative cases. This is bounded structural provenance and advisory Knowledge consumption; complete domain semantic Oracle/SAP, full public ABI or Product/L1 Target applicability remains unproven; state PARTIAL. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL."
     },
     {
       "id": "DIS020-CORE-004",
@@ -431,7 +454,8 @@
       "implementation": [
         "packages/microkernel/dis-v020.mjs",
         "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
-        "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs"
+        "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+        "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs"
       ],
       "positive": [
         {
@@ -449,6 +473,14 @@
         {
           "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
           "case": "B05-03 R46 real host original Tally Rule xDownload Knowledge Runx Stateful and KDP admission compose without business authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 original DKE #209 R6 Git receipt is actual selected native DIS Knowledge dependency"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 two actual Tally source versions distinguish new graph evidence without SAP upgrade"
         }
       ],
       "negative": [
@@ -471,15 +503,28 @@
         {
           "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
           "case": "B05-03 R46 stale independent source pin denies selected native KDP boot before side effects"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 changed DKE source, false producer approval and source-origin mismatch fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 independently installer-pinned DKE input, Function schema and forged outcome refuse privilege"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 producer DKE JSON source is selectable only as DATA, never executable LOCAL or unsafe docs path"
         }
       ],
       "receiptIds": [
         "r9.5-baseline",
         "r33-b01-state-ci",
         "r34-b01-abi-ci",
-        "r46-b05-target-original-consumer-ci"
+        "r46-b05-target-original-consumer-ci",
+        "r54-b08-real-dke-knowledge-consumer-ci"
       ],
-      "note": "Actual Tally rule and Runx observer run as LOCAL, but general per-Element state ownership and knowledge query contract do not have complete executable profile. B01 R33 real Runx Stateful handle independence, token mismatch, process-local boundary and separated Tally Rule/xDownload Knowledge sources PASS at exact replay #2276/1-3; closing SDK ingress does not revoke existing in-process handles or prove persistent Domain state or real KDP lease. Still PARTIAL. B05 native real process OS/arch preflight, optional complete installer original source locks and actual Tally/Runx/xDownload/KDP invocation candidate. It remains a bounded C2/C3 implementation; it is not distinct per-OS module source or independent Tally semantic SAP acceptance. No Core promotion without authoritative scope and exact CI. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation."
+      "note": "Actual Tally rule and Runx observer run as LOCAL, but general per-Element state ownership and knowledge query contract do not have complete executable profile. B01 R33 real Runx Stateful handle independence, token mismatch, process-local boundary and separated Tally Rule/xDownload Knowledge sources PASS at exact replay #2276/1-3; closing SDK ingress does not revoke existing in-process handles or prove persistent Domain state or real KDP lease. Still PARTIAL. B05 native real process OS/arch preflight, optional complete installer original source locks and actual Tally/Runx/xDownload/KDP invocation candidate. It remains a bounded C2/C3 implementation; it is not distinct per-OS module source or independent Tally semantic SAP acceptance. No Core promotion without authoritative scope and exact CI. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL."
     },
     {
       "id": "DIS020-CORE-007",
@@ -949,7 +994,8 @@
         "examples/dis-v020-conformance/closure-audit.mjs",
         "examples/dis-v020-conformance/readiness-gate.test.mjs",
         "examples/dis-v020-conformance/readiness-gate.mjs",
-        "examples/dis-v020-conformance/batch-ledger-18.test.mjs"
+        "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
+        "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs"
       ],
       "positive": [
         {
@@ -979,6 +1025,14 @@
         {
           "path": "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
           "case": "B07-01 R51 all B01-B06 eighteen immutable native Demo receipts are checked without inventing semantic acceptance"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 original DKE #209 R6 Git receipt is actual selected native DIS Knowledge dependency"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 two actual Tally source versions distinguish new graph evidence without SAP upgrade"
         }
       ],
       "negative": [
@@ -1025,6 +1079,18 @@
         {
           "path": "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
           "case": "B07-01 R51 malicious cross-pipeline CI reuse and duplicate job numbers fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 changed DKE source, false producer approval and source-origin mismatch fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 independently installer-pinned DKE input, Function schema and forged outcome refuse privilege"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 producer DKE JSON source is selectable only as DATA, never executable LOCAL or unsafe docs path"
         }
       ],
       "receiptIds": [
@@ -1035,9 +1101,10 @@
         "r41-b04-source-ledger-ci",
         "r42-b04-closure-dag-ci",
         "r43-b04-readiness-gate-ci",
-        "r51-b07-full-ledger-ci"
+        "r51-b07-full-ledger-ci",
+        "r54-b08-real-dke-knowledge-consumer-ci"
       ],
-      "note": "R9.5 exact-SHA CI is verified; version-wide Requirement matrix and receipts only being established in this commit. R21 native Exact-SHA semantic receipt documents dedicated Integration and Verify SUCCESS while preserving engine-only context ERROR; main version conformance remains incomplete. R22 extra AOT source dependencies structurally registered, must be CI-qualified on newer exact SHA; previous R21 receipt remains historical. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. B04 candidate R41/R42/R43 add read-only source Git Blob vs current drift audit, 21-requirement C1-C5 DAG blocker inventory, and fail-closed Freeze/Release gate; all seven normative Core gaps remain, so CORE-016 cannot be promoted even if native CI succeeds. Source reviewer/OS platform decision still missing. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B07-01 R51 read-only prior-18-round audit and Woodpecker reordering fix qualified at exact source 61f32bfc274b701f6b4d8ffcd66f58d4349f22fc / #2302/1-3 all SUCCESS. This audits recorded CI and Git claims only, not independent SAP/semantic authority, live CI attestation or final version-wide conformance; still PARTIAL."
+      "note": "R9.5 exact-SHA CI is verified; version-wide Requirement matrix and receipts only being established in this commit. R21 native Exact-SHA semantic receipt documents dedicated Integration and Verify SUCCESS while preserving engine-only context ERROR; main version conformance remains incomplete. R22 extra AOT source dependencies structurally registered, must be CI-qualified on newer exact SHA; previous R21 receipt remains historical. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. B04 candidate R41/R42/R43 add read-only source Git Blob vs current drift audit, 21-requirement C1-C5 DAG blocker inventory, and fail-closed Freeze/Release gate; all seven normative Core gaps remain, so CORE-016 cannot be promoted even if native CI succeeds. Source reviewer/OS platform decision still missing. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B07-01 R51 read-only prior-18-round audit and Woodpecker reordering fix qualified at exact source 61f32bfc274b701f6b4d8ffcd66f58d4349f22fc / #2302/1-3 all SUCCESS. This audits recorded CI and Git claims only, not independent SAP/semantic authority, live CI attestation or final version-wide conformance; still PARTIAL. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL."
     },
     {
       "id": "DIS020-OPT-001",
