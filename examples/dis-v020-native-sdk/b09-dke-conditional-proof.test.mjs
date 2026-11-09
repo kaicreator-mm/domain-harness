@@ -16,9 +16,9 @@ import {makeR9ConditionalProofReader,R9_DATA_ORIGINS,R9_INPUT_BLOB,R9_PROOF_BLOB
 
 const READER_ORIGIN=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'005bb61307b174467ae0db9c954dbc72c8654362',
+ commit:'4da0c6afb7ede4686092cfcf62321ea2378a7683',
  path:'examples/dis-v020-native-sdk/dke-r9-proof-reader.mjs',
- gitBlob:'077a799d7218017a43fde584fee6ea13944c16fa'
+ gitBlob:'5aba024775a759ba992d1bd06f71770c408f3cec'
 });
 const fail=code=>e=>e?.code===code;
 const clone=structuredClone;
@@ -135,6 +135,16 @@ test('B09-01 R55 real selected SDK consumes 2 entailed + 2 refuted + 7 UNKNOWN w
     '8124fd2d647578345d84664b1319b878e0760259',
     '0e04c366d80375dd377a2200b98962693d47dfba'];
    for(const source of value.sourceRefs)assert.ok(allDocs.some(b=>source.endsWith(b)));
+   const perCase={
+    S01:[allDocs[0],allDocs[1]],S02:[allDocs[0],allDocs[1]],
+    S03:[allDocs[1]],S04:[allDocs[2]],S05:[allDocs[2]],S06:[allDocs[2]],
+    S07:[allDocs[3]],S08:[allDocs[3]],S09:[allDocs[3]],S10:[allDocs[3]],
+    S11:[allDocs[0],allDocs[3]]
+   };
+   assert.deepEqual(value.sourceRefs,perCase[id].map(blob=>
+    Object.entries({CF_FAQ:allDocs[0],CF_HOW:allDocs[1],
+     CF_CHANGE:allDocs[2],GH_WEBHOOK:allDocs[3]})
+     .find(([,sha])=>sha===blob)[0]+':git-blob:'+blob));
    assert.equal(value.propositionLogicallySupported,value.verdict==='ENTAILED');
    if(value.verdict==='UNDERDETERMINED'){
     assert.equal(out.disposition,'UNKNOWN');
