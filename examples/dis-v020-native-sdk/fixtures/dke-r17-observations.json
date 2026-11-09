@@ -1,0 +1,72 @@
+{
+  "schema": "dke.r17.cross-guide-observation/v1",
+  "observedAt": "2026-11-10",
+  "status": "WEB_PUBLISHED_HTML_OBSERVATIONS_NO_RAW_HTTP_BYTE_DIGEST",
+  "originalParent": {
+    "repo": "FrameworkComputer/RTCRework",
+    "gitCommit": "d80b134c3ce9cbafac1c5284095c372cb060a9c5",
+    "readmeBlob": "dbdfc6ba1556689864d733401f7c8f824d965cdf",
+    "verifiedAtR16": true,
+    "guideReferenceStep": 4
+  },
+  "sourceGuide203": {
+    "url": "https://guides.frame.work/Guide/RTC+Battery+Substitution+on+11th+Gen+Intel%C2%AE+Core%E2%84%A2/203",
+    "publicationDate": "2023-11-12",
+    "pdfSnapshotUrl": "https://dozuki-prod-us-east-1-guide-pdfs.s3.amazonaws.com/pdf/framework/guide_203_en_1070.pdf",
+    "pdfGenerated": "2025-08-24 23:52:16 MST",
+    "webLineForDisassembly": 75,
+    "webLineForReassembly": 163,
+    "webQuotedSourceFragments": [
+      "Mainboard guide up to Step 16",
+      "Mainboard guide starting at Step 17"
+    ],
+    "expectedRoles": {
+      "removeThrough": {
+        "step": 16,
+        "requiresRole": "REMOVE_MAINBOARD"
+      },
+      "reassembleFrom": {
+        "step": 17,
+        "requiresRole": "REASSEMBLE_MAINBOARD"
+      }
+    }
+  },
+  "targetGuide79": {
+    "url": "https://guides.frame.work/Guide/Mainboard+Replacement+for+Framework+Laptop+13/79?permalink=1",
+    "latestObservedRevision": "Initial Revamp Release - 1.02",
+    "revisionDate": "2026-07-02",
+    "webLineRevision": 16,
+    "webStepObservations": [
+      {
+        "step": 16,
+        "role": "REMOVE_SSD",
+        "webLine": 438,
+        "title": "Step 16 Remove the SSD"
+      },
+      {
+        "step": 17,
+        "role": "DISCONNECT_SPEAKER",
+        "webLine": 462,
+        "title": "Step 17 Disconnect the Speaker"
+      },
+      {
+        "step": 26,
+        "role": "REMOVE_MAINBOARD",
+        "webLine": 673,
+        "title": "Step 26 Remove the Mainboard"
+      },
+      {
+        "step": 28,
+        "role": "PLACE_MAINBOARD",
+        "webLine": 718,
+        "title": "Step 28 Place the Mainboard"
+      }
+    ]
+  },
+  "semanticMappingAuthority": "same-assistant-authored; two real cross-document contradictions source-located, independent Critic NOT_RUN",
+  "guide203FullOriginalBytesSHA256": null,
+  "guide79FullOriginalBytesSHA256": null,
+  "pdfBytePinStatus": "NOT_RUN",
+  "liveSourceCannotBeCalledGitPinned": true,
+  "scope": "compatibility and read-only invalidation, NOT performing manufacturer physical repair"
+}
