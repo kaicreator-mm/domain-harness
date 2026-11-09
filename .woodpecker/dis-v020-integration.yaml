@@ -38,6 +38,7 @@ steps:
       # All three cases remain mandatory; do not skip or downgrade.
       - node --import tsx --test --test-concurrency=1 examples/dis-v020-native-sdk/b06-http-transport.test.mjs examples/dis-v020-native-sdk/b06-http-negative.test.mjs examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs
       - node --import tsx --test --test-concurrency=1 examples/dis-v020-native-sdk/b11-cli-process.test.mjs
+      - node --import tsx --test --test-concurrency=1 examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs
       - node --test examples/dis-v020-conformance/validate.test.mjs
       - node --test examples/dis-v020-conformance/batch-audit.test.mjs
       - node --test examples/dis-v020-conformance/batch-ledger-18.test.mjs
