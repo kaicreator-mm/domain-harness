@@ -243,3 +243,8 @@ Original DKE R16 4 publisher full files/14 anchors/25 mutations qualified only u
 ### B15/R61 real original Framework Guide version dependency invalidation
 
 Real original DKE R17 observed version-specific cross-guide drift through source-selected native DIS Knowledge SDK at `2d331ec0aa38464808d419318422a86fa60c6d7a` #2331/1–3 3/3 SUCCESS; 20 upstream cases, two mismatched role references, dependent D05 Method invalidated while unrelated RTC facts unaffected. Unpinned full Guide pages, no independent semantic SAP/Effects. B01–B15 29/29 rounds, Core 9/16 VERIFIED, seven PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN.
+
+
+### B16/R62 actual native DKE R18 transitive graph and source-locked Knowledge consumer
+
+Original source-selected DKE R18 native evidence DAG from `domain-forge@a9f02a31b86013435bf91a1b43755ad5fb52fd11` is separately consumed through real DIS AOT/SDK/KDP at original R62 native source `domain-harness@1da216faafb60b99f2cd75b74a10b294bd6ae16b`, receipt qualified at `a544ed57fb0bb69d7176e332c84f83e8889014d5`. Native Woodpecker #2333/1–3 **3/3 SUCCESS**, three original Git-pinned producer DATA/installed fixture bytes matched. Ten-node provenance/impact graph **four affected invalidated; unrelated RTC evidence unaffected**. Typed Method UNKNOWN, no owner authority, no KDP Effect or invented step correction. B01–B16 **30/30 scoped Demo rounds VERIFIED**, Core 9/16 VERIFIED, 7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN. Original 203/79 publisher full raw bytes & independently reviewed domain semantics NOT_RUN; no SAP, source owner promotion, merge or L2 Freeze. The separate R61 repaired Reader `8a576dbf` #2335/1–3 3/3 SUCCESS qualifies its own exact fixed source and does not silently rewrite original R62 historical source.
