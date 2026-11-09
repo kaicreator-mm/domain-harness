@@ -121,6 +121,9 @@ export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins
     platform:process.platform==='win32'?'windows':process.platform,
     architecture:process.arch,runtime:'node'
    }),
+   // Read-only semantic relationship catalog, source-linked at AOT. It is not
+   // a trusted domain oracle or an authorization for a cross-Element invoke.
+   semanticRelations:qualified.semanticRelations,
    get state(){return open?result.status:'STOPPED'},
    functions:Object.freeze([...qualified.functions.keys()].filter(x=>x!==artifact.program.appInit)),
    contractVersions:Object.freeze(Object.fromEntries([...qualified.functions]

@@ -462,14 +462,41 @@ export function qualifyDisV020Artifact(artifact){
   visitStatus.set(key,2);
  };
  for(const k of elements.keys())visit(k);
+ // R53: source-linked relation verification is a selected LOCAL Function
+ // reference, NOT an independently accepted semantic claim. Cyclic semantic
+ // links do not authorize cycles in the static Element dependency DAG.
+ const semanticRelations=[],relationIds=new Set();
  for(const r of program.relations){
-  keys(r,['from','to','kind']);
+  keys(r,['from','to','kind','contract']);
   if(!elements.has(r.from)||!elements.has(r.to)||!REL_KINDS.has(r.kind))fail('DIS_RELATION_INVALID');
   if(r.kind==='depends-on'&&!elements.get(r.to).dependsOn.includes(r.from))fail('DIS_RELATION_DEPENDENCY_MISMATCH');
+  if(r.contract===undefined)continue; // Legacy metadata-only relations.
+  const c=r.contract;
+  keys(c,['schema','id','version','sourceId','verifierFunctionId','verifierContractVersion','applicability','authority']);
+  if(c.schema!=='dis.v0.2.semantic-relation/1'||!id(c.id)||relationIds.has(c.id)||
+     !SEMVER.test(c.version)||!id(c.sourceId)||!id(c.verifierFunctionId)||
+     !SEMVER.test(c.verifierContractVersion)||c.applicability!=='AOT_SELECTED'||
+     c.authority!=='NONE')
+   fail('DIS_RELATION_CONTRACT_INVALID');
+  relationIds.add(c.id);
+  const fn=functions.get(c.verifierFunctionId);
+  if(!fn||fn.element.id!==r.from||!['rule','knowledge'].includes(fn.definition.kind)||
+     fn.definition.binding.type!=='local'||fn.definition.binding.sourceId!==c.sourceId)
+   fail('DIS_RELATION_VERIFIER_UNBOUND');
+  if(fn.definition.contract?.version!==c.verifierContractVersion)
+   fail('DIS_RELATION_VERIFIER_VERSION_MISMATCH');
+  const pin=pins.get(c.sourceId);
+  if(!pin)fail('DIS_RELATION_VERIFIER_UNBOUND');
+  semanticRelations.push(Object.freeze({
+   id:c.id,version:c.version,from:r.from,to:r.to,kind:r.kind,
+   verifierFunctionId:c.verifierFunctionId,verifierContractVersion:c.verifierContractVersion,
+   sourceId:c.sourceId,sourceSha256:pin.sha256,authority:'NONE',
+   applicability:'AOT_SELECTED',verifiedBusinessSemantics:false
+  }));
  }
  const data={format:artifact.format,built,program,sources};
  if(sha256Canonical(data)!==artifact.digest)fail('DIS_AOT_DIGEST_DRIFT');
- return {functions,elements,selected,pins,target,
+ return {functions,elements,selected,pins,target,semanticRelations:Object.freeze(semanticRelations),
   sourceConsumers:new Map([...sourceConsumers].map(([sourceId,ids])=>
     [sourceId,Object.freeze(ids.sort())]))};
 }
