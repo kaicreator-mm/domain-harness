@@ -1,0 +1,31 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B16",
+  "roundId": "B16-01",
+  "globalRoundId": "R62",
+  "status": "CI_PENDING",
+  "originCommit": "1da216faafb60b99f2cd75b74a10b294bd6ae16b",
+  "originTree": "41fe8711b6d484cad7bdebb4342947c558abcf38",
+  "testPath": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+  "testGitBlob": "9aa5bc3a77c9f666ffe44a5439aa14d936625ed3",
+  "receipt": "receipts/r62-b16-r18-native-transitive-knowledge-impact-ci.json",
+  "sourceHead": "1da216faafb60b99f2cd75b74a10b294bd6ae16b",
+  "checks": [],
+  "positive": [
+    "R62 original DKE R18 native runner and machine receipt compressed Git Blobs are selected AOT DATA, never executable",
+    "R62 original DKE native evidence DAG: only four nodes invalidated, unrelated RTC Knowledge preserved in real selected SDK",
+    "R62 native independent graph replay verifies original baseline/partial/hypothetical and conservative missing-publisher-source gate"
+  ],
+  "negative": [
+    "R62 forged origin package/full source SHA, false semantic Owner SAP, altered method graph/cycle/duplicate fail closed",
+    "R62 compressed upstream DATA cannot masquerade as LOCAL code, installer drift and forged Function Effect rejected"
+  ],
+  "limits": [
+    "Original DKE R18 source+receipt were truly executed in native Node upstream and independently verified with Python, unlike original R17 hosted V8 only; DIS R62 consumes byte-identical compressed DATA and runs a separate, source-selected SDK/KDP native graph replay, not physical repair.",
+    "Original Framework RTCRework README Git Blob verified upstream 1/1, but official Guide 203/79 full original HTML/PDF raw bytes not SHA-pinned, independent source-first semantic Critic NOT_RUN, SAP=0, Effects=0.",
+    "Four invalidated evidence DAG nodes are selectively invalidated; three unrelated/RTC Knowledge nodes preserve source observed, not independent source-owner Semantic approval.",
+    "Even hypothetical semantic alignment of step numbers remains BLOCKED_SOURCE_PIN until authentic source versions and independent reviewer, and a Function reporting UNKNOWN cannot authorize a KDP Effect.",
+    "New narrow contract support for Git-pinned DKE .json.zlib.b64/.mjs.zlib.b64 origins as DATA only is required because original producer stored byte-exact zlib+base64 packages; it is forbidden to bind these DATA sources as LOCAL executables.",
+    "CORE-002/003/005/006/016 remain PARTIAL; R62 cannot substitute Product/L1 scope approval, full domain semantic SAP, actual EV lifecycle closure or final independent review."
+  ]
+}

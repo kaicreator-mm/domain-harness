@@ -1,0 +1,39 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r62-b16-r18-native-transitive-knowledge-impact-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "1da216faafb60b99f2cd75b74a10b294bd6ae16b",
+    "tree": "41fe8711b6d484cad7bdebb4342947c558abcf38"
+  },
+  "originCommit": "1da216faafb60b99f2cd75b74a10b294bd6ae16b",
+  "testGitBlob": "9aa5bc3a77c9f666ffe44a5439aa14d936625ed3",
+  "testPath": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+  "readerSourceGitBlob": "71d55ad1e13cce255276794eec4afa417b139c45",
+  "contractSourceGitBlob": "2b50608e764c9f586319aac497078f434b4184dc",
+  "ci": [],
+  "upstreamDke": {
+    "repo": "kaicreator-mm/domain-forge",
+    "commit": "a9f02a31b86013435bf91a1b43755ad5fb52fd11",
+    "planGitBlob": "faca8efa29e4525e352783511c766a546fd4db0b",
+    "runnerPackageGitBlob": "aca65f96917b5643b18b479b8aa019bb8d2dc24a",
+    "receiptPackageGitBlob": "49405f17ce2eacce5a1ea63b90822c711550fa48",
+    "uncompressedRunnerGitBlob": "4d197c74bf25fbad2234972341fa7aee9a034045",
+    "uncompressedReceiptGitBlob": "0d168fae56e2dfbfe1239d9b8df131ad132b7dde"
+  },
+  "observations": [
+    "Original DKE R18 native Node 6 selected +18 adversarial cases, compressed original source/receipt Git Blobs and decoded SHA256 are distinct genuine upstream provenance. The source has not been re-executed by DIS R62; DIS independently replays DAG from frozen original source observations through new selected Knowledge Function.",
+    "Scoped ten-node evidence DAG source-role conflict invalidates exactly four dependent ref/method/consumer nodes, while unaffected RTC Knowledge remains SOURCE_OBSERVED_NOT_SAP. Both synthetic-role correction and partial correction are source/semantic unqualified, no silent 16→26/17→28 Method replacement.",
+    "R62 source first commit preserves native reader, original compressed zlib Data, narrow contract DATA-source extension and actual adversarial tests. Full CI qualification is PENDING for exact native/min/general checks."
+  ],
+  "limitations": [
+    "Original DKE R18 source+receipt were truly executed in native Node upstream and independently verified with Python, unlike original R17 hosted V8 only; DIS R62 consumes byte-identical compressed DATA and runs a separate, source-selected SDK/KDP native graph replay, not physical repair.",
+    "Original Framework RTCRework README Git Blob verified upstream 1/1, but official Guide 203/79 full original HTML/PDF raw bytes not SHA-pinned, independent source-first semantic Critic NOT_RUN, SAP=0, Effects=0.",
+    "Four invalidated evidence DAG nodes are selectively invalidated; three unrelated/RTC Knowledge nodes preserve source observed, not independent source-owner Semantic approval.",
+    "Even hypothetical semantic alignment of step numbers remains BLOCKED_SOURCE_PIN until authentic source versions and independent reviewer, and a Function reporting UNKNOWN cannot authorize a KDP Effect.",
+    "New narrow contract support for Git-pinned DKE .json.zlib.b64/.mjs.zlib.b64 origins as DATA only is required because original producer stored byte-exact zlib+base64 packages; it is forbidden to bind these DATA sources as LOCAL executables.",
+    "CORE-002/003/005/006/016 remain PARTIAL; R62 cannot substitute Product/L1 scope approval, full domain semantic SAP, actual EV lifecycle closure or final independent review."
+  ]
+}
