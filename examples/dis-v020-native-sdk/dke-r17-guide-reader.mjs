@@ -141,7 +141,8 @@ export function makeR17KnowledgeReader(observationText,casesText,receiptText){
    return Object.freeze({
     status:'UNKNOWN',caseId:request.caseId,compatibility:c.status,
     mismatchesCount:c.mismatches?.length??0,
-    affectedIds:c.affected??[],unaffectedIds:c.unaffected??[],
+    affectedIds:Object.freeze([...(c.affected??[])]),
+    unaffectedIds:Object.freeze([...(c.unaffected??[])]),
     sourceAnchor:'ORIGINAL_UPSTREAM_PUBLISHER_WEB_LINES_UNPINNED_FULL_BYTES',
     guide203RawPinned:false,guide79RawPinned:false,
     independentSemanticOracle:false,methodQualified:false,
