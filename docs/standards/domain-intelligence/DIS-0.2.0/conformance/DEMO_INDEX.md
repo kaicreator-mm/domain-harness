@@ -273,3 +273,8 @@ Selected `dke.r9.readProof` Function uses real BUILD/SDK/KDP and exact original 
 ### B13 / R59 complete 26 historical source/CI ledger readback
 
 [Summary](batches/B13/BATCH_SUMMARY.md), [round](batches/B13/rounds/B13-01/ROUND.md), [receipt](receipts/r59-b13-26-round-full-ledger-ci.json); source `bbf076316e5c9cb4f153a88ea9c756c38722d9f5` TREE `34430b78c6dc02a0df9a781e257c8a06b87c1b63` #2327/1–3 3/3 SUCCESS. Cumulative 27/27 scoped Demo rounds; Core 9/16 remains, independent semantic/approval pending.
+
+
+### B14/R60 real DKE R16 source-authenticity receipt native Knowledge consumer
+
+[Summary](batches/B14/BATCH_SUMMARY.md), [round](batches/B14/rounds/B14-01/ROUND.md), [receipt](receipts/r60-b14-r16-source-authenticity-native-ci.json). Original exact source `9b761ad3628048706a6207deb645add5dc27eee1` #2329/1–3 3/3 SUCCESS; total B01–B14 **28/28 bounded demos VERIFIED**, Core 9/16 and SAP unqualified.

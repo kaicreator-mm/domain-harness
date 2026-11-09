@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B14",
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -22,17 +22,34 @@
     {
       "batchRoundId": "B14-01",
       "globalRoundId": "R60",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
       "originalSourceHead": "905730d6a86a7593d070893acba12fd3fc1c7702",
       "testGitBlob": "8c639dd06a2c9509abdccafc7057cde3ba80c7bb",
       "receipt": "receipts/r60-b14-r16-source-authenticity-native-ci.json",
-      "sourceHead": "905730d6a86a7593d070893acba12fd3fc1c7702",
-      "checks": []
+      "sourceHead": "9b761ad3628048706a6207deb645add5dc27eee1",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/3"
+        }
+      ],
+      "qualificationTree": "7ed525bf9852175215452ec13647ada2ec5de075"
     }
   ],
-  "verifiedRounds": 0,
-  "pendingRounds": 1,
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
   "unstartedRounds": 0,
   "noAutomaticCorePromotion": true,
   "limitations": [
@@ -41,5 +58,24 @@
     "Unrendered GitHub Liquid placeholder remains unrendered; independent blinded primary-source reviewer, source-owner approval, SAP and KDP Effects all remain 0.",
     "Same-model source selection/anchor interpretations may not be promoted to authoritative Domain Knowledge on the strength of a correct Git Blob or native Function invocation.",
     "CORE-002/003/005/016 all remain PARTIAL until independent semantics, full Function scope and conformance criteria are met."
+  ],
+  "qualificationHead": "9b761ad3628048706a6207deb645add5dc27eee1",
+  "qualificationTree": "7ed525bf9852175215452ec13647ada2ec5de075",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/3"
+    }
   ]
 }

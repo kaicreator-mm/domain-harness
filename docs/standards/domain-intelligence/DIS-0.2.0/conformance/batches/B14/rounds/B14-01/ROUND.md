@@ -15,3 +15,8 @@ R60 adds versioned `dke.r16.readSourceScope` public Knowledge Function, selected
 ## Gate and carryover
 
 Before R60, B01–B13 **27/27 individually scoped Demo rounds VERIFIED**, Core **9/16 VERIFIED +7 PARTIAL**, Optional 4 NOT_RUN, Governance 1 NOT_RUN. The B13 closing archival HEAD `f81acfb81700bed5870af2dcf2968a71104b628c` has independent #2328 source CI triggered; R60 source/test must receive its own three named Woodpecker CI contexts before adding any new verified round or matrix receipt. No CORE promotion, merge, Product/L2 Freeze or Release.
+
+
+## R60 final exact-SHA source qualification
+
+Original R60 source `9b761ad3628048706a6207deb645add5dc27eee1`, TREE `7ed525bf9852175215452ec13647ada2ec5de075`, immutable native test Git Blob `8c639dd06a2c9509abdccafc7057cde3ba80c7bb`; [#2329/1](https://ci.kaicreator.com/repos/18/pipeline/2329/1) native, [#2329/2](https://ci.kaicreator.com/repos/18/pipeline/2329/2) compatibility, [#2329/3](https://ci.kaicreator.com/repos/18/pipeline/2329/3) general Verify **3/3 SUCCESS**. This proves genuine selected DIS Knowledge Function consumes upstream DKE's source-authenticity receipt, NOT that DIS itself rechecked four publisher files, independently reviewed semantics, or qualified SAP/Effects.

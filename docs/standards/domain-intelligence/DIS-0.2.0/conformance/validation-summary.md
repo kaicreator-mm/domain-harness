@@ -233,3 +233,8 @@ Actual source-locked Runx Stateful through native KDP/SDK with reopened physical
 ### B13/R59 full historical round source/CI audit
 
 26 historical B01-B12 original round Git/CI receipts and Matrix links checked by exact source `bbf076316e5c9cb4f153a88ea9c756c38722d9f5` TREE `34430b78c6dc02a0df9a781e257c8a06b87c1b63`, Woodpecker #2327/1–3 3/3 SUCCESS; B09 stale R55 round metadata corrected against original #2312. Total 27/27 scoped rounds, Core 9/16 VERIFIED +7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN, no SAP qualification or Freeze.
+
+
+### B14/R60 source-authenticity receipt via actual native DIS Knowledge Function
+
+Original DKE R16 4 publisher full files/14 anchors/25 mutations qualified only upstream, DIS consumes pinned source receipt at `9b761ad3628048706a6207deb645add5dc27eee1` #2329/1–3 3/3 SUCCESS. Four SOURCE-SCOPE-only OBSERVED, seven UNKNOWN; no independent semantic SAP. 28/28 scoped rounds, Core 9/16, Optional 4 NOT_RUN, Governance 1 NOT_RUN.
