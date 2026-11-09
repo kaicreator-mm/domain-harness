@@ -7,3 +7,9 @@ DKE original upstream `domain-forge@a9f02a31b86013435bf91a1b43755ad5fb52fd11`: e
 Original publisher Framework Guide203/79 full raw HTML/PDF bytes unpinned; truly blind source-first semantic Critic/owner SAP NOT_RUN. Original DKE D05 full 0/14, R8 full 0/53 EV, autonomous EV 0/18, SAP=0 Effects=0. This native selected DIS consumer does not amount to domain source qualification or physical procedure approval.
 
 **B01–B16: 30/30 bounded scoped Demo rounds VERIFIED.** DIS matrix Core 9/16 VERIFIED, 7 PARTIAL; Optional 4 NOT_RUN, Governance 1 NOT_RUN. No Product/L2 Freeze, merge or release.
+
+## R62-R1 native edge-integrity repair (separate exact source qualification)
+
+Original B16/R62 source at `a544ed57fb0bb69d7176e332c84f83e8889014d5` with native Woodpecker #2333/1–3 remains a historically true qualified snapshot. DKE [#209 R21](https://github.com/kaicreator-mm/domain-forge/issues/209#issuecomment-6751141651) found a real missing-edge impact integrity false negative in the original exported `replayR18` under hosted exact-source V8: valid acyclic graphs with missing Method/consumer source edges silently reduced invalidations from 4→2/3. The existing selected default Reader was not shown to produce false outputs.
+
+Same-Writer DIS patch Reader Git Blob `0a51feffaec5119dff2bb3176fb00ae93bca7ed5` commit `ccc0bf0ab7bc3b6b247929f78d36056dba7ad9bb`; native B16 source test Git Blob `2a61a0ed371ea500ec05cc2e277dec5d25c4bd78` exact commit `e16362004f3f40f763a733e2a3973d025898a26d` TREE `dbcdafacbd20106520531af2f18b9610338e8bac`. New canonical complete edge-set proof rejects missing/redirected dependencies, retains cycle/duplicate errors and allows order-only permutations. Fresh Woodpecker #2344/1–3 **3/3 SUCCESS** at the exact new test source. This is **R62 repaired qualification**, not a new Demo round, source-independent semantic approval or physical Method authority. All DKE R18 historical producer blobs unchanged, SAP/Effects=0.

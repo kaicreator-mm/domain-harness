@@ -1,6 +1,6 @@
 # B16-01/R62 — original DKE R18 real native evidence DAG → selected DIS cross-domain Knowledge invalidation
 
-**CI_PENDING (not VERIFIED).** Original R62 source HEAD `1da216faafb60b99f2cd75b74a10b294bd6ae16b`, TREE `41fe8711b6d484cad7bdebb4342947c558abcf38`, native test Git Blob `9aa5bc3a77c9f666ffe44a5439aa14d936625ed3`, separately pinned LOCAL reader Git Blob `71d55ad1e13cce255276794eec4afa417b139c45`, narrow contracts source Git Blob `2b50608e764c9f586319aac497078f434b4184dc`.
+**VERIFIED: Original source #2333/1–3 and newer R62-R1 repaired source #2344/1–3 each 3/3 SUCCESS.** The following original PENDING language is preserved as historical source chronology. Original R62 source HEAD `1da216faafb60b99f2cd75b74a10b294bd6ae16b`, TREE `41fe8711b6d484cad7bdebb4342947c558abcf38`, native test Git Blob `9aa5bc3a77c9f666ffe44a5439aa14d936625ed3`, separately pinned LOCAL reader Git Blob `71d55ad1e13cce255276794eec4afa417b139c45`, narrow contracts source Git Blob `2b50608e764c9f586319aac497078f434b4184dc`.
 
 ## Original true upstream native source
 
@@ -25,3 +25,9 @@ The top-of-file `CI_PENDING` reflected the **initial R62 candidate**, not the fi
 - [Woodpecker #2333/3 verify](https://ci.kaicreator.com/repos/18/pipeline/2333/3) — **SUCCESS**
 
 [B16 batch manifest](../../manifest.json) and [R62 exact Git machine receipt](../../../receipts/r62-b16-r18-native-transitive-knowledge-impact-ci.json) are independently versioned as **VERIFIED/SUCCESS** on those original source checks. The cumulative B01–B16 **30/30 scoped rounds VERIFIED**, distinct from Core matrix 9/16 VERIFIED and 7/16 PARTIAL. This is a true native `compileDisV020Aot → loadDisV020Aot` selected Knowledge Function on original DKE R18 evidence, not a new independently reviewed original Framework Guide203/79 raw source, not a current hardware repair, not qualified SAP or Effect. The later DIS R61 Reader repair #2335 separately qualifies its own source; this does not retrospectively change original R62 candidate sources.
+
+## R62-R1 native edge-integrity repair (separate exact source qualification)
+
+Original B16/R62 source at `a544ed57fb0bb69d7176e332c84f83e8889014d5` with native Woodpecker #2333/1–3 remains a historically true qualified snapshot. DKE [#209 R21](https://github.com/kaicreator-mm/domain-forge/issues/209#issuecomment-6751141651) found a real missing-edge impact integrity false negative in the original exported `replayR18` under hosted exact-source V8: valid acyclic graphs with missing Method/consumer source edges silently reduced invalidations from 4→2/3. The existing selected default Reader was not shown to produce false outputs.
+
+Same-Writer DIS patch Reader Git Blob `0a51feffaec5119dff2bb3176fb00ae93bca7ed5` commit `ccc0bf0ab7bc3b6b247929f78d36056dba7ad9bb`; native B16 source test Git Blob `2a61a0ed371ea500ec05cc2e277dec5d25c4bd78` exact commit `e16362004f3f40f763a733e2a3973d025898a26d` TREE `dbcdafacbd20106520531af2f18b9610338e8bac`. New canonical complete edge-set proof rejects missing/redirected dependencies, retains cycle/duplicate errors and allows order-only permutations. Fresh Woodpecker #2344/1–3 **3/3 SUCCESS** at the exact new test source. This is **R62 repaired qualification**, not a new Demo round, source-independent semantic approval or physical Method authority. All DKE R18 historical producer blobs unchanged, SAP/Effects=0.
