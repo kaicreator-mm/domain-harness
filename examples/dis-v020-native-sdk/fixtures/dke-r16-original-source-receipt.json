@@ -1,0 +1,205 @@
+{
+  "Effects": 0,
+  "SAPQualified": 0,
+  "anchoredLines": 14,
+  "boundedDocumentObservations": [
+    {
+      "id": "S01",
+      "kind": "VENDOR_MODE_CLASSIFICATION_CONDITIONAL"
+    },
+    {
+      "id": "S02",
+      "kind": "PRODUCT_GUIDE_LITERAL"
+    },
+    {
+      "id": "S09",
+      "kind": "PUBLISHER_TEMPLATE_UNRENDERED_NEGATIVE"
+    },
+    {
+      "id": "S10",
+      "kind": "PRODUCT_GUIDE_LITERAL"
+    }
+  ],
+  "fullFiles": 4,
+  "githubTemplateRendered": false,
+  "independentSemanticOracle": false,
+  "limitations": [
+    "Upstream original source full bytes were retrieved by GitHub connector and locally reconstructed; raw publisher text is not committed to domain-forge",
+    "GitHub doc has unresolved Liquid company_short template; no publisher rendering was executed",
+    "Anchor and lexical constraints are same-assistant authored, not independently accepted semantic entailment",
+    "Source qualification, native DIS BUILD/SDK/KDP execution, SAP and Effects are NOT_RUN or 0 in R16"
+  ],
+  "mutants": [
+    {
+      "id": "empty_files_explicit",
+      "reason": "SOURCE_ROSTER_DRIFT",
+      "rejected": true
+    },
+    {
+      "id": "empty_selection_explicit",
+      "reason": "QUERY_ROSTER_DRIFT",
+      "rejected": true
+    },
+    {
+      "id": "empty_metadata_explicit",
+      "reason": "FALSE_SOURCE_SEMANTIC_AUTHORITY_OR_SCOPE",
+      "rejected": true
+    },
+    {
+      "id": "truncated_CF_FAQ",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:CF_FAQ",
+      "rejected": true
+    },
+    {
+      "id": "byte_mutation_CF_FAQ",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:CF_FAQ",
+      "rejected": true
+    },
+    {
+      "id": "truncated_CF_HOW",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:CF_HOW",
+      "rejected": true
+    },
+    {
+      "id": "byte_mutation_CF_HOW",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:CF_HOW",
+      "rejected": true
+    },
+    {
+      "id": "truncated_CF_CHANGE",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:CF_CHANGE",
+      "rejected": true
+    },
+    {
+      "id": "byte_mutation_CF_CHANGE",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:CF_CHANGE",
+      "rejected": true
+    },
+    {
+      "id": "truncated_GH_WEBHOOK",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:GH_WEBHOOK",
+      "rejected": true
+    },
+    {
+      "id": "byte_mutation_GH_WEBHOOK",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:GH_WEBHOOK",
+      "rejected": true
+    },
+    {
+      "id": "cross_source_swap",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:CF_FAQ",
+      "rejected": true
+    },
+    {
+      "id": "date_backshift",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:CF_CHANGE",
+      "rejected": true
+    },
+    {
+      "id": "metric_population_swap",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:CF_CHANGE",
+      "rejected": true
+    },
+    {
+      "id": "unverified_template_render",
+      "reason": "FULL_PUBLISHER_BLOB_DRIFT:GH_WEBHOOK",
+      "rejected": true
+    },
+    {
+      "id": "query_source_overattribution",
+      "reason": "QUERY_SOURCE_SCOPE_DRIFT:S03",
+      "rejected": true
+    },
+    {
+      "id": "cross_domain_scope_swap",
+      "reason": "QUERY_SOURCE_SCOPE_DRIFT:S09",
+      "rejected": true
+    },
+    {
+      "id": "forged_independentSemanticOracle",
+      "reason": "FALSE_SOURCE_SEMANTIC_AUTHORITY_OR_SCOPE",
+      "rejected": true
+    },
+    {
+      "id": "forged_ownerApproved",
+      "reason": "FALSE_SOURCE_SEMANTIC_AUTHORITY_OR_SCOPE",
+      "rejected": true
+    },
+    {
+      "id": "forged_qualifiedSap",
+      "reason": "FALSE_SOURCE_SEMANTIC_AUTHORITY_OR_SCOPE",
+      "rejected": true
+    },
+    {
+      "id": "forged_effectAllowed",
+      "reason": "FALSE_SOURCE_SEMANTIC_AUTHORITY_OR_SCOPE",
+      "rejected": true
+    },
+    {
+      "id": "forged_githubTemplateRendered",
+      "reason": "FALSE_SOURCE_SEMANTIC_AUTHORITY_OR_SCOPE",
+      "rejected": true
+    },
+    {
+      "id": "forged_historicalEventPromoted",
+      "reason": "FALSE_SOURCE_SEMANTIC_AUTHORITY_OR_SCOPE",
+      "rejected": true
+    },
+    {
+      "id": "forged_metricEquivalentAcrossPopulation",
+      "reason": "FALSE_SOURCE_SEMANTIC_AUTHORITY_OR_SCOPE",
+      "rejected": true
+    },
+    {
+      "id": "forged_rolloutRetroactive",
+      "reason": "FALSE_SOURCE_SEMANTIC_AUTHORITY_OR_SCOPE",
+      "rejected": true
+    }
+  ],
+  "mutantsRejected": 25,
+  "queryIds": 11,
+  "rawFullPublisherDocsCommitted": false,
+  "runtime": {
+    "platform": "Linux",
+    "python": "3.13.5"
+  },
+  "schema": "dke-dis/r16-native-full-original-source/1",
+  "scriptSha256": "17635fd0152f3175ad506d1c26606ef36dcc9ca14c82d311f44a58db22bc69c0",
+  "sourceOwnerApproved": false,
+  "sourceScopeInsufficient": [
+    "S03",
+    "S04",
+    "S05",
+    "S06",
+    "S07",
+    "S08",
+    "S11"
+  ],
+  "sources": {
+    "CF_CHANGE": {
+      "anchors": 4,
+      "bytes": 1252,
+      "gitBlob": "8124fd2d647578345d84664b1319b878e0760259",
+      "sha256": "5d489fd491888a71451be97b65972cfb32555ba6c64b26edff25b07a3969af84"
+    },
+    "CF_FAQ": {
+      "anchors": 3,
+      "bytes": 3793,
+      "gitBlob": "91443a1ba972ab4b172adf0cf2bda0d4594b9c29",
+      "sha256": "645b956ae2680ae13f095373c3c54477d58fafc3fa456e8eb6f2c15845f4740f"
+    },
+    "CF_HOW": {
+      "anchors": 4,
+      "bytes": 5680,
+      "gitBlob": "15370b3c521db075a3b36c72b0461fa0a0239349",
+      "sha256": "625231b9623c31fa6182dfd0cb28f639fca55425c6cc48374f42b91c0de3a321"
+    },
+    "GH_WEBHOOK": {
+      "anchors": 3,
+      "bytes": 3157,
+      "gitBlob": "0e04c366d80375dd377a2200b98962693d47dfba",
+      "sha256": "00ef6894664306ef274d99e3f2cba820d9e34bd73519d08dcc83f3a00e0fc343"
+    }
+  },
+  "status": "PASS_FULL_BYTES_SCOPED_TEXT_NOT_SEMANTIC_QUALIFICATION"
+}
