@@ -15,3 +15,10 @@
 **Governance:** C5 independent exact-SHA audit / Freeze is NOT_RUN. R43 is a read-only readiness check returning BLOCKED; neither human/LLM self-asserted authority nor a full technical native CI green result can mint a Release. No new Task DAG, merge, freeze, publication or unrelated Node-major semantic gate.
 
 **Progress:** 9 Core VERIFIED / 7 Core PARTIAL = 56.25%; Optional 4 NOT_RUN, Governance 1 NOT_RUN. Previous batches B01–B03 9/9 scoped rounds were verified. B04 3 source commits are complete but currently **0/3 qualified** at this readback. The 11 new tests are authored, not yet accepted under exact full source.
+
+
+## B04 later exact replay checkpoint (not a retroactive old-SHA pass)
+
+Archive `9d44c1b32a96774a10cd6e7a3e3e9174368b39a5` [Woodpecker #2289/1](https://ci.kaicreator.com/repos/18/pipeline/2289/1) Integration **SUCCESS**, [#2289/2](https://ci.kaicreator.com/repos/18/pipeline/2289/2) minimum-node **SUCCESS**, [#2289/3](https://ci.kaicreator.com/repos/18/pipeline/2289/3) general Verify **ERROR**. No claim of three-context acceptance on #2289 or its earlier ERROR candidates.
+
+The subsequent B05 native source `42fc7bde28bdbc653113651f2f87aa1021df614c` includes the **unchanged original B04 R41/R42/R43 test Git Blobs** (direct GitHub file SHA readback confirms all 3 match), and [#2292/1](https://ci.kaicreator.com/repos/18/pipeline/2292/1) native plus [#2292/2](https://ci.kaicreator.com/repos/18/pipeline/2292/2) compatibility are **SUCCESS**, but [#2292/3](https://ci.kaicreator.com/repos/18/pipeline/2292/3) Verify was still **PENDING** at this checkpoint. If later all 3 succeed, the identical B04 round blobs may be jointly requalified at that *later* exact SHA, preserving original errors; until then B04 remains `CI_PENDING` with three unaccepted receipts.

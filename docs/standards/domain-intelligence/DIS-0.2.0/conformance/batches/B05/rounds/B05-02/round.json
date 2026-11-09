@@ -7,7 +7,7 @@
   "startParent": "36bcdca50d1b79b82bc0944d4691979631010707",
   "testPath": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
   "testGitBlob": "e66c8839dbab6551f2c0a33f2db867c9a7e1cc75",
-  "receipt": null,
+  "receipt": "receipts/r45-b05-source-closure-ci.json",
   "positive": [
     "B05-02 R45 targeted native Tally Runx xDownload original sources all have independent installer exact pins"
   ],
@@ -16,5 +16,69 @@
     "B05-02 R45 malicious source Git origin and forged unrelated source fail closed independent of AOT",
     "B05-02 R45 nonboolean and absent strict Source closure options fail before KDP boot"
   ],
-  "boundary": "Opt-in independent source closure via original first-party snapshot bytes; no source owner's independent semantic approval."
+  "boundary": "Opt-in independent source closure via original first-party snapshot bytes; no source owner's independent semantic approval.",
+  "originCommit": "6db5024fadb1b524e8eed39d604605404044e157",
+  "originTree": "78a03be74fb6a29010f0f000561fa646115390d4",
+  "sourceHead": "6db5024fadb1b524e8eed39d604605404044e157",
+  "finalTree": "78a03be74fb6a29010f0f000561fa646115390d4",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "PENDING",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "6db5024fadb1b524e8eed39d604605404044e157",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/3"
+        }
+      ]
+    },
+    {
+      "sourceHead": "42fc7bde28bdbc653113651f2f87aa1021df614c",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/3"
+        }
+      ],
+      "meaning": "Cumulative three-round native replay"
+    }
+  ]
 }

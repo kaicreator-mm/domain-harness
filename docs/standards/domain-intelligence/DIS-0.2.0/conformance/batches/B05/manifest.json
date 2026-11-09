@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B05",
-  "status": "IN_PROGRESS",
+  "status": "CI_PENDING",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -25,7 +25,26 @@
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
       "sourceHead": null,
-      "receipt": null
+      "receipt": "receipts/r44-b05-host-target-ci.json",
+      "originalSourceHead": "36bcdca50d1b79b82bc0944d4691979631010707",
+      "testGitBlob": "650ac196f2df5fe9ba24f05f86edded9c41819e5",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2290/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2290/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2290/3"
+        }
+      ]
     },
     {
       "batchRoundId": "B05-02",
@@ -33,7 +52,26 @@
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
       "sourceHead": null,
-      "receipt": null
+      "receipt": "receipts/r45-b05-source-closure-ci.json",
+      "originalSourceHead": "6db5024fadb1b524e8eed39d604605404044e157",
+      "testGitBlob": "e66c8839dbab6551f2c0a33f2db867c9a7e1cc75",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/3"
+        }
+      ]
     },
     {
       "batchRoundId": "B05-03",
@@ -41,7 +79,26 @@
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
       "sourceHead": null,
-      "receipt": null
+      "receipt": "receipts/r46-b05-target-original-consumer-ci.json",
+      "originalSourceHead": "42fc7bde28bdbc653113651f2f87aa1021df614c",
+      "testGitBlob": "6aba7dd4a1bfd7597b6143ab3ef048c8150aa053",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/3"
+        }
+      ]
     }
   ],
   "boundaries": [
@@ -53,5 +110,14 @@
   "noAutomaticCorePromotion": true,
   "noGitHubActions": true,
   "noNodeMajorSemanticGate": true,
-  "noMergeFreezeRelease": true
+  "noMergeFreezeRelease": true,
+  "candidateReplayHead": "42fc7bde28bdbc653113651f2f87aa1021df614c",
+  "candidateReplayTree": "48bd574c89c1c47e0858ff6d937b255610540035",
+  "currentCore": {
+    "verified": 9,
+    "partial": 7
+  },
+  "optionalNotRun": 4,
+  "governanceNotRun": 1,
+  "conclusion": "Source-scoped B05 R44/45/46 committed and 3 native integrations SUCCESS (#2290/1,#2291/1,#2292/1). No 3-of-3 exact qualification yet; same-source replay requires final verify/min status. Host identity and all-source installer closure are implemented but full OS Target variants/Product/L1 applicability, original Tally SAP and C4/Freeze remain unresolved."
 }
