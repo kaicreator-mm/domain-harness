@@ -53,7 +53,8 @@
     "r58-b12-runx-physical-process-state-ci",
     "r59-b13-26-round-full-ledger-ci",
     "r60-b14-r16-source-authenticity-native-ci",
-    "r61-b15-r17-guide-version-native-ci"
+    "r61-b15-r17-guide-version-native-ci",
+    "r62-b16-r18-native-transitive-knowledge-impact-ci"
   ],
   "requirements": [
     {
