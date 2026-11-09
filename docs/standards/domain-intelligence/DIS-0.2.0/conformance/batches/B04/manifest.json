@@ -30,7 +30,7 @@
     {
       "batchRoundId": "B04-02",
       "globalRoundId": "R42",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "testPath": "examples/dis-v020-conformance/closure-audit.test.mjs",
       "receipt": null
     },

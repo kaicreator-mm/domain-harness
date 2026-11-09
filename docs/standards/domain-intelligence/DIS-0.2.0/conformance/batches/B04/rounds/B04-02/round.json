@@ -1,0 +1,22 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B04",
+  "roundId": "B04-02",
+  "globalRoundId": "R42",
+  "status": "CI_PENDING",
+  "startParent": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
+  "sourceHead": null,
+  "finalTree": null,
+  "testPath": "examples/dis-v020-conformance/closure-audit.test.mjs",
+  "testGitBlob": "77e6b427fabd3fc8b07a70b5ce72117294e7b570",
+  "receipt": null,
+  "positives": [
+    "B04-02 R42 exact historical source ledger and 21 requirement DAG leave 7 substantive Core blockers"
+  ],
+  "negatives": [
+    "B04-02 R42 fake SAP approval or historical reviewer byte substitution is rejected",
+    "B04-02 R42 Core semantic or Target promotion without actual owner and approved scope is rejected",
+    "B04-02 R42 skipped dependency, fake governance and incomplete prior round audit fail closed"
+  ],
+  "boundary": "C4 ledger audit structurally proves 7 remaining, not that any pending SAP/Target issue is actually solved."
+}
