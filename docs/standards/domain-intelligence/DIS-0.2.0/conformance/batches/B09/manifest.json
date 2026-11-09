@@ -87,5 +87,24 @@
     "Source Git Blob/installer locks and observations cannot authorize KDP Effect or Production Release. CORE-003/006/016 and CORE-002/005 remain PARTIAL until independent SAP and complete contract scope.",
     "DKE R10 improved seven UNKNOWN's 11-variable countermodel evidence completeness but this R55 source still consumes original R9 proof only; R10 is not CI-qualified by R55."
   ],
-  "noAutomaticCorePromotion": true
+  "noAutomaticCorePromotion": true,
+  "qualificationHead": "2d96e16942dcff518619b37e4b6c0664ca032ae3",
+  "qualificationTree": "f2d708c797216c94439e8b24d4e011699da266fe",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/3"
+    }
+  ]
 }
