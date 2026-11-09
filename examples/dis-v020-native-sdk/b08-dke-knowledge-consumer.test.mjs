@@ -15,9 +15,9 @@ import {DKE_RECEIPT_ORIGIN,DKE_OLD_GRAPH_BLOB,DKE_NEW_GRAPH_BLOB,makeDkeCandidat
 
 const READER_ORIGIN=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'f55a653e88fa40ecc1f8a49923217c08e0428fad',
+ commit:'269804b8a4be9d262deb61e1764d9030612dc01e',
  path:'examples/dis-v020-native-sdk/dke-knowledge-reader.mjs',
- gitBlob:'b734a1710da1d3044ead1e3638bad1e6a73d4990'
+ gitBlob:'ab0cb7d9fed146f419ef7555fcdc8a406f25db10'
 });
 const receiptPath=new URL('./fixtures/dke-r6-execution-receipt.json',import.meta.url);
 const readerPath=new URL('./dke-knowledge-reader.mjs',import.meta.url);
@@ -53,7 +53,7 @@ async function setup(){
     output:{type:'record',fields:{status:'string',reviewState:'string',
      qualified:'boolean',sourceVersion:'string',sourceGraphGitBlob:'string',
      sourceGitBlob:'string',sourcePath:'array',evidenceRefs:'array',effectDispatched:'boolean'},
-     additionalProperties:false},
+     optional:['evidenceRefs'],additionalProperties:false},
     outcomes:{field:'status',classes:{SOURCE_TRACE_FOUND:'OBSERVED',SOURCE_TRACE_UNAVAILABLE:'UNKNOWN'}},
     evidence:{refField:'evidenceRefs',requiredFor:[]},
     compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
@@ -115,7 +115,7 @@ test('B08-01 R54 two actual Tally source versions distinguish new graph evidence
    assert.equal(old.disposition,'UNKNOWN');
    assert.equal(old.value.status,'SOURCE_TRACE_UNAVAILABLE');
    assert.equal(old.value.sourceGraphGitBlob,DKE_OLD_GRAPH_BLOB);
-   assert.deepEqual(old.value.evidenceRefs,[]);
+   assert.equal(Object.hasOwn(old.value,'evidenceRefs'),false);
    assert.equal(newer.disposition,'OBSERVED');
    assert.equal(newer.value.qualified,false);
    assert.deepEqual(newer.value.sourcePath,t.linkedSourcePath);
