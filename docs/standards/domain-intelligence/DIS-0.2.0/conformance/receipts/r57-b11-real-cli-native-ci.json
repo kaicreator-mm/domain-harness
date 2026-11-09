@@ -1,0 +1,27 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r57-b11-real-cli-native-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
+    "tree": "f742970f3cd1917e576eb2bec990070b3a6b7361"
+  },
+  "originCommit": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
+  "testGitBlob": "9f0b608d36dd065b761ac5f83533a3b4bc5c302f",
+  "testPath": "examples/dis-v020-native-sdk/b11-cli-process.test.mjs",
+  "transportGitBlob": "ebc54ae8351007aba510708509e1a9c142343c9f",
+  "ci": [],
+  "observations": [
+    "Original selected xDownload Interaction AOT/SDK KDP source reuses existing B02/B06 without modifications, but transport is an independent actual Node OS process entry; subprocess arguments, errors and stdout are tested.",
+    "New process transport Git Blob ebc54ae8351007aba510708509e1a9c142343c9f original source commit aa1c4287d8d8b1e19110d4978bfb93079a3517bf; mandatory Node native test Git Blob 9f0b608d36dd065b761ac5f83533a3b4bc5c302f.",
+    "No CI qualified until cumulative exact source Woodpecker native/min/verify are all SUCCESS."
+  ],
+  "limitations": [
+    "Native CLI process is an actual Node argv→AOT/SDK/KDP consumer, but a scoped demo, not a production CLI binary/distribution or OS-level integration of every target.",
+    "Selected original xDownload Interaction is advisory: even with --confirm, READY_FOR_KDP means PENDING_AUTHORIZATION, never a KDP Effect permit or actual download.",
+    "Physical OS child-process invocation adds transport evidence missing from B02 in-process CLI adapter; B06 already independently qualified loopback HTTP Form/Chat.",
+    "Complete CORE-014 needs Product/L1 actual required transports/architecture applicability and independent conformance approval; preserve PARTIAL."
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B11",
+  "roundId": "B11-01",
+  "globalRoundId": "R57",
+  "status": "CI_PENDING",
+  "originCommit": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
+  "originTree": "f742970f3cd1917e576eb2bec990070b3a6b7361",
+  "testPath": "examples/dis-v020-native-sdk/b11-cli-process.test.mjs",
+  "testGitBlob": "9f0b608d36dd065b761ac5f83533a3b4bc5c302f",
+  "receipt": "receipts/r57-b11-real-cli-native-ci.json",
+  "sourceHead": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
+  "checks": [],
+  "positive": [
+    "B11 R57 real CLI OS child process starts native DIS AOT selected Interaction but never dispatches Effect",
+    "B11 R57 OS CLI without confirmation keeps source-selected Intent at NEEDS_CONFIRMATION",
+    "B11 R57 real child process isolates simultaneous request IDs and original business proposals"
+  ],
+  "negative": [
+    "B11 R57 forbidden CLI Effect flags and spoofed caller authorization are refused before native SDK",
+    "B11 R57 real CLI passes credential-bearing URL into selected business rejection, never silent success"
+  ],
+  "limits": [
+    "Native CLI process is an actual Node argv→AOT/SDK/KDP consumer, but a scoped demo, not a production CLI binary/distribution or OS-level integration of every target.",
+    "Selected original xDownload Interaction is advisory: even with --confirm, READY_FOR_KDP means PENDING_AUTHORIZATION, never a KDP Effect permit or actual download.",
+    "Physical OS child-process invocation adds transport evidence missing from B02 in-process CLI adapter; B06 already independently qualified loopback HTTP Form/Chat.",
+    "Complete CORE-014 needs Product/L1 actual required transports/architecture applicability and independent conformance approval; preserve PARTIAL."
+  ]
+}
