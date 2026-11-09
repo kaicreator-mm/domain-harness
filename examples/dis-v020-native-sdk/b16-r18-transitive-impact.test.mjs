@@ -15,9 +15,9 @@ import {R18_ORIGINS,makeR18KnowledgeReader,unpackR18,replayR18,verifyR18NativeEv
  from './dke-r18-impact-reader.mjs';
 const READER_ORIGIN=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'5a3ec4a3b5cdcdf357d02406ef6e2cea430ed574',
+ commit:'ccc0bf0ab7bc3b6b247929f78d36056dba7ad9bb',
  path:'examples/dis-v020-native-sdk/dke-r18-impact-reader.mjs',
- gitBlob:'71d55ad1e13cce255276794eec4afa417b139c45'
+ gitBlob:'0a51feffaec5119dff2bb3176fb00ae93bca7ed5'
 });
 const fail=code=>e=>e?.code===code;
 const clone=structuredClone;
@@ -174,6 +174,19 @@ test('R62 forged origin package/full source SHA, false semantic Owner SAP, alter
   'consumer.method-readonly':['method.d05-rtc-substitution'],
   'consumer.rtc-fact-readonly':['knowledge.rtc-conditional']
  };
+ // A source graph with a missing edge is still a valid DAG, but is NOT
+ // the original exact source graph and must not hide affected Method/consumer nodes.
+ assert.deepEqual(replayR18(plan,{edges}),replayR18(plan));
+ const swappedOrder=clone(edges);swappedOrder['reference.remove-16'].reverse();
+ assert.deepEqual(replayR18(plan,{edges:swappedOrder}),replayR18(plan));
+ const missingMethod=clone(edges);missingMethod['method.d05-rtc-substitution']=[];
+ assert.throws(()=>replayR18(plan,{edges:missingMethod}),fail('DIS_R18_GRAPH_EDGE_SET_DRIFT'));
+ const missingConsumer=clone(edges);missingConsumer['consumer.method-readonly']=[];
+ assert.throws(()=>replayR18(plan,{edges:missingConsumer}),fail('DIS_R18_GRAPH_EDGE_SET_DRIFT'));
+ const redirected=clone(edges);redirected['consumer.method-readonly']=['knowledge.rtc-conditional'];
+ assert.throws(()=>replayR18(plan,{edges:redirected}),fail('DIS_R18_GRAPH_EDGE_SET_DRIFT'));
+ const missingFact=clone(edges);missingFact['consumer.rtc-fact-readonly']=[];
+ assert.throws(()=>replayR18(plan,{edges:missingFact}),fail('DIS_R18_GRAPH_EDGE_SET_DRIFT'));
  const cyclic=clone(edges);cyclic['reference.remove-16']=['method.d05-rtc-substitution'];
  assert.throws(()=>replayR18(plan,{edges:cyclic}),fail('DIS_R18_GRAPH_CYCLE'));
  const duplicate=clone(edges);duplicate['method.d05-rtc-substitution'].push('reference.remove-16');
