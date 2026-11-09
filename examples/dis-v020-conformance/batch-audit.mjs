@@ -55,12 +55,12 @@ export function validateRoundEvidence({manifest,round,receipt,sourceText,ciFile,
  }
  if(JSON.stringify(entry.checks)!==JSON.stringify(receipt.ci)||JSON.stringify(round.checks)!==JSON.stringify(receipt.ci))
   fail('BATCH_CI_INCONSISTENT');
- const matched=receipt.ci.map((x,i)=>{
-  const parsed=x.url?.match(/^https:\/\/ci\.kaicreator\.com\/repos\/18\/pipeline\/(\d+)\/([123])$/);
-  if(!parsed||Number(parsed[2])!==i+1)fail('BATCH_CI_URL_INVALID');
-  return parsed[1];
- });
- if(new Set(matched).size!==1)fail('BATCH_CI_SHA_UNRELATED');
+ // Woodpecker may assign job slots in another order (#2300: verify=/2,
+ // verify-min-node=/3). Bind context identity separately from job slot.
+ const matched=receipt.ci.map(x=>x.url?.match(/^https:\/\/ci\.kaicreator\.com\/repos\/18\/pipeline\/(\d+)\/([123])$/));
+ if(matched.some(x=>!x))fail('BATCH_CI_URL_INVALID');
+ if(new Set(matched.map(x=>x[1])).size!==1||
+    new Set(matched.map(x=>x[2])).size!==3)fail('BATCH_CI_SHA_UNRELATED');
  if(!matrix?.receipts?.includes(receipt.id)||
     !matrix.requirements?.some(x=>x.receiptIds?.includes(receipt.id)))
   fail('BATCH_MATRIX_RECEIPT_UNLINKED');
@@ -73,7 +73,7 @@ export function validateRoundEvidence({manifest,round,receipt,sourceText,ciFile,
   testedAt:receipt.source.head,originalCommit:orig,
   recordedTestGitBlob:receiptBlob,currentTestGitBlob:blob(sourceText),
   currentBlobMatchesHistorical:blob(sourceText)===receiptBlob,
-  ciPipeline:matched[0],ci:"STORED_CI_3_OF_3_SUCCESS",
+  ciPipeline:matched[0][1],ci:"STORED_CI_3_OF_3_SUCCESS",
   independentSemanticOracle:false});
 }
 export async function auditCheckedInBatches(ids=['B01','B02','B03']){

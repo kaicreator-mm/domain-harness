@@ -39,6 +39,7 @@ steps:
       - node --import tsx --test --test-concurrency=1 examples/dis-v020-native-sdk/b06-http-transport.test.mjs examples/dis-v020-native-sdk/b06-http-negative.test.mjs examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs
       - node --test examples/dis-v020-conformance/validate.test.mjs
       - node --test examples/dis-v020-conformance/batch-audit.test.mjs
+      - node --test examples/dis-v020-conformance/batch-ledger-18.test.mjs
       - node --test examples/dis-v020-conformance/closure-audit.test.mjs
       - node --test examples/dis-v020-conformance/readiness-gate.test.mjs
       - node --import tsx --test tests/assembly/v010-c01-external-effect.test.ts
