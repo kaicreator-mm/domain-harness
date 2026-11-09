@@ -1,0 +1,57 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B05",
+  "status": "IN_PROGRESS",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "head": "9d44c1b32a96774a10cd6e7a3e3e9174368b39a5",
+    "tree": "6837a6c3cd4fa6a080cdcb901b8c125ccd8388ef",
+    "b04Status": "CI_PENDING",
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "strategy": "Delivery-First exact independent per-round commit and receipts; next batch does not inherit B04 acceptance",
+  "theme": "C3 real runtime Target platform/architecture preflight, not a self-declared label; no false OS variant or source SAP authority",
+  "rounds": [
+    {
+      "batchRoundId": "B05-01",
+      "globalRoundId": "R44",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+      "sourceHead": null,
+      "receipt": null
+    },
+    {
+      "batchRoundId": "B05-02",
+      "globalRoundId": "R45",
+      "status": "PLANNED",
+      "testPath": "examples/dis-v020-native-sdk/b05-target-host-provenance.test.mjs",
+      "sourceHead": null,
+      "receipt": null
+    },
+    {
+      "batchRoundId": "B05-03",
+      "globalRoundId": "R46",
+      "status": "PLANNED",
+      "testPath": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+      "sourceHead": null,
+      "receipt": null
+    }
+  ],
+  "boundaries": [
+    "Target match is an actual Node OS/arch check, not physical hardware attestation.",
+    "A selected portable original Business module can still be identical on two OS targets; independent variant provenance remains unqualified.",
+    "Product/L1 supported targets and actual adapter/transport applicability are not automatically approved.",
+    "Original Tally/SAP semantics and exact-source reviewer remain blocked."
+  ],
+  "noAutomaticCorePromotion": true,
+  "noGitHubActions": true,
+  "noNodeMajorSemanticGate": true,
+  "noMergeFreezeRelease": true
+}

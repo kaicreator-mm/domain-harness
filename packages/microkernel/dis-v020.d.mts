@@ -22,6 +22,9 @@ export interface DisV020App {
  readonly aotDigest:string;
 
  readonly selectedTarget:Readonly<{platform:'linux'|'windows'|'android';architecture:'x64'|'arm64';runtime:'node'}>|null;
+ /** Real Node process OS/arch compared against installer and AOT before KDP boot.
+  * No physical hardware attestation or target-specific code provenance claim. */
+ readonly actualHostTarget:Readonly<{platform:string;architecture:string;runtime:'node'}>|null;
  readonly state:'READY'|'DEGRADED'|'STOPPED';
  readonly functions:readonly string[];
  readonly contractVersions:Readonly<Record<string,string>>;

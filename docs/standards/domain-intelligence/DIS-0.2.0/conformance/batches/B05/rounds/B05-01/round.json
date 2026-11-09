@@ -1,0 +1,20 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B05",
+  "roundId": "B05-01",
+  "globalRoundId": "R44",
+  "status": "CI_PENDING",
+  "startParent": "9d44c1b32a96774a10cd6e7a3e3e9174368b39a5",
+  "testPath": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+  "testGitBlob": "650ac196f2df5fe9ba24f05f86edded9c41819e5",
+  "receipt": null,
+  "positive": [
+    "B05-01 R44 real runtime OS and CPU architecture match selected original canonical Business/KDP modules",
+    "B05-01 R44 legacy untargeted artifacts remain usable but cannot inherit a claimed host qualification"
+  ],
+  "negative": [
+    "B05-01 R44 caller and AOT agreeing on a wrong OS label cannot bypass the real runtime host identity",
+    "B05-01 R44 caller and AOT agreeing on a wrong architecture cannot boot the KDP"
+  ],
+  "boundary": "Actual process.platform/process.arch check independently of artifact and installer; no cryptographic host attestation or per-OS module difference."
+}

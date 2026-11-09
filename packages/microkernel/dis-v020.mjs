@@ -28,6 +28,12 @@ export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins
    refuse('DIS_TARGET_TRUST_ANCHOR_REQUIRED');
   if(['platform','architecture','runtime'].some(k=>expectedTarget[k]!==qualified.target[k]))
    refuse('DIS_TARGET_INSTALLED_MISMATCH');
+  // R44: independently compare against the actual Node runtime's OS/arch.
+  // Caller-provided expectedTarget and AOT metadata cannot spoof process data.
+  const hostPlatform=process.platform==='win32'?'windows':process.platform;
+  if(hostPlatform!==qualified.target.platform||
+     process.arch!==qualified.target.architecture)
+   refuse('DIS_TARGET_HOST_MISMATCH');
  }
 
  // R26: an optional independent installer pin for named AOT-selected sources.
@@ -97,6 +103,12 @@ export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins
   return Object.freeze({
    aotDigest:artifact.digest,
    selectedTarget:qualified.target===null?null:Object.freeze({platform:qualified.target.platform,architecture:qualified.target.architecture,runtime:qualified.target.runtime}),
+   // Real runtime identity, not OS hardware attestation or platform-specific
+   // module provenance. Null for backward-compatible untargeted artifacts.
+   actualHostTarget:qualified.target===null?null:Object.freeze({
+    platform:process.platform==='win32'?'windows':process.platform,
+    architecture:process.arch,runtime:'node'
+   }),
    get state(){return open?result.status:'STOPPED'},
    functions:Object.freeze([...qualified.functions.keys()].filter(x=>x!==artifact.program.appInit)),
    contractVersions:Object.freeze(Object.fromEntries([...qualified.functions]
