@@ -40,6 +40,7 @@ steps:
       - node --import tsx --test --test-concurrency=1 examples/dis-v020-native-sdk/b11-cli-process.test.mjs
       - node --import tsx --test --test-concurrency=1 examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs
       - node --test examples/dis-v020-conformance/validate.test.mjs
+      - node --test examples/dis-v020-conformance/full-ledger.test.mjs
       - node --test examples/dis-v020-conformance/batch-audit.test.mjs
       - node --test examples/dis-v020-conformance/batch-ledger-18.test.mjs
       - node --test examples/dis-v020-conformance/closure-audit.test.mjs
