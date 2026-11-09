@@ -1,0 +1,19 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r51-b07-full-ledger-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "179e2127a884f6a10587563094f0a2d709af5300",
+    "tree": "8bd95bdbe1b209b5f1cb2ef339736a4ef964bd62"
+  },
+  "originCommit": "179e2127a884f6a10587563094f0a2d709af5300",
+  "testGitBlob": "639cfbcaa09f829f1b0687fff961c99e04a9da9c",
+  "testPath": "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
+  "ci": [],
+  "observations": [
+    "Git source R51 and 18-round ledger tests committed; no successful CI claim at this time.",
+    "Await exact final branch HEAD and three actual Woodpecker contexts before qualification."
+  ]
+}
