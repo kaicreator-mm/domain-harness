@@ -22,11 +22,27 @@
       "globalRoundId": "R57",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b11-cli-process.test.mjs",
-      "originalSourceHead": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
-      "testGitBlob": "9f0b608d36dd065b761ac5f83533a3b4bc5c302f",
+      "originalSourceHead": "475a0c2f12de164fd6149f812fee754d26f1aa6b",
+      "testGitBlob": "c6d1149bea35324a6b6ef721bd445de948218153",
       "receipt": "receipts/r57-b11-real-cli-native-ci.json",
-      "sourceHead": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
-      "checks": []
+      "sourceHead": "475a0c2f12de164fd6149f812fee754d26f1aa6b",
+      "checks": [],
+      "originalR0SourceHead": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
+      "originalR0TestGitBlob": "9f0b608d36dd065b761ac5f83533a3b4bc5c302f",
+      "history": [
+        {
+          "head": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
+          "testGitBlob": "9f0b608d36dd065b761ac5f83533a3b4bc5c302f",
+          "status": "SOURCE_REVIEW_CORRECTED",
+          "finding": "R0 test incorrectly expected typed disposition REJECTED for original native Function's business status REJECTED. Existing Function contract maps that status to FAILED."
+        },
+        {
+          "head": "475a0c2f12de164fd6149f812fee754d26f1aa6b",
+          "blob": "c6d1149bea35324a6b6ef721bd445de948218153",
+          "status": "R1_CANDIDATE",
+          "finding": "Same Builder corrected expected native typed disposition to FAILED, preserved original Effect/authority/credential negatives; awaiting exact cumulative CI."
+        }
+      ]
     }
   ],
   "verifiedRounds": 0,
