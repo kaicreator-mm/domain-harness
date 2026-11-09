@@ -66,7 +66,9 @@ export function makeDkeCandidateKnowledge(sourceText,origin=DKE_RECEIPT_ORIGIN){
     sourceGraphGitBlob:input.sourceVersion==='new'?DKE_NEW_GRAPH_BLOB:DKE_OLD_GRAPH_BLOB,
     sourceGitBlob:DKE_RECEIPT_ORIGIN.gitBlob,
     sourcePath:found?[...trace.linkedSourcePath]:[],
-    evidenceRefs:found?[trace.id]:[],
+    // DIS Function evidenceRefs is optional. Empty [] is not a valid
+    // declared evidence value, especially for an UNKNOWN no-source result.
+    ...(found?{evidenceRefs:[trace.id]}:{}),
     effectDispatched:false
    });
   }
