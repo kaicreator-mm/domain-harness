@@ -25,7 +25,9 @@ const ids=['source.framework-readme','source.guide203','source.guide79',
 const invalid=['reference.remove-16','reference.replace-17','method.d05-rtc-substitution','consumer.method-readonly'];
 const fail=code=>{const e=new Error(code);e.code=code;throw e};
 const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&Object.getPrototypeOf(x)===Object.prototype;
-const eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const stable=x=>Array.isArray(x)?x.map(stable):
+ obj(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,stable(x[k])])):x;
+const eq=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b));
 const digest=x=>createHash('sha256').update(x).digest('hex');
 export function unpackR18(text,key){
  if(!Object.hasOwn(expected,key)||typeof text!=='string')fail('DIS_R18_PACKAGE_INVALID');
