@@ -5,22 +5,43 @@
   "status": "PENDING",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
-    "tree": "9d63590ea5964c95700141b5a53581c66a2cad4c"
+    "head": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+    "tree": "4ab65c63a19fb839215b500be21a94e96abdf098"
   },
-  "originCommit": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
-  "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+  "originCommit": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+  "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
   "testPath": "examples/dis-v020-native-sdk/b09-dke-conditional-proof.test.mjs",
   "ci": [],
   "observations": [
     "DKE formal input Git Blob 426c7d165c19b7aa459de82d5d776962dba13fb0 and real Python/SymPy formal receipt Git Blob 7387ca838e37d314e28a33e35ef21ba2f4358730 are original immutable upstream DKE #209 sources under domain-forge@7aa5cf4afa625c19e9d9a59667d85b67d5bc1401.",
     "R55 actual selected DIS v0.2 Knowledge Function invokes from a frozen LOCAL Reader + two original DATA sourceDependencies and independent installer pins; actual Woodpecker verification not yet qualified.",
-    "DKE original proof outcomes were 2 ENTAILED, 2 REFUTED, 7 UNDERDETERMINED with 64 satisfying worlds; no independent SAP/owner semantic acceptance."
+    "DKE original proof outcomes were 2 ENTAILED, 2 REFUTED, 7 UNDERDETERMINED with 64 satisfying worlds; no independent SAP/owner semantic acceptance.",
+    "R0 source-code self-adversarial review found overbroad four-docs-per-CQ sourceRefs; R1 uses original DKE R9 Node Reader exact S01–S11 doc-to-CQ mapping, original reader source Git Blob 5aba024775a759ba992d1bd06f71770c408f3cec, native test Git Blob 973eaffc13dd059f929a6ee77045fc11ea86ad93."
   ],
   "limitations": [
     "The upstream DKE R9 actual Python/SymPy formal proof is conditional on frozen same-model authored source facts; independent solver is NOT independent domain semantic reviewer or original publisher source owner.",
     "Original upstream R9 Node reader is not executed here; this uses the original actual FORMAL_INPUT and SymPy R9_FORMAL_RECEIPT under original Git Blob, via a new native DIS BUILD/SDK/KDP Knowledge Function.",
     "Logical REFUTED describes a refuted proposition in the selected source theory; it is not an accepted domain fact. UNKNOWN remains explicitly indeterminate with countermodels, no unqualified claims promoted.",
     "Source Git Blob/installer locks and observations cannot authorize KDP Effect or Production Release. CORE-003/006/016 and CORE-002/005 remain PARTIAL until independent SAP and complete contract scope."
+  ],
+  "history": [
+    {
+      "head": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+      "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+      "status": "INITIAL_SOURCE_ONLY",
+      "finding": "R0 returned all four DKE upstream publisher document references for every individual query, overclaiming per-CQ source provenance; not yet CI qualified"
+    },
+    {
+      "head": "4da0c6afb7ede4686092cfcf62321ea2378a7683",
+      "readerGitBlob": "5aba024775a759ba992d1bd06f71770c408f3cec",
+      "status": "SAME_WRITER_SOURCE_REPAIR",
+      "finding": "Read-only reader now exactly matches DKE original Node source mapping S01–S11 and verifies four publisher docs Git Blobs"
+    },
+    {
+      "head": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+      "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
+      "status": "REPINNED_SOURCE_AND_TEST",
+      "finding": "Selected DIS original reader commit/pin updated, each CQ verifies exact original publisher doc references; awaits real exact CI"
+    }
   ]
 }

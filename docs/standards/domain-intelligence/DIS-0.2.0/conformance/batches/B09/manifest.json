@@ -24,11 +24,33 @@
       "globalRoundId": "R55",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b09-dke-conditional-proof.test.mjs",
-      "originalSourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
-      "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+      "originalSourceHead": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+      "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
       "receipt": "receipts/r55-b09-dke-conditional-proof-native-ci.json",
-      "sourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
-      "checks": []
+      "sourceHead": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+      "checks": [],
+      "originalR0SourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+      "originalR0TestGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+      "history": [
+        {
+          "head": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+          "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+          "status": "INITIAL_SOURCE_ONLY",
+          "finding": "R0 returned all four DKE upstream publisher document references for every individual query, overclaiming per-CQ source provenance; not yet CI qualified"
+        },
+        {
+          "head": "4da0c6afb7ede4686092cfcf62321ea2378a7683",
+          "readerGitBlob": "5aba024775a759ba992d1bd06f71770c408f3cec",
+          "status": "SAME_WRITER_SOURCE_REPAIR",
+          "finding": "Read-only reader now exactly matches DKE original Node source mapping S01–S11 and verifies four publisher docs Git Blobs"
+        },
+        {
+          "head": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+          "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
+          "status": "REPINNED_SOURCE_AND_TEST",
+          "finding": "Selected DIS original reader commit/pin updated, each CQ verifies exact original publisher doc references; awaits real exact CI"
+        }
+      ]
     }
   ],
   "verifiedRounds": 0,

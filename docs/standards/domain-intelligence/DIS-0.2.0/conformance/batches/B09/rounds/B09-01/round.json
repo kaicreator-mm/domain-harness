@@ -4,12 +4,12 @@
   "roundId": "B09-01",
   "globalRoundId": "R55",
   "status": "CI_PENDING",
-  "originCommit": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
-  "originTree": "9d63590ea5964c95700141b5a53581c66a2cad4c",
+  "originCommit": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+  "originTree": "4ab65c63a19fb839215b500be21a94e96abdf098",
   "testPath": "examples/dis-v020-native-sdk/b09-dke-conditional-proof.test.mjs",
-  "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+  "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
   "receipt": "receipts/r55-b09-dke-conditional-proof-native-ci.json",
-  "sourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+  "sourceHead": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
   "checks": [],
   "positive": [
     "B09-01 R55 original source-pinned SymPy proof is a selected DIS Knowledge Function with exact two DATA sources",
@@ -26,5 +26,27 @@
     "Original upstream R9 Node reader is not executed here; this uses the original actual FORMAL_INPUT and SymPy R9_FORMAL_RECEIPT under original Git Blob, via a new native DIS BUILD/SDK/KDP Knowledge Function.",
     "Logical REFUTED describes a refuted proposition in the selected source theory; it is not an accepted domain fact. UNKNOWN remains explicitly indeterminate with countermodels, no unqualified claims promoted.",
     "Source Git Blob/installer locks and observations cannot authorize KDP Effect or Production Release. CORE-003/006/016 and CORE-002/005 remain PARTIAL until independent SAP and complete contract scope."
+  ],
+  "R0SourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+  "originalR0TestGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+  "repairHistory": [
+    {
+      "head": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+      "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+      "status": "INITIAL_SOURCE_ONLY",
+      "finding": "R0 returned all four DKE upstream publisher document references for every individual query, overclaiming per-CQ source provenance; not yet CI qualified"
+    },
+    {
+      "head": "4da0c6afb7ede4686092cfcf62321ea2378a7683",
+      "readerGitBlob": "5aba024775a759ba992d1bd06f71770c408f3cec",
+      "status": "SAME_WRITER_SOURCE_REPAIR",
+      "finding": "Read-only reader now exactly matches DKE original Node source mapping S01–S11 and verifies four publisher docs Git Blobs"
+    },
+    {
+      "head": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+      "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
+      "status": "REPINNED_SOURCE_AND_TEST",
+      "finding": "Selected DIS original reader commit/pin updated, each CQ verifies exact original publisher doc references; awaits real exact CI"
+    }
   ]
 }
