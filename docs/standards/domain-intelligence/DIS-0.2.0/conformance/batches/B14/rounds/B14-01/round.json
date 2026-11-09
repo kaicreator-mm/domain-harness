@@ -1,0 +1,30 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B14",
+  "roundId": "B14-01",
+  "globalRoundId": "R60",
+  "status": "CI_PENDING",
+  "originCommit": "905730d6a86a7593d070893acba12fd3fc1c7702",
+  "originTree": "1de0992444da372159e1bd72f220fc7b33d125db",
+  "testPath": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+  "testGitBlob": "8c639dd06a2c9509abdccafc7057cde3ba80c7bb",
+  "sourceHead": "905730d6a86a7593d070893acba12fd3fc1c7702",
+  "receipt": "receipts/r60-b14-r16-source-authenticity-native-ci.json",
+  "checks": [],
+  "positive": [
+    "R60 original DKE R16 full-original-publisher receipt is selected AOT Knowledge DATA, not executable or SAP",
+    "R60 original publisher byte-authenticity and all 11 source-scope questions are typed OBSERVED vs UNKNOWN, never qualified semantics"
+  ],
+  "negative": [
+    "R60 explicit empty caller source, selection and semantic reviewer maps cannot fallback to trusted receipt",
+    "R60 counterfeit source or JSON-as-code and caller SAP/Effect/Function-version forged requests fail closed",
+    "R60 forged LOCAL semantic owner approval cannot become typed SDK success even with pinned source"
+  ],
+  "limits": [
+    "Original four complete publisher documents were authenticated by DKE R16 native Python, not copied or byte-reverified by DIS R60; DIS consumes an immutable DKE producer machine receipt as selected DATA.",
+    "Four limited direct publisher source/document observations become read-only OBSERVED of authenticity/scope, not verified independent business meaning; seven source-insufficient CQs remain UNKNOWN.",
+    "Unrendered GitHub Liquid placeholder remains unrendered; independent blinded primary-source reviewer, source-owner approval, SAP and KDP Effects all remain 0.",
+    "Same-model source selection/anchor interpretations may not be promoted to authoritative Domain Knowledge on the strength of a correct Git Blob or native Function invocation.",
+    "CORE-002/003/005/016 all remain PARTIAL until independent semantics, full Function scope and conformance criteria are met."
+  ]
+}
