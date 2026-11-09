@@ -1,0 +1,28 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B08",
+  "roundId": "B08-01",
+  "globalRoundId": "R54",
+  "status": "CI_PENDING",
+  "originCommit": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+  "originTree": "0cdbe36c6c87f02a4067faed66d86230bf0a5a54",
+  "testPath": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+  "testGitBlob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
+  "receipt": "receipts/r54-b08-real-dke-knowledge-consumer-ci.json",
+  "sourceHead": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+  "checks": [],
+  "positive": [
+    "B08-01 R54 original DKE #209 R6 Git receipt is actual selected native DIS Knowledge dependency",
+    "B08-01 R54 two actual Tally source versions distinguish new graph evidence without SAP upgrade"
+  ],
+  "negative": [
+    "B08-01 R54 changed DKE source, false producer approval and source-origin mismatch fail closed",
+    "B08-01 R54 independently installer-pinned DKE input, Function schema and forged outcome refuse privilege"
+  ],
+  "limits": [
+    "DKE upstream producer verified Git Source is generated, not independent source-owner meaning approval.",
+    "Original full Tally graph source bytes were checked by DKE #209, NOT rerun inside native DIS; this round directly consumes original DKE receipt bytes pinned by Git Blob.",
+    "No browser/OS Host Effect or production permission, Core-006/003 remain PARTIAL.",
+    "DKE SAP_QUALIFIED=0; independent semantic review remains absent."
+  ]
+}

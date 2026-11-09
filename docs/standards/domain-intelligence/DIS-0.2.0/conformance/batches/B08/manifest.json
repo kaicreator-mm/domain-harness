@@ -1,0 +1,43 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B08",
+  "status": "IN_PROGRESS",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "4b1d14cac4be60688b50f3f92b34b4c55f86ad96",
+    "tree": "e7dac73f5d9bcb9a8446cf911e3c0590298cb713",
+    "ci": "Woodpecker #2306/1-3 SUCCESS",
+    "verifiedPriorRounds": 21,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "C2 Knowledge read-only DKE producer-to-DIS consumer, cross-revision Git pins, actual unapproved SAP/UNKNOWN at selected SDK; not a fake complete Core closure",
+  "rounds": [
+    {
+      "batchRoundId": "B08-01",
+      "globalRoundId": "R54",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+      "originalSourceHead": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+      "testGitBlob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
+      "receipt": "receipts/r54-b08-real-dke-knowledge-consumer-ci.json",
+      "sourceHead": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+      "checks": []
+    }
+  ],
+  "verifiedRounds": 0,
+  "pendingRounds": 1,
+  "unstartedRounds": 0,
+  "limits": [
+    "DKE upstream producer verified Git Source is generated, not independent source-owner meaning approval.",
+    "Original full Tally graph source bytes were checked by DKE #209, NOT rerun inside native DIS; this round directly consumes original DKE receipt bytes pinned by Git Blob.",
+    "No browser/OS Host Effect or production permission, Core-006/003 remain PARTIAL.",
+    "DKE SAP_QUALIFIED=0; independent semantic review remains absent."
+  ]
+}

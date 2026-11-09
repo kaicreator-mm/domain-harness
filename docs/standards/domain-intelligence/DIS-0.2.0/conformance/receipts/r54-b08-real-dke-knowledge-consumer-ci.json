@@ -1,0 +1,25 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r54-b08-real-dke-knowledge-consumer-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+    "tree": "0cdbe36c6c87f02a4067faed66d86230bf0a5a54"
+  },
+  "originCommit": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+  "testGitBlob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
+  "testPath": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+  "ci": [],
+  "observations": [
+    "Original DKE producer receipt is Git-original byte-identical from domain-forge@880a24e... Blob 62a992b..., and DKE retained SAP_QUALIFIED=0.",
+    "This is the first selected DIS v0.2 native SDK Knowledge Function from genuine DKE producer output; no upstream domain-source owner approval or independently qualified SAP."
+  ],
+  "limitations": [
+    "DKE upstream producer verified Git Source is generated, not independent source-owner meaning approval.",
+    "Original full Tally graph source bytes were checked by DKE #209, NOT rerun inside native DIS; this round directly consumes original DKE receipt bytes pinned by Git Blob.",
+    "No browser/OS Host Effect or production permission, Core-006/003 remain PARTIAL.",
+    "DKE SAP_QUALIFIED=0; independent semantic review remains absent."
+  ]
+}
