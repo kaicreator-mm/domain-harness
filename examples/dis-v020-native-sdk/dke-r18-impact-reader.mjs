@@ -64,13 +64,14 @@ export function replayR18(plan,{steps,model='FRAMEWORK_11_GEN_INTEL',autoRemap=f
   {id:'reference.remove-16',step:16,role:'REMOVE_MAINBOARD'},
   {id:'reference.replace-17',step:17,role:'REASSEMBLE_MAINBOARD'}
  ];
- const deps=edges===undefined?{
+ const frozenDeps={
   'reference.remove-16':['source.guide203','source.guide79'],
   'reference.replace-17':['source.guide203','source.guide79'],
   'method.d05-rtc-substitution':['reference.remove-16','reference.replace-17'],
   'consumer.method-readonly':['method.d05-rtc-substitution'],
   'consumer.rtc-fact-readonly':['knowledge.rtc-conditional']
- }:edges;
+ };
+ const deps=edges===undefined?frozenDeps:edges;
  if(!obj(deps)||!eq(Object.keys(deps).sort(),[
   'reference.remove-16','reference.replace-17','method.d05-rtc-substitution',
   'consumer.method-readonly','consumer.rtc-fact-readonly'].sort()))
@@ -87,6 +88,12 @@ export function replayR18(plan,{steps,model='FRAMEWORK_11_GEN_INTEL',autoRemap=f
   active.delete(id);visited.add(id);
  }
  ids.forEach(walk);
+ // Acyclic and unique keys are necessary but not sufficient: dropping a
+ // reference edge silently loses real transitive invalidation.
+ const canonicalEdges=x=>Object.fromEntries(Object.entries(x).map(([k,v])=>
+  [k,Array.isArray(v)?[...v].sort():v]));
+ if(!eq(canonicalEdges(deps),canonicalEdges(frozenDeps)))
+  fail('DIS_R18_GRAPH_EDGE_SET_DRIFT');
  const status={
   'source.framework-readme':'SOURCE_GIT_VERIFIED',
   'source.guide203':'SOURCE_UNPINNED',
