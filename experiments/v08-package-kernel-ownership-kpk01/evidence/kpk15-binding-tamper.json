@@ -1,0 +1,5 @@
+{
+  "falsifier": "KPK-15j2",
+  "liveMutation": "ignored — frozen wiring snapshot is the only trusted declaration source",
+  "injectedSyntax": "ADMISSION_EFFECT_BINDING_UNVALIDATED before any journal write"
+}

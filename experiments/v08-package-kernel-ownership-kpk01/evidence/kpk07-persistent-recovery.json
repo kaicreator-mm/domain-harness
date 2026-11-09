@@ -1,0 +1,19 @@
+{
+  "falsifier": "KPK-07",
+  "verdict": "PARTIAL→BOUNDED_PASS: same-version durable restart recovery proven via the Host file-store seam; real OS crash-mid-write and multi-process contention NOT simulated (explicit boundary)",
+  "durableDirectory": "kpk07-TAyezv",
+  "restartRecovered": {
+    "instanceState": "approved",
+    "stateRevision": 1,
+    "journalRows": 1,
+    "journalStatus": "completed"
+  },
+  "restartDuplicateMessage": {
+    "reason": "no-candidate-transition",
+    "resources": 0
+  },
+  "crashBeforeCommitRecovery": {
+    "disposition": "replayed",
+    "dispatchesTotal": 1
+  }
+}

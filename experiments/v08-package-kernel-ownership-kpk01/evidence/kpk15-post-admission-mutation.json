@@ -1,0 +1,5 @@
+{
+  "falsifier": "KPK-15g",
+  "identicalRedrive": "replayed, 1 dispatch total",
+  "mutatedRedrive": "ADMISSION_EFFECT_JOURNAL_CONFLICT (resolved input participates in the durable effect identity), 1 dispatch total"
+}

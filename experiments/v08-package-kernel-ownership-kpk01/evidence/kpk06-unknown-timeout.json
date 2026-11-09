@@ -1,0 +1,7 @@
+{
+  "falsifier": "KPK-06a",
+  "verdict": "PASS (migrated v0.7 failed-effect path)",
+  "dispatches": 1,
+  "journalRowStatus": "failed",
+  "retryErrorCode": "ADMISSION_EFFECT_FAILED"
+}

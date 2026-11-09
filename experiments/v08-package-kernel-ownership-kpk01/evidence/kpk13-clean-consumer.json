@@ -1,0 +1,32 @@
+{
+  "falsifier": "KPK-13",
+  "consumerCommand": "node consumer\\demo-consumer.mjs",
+  "nodeVersion": "v24.21.0",
+  "roundTrip": {
+    "consumer": "stock-node public consumer (no compiledApp, no runtime compilation)",
+    "loadedKernel": "kernel-vnext@1.1.0",
+    "kernelModuleSha256": "c87b1b7ac5df64734d7c0835a368bbcac84cd3a15294e9e8633407e2b211d756",
+    "decision": {
+      "status": "admitted",
+      "turn": "turn:order-quote:instance%3A42:message:msg%3Ademo-1",
+      "transition": "approve",
+      "targetState": "approved",
+      "effect": "executed"
+    },
+    "dynamicDecision": {
+      "status": "admitted",
+      "effectIdempotencyKey": "reserve:quote:DEMO-R1",
+      "ledgerPayload": {
+        "amount": 27,
+        "requestId": "DEMO-R1",
+        "effectId": "turn:order-quote:instance%3A43:message:msg%3Ademo-2/effect/1"
+      }
+    },
+    "instanceState": {
+      "stateKey": "approved",
+      "context": {}
+    },
+    "journalRows": 2,
+    "observedReceipts": 2
+  }
+}
