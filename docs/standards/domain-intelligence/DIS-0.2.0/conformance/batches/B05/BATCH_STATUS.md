@@ -23,3 +23,8 @@ R46 composes those two checks with the **actual original** Tally Rule, xDownload
 All three rounds independently committed `round.json` and `ROUND.md`, and have separate `PENDING` receipts `receipts/r44-b05-host-target-ci.json`, `receipts/r45-b05-source-closure-ci.json`, `receipts/r46-b05-target-original-consumer-ci.json`. None is linked in `matrix.receipts` until actual exact SHA Integration + general Verify success, with historical CI ERROR preserved. No new GitHub Issue/DAG or unrelated Node major gate.
 
 **Total DIS v0.2:** Core **9 VERIFIED / 7 PARTIAL = 56.25%**, Optional 4 NOT_RUN, Governance 1 NOT_RUN. B01–B03: 9/9 scoped rounds accepted; B04 3/3 source-committed but not fully qualified; B05 3/3 source-committed with native success but not fully qualified. No merge/Freeze/Release.
+
+
+## Final cumulative exact-SHA qualification — supersedes earlier pending snapshot
+
+**VERIFIED for all three source-scoped rounds.** Git HEAD `1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de`, TREE `4c3e3ecbac8cf1489fc807a60ce22806672f414f`, [Woodpecker #2293/1](https://ci.kaicreator.com/repos/18/pipeline/2293/1) native SUCCESS, [#2293/2](https://ci.kaicreator.com/repos/18/pipeline/2293/2) minimum-node SUCCESS, [#2293/3](https://ci.kaicreator.com/repos/18/pipeline/2293/3) Verify SUCCESS. All six original R41–R46 test Git Blobs were re-read and matched the successful cumulative source exactly. Earlier `ERROR` statuses had GitHub descriptions `Pipeline was canceled`, not demonstrated test failures, and remain historical. Separate `round.json`, `manifest.json` and independent `receipts/` now bind qualifying SHA; no full Core promotion, SAP authority, platform multi-variant or Release.

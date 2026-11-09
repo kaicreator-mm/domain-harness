@@ -2,12 +2,12 @@
   "schema": "dis.v0.2.validation-receipt/1",
   "id": "r43-b04-readiness-gate-ci",
   "disVersion": "0.2.0",
-  "status": "PENDING",
+  "status": "SUCCESS",
   "scope": "B04_B04-03_C4_REVIEW_AND_PROVENANCE",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": "d451eb36b8c4058d14c501c8965c300bee88acd9",
-    "tree": "0a06f79233b3404a32871c0efb7973fae1c0b2e1"
+    "head": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+    "tree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f"
   },
   "originCommit": "d451eb36b8c4058d14c501c8965c300bee88acd9",
   "originTree": "0a06f79233b3404a32871c0efb7973fae1c0b2e1",
@@ -17,18 +17,18 @@
   "ci": [
     {
       "context": "ci/woodpecker/pr/dis-v020-integration",
-      "state": "PENDING",
-      "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/1"
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
     },
     {
       "context": "ci/woodpecker/pr/verify-min-node",
-      "state": "PENDING",
-      "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/2"
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
     },
     {
       "context": "ci/woodpecker/pr/verify",
-      "state": "PENDING",
-      "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/3"
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
     }
   ],
   "history": [
@@ -72,11 +72,35 @@
         }
       ],
       "description": "Later cumulative full-suite candidate"
+    },
+    {
+      "head": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+      "tree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+        }
+      ],
+      "meaning": "Final exact full-suite source, original test Blob unchanged"
     }
   ],
   "limitations": [
     "Stored CI claims/URLs do not independently verify remote run; live GitHub CI is separately re-read.",
     "No SAP independent qualification or real Target-specific OS implementation.",
     "CORE-016 and Governance remain non-accepted until all Core MUSTs and fresh independent final review."
-  ]
+  ],
+  "casePath": "examples/dis-v020-conformance/readiness-gate.test.mjs",
+  "qualification": "Original independent test Blob unchanged at 2293 exact native+compatibility+general Verify 3/3 SUCCESS."
 }

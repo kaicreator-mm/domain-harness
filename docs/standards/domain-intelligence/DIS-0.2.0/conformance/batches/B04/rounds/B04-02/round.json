@@ -3,10 +3,10 @@
   "batchId": "B04",
   "roundId": "B04-02",
   "globalRoundId": "R42",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "startParent": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
-  "sourceHead": "9e6c05e4328614ea8a5e86a0ea201869eb4333a1",
-  "finalTree": "7d5ee77633a413c42fde24f245e6156d068337a8",
+  "sourceHead": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+  "finalTree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
   "testPath": "examples/dis-v020-conformance/closure-audit.test.mjs",
   "testGitBlob": "77e6b427fabd3fc8b07a70b5ce72117294e7b570",
   "receipt": "receipts/r42-b04-closure-dag-ci.json",
@@ -25,18 +25,18 @@
   "checks": [
     {
       "context": "ci/woodpecker/pr/dis-v020-integration",
-      "state": "ERROR",
-      "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/1"
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
     },
     {
       "context": "ci/woodpecker/pr/verify-min-node",
-      "state": "PENDING",
-      "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/2"
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
     },
     {
       "context": "ci/woodpecker/pr/verify",
-      "state": "PENDING",
-      "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/3"
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
     }
   ],
   "history": [
@@ -80,6 +80,28 @@
         }
       ],
       "description": "Later cumulative full-suite candidate"
+    },
+    {
+      "head": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+      "tree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+        }
+      ],
+      "meaning": "Final exact full-suite source, original test Blob unchanged"
     }
   ]
 }

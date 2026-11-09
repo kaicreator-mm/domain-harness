@@ -3,7 +3,7 @@
   "batchId": "B05",
   "roundId": "B05-02",
   "globalRoundId": "R45",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "startParent": "36bcdca50d1b79b82bc0944d4691979631010707",
   "testPath": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
   "testGitBlob": "e66c8839dbab6551f2c0a33f2db867c9a7e1cc75",
@@ -19,23 +19,23 @@
   "boundary": "Opt-in independent source closure via original first-party snapshot bytes; no source owner's independent semantic approval.",
   "originCommit": "6db5024fadb1b524e8eed39d604605404044e157",
   "originTree": "78a03be74fb6a29010f0f000561fa646115390d4",
-  "sourceHead": "6db5024fadb1b524e8eed39d604605404044e157",
-  "finalTree": "78a03be74fb6a29010f0f000561fa646115390d4",
+  "sourceHead": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+  "finalTree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
   "checks": [
     {
       "context": "ci/woodpecker/pr/dis-v020-integration",
       "state": "SUCCESS",
-      "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/1"
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
     },
     {
       "context": "ci/woodpecker/pr/verify-min-node",
-      "state": "ERROR",
-      "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/2"
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
     },
     {
       "context": "ci/woodpecker/pr/verify",
-      "state": "PENDING",
-      "url": "https://ci.kaicreator.com/repos/18/pipeline/2291/3"
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
     }
   ],
   "history": [
@@ -79,6 +79,28 @@
         }
       ],
       "meaning": "Cumulative three-round native replay"
+    },
+    {
+      "head": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+      "tree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+        }
+      ],
+      "meaning": "Final exact full-suite source, original test Blob unchanged"
     }
   ]
 }

@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B04",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -23,7 +23,7 @@
     {
       "batchRoundId": "B04-01",
       "globalRoundId": "R41",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-conformance/batch-audit.test.mjs",
       "receipt": "receipts/r41-b04-source-ledger-ci.json",
       "originalSourceHead": "8a94a1aec41dc80dbb748d2883d2db8240771bf9",
@@ -45,12 +45,31 @@
           "state": "PENDING",
           "url": "https://ci.kaicreator.com/repos/18/pipeline/2286/3"
         }
+      ],
+      "sourceHead": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+      "qualificationTree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+        }
       ]
     },
     {
       "batchRoundId": "B04-02",
       "globalRoundId": "R42",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-conformance/closure-audit.test.mjs",
       "receipt": "receipts/r42-b04-closure-dag-ci.json",
       "originalSourceHead": "9e6c05e4328614ea8a5e86a0ea201869eb4333a1",
@@ -72,12 +91,31 @@
           "state": "PENDING",
           "url": "https://ci.kaicreator.com/repos/18/pipeline/2287/3"
         }
+      ],
+      "sourceHead": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+      "qualificationTree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+        }
       ]
     },
     {
       "batchRoundId": "B04-03",
       "globalRoundId": "R43",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-conformance/readiness-gate.test.mjs",
       "receipt": "receipts/r43-b04-readiness-gate-ci.json",
       "originalSourceHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
@@ -99,6 +137,25 @@
           "state": "PENDING",
           "url": "https://ci.kaicreator.com/repos/18/pipeline/2288/3"
         }
+      ],
+      "sourceHead": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+      "qualificationTree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+        }
       ]
     }
   ],
@@ -112,10 +169,12 @@
   ],
   "fullSuiteCandidateHead": "d451eb36b8c4058d14c501c8965c300bee88acd9",
   "fullSuiteCandidateTree": "0a06f79233b3404a32871c0efb7973fae1c0b2e1",
-  "batchResult": "Three independently versioned C4 audit scopes, code committed; full source #2288 still PENDING. No 3/3 exact native verification and no Core promotion.",
+  "batchResult": "3/3 immutable round test Blobs replay qualified at #2293/1-3 full SUCCESS; historical canceled pipelines retained.",
   "blockers": [
     "Tally source-independent acceptance negative; GH locator remains unapproved",
     "Product/L1 real OS Target and UI transport applicability unresolved",
     "Seven Core PARTIAL, Governance NOT_RUN, no release/freeze"
-  ]
+  ],
+  "qualificationHead": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+  "qualificationTree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f"
 }

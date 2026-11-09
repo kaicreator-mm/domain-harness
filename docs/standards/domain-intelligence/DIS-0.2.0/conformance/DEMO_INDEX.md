@@ -221,3 +221,7 @@ D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式�
 ### B05 — source-scoped R44/R45/R46 real runtime Target and complete Source coverage (CI_PENDING)
 - [B05 status](batches/B05/BATCH_STATUS.md), [manifest](batches/B05/manifest.json), independently [R44](batches/B05/rounds/B05-01/ROUND.md), [R45](batches/B05/rounds/B05-02/ROUND.md), [R46](batches/B05/rounds/B05-03/ROUND.md). Original source SHAs `36bcdca50d1b79b82bc0944d4691979631010707`, `6db5024fadb1b524e8eed39d604605404044e157`, `42fc7bde28bdbc653113651f2f87aa1021df614c`. Each has independent Git Blob and `PENDING` source receipt.
 - Actual Node process OS/arch compared with independently installed Target before KDP boot; new optional `requireAllSourcesPinned` checks all original consumed Business source origins/SHAs; original Tally/Runx/xDownload/KDP native end-to-end uses distinct Function/KDP authorities. #2292/1 Integration SUCCESS, #2292/2 and #2292/3 PENDING at readback. No actual cross-OS variant or independent Tally SAP approval.
+
+
+### B04/B05 successful final joint replay — 6 unchanged independent round test blobs
+- B04 R41–R43 and B05 R44–R46 now have independently versioned SUCCESS receipts at `1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de` (#2293/1-3 SUCCESS). [B04](batches/B04/BATCH_STATUS.md) · [B05](batches/B05/BATCH_STATUS.md). Earlier CI cancellation statuses preserved. Total bounded rounds **15/15 VERIFIED**; Core remains **9/16 VERIFIED** due separate normative acceptance gates.
