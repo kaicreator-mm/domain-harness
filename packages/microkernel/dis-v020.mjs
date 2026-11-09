@@ -12,7 +12,7 @@ import {
 
 const refuse=code=>{throw new DisV020Error(code)};
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&Object.getPrototypeOf(x)===Object.prototype;
-export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins,expectedTarget,registry,store,tenantId,deploymentIdentity}={}){
+export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins,requireAllSourcesPinned,expectedTarget,registry,store,tenantId,deploymentIdentity}={}){
  if(typeof expectedDigest!=='string'||expectedDigest.length!==64)refuse('DIS_TRUST_ANCHOR_REQUIRED');
  const qualified=qualifyDisV020Artifact(artifact);
  if(expectedDigest!==artifact.digest)refuse('DIS_INSTALLED_AOT_MISMATCH');
@@ -57,6 +57,18 @@ export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins
    if(actual.sha256!==expect.sha256||
       ['repository','commit','path','gitBlob'].some(k=>actual.origin[k]!==expect.origin[k]))
     refuse('DIS_SOURCE_ANCHOR_STALE');
+  }
+ }
+ // R45: opt-in complete original source closure. The trusted installer must
+ // supply independent exact pins for EVERY consumed source; AOT cannot
+ // self-vouch merely by listing its own source IDs/digests.
+ if(requireAllSourcesPinned!==undefined&&typeof requireAllSourcesPinned!=='boolean')
+  refuse('DIS_SOURCE_ANCHOR_POLICY_INVALID');
+ if(requireAllSourcesPinned===true){
+  if(!plain(expectedSourcePins))refuse('DIS_SOURCE_ANCHOR_COVERAGE_INCOMPLETE');
+  for(const [id,consumers] of qualified.sourceConsumers){
+   if(consumers.length>0&&!Object.hasOwn(expectedSourcePins,id))
+    refuse('DIS_SOURCE_ANCHOR_COVERAGE_INCOMPLETE');
   }
  }
  if(!plain(registry)||!store)refuse('DIS_RUNTIME_INPUT_INVALID');

@@ -13,6 +13,8 @@ export interface DisV020LoadOptions {
  readonly expectedSourcePins?:Readonly<Record<string,Readonly<{
   sha256:string;origin:DisV020Origin
  }>>>;
+ /** Opt-in independent installer exact pin of every selected/consumed source. */
+ readonly requireAllSourcesPinned?:boolean;
  readonly registry:Readonly<Record<string,DisV020Implementation>>;
  readonly store:V10DocStore;
  readonly tenantId?:string;

@@ -30,8 +30,8 @@
     {
       "batchRoundId": "B05-02",
       "globalRoundId": "R45",
-      "status": "PLANNED",
-      "testPath": "examples/dis-v020-native-sdk/b05-target-host-provenance.test.mjs",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
       "sourceHead": null,
       "receipt": null
     },

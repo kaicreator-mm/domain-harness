@@ -1,0 +1,20 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B05",
+  "roundId": "B05-02",
+  "globalRoundId": "R45",
+  "status": "CI_PENDING",
+  "startParent": "36bcdca50d1b79b82bc0944d4691979631010707",
+  "testPath": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+  "testGitBlob": "e66c8839dbab6551f2c0a33f2db867c9a7e1cc75",
+  "receipt": null,
+  "positive": [
+    "B05-02 R45 targeted native Tally Runx xDownload original sources all have independent installer exact pins"
+  ],
+  "negative": [
+    "B05-02 R45 removing one consumed Domain original source pin cannot admit a target",
+    "B05-02 R45 malicious source Git origin and forged unrelated source fail closed independent of AOT",
+    "B05-02 R45 nonboolean and absent strict Source closure options fail before KDP boot"
+  ],
+  "boundary": "Opt-in independent source closure via original first-party snapshot bytes; no source owner's independent semantic approval."
+}
