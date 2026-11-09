@@ -50,7 +50,8 @@
     "r55-b09-dke-conditional-proof-native-ci",
     "r56-b10-r10-complete-witness-native-ci",
     "r57-b11-real-cli-native-ci",
-    "r58-b12-runx-physical-process-state-ci"
+    "r58-b12-runx-physical-process-state-ci",
+    "r59-b13-26-round-full-ledger-ci"
   ],
   "requirements": [
     {
@@ -1076,7 +1077,9 @@
         "examples/dis-v020-conformance/readiness-gate.mjs",
         "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
         "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
-        "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs"
+        "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+        "examples/dis-v020-conformance/full-ledger.test.mjs",
+        "examples/dis-v020-conformance/full-ledger.mjs"
       ],
       "positive": [
         {
@@ -1122,6 +1125,14 @@
         {
           "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
           "case": "R56 native real KDP SDK replays all 2048 valuations and 18 complete witness worlds; seven UNKNOWN remain UNKNOWN"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 all B01-B12 genuine 26 native source rounds have consistent 3-context exact stored CI and matrix refs"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 the previously stale B09 R55 standalone round now agrees with original verified #2312 receipts"
         }
       ],
       "negative": [
@@ -1188,6 +1199,18 @@
         {
           "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
           "case": "R56 stale installer source, JSON-as-code and caller forged owner/Effect fail closed before authority"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 fake verified status or historical Git test Blob are rejected before CI attribution"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 forged qualifying Source HEAD/TREE, mixed named contexts and duplicate job slots fail closed"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 missing matrix claim, swapped Function source and unexecuted native test cannot masquerade as proof"
         }
       ],
       "receiptIds": [
@@ -1201,9 +1224,10 @@
         "r51-b07-full-ledger-ci",
         "r54-b08-real-dke-knowledge-consumer-ci",
         "r55-b09-dke-conditional-proof-native-ci",
-        "r56-b10-r10-complete-witness-native-ci"
+        "r56-b10-r10-complete-witness-native-ci",
+        "r59-b13-26-round-full-ledger-ci"
       ],
-      "note": "R9.5 exact-SHA CI is verified; version-wide Requirement matrix and receipts only being established in this commit. R21 native Exact-SHA semantic receipt documents dedicated Integration and Verify SUCCESS while preserving engine-only context ERROR; main version conformance remains incomplete. R22 extra AOT source dependencies structurally registered, must be CI-qualified on newer exact SHA; previous R21 receipt remains historical. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. B04 candidate R41/R42/R43 add read-only source Git Blob vs current drift audit, 21-requirement C1-C5 DAG blocker inventory, and fail-closed Freeze/Release gate; all seven normative Core gaps remain, so CORE-016 cannot be promoted even if native CI succeeds. Source reviewer/OS platform decision still missing. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B07-01 R51 read-only prior-18-round audit and Woodpecker reordering fix qualified at exact source 61f32bfc274b701f6b4d8ffcd66f58d4349f22fc / #2302/1-3 all SUCCESS. This audits recorded CI and Git claims only, not independent SAP/semantic authority, live CI attestation or final version-wide conformance; still PARTIAL. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL. B09 R55 exact source `2d96e16942dcff518619b37e4b6c0664ca032ae3` / Woodpecker #2312/1-3 all SUCCESS, original DKE R9 fixed Git formal DATA + per-CQ source refs consumed by actual native selected DIS BUILD/SDK/KDP Knowledge Function: 2 ENTAILED, 2 REFUTED, 7 UNKNOWN. Read-only OBSERVED of REFUTED is not positive SAP; source facts same-model authored and upstream DKE R10 complete certificate NOT part of selected R55 source. No independent domain-semantic approval, source owner SAP, Effect or full Core conformance; this requirement remains PARTIAL. B10 R56 original DKE R10 full 11-var witness certificate, 2048 assignments/64 satisfying/18 complete witnesses selected native SDK Knowledge Function qualified at 66d7024f551faa69fa432e19cc535ced8065abd0 #2320/1-3 3/3 SUCCESS; independent semantic SAP and source-owner truth still NOT qualified. Core stays PARTIAL."
+      "note": "R9.5 exact-SHA CI is verified; version-wide Requirement matrix and receipts only being established in this commit. R21 native Exact-SHA semantic receipt documents dedicated Integration and Verify SUCCESS while preserving engine-only context ERROR; main version conformance remains incomplete. R22 extra AOT source dependencies structurally registered, must be CI-qualified on newer exact SHA; previous R21 receipt remains historical. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. B04 candidate R41/R42/R43 add read-only source Git Blob vs current drift audit, 21-requirement C1-C5 DAG blocker inventory, and fail-closed Freeze/Release gate; all seven normative Core gaps remain, so CORE-016 cannot be promoted even if native CI succeeds. Source reviewer/OS platform decision still missing. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B07-01 R51 read-only prior-18-round audit and Woodpecker reordering fix qualified at exact source 61f32bfc274b701f6b4d8ffcd66f58d4349f22fc / #2302/1-3 all SUCCESS. This audits recorded CI and Git claims only, not independent SAP/semantic authority, live CI attestation or final version-wide conformance; still PARTIAL. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL. B09 R55 exact source `2d96e16942dcff518619b37e4b6c0664ca032ae3` / Woodpecker #2312/1-3 all SUCCESS, original DKE R9 fixed Git formal DATA + per-CQ source refs consumed by actual native selected DIS BUILD/SDK/KDP Knowledge Function: 2 ENTAILED, 2 REFUTED, 7 UNKNOWN. Read-only OBSERVED of REFUTED is not positive SAP; source facts same-model authored and upstream DKE R10 complete certificate NOT part of selected R55 source. No independent domain-semantic approval, source owner SAP, Effect or full Core conformance; this requirement remains PARTIAL. B10 R56 original DKE R10 full 11-var witness certificate, 2048 assignments/64 satisfying/18 complete witnesses selected native SDK Knowledge Function qualified at 66d7024f551faa69fa432e19cc535ced8065abd0 #2320/1-3 3/3 SUCCESS; independent semantic SAP and source-owner truth still NOT qualified. Core stays PARTIAL. B13 R59 read-only full B01–B12 26-round heterogeneous stored provenance/CI ledger, originally stale B09 round fixed. Actual source bbf076316e5c9cb4f153a88ea9c756c38722d9f5 #2327/1–3 3/3 SUCCESS; not independent live CI recheck for each historic SHA, SAP owner qualification or full-version acceptance. Remains PARTIAL."
     },
     {
       "id": "DIS020-OPT-001",

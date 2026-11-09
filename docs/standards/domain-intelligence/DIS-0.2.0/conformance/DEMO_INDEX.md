@@ -268,3 +268,8 @@ Selected `dke.r9.readProof` Function uses real BUILD/SDK/KDP and exact original 
 ### B12 / R58 real Runx Stateful vs physical KDP SQLite
 
 [Batch](batches/B12/BATCH_SUMMARY.md), [round](batches/B12/rounds/B12-01/ROUND.md), [receipt](receipts/r58-b12-runx-physical-process-state-ci.json). Source `67bd90839e3634427845181a406cd32804c75e17` #2325/1–3 **3/3 SUCCESS**. Cumulative 26/26 scoped demos; Core 9/16, no automatic Domain-owned persistent State.
+
+
+### B13 / R59 complete 26 historical source/CI ledger readback
+
+[Summary](batches/B13/BATCH_SUMMARY.md), [round](batches/B13/rounds/B13-01/ROUND.md), [receipt](receipts/r59-b13-26-round-full-ledger-ci.json); source `bbf076316e5c9cb4f153a88ea9c756c38722d9f5` TREE `34430b78c6dc02a0df9a781e257c8a06b87c1b63` #2327/1–3 3/3 SUCCESS. Cumulative 27/27 scoped Demo rounds; Core 9/16 remains, independent semantic/approval pending.

@@ -228,3 +228,8 @@ Actual OS subprocess via original DIS AOT selected xDownload Interaction, full #
 ### B12/R58 original Runx State vs KDP physical lifecycle
 
 Actual source-locked Runx Stateful through native KDP/SDK with reopened physical SQLite and separate Node child processes. Exact `67bd90839e3634427845181a406cd32804c75e17` TREE `2095af677e10efde0c66ecad1c13b342e5c8f633` #2325/1–3 SUCCESS; no automatic Domain State persistence. Total 26/26 bounded rounds, Core 9/16, seven PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN.
+
+
+### B13/R59 full historical round source/CI audit
+
+26 historical B01-B12 original round Git/CI receipts and Matrix links checked by exact source `bbf076316e5c9cb4f153a88ea9c756c38722d9f5` TREE `34430b78c6dc02a0df9a781e257c8a06b87c1b63`, Woodpecker #2327/1–3 3/3 SUCCESS; B09 stale R55 round metadata corrected against original #2312. Total 27/27 scoped rounds, Core 9/16 VERIFIED +7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN, no SAP qualification or Freeze.
