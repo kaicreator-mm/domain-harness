@@ -1,0 +1,28 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B10",
+  "roundId": "B10-01",
+  "globalRoundId": "R56",
+  "status": "CI_PENDING",
+  "originCommit": "c3f8511d5df5b9642255d4ba57ee2115c8f75b9c",
+  "originTree": "dcd1527e938deb0751861601e10de4ce8a88b6e8",
+  "testPath": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+  "testGitBlob": "dc20a458b3b0402d5545ccb35b38565179374be9",
+  "sourceHead": "c3f8511d5df5b9642255d4ba57ee2115c8f75b9c",
+  "receipt": "receipts/r56-b10-r10-complete-witness-native-ci.json",
+  "checks": [],
+  "positive": [
+    "R56 original R10 Python certificate and DIS Reader are AOT-selected DATA and local code with exact Git origin",
+    "R56 native real KDP SDK replays all 2048 valuations and 18 complete witness worlds; seven UNKNOWN remain UNKNOWN"
+  ],
+  "negative": [
+    "R56 complete countermodel verifier rejects missing variable, false source-fact, incorrect polarity and SAP impersonation",
+    "R56 stale installer source, JSON-as-code and caller forged owner/Effect fail closed before authority"
+  ],
+  "limits": [
+    "R10 11-variable complete SAT witnesses prove finite truth relative to same-model-authored frozen facts; no independent semantic/source owner reviewer or qualified SAP.",
+    "R56 consumes exactly the original R10 Python certificate Git Blob c77442b32c3ca49df303db99d8678a6cbcc8ce89 as DATA, and original DKE R9 input Git Blob 426c7d165c19b7aa459de82d5d776962dba13fb0, not the DKE original executable verifier; DIS independently enumerates finite Boolean assignments.",
+    "Full certificate can strengthen evidence completeness without upgrading any of seven UNDERDETERMINED questions to accepted domain facts or permitting non-idempotent KDP Effects.",
+    "History of B09 R55 original R9 summary-only countermodels is intact; no retroactive qualification by R55 CI."
+  ]
+}

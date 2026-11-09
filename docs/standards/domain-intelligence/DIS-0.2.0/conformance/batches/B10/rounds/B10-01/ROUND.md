@@ -1,0 +1,15 @@
+# B10-01 / R56 — DKE R10 complete SAT proof certificate consumed natively by DIS
+
+**Status: CI_PENDING, not yet VERIFIED.** Source `c3f8511d5df5b9642255d4ba57ee2115c8f75b9c`, TREE `dcd1527e938deb0751861601e10de4ce8a88b6e8`, original test Git Blob `dc20a458b3b0402d5545ccb35b38565179374be9`. Master Issue #1499, Draft PR #1497.
+
+## Original upstream evidence, independent replay
+
+- Actual DKE [R10 #209](https://github.com/kaicreator-mm/domain-forge/issues/209#issuecomment-6744209654), original `domain-forge@bbeceb44cdc9b38ac5d50e591f28ef914f828709` Python 3.13.5 generated [complete certificate](https://github.com/kaicreator-mm/domain-forge/blob/bbeceb44cdc9b38ac5d50e591f28ef914f828709/docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r10-replayable-cert/R10_01_CERTIFICATE.json), Git Blob `c77442b32c3ca49df303db99d8678a6cbcc8ce89`.
+- Original DKE R9 [frozen formal input](https://github.com/kaicreator-mm/domain-forge/blob/7aa5cf4afa625c19e9d9a59667d85b67d5bc1401/docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r9-symbolic-source-scope/FORMAL_INPUT.json) Git Blob `426c7d165c19b7aa459de82d5d776962dba13fb0`. Its original DIS fixture is reused read-only as the same exact source, not reauthored. R10 generator's source and Node independent verifier are historical DKE tests, not assumed to have run in DIS.
+- New DIS local `dke-r10-certificate-reader.mjs` source Git Blob `2f3927953c2c3ccfa3108213868823c9c25882df` is an explicit LOCAL implementation separately source-locked at `636ecafb1566d67f34da1685b09f14550286411c`; original DKE JSON source path remains original `docs/standards/dke`, as non-executable DATA dependency.
+
+## Genuine native runtime path and scope
+
+New selected `dke.r10.readProof` Knowledge Function through actual DIS `compileDisV020Aot` + `loadDisV020Aot` / KDP fixture, independent installer original source pins, typed Contract and actual invocation. Every 11-bit valuation (2048) is evaluated on the original frozen source facts and mode exclusivity, yielding 64 satisfying worlds; every R10 certificate row must contain complete *11-variable* positive/negative world satisfying the original facts and required proposition polarity. All **18** R10 witness worlds and all 11 original propositions are checked; typed `COMPLETE_REPLAYED_CONDITIONAL` distinguishes this from R55 `SUMMARY_ONLY` proof evidence. 2 source-conditional ENTAILED, 2 REFUTED remain `OBSERVED`, 7 UNDERDETERMINED remain `UNKNOWN`, still `qualified:false`, `authority:NONE`, `attested:false`, Effects forbidden. False/missing variables, false facts, polarity, SAP/owner impersonation, source pin drift and JSON-as-executable fail closed.
+
+No self-authorized promotion; this is actual *formal evidence completeness* beyond R55, but not original publisher semantic truth or qualified SAP. Historic R55 test/receipt unchanged. No Node major semantic gate, merge/Freeze/Release. Full native exact CI required before R56 matrix linkage.
