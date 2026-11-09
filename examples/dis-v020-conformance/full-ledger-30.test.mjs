@@ -60,7 +60,7 @@ test('R63 preserve R61 exact original CI separately from genuine R61-R1 immutabl
  assert.equal(gitBlob(reader),'a599be27036b85194d1e64a88c87959987b16059');
  assert.equal(gitBlob(testCode),'13b316ceac51227caa0c66c15ac430879fafa55e');
  assert.notEqual(gitBlob(testCode),r.testGitBlob);
- assert.ok(testCode.includes('immutable detached impact arrays across requests'));
+ assert.ok(testCode.includes('immutable detached source-impact arrays across requests'));
 });
 test('R63 exact R62 revised 10-node graph edge checks and later #2344 CI are consistent across B16 manifest round and receipt',async()=>{
  const x=await r62();
