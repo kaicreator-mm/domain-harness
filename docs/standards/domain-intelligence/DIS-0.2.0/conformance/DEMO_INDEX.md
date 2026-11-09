@@ -263,3 +263,8 @@ Selected `dke.r9.readProof` Function uses real BUILD/SDK/KDP and exact original 
 ### B11 / R57 actual OS CLI native Interaction
 
 [Batch](batches/B11/BATCH_SUMMARY.md), [round](batches/B11/rounds/B11-01/ROUND.md), [receipt](receipts/r57-b11-real-cli-native-ci.json), source `b5762ae29ac7234d45d8bc1cbf974faebad39e2e` #2323/1-3 SUCCESS. Cumulative 25/25, Core 9/16 (CORE-014 PARTIAL).
+
+
+### B12 / R58 real Runx Stateful vs physical KDP SQLite
+
+[Batch](batches/B12/BATCH_SUMMARY.md), [round](batches/B12/rounds/B12-01/ROUND.md), [receipt](receipts/r58-b12-runx-physical-process-state-ci.json). Source `67bd90839e3634427845181a406cd32804c75e17` #2325/1–3 **3/3 SUCCESS**. Cumulative 26/26 scoped demos; Core 9/16, no automatic Domain-owned persistent State.

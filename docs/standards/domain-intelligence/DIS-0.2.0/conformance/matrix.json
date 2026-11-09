@@ -49,7 +49,8 @@
     "r54-b08-real-dke-knowledge-consumer-ci",
     "r55-b09-dke-conditional-proof-native-ci",
     "r56-b10-r10-complete-witness-native-ci",
-    "r57-b11-real-cli-native-ci"
+    "r57-b11-real-cli-native-ci",
+    "r58-b12-runx-physical-process-state-ci"
   ],
   "requirements": [
     {
@@ -478,7 +479,9 @@
         "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
         "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
         "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
-        "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs"
+        "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+        "examples/dis-v020-stateful/runx-process-state.mjs",
+        "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs"
       ],
       "positive": [
         {
@@ -512,6 +515,10 @@
         {
           "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
           "case": "R56 native real KDP SDK replays all 2048 valuations and 18 complete witness worlds; seven UNKNOWN remain UNKNOWN"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs",
+          "case": "B12 R58 original Runx Stateful local presence does NOT auto-resurrect through second Node process with same physical KDP SQLite file"
         }
       ],
       "negative": [
@@ -554,6 +561,14 @@
         {
           "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
           "case": "R56 stale installer source, JSON-as-code and caller forged owner/Effect fail closed before authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs",
+          "case": "B12 R58 forged Runx agent token cannot put a fake execution lease into the physical KDP or Runx owner map"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs",
+          "case": "B12 R58 invalid OS process modes and source spoofed argument shape fail closed before KDP DB opening"
         }
       ],
       "receiptIds": [
@@ -563,9 +578,10 @@
         "r46-b05-target-original-consumer-ci",
         "r54-b08-real-dke-knowledge-consumer-ci",
         "r55-b09-dke-conditional-proof-native-ci",
-        "r56-b10-r10-complete-witness-native-ci"
+        "r56-b10-r10-complete-witness-native-ci",
+        "r58-b12-runx-physical-process-state-ci"
       ],
-      "note": "Actual Tally rule and Runx observer run as LOCAL, but general per-Element state ownership and knowledge query contract do not have complete executable profile. B01 R33 real Runx Stateful handle independence, token mismatch, process-local boundary and separated Tally Rule/xDownload Knowledge sources PASS at exact replay #2276/1-3; closing SDK ingress does not revoke existing in-process handles or prove persistent Domain state or real KDP lease. Still PARTIAL. B05 native real process OS/arch preflight, optional complete installer original source locks and actual Tally/Runx/xDownload/KDP invocation candidate. It remains a bounded C2/C3 implementation; it is not distinct per-OS module source or independent Tally semantic SAP acceptance. No Core promotion without authoritative scope and exact CI. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL. B09 R55 exact source `2d96e16942dcff518619b37e4b6c0664ca032ae3` / Woodpecker #2312/1-3 all SUCCESS, original DKE R9 fixed Git formal DATA + per-CQ source refs consumed by actual native selected DIS BUILD/SDK/KDP Knowledge Function: 2 ENTAILED, 2 REFUTED, 7 UNKNOWN. Read-only OBSERVED of REFUTED is not positive SAP; source facts same-model authored and upstream DKE R10 complete certificate NOT part of selected R55 source. No independent domain-semantic approval, source owner SAP, Effect or full Core conformance; this requirement remains PARTIAL. B10 R56 original DKE R10 full 11-var witness certificate, 2048 assignments/64 satisfying/18 complete witnesses selected native SDK Knowledge Function qualified at 66d7024f551faa69fa432e19cc535ced8065abd0 #2320/1-3 3/3 SUCCESS; independent semantic SAP and source-owner truth still NOT qualified. Core stays PARTIAL."
+      "note": "Actual Tally rule and Runx observer run as LOCAL, but general per-Element state ownership and knowledge query contract do not have complete executable profile. B01 R33 real Runx Stateful handle independence, token mismatch, process-local boundary and separated Tally Rule/xDownload Knowledge sources PASS at exact replay #2276/1-3; closing SDK ingress does not revoke existing in-process handles or prove persistent Domain state or real KDP lease. Still PARTIAL. B05 native real process OS/arch preflight, optional complete installer original source locks and actual Tally/Runx/xDownload/KDP invocation candidate. It remains a bounded C2/C3 implementation; it is not distinct per-OS module source or independent Tally semantic SAP acceptance. No Core promotion without authoritative scope and exact CI. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL. B09 R55 exact source `2d96e16942dcff518619b37e4b6c0664ca032ae3` / Woodpecker #2312/1-3 all SUCCESS, original DKE R9 fixed Git formal DATA + per-CQ source refs consumed by actual native selected DIS BUILD/SDK/KDP Knowledge Function: 2 ENTAILED, 2 REFUTED, 7 UNKNOWN. Read-only OBSERVED of REFUTED is not positive SAP; source facts same-model authored and upstream DKE R10 complete certificate NOT part of selected R55 source. No independent domain-semantic approval, source owner SAP, Effect or full Core conformance; this requirement remains PARTIAL. B10 R56 original DKE R10 full 11-var witness certificate, 2048 assignments/64 satisfying/18 complete witnesses selected native SDK Knowledge Function qualified at 66d7024f551faa69fa432e19cc535ced8065abd0 #2320/1-3 3/3 SUCCESS; independent semantic SAP and source-owner truth still NOT qualified. Core stays PARTIAL. B12/R58 original Runx Stateful is PROCESS_LOCAL despite identical physical file-backed KDP SQLite reopened across OS child processes; exact 67bd90839e3634427845181a406cd32804c75e17 / Woodpecker #2325/1–3 SUCCESS. A Domain-owned persistent State schema/recovery contract NOT implemented, still PARTIAL."
     },
     {
       "id": "DIS020-CORE-007",

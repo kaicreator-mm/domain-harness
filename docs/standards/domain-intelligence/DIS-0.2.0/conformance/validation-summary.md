@@ -223,3 +223,8 @@ Real original DKE R10 11-variable SAT certificate through selected DIS SDK/KDP, 
 ### B11 / R57 CLI child-process proof
 
 Actual OS subprocess via original DIS AOT selected xDownload Interaction, full #2323/1-3 SUCCESS at `b5762ae29ac7234d45d8bc1cbf974faebad39e2e`. 25/25 bounded rounds; Core 9/16; no SAP/Effect Product approval.
+
+
+### B12/R58 original Runx State vs KDP physical lifecycle
+
+Actual source-locked Runx Stateful through native KDP/SDK with reopened physical SQLite and separate Node child processes. Exact `67bd90839e3634427845181a406cd32804c75e17` TREE `2095af677e10efde0c66ecad1c13b342e5c8f633` #2325/1–3 SUCCESS; no automatic Domain State persistence. Total 26/26 bounded rounds, Core 9/16, seven PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN.

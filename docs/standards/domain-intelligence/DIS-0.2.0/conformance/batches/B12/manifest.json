@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B12",
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -20,17 +20,34 @@
     {
       "batchRoundId": "B12-01",
       "globalRoundId": "R58",
-      "status": "CI_PENDING",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs",
       "originalSourceHead": "8a518e803db378e2e263527b25c647f6a656936c",
       "testGitBlob": "076d279acf5654c8ddea42d9e0a25211423bfb47",
       "receipt": "receipts/r58-b12-runx-physical-process-state-ci.json",
-      "sourceHead": "8a518e803db378e2e263527b25c647f6a656936c",
-      "checks": []
+      "sourceHead": "67bd90839e3634427845181a406cd32804c75e17",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2325/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2325/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2325/3"
+        }
+      ],
+      "qualificationTree": "2095af677e10efde0c66ecad1c13b342e5c8f633"
     }
   ],
-  "verifiedRounds": 0,
-  "pendingRounds": 1,
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
   "unstartedRounds": 0,
   "noAutomaticCorePromotion": true,
   "limitations": [
@@ -38,5 +55,24 @@
     "Native process child opens real file-backed KDP SQLite with a shared tenant, yet deliberately has no automatic Domain State migration or Event replay; any durable Domain State implementation needs separate first-party spec and tests.",
     "Physical SQLite file is a temp sandbox; no production Host/OS Effect, execution lease or external Tally/GitHub business fact is authorized.",
     "CORE-006 full general State/Rule/Knowledge implementation coverage and independent SAP still require source-owner semantic and Product/L1 decisions; no auto Core promotion."
+  ],
+  "qualificationHead": "67bd90839e3634427845181a406cd32804c75e17",
+  "qualificationTree": "2095af677e10efde0c66ecad1c13b342e5c8f633",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2325/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2325/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2325/3"
+    }
   ]
 }
