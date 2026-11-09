@@ -102,5 +102,7 @@
     "CORE-016 and Governance remain non-accepted until all Core MUSTs and fresh independent final review."
   ],
   "casePath": "examples/dis-v020-conformance/closure-audit.test.mjs",
-  "qualification": "Original independent test Blob unchanged at 2293 exact native+compatibility+general Verify 3/3 SUCCESS."
+  "observations": [
+    "Original independent test Blob unchanged at 2293 exact native+compatibility+general Verify 3/3 SUCCESS."
+  ]
 }

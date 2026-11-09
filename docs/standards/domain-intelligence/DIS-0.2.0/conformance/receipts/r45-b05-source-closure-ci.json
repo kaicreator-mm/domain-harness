@@ -101,5 +101,7 @@
     "KDP admission is not proof of business Effect completion or human review."
   ],
   "testPath": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
-  "qualification": "Original independent test Blob unchanged at 2293 exact native+compatibility+general Verify 3/3 SUCCESS."
+  "observations": [
+    "Original independent test Blob unchanged at 2293 exact native+compatibility+general Verify 3/3 SUCCESS."
+  ]
 }
