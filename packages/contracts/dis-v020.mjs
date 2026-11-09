@@ -205,7 +205,7 @@ export function classifyDisV020FunctionOutcome(contract,value){
  * authorization to install an AOT with a changed contract.
  */
 export function compareDisV020ElementContracts(previous,next){
- const allowed=['id','domainId','kind','description','version','packageId','dependsOn','functions','validation'];
+ const allowed=['id','domainId','kind','description','version','packageId','dependsOn','dependencies','functions','validation'];
  keys(previous,allowed);keys(next,allowed);
  if(!SEMVER.test(previous.version)||!SEMVER.test(next.version))
   fail('DIS_ELEMENT_VERSION_INVALID');
@@ -231,6 +231,17 @@ export function compareDisV020ElementContracts(previous,next){
  }
  if(previous.dependsOn.some(id=>!next.dependsOn.includes(id)))
   fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+ // A consumer must not lose an AOT-locked Function-level dependency
+ // in a same-major Element upgrade, even when the coarse edge remains.
+ if(previous.dependencies!==undefined){
+  if(!arr(next.dependencies,true))fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+  for(const old of previous.dependencies){
+   const cur=next.dependencies.find(x=>x.element===old.element);
+   if(!cur||old.functions.some(x=>!cur.functions.some(y=>
+      y.id===x.id&&y.contractVersion===x.contractVersion)))
+    fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+  }
+ }
  return Object.freeze({compatible:true,from:previous.version,to:next.version});
 }
 
@@ -324,7 +335,7 @@ export function qualifyDisV020Artifact(artifact){
  // NOT from external dynamic knowledge truth or a fabricated ECP closure.
  const sourceConsumers=new Map([...pins.keys()].map(sourceId=>[sourceId,[]]));
  for(const e of program.elements){
-  keys(e,['id','domainId','kind','version','description','packageId','dependsOn','functions','validation']);
+  keys(e,['id','domainId','kind','version','description','packageId','dependsOn','dependencies','functions','validation']);
   if(!SEMVER.test(e.version))fail('DIS_ELEMENT_VERSION_INVALID');
   if(!id(e.id)||!domains.has(e.domainId)||!ELEMENT_KINDS.has(e.kind)||
      typeof e.description!=='string'||!e.description.trim()||
@@ -406,6 +417,37 @@ export function qualifyDisV020Artifact(artifact){
     if(!e.functions.some(f=>f.binding.type==='local'&&
        (f.binding.sourceId===sid||f.sourceDependencies?.includes(sid))))
      fail('DIS_ELEMENT_VALIDATION_UNBOUND');
+   }
+  }
+ }
+ // R52: optional complete Function-level references inside each static
+ // Element dependency edge. Legacy dependsOn-only AOTs remain valid. No
+ // dynamic cross-Element execution authority is granted by this metadata.
+ for(const e of program.elements){
+  if(e.dependencies===undefined)continue;
+  if(!arr(e.dependencies,e.dependsOn.length===0)||
+     e.dependencies.length!==e.dependsOn.length)
+   fail('DIS_FUNCTION_DEPENDENCY_INVALID');
+  const targets=new Set();
+  for(const dep of e.dependencies){
+   keys(dep,['element','functions']);
+   if(!id(dep.element)||!e.dependsOn.includes(dep.element)||targets.has(dep.element)||
+      !arr(dep.functions))fail('DIS_FUNCTION_DEPENDENCY_INVALID');
+   targets.add(dep.element);
+   const to=elements.get(dep.element);
+   if(!to)fail('DIS_FUNCTION_DEPENDENCY_UNBOUND');
+   const funcs=new Set();
+   for(const ref of dep.functions){
+    keys(ref,['id','contractVersion']);
+    if(!id(ref.id)||typeof ref.contractVersion!=='string'||
+       !SEMVER.test(ref.contractVersion)||funcs.has(ref.id))
+      fail('DIS_FUNCTION_DEPENDENCY_INVALID');
+    funcs.add(ref.id);
+    const target=to.functions.find(x=>x.id===ref.id);
+    if(!target)fail('DIS_FUNCTION_DEPENDENCY_UNBOUND');
+    const v=target.contract?.version??target.receiptContract?.version??target.handleContract?.version;
+    if(v===undefined)fail('DIS_FUNCTION_DEPENDENCY_CONTRACT_MISSING');
+    if(v!==ref.contractVersion)fail('DIS_FUNCTION_DEPENDENCY_VERSION_MISMATCH');
    }
   }
  }

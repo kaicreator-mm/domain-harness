@@ -59,7 +59,15 @@ export async function makeNativeFixture(){
     dependsOn:['xdownload.policy'],functions:[
     {id:'xdownload.interaction.inspect',kind:'interaction',effect:'none',binding:{type:'local',sourceId:'xdownload-interaction'}},
     {id:'xdownload.interaction.confirm',kind:'interaction',effect:'none',binding:{type:'local',sourceId:'xdownload-interaction'}}]},
-   {id:'xdownload.acquire',domainId:'xdownload',version:'1.0.0',kind:'effect',description:'Non-idempotent acquisition requires KDP permit',packageId:'business-download@0.2.0-t03',dependsOn:['xdownload.policy'],functions:[
+   {id:'xdownload.acquire',domainId:'xdownload',version:'1.0.0',kind:'effect',description:'Non-idempotent acquisition requires KDP permit',packageId:'business-download@0.2.0-t03',
+    dependsOn:['xdownload.policy','xdownload.interaction'],
+    // Exact static selection, not permission to invoke without KDP admission.
+    dependencies:[
+     {element:'xdownload.policy',functions:[{id:'xdownload.describePolicy',contractVersion:'1.0.0'}]},
+     {element:'xdownload.interaction',functions:[
+      {id:'xdownload.interaction.inspect',contractVersion:'1.0.0'},
+      {id:'xdownload.interaction.confirm',contractVersion:'1.0.0'}]}
+    ],functions:[
     {id:'xdownload.confirmDownload',kind:'effect',effect:'governed',binding:{type:'kdp-intent',intentId:'confirmDownload'}}]},
   ],
   relations:[
