@@ -15,3 +15,13 @@ Original 203→79 stale step interfaces invalidate `reference.remove-16`, `refer
 **Contract change needed only for actual producer encoding:** DIS `DKE_DATA_ORIGIN` narrowly accepts original DKE `.json.zlib.b64` / `.mjs.zlib.b64` within `docs/standards/dke/**` as **DATA source dependencies**; compressed source code remains forbidden as `LOCAL` executable. No broad source path allow, untrusted JS eval or arbitrary package authority.
 
 **Honest boundaries:** This validates a real native original DKE producer receipt and native DIS selected graph consumer separately. The original publisher Guide 203/79 full HTML/PDF source bytes are still NOT pinned, no independent source semantic Critic, SAP, owner approval or KDP Effects. Original D05 0/14 full, R8 0/53 full and autonomous EV 0/18. B01–B15 29/29 rounds verified; B16/R62 requires its own exact-source three Woodpecker contexts. Core 9/16 VERIFIED /7 PARTIAL unchanged.
+
+
+## R62 exact source CI qualification — later observed acceptance
+
+The top-of-file `CI_PENDING` reflected the **initial R62 candidate**, not the final source qualification. GitHub original combined statuses at **`domain-harness@a544ed57fb0bb69d7176e332c84f83e8889014d5`**, with the original unchanged native test Git Blob `9aa5bc3a77c9f666ffe44a5439aa14d936625ed3`, selected Reader Blob `71d55ad1e13cce255276794eec4afa417b139c45`, and original compressed DKE R18 three DATA Git Blob IDs, now verify all three exact-source native gates:
+- [Woodpecker #2333/1 native DIS integration](https://ci.kaicreator.com/repos/18/pipeline/2333/1) — **SUCCESS**
+- [Woodpecker #2333/2 compatibility](https://ci.kaicreator.com/repos/18/pipeline/2333/2) — **SUCCESS**
+- [Woodpecker #2333/3 verify](https://ci.kaicreator.com/repos/18/pipeline/2333/3) — **SUCCESS**
+
+[B16 batch manifest](../../manifest.json) and [R62 exact Git machine receipt](../../../receipts/r62-b16-r18-native-transitive-knowledge-impact-ci.json) are independently versioned as **VERIFIED/SUCCESS** on those original source checks. The cumulative B01–B16 **30/30 scoped rounds VERIFIED**, distinct from Core matrix 9/16 VERIFIED and 7/16 PARTIAL. This is a true native `compileDisV020Aot → loadDisV020Aot` selected Knowledge Function on original DKE R18 evidence, not a new independently reviewed original Framework Guide203/79 raw source, not a current hardware repair, not qualified SAP or Effect. The later DIS R61 Reader repair #2335 separately qualifies its own source; this does not retrospectively change original R62 candidate sources.
