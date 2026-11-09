@@ -1,0 +1,19 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B05",
+  "roundId": "B05-03",
+  "globalRoundId": "R46",
+  "status": "CI_PENDING",
+  "startParent": "6db5024fadb1b524e8eed39d604605404044e157",
+  "testPath": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+  "testGitBlob": "6aba7dd4a1bfd7597b6143ab3ef048c8150aa053",
+  "receipt": null,
+  "positive": [
+    "B05-03 R46 real host original Tally Rule xDownload Knowledge Runx Stateful and KDP admission compose without business authority"
+  ],
+  "negative": [
+    "B05-03 R46 original source and host matching still cannot make unreviewed semantic Tally claim succeed",
+    "B05-03 R46 stale independent source pin denies selected native KDP boot before side effects"
+  ],
+  "boundary": "Real selected original multi-domain consumers and independent preflight; no physical Host Effect, SAP Oracle, or per-OS native implementation certification."
+}

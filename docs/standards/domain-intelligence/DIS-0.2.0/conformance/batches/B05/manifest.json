@@ -38,7 +38,7 @@
     {
       "batchRoundId": "B05-03",
       "globalRoundId": "R46",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
       "sourceHead": null,
       "receipt": null
