@@ -225,3 +225,7 @@ D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式�
 
 ### B04/B05 successful final joint replay — 6 unchanged independent round test blobs
 - B04 R41–R43 and B05 R44–R46 now have independently versioned SUCCESS receipts at `1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de` (#2293/1-3 SUCCESS). [B04](batches/B04/BATCH_STATUS.md) · [B05](batches/B05/BATCH_STATUS.md). Earlier CI cancellation statuses preserved. Total bounded rounds **15/15 VERIFIED**; Core remains **9/16 VERIFIED** due separate normative acceptance gates.
+
+
+### Batch B06 — real loopback HTTP Form/Chat native Interaction, 3 source rounds (CI_PENDING)
+- [B06 source-scoped status](batches/B06/BATCH_STATUS.md), [manifest](batches/B06/manifest.json), separate [R47](batches/B06/rounds/B06-01/ROUND.md), [R48](batches/B06/rounds/B06-02/ROUND.md), [R49](batches/B06/rounds/B06-03/ROUND.md). Three immutable test Git Blobs, 8 native cases and separate PENDING receipts; final full-batch exact CI to follow. This is an actual loopback HTTP transport, not deployed public UI or KDP effect.

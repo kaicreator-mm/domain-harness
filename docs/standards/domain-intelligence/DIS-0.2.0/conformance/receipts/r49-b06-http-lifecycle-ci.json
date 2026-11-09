@@ -1,0 +1,27 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r49-b06-http-lifecycle-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+    "tree": "3e36df2a307d51311bf096c61adc40a3228ac81d"
+  },
+  "originCommit": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+  "testGitBlob": "a74e6631c22b7729665629490e637c60d9ded234",
+  "testPath": "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
+  "ci": [],
+  "historical": [
+    {
+      "sourceHead": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Per-round immutable commit; only final batch head is pushed to minimize canceled CI."
+    }
+  ],
+  "limitations": [
+    "Round was independently committed but no per-round CI was requested; exact full-batch source gate is pending.",
+    "Actual loopback HTTP Form/Chat is not a deployed production web/chat app or permission to execute a Host/KDP Effect.",
+    "No independent Tally/SAP acceptance, physical platform variants or Product/L1 applicability approval."
+  ]
+}

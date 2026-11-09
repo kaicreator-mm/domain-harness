@@ -181,3 +181,7 @@ Three individually committed source-locked rounds (11 named native cases) add **
 ## Final cumulative exact-SHA qualification — supersedes earlier pending snapshot
 
 **VERIFIED for all three source-scoped rounds.** Git HEAD `1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de`, TREE `4c3e3ecbac8cf1489fc807a60ce22806672f414f`, [Woodpecker #2293/1](https://ci.kaicreator.com/repos/18/pipeline/2293/1) native SUCCESS, [#2293/2](https://ci.kaicreator.com/repos/18/pipeline/2293/2) minimum-node SUCCESS, [#2293/3](https://ci.kaicreator.com/repos/18/pipeline/2293/3) Verify SUCCESS. All six original R41–R46 test Git Blobs were re-read and matched the successful cumulative source exactly. Earlier `ERROR` statuses had GitHub descriptions `Pipeline was canceled`, not demonstrated test failures, and remain historical. Separate `round.json`, `manifest.json` and independent `receipts/` now bind qualifying SHA; no full Core promotion, SAP authority, platform multi-variant or Release.
+
+
+### B06 R47–R49 real HTTP native Chat/Form transport — CI_PENDING
+Three separate Git source commits introduce real loopback HTTP Form/Chat POST through original AOT-selected xDownload Interaction; negative parser/forged Effect/oversize tests and six-session concurrency/SDK STOP. Eight native test cases planned for one final CI gate. Separate round source/Blob receipts remain PENDING until full-source exact 3/3 CI; no inflated Core-014 (still PARTIAL), no production HTTP UI or Host effects. [B06 status](batches/B06/BATCH_STATUS.md).

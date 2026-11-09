@@ -7,7 +7,7 @@
   "startParent": "11137b81f3bf715c665ffe30c45c992f9c68052e",
   "testPath": "examples/dis-v020-native-sdk/b06-http-transport.test.mjs",
   "testGitBlob": "5c127b88996b219ff90caf225b45d41f99d05ab8",
-  "receipt": null,
+  "receipt": "receipts/r47-b06-http-transport-ci.json",
   "positive": [
     "B06-01 R47 actual loopback HTTP Form POST uses selected xDownload Interaction and remains unauthorized for Effects",
     "B06-01 R47 actual loopback Chat JSON POST and Form produce equivalent source-selected structured Intent"
@@ -16,5 +16,17 @@
   "limitations": [
     "Loopback-only real HTTP, not publicly deployed production UI.",
     "HTTP request merely calls selected LOCAL Interaction, not KDP governed Effect."
+  ],
+  "originCommit": "b3b2fd993b74897f80142f8ca7afb3ee2855bdca",
+  "originTree": "2d0ba06c1a26c00e4f41cd5f47210f082353dfa0",
+  "sourceHead": "b3b2fd993b74897f80142f8ca7afb3ee2855bdca",
+  "finalTree": "2d0ba06c1a26c00e4f41cd5f47210f082353dfa0",
+  "checks": [],
+  "history": [
+    {
+      "sourceHead": "b3b2fd993b74897f80142f8ca7afb3ee2855bdca",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Per-round immutable commit; only final batch head is pushed to minimize canceled CI."
+    }
   ]
 }

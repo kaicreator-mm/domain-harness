@@ -26,23 +26,32 @@
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b06-http-transport.test.mjs",
       "testGitBlob": "5c127b88996b219ff90caf225b45d41f99d05ab8",
-      "receipt": null
+      "receipt": "receipts/r47-b06-http-transport-ci.json",
+      "originalSourceHead": "b3b2fd993b74897f80142f8ca7afb3ee2855bdca",
+      "originalTree": "2d0ba06c1a26c00e4f41cd5f47210f082353dfa0",
+      "originalTestGitBlob": "5c127b88996b219ff90caf225b45d41f99d05ab8"
     },
     {
       "batchRoundId": "B06-02",
       "globalRoundId": "R48",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b06-http-negative.test.mjs",
-      "receipt": null,
-      "testGitBlob": "88ec4f70da84538537b4ba4d5b8815c02b61bb4d"
+      "receipt": "receipts/r48-b06-http-negative-ci.json",
+      "testGitBlob": "88ec4f70da84538537b4ba4d5b8815c02b61bb4d",
+      "originalSourceHead": "6b2a1d4e30c8b334074609a0f60ee7bc613cbcda",
+      "originalTree": "23800ec8a45ad5bbeb7208ebda542e2df4303016",
+      "originalTestGitBlob": "88ec4f70da84538537b4ba4d5b8815c02b61bb4d"
     },
     {
       "batchRoundId": "B06-03",
       "globalRoundId": "R49",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
-      "receipt": null,
-      "testGitBlob": "a74e6631c22b7729665629490e637c60d9ded234"
+      "receipt": "receipts/r49-b06-http-lifecycle-ci.json",
+      "testGitBlob": "a74e6631c22b7729665629490e637c60d9ded234",
+      "originalSourceHead": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+      "originalTree": "3e36df2a307d51311bf096c61adc40a3228ac81d",
+      "originalTestGitBlob": "a74e6631c22b7729665629490e637c60d9ded234"
     }
   ],
   "technicalLimitations": [
@@ -51,5 +60,8 @@
     "No independent SAP semantic acceptance, Tally source locator owner or distinct Windows/Linux/Android implementation is conferred.",
     "Current CORE-014 remains PARTIAL until normative applicability/coverage accepted."
   ],
-  "archiveStrategy": "Per-round code/test Git Blob + ROUND.md/round.json are separate Git commits; update branch only after all 3, triggering one final exact CI."
+  "archiveStrategy": "Per-round code/test Git Blob + ROUND.md/round.json are separate Git commits; update branch only after all 3, triggering one final exact CI.",
+  "sourceCandidateHead": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+  "sourceCandidateTree": "3e36df2a307d51311bf096c61adc40a3228ac81d",
+  "exactCiStatus": "NOT_YET_TRIGGERED"
 }

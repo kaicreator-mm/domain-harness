@@ -7,7 +7,7 @@
   "startParent": "6b2a1d4e30c8b334074609a0f60ee7bc613cbcda",
   "testPath": "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
   "testGitBlob": "a74e6631c22b7729665629490e637c60d9ded234",
-  "receipt": null,
+  "receipt": "receipts/r49-b06-http-lifecycle-ci.json",
   "positive": [
     "B06-03 R49 simultaneous independent HTTP Chat/Form sessions cannot mix original selected Business intents"
   ],
@@ -18,5 +18,17 @@
   "limitations": [
     "Loopback HTTP is a demonstration of real network parsing/client consumption, not production UI or direct KDP effect.",
     "Concurrency scope is six independent requests within one native SDK process, not distributed tenancy."
+  ],
+  "originCommit": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+  "originTree": "3e36df2a307d51311bf096c61adc40a3228ac81d",
+  "sourceHead": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+  "finalTree": "3e36df2a307d51311bf096c61adc40a3228ac81d",
+  "checks": [],
+  "history": [
+    {
+      "sourceHead": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Per-round immutable commit; only final batch head is pushed to minimize canceled CI."
+    }
   ]
 }
