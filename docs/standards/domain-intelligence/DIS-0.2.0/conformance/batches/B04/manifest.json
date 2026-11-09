@@ -37,7 +37,7 @@
     {
       "batchRoundId": "B04-03",
       "globalRoundId": "R43",
-      "status": "PLANNED",
+      "status": "CI_PENDING",
       "testPath": "examples/dis-v020-conformance/readiness-gate.test.mjs",
       "receipt": null
     }

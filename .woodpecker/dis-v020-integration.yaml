@@ -36,4 +36,5 @@ steps:
       - node --test examples/dis-v020-conformance/validate.test.mjs
       - node --test examples/dis-v020-conformance/batch-audit.test.mjs
       - node --test examples/dis-v020-conformance/closure-audit.test.mjs
+      - node --test examples/dis-v020-conformance/readiness-gate.test.mjs
       - node --import tsx --test tests/assembly/v010-c01-external-effect.test.ts

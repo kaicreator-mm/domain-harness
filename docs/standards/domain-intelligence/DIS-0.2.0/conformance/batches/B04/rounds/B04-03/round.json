@@ -1,0 +1,21 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B04",
+  "roundId": "B04-03",
+  "globalRoundId": "R43",
+  "status": "CI_PENDING",
+  "startParent": "9e6c05e4328614ea8a5e86a0ea201869eb4333a1",
+  "sourceHead": null,
+  "finalTree": null,
+  "testPath": "examples/dis-v020-conformance/readiness-gate.test.mjs",
+  "testGitBlob": "fe73afab74dce2d82f24f64b09c22f9aafba341f",
+  "receipt": null,
+  "positives": [
+    "B04-03 R43 source-real C4 ledger says no auto Freeze Merge or Release with seven Core blockers"
+  ],
+  "negatives": [
+    "B04-03 R43 a user or LLM-supplied self-attested independent review cannot grant release",
+    "B04-03 R43 forged C4 finalization and incomplete historical exact-SHA audit are denied"
+  ],
+  "boundary": "Read-only machine readiness BLOCKED, not independent C5 audit or Product/L1 Freeze."
+}
