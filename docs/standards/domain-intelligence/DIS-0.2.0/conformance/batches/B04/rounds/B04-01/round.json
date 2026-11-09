@@ -1,0 +1,22 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B04",
+  "roundId": "B04-01",
+  "globalRoundId": "R41",
+  "status": "CI_PENDING",
+  "startParent": "59b61aa69b785b3fdb1709d3bd9ebd118a764588",
+  "testPath": "examples/dis-v020-conformance/batch-audit.test.mjs",
+  "sourceHead": null,
+  "finalTree": null,
+  "testGitBlob": "3bc3f9703f303c48ad9841edece0d0bb209eb9cb",
+  "receipt": null,
+  "positives": [
+    "B04-01 R41 verify B01 B02 B03 recorded 9 individually versioned exact-SHA receipts without promoting Core"
+  ],
+  "negatives": [
+    "B04-01 R41 negative forged original test blob or Source HEAD does not inherit a later CI PASS",
+    "B04-01 R41 negative three CI URLs must belong to a single exact source pipeline",
+    "B04-01 R41 negative requirement receipt must be linked, and a source test must actually run in native CI"
+  ],
+  "statusBoundary": "Git-backed independent per-round source/CI metadata coherence; not live CI response or semantic Oracle."
+}

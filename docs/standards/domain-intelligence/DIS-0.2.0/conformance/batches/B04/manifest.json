@@ -1,0 +1,53 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B04",
+  "status": "IN_PROGRESS",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "mode": "DELIVERY_FIRST_THREE_SEPARATE_SOURCE_AND_ROUND_COMMITS",
+  "baseline": {
+    "sourceHead": "59b61aa69b785b3fdb1709d3bd9ebd118a764588",
+    "tree": "c1afd6ba3393b634ae702af274d54eac39716632",
+    "ciPipeline": 2285,
+    "ciStatus": "3_OF_3_SUCCESS",
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "C4 read-only source/CI round provenance, full 21-requirement closure blockers, independent-governance fail-closed gate",
+  "rounds": [
+    {
+      "batchRoundId": "B04-01",
+      "globalRoundId": "R41",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-conformance/batch-audit.test.mjs",
+      "receipt": null
+    },
+    {
+      "batchRoundId": "B04-02",
+      "globalRoundId": "R42",
+      "status": "PLANNED",
+      "testPath": "examples/dis-v020-conformance/closure-audit.test.mjs",
+      "receipt": null
+    },
+    {
+      "batchRoundId": "B04-03",
+      "globalRoundId": "R43",
+      "status": "PLANNED",
+      "testPath": "examples/dis-v020-conformance/readiness-gate.test.mjs",
+      "receipt": null
+    }
+  ],
+  "constraints": [
+    "Read only prior B01-B03 Git evidence without changing historic receipt.",
+    "A historical receipt's original test Blob may differ from current checkout; report drift rather than falsify source equivalence.",
+    "No independent source-owner/SAP or real multi-Target implementation authority can be minted by a validator.",
+    "No provisional CI PENDING can become PASS automatically.",
+    "No special Node-major content gate.",
+    "No merge/freeze/release."
+  ]
+}
