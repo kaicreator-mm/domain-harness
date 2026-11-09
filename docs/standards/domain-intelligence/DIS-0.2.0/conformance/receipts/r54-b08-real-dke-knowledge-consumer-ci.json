@@ -5,17 +5,18 @@
   "status": "PENDING",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
-    "tree": "45243d1d4bcf98a7aba6f244527787b0700dc12b"
+    "head": "d20622f226e40ffe75981d3df75ad7ff941a215f",
+    "tree": "02dd0c7bd5d8420a864d29e5d3cd8751d060bfcc"
   },
-  "originCommit": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
-  "testGitBlob": "503d34cc3d5049c036ba590e66b4092c52958c9e",
+  "originCommit": "d20622f226e40ffe75981d3df75ad7ff941a215f",
+  "testGitBlob": "80ecb069278d4112cf38098bfbcb5f5d1465e498",
   "testPath": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
   "ci": [],
   "observations": [
     "Original DKE producer receipt is Git-original byte-identical from domain-forge@880a24e... Blob 62a992b..., and DKE retained SAP_QUALIFIED=0.",
     "This is the first selected DIS v0.2 native SDK Knowledge Function from genuine DKE producer output; no upstream domain-source owner approval or independently qualified SAP.",
-    "R0 had concrete DIS typed Function UNKNOWN evidenceRefs=[] contract mismatch; R1 repairs output to omit refs and marks Schema optional, without modifying existing Function outcome validator. Original R0 Git Blob and #2307 FAILURE retained."
+    "R0 had concrete DIS typed Function UNKNOWN evidenceRefs=[] contract mismatch; R1 repairs output to omit refs and marks Schema optional, without modifying existing Function outcome validator. Original R0 Git Blob and #2307 FAILURE retained.",
+    "R1 #2308/1 original native CI FAILURE. Source review found native DIS only accepted packages/ and examples/ origins, while authentic DKE producer JSON has docs/standards/dke path; R2 adds narrowly scoped non-executable source DATA path and negative execution/path traversal tests."
   ],
   "limitations": [
     "DKE upstream producer verified Git Source is generated, not independent source-owner meaning approval.",
@@ -43,6 +44,21 @@
       "head": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
       "blob": "503d34cc3d5049c036ba590e66b4092c52958c9e",
       "decision": "R1 test pin updated to repaired reader, output Schema evidenceRefs optional, asserts old version absence instead of false declared evidence"
+    },
+    {
+      "head": "c798f433ef9cffeb808b2c91b6c2923f5a406524",
+      "ci": "Woodpecker #2308/1 FAILURE",
+      "decision": "R1 typed UNKNOWN contract fixed, but existing DIS SourceOrigin validation rejects original DKE docs/standards/dke original JSON path; exact failing step unavailable"
+    },
+    {
+      "head": "8c8b29713c3f7aed70d448e707ab65d9234582fa",
+      "codeGitBlob": "fa2fb30875653eaa1eeb32ffbbc97fbb01210c34",
+      "decision": "R2 contract allows bounded DKE JSON DATA origin but prohibits executable LOCAL binding"
+    },
+    {
+      "head": "d20622f226e40ffe75981d3df75ad7ff941a215f",
+      "testGitBlob": "80ecb069278d4112cf38098bfbcb5f5d1465e498",
+      "decision": "R2 newly verifies docs DATA-only acceptance plus JS/path traversal negatives"
     }
   ]
 }

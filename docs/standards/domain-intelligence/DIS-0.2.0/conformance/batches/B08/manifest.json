@@ -24,10 +24,10 @@
       "globalRoundId": "R54",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
-      "originalSourceHead": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
-      "testGitBlob": "503d34cc3d5049c036ba590e66b4092c52958c9e",
+      "originalSourceHead": "d20622f226e40ffe75981d3df75ad7ff941a215f",
+      "testGitBlob": "80ecb069278d4112cf38098bfbcb5f5d1465e498",
       "receipt": "receipts/r54-b08-real-dke-knowledge-consumer-ci.json",
-      "sourceHead": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
+      "sourceHead": "d20622f226e40ffe75981d3df75ad7ff941a215f",
       "checks": [],
       "originalR0SourceHead": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
       "originalR0TestBlob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
@@ -51,8 +51,24 @@
           "head": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
           "blob": "503d34cc3d5049c036ba590e66b4092c52958c9e",
           "decision": "R1 test pin updated to repaired reader, output Schema evidenceRefs optional, asserts old version absence instead of false declared evidence"
+        },
+        {
+          "head": "c798f433ef9cffeb808b2c91b6c2923f5a406524",
+          "ci": "Woodpecker #2308/1 FAILURE",
+          "decision": "R1 typed UNKNOWN contract fixed, but existing DIS SourceOrigin validation rejects original DKE docs/standards/dke original JSON path; exact failing step unavailable"
+        },
+        {
+          "head": "8c8b29713c3f7aed70d448e707ab65d9234582fa",
+          "codeGitBlob": "fa2fb30875653eaa1eeb32ffbbc97fbb01210c34",
+          "decision": "R2 contract allows bounded DKE JSON DATA origin but prohibits executable LOCAL binding"
+        },
+        {
+          "head": "d20622f226e40ffe75981d3df75ad7ff941a215f",
+          "testGitBlob": "80ecb069278d4112cf38098bfbcb5f5d1465e498",
+          "decision": "R2 newly verifies docs DATA-only acceptance plus JS/path traversal negatives"
         }
-      ]
+      ],
+      "originalR1TestBlob": "503d34cc3d5049c036ba590e66b4092c52958c9e"
     }
   ],
   "verifiedRounds": 0,
