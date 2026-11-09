@@ -2,25 +2,62 @@
   "schema": "dis.v0.2.validation-receipt/1",
   "id": "r48-b06-http-negative-ci",
   "disVersion": "0.2.0",
-  "status": "PENDING",
+  "status": "SUCCESS",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": "6b2a1d4e30c8b334074609a0f60ee7bc613cbcda",
-    "tree": "23800ec8a45ad5bbeb7208ebda542e2df4303016"
+    "head": "272cc9e52df02a1261cc79b96fa2acd683e88680",
+    "tree": "98541d1fce171c392eaeaa8bbd5a8dc3af32b09a"
   },
   "originCommit": "6b2a1d4e30c8b334074609a0f60ee7bc613cbcda",
   "testGitBlob": "88ec4f70da84538537b4ba4d5b8815c02b61bb4d",
   "testPath": "examples/dis-v020-native-sdk/b06-http-negative.test.mjs",
-  "ci": [],
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/3"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/2"
+    }
+  ],
   "historical": [
     {
       "sourceHead": "6b2a1d4e30c8b334074609a0f60ee7bc613cbcda",
       "ciStatus": "NOT_RUN_BY_DESIGN",
       "note": "Per-round immutable commit; only final batch head is pushed to minimize canceled CI."
+    },
+    {
+      "head": "272cc9e52df02a1261cc79b96fa2acd683e88680",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/3"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/2"
+        }
+      ],
+      "meaning": "Exact later full-batch requalification preserving the original immutable source test Blob; first gates #2294/#2295 failed on an unrelated r41-r46 receipt validator regression, not these tests."
     }
   ],
   "limitations": [
-    "Round was independently committed but no per-round CI was requested; exact full-batch source gate is pending.",
+    "Round was independently committed without per-round CI; qualified by the later exact full-batch source gate at 272cc9e52df02a1261cc79b96fa2acd683e88680 with the original test Blob unchanged.",
     "Actual loopback HTTP Form/Chat is not a deployed production web/chat app or permission to execute a Host/KDP Effect.",
     "No independent Tally/SAP acceptance, physical platform variants or Product/L1 applicability approval."
   ]

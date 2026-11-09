@@ -39,7 +39,10 @@
     "r43-b04-readiness-gate-ci",
     "r44-b05-host-target-ci",
     "r45-b05-source-closure-ci",
-    "r46-b05-target-original-consumer-ci"
+    "r46-b05-target-original-consumer-ci",
+    "r47-b06-http-transport-ci",
+    "r48-b06-http-negative-ci",
+    "r49-b06-http-lifecycle-ci"
   ],
   "requirements": [
     {
@@ -845,9 +848,12 @@
         "r10-ci-recovery",
         "r15-d02-d03-native",
         "r36-b02-channel-parity-ci",
-        "r37-b02-interaction-negative-ci"
+        "r37-b02-interaction-negative-ci",
+        "r47-b06-http-transport-ci",
+        "r48-b06-http-negative-ci",
+        "r49-b06-http-lifecycle-ci"
       ],
-      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance. D03 deterministic Chat text/Form URLSearchParams/CLI argv adapters added as native SDK consumer candidates; pending next exact-SHA CI and external UI transport/Host validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. B02 R35–R37 source-pinned native C3 positive+negative cases are versioned; still PARTIAL pending exact full-suite CI plus Product/L1 Target/transport applicability. The current DIS AOT lacks explicit OS Target selector. B02 R36/R37 actual UI-neutral Chat/Form/CLI adapter native #2280/1–3 3/3 SUCCESS, including negative consent, token URLs and no Effect; no deployed real transport; CORE remains PARTIAL. B06 R47–R49 independently committed actual loopback node:http Form/Chat native Interaction transport and negative/effect/concurrency/stop tests, with final batch CI pending; scoped to nonproduction loopback only. CORE-014 remains PARTIAL pending actual Product/L1 required transport applicability and full contractual review."
+      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance. D03 deterministic Chat text/Form URLSearchParams/CLI argv adapters added as native SDK consumer candidates; pending next exact-SHA CI and external UI transport/Host validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. B02 R35–R37 source-pinned native C3 positive+negative cases are versioned; still PARTIAL pending exact full-suite CI plus Product/L1 Target/transport applicability. The current DIS AOT lacks explicit OS Target selector. B02 R36/R37 actual UI-neutral Chat/Form/CLI adapter native #2280/1–3 3/3 SUCCESS, including negative consent, token URLs and no Effect; no deployed real transport; CORE remains PARTIAL. B06 R47–R49 independently committed actual loopback node:http Form/Chat native Interaction transport and negative/effect/concurrency/stop tests, with final batch CI pending; scoped to nonproduction loopback only. B06 R47-R49 actual loopback HTTP Form/Chat transport and negative/concurrency/STOP cases qualified at 272cc9e52df02a1261cc79b96fa2acd683e88680 / #2300/1-3 3/3 SUCCESS with original test Blobs unchanged after the r41-r46 receipt-field validator repair; loopback-only, CORE-014 remains PARTIAL pending actual Product/L1 required transport applicability and full contractual review."
     },
     {
       "id": "DIS020-CORE-015",
