@@ -2,21 +2,38 @@
   "schema": "dis.v0.2.validation-receipt/1",
   "id": "r55-b09-dke-conditional-proof-native-ci",
   "disVersion": "0.2.0",
-  "status": "PENDING",
+  "status": "SUCCESS",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
-    "tree": "4ab65c63a19fb839215b500be21a94e96abdf098"
+    "head": "2d96e16942dcff518619b37e4b6c0664ca032ae3",
+    "tree": "f2d708c797216c94439e8b24d4e011699da266fe"
   },
   "originCommit": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
   "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
   "testPath": "examples/dis-v020-native-sdk/b09-dke-conditional-proof.test.mjs",
-  "ci": [],
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/3"
+    }
+  ],
   "observations": [
     "DKE formal input Git Blob 426c7d165c19b7aa459de82d5d776962dba13fb0 and real Python/SymPy formal receipt Git Blob 7387ca838e37d314e28a33e35ef21ba2f4358730 are original immutable upstream DKE #209 sources under domain-forge@7aa5cf4afa625c19e9d9a59667d85b67d5bc1401.",
-    "R55 actual selected DIS v0.2 Knowledge Function invokes from a frozen LOCAL Reader + two original DATA sourceDependencies and independent installer pins; actual Woodpecker verification not yet qualified.",
+    "R55 actual selected DIS v0.2 Knowledge Function invokes from a frozen LOCAL Reader + two original DATA sourceDependencies and independent installer pins; exact qualifying native Woodpecker #2312/1–3 all SUCCESS at source HEAD 2d96e16942dcff518619b37e4b6c0664ca032ae3.",
     "DKE original proof outcomes were 2 ENTAILED, 2 REFUTED, 7 UNDERDETERMINED with 64 satisfying worlds; no independent SAP/owner semantic acceptance.",
-    "R0 source-code self-adversarial review found overbroad four-docs-per-CQ sourceRefs; R1 uses original DKE R9 Node Reader exact S01–S11 doc-to-CQ mapping, original reader source Git Blob 5aba024775a759ba992d1bd06f71770c408f3cec, native test Git Blob 973eaffc13dd059f929a6ee77045fc11ea86ad93."
+    "R0 source-code self-adversarial review found overbroad four-docs-per-CQ sourceRefs; R1 uses original DKE R9 Node Reader exact S01–S11 doc-to-CQ mapping, original reader source Git Blob 5aba024775a759ba992d1bd06f71770c408f3cec, native test Git Blob 973eaffc13dd059f929a6ee77045fc11ea86ad93.",
+    "R55 qualifies only the original R9 fixed proof/data/Reader scope: 11 conditional queries (2 ENTAILED, 2 REFUTED, 7 UNDERDETERMINED), all authority NONE and no Effect. This does not import DKE R10 complete replayable 11-variable witness certificate, SAP independent semantic approval or another source version."
   ],
   "limitations": [
     "The upstream DKE R9 actual Python/SymPy formal proof is conditional on frozen same-model authored source facts; independent solver is NOT independent domain semantic reviewer or original publisher source owner.",
@@ -42,6 +59,29 @@
       "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
       "status": "REPINNED_SOURCE_AND_TEST",
       "finding": "Selected DIS original reader commit/pin updated, each CQ verifies exact original publisher doc references; awaits real exact CI"
+    },
+    {
+      "head": "2d96e16942dcff518619b37e4b6c0664ca032ae3",
+      "tree": "f2d708c797216c94439e8b24d4e011699da266fe",
+      "CI": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/3"
+        }
+      ],
+      "status": "SUCCESS",
+      "meaning": "Original R55 selected BUILD/SDK/KDP source pinned at this exact 3/3 Woodpecker SUCCESS. Documentation closeout commit is separate; R9 logical status not domain SAP."
     }
   ]
 }
