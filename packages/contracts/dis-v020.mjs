@@ -16,7 +16,25 @@ const FUNCTION_KINDS=new Set(['init','knowledge','rule','stateful','workflow','e
 const REL_KINDS=new Set(['depends-on','constrains','cooperates','defines']);
 // DKE producer JSON-LD/receipt content is a provenance DATA dependency,
 // never a Function executable. Keep the allowance narrow, Git-blob pinned.
-const DKE_DATA_ORIGIN=/^docs\/standards\/dke\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:json|json\.zlib\.b64|mjs\.zlib\.b64)$/;
+const DKE_DATA_ORIGIN=/^docs\\/standards\\/dke\\/(?:[A-Za-z0-9_.-]+\\/)*[A-Za-z0-9_.-]+\\.(?:json|json\\.zlib\\.b64|mjs\\.zlib\\.b64)$/;
+// B18/R64 source-specific exception: a real Tally JSON-LD Knowledge DATA file is
+// not executable, and the DKE R23 original Reader is source-pinned LOCAL code.
+// Do not expand docs/ or .mjs broadly; the original Git commit + Blob are mandatory.
+const R64_SOURCE_EXCEPTIONS=Object.freeze([
+ Object.freeze({role:'DATA',repository:'kaicreator-mm/tally',
+  commit:'3e94685ca57a4b7258988826697af1c1c3a6b3c8',
+  path:'docs/versions/v2.1.1/knowledge/generated/graph.jsonld',
+  gitBlob:'0f6007315fd7352fe6fd218effcfecf672cb4961'}),
+ Object.freeze({role:'LOCAL_CODE',repository:'kaicreator-mm/domain-forge',
+  commit:'1f3b39a2a6716c1e977e726fd3737d9bd590a412',
+  path:'docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r23-ev16-bound-reader/verified-reader.mjs',
+  gitBlob:'c37b09082a50eeec7e17c17ecd9366a79c4ce8ae'})
+]);
+const r64Exception=origin=>R64_SOURCE_EXCEPTIONS.find(item=>
+ origin!==null&&typeof origin==='object'&&
+ ['repository','commit','path','gitBlob'].every(k=>origin[k]===item[k]));
+const sourceOriginIsData=origin=>DKE_DATA_ORIGIN.test(origin?.path??'')||
+ r64Exception(origin)?.role==='DATA';
 const MAX=256;
 
 /** R11 bounded Function Contract — source evidence is NOT business attestation. */
@@ -310,7 +328,7 @@ function validatePins(pins){
   if(!id(p.id)||!HEX.test(p.sha256)||map.has(p.id))fail('DIS_SOURCE_PIN_INVALID');
   keys(p.origin,['repository','commit','path','gitBlob']);
   if(!/^[-\w]+\/[-\w.]+$/.test(p.origin.repository)||!GIT.test(p.origin.commit)||
-     typeof p.origin.path!=='string'||p.origin.path.includes('..')||!(p.origin.path.startsWith('packages/')||p.origin.path.startsWith('examples/')||DKE_DATA_ORIGIN.test(p.origin.path))||
+     typeof p.origin.path!=='string'||p.origin.path.includes('..')||!(p.origin.path.startsWith('packages/')||p.origin.path.startsWith('examples/')||DKE_DATA_ORIGIN.test(p.origin.path)||r64Exception(p.origin))||
      !GIT.test(p.origin.gitBlob))fail('DIS_SOURCE_ORIGIN_INVALID');
   map.set(p.id,p);
  }
@@ -380,7 +398,7 @@ export function qualifyDisV020Artifact(artifact){
    if(b.type==='local'){
     // A selected producer DATA pin may be consumed as sourceDependencies only;
     // it cannot be registered as trusted executable LOCAL code.
-    if(DKE_DATA_ORIGIN.test(pins.get(b.sourceId)?.origin.path??''))
+    if(sourceOriginIsData(pins.get(b.sourceId)?.origin))
      fail('DIS_DATA_SOURCE_EXECUTION_FORBIDDEN');
     if(f.effect!=='none'||typeof b.sourceId!=='string'||!pins.has(b.sourceId)||
        Object.hasOwn(b,'intentId')||f.kind==='effect')fail('DIS_LOCAL_NOT_QUALIFIED');
