@@ -21,7 +21,8 @@ test('B04-03 R43 source-real C4 ledger says no auto Freeze Merge or Release with
 test('R68 dynamic readiness accepts 10/16 progress as inventory but still denies Freeze, merge and unauthorized approval',async()=>{
  const [snapshot,audit]=await Promise.all([inspectCheckedInClosure(),auditCheckedInBatches()]);
  const c=clone(snapshot);
- c.verifiedCore++;c.partialCore--;c.remaining=c.remaining.filter(r=>r.id!=='DIS020-CORE-003');
+ const nextId=c.remaining[0].id;
+ c.verifiedCore++;c.partialCore--;c.remaining=c.remaining.filter(r=>r.id!==nextId);
  const result=decideB04Readiness({closure:c,sourceAudit:audit});
  assert.equal(result.verifiedCore,c.verifiedCore);assert.equal(result.partialCore,c.partialCore);
  assert.equal(result.blockers.length,c.partialCore);

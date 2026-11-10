@@ -74,7 +74,7 @@ test('R21 semantic receipt permits engine-only ERROR but fails closed on native 
 
 // R28: audited exact-SHA R27 Woodpecker result becomes machine-checkable
 // evidence without promoting the incomplete SAP/Oracle Core requirement.
-test('R28 R27 exact-source native receipt is referenced only as bounded PARTIAL evidence',async()=>{
+test('R28 old R27 source scope remains bounded even after an independent later CORE003 receipt',async()=>{
  const id='r27-native-impact-ci';
  assert.ok(matrix.receipts.includes(id));
  const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async rid=>[
@@ -92,7 +92,9 @@ test('R28 R27 exact-source native receipt is referenced only as bounded PARTIAL 
  assert.ok(receipt.ci.every(x=>x.state==='SUCCESS'));
  for(const core of ['003','005','016']){
   const r=matrix.requirements.find(x=>x.id==='DIS020-CORE-'+core);
-  assert.equal(r.state,'PARTIAL','R27 scoped evidence is not full DIS Core acceptance');
+  assert.equal(r.state,core==='003'?'VERIFIED':'PARTIAL',
+   'R27 alone cannot grant Core acceptance; only later independent R79 covers selected Function ABI');
+  if(core==='003')assert.ok(r.receiptIds.includes('r79-core003-public-functions-semantic-ci'));
   assert.ok(r.receiptIds.includes(id));
   assert.ok(r.positive.some(x=>x.case.startsWith('R27 actual Tally 14-record')));
   assert.ok(r.negative.some(x=>x.case.startsWith('R27 false SAP approval')));
@@ -105,6 +107,26 @@ test('R28 R27 exact-source native receipt is referenced only as bounded PARTIAL 
  wrong.requirements.find(x=>x.id==='DIS020-CORE-005').negative
   .find(x=>x.case.startsWith('R27 false SAP approval')).case='fictional R27 native failure';
  await assert.rejects(validateVersionMatrix(wrong,receipts),rejects('MATRIX_CASE_NOT_FOUND'));
+});
+test('R79 actual two content-success CI preserves failed Node context and rejects forged Function success',async()=>{
+ const id='r79-core003-public-functions-semantic-ci';
+ const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async rid=>[
+  rid,JSON.parse(await readFile(new URL('receipts/'+rid+'.json',base),'utf8'))
+ ])));
+ const rec=receipts[id];
+ assert.equal(rec.qualification,'DIS_SEMANTIC_ONLY');
+ assert.equal(rec.source.head,'c1f3fb71e0ab4616ad6bf4c98db9d81275c4dacb');
+ assert.equal(rec.source.tree,'0d8329dce7fdc7893c0a7adfa7c90d4e66ab44d3');
+ assert.equal(rec.testGitBlob,'a3ea6608d63b1cac274d99aacac2ea444908de10');
+ assert.equal(rec.ci.find(x=>x.context==='ci/woodpecker/pr/verify-min-node').state,'FAILURE');
+ const verified=await validateVersionMatrix(clone(matrix),receipts);
+ assert.equal(verified.tallies['core:VERIFIED'],12);
+ assert.equal(verified.tallies['core:PARTIAL'],4);
+ assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-003').state,'VERIFIED');
+ for(const ctx of ['ci/woodpecker/pr/dis-v020-integration','ci/woodpecker/pr/verify']){
+  const tampered=clone(receipts);tampered[id].ci.find(x=>x.context===ctx).state='FAILURE';
+  await assert.rejects(validateVersionMatrix(clone(matrix),tampered),rejects('MATRIX_RECEIPT_INVALID'));
+ }
 });
 test('R28 remaining-core closure groups account for seven PARTIAL requirements exactly once',async()=>{
  const plan=JSON.parse(await readFile(new URL('closure-plan-r28.json',base),'utf8'));

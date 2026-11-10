@@ -39,18 +39,12 @@ test('R71 CORE-006 source-selected Rule, Knowledge and Domain-owned PROCESS_LOCA
  assert.equal(review.formalFreezeEligible,false);
  assert.equal(review.sourceReview.sap,'UNQUALIFIED');
 });
-test('R68 dynamic Core inventory can count a hypothesized qualified C2 item 10/16 without granting semantic owner authority',()=>{
- const x=clone(baseline),id='DIS020-CORE-003';
- x.matrix.requirements.find(r=>r.id===id).state='VERIFIED';
- const group=x.plan.coreAndGovernance.find(g=>g.group==='C2');
- group.requirementIds=group.requirementIds.filter(x=>x!==id);
- const out=inspectClosure(x);
- assert.equal(out.verifiedCore,
-  baseline.matrix.requirements.filter(x=>x.profile==='core'&&x.state==='VERIFIED').length+1);
- assert.equal(out.partialCore,
-  baseline.matrix.requirements.filter(x=>x.profile==='core'&&x.state==='PARTIAL').length-1);
- assert.equal(out.remaining.length,out.partialCore);
- assert.equal(out.remaining.some(r=>r.id===id),false);
+test('R79 actual C2 selected Function closure is counted without independent semantic SAP or Freeze',()=>{
+ const out=inspectClosure(clone(baseline));
+ assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-003').state,'VERIFIED');
+ assert.equal(out.verifiedCore+out.partialCore,16);
+ assert.equal(out.verifiedCore,matrix.requirements.filter(x=>x.profile==='core'&&x.state==='VERIFIED').length);
+ assert.equal(out.remaining.some(x=>x.id==='DIS020-CORE-003'),false);
  assert.equal(out.formalFreezeEligible,false);
  assert.equal(out.sourceReview.sap,'UNQUALIFIED');
 });
@@ -77,7 +71,7 @@ test('R69 UI-neutral selected Interaction hypothetical closure uses source-deriv
 });
 test('R68 a claimed Core promotion without closing its planned normative gap remains fail closed',()=>{
  const x=clone(baseline);
- x.matrix.requirements.find(r=>r.id==='DIS020-CORE-003').state='VERIFIED';
+ x.matrix.requirements.find(r=>r.id==='DIS020-CORE-016').state='VERIFIED';
  assert.throws(()=>inspectClosure(x),reject('CLOSURE_DAG_GAP'));
  const y=clone(baseline);y.matrix.requirements.find(r=>r.id==='DIS020-CORE-005').state='VERIFIED';
  y.plan.coreAndGovernance.find(g=>g.group==='C1').requirementIds=
