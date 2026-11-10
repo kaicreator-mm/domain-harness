@@ -23,15 +23,45 @@ const load=(f,a,identity)=>loadDisV020Aot(a,{
  store:new PlainCasDocStore(),tenantId:'tenant:b05-host-identity'
 });
 test('B05-01 R44 real runtime OS and CPU architecture match selected original canonical Business/KDP modules',async(t)=>{
+ // C3: ordinary local/portable runs may skip an unsupported OS. The required
+ // Woodpecker exact-SHA lane MUST actually run the selected Linux/x64 target,
+ // never report SUCCESS because an unsupported host silently skipped the only
+ // real-host positive. CI_COMMIT_SHA is supplied independently by Woodpecker.
+ const ciSha=process.env.CI_COMMIT_SHA;
+ if(ciSha!==undefined){
+  assert.match(ciSha,/^[a-f0-9]{40}$/,'C3 exact CI source SHA required');
+  assert.equal(actual.platform,'linux','C3 selected Linux Target was not run on Linux');
+  assert.equal(actual.architecture,'x64','C3 selected x64 Target was not run on x64');
+  assert.equal(actual.runtime,'node');
+ }
  if(!eligible)return t.skip('This runtime platform is not an applicable selected DIS target');
  const f=await fixture,a=compile(f,actual),app=await load(f,a,actual);
  try{
   assert.deepEqual(app.selectedTarget,actual);
   assert.deepEqual(app.actualHostTarget,actual);
+  assert.equal(app.aotDigest,a.digest);
+  const selected=a.program.target.selectedModules;
+  assert.equal(selected.length,f.artifact.built.modules.length);
+  for(const pin of selected){
+   const module=f.artifact.built.modules.find(m=>m.packageId===pin.packageId);
+   assert.ok(module,'C3 selected original module must exist in canonical BUILD');
+   assert.equal(module.moduleSha256,pin.moduleSha256);
+  }
   const observation=await app.invoke('tally.assessTaskEvidence',{});
   assert.equal(observation.kind,'OBSERVATION');
   assert.equal(observation.authority,'NONE');
   assert.equal(observation.evidence.attested,false);
+  if(ciSha!==undefined){
+   // Machine-readable, bounded source/host identity record in the original
+   // Woodpecker native log. No business semantic or Owner SAP promotion.
+   console.log('DIS_C3_SELECTED_HOST='+JSON.stringify({
+    schema:'dis.v0.2.c3-selected-host-observation/1',
+    sourceHead:ciSha,selectedTarget:app.selectedTarget,actualHostTarget:app.actualHostTarget,
+    selectedModules:selected.map(({packageId,moduleSha256})=>({packageId,moduleSha256})),
+    aotDigest:a.digest,sourceQualified:'STRUCTURAL_ONLY',semanticSAP:false,
+    effectAuthorized:false
+   }));
+  }
  }finally{app.stop()}
 });
 test('B05-01 R44 caller and AOT agreeing on a wrong OS label cannot bypass the real runtime host identity',async()=>{
