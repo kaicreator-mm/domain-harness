@@ -35,7 +35,7 @@ test('B05-03 R46 real host original Tally Rule xDownload Knowledge Runx Stateful
    assert.equal(q.selected.get(x.packageId).moduleSha256,x.moduleSha256);
   const rule=await app.invoke('tally.assessTaskEvidence',{});
   const knowledge=await app.invoke('xdownload.describePolicy',{});
-  const presence=await app.invoke('runx.createPresenceObserver',{});
+  const presence=await app.invoke('runx.createPresenceObserver',()=>'2026-11-10T20:00:00Z');
   const receipt=await app.invoke('orders.approve',{
    messageId:'msg:b05-r46',instanceKey:'instance:b05-r46',input:{amount:30,requestId:'B05-R46'}
   },{expectedContractVersion:'1.0.0'});

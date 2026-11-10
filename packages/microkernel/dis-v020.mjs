@@ -7,7 +7,7 @@
  */
 import {load} from './dist/domain-app.js';
 import {
- DisV020Error,qualifyDisV020Artifact,validateDisV020FunctionValue,classifyDisV020FunctionOutcome,classifyDisV020KdpReceipt,validateDisV020LocalHandle
+ DisV020Error,qualifyDisV020Artifact,validateDisV020FunctionValue,classifyDisV020FunctionOutcome,classifyDisV020KdpReceipt,validateDisV020LocalHandle,bindDisV020LocalHandle
 } from '@kaicreator/domain-harness-contracts/dis-v020';
 
 const refuse=code=>{throw new DisV020Error(code)};
@@ -151,12 +151,22 @@ export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins
        options.expectedContractVersion!==currentContractVersion)refuse('DIS_FUNCTION_VERSION_MISMATCH');
     if(f.contract)validateDisV020FunctionValue(f.contract,'input',input);
     if(f.binding.type==='local'){
-     const value=await delegates.get(id)(input);
+     let delegateInput=input;
+     if(f.handleContract?.factoryInput==='CLOCK_FUNCTION'){
+      if(typeof input!=='function')refuse('DIS_LOCAL_HANDLE_FACTORY_INPUT_INVALID');
+      delegateInput=()=>{
+       const v=input();
+       if(typeof v!=='string'||!v.trim())refuse('DIS_LOCAL_HANDLE_CLOCK_INVALID');
+       return v;
+      };
+     }
+     const value=await delegates.get(id)(delegateInput);
      if(f.handleContract){
       validateDisV020LocalHandle(f.handleContract,value);
+      const boundValue=bindDisV020LocalHandle(f.handleContract,value);
       const pin=qualified.pins.get(f.binding.sourceId);
       return Object.freeze({
-       kind:'OBSERVATION',authority:'NONE',value,
+       kind:'OBSERVATION',authority:'NONE',value:boundValue,
        contractVersion:f.handleContract.version,
        handle:Object.freeze({
         lifetime:'PROCESS_LOCAL',methods:Object.freeze([...f.handleContract.methods])

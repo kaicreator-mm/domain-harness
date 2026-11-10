@@ -37,14 +37,13 @@ test('R72 selected Tally Runx xDownload and Orders nine public Functions have ex
 });
 test('R72/R73 selected Function inventory keeps two special non-JSON I/O gaps visible',async()=>{
  const f=await selected,a=inspectDisV020PublicFunctionCoverage(f.artifact);
- assert.equal(a.typedIOFunctions,8);
- assert.deepEqual([...a.missingTypedIO].sort(),[
-  'runx.createPresenceObserver'
- ]);
+ assert.equal(a.typedIOFunctions,9);
+ assert.deepEqual(a.missingTypedIO,[]);
+ assert.equal(a.rows.find(x=>x.id==='runx.createPresenceObserver').profile,'TYPED_LOCAL_HANDLE_IO');
  assert.equal(a.rows.find(x=>x.id==='orders.appInit').profile,'TYPED_APP_INIT_IO');
  assert.equal(a.rows.filter(x=>x.profile==='TYPED_KDP_ADMISSION_IO').length,2);
  assert.equal(a.rows.filter(x=>x.profile==='KDP_ADMISSION_RECEIPT_ONLY').length,0);
- assert.equal(a.rows.filter(x=>x.profile==='LOCAL_HANDLE_METHODS_ONLY').length,1);
+ assert.equal(a.rows.filter(x=>x.profile==='LOCAL_HANDLE_METHODS_ONLY').length,0);
  assert.equal(a.rows.filter(x=>x.profile==='APP_INIT_LIFECYCLE_ONLY').length,0);
  assert.equal(a.fullCore003Ready,false);
  assert.equal(a.independentSAP,false);
@@ -123,7 +122,7 @@ test('R73 incomplete or forged KDP schema fails source-selected AOT qualificatio
 
 test('R74 selected Business App Init has typed Context / READY lifecycle and no public ingress',async()=>{
  const f=await selected,a=inspectDisV020PublicFunctionCoverage(f.artifact);
- assert.equal(a.typedIOFunctions,8);
+ assert.equal(a.typedIOFunctions,9);
  const fn=f.program.elements.flatMap(e=>e.functions).find(x=>x.id==='orders.appInit');
  assert.equal(fn.initContract.schema,'dis.v0.2.app-init-contract/1');
  assert.equal(fn.initContract.input.fields.aotDigest,'string');
@@ -158,4 +157,67 @@ test('R74 forged App Init Schema and fake outcome cannot grant startup authority
  await assert.rejects(loadDisV020Aot(changed,{expectedDigest:changed.digest,
   registry:f.registry,store:new PlainCasDocStore(),tenantId:'tenant:dis-r74-invalid-output'}),
   fail('DIS_FUNCTION_OUTPUT_INVALID'));
+});
+
+test('R75 real selected Runx process-local Factory, observe list and latest method I/O are checked',async()=>{
+ const f=await selected,a=inspectDisV020PublicFunctionCoverage(f.artifact);
+ assert.equal(a.typedIOFunctions,9);assert.deepEqual(a.missingTypedIO,[]);
+ assert.equal(a.independentSAP,false);
+ const app=await loadDisV020Aot(f.artifact,{expectedDigest:f.artifact.digest,
+  registry:f.registry,store:new PlainCasDocStore(),tenantId:'tenant:r75-method-io'});
+ try{
+  await assert.rejects(app.invoke('runx.createPresenceObserver',{}),
+   fail('DIS_LOCAL_HANDLE_FACTORY_INPUT_INVALID'));
+  const x=await app.invoke('runx.createPresenceObserver',()=>'2026-11-10T20:00:00Z');
+  assert.equal(x.authority,'NONE');assert.equal(x.handle.lifetime,'PROCESS_LOCAL');
+  const h=x.value;
+  assert.equal(h.latest(),null);assert.deepEqual(h.list(),[]);
+  const req={agent_id:'agent-r75',agent_incarnation_id:'inc-r75',
+   capability:{capability_id:'read'}};
+  assert.throws(()=>h.observe({...req,agent_incarnation_id:9},{agent_id:'agent-r75'}),
+   fail('DIS_LOCAL_HANDLE_INPUT_INVALID'));
+  assert.equal(h.latest(),null);
+  assert.equal(h.observe(req,{agent_id:'agent-r75'}),undefined);
+  assert.equal(h.list().length,1);assert.equal(h.latest().agent_incarnation_id,'inc-r75');
+  assert.equal(Object.hasOwn(h.latest(),'execution_authorized'),false);
+  assert.throws(()=>h.latest(5),fail('DIS_LOCAL_HANDLE_INPUT_INVALID'));
+  app.stop();assert.equal(h.latest().agent_id,'agent-r75');
+ }finally{app.stop()}
+});
+test('R75 forged clock, method output, and unsafe source-selected method schema fail closed',async()=>{
+ const f=await selected;
+ const a=await loadDisV020Aot(f.artifact,{expectedDigest:f.artifact.digest,
+  registry:f.registry,store:new PlainCasDocStore(),tenantId:'tenant:r75-clock'});
+ try{
+  const h=(await a.invoke('runx.createPresenceObserver',()=>0)).value;
+  assert.throws(()=>h.observe({agent_id:'x',agent_incarnation_id:'y',
+   capability:{capability_id:'c'}},{agent_id:'x'}),fail('DIS_LOCAL_HANDLE_CLOCK_INVALID'));
+  assert.deepEqual(h.list(),[]);
+ }finally{a.stop()}
+ const registry={...f.registry,'runx.createPresenceObserver':{
+  ...f.registry['runx.createPresenceObserver'],
+  execute:()=>new class{
+   observe(){return undefined}
+   list(){return [{agent_id:'x',agent_incarnation_id:4,capability_id:'c',last_seen_at:'now'}]}
+   latest(){return {agent_id:'x',agent_incarnation_id:4,capability_id:'c',last_seen_at:'now'}}
+  }
+ }};
+ const b=await loadDisV020Aot(f.artifact,{expectedDigest:f.artifact.digest,
+  registry,store:new PlainCasDocStore(),tenantId:'tenant:r75-forged-output'});
+ try{
+  const h=(await b.invoke('runx.createPresenceObserver',()=>'now')).value;
+  assert.throws(()=>h.list(),fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID'));
+  assert.throws(()=>h.latest(),fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID'));
+ }finally{b.stop()}
+ for(const [mutate,code] of [
+  [h=>{delete h.methodIO.list},'DIS_LOCAL_HANDLE_IO_INVALID'],
+  [h=>{delete h.factoryInput},'DIS_LOCAL_HANDLE_IO_INCOMPLETE'],
+  [h=>{h.methodIO.latest.returns='SUCCEEDED'},'DIS_LOCAL_HANDLE_IO_INVALID'],
+  [h=>{h.methods.push('then')},'DIS_LOCAL_HANDLE_CONTRACT_INVALID']
+ ]){
+  const p=structuredClone(f.program);
+  const h=p.elements.flatMap(e=>e.functions).find(x=>x.id==='runx.createPresenceObserver').handleContract;
+  mutate(h);
+  assert.throws(()=>build(f,p),fail(code));
+ }
 });

@@ -139,7 +139,17 @@ export async function makeNativeFixture(){
  // Only method names and process-local lifetime are declared here.
  find('runx.createPresenceObserver').handleContract={
   schema:'dis.v0.2.local-handle-contract/1',version:'1.0.0',
-  methods:['observe','list','latest'],lifetime:'PROCESS_LOCAL'
+  methods:['observe','list','latest'],lifetime:'PROCESS_LOCAL',
+  factoryInput:'CLOCK_FUNCTION',
+  methodIO:{
+   observe:{args:[
+    {type:'record',fields:{agent_id:'string',agent_incarnation_id:'string',
+     capability:{type:'record',fields:{capability_id:'string'},additionalProperties:true}},additionalProperties:true},
+    {type:'record',fields:{agent_id:'string'},additionalProperties:true}
+   ],returns:'void'},
+   list:{args:[],returns:'records',record:{type:'record',fields:{agent_id:'string',agent_incarnation_id:'string',capability_id:'string',last_seen_at:'string'},additionalProperties:true}},
+   latest:{args:[],returns:'nullable-record',record:{type:'record',fields:{agent_id:'string',agent_incarnation_id:'string',capability_id:'string',last_seen_at:'string'},additionalProperties:true}}
+  }
  };
  find('tally.assessTaskEvidence').contract=r11({
   UNQUALIFIED_INPUT:'UNKNOWN',OBSERVED_INPUT_ONLY:'OBSERVED'

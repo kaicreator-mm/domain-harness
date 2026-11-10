@@ -52,12 +52,33 @@ const SEMVER=/^[1-9][0-9]*\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/;
 const FIELD=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const UNSAFE_METHODS=new Set(['constructor','prototype','__proto__','then']);
 function validateLocalHandleContract(c){
- keys(c,['schema','version','methods','lifetime']);
+ keys(c,['schema','version','methods','lifetime','factoryInput','methodIO']);
  if(c.schema!=='dis.v0.2.local-handle-contract/1'||!SEMVER.test(c.version)||
     c.lifetime!=='PROCESS_LOCAL'||!arr(c.methods)||c.methods.length>16||
     new Set(c.methods).size!==c.methods.length||
     c.methods.some(m=>typeof m!=='string'||!FIELD.test(m)||UNSAFE_METHODS.has(m)))
   fail('DIS_LOCAL_HANDLE_CONTRACT_INVALID');
+ if((c.factoryInput===undefined)!==(c.methodIO===undefined))
+  fail('DIS_LOCAL_HANDLE_IO_INCOMPLETE');
+ if(c.methodIO!==undefined){
+  if(c.factoryInput!=='CLOCK_FUNCTION'||!record(c.methodIO)||
+    Object.keys(c.methodIO).length!==c.methods.length||
+    c.methods.some(n=>!Object.hasOwn(c.methodIO,n)))
+   fail('DIS_LOCAL_HANDLE_IO_INVALID');
+  for(const io of Object.values(c.methodIO)){
+   keys(io,['args','returns','record']);
+   if(!arr(io.args,true)||io.args.length>8||
+     !['void','records','nullable-record'].includes(io.returns))
+    fail('DIS_LOCAL_HANDLE_IO_INVALID');
+   for(const a of io.args)validateShape(a);
+   if(io.returns==='void'){
+    if(io.record!==undefined)fail('DIS_LOCAL_HANDLE_IO_INVALID');
+   }else{
+    if(io.record===undefined)fail('DIS_LOCAL_HANDLE_IO_INVALID');
+    validateShape(io.record);
+   }
+  }
+ }
 }
 /**
  * The returned class instance may be used only in-process. Method shape is
@@ -72,6 +93,32 @@ export function validateDisV020LocalHandle(contract,value){
  return true;
 }
 
+/** Source-bound in-process Handle; never serialized or accepted as semantic SAP. */
+export function bindDisV020LocalHandle(contract,value){
+ validateDisV020LocalHandle(contract,value);
+ if(contract.methodIO===undefined)return value;
+ return new Proxy(value,{
+  get(target,key){
+   const original=Reflect.get(target,key,target);
+   if(typeof key!=='string'||!Object.hasOwn(contract.methodIO,key))return original;
+   const io=contract.methodIO[key];
+   return (...args)=>{
+    if(args.length!==io.args.length||args.some((x,i)=>!valueMatchesShape(io.args[i],x)))
+     fail('DIS_LOCAL_HANDLE_INPUT_INVALID');
+    const result=Reflect.apply(original,target,args);
+    if(io.returns==='void'){
+     if(result!==undefined)fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID');
+    }else if(io.returns==='nullable-record'){
+     if(result!==null&&!valueMatchesShape(io.record,result))
+      fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID');
+    }else if(!Array.isArray(result)||result.length>MAX||
+      result.some(x=>!valueMatchesShape(io.record,x)))
+     fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID');
+    return result;
+   };
+  }
+ });
+}
 /** Business App Init has a typed lifecycle envelope, not a second Kernel. */
 function validateAppInitContract(c){
  keys(c,['schema','version','input','output','outcomes','compatibility']);
@@ -636,13 +683,15 @@ export function inspectDisV020PublicFunctionCoverage(artifact){
    fail('DIS_PUBLIC_FUNCTION_DESCRIPTION_REQUIRED');
   const typedIO=fn.contract!==undefined||
    (fn.receiptContract?.input!==undefined&&fn.receiptContract?.output!==undefined)||
-   (fn.initContract?.input!==undefined&&fn.initContract?.output!==undefined);
+   (fn.initContract?.input!==undefined&&fn.initContract?.output!==undefined)||
+   (fn.handleContract?.factoryInput!==undefined&&fn.handleContract?.methodIO!==undefined);
   rows.push(Object.freeze({
    id,kind:fn.kind,binding:fn.binding.type,description:fn.description,
    typedIO,profile:fn.contract!==undefined?'TYPED_LOCAL_IO':
     fn.initContract?.input!==undefined?'TYPED_APP_INIT_IO':
     fn.receiptContract?.input!==undefined?'TYPED_KDP_ADMISSION_IO':
     fn.receiptContract!==undefined?'KDP_ADMISSION_RECEIPT_ONLY':
+    fn.handleContract?.methodIO!==undefined?'TYPED_LOCAL_HANDLE_IO':
     fn.handleContract!==undefined?'LOCAL_HANDLE_METHODS_ONLY':
     fn.kind==='init'?'APP_INIT_LIFECYCLE_ONLY':'UNQUALIFIED_PUBLIC_IO'
   }));
