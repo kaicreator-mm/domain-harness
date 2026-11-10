@@ -18,6 +18,61 @@ const sha=/^[a-f0-9]{40}$/;
 const pathOk=p=>typeof p==='string'&&!!p&&!p.startsWith('/')&&!p.split('/').includes('..');
 const fail=(code)=>{throw Object.assign(new Error(code),{code})};
 const fileCache=new Map();
+
+// R90 reviewer: test evidence must name a declared executable Node test.
+// Source strings/comments, a shorter substring, skip/todo are not proof.
+const declaredTestCache=new Map();
+export function declaredTestCases(source){
+ const found=new Set();
+ if(typeof source!=='string')return found;
+ const isIdentifier=c=>c!==undefined&&/[A-Za-z0-9_$]/.test(c);
+ const isSpace=c=>c!==undefined&&/\s/.test(c);
+ const space=p=>{while(isSpace(source[p]))p++;return p;};
+ const isQuote=c=>c==="'"||c==='"'||c===String.fromCharCode(96);
+ function quoted(p){
+  const quote=source[p];let out='';
+  for(let j=p+1;j<source.length;){
+   const c=source[j++];
+   if(c==='\\'){
+    // Existing source-roster test names are plain literal text; do not
+    // silently reinterpret escape syntax as a different named test.
+    return {end:j+1,invalid:true};
+   }
+   if(c===quote)return {end:j,value:out,invalid:false};
+   out+=c;
+  }
+  return null;
+ }
+ for(let i=0;i<source.length;){
+  if(source[i]==='/'&&source[i+1]==='/'){
+   i+=2;while(i<source.length&&source[i]!=='\n')i++;continue;
+  }
+  if(source[i]==='/'&&source[i+1]==='*'){
+   i+=2;const end=source.indexOf('*/',i);
+   i=end<0?source.length:end+2;continue;
+  }
+  if(isQuote(source[i])){
+   const lit=quoted(i);i=lit?lit.end:source.length;continue;
+  }
+  if(source.startsWith('test',i)&&!isIdentifier(source[i-1])&&
+     source[i-1]!=='.'&&!isIdentifier(source[i+4])){
+   let j=space(i+4);
+   // Skip test.skip, test.todo and test.only rather than claiming the
+   // CI actually ran a non-default test mode.
+   if(source[j]==='('){
+    j=space(j+1);
+    if(isQuote(source[j])){
+     const lit=quoted(j);
+     if(lit&&!lit.invalid&&source[space(lit.end)]===',')
+      found.add(lit.value);
+    }
+   }
+  }
+  i++;
+ }
+ return found;
+}
+
 async function sourceText(path){
  if(!pathOk(path))fail('MATRIX_INVALID_PATH');
  if(!fileCache.has(path)){
@@ -52,7 +107,9 @@ export async function validateVersionMatrix(matrix,receipts){
   for(const e of [...r.positive,...r.negative]){
    if(!e?.path||!e.case)fail('MATRIX_CASE_INVALID');
    const content=await sourceText(e.path);
-   if(!content.includes('test(')||!content.includes(e.case))fail('MATRIX_CASE_NOT_FOUND');
+   if(!declaredTestCache.has(e.path))
+    declaredTestCache.set(e.path,declaredTestCases(content));
+   if(!declaredTestCache.get(e.path).has(e.case))fail('MATRIX_CASE_NOT_FOUND');
   }
   if(r.state==='VERIFIED'&&(!r.positive.length||!r.negative.length||!r.receiptIds.length))fail('MATRIX_UNSUPPORTED_VERIFIED');
   if(r.state==='NOT_RUN'&&(r.positive.length||r.negative.length||r.receiptIds.length))fail('MATRIX_UNRUN_HAS_EVIDENCE');

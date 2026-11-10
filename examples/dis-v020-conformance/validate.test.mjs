@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {validateCheckedInMatrix,validateVersionMatrix} from './validate.mjs';
+import {validateCheckedInMatrix,validateVersionMatrix,declaredTestCases} from './validate.mjs';
 import {validateRoundEvidence} from './batch-audit.mjs';
 const base=new URL('../../docs/standards/domain-intelligence/DIS-0.2.0/conformance/',import.meta.url);
 const matrix=JSON.parse(await readFile(new URL('matrix.json',base),'utf8'));
@@ -233,4 +233,42 @@ test('R28 remaining-core closure groups account for seven PARTIAL requirements e
  assert.deepEqual(plan.estimates.allProfilesAndGovernancePracticalRange,[7,12]);
  assert.equal(plan.scopeProtection.coreStatesNotPromoted,true);
  assert.equal(plan.scopeProtection.noFreeze,true);
+});
+
+
+test('R90 reviewer: declared test evidence rejects substring, comments, strings and skipped cases',async()=>{
+ const changed=clone(matrix);
+ // A substring present in a true native test's title is not itself a test.
+ changed.requirements[0].positive[0].case='native';
+ await assert.rejects(validateVersionMatrix(changed,{'r9.5-baseline':baseline}),
+  rejects('MATRIX_CASE_NOT_FOUND'));
+ const sample=[
+  "// test('fake line',()=>{})",
+  "/* test('fake block',()=>{}) */",
+  "const text=\"test('fake quoted',()=>{})\";",
+  "test('genuine node test',()=>{})",
+  "test('genuine node test with suffix',()=>{})",
+  "test.skip('skipped',()=>{})",
+  "test.todo('todo')"
+ ].join('\n');
+ const declared=declaredTestCases(sample);
+ assert.deepEqual([...declared].sort(),[
+  'genuine node test','genuine node test with suffix'
+ ]);
+ assert.equal(declared.has('genuine'),false);
+});
+test('R90 reviewer: future legitimate 100 percent coverage is not blocked by old progress tallies',()=>{
+ // Only summary-count logic is being tested here. No synthetic receipt or
+ // real requirement receives a VERIFIED promotion.
+ const future=[
+  '| Scope | VERIFIED | PARTIAL | NOT_RUN | OUT_OF_SCOPE | Total |',
+  '| --- | ---: | ---: | ---: | ---: | ---: |',
+  '| Core | 16 | 0 | 0 | 0 | 16 |',
+  '| Optional profiles | 4 | 0 | 0 | 0 | 4 |',
+  '| Governance | 1 | 0 | 0 | 0 | 1 |',
+  '### Normalized Demo plan'
+ ].join('\n');
+ assert.doesNotThrow(()=>assertCurrentSummaryTallies(future,{
+  'core:VERIFIED':16,'optional-profile:VERIFIED':4,'governance:VERIFIED':1
+ }));
 });
