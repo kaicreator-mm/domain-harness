@@ -29,16 +29,15 @@
     },
     {
       "group": "C2",
-      "theme": "Public Function ABI, evidence/compatibility, and Element-owned state",
+      "theme": "Complete applicable Public Function ABI / metadata / typed outcomes and evidence",
       "requirementIds": [
-        "DIS020-CORE-003",
-        "DIS020-CORE-006"
+        "DIS020-CORE-003"
       ],
       "prerequisites": [
-        "Agreed minimal complete ABI/schema vocabulary",
-        "Real Knowledge/Rule/Stateful owner boundaries"
+        "Public Function MUST description, input/output/outcomes/compatibility across applicable selected Functions",
+        "Source and SDK output must not fabricate semantic attestation from schema validity"
       ],
-      "doneWhen": "All applicable public Function categories have checked contracts, typed UNKNOWN/Evidence, negative compatibility obligations, and selected domain-owned state behavior on native SDK"
+      "doneWhen": "All applicable Public Functions provide validated description, I/O/schema, typed outcomes, correct evidence/compatibility and negative ABI checks at original-source Native SDK; unrelated missing generic durable State engine is not a gate"
     },
     {
       "group": "C3",

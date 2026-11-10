@@ -25,6 +25,20 @@ test('B04-02 R42 exact historical source ledger and 21 requirement DAG leave 7 s
   matrix.requirements.filter(x=>x.profile==='core'&&x.state==='PARTIAL').map(x=>x.id));
  assert.equal(r.remaining.every(x=>x.positiveCases>0&&x.negativeCases>0),true);
 });
+test('R71 CORE-006 source-selected Rule, Knowledge and Domain-owned PROCESS_LOCAL state are original-source qualified without fictitious durable KDP recovery',()=>{
+ const x=matrix.requirements.find(r=>r.id==='DIS020-CORE-006');
+ assert.equal(x.state,'VERIFIED');
+ for(const receipt of ["r33-b01-state-ci","r46-b05-target-original-consumer-ci","r54-b08-real-dke-knowledge-consumer-ci","r58-b12-runx-physical-process-state-ci"])assert.ok(x.receiptIds.includes(receipt));
+ for(const name of ["B01-02 R33 real Runx Stateful handles isolate each invocation, source and process-local ownership","B01-02 R33 Domain-owned Stateful presence does not mutate Tally Rule or xDownload Knowledge outputs","B05-03 R46 real host original Tally Rule xDownload Knowledge Runx Stateful and KDP admission compose without business authority","B12 R58 original Runx Stateful local presence does NOT auto-resurrect through second Node process with same physical KDP SQLite file"])assert.ok(x.positive.some(v=>v.case===name));
+ for(const name of ["B01-02 R33 source-real Runx token mismatch cannot create presence or grant lease","B08-01 R54 producer DKE JSON source is selectable only as DATA, never executable LOCAL or unsafe docs path","B12 R58 forged Runx agent token cannot put a fake execution lease into the physical KDP or Runx owner map"])assert.ok(x.negative.some(v=>v.case===name));
+ assert.equal(x.note.includes('general arbitrary producer semantic truth and application-specific durable-state promises are NOT qualified'),true);
+ assert.ok(!plan.coreAndGovernance.flatMap(g=>g.requirementIds).includes(x.id));
+ const review=inspectClosure(clone(baseline));
+ assert.equal(review.verifiedCore+review.partialCore,16);
+ assert.equal(review.remaining.some(r=>r.id===x.id),false);
+ assert.equal(review.formalFreezeEligible,false);
+ assert.equal(review.sourceReview.sap,'UNQUALIFIED');
+});
 test('R68 dynamic Core inventory can count a hypothesized qualified C2 item 10/16 without granting semantic owner authority',()=>{
  const x=clone(baseline),id='DIS020-CORE-003';
  x.matrix.requirements.find(r=>r.id===id).state='VERIFIED';
