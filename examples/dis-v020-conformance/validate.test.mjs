@@ -39,6 +39,32 @@ test('version matrix accounts for all 16 core requirements without inventing an 
  assert.ok((result.tallies['core:PARTIAL']??0)+(result.tallies['core:NOT_RUN']??0)>0);
  assert.ok((result.tallies['optional-profile:NOT_RUN']??0)>0);
 });
+test('R90 version matrix requires the exact 16 Core, 4 Optional and 1 Governance identities',async()=>{
+ const removed=clone(matrix);
+ removed.requirements=removed.requirements.filter(r=>r.id!=='DIS020-OPT-004');
+ await assert.rejects(validateVersionMatrix(removed,{}),
+  rejects('MATRIX_REQUIREMENT_ROSTER_INVALID'));
+ const replaced=clone(matrix);
+ replaced.requirements.find(r=>r.id==='DIS020-CORE-016').id='DIS020-CORE-017';
+ await assert.rejects(validateVersionMatrix(replaced,{}),
+  rejects('MATRIX_REQUIREMENT_ROSTER_INVALID'));
+ const renamedOptional=clone(matrix);
+ renamedOptional.requirements.find(r=>r.id==='DIS020-OPT-002').id='DIS020-OPT-005';
+ await assert.rejects(validateVersionMatrix(renamedOptional,{}),
+  rejects('MATRIX_REQUIREMENT_ROSTER_INVALID'));
+ const removedGovernance=clone(matrix);
+ removedGovernance.requirements=removedGovernance.requirements.filter(r=>r.id!=='DIS020-GOV-001');
+ await assert.rejects(validateVersionMatrix(removedGovernance,{}),
+  rejects('MATRIX_REQUIREMENT_ROSTER_INVALID'));
+ const extra=clone(matrix);
+ extra.requirements.push({...extra.requirements[0],id:'DIS020-CORE-017'});
+ await assert.rejects(validateVersionMatrix(extra,{}),
+  rejects('MATRIX_REQUIREMENT_ROSTER_INVALID'));
+ const duplicate=clone(matrix);
+ duplicate.requirements.find(r=>r.id==='DIS020-CORE-016').id='DIS020-CORE-015';
+ await assert.rejects(validateVersionMatrix(duplicate,{}),
+  rejects('MATRIX_DUP_OR_INVALID_ID'));
+});
 test('machine validator rejects a VERIFIED requirement without positive or negative proof',async()=>{
  const v=clone(matrix);v.requirements[0].negative=[];
  await assert.rejects(validateVersionMatrix(v,{'r9.5-baseline':baseline}),rejects('MATRIX_UNSUPPORTED_VERIFIED'));
