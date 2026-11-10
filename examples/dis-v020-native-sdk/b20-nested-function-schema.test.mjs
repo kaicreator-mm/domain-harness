@@ -103,6 +103,14 @@ test('B20 R66 malformed recursive schemas and over-budget depth/cardinality fail
   c=>c.output.fields.workflowDefinition.fields.guards.items='any',
   c=>c.output.fields.workflowDefinition.fields.guards.maxItems=999,
   c=>c.output.fields.workflowDefinition.fields.guards.minItems=9,
+  // R66 depth boundary: four nested record wrappers under the root output
+  // place a primitive leaf at depth 6. The old compiler admitted this shape,
+  // but the SDK runtime could not match ANY valid leaf value at depth 6.
+  c=>{
+   let descriptor={type:'record',fields:{leaf:'string'}};
+   for(let i=0;i<4;i++)descriptor={type:'record',fields:{child:descriptor}};
+   c.output.fields.workflowDefinition=descriptor;
+  },
   c=>c.output.fields.intentBindings.fields.confirmDownload.fields.roles.items={type:'undefined'},
   c=>c.output.fields.workflowDefinition.fields.states.items.fields.stateKey={type:'record',
    fields:{a:{type:'record',fields:{b:{type:'record',fields:{c:{type:'record',

@@ -106,11 +106,14 @@ export function classifyDisV020KdpReceipt(contract,receipt){
 // unchanged; only an explicit descriptor constrains nested contents.
 const MAX_SHAPE_DEPTH=5;
 function validateFieldType(type,depth){
+ // Schema admission and runtime matching must have the same maximum depth.
+ // Previously a primitive leaf at depth 6 compiled but could never match.
+ if(depth>MAX_SHAPE_DEPTH)fail('DIS_FUNCTION_SCHEMA_INVALID');
  if(typeof type==='string'){
   if(!VALUE_TYPES.has(type))fail('DIS_FUNCTION_SCHEMA_INVALID');
   return;
  }
- if(depth>MAX_SHAPE_DEPTH||!record(type))fail('DIS_FUNCTION_SCHEMA_INVALID');
+ if(!record(type))fail('DIS_FUNCTION_SCHEMA_INVALID');
  if(type.type==='record'){validateShape(type,depth,false);return}
  if(type.type!=='array')fail('DIS_FUNCTION_SCHEMA_INVALID');
  keys(type,['type','items','minItems','maxItems']);
