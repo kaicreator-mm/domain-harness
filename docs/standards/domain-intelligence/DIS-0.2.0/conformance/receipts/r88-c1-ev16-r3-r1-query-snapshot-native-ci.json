@@ -1,0 +1,65 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r88-c1-ev16-r3-r1-query-snapshot-native-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "C1_DKE_EV16_R3_R7_R1_SOURCE_SELECTED_READONLY_NATIVE_QUERY_IDENTITY",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "83ddc0b2d3e741f1d607d1095cc1221476ce160f",
+    "tree": "9b6a7146036458f547c6bf070360777ef6c69996"
+  },
+  "native": {
+    "reader": {
+      "path": "examples/dis-v020-native-sdk/dke-ev16-r3-reader.mjs",
+      "gitBlob": "177a36d35955cae02deb2c9bcdb349f0107a447c"
+    },
+    "test": {
+      "path": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+      "gitBlob": "02098232d92c588fea4f8f660bc8abbf4fcbf243"
+    },
+    "upstreamData": [
+      {
+        "path": "examples/dis-v020-native-sdk/fixtures/dke-ev16-r3-original-source-repair-receipt.json",
+        "gitBlob": "844a16219e31cc994d4d958e565879cb5e0c6872"
+      },
+      {
+        "path": "examples/dis-v020-native-sdk/fixtures/dke-r31-r7-owner-route.json",
+        "gitBlob": "6abb5fb59843845e594aedd749f78cbbe0efeea7"
+      },
+      {
+        "path": "examples/dis-v020-native-sdk/fixtures/dke-ev16-r1-selected-consumer-repair-receipt.json",
+        "gitBlob": "4fe1b2ec9ae359e3b75c775267a7f354641006bd"
+      }
+    ],
+    "woodpeckerYamlBlob": "e4bb30630a6c3a095f26717384c4c440b8534aa0"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2419/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2419/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2419/3"
+    }
+  ],
+  "observations": [
+    "Actual selected AOT/SDK/KDP source consumer binds original DKE R3, R7 and independently repaired R1 evidence as DATA.",
+    "Three original EV16, analyst-derived relation and unsupported Tally DM subjects produce typed UNKNOWN with no publisher authority, no SAP and no Effect.",
+    "Reader captures one own data descriptor once; native negative assertions reject accessor getter without invocation, hostile Proxy ownKeys, inherited subject and symbol extra key.",
+    "Source tampering, stale source anchors, DATA-as-LOCAL and forged local registry remain rejected by the existing native test."
+  ],
+  "limits": [
+    "DKE source R1 is a bounded technical review receipt, not an authenticated original Tally Source Owner decision or independent semantic Domain Oracle.",
+    "Original formal EV16 R8 remains 0/53; DKE SAP=0 and Effects=0; no release or KDP Effect permission.",
+    "This receipt qualifies only the exact selected read-only native consumer and its query-identity boundary."
+  ]
+}

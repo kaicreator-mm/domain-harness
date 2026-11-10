@@ -22,6 +22,12 @@ Product [#1496 explicit acceptance](https://github.com/kaicreator-mm/domain-harn
 
 **Fresh-review CI closeout (receipt [r86](receipts/r86-c3-fresh-exact-sha-review-ci.json)):** repaired review HEAD `c21a7763c1d4539f5ae062f24faead6c9a5f1a9b` / TREE `b7d678417ed61fd70231dff309275109c5abdc18` — Woodpecker [#2415/1](https://ci.kaicreator.com/repos/18/pipeline/2415/1) native integration (re-emitted `DIS_C3_SELECTED_CLOSURE` linux/x64/node at this exact SHA; guarded b03 cases executed on Linux), [#2415/2](https://ci.kaicreator.com/repos/18/pipeline/2415/2) min-node, [#2415/3](https://ci.kaicreator.com/repos/18/pipeline/2415/3) verify — **3/3 SUCCESS**. Tallies unchanged: Core 12/16 VERIFIED, 4 PARTIAL (002/005/008/016), Optional 0/4, Governance 0/1.
 
+### R88/R89 C1 and D02 structural native closeout (2026-11-11)
+
+- **R88 C1 EV16 R3/R7/R1:** exact PR source HEAD `83ddc0b2d3e741f1d607d1095cc1221476ce160f` / TREE `9b6a7146036458f547c6bf070360777ef6c69996` passed Woodpecker #2419/1–3 3/3. The selected DIS AOT→SDK/KDP reader consumes exact DKE R3, R7 and repaired R1 evidence as DATA; three selected outcomes remain typed UNKNOWN. A source-first red/green repair snapshots the own `subject` data descriptor once and rejects changing getters, inherited/symbol fields and hostile Proxy traps. No SAP, Effect or full R8 cell is claimed.
+- **R89 D02/R30:** the same exact HEAD and #2419/1–3 executed the same-source parent-vs-split Tally Function comparison, semantic-cooperation-vs-static-DAG distinction, absent constraint-owner rejection, and R30 mandatory Element version/source-validation/same-major ABI tests. These cases are now registered in the machine Matrix under CORE-002/005. They prove bounded structural behavior, not the semantically optimal Element partition or an independent Domain Oracle/SAP.
+- **Accounting unchanged:** Core 12/16 VERIFIED (75%), four PARTIAL (002/005/008/016), Optional 0/4, Governance 0/1. New receipts improve auditable evidence coverage; they do not inflate requirement tallies.
+
 ### Normalized Demo plan / history (ADS #1362 practice)
 
 See [Demo index, dependency map and R1–R11 historical evidence](DEMO_INDEX.md). It maps every Core/optional/governance requirement to D00–D08 evidence questions, preserves original files and exact historical receipts, and keeps the failed R11 integration context open. This index is not a second machine matrix or frozen implementation Task DAG.

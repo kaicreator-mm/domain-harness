@@ -64,7 +64,9 @@
     "r82-b22-r33-source-native-ci",
     "r84-c3-selected-closure-ci",
     "r85-c3-core008-source-review",
-    "r86-c3-fresh-exact-sha-review-ci"
+    "r86-c3-fresh-exact-sha-review-ci",
+    "r88-c1-ev16-r3-r1-query-snapshot-native-ci",
+    "r89-d02-parent-split-semantic-static-r30-native-ci"
   ],
   "requirements": [
     {
@@ -163,6 +165,10 @@
         {
           "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
           "case": "R62 native independent graph replay verifies original baseline/partial/hypothetical and conservative missing-publisher-source gate"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "D02 parent-vs-split Tally rule Elements preserve two source-real advisory Function outputs"
         }
       ],
       "negative": [
@@ -222,9 +228,10 @@
         "r52-b07-function-dependency-ci",
         "r60-b14-r16-source-authenticity-native-ci",
         "r61-b15-r17-guide-version-native-ci",
-        "r62-b16-r18-native-transitive-knowledge-impact-ci"
+        "r62-b16-r18-native-transitive-knowledge-impact-ci",
+        "r89-d02-parent-split-semantic-static-r30-native-ci"
       ],
-      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 source-pinned DKE ED06 native selected LOCAL Knowledge functions across three decomposition variants; identity and Function selection bounded, not an independently verified cohesive Element-owner decision. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN. R30 candidate changes native ABI: every selected Element version is mandatory; opt-in source-linked validation has authority NONE; same-major comparator rejects unversioned Element drift and binding/owner breaks. Not yet exact-SHA CI qualified, no SAP acceptance or C1 closure. B07 R52/R53 exact real selected xDownload Function-level static dependencies and source-version-linked semantic constraint qualified at source 0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f / #2305/1-3 all SUCCESS, with separate original test Git Blobs and negative cases. This is bounded structural provenance and advisory Knowledge consumption; complete domain semantic Oracle/SAP, full public ABI or Product/L1 Target applicability remains unproven; state PARTIAL. B14/R60 DKE R16 original full-source native authenticity upstream receipt DATA selected through actual DIS SDK/KDP native Knowledge; exact 9b761ad3628048706a6207deb645add5dc27eee1 Woodpecker #2329/1–3 3/3 SUCCESS. Only four source-scope OBSERVED, seven UNKNOWN; independent semantics/SAP absent; remains PARTIAL. B15/R61 genuine original DKE R17 Framework Guide 203→79 stale step-reference case 20 native DIS SDK/KDP cases, exact 2d331ec0aa38464808d419318422a86fa60c6d7a #2331/1–3 SUCCESS. Method stays UNKNOWN/invalidated, full publisher source not byte pinned and independent SAP=0. Core remains PARTIAL. B16/R62 selected actual original DKE R18 native 10-node graph under DIS AOT/SDK/KDP, four selectively INVALIDATED and RTC Knowledge unaffected, exact e1636200... #2344/1–3 3/3 SUCCESS; original publisher Guide 203/79 unpinned and independent SAP=0; remains PARTIAL."
+      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 source-pinned DKE ED06 native selected LOCAL Knowledge functions across three decomposition variants; identity and Function selection bounded, not an independently verified cohesive Element-owner decision. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN. R30 Element version/source-validation ABI and same-major structural comparator are exact-SHA native-qualified at #2419/1–3 (r89); every selected Element version is mandatory and opt-in source-linked validation has authority NONE. The D02 same-source parent-vs-split test compares the same two advisory Function outputs in split and fused Element layouts at the same source. These are structural compatibility/output-preservation proofs only; they do not decide optimal semantic boundaries, approve SAP or close C1. B07 R52/R53 exact real selected xDownload Function-level static dependencies and source-version-linked semantic constraint qualified at source 0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f / #2305/1-3 all SUCCESS, with separate original test Git Blobs and negative cases. This is bounded structural provenance and advisory Knowledge consumption; complete domain semantic Oracle/SAP, full public ABI or Product/L1 Target applicability remains unproven; state PARTIAL. B14/R60 DKE R16 original full-source native authenticity upstream receipt DATA selected through actual DIS SDK/KDP native Knowledge; exact 9b761ad3628048706a6207deb645add5dc27eee1 Woodpecker #2329/1–3 3/3 SUCCESS. Only four source-scope OBSERVED, seven UNKNOWN; independent semantics/SAP absent; remains PARTIAL. B15/R61 genuine original DKE R17 Framework Guide 203→79 stale step-reference case 20 native DIS SDK/KDP cases, exact 2d331ec0aa38464808d419318422a86fa60c6d7a #2331/1–3 SUCCESS. Method stays UNKNOWN/invalidated, full publisher source not byte pinned and independent SAP=0. Core remains PARTIAL. B16/R62 selected actual original DKE R18 native 10-node graph under DIS AOT/SDK/KDP, four selectively INVALIDATED and RTC Knowledge unaffected, exact e1636200... #2344/1–3 3/3 SUCCESS; original publisher Guide 203/79 unpinned and independent SAP=0; remains PARTIAL."
     },
     {
       "id": "DIS020-CORE-003",
@@ -704,6 +711,18 @@
         {
           "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
           "case": "R33 full real original source tier consumes into KDP and only yields typed UNKNOWN"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "D02 semantic cooperation may be cyclic while static Element dependency DAG remains acyclic"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+          "case": "C1 EV16 R3 two original DKE sources are selected DATA only by real AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+          "case": "C1 EV16 R3 actual KDP Function produces typed UNKNOWN and never source SAP"
         }
       ],
       "negative": [
@@ -770,6 +789,14 @@
         {
           "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
           "case": "R33 original source tamper, wrong tier, forged SAP/Effect fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "D02 cross-Element constraint relation cannot nominate an absent owner"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+          "case": "C1 EV16 R3 provenance forgery or Owner/Effect escalation is rejected at source, AOT or SDK"
         }
       ],
       "receiptIds": [
@@ -783,9 +810,11 @@
         "r60-b14-r16-source-authenticity-native-ci",
         "r61-b15-r17-guide-version-native-ci",
         "r62-b16-r18-native-transitive-knowledge-impact-ci",
-        "r82-b22-r33-source-native-ci"
+        "r82-b22-r33-source-native-ci",
+        "r88-c1-ev16-r3-r1-query-snapshot-native-ci",
+        "r89-d02-parent-split-semantic-static-r30-native-ci"
       ],
-      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency test authored in next candidate; pending matching CI and independent semantic ownership validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 24 CQ native AOT source-consumption confirmed on real original Tally KG projection/Textile reference. No registered complete CQ→SAP→external Package inverse dependency or independent semantic oracle; remains PARTIAL. R22 first bounded static reverse provenance edge source→selected LOCAL Function, distinctly not Element DAG cycle, automatic SAP invalidation or ECP dependent closure. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN. B03 R38–R40 candidate typed target/installer checks and DKE semantic authority negative are actual source-committed, new target identity is optional and bound to canonical module SHA roster; physical OS variant/independent SAP source owner not yet qualified. No automatic Core promotion. B03 R40 Git-Blob-pinned first-party DKE reviewer/locator status explicitly remains unqualified; no independent original source/SAP approval. R40 exact #2284/1–3 SUCCESS scoped negative only; CORE still PARTIAL. B07 R52/R53 exact real selected xDownload Function-level static dependencies and source-version-linked semantic constraint qualified at source 0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f / #2305/1-3 all SUCCESS, with separate original test Git Blobs and negative cases. This is bounded structural provenance and advisory Knowledge consumption; complete domain semantic Oracle/SAP, full public ABI or Product/L1 Target applicability remains unproven; state PARTIAL. B14/R60 DKE R16 original full-source native authenticity upstream receipt DATA selected through actual DIS SDK/KDP native Knowledge; exact 9b761ad3628048706a6207deb645add5dc27eee1 Woodpecker #2329/1–3 3/3 SUCCESS. Only four source-scope OBSERVED, seven UNKNOWN; independent semantics/SAP absent; remains PARTIAL. B15/R61 genuine original DKE R17 Framework Guide 203→79 stale step-reference case 20 native DIS SDK/KDP cases, exact 2d331ec0aa38464808d419318422a86fa60c6d7a #2331/1–3 SUCCESS. Method stays UNKNOWN/invalidated, full publisher source not byte pinned and independent SAP=0. Core remains PARTIAL. B16/R62 selected actual original DKE R18 native 10-node graph under DIS AOT/SDK/KDP, four selectively INVALIDATED and RTC Knowledge unaffected, exact e1636200... #2344/1–3 3/3 SUCCESS; original publisher Guide 203/79 unpinned and independent SAP=0; remains PARTIAL. B22/R82 original DKE source-scoped Knowledge qualified at fe2334e63d39a9c006746caad695f7e3c5ade97d #2397/1-3 3/3; earlier #2395 clone failures retained, all R33 source dispositions UNKNOWN. No independent SAP/Effect/Target approval; remains PARTIAL."
+      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency cases are registered and native CI-qualified at #2419 (r89): cooperation relations may be cyclic metadata while static Element dependency DAG cycles remain rejected; absent relation owners fail closed. This is structural behavior, not independent semantic ownership or SAP. C1 EV16 R3/R7/R1 selected-source reader and native AOT/SDK/KDP consumer are exact-SHA qualified at #2419 (r88); caller getter/Proxy/inherited/symbol attacks fail closed and selected outcomes remain typed UNKNOWN. No Owner/SAP/Effect promotion. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 24 CQ native AOT source-consumption confirmed on real original Tally KG projection/Textile reference. No registered complete CQ→SAP→external Package inverse dependency or independent semantic oracle; remains PARTIAL. R22 first bounded static reverse provenance edge source→selected LOCAL Function, distinctly not Element DAG cycle, automatic SAP invalidation or ECP dependent closure. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN. B03 R38–R40 candidate typed target/installer checks and DKE semantic authority negative are actual source-committed, new target identity is optional and bound to canonical module SHA roster; physical OS variant/independent SAP source owner not yet qualified. No automatic Core promotion. B03 R40 Git-Blob-pinned first-party DKE reviewer/locator status explicitly remains unqualified; no independent original source/SAP approval. R40 exact #2284/1–3 SUCCESS scoped negative only; CORE still PARTIAL. B07 R52/R53 exact real selected xDownload Function-level static dependencies and source-version-linked semantic constraint qualified at source 0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f / #2305/1-3 all SUCCESS, with separate original test Git Blobs and negative cases. This is bounded structural provenance and advisory Knowledge consumption; complete domain semantic Oracle/SAP, full public ABI or Product/L1 Target applicability remains unproven; state PARTIAL. B14/R60 DKE R16 original full-source native authenticity upstream receipt DATA selected through actual DIS SDK/KDP native Knowledge; exact 9b761ad3628048706a6207deb645add5dc27eee1 Woodpecker #2329/1–3 3/3 SUCCESS. Only four source-scope OBSERVED, seven UNKNOWN; independent semantics/SAP absent; remains PARTIAL. B15/R61 genuine original DKE R17 Framework Guide 203→79 stale step-reference case 20 native DIS SDK/KDP cases, exact 2d331ec0aa38464808d419318422a86fa60c6d7a #2331/1–3 SUCCESS. Method stays UNKNOWN/invalidated, full publisher source not byte pinned and independent SAP=0. Core remains PARTIAL. B16/R62 selected actual original DKE R18 native 10-node graph under DIS AOT/SDK/KDP, four selectively INVALIDATED and RTC Knowledge unaffected, exact e1636200... #2344/1–3 3/3 SUCCESS; original publisher Guide 203/79 unpinned and independent SAP=0; remains PARTIAL. B22/R82 original DKE source-scoped Knowledge qualified at fe2334e63d39a9c006746caad695f7e3c5ade97d #2397/1-3 3/3; earlier #2395 clone failures retained, all R33 source dispositions UNKNOWN. No independent SAP/Effect/Target approval; remains PARTIAL."
     },
     {
       "id": "DIS020-CORE-006",
