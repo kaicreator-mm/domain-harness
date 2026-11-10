@@ -119,6 +119,9 @@ export async function makeNativeFixture(){
  find('orders.approve').receiptContract={
   schema:'dis.v0.2.kdp-receipt-contract/1',version:'1.0.0',
   statusMap:{admitted:'ADMITTED',denied:'DENIED',rejected:'DENIED'},
+  input:{type:'record',fields:{messageId:'string',instanceKey:'string',input:'record'},
+   additionalProperties:false},
+  output:{type:'record',fields:{status:'string'},additionalProperties:true},
   compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
  };
  // R20: Runx returns a genuine source-pinned stateful class instance, not JSON.

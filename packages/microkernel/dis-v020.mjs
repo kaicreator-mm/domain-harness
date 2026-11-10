@@ -181,11 +181,17 @@ export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins
     if(!plain(input)||typeof input.messageId!=='string'||!input.messageId||
        typeof input.instanceKey!=='string'||!input.instanceKey||
        !plain(input.input))refuse('DIS_INTENT_INPUT_INVALID');
+    if(f.receiptContract?.input!==undefined)
+     try{validateDisV020FunctionValue({input:f.receiptContract.input},
+       'input',input)}catch{refuse('DIS_KDP_INTENT_SCHEMA_INPUT_INVALID')}
     const receipt=await app.send({
      intentType:f.binding.intentId,
      messageId:input.messageId,instanceKey:input.instanceKey,input:input.input
     });
     if(f.receiptContract){
+     if(f.receiptContract.output!==undefined)
+      try{validateDisV020FunctionValue({output:f.receiptContract.output},
+        'output',receipt)}catch{refuse('DIS_KDP_RECEIPT_SCHEMA_OUTPUT_INVALID')}
      const typed=classifyDisV020KdpReceipt(f.receiptContract,receipt);
      return Object.freeze({
       kind:'KDP_RECEIPT',authority:'KDP',receipt,

@@ -35,14 +35,14 @@ test('R72 selected Tally Runx xDownload and Orders nine public Functions have ex
   assert.equal(observation.evidence.attested,false);
  }finally{app.stop()}
 });
-test('R72 explicit typed Function I/O completeness report keeps four real native gaps visible, no invented CORE-003 acceptance',async()=>{
+test('R72/R73 selected Function inventory keeps two special non-JSON I/O gaps visible',async()=>{
  const f=await selected,a=inspectDisV020PublicFunctionCoverage(f.artifact);
- assert.equal(a.typedIOFunctions,5);
+ assert.equal(a.typedIOFunctions,7);
  assert.deepEqual([...a.missingTypedIO].sort(),[
-  'orders.appInit','orders.approve','runx.createPresenceObserver',
-  'xdownload.confirmDownload'
+  'orders.appInit','runx.createPresenceObserver'
  ]);
- assert.equal(a.rows.filter(x=>x.profile==='KDP_ADMISSION_RECEIPT_ONLY').length,2);
+ assert.equal(a.rows.filter(x=>x.profile==='TYPED_KDP_ADMISSION_IO').length,2);
+ assert.equal(a.rows.filter(x=>x.profile==='KDP_ADMISSION_RECEIPT_ONLY').length,0);
  assert.equal(a.rows.filter(x=>x.profile==='LOCAL_HANDLE_METHODS_ONLY').length,1);
  assert.equal(a.rows.filter(x=>x.profile==='APP_INIT_LIFECYCLE_ONLY').length,1);
  assert.equal(a.fullCore003Ready,false);
@@ -73,4 +73,49 @@ test('R72 descriptions do not authorize business truth or change an installed AO
   expectedDigest:f.artifact.digest,registry:f.registry,
   store:new PlainCasDocStore(),tenantId:'tenant:dis-r72-old-aot'
  }),fail('DIS_INSTALLED_AOT_MISMATCH'));
+});
+
+test('R73 typed actual KDP Intent envelope and KDP receipt never imply executed Effect',async()=>{
+ const f=await selected,a=inspectDisV020PublicFunctionCoverage(f.artifact);
+ for(const id of ['orders.approve','xdownload.confirmDownload']){
+  const profile=a.rows.find(x=>x.id===id);
+  assert.equal(profile.profile,'TYPED_KDP_ADMISSION_IO');
+  const contract=f.program.elements.flatMap(e=>e.functions)
+    .find(fn=>fn.id===id).receiptContract;
+  assert.equal(contract.input.fields.messageId,'string');
+  assert.equal(contract.input.fields.instanceKey,'string');
+  assert.equal(contract.input.fields.input,'record');
+  assert.equal(contract.output.fields.status,'string');
+ }
+ const app=await loadDisV020Aot(f.artifact,{expectedDigest:f.artifact.digest,
+  registry:f.registry,store:new PlainCasDocStore(),tenantId:'tenant:dis-r73-kdp-typed'});
+ try{
+  const good=await app.invoke('orders.approve',{
+   messageId:'msg:r73',instanceKey:'instance:r73',input:{amount:30,requestId:'R73'}
+  },{expectedContractVersion:'1.0.0'});
+  assert.equal(good.kind,'KDP_RECEIPT');
+  assert.equal(good.admission,'ADMITTED');
+  assert.equal(good.execution,'NOT_PROVEN');
+  assert.equal(good.evidence.businessAttested,false);
+  for(const extra of [{authority:'KDP'},{effectPermit:true}]){
+   await assert.rejects(app.invoke('orders.approve',{
+    messageId:'msg:r73-forged',instanceKey:'instance:r73-forged',input:{},...extra
+   }),fail('DIS_KDP_INTENT_SCHEMA_INPUT_INVALID'));
+  }
+ }finally{app.stop()}
+});
+test('R73 incomplete or forged KDP schema fails source-selected AOT qualification',async()=>{
+ const f=await selected;
+ for(const [mutation,error] of [
+  [r=>{delete r.output},'DIS_KDP_RECEIPT_SCHEMA_INCOMPLETE'],
+  [r=>{r.input.fields.instanceKey='number'},'DIS_KDP_RECEIPT_SCHEMA_INVALID'],
+  [r=>{r.output.fields.status='number'},'DIS_KDP_RECEIPT_SCHEMA_INVALID'],
+  [r=>{r.input.fields.messageId='boolean'},'DIS_KDP_RECEIPT_SCHEMA_INVALID']
+ ]){
+  const p=clone(f.program);
+  const r=p.elements.flatMap(e=>e.functions).find(x=>x.id==='orders.approve').receiptContract;
+  mutation(r);
+  assert.throws(()=>build(f,p),fail(error));
+ }
+ assert.equal(inspectDisV020PublicFunctionCoverage(f.artifact).independentSAP,false);
 });

@@ -72,9 +72,20 @@ export function validateDisV020LocalHandle(contract,value){
  return true;
 }
 function validateKdpReceiptContract(contract){
- keys(contract,['schema','version','statusMap','compatibility']);
+ keys(contract,['schema','version','statusMap','compatibility','input','output']);
  if(contract.schema!=='dis.v0.2.kdp-receipt-contract/1'||!SEMVER.test(contract.version))
   fail('DIS_KDP_RECEIPT_CONTRACT_INVALID');
+ // R73: a complete typed KDP public Function profile describes BOTH the
+ // caller envelope and the receipt, never the successful business Effect.
+ if((contract.input===undefined)!==(contract.output===undefined))
+  fail('DIS_KDP_RECEIPT_SCHEMA_INCOMPLETE');
+ if(contract.input!==undefined){
+  validateShape(contract.input);validateShape(contract.output);
+  const i=contract.input.fields??{},o=contract.output.fields??{};
+  if(i.messageId!=='string'||i.instanceKey!=='string'||
+     i.input!=='record'||o.status!=='string')
+   fail('DIS_KDP_RECEIPT_SCHEMA_INVALID');
+ }
  if(!record(contract.statusMap)||Object.keys(contract.statusMap).length===0||
     Object.keys(contract.statusMap).length>MAX||contract.statusMap.admitted!=='ADMITTED')
   fail('DIS_KDP_RECEIPT_CONTRACT_INVALID');
@@ -598,10 +609,12 @@ export function inspectDisV020PublicFunctionCoverage(artifact){
   if(typeof fn.description!=='string'||!fn.description.trim()||
      fn.description.length>2048)
    fail('DIS_PUBLIC_FUNCTION_DESCRIPTION_REQUIRED');
-  const typedIO=fn.contract!==undefined;
+  const typedIO=fn.contract!==undefined||
+   (fn.receiptContract?.input!==undefined&&fn.receiptContract?.output!==undefined);
   rows.push(Object.freeze({
    id,kind:fn.kind,binding:fn.binding.type,description:fn.description,
-   typedIO,profile:typedIO?'TYPED_IO':
+   typedIO,profile:fn.contract!==undefined?'TYPED_LOCAL_IO':
+    fn.receiptContract?.input!==undefined?'TYPED_KDP_ADMISSION_IO':
     fn.receiptContract!==undefined?'KDP_ADMISSION_RECEIPT_ONLY':
     fn.handleContract!==undefined?'LOCAL_HANDLE_METHODS_ONLY':
     fn.kind==='init'?'APP_INIT_LIFECYCLE_ONLY':'UNQUALIFIED_PUBLIC_IO'
