@@ -412,8 +412,8 @@ export function compareDisV020ElementContracts(previous,next){
    // No verified relaxed variance rule for these special interfaces:
    // a changed KDP admission, Init lifecycle or process-local method
    // contract must not be called same-major consumer-compatible.
-   const {version:oldVersion,...oldShape}=before;
-   const {version:newVersion,...newShape}=after;
+   const {version:_oldVersion,...oldShape}=before;
+   const {version:_newVersion,...newShape}=after;
    if(sha256Canonical(oldShape)!==sha256Canonical(newShape))
     fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
   }

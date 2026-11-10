@@ -1,4 +1,4 @@
-import type {DisV020Aot,DisV020Origin,DisV020Disposition,DisV020Admission} from '@kaicreator/domain-harness-contracts/dis-v020';
+import type {DisV020Aot,DisV020Origin,DisV020Disposition,DisV020Admission,DisV020SelectedSemanticRelation} from '@kaicreator/domain-harness-contracts/dis-v020';
 import type {V10DocStore} from '@kaicreator/domain-harness-contracts';
 export interface DisV020Implementation {
  readonly sourceId:string; readonly sha256:string; readonly gitBlob:string;
@@ -28,6 +28,8 @@ export interface DisV020App {
   * No physical hardware attestation or target-specific code provenance claim. */
  readonly actualHostTarget:Readonly<{platform:string;architecture:string;runtime:'node'}>|null;
  readonly state:'READY'|'DEGRADED'|'STOPPED';
+ /** Bounded source AOT relations, not independently accepted semantic truth. */
+ readonly semanticRelations:readonly DisV020SelectedSemanticRelation[];
  readonly functions:readonly string[];
  readonly contractVersions:Readonly<Record<string,string>>;
  invoke(id:string,input?:unknown,options?:Readonly<{expectedContractVersion?:string}>):Promise<
