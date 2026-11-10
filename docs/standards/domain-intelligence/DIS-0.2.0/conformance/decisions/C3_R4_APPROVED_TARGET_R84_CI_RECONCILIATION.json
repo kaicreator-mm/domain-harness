@@ -1,0 +1,84 @@
+{
+  "schema": "dis.v020.c3.approved-target-and-exact-ci-reconciliation/1",
+  "date": "2026-11-11",
+  "sourceAuthority": {
+    "productIssue": "https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6777762870",
+    "masterIssue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+    "originalTargetDecisionGitBlob": "7f0d195849647282fad09a53a117b4f3a705b138",
+    "sourceCorrectiveGitBlob": "024ba321d806b197e88e3dc4343be10abfc49390",
+    "target": "linux/x64/node",
+    "nonApplicable": [
+      "Windows",
+      "Android",
+      "other runtimes or CPUs"
+    ]
+  },
+  "sourceEvidence": {
+    "nativeImplementationExactHead": "1c9826bcfecdbd83c57a466e624eec4defb29604",
+    "sourceTree": "275fb915dc136b91e04c7ab66de2cbcc80eb9aab",
+    "b05TestGitBlob": "a59f5c7e4b36803c957db729b9a5a1a1380679a8",
+    "recordedR84ReceiptGitBlob": "75469df2cfcda812455cb9ff4bc7f21f5fc96375",
+    "r84ReceiptPath": "docs/standards/domain-intelligence/DIS-0.2.0/conformance/receipts/r84-c3-selected-closure-ci.json",
+    "woodpecker": [
+      {
+        "run": 2410,
+        "step": 1,
+        "state": "SUCCESS"
+      },
+      {
+        "run": 2410,
+        "step": 2,
+        "state": "SUCCESS"
+      },
+      {
+        "run": 2410,
+        "step": 3,
+        "state": "SUCCESS"
+      }
+    ],
+    "currentDocsExactHead": "989a5858ac1393bdecbf20f0344df9c56a889fa6",
+    "currentDocsWoodpecker": [
+      {
+        "run": 2411,
+        "step": 1,
+        "state": "SUCCESS"
+      },
+      {
+        "run": 2411,
+        "step": 2,
+        "state": "SUCCESS"
+      },
+      {
+        "run": 2411,
+        "step": 3,
+        "state": "SUCCESS"
+      }
+    ]
+  },
+  "crossCheckedFacts": [
+    "User's approved Demo target is linux/x64/node only; no Windows/Android execution requirement for this version-scoped Demo",
+    "Qualified source HEAD has actual selected BUILD package/source/host closure test at the same real Linux worker, B05 case and independently installer-pinned source tests",
+    "R84 3/3 SUCCESS at exact qualifying code SHA and latest docs commit independently 3/3 SUCCESS",
+    "B03 isolated same-Source Windows/Linux labels are insufficient as sole evidence, but portable identical module bytes are not forbidden",
+    "Matrix and closure-plan still contain stale Product/L1 Target approval and per-OS distinct-byte blockers; do not infer these are outstanding requirements",
+    "CORE-008 is still PARTIAL because final fresh independent exact-source review/matrix acceptance remains outside this execution"
+  ],
+  "status": {
+    "c3EngineeringEvidence": "READY_FOR_FRESH_INDEPENDENT_ACCEPTANCE",
+    "productScope": "ACCEPTED",
+    "core008": "PARTIAL",
+    "coreTotal": "12/16",
+    "optional": "0/4",
+    "governance": "0/1",
+    "semanticSAP": "NOT_QUALIFIED",
+    "effects": 0,
+    "freeze": false,
+    "merge": false,
+    "release": false
+  },
+  "neededNext": [
+    "Fresh independent reviewer inspect original R84 source/test, exact 2410/2411 CIs and scoped Product decision; repair genuine findings directly",
+    "Single Writer should correct outdated C3 Core/closure plan notes and promote CORE-008 only after qualified review",
+    "DKE C1 independent semantic Owner/SAP remains separate; do not require synthetic per-OS distinct module bytes"
+  ]
+}
