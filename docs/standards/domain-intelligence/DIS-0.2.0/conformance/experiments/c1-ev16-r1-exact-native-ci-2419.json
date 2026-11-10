@@ -1,0 +1,81 @@
+{
+  "schema": "dis.v020.c1.ev16.r1.exact-native-source-repair-ci/1",
+  "date": "2026-11-11",
+  "masterIssue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+  "implementationPR": "https://github.com/kaicreator-mm/domain-harness/pull/1497",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "commit": "83ddc0b2d3e741f1d607d1095cc1221476ce160f",
+    "tree": "9b6a7146036458f547c6bf070360777ef6c69996"
+  },
+  "woodpecker": [
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2419/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2419/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2419/3"
+    }
+  ],
+  "selectedNativeTest": {
+    "path": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+    "gitBlob": "02098232d92c588fea4f8f660bc8abbf4fcbf243",
+    "registeredInNativePipeline": true
+  },
+  "sourceReader": {
+    "path": "examples/dis-v020-native-sdk/dke-ev16-r3-reader.mjs",
+    "gitBlob": "177a36d35955cae02deb2c9bcdb349f0107a447c"
+  },
+  "originalDkeData": [
+    {
+      "name": "R3 original source-first repair receipt",
+      "gitBlob": "844a16219e31cc994d4d958e565879cb5e0c6872"
+    },
+    {
+      "name": "R7 scoped owner route",
+      "gitBlob": "6abb5fb59843845e594aedd749f78cbbe0efeea7"
+    },
+    {
+      "name": "R1 independently repaired selected-source consumer receipt",
+      "gitBlob": "4fe1b2ec9ae359e3b75c775267a7f354641006bd"
+    }
+  ],
+  "repair": {
+    "failureFirstGitBlob": "90b1d81246dff7d9807bcf1b52145163e9031192",
+    "redGreenGitBlob": "b98b1d2925040c958a0dd11c907e1cd0f6d0f1e3",
+    "p1Fixed": "mutable own getter request subject changing between validation and output; throwing Proxy normalized",
+    "hostedSourceChecks": "17/17 PASS",
+    "nativeActualCi": "3/3 SUCCESS"
+  },
+  "boundary": {
+    "kind": "READ_ONLY_ORIGINAL_DKE_REVIEW_EVIDENCE_THROUGH_DIS_AOT_SDK_KDP",
+    "notIndependentDkeSemanticOwner": true,
+    "notOfficialEv16R8Cell": true,
+    "notRuntimeEffectAuthorization": true,
+    "notFullPublisherSourceReexecutionWithinDIS": true,
+    "notReleaseOrFreeze": true
+  },
+  "formalProgress": {
+    "disCoreVerified": 12,
+    "disCorePartial": 4,
+    "disCore008": "PARTIAL_PENDING_FINAL_PRODUCT_FRESH_REVIEW_ACCEPTANCE",
+    "disOptionalNotRun": 4,
+    "disGovernanceNotRun": 1,
+    "dkeR8Qualified": "0/53",
+    "sapQualified": 0,
+    "effectsAuthorized": 0
+  },
+  "limitations": [
+    "Original GitHub CI exact commit statuses checked 3/3, raw Woodpecker line-level logs not independently fetched in this evidence writer",
+    "This receipt is fixed to implementation exact SHA. Evidence branch commit SHA differs from source implementation SHA",
+    "No automatic Product C3 Core promotion or semantic Source Owner signoff from a green native consumer test"
+  ]
+}
