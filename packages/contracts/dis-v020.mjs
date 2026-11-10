@@ -16,7 +16,7 @@ const FUNCTION_KINDS=new Set(['init','knowledge','rule','stateful','workflow','e
 const REL_KINDS=new Set(['depends-on','constrains','cooperates','defines']);
 // DKE producer JSON-LD/receipt content is a provenance DATA dependency,
 // never a Function executable. Keep the allowance narrow, Git-blob pinned.
-const DKE_DATA_ORIGIN=/^docs\\/standards\\/dke\\/(?:[A-Za-z0-9_.-]+\\/)*[A-Za-z0-9_.-]+\\.(?:json|json\\.zlib\\.b64|mjs\\.zlib\\.b64)$/;
+const DKE_DATA_ORIGIN=/^docs\/standards\/dke\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:json|json\.zlib\.b64|mjs\.zlib\.b64)$/;
 // B18/R64 source-specific exception: a real Tally JSON-LD Knowledge DATA file is
 // not executable, and the DKE R23 original Reader is source-pinned LOCAL code.
 // Do not expand docs/ or .mjs broadly; the original Git commit + Blob are mandatory.
