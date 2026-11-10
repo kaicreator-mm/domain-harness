@@ -81,6 +81,32 @@ test('R33 full real original source tier consumes into KDP and only yields typed
   assert.equal(out.value.tierCanonicalSha256.length,64);
  }}finally{app.stop()}
 });
+test('R33 independently installed original producer DATA and executable reader pins deny stale origin and registry before KDP',async()=>{
+ const x=await context,poison=structuredClone(x.pinned);
+ poison[DATA].sha256='0'.repeat(64);
+ await assert.rejects(activate({...x,pinned:poison}),err('DIS_SOURCE_ANCHOR_STALE'));
+ const fakeOrigin=structuredClone(x.pinned);
+ fakeOrigin[DATA].origin.commit='0'.repeat(40);
+ await assert.rejects(activate({...x,pinned:fakeOrigin}),err('DIS_SOURCE_ANCHOR_STALE'));
+ const unselected=structuredClone(x.pinned);
+ unselected['unselected-r33-source']={...unselected[DATA]};
+ await assert.rejects(activate({...x,pinned:unselected}),err('DIS_SOURCE_ANCHOR_NOT_CONSUMED'));
+ const wrongRegistry={...x.registry,[FN]:{...x.registry[FN],sha256:'0'.repeat(64)}};
+ await assert.rejects(activate({...x,registry:wrongRegistry}),err('DIS_LOCAL_REGISTRY_MISMATCH'));
+ // The installer AOT digest must be externally pinned; the AOT's own digest
+ // never self-authorizes admission, even with real source bytes.
+ await assert.rejects(loadDisV020Aot(x.artifact,{
+  expectedDigest:'0'.repeat(64),expectedSourcePins:x.pinned,registry:x.registry,
+  store:new PlainCasDocStore(),tenantId:'tenant:r33-stale-aot'
+ }),err('DIS_INSTALLED_AOT_MISMATCH'));
+ const valid=await activate(x);
+ try{
+  const result=await valid.invoke(FN,{disposition:'QUARANTINE_FATAL'});
+  assert.equal(result.value.sapQualified,false);
+  assert.equal(result.value.effectDispatched,false);
+  assert.equal(result.authority,'NONE');
+ }finally{valid.stop()}
+});
 test('R33 original source tamper, wrong tier, forged SAP/Effect fail closed',async()=>{
  const x=await context;
  assert.throws(()=>makeR33OriginalGoReader(x.receipt+' '),err('DKE_R33_RECEIPT_GIT_BLOB_DRIFT'));
