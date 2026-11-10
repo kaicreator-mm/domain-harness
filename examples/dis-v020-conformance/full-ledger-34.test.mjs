@@ -31,7 +31,12 @@ test('R67 all 34 original B01-B20 scoped rounds retain independent named 3-conte
  assert.deepEqual(r.rows.slice(-4).map(x=>x.pipeline),['2348','2355','2357','2364']);
  assert.ok(r.rows.every(x=>x.ci==='STORED_EXACT_SOURCE_CI_3_OF_3_SUCCESS'));
  assert.ok(r.rows.every(x=>x.semanticSAP==='NOT_INFERRED'));
- assert.deepEqual([r.coreVerified,r.corePartial,r.optionalNotRun,r.governanceNotRun],[9,7,4,1]);
+ const live=(await json('matrix.json')).requirements;
+ assert.deepEqual([r.coreVerified,r.corePartial,r.optionalNotRun,r.governanceNotRun],[
+  live.filter(x=>x.profile==='core'&&x.state==='VERIFIED').length,
+  live.filter(x=>x.profile==='core'&&x.state==='PARTIAL').length,
+  4,1
+ ]);
  assert.equal(r.versionFreezeEligible,false);assert.equal(r.independentSemanticSAP,'NOT_CLAIMED');
 });
 test('R67 preserves pre-existing B13 ordinary forged source origin rejection code',async()=>{

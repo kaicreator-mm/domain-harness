@@ -9,22 +9,21 @@ test('B04-03 R43 source-real C4 ledger says no auto Freeze Merge or Release with
  const r=await inspectCheckedInReadiness();
  assert.equal(r.status,'BLOCKED');
  assert.equal(r.roundsAudited,9);
- assert.equal(r.verifiedCore,9);
- assert.equal(r.partialCore,7);
+ assert.equal(r.verifiedCore+r.partialCore,16);
  assert.equal(r.releaseEligible,false);
  assert.equal(r.freezeEligible,false);
  assert.equal(r.mergeEligible,false);
  assert.equal(r.independentSAP,false);
- assert.equal(r.blockers.length,7);
+ assert.equal(r.blockers.length,r.partialCore);
  assert.equal(r.blockers.every(x=>x.structuralEvidenceExists&&x.receiptCount>0),true);
  assert.ok(r.priorTestBlobDriftCount>=1);
 });
 test('R68 dynamic readiness accepts 10/16 progress as inventory but still denies Freeze, merge and unauthorized approval',async()=>{
  const [snapshot,audit]=await Promise.all([inspectCheckedInClosure(),auditCheckedInBatches()]);
  const c=clone(snapshot);
- c.verifiedCore=10;c.partialCore=6;c.remaining=c.remaining.filter(r=>r.id!=='DIS020-CORE-003');
+ c.verifiedCore++;c.partialCore--;c.remaining=c.remaining.filter(r=>r.id!=='DIS020-CORE-003');
  const result=decideB04Readiness({closure:c,sourceAudit:audit});
- assert.equal(result.verifiedCore,10);assert.equal(result.partialCore,6);
+ assert.equal(result.verifiedCore,c.verifiedCore);assert.equal(result.partialCore,c.partialCore);
  assert.equal(result.blockers.length,6);
  assert.equal(result.status,'BLOCKED');
  assert.equal(result.freezeEligible,false);

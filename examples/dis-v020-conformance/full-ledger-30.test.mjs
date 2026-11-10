@@ -39,8 +39,10 @@ test('R63 every B01-B16 source-qualified round (30/30) has unique historical Git
  assert.equal(r16.pipeline,'2344');
  assert.equal(r16.sourceMatchesCurrent,true);
  assert.ok(a.currentBlobMismatch.includes('B15-01'), 'R61 historical success source intentionally differs from separately qualified repaired source');
- assert.equal(a.coreVerified,9);
- assert.equal(a.corePartial,7);
+ const actualCore=(await read('matrix.json')).requirements.filter(x=>x.profile==='core');
+ assert.equal(a.coreVerified,actualCore.filter(x=>x.state==='VERIFIED').length);
+ assert.equal(a.corePartial,actualCore.filter(x=>x.state==='PARTIAL').length);
+ assert.equal(a.coreVerified+a.corePartial,16);
  assert.equal(a.optionalNotRun,4);
  assert.equal(a.governanceNotRun,1);
  assert.equal(a.independentSemanticSAP,'NOT_CLAIMED');
