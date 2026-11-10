@@ -20,3 +20,10 @@ R3 §3 要求每个 Package 有实际选定 Target、Implementation 与依赖闭
 **不能仅凭这个范围决定就把 CORE-008 改成 VERIFIED。** 决策后还须真正构造目标专属的 Package / BUILD-selected 实现或目标依赖闭包（最小可行即可，不需要通用 Host 抽象）；在 Linux/x64 实际进程完成“选定来源→构建→独立安装目标→KDP”正例，验证改 Target 标签、Source digest、选定模块、实际 Host 各种负例，并取得相同源码的三项 CI 收据。
 
 目前 `PRODUCT_L1_DECISION=PENDING`，新 `#2404` 原生收据尚不能在这里宣称成功，`CORE-008=PARTIAL`，Core **12/16**。DKE 的独立 Source-First Critic / Owner SAP、CORE-002/005、CORE-016、GOV-001 都属于**单独门禁**。本文件无自动 SAP、Effect、Freeze、Merge 或 Release 授权。
+
+
+## 随后独立 CI 结果（R1，新证据，不覆盖 R0）
+
+在上述 R0 建立之后，源 HEAD `3bf6d05687faecd961a6fff43faeaa8955960c63` 的原始 Woodpecker [#2404/1](https://ci.kaicreator.com/repos/18/pipeline/2404/1) Native、[#2404/2](https://ci.kaicreator.com/repos/18/pipeline/2404/2) Min Node、[#2404/3](https://ci.kaicreator.com/repos/18/pipeline/2404/3) Generic 均返回 **SUCCESS**。已重新读取必跑工作流 Git Blob `62faed461b0a0a099101b5a33cca4c46e0aa5a87`，确认 `b05-host-target.test.mjs` 在原生命令中不可省略；原始新测试 Git Blob `8f099b6158ad5a71b5bc0f0375046e7280723588`，CI 环境下会断言真实 Linux/x64/Node 并输出结构性 Host/模块摘要。
+
+单独固化 [R1 原始 CI 资格收据](C3_TARGET_HOST_EXACT_CI_R1.json)，保留 R0 构建时的 PENDING 历史。本对话未直接读取 Woodpecker `DIS_C3_SELECTED_HOST` 原始步骤 stdout，**不伪造具体摘要值**。此成功证明 *实际选定 Host 原生门禁*，**仍然不能**解决 B03/R40“相同模块换不同标签”的真实 Target 专属构建缺口。因此 CORE-008 继续 `PARTIAL`，需要正式 Product/L1 决策及实际构建选择后才可申请升级。
