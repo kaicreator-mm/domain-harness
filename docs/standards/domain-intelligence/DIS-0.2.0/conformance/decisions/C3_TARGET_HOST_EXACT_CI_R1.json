@@ -1,0 +1,57 @@
+{
+  "schema": "dis.v0.2.c3-selected-host-exact-ci-receipt/1",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "3bf6d05687faecd961a6fff43faeaa8955960c63",
+    "tree": "d25cca649a3856f016ea83ee1309f994a100fd1a"
+  },
+  "tested": {
+    "path": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+    "gitBlob": "8f099b6158ad5a71b5bc0f0375046e7280723588",
+    "workflowPath": ".woodpecker/dis-v020-integration.yaml",
+    "workflowGitBlob": "62faed461b0a0a099101b5a33cca4c46e0aa5a87",
+    "requiredNativeTestIncluded": true,
+    "sourceBehavior": [
+      "CI_COMMIT_SHA present => asserts source 40-hex SHA and process platform linux, architecture x64, runtime node; mandatory positive cannot skip on an incompatible CI host.",
+      "Real AOT/selected Target vs real process identity and selected module digest roster are checked before real Tally Business invocation; observation authority NONE.",
+      "Emits DIS_C3_SELECTED_HOST JSON with selectedTarget, actualHostTarget, selectedModules, AOT digest only when in CI context; semanticSAP=false, effectAuthorized=false.",
+      "Wrong OS, wrong arch, legacy unselected AOT cannot gain independent host qualification."
+    ]
+  },
+  "exactCi": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "status": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2404/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "status": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2404/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "status": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2404/3"
+    }
+  ],
+  "qualification": "BOUNDED_ACTUAL_CI_SELECTED_HOST_GUARD_AND_SOURCE_CLOSURE",
+  "logBoundary": "Exact three CI terminal status SUCCESS and original mandatory test source were read back; raw DIS_C3_SELECTED_HOST log JSON was not independently extracted in this ChatGPT environment, do not invent its observed digest values.",
+  "counterexample": {
+    "sourceTest": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+    "blob": "e4e91b820bc4e551d3b40270102115524755f9bf",
+    "note": "Same canonical module SHA roster may receive linux and windows AOT labels; this selected host CI does not prove independent per-target implementation/build."
+  },
+  "remaining": {
+    "productApplicability": "PENDING",
+    "perTargetBuildSelection": "NOT_PROVEN",
+    "core008": "PARTIAL",
+    "coreVerified": 12,
+    "coreTotal": 16,
+    "dkeIndependentSAP": 0,
+    "effects": 0,
+    "freeze": false,
+    "merge": false,
+    "release": false
+  }
+}
