@@ -24,11 +24,28 @@ test('R68 dynamic readiness accepts 10/16 progress as inventory but still denies
  c.verifiedCore++;c.partialCore--;c.remaining=c.remaining.filter(r=>r.id!=='DIS020-CORE-003');
  const result=decideB04Readiness({closure:c,sourceAudit:audit});
  assert.equal(result.verifiedCore,c.verifiedCore);assert.equal(result.partialCore,c.partialCore);
- assert.equal(result.blockers.length,6);
+ assert.equal(result.blockers.length,c.partialCore);
  assert.equal(result.status,'BLOCKED');
  assert.equal(result.freezeEligible,false);
  assert.equal(result.mergeEligible,false);
  assert.equal(result.independentSAP,false);
+});
+test('R70 repeated future Core closure counts 9-to-16 are not frozen by old readiness snapshots',async()=>{
+ const [snapshot,audit]=await Promise.all([inspectCheckedInClosure(),auditCheckedInBatches()]);
+ const remaining=snapshot.remaining.map(x=>x.id);
+ for(let extra=0;extra<=remaining.length;extra++){
+  const c=clone(snapshot);
+  c.verifiedCore+=extra;c.partialCore-=extra;
+  c.remaining=c.remaining.filter(x=>!remaining.slice(0,extra).includes(x.id));
+  const actual=decideB04Readiness({closure:c,sourceAudit:audit});
+  assert.equal(actual.verifiedCore,c.verifiedCore);
+  assert.equal(actual.partialCore,c.partialCore);
+  assert.equal(actual.blockers.length,c.partialCore);
+  assert.equal(actual.independentSAP,false);
+  assert.equal(actual.freezeEligible,false);
+  assert.equal(actual.mergeEligible,false);
+  assert.equal(actual.releaseEligible,false);
+ }
 });
 test('B04-03 R43 a user or LLM-supplied self-attested independent review cannot grant release',async()=>{
  const [closure,sourceAudit]=await Promise.all([inspectCheckedInClosure(),auditCheckedInBatches()]);
