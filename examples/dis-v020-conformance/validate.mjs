@@ -38,6 +38,10 @@ export function declaredTestCases(source){
     // silently reinterpret escape syntax as a different named test.
     return {end:j+1,invalid:true};
    }
+   // A bare quote character in a JS regex must not swallow subsequent
+   // test declarations across a line: normal JS string literals cannot
+   // cross a physical newline (unlike template literals).
+   if(c==='\n'&&quote!==String.fromCharCode(96))return {end:j,invalid:true};
    if(c===quote)return {end:j,value:out,invalid:false};
    out+=c;
   }
