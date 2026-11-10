@@ -1,0 +1,79 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r90-r31-independent-critic-readonly-native-ci",
+  "disVersion": "0.2.0",
+  "scope": "C1_BOUNDARY_ONLY_SOURCE_FIRST_CRITIC_ORIGINAL_DKE_R31_READ_ONLY_NATIVE_UNKNOWN",
+  "status": "SUCCESS",
+  "qualifyingHead": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "888a25297c50c1dec40a56a755cfe3888f06f8bf",
+    "tree": "762affaa466e2a5088a6607ff099cfb899e25fe4"
+  },
+  "source": {
+    "testPath": "examples/dis-v020-native-sdk/c1-r31-critic-native.test.mjs",
+    "testGitBlob": "474e83c51d2c50f97e7486186a72be6c6eb4d97f",
+    "readerPath": "examples/dis-v020-native-sdk/dke-r31-critic-reader.mjs",
+    "readerGitBlob": "0e7dcf1fb500cd0df60eefc8a4ad605293f79ed9",
+    "contractsPath": "packages/contracts/dis-v020.mjs",
+    "contractsGitBlob": "5bb9bf413cdae462a6af0e2678d83a2203c41a14",
+    "mandatoryCiPath": ".woodpecker/dis-v020-integration.yaml",
+    "mandatoryCiGitBlob": "80397b676da9be41a384661d7034832c4f07e2e6"
+  },
+  "originalDke": {
+    "repo": "kaicreator-mm/domain-forge",
+    "r31Head": "4667becfdc9bfb382bbe830150fa7c9af4533ba2",
+    "sourceFirstCriticReviewGitBlob": "10cc8aeade4b9019105490c08995aa7496e093f4",
+    "sourceFirstCriticReceiptGitBlob": "cfda311e2606fcf40dbd914145f5f38d413939a9",
+    "originalTallyGraphGitBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+    "reviewerScope": "SOURCE_FIRST_CONTEXT_NOT_INDEPENDENT_AUTHENTICATED_DOMAIN_OWNER",
+    "boundedSourceV8": "29/29",
+    "actualOwnerReviewDecision": "NOT_RUN",
+    "sapQualified": 0
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "success",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2408/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "success",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2408/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "success",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2408/3"
+    }
+  ],
+  "verifiedBoundaries": [
+    "Native DIS AOT→SDK→KDP source-selected C1 source-first review Reader is mandatory in Woodpecker native command; report and receipt are the exact original DKE Git blobs.",
+    "Two original CS2023 scoped-curriculum Claims and author-derived NIST thematic relation remain typed UNKNOWN, without accountable Owner Decision/SAP/Effects.",
+    "One exact source-first R31 Markdown reviewer report was allowlisted by full original repo/commit/path/Git Blob as DATA only; forged arbitrary Markdown and executable LOCAL binding are denied.",
+    "Prior R87/R88/R89 native failures are historical and not reinterpreted as PASS; original current R90 #2408 three required statuses are all SUCCESS."
+  ],
+  "limitations": [
+    "Original Woodpecker raw job logs are not independently extracted; exact-SHA CI statuses and mandatory source command were verified on GitHub.",
+    "Native code execution and structural provenance do not independently qualify curriculum claims, DKE SAP, individual original graph rows, physical Effects or Product Owner approval.",
+    "CORE-002 and CORE-005 remain PARTIAL; C1 needs accountable Producer/Owner ReviewDecision and exact source-scoped semantics/EV gate.",
+    "CORE-008 remains PARTIAL pending Product/L1 accepted selected Linux/x64/Node scope and genuinely target-specific build/closure; CORE-016 remains PARTIAL until all applicable requirements complete.",
+    "This isolated receipt branch is not the active Draft PR HEAD; source qualification refers only to qualifyingHead, not self-qualification of future commits.",
+    "Optional Profiles 0/4 NOT_RUN, Governance 0/1 NOT_RUN; no Freeze/Merge/Release."
+  ],
+  "accounting": {
+    "boundedRounds": "B01–B22 36/36",
+    "coreVerified": 12,
+    "coreTotal": 16,
+    "corePartialIds": [
+      "DIS020-CORE-002",
+      "DIS020-CORE-005",
+      "DIS020-CORE-008",
+      "DIS020-CORE-016"
+    ],
+    "optionalVerified": 0,
+    "optionalTotal": 4,
+    "governanceVerified": 0,
+    "governanceTotal": 1
+  }
+}
