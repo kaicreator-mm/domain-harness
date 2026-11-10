@@ -14,6 +14,158 @@ const requiredIds=new Set([
  ...Array.from({length:4},(_,i)=>'DIS020-OPT-'+String(i+1).padStart(3,'0')),
  'DIS020-GOV-001'
 ]);
+// R90 independent reviewer: explicit requirement-specific admission witnesses.
+// These bind existing VERIFIED claims to their original selected positive and
+// negative test names and historical receipt IDs. Merely borrowing another
+// requirement's SUCCESS receipt and passing tests cannot grant VERIFIED.
+// Later legitimate coverage is allowed after independently reviewed additions
+// to this version-scoped witness roster; this is NOT a permanent 13/16 cap.
+// The roster is a mechanical source guard, not semantic/Owner attestation.
+const verifiedWitnesses=new Map(Object.entries({
+  "DIS020-CORE-001": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "native Contracts + canonical BUILD select 4 heterogeneous domains and explicit global semantics"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "actual Runx Element cannot silently import Tally source as its LOCAL stateful implementation"
+    }
+  },
+  "DIS020-CORE-003": {
+    "receiptId": "r14-d01-ci-recovered",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "R11 typed Function I/O and provenance preserve original Tally UNKNOWN advisory semantics"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "R11 refuses malformed Function output rather than claiming a typed successful outcome"
+    }
+  },
+  "DIS020-CORE-004": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "native public SDK loads actual selected KDP, initializes one Business and executes admitted orders Intent"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule"
+    }
+  },
+  "DIS020-CORE-006": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "Runx native stateful observer is not reclassified as a Business or execution lease"
+    },
+    "negative": {
+      "path": "examples/dis-v020-cross-project/consumer.test.mjs",
+      "case": "Runx: presence observation cannot be treated as a fresh lease or execution permit"
+    }
+  },
+  "DIS020-CORE-007": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-cross-project/selected-build.test.mjs",
+      "case": "R8 canonical BUILD selects byte-locked Tally and xDownload real Business packages"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "installed independent digest catches altered but rehashed and internally valid AOT semantics"
+    }
+  },
+  "DIS020-CORE-008": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs",
+      "case": "AOT target drift fails closed"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+      "case": "B02-01 R35 install refuses tampered selected module bytes or unbound source before KDP boot"
+    }
+  },
+  "DIS020-CORE-009": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "native public SDK loads actual selected KDP, initializes one Business and executes admitted orders Intent"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "native SDK Business App Init refusal blocks every Function without exposing a facade"
+    }
+  },
+  "DIS020-CORE-010": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "Tally actual Task evidence Function stays OBSERVATION, never mints Task Claim or authorization"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "native SDK stop closes all Function ingress, including stateful LOCAL functions"
+    }
+  },
+  "DIS020-CORE-011": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "native SDK DEGRADED explicitly disables absent optional Tally Function without weakening mandatory KDP"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "native SDK refuses silent optional Function omission or optional Business App Init"
+    }
+  },
+  "DIS020-CORE-012": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-sdk-integration/test.mjs",
+      "case": "trusted K view allows a real bounded temporary-file effect"
+    },
+    "negative": {
+      "path": "examples/dis-v020-sdk-integration/test.mjs",
+      "case": "after dispatch error is UNKNOWN, not pre-handler refusal"
+    }
+  },
+  "DIS020-CORE-013": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs",
+      "case": "physical SQLite Journal survives close and a real second Node process without duplicated Effects"
+    },
+    "negative": {
+      "path": "examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs",
+      "case": "untrusted persisted Projection cannot restore physical KDP Journal with wrong installed digest"
+    }
+  },
+  "DIS020-CORE-014": {
+    "receiptId": "r10-ci-recovery",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "Chat, Form and CLI share native progressive clarification without triggering xDownload Effect"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "AOT refuses interaction with KDP_INTENT or governed Effect reclassification"
+    }
+  },
+  "DIS020-CORE-015": {
+    "receiptId": "r9.5-baseline",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "xDownload original policy is exposed as knowledge without providing direct acquisition authority"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "case": "native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule"
+    }
+  }
+}));
 const sha=/^[a-f0-9]{40}$/;
 const pathOk=p=>typeof p==='string'&&!!p&&!p.startsWith('/')&&!p.split('/').includes('..');
 const fail=(code)=>{throw Object.assign(new Error(code),{code})};
@@ -57,6 +209,27 @@ export function declaredTestCases(source){
   }
   if(isQuote(source[i])){
    const lit=quoted(i);i=lit?lit.end:source.length;continue;
+  }
+  // Regex source is NOT an executable test() call: /test('forged',)/ is
+  // a valid regex and previously fabricated a named test in this scanner.
+  // Slash-as-regex positions are conservative; a real CI run remains the
+  // ultimate execution check, not textual discovery alone.
+  if(source[i]==='/'){
+   const before=source.slice(0,i).trimEnd();
+   const prev=before.at(-1);
+   if((prev&&'=([{,:;!?&|'.includes(prev))||/\\b(?:return|throw|yield|case)\\s*$/.test(before)){
+    let inClass=false,escaped=false,j=i+1;
+    for(;j<source.length;j++){
+     const c=source[j];
+     if(c==='\\n')break;
+     if(escaped){escaped=false;continue;}
+     if(c==='\\\\'){escaped=true;continue;}
+     if(c==='['){inClass=true;continue;}
+     if(c===']'){inClass=false;continue;}
+     if(c==='/'&&!inClass){i=j+1;break;}
+    }
+    if(i===j+1)continue;
+   }
   }
   if(source.startsWith('test',i)&&!isIdentifier(source[i-1])&&
      source[i-1]!=='.'&&!isIdentifier(source[i+4])){
@@ -116,6 +289,13 @@ export async function validateVersionMatrix(matrix,receipts){
    if(!declaredTestCache.get(e.path).has(e.case))fail('MATRIX_CASE_NOT_FOUND');
   }
   if(r.state==='VERIFIED'&&(!r.positive.length||!r.negative.length||!r.receiptIds.length))fail('MATRIX_UNSUPPORTED_VERIFIED');
+  if(r.state==='VERIFIED'){
+   const w=verifiedWitnesses.get(r.id);
+   const anchored=(rows,anchor)=>rows.some(x=>x.path===anchor.path&&x.case===anchor.case);
+   if(!w||!r.receiptIds.includes(w.receiptId)||
+      !anchored(r.positive,w.positive)||!anchored(r.negative,w.negative))
+    fail('MATRIX_VERIFIED_WITNESS_MISMATCH');
+  }
   if(r.state==='NOT_RUN'&&(r.positive.length||r.negative.length||r.receiptIds.length))fail('MATRIX_UNRUN_HAS_EVIDENCE');
   if(r.state==='OUT_OF_SCOPE'&&!/^https:\/\/github\.com\/kaicreator-mm\/domain-harness\/issues\/\d+$/.test(r.decisionUrl??''))fail('MATRIX_SCOPE_DECISION_MISSING');
   for(const rid of r.receiptIds){
