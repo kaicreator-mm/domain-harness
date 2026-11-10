@@ -22,7 +22,7 @@
       "globalRoundId": "R67",
       "status": "CI_PENDING",
       "testPath": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
-      "testGitBlob": "84b38dad5e56b27239b61b563c7d864c8c345433",
+      "testGitBlob": "f72980e5b953e2fc9e2cafcd785133ee454aacca",
       "originalSourceHead": "5258d1412c16e72ae4a4b23585df0fd482e1c061",
       "sourceHead": null,
       "checks": [],
@@ -36,6 +36,7 @@
   "limitations": [
     "All historical source Git Blobs/CI URLs are stored versioned evidence, not a live reexecution of every historical code snapshot or independent semantic SAP.",
     "B18 original R0 source vs R1 qualifying test origin has verified separate failure history; do not collapse, relabel or auto-inherit an R0 PASS.",
-    "CORE-016 remains PARTIAL until all applicable Core MUSTs are independently and source-first qualified; no Freeze, Effect, merge or release."
+    "CORE-016 remains PARTIAL until all applicable Core MUSTs are independently and source-first qualified; no Freeze, Effect, merge or release.",
+    "R67 preflight R1: B20 finalized original test source requires both recorded original failure and final exact test-blob success; not the distinct B18 two-failure R0/R1 lineage."
   ]
 }

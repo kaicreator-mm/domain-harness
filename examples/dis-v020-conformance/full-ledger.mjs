@@ -36,15 +36,33 @@ export function validateFullRound({batch,manifest,entry,round,receipt,sourceText
  // The two identities are acceptable ONLY with byte-specific R0->R1 failure
  // history in BOTH independently versioned round and manifest records.
  const repairedTestOrigin=round.originCommit!==identity;
- if(repairedTestOrigin&&!(
-   sha.test(identity)&&sha.test(round.originCommit)&&
+ if(repairedTestOrigin){
+  // R64: original R0 and selected R1 test origins are both stored as genuine
+  // failed runs in both independent machine records.
+  const r64VersionedHistory=sha.test(identity)&&sha.test(round.originCommit)&&
    entry.originalR0SourceHead===identity&&round.originalR0SourceHead===identity&&
    Array.isArray(entry.history)&&Array.isArray(round.history)&&
    [entry.history,round.history].every(history=>
      history.some(h=>h.sourceHead===identity&&h.native==='FAILURE')&&
      history.some(h=>h.sourceHead===round.originCommit&&
-       h.testBlob===round.testGitBlob&&h.native==='FAILURE'))
- ))fail('FULL_LEDGER_REPAIR_LINEAGE_INVALID');
+       h.testBlob===round.testGitBlob&&h.native==='FAILURE'));
+  // R66: the first trial source predates the final recompiled native test.
+  // Accept final source as test origin ONLY when a versioned failed attempt
+  // binds the older identity and a separate explicit source-exact SUCCESS
+  // record binds the final test blob and manifest's qualified source.
+  const r66FinalizedOrigin=sha.test(identity)&&sha.test(round.originCommit)&&
+   round.originCommit===round.sourceHead&&
+   entry.qualificationHead===round.sourceHead&&
+   manifest.qualificationHead===round.sourceHead&&
+   Array.isArray(round.history)&&
+   round.history.some(h=>h.sourceHead===identity&&
+     h.status==='NOT_QUALIFIED'&&
+     ['ERROR','FAILURE'].includes(h.integration??h.native))&&
+   round.history.some(h=>h.sourceHead===round.sourceHead&&
+     h.testBlob===round.testGitBlob&&h.native==='SUCCESS');
+  if(!r64VersionedHistory&&!r66FinalizedOrigin)
+   fail('FULL_LEDGER_REPAIR_LINEAGE_INVALID');
+ }
  // R63/R64 originally used qualificationTree (not finalTree). Do not invent
  // a later Git tree: where both names are present, require byte agreement.
  const roundTree=round.finalTree??round.qualificationTree;

@@ -6,7 +6,7 @@
   "status": "CI_PENDING",
   "originCommit": "5258d1412c16e72ae4a4b23585df0fd482e1c061",
   "testPath": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
-  "testGitBlob": "84b38dad5e56b27239b61b563c7d864c8c345433",
+  "testGitBlob": "f72980e5b953e2fc9e2cafcd785133ee454aacca",
   "receipt": "receipts/r67-b21-34-round-full-ledger-ci.json",
   "sourceHead": null,
   "checks": [],
@@ -16,12 +16,21 @@
   "negative": [
     "R67 R64 R0->R1 repaired test origin cannot be forged without BOTH historical failure pedigrees",
     "R67 R63 qualificationTree aliases finalTree only when actual source SHA and Tree agree",
-    "R67 R66 newest original B20 proof cannot inherit mixed CI, source or Matrix link"
+    "R67 R66 newest original B20 proof cannot inherit mixed CI, source or Matrix link",
+    "Forged B20 final receipt/origin or removed original failed B20 baseline cannot inherit actual #2364 CI."
   ],
   "limits": [
     "All historical source Git Blobs/CI URLs are stored versioned evidence, not a live reexecution of every historical code snapshot or independent semantic SAP.",
     "B18 original R0 source vs R1 qualifying test origin has verified separate failure history; do not collapse, relabel or auto-inherit an R0 PASS.",
-    "CORE-016 remains PARTIAL until all applicable Core MUSTs are independently and source-first qualified; no Freeze, Effect, merge or release."
+    "CORE-016 remains PARTIAL until all applicable Core MUSTs are independently and source-first qualified; no Freeze, Effect, merge or release.",
+    "R67 R0 source lacked a separate B20-finalized provenance form; R1 adds strict dual-history original FAIL and final success identity checks."
   ],
-  "history": []
+  "history": [
+    {
+      "sourceHead": "83fb495d2412237b4efddb55987fcb230729d318",
+      "testBlob": "84b38dad5e56b27239b61b563c7d864c8c345433",
+      "status": "SUPERSEDED_BEFORE_NATIVE_QUALIFICATION",
+      "finding": "R0 auditor excluded B20 finalized native test origin despite original R66 failure and final success. R1 now explicitly enforces both without weakening R64 provenance."
+    }
+  ]
 }

@@ -54,6 +54,19 @@ test('R67 R63 qualificationTree aliases finalTree only when actual source SHA an
  const p=clone(r);p.round.qualificationTree='0'.repeat(40);
  assert.throws(()=>validateFullRound(p),reject('FULL_LEDGER_RECEIPT_SOURCE_DRIFT'));
 });
+test('R67 R66 finalized origin is accepted only with original FAILURE and final identical test-blob SUCCESS',async()=>{
+ const x=await roundFixture('B20');
+ assert.equal(validateFullRound(x).pipeline,'2364');
+ assert.notEqual(x.entry.originalSourceHead,x.round.originCommit);
+ const noFailure=clone(x);
+ noFailure.round.history=noFailure.round.history.filter(h=>h.sourceHead!==x.entry.originalSourceHead);
+ assert.throws(()=>validateFullRound(noFailure),reject('FULL_LEDGER_REPAIR_LINEAGE_INVALID'));
+ const noSuccess=clone(x);
+ noSuccess.round.history=noSuccess.round.history.filter(h=>h.sourceHead!==x.round.originCommit);
+ assert.throws(()=>validateFullRound(noSuccess),reject('FULL_LEDGER_REPAIR_LINEAGE_INVALID'));
+ const swapped=clone(x);swapped.entry.qualificationHead='f'.repeat(40);
+ assert.throws(()=>validateFullRound(swapped),reject('FULL_LEDGER_REPAIR_LINEAGE_INVALID'));
+});
 test('R67 R66 newest original B20 proof cannot inherit mixed CI, source or Matrix link',async()=>{
  const r=await roundFixture('B20');
  assert.equal(validateFullRound(r).pipeline,'2364');
