@@ -1,0 +1,83 @@
+{
+  "schema": "dis.v020.dke-ev16-r3-readonly-consumer-preflight/1",
+  "date": "2026-11-11",
+  "masterIssue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+  "upstream": "https://github.com/kaicreator-mm/domain-forge/issues/209",
+  "upstreamExactHead": "5659d8f56a53ef63981fe93a264cad6c453a94ed",
+  "experiment": {
+    "repository": "kaicreator-mm/domain-harness",
+    "branch": "experiment/dis-v020-dke-ev16-r3-consumer-r0",
+    "sourceHead": "4d8a75e06c62b29b0d07d73b8ea6bbc4815809e5",
+    "originalPrHead": "21a130bfd34431de74e1ee20853cc538d9b0bbf7",
+    "files": [
+      {
+        "role": "receiptCopy",
+        "path": "examples/dis-v020-native-sdk/fixtures/dke-ev16-r3-original-source-repair-receipt.json",
+        "gitBlob": "844a16219e31cc994d4d958e565879cb5e0c6872"
+      },
+      {
+        "role": "routeCopy",
+        "path": "examples/dis-v020-native-sdk/fixtures/dke-r31-r7-owner-route.json",
+        "gitBlob": "6abb5fb59843845e594aedd749f78cbbe0efeea7"
+      },
+      {
+        "role": "reader",
+        "path": "examples/dis-v020-native-sdk/dke-ev16-r3-reader.mjs",
+        "gitBlob": "43ea2bc2b2bee887d03af9167b5356cd89f9ce78"
+      },
+      {
+        "role": "nativeTest",
+        "path": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+        "gitBlob": "cf2ee229e300f001261a2b574506854d828098bc"
+      },
+      {
+        "role": "ci",
+        "path": ".woodpecker/dis-v020-integration.yaml",
+        "gitBlob": "f683db04cbf82c608b029ce4d9b56cdef10bc1e2"
+      }
+    ]
+  },
+  "actualOriginalSourceCopy": {
+    "r3OriginalGitBlob": "844a16219e31cc994d4d958e565879cb5e0c6872",
+    "r7OriginalGitBlob": "6abb5fb59843845e594aedd749f78cbbe0efeea7",
+    "r3CopyGitBlob": "844a16219e31cc994d4d958e565879cb5e0c6872",
+    "r7CopyGitBlob": "6abb5fb59843845e594aedd749f78cbbe0efeea7",
+    "bytesExactByGitBlob": true
+  },
+  "execution": {
+    "environment": "CONNECTED_HOSTED_V8_GITHUB_READBACK_READER_SCOPE",
+    "sourceReaderChecks": 9,
+    "sourceReaderPassed": 9,
+    "sourceReaderFailed": 0,
+    "selectedSubjects": [
+      "EV16:D02+D04",
+      "se:REL-TVV-0020",
+      "se:DM-REQ-FUNCTIONAL-DOC-METHOD"
+    ],
+    "expectedSelectedOutcome": "TYPED_UNKNOWN_NO_SAP_NO_EFFECT",
+    "negativeSpoofedPayloads": 6,
+    "originalReaderNativeNode": "NOT_RUN",
+    "testSourceHostedSyntaxParse": "PASS_WITH_MODULE_IMPORTS_REMOVED_ONLY",
+    "originalFullAotSdkKdpNative": "NOT_RUN",
+    "woodpecker": "NOT_RUN_EXPERIMENT_BRANCH_NO_PR_CI",
+    "branchCIRegistered": true
+  },
+  "qualifications": {
+    "disCore": "13/16_VERIFIED_AT_ACTIVE_PR_CANDIDATE",
+    "newCorePromotion": false,
+    "dkeFrozenR8": "0/53",
+    "ownerReview": "NOT_ATTESTED",
+    "qualifiedSap": 0,
+    "authorizedEffects": 0,
+    "fullEv16Cell": "NOT_RUN",
+    "release": false,
+    "freeze": false,
+    "merge": false
+  },
+  "next": [
+    "Resolve active Draft PR #1497 exact current CI FAILURE from raw first failing Woodpecker log; no speculation or inherited CI",
+    "After passing existing PR gate, source-review/merge or port exact isolated experiment as one atomic change in #1497 (existing PR, no new Issue/PR)",
+    "Run new native c1-ev16-r3-source-consumer.test.mjs on exact HEAD with all 3 Woodpecker contexts and actual typed results",
+    "Promote nothing from Hosted V8 without actual AOT/SDK/KDP native CI, independent reviewer and external semantic Source Owner gates"
+  ]
+}
