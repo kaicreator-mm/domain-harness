@@ -14,6 +14,7 @@ test('B04-03 R43 source-real C4 ledger says no auto Freeze Merge or Release with
  assert.equal(r.freezeEligible,false);
  assert.equal(r.mergeEligible,false);
  assert.equal(r.independentSAP,false);
+ assert.equal(r.unqualifiedHostTarget,false);
  assert.equal(r.blockers.length,r.partialCore);
  assert.equal(r.blockers.every(x=>x.structuralEvidenceExists&&x.receiptCount>0),true);
  assert.ok(r.priorTestBlobDriftCount>=1);

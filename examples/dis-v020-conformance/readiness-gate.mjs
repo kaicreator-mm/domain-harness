@@ -43,7 +43,7 @@ export function decideB04Readiness({closure,sourceAudit,claimedApproval=undefine
   priorTestBlobDriftCount:sourceAudit.currentBlobDrifts.length,
   releaseEligible:false,freezeEligible:false,mergeEligible:false,
   independentSourceOwnerAccepted:false,independentSAP:false,
-  unqualifiedHostTarget:true,
+  unqualifiedHostTarget:closure.remaining.some(x=>x.id==='DIS020-CORE-008'),
   blockers,
   next:[GROUPS.C1,GROUPS.C3,GROUPS.C2,GROUPS.C4,
    'Fresh independent exact-SHA C5 Product/L1/L2 review after C4 full coverage'],

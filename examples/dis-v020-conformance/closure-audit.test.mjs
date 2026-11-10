@@ -87,8 +87,10 @@ test('B04-02 R42 fake SAP approval or historical reviewer byte substitution is r
 test('B04-02 R42 Core semantic or Target promotion without actual owner and approved scope is rejected',()=>{
  const r=clone(baseline);r.matrix.requirements.find(x=>x.id==='DIS020-CORE-002').state='VERIFIED';
  assert.throws(()=>inspectClosure(r),reject('CLOSURE_DAG_GAP'));
- const t=clone(baseline);t.matrix.requirements.find(x=>x.id==='DIS020-CORE-008').state='VERIFIED';
- assert.throws(()=>inspectClosure(t),reject('CLOSURE_DAG_GAP'));
+ const t=clone(baseline);t.plan.currentC3.productAcceptanceUrl='https://github.com/forged/owner';
+ assert.throws(()=>inspectClosure(t),reject('CLOSURE_UNQUALIFIED_TARGET_PROMOTION'));
+ const u=clone(baseline);u.plan.currentC3.appliesTo.platform='windows';
+ assert.throws(()=>inspectClosure(u),reject('CLOSURE_UNQUALIFIED_TARGET_PROMOTION'));
 });
 test('B04-02 R42 skipped dependency, fake governance and incomplete prior round audit fail closed',()=>{
  const r=clone(baseline);r.plan.coreAndGovernance[0].requirementIds.pop();

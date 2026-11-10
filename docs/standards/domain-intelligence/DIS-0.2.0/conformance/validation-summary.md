@@ -6,11 +6,17 @@
 
 | Scope | VERIFIED | PARTIAL | NOT_RUN | OUT_OF_SCOPE | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Core | 12 | 4 | 0 | 0 | 16 |
+| Core | 13 | 3 | 0 | 0 | 16 |
 | Optional profiles | 0 | 0 | 4 | 0 | 4 |
 | Governance | 0 | 0 | 1 | 0 | 1 |
 
-**Current status: PARTIAL — Core 12/16 VERIFIED (75%), four PARTIAL (CORE-002/005/008/016).** CORE-008 evidence is complete for the Product-approved linux/x64/node Demo Target but stays PARTIAL until Product/L1 accepts the completed fresh independent exact-SHA review and the single Writer re-applies the scoped promotion. CORE-002/005 still require independent source-first Element and semantic SAP ownership; CORE-016 still requires full version closeout. All four optional profiles remain NOT_RUN pending explicit applicability/enablement decision; governance GOV-001 is NOT_RUN (independent exact-SHA review and Product/L1/L2 Freeze). The historical chronology below intentionally retains its original per-round numbers; it must never be mistaken for the current top-line Matrix tally.
+**Current status: PARTIAL — Core 13/16 VERIFIED (81.25%), three PARTIAL (CORE-002/005/016).** CORE-008 is VERIFIED **only** for Product-approved linux/x64/node bounded Demo: the requester accepted the completed independent C3 engineering review at [Product #1496 comment 6782273293](https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293); source R86 with #2415/1–3 exact-SHA CI and #2429/1–3 nonpromoted baseline remain historical. The new promotion commit requires its own exact-SHA CI before describing **13/16 as newly CI-qualified**. CORE-002/005 still need attributable original Tally Source Owner decisions and qualified independent semantic Oracle/SAP; CORE-016 waits for the remaining Core. All optional profiles are NOT_RUN and GOV-001 NOT_RUN. R85/R86 below are immutable **pre-acceptance history** (not current state).
+
+### R92 — C3 independent engineering review accepted, scoped promotion (2026-11-11)
+
+- Exact requester decision: [Product #1496 #6782273293](https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293); prior Target scope [#6777762870](https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6777762870) unchanged. The connected GitHub identity transcribes user chat authorization, not a separate authenticated source-owner signature.
+- Reviewed source R86, #2415/1–3 3/3 SUCCESS; current non-promoted baseline `a406927e9408424a09776e3896c1aa7ed1d0e9ef` #2429/1–3 3/3 SUCCESS. Real positive + negatives for selected BUILD/installer/source-pins/real Linux Host/KDP are preserved unchanged.
+- Matrix `DIS020-CORE-008` is now scoped VERIFIED with no Effect or SAP; C3 removed from remaining Core closure DAG. Other Targets unqualified; the new promotion HEAD CI and fresh provenance check remain an independent gate. No L2 Freeze, merge or release.
 
 ### R85/R86 C3 fresh review — promotion prepared, pending Product/L1 acceptance (2026-11-11)
 

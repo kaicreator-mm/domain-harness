@@ -48,6 +48,16 @@ export function inspectClosure({matrix,plan,review,proposal,reviewBlob,proposalB
   fail('CLOSURE_DAG_GAP');
  if(['DIS020-CORE-002','DIS020-CORE-005'].some(id=>core.find(x=>x.id===id).state==='VERIFIED'))
   fail('CLOSURE_UNQUALIFIED_SEMANTIC_PROMOTION');
+ // Product #1496 explicitly accepted R86 only for the prior linux/x64/node Demo.
+ // Require this exact decision marker and bounded scope for a VERIFIED C3 row.
+ const c3=plan.currentC3,target=c3?.appliesTo;
+ if(core.find(x=>x.id==='DIS020-CORE-008').state==='VERIFIED'&&
+   (c3?.status!=='VERIFIED_PRODUCT_ACCEPTED_LINUX_X64_NODE'||
+    c3?.productAcceptanceUrl!=='https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293'||
+    target?.platform!=='linux'||target?.architecture!=='x64'||target?.runtime!=='node'||
+    !c3?.freshReviewReceiptId||!core.find(x=>x.id==='DIS020-CORE-008').receiptIds.includes(c3.freshReviewReceiptId)||
+    plan.blockers.some(x=>x.blocks?.includes('DIS020-CORE-008'))))
+  fail('CLOSURE_UNQUALIFIED_TARGET_PROMOTION');
  if(plan.blockers.some(x=>x.code==='TARGET_APPLICABILITY_NOT_APPROVED')&&
     core.find(x=>x.id==='DIS020-CORE-008').state==='VERIFIED')
   fail('CLOSURE_UNQUALIFIED_TARGET_PROMOTION');

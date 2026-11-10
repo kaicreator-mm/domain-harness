@@ -65,6 +65,22 @@ test('R90 version matrix requires the exact 16 Core, 4 Optional and 1 Governance
  await assert.rejects(validateVersionMatrix(duplicate,{}),
   rejects('MATRIX_DUP_OR_INVALID_ID'));
 });
+test('R92 C3 accepted linux/x64/node Target is the sole newly promoted Core while C1/C4 remain unresolved',async()=>{
+ const result=await validateCheckedInMatrix();
+ const row=matrix.requirements.find(x=>x.id==='DIS020-CORE-008');
+ assert.equal(row.state,'VERIFIED');
+ assert.ok(row.receiptIds.includes('r86-c3-fresh-exact-sha-review-ci'));
+ assert.equal(result.tallies['core:VERIFIED'],13);
+ assert.equal(result.tallies['core:PARTIAL'],3);
+ const plan=JSON.parse(await readFile(new URL('closure-plan-r28.json',base),'utf8'));
+ assert.equal(plan.currentC3.productAcceptanceUrl,'https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293');
+ assert.deepEqual(plan.currentC3.appliesTo,{platform:'linux',architecture:'x64',runtime:'node'});
+ assert.deepEqual(plan.coreAndGovernance.find(g=>g.group==='C3').requirementIds,[]);
+ assert.equal(plan.blockers.some(x=>x.blocks?.includes('DIS020-CORE-008')),false);
+ for(const id of ['002','005','016'])
+  assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-'+id).state,'PARTIAL');
+ assert.equal(matrix.requirements.filter(x=>x.profile==='optional-profile').every(x=>x.state==='NOT_RUN'),true);
+});
 test('machine validator rejects a VERIFIED requirement without positive or negative proof',async()=>{
  const v=clone(matrix);v.requirements[0].negative=[];
  await assert.rejects(validateVersionMatrix(v,{'r9.5-baseline':baseline}),rejects('MATRIX_UNSUPPORTED_VERIFIED'));
