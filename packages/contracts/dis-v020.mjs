@@ -252,17 +252,31 @@ function valueMatchesField(type,value,depth=0){
  return true;
 }
 function valueMatchesShape(shape,value,depth=0){
- if(!record(value)||depth>MAX_SHAPE_DEPTH)return false;
- const fields=shape.fields??{},optional=new Set(shape.optional??[]);
- for(const [name,type] of Object.entries(fields)){
-  if(!Object.hasOwn(value,name)){
-   if(optional.has(name))continue;
-   return false;
+ // The public SDK checks input before calling a selected LOCAL Reader.
+ // Never evaluate caller getters during that preflight: capture a bounded
+ // own-data descriptor snapshot once, just as the downstream Reader does.
+ try{
+  if(!record(value)||depth>MAX_SHAPE_DEPTH)return false;
+  const fields=shape.fields??{},optional=new Set(shape.optional??[]);
+  const names=Reflect.ownKeys(value);
+  if(names.length>MAX||names.some(name=>typeof name!=='string'))return false;
+  const descriptors=Object.getOwnPropertyDescriptors(value);
+  if(names.some(name=>!Object.hasOwn(descriptors,name)||
+     !Object.hasOwn(descriptors[name],'value')))return false;
+  for(const [name,type] of Object.entries(fields)){
+   if(!Object.hasOwn(descriptors,name)){
+    if(optional.has(name))continue;
+    return false;
+   }
+   if(!valueMatchesField(type,descriptors[name].value,depth+1))return false;
   }
-  if(!valueMatchesField(type,value[name],depth+1))return false;
+  return shape.additionalProperties!==false||
+   names.every(name=>Object.hasOwn(fields,name));
+ }catch{
+  // A hostile Proxy trap is invalid input, not a raw exception reaching the
+  // selected Function; valid data still has to pass the Reader's own gate.
+  return false;
  }
- return shape.additionalProperties!==false||
-  Object.keys(value).every(name=>Object.hasOwn(fields,name));
 }
 const sameFieldType=(a,b)=>typeof a==='string'&&typeof b==='string'?
  a===b:typeof a==='object'&&a!==null&&typeof b==='object'&&b!==null&&
