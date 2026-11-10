@@ -85,6 +85,27 @@ test('machine validator rejects a VERIFIED requirement without positive or negat
  const v=clone(matrix);v.requirements[0].negative=[];
  await assert.rejects(validateVersionMatrix(v,{'r9.5-baseline':baseline}),rejects('MATRIX_UNSUPPORTED_VERIFIED'));
 });
+test('R90 independent: a different requirement cannot borrow a successful receipt and test cases',async()=>{
+ const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async id=>[
+  id,JSON.parse(await readFile(new URL('receipts/'+id+'.json',base),'utf8'))
+ ])));
+ const promoted=clone(matrix);
+ const source=promoted.requirements.find(x=>x.id==='DIS020-CORE-001');
+ const target=promoted.requirements.find(x=>x.id==='DIS020-OPT-001');
+ target.state='VERIFIED';
+ target.positive=clone(source.positive);
+ target.negative=clone(source.negative);
+ target.receiptIds=clone(source.receiptIds);
+ await assert.rejects(validateVersionMatrix(promoted,receipts),
+  rejects('MATRIX_VERIFIED_WITNESS_MISMATCH'));
+ const swapped=clone(matrix);
+ const old=swapped.requirements.find(x=>x.id==='DIS020-CORE-001');
+ const another=swapped.requirements.find(x=>x.id==='DIS020-CORE-004');
+ old.positive=clone(another.positive);
+ old.negative=clone(another.negative);
+ await assert.rejects(validateVersionMatrix(swapped,receipts),
+  rejects('MATRIX_VERIFIED_WITNESS_MISMATCH'));
+});
 test('machine validator rejects a claimed old PASS with a missing or failed receipt',async()=>{
  const receipts={'r9.5-baseline':{...baseline,status:'FAIL'}};
  await assert.rejects(validateVersionMatrix(clone(matrix),receipts),rejects('MATRIX_RECEIPT_INVALID'));
@@ -224,7 +245,7 @@ test('R82 original B22 DKE native source is 3/3 exact SHA qualified and forged C
  assert.throws(()=>validateRoundEvidence({manifest,round,receipt:forged,sourceText,ciFile,matrix}),
   e=>e?.code==='BATCH_CI_RECEIPT_INVALID');
 });
-test('R28 remaining-core closure groups account for seven PARTIAL requirements exactly once',async()=>{
+test('R28 historical closure groups cover still-open requirements without forbidding future full coverage',async()=>{
  const plan=JSON.parse(await readFile(new URL('closure-plan-r28.json',base),'utf8'));
  assert.equal(plan.schema,'dis.v0.2.closure-plan/1');
  assert.equal(plan.version,'0.2.0');
@@ -236,11 +257,18 @@ test('R28 remaining-core closure groups account for seven PARTIAL requirements e
   matrix.requirements.filter(x=>x.profile==='core'&&x.state!=='VERIFIED').length);
  const planned=plan.coreAndGovernance.flatMap(g=>g.requirementIds)
   .filter(x=>x.startsWith('DIS020-CORE-')).sort();
- assert.deepEqual(planned,unfinished);
- assert.equal(new Set(planned).size,unfinished.length);
+ // A historical plan may still list already completed requirements, but
+ // every current gap must appear; no future legitimate VERIFIED outcome
+ // is forced to remain PARTIAL simply to satisfy an R28 baseline.
+ assert.ok(unfinished.every(id=>planned.includes(id)));
+ assert.equal(new Set(planned).size,planned.length);
+ assert.ok(planned.every(id=>matrix.requirements.some(r=>r.id===id&&r.profile==='core')));
  const optional=matrix.requirements.filter(x=>x.profile==='optional-profile'&&x.state==='NOT_RUN')
   .map(x=>x.id).sort();
- assert.deepEqual(plan.optionalProfiles.flatMap(g=>g.requirementIds).sort(),optional);
+ const optionalPlanned=plan.optionalProfiles.flatMap(g=>g.requirementIds).sort();
+ assert.ok(optional.every(id=>optionalPlanned.includes(id)));
+ assert.equal(new Set(optionalPlanned).size,optionalPlanned.length);
+ assert.ok(optionalPlanned.every(id=>matrix.requirements.some(r=>r.id===id&&r.profile==='optional-profile')));
  assert.deepEqual(plan.coreAndGovernance.flatMap(g=>g.requirementIds)
   .filter(x=>x.startsWith('DIS020-GOV-')),['DIS020-GOV-001']);
  assert.equal(plan.baseline.coreVerified,9);
@@ -272,6 +300,9 @@ test('R90 reviewer: declared test evidence rejects substring, comments, strings 
   'genuine node test','genuine node test with suffix'
  ]);
  assert.equal(declared.has('genuine'),false);
+ const regexSpoof=declaredTestCases("const re=/test('regex only',)/; test('actual registered',()=>{});");
+ assert.equal(regexSpoof.has('regex only'),false,'regex literal must not forge a registered test');
+ assert.equal(regexSpoof.has('actual registered'),true);
  assert.equal(declaredTestCases("const re=/'/;"+String.fromCharCode(10)+"test('after regex',()=>{})").has('after regex'),true);
 });
 test('R90 reviewer: future legitimate 100 percent coverage is not blocked by old progress tallies',()=>{
