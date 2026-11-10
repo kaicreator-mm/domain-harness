@@ -147,7 +147,7 @@ function valueMatchesField(type,value,depth=0){
   return type==='number'?typeof value==='number'&&Number.isFinite(value):
     typeof value===type;
  }
- if(type.type==='record')return valueMatchesShape(type,value,depth+1);
+ if(type.type==='record')return valueMatchesShape(type,value,depth);
  if(type.type!=='array'||!Array.isArray(value))return false;
  if(value.length<(type.minItems??0)||value.length>(type.maxItems??MAX))return false;
  for(let i=0;i<value.length;i++){

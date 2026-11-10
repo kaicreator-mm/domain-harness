@@ -78,7 +78,7 @@ test('B20 R66 nested unexpected-key, missing role, wrong array item and forged o
  for(const mutate of mutations){
   const impl={...x.registry,[FN]:{
    ...x.registry[FN],
-   execute:()=>{const p=copy(x.registry[FN].execute());mutate(p);return p}
+   execute:()=>{const p=x.registry[FN].execute();mutate(p);return p}
   }};
   const app=await open(x,impl);
   try{await assert.rejects(app.invoke(FN,{}),deny('DIS_FUNCTION_OUTPUT_INVALID'))}
