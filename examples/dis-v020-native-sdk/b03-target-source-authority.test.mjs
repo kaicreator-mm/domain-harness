@@ -9,6 +9,10 @@ import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
 import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
 import {makeNativeFixture} from './native-fixture.mjs';
 const fixture=makeNativeFixture(),clone=structuredClone,reject=code=>e=>e?.code===code;
+// Like the B05 positives: the linux/x64 selected Target may only really boot on
+// that actual host. Required CI still executes this case on the Linux worker.
+const selectedHost=(process.platform==='win32'?'windows':process.platform)==='linux'&&
+ process.arch==='x64';
 const buildFor=(f,platform)=>{
  const p=clone(f.program);
  p.target={
@@ -56,7 +60,8 @@ test('B03-03 R40 one-model DKE reviewer and synthetic locator repair remain unqu
  // The selected original Tally business is NOT a qualified replacement for
  // a separately accepted DKE Knowledge Graph or a fresh SAP Oracle.
 });
-test('B03-03 R40 targeted native Tally observation never becomes an accepted semantic claim or KDP Effect permit',async()=>{
+test('B03-03 R40 targeted native Tally observation never becomes an accepted semantic claim or KDP Effect permit',async(t)=>{
+ if(!selectedHost)return t.skip('Selected linux/x64 Target cannot boot on this actual host');
  const f=await fixture,a=buildFor(f,'linux');
  const app=await loadDisV020Aot(a,{
   expectedDigest:a.digest,expectedTarget:{platform:'linux',architecture:'x64',runtime:'node'},

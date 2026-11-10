@@ -2,7 +2,7 @@
 
 **权威来源：** [Product/L1 #1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)、[Demo 主 Issue #1499](https://github.com/kaicreator-mm/domain-harness/issues/1499)、[Draft PR #1497](https://github.com/kaicreator-mm/domain-harness/pull/1497)。对应机器计划：[closure-plan-r28.json](closure-plan-r28.json)。
 
-> **R85 最新判定（本文件后文 R28 轮次和阻塞为历史规划）：** Product/L1 #1496 已批准 `linux/x64/node` 为唯一 Demo 必需 Target；B03/B05 #2410 和 #2411 原始三条 Woodpecker 精确 SHA SUCCESS，独立源码审核后 CORE-008 限界 **VERIFIED**。无需跨 OS 源码字节不同；DKE SAP 继续由 C1 CORE-002/005 管理，不阻塞 C3 结构闭包。当前 CORE 13/16 VERIFIED、3 PARTIAL；参阅 [R85 receipt](receipts/r85-c3-core008-source-review.json)、[机器 closure plan](closure-plan-r28.json) 和 [Matrix](matrix.json)。不授权 Freeze/Merge/Release。
+> **R85/R86 最新判定（本文件后文 R28 轮次和阻塞为历史规划）：** Product/L1 #1496 评论 6777762870 已批准 `linux/x64/node` 为唯一 Demo 必需 Target（决策 JSON Blob `7f0d195849647282fad09a53a117b4f3a705b138`）；B03/B05 #2410 与 #2411 原始三条 Woodpecker 精确 SHA 全 SUCCESS，独立源码复核确认闭包/安装/Host/来源 Pin 链无 P0 缺陷。但按该接受的原文「CORE-008 remains PARTIAL until remaining engineering evidence and review close」，完成的新鲜独立审查尚待 Product/L1 接受，故 CORE-008 **保持 PARTIAL**；中间态 VERIFIED（`ebaae7de`，#2412-#2414 三轮 CI 因 r85 未入顶层 receipts 清单全红）已按规则回退，全部证据与负例锚点保留。跨 OS 字节不同仍非必需；DKE SAP 继续由 C1 CORE-002/005 管理。当前 CORE 12/16 VERIFIED、4 PARTIAL；参阅 [R85 receipt](receipts/r85-c3-core008-source-review.json)、[机器 closure plan](closure-plan-r28.json) 和 [Matrix](matrix.json)。不授权 Freeze/Merge/Release。
 
 ## 本轮验证结果与收据
 

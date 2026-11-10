@@ -61,25 +61,3 @@ test('B04-03 R43 forged C4 finalization and incomplete historical exact-SHA audi
  assert.throws(()=>decideB04Readiness({closure:original,sourceAudit:absent}),
   reject('READINESS_ROUND_AUDIT_INCOMPLETE'));
 });
-
-test('R85 accepted scoped Target disappears from active readiness blockers, but SAP and Freeze remain blocked',async()=>{
- const r=await inspectCheckedInReadiness();
- assert.equal(r.verifiedCore,13);
- assert.equal(r.partialCore,3);
- assert.equal(r.unqualifiedHostTarget,false);
- assert.equal(r.blockers.some(x=>x.id==='DIS020-CORE-008'),false);
- assert.equal(r.next.some(x=>x.includes('Target implementation')),false);
- assert.equal(r.independentSAP,false);
- assert.equal(r.freezeEligible,false);
- assert.equal(r.releaseEligible,false);
- const [closure,sourceAudit]=await Promise.all([inspectCheckedInClosure(),auditCheckedInBatches()]);
- const hypothetical=clone(closure);
- hypothetical.remaining.push({
-  id:'DIS020-CORE-008',group:'C3',linkedReceipts:1,positiveCases:1,
-  negativeCases:1,status:'PARTIAL',title:'historical unapproved C3'
- });
- hypothetical.verifiedCore--;hypothetical.partialCore++;
- const blocked=decideB04Readiness({closure:hypothetical,sourceAudit});
- assert.equal(blocked.unqualifiedHostTarget,true);
- assert.equal(blocked.blockers.some(x=>x.id==='DIS020-CORE-008'),true);
-});

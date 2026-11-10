@@ -62,7 +62,8 @@
     "r67-b21-34-round-full-ledger-ci",
     "r79-core003-public-functions-semantic-ci",
     "r82-b22-r33-source-native-ci",
-    "r84-c3-selected-closure-ci"
+    "r84-c3-selected-closure-ci",
+    "r85-c3-core008-source-review"
   ],
   "requirements": [
     {
@@ -983,7 +984,7 @@
       "id": "DIS020-CORE-008",
       "title": "Target-specific package dependency and implementation selection",
       "profile": "core",
-      "state": "VERIFIED",
+      "state": "PARTIAL",
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "5"
@@ -1126,7 +1127,7 @@
         "r84-c3-selected-closure-ci",
         "r85-c3-core008-source-review"
       ],
-      "note": "R85 C3 CORE-008 VERIFIED **only** for Product #1496 explicitly accepted applicable DIS v0.2.0 Demo Target linux/x64/node (Issue comment #6777762870; original decision Git Blob 7f0d195849647282fad09a53a117b4f3a705b138). B03 R38–40 and B05 R44–46 positive/negative native cases select original Tally/xDownload/Runx canonical BUILD module digest roster; AOT Package, Function, declared Resource/Source/Dependency closure, independently pinned entire consumed original-source set, installer-selected Target, actual Linux/x64 Node Host and real KDP/SDK Business observation (OBSERVATION/UNKNOWN/NONE). Cases reject forged/missing module SHA or list, unselected dependency, wrong actual OS/arch, absent/forged source pin, unauthorized SAP/Effect. Qualifying code HEAD 1c9826bcfecdbd83c57a466e624eec4defb29604 Woodpecker #2410/1–3 SUCCESS; unchanged code at docs HEAD 989a5858ac1393bdecbf20f0344df9c56a889fa6 #2411/1–3 SUCCESS; R84 historical receipt, R85 scoped independent source review. Different per-OS source bytes are NOT mandatory: portable implementations can be byte-identical so long as selected Target/manifest/installer and actual host bind. Windows/Android/other Targets are not required or qualified in this bounded Demo; they are not universally OUT_OF_SCOPE in future products. This is only C3 structural Target/Package/Function/Source closure, not DKE SAP or business truth (separate C1 CORE-002/005), malicious-native sandbox, hardware attestation, KDP Effect grant, all Core MUSTs, L2 Freeze, Merge or Release."
+      "note": "R86 C3 fresh independent exact-SHA review (2026-11-11, tag DIS1499_C3_FRESH_REVIEW_REPAIR_RESULT) — CORE-008 stays PARTIAL, by rule and by the Product acceptance's own terms. Product/L1 #1496 comment 6777762870 accepted linux/x64/node as the ONLY required applicable Target for this bounded Demo (versioned decision decisions/C3_USER_ACCEPTED_LINUX_X64_NODE_2026-11-11.json, Git Blob 7f0d195849647282fad09a53a117b4f3a705b138, commit 7ada7ae8a73457dfec9937b40ffd4eea4a037b32; reconciliation record decisions/C3_R4_APPROVED_TARGET_R84_CI_RECONCILIATION.json, Blob 183b85359722232ba1336da38f80e452115d1867). Portable byte-identical module sources across Target labels are explicitly allowed and are not per-OS qualification fiction: qualification binds selected target == independent installer target == real process host in one native KDP consumption with fail-closed forged-roster/host/source-pin negatives (B03 R38-R40 + B05 R44-R46; qualifying code HEAD 1c9826bcfecdbd83c57a466e624eec4defb29604 Woodpecker #2410/1-3 SUCCESS; docs HEAD 989a5858ac1393bdecbf20f0344df9c56a889fa6 #2411/1-3 SUCCESS; receipt r85-c3-core008-source-review records the R85 scoped review round). The fresh independent review re-verified the original R1 s5/R3 s3 specs, #1496 Product record, BUILD/Contracts/Microkernel source, B03/B05 tests and CI #2409-#2414 step logs: no P0 product defect in the closure/installer/host/source-pin chain; the r85 receipt was missing from the top-level receipts inventory (3 CI failures #2412-#2414, MATRIX_RECEIPT_INVALID), repaired here. The interim VERIFIED flip at ebaae7de preceded the completed independent review and lacks documented Product/L1 acceptance of it ('CORE-008 remains PARTIAL until remaining engineering evidence and review close', #1496 comment 6777762870), so the state is restored to PARTIAL without deleting any evidence or negative anchor; the closure-plan anti-promotion blocker stays fail-closed. Remaining before any VERIFIED promotion: (1) Product/L1 acceptance of the completed fresh independent review on this exact repaired HEAD (receipt r86 pins it), (2) single-Writer re-application of the scoped linux/x64/node promotion package, (3) independent Tally semantic SAP stays the separate DKE-owned C1 gate (CORE-002/005). Windows/Android/other Targets are neither qualified nor required for this Demo; no SAP, Effect, hardware attestation, L2 Freeze, Merge or Release authority is claimed. Supersedes all earlier sentences in the historical note below that treat Target applicability or per-OS-different-bytes as outstanding C3 requirements."
     },
     {
       "id": "DIS020-CORE-009",

@@ -1,0 +1,53 @@
+{
+  "schema": "dis.v020.user-approved-c3-applicability/1",
+  "asOf": "2026-11-11",
+  "status": "PRODUCT_DEMO_TARGET_SCOPE_ACCEPTED_PENDING_CORE008_EVIDENCE_REVIEW",
+  "provenance": {
+    "source": "explicit user approval in this ChatGPT conversation on 2026-11-11",
+    "transcribedBy": "ChatGPT assistant",
+    "authenticatedGitHubOwnerIdentityAttested": false
+  },
+  "authority": {
+    "productIssue": "https://github.com/kaicreator-mm/domain-harness/issues/1496",
+    "masterDemoIssue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+    "draftPR": "https://github.com/kaicreator-mm/domain-harness/pull/1497"
+  },
+  "selectedApplicableTarget": {
+    "platform": "linux",
+    "architecture": "x64",
+    "runtime": "node",
+    "profile": "bounded DIS v0.2.0 Demo; actual selected Woodpecker Linux/x64/Node worker only"
+  },
+  "nonApplicableToThisDemo": [
+    "Windows",
+    "Android",
+    "non-x64 architectures",
+    "non-Node runtimes",
+    "production-device certification",
+    "external Effect authorization"
+  ],
+  "qualificationRequirements": [
+    "Real Target-selected immutable Package/Function/Resource/Dependency closure and Source Pin integrity",
+    "Independent installer-selected target and actual process host mismatch fail-closed",
+    "Actual AOT→SDK/KDP/business consumption positive and negatives at exact candidate HEAD",
+    "Review applicable original Woodpecker native logs and fresh exact-SHA evidence",
+    "No artificial different-byte-per-OS requirement: truly portable implementation may share byte-identical module sources"
+  ],
+  "earlierEvidence": {
+    "r86Head": "3bf6d05687faecd961a6fff43faeaa8955960c63",
+    "woodpecker": [
+      "https://ci.kaicreator.com/repos/18/pipeline/2404/1",
+      "https://ci.kaicreator.com/repos/18/pipeline/2404/2",
+      "https://ci.kaicreator.com/repos/18/pipeline/2404/3"
+    ],
+    "note": "Historical exact-SHA successful receipts; not a new latest-HEAD qualification"
+  },
+  "gates": {
+    "core008": "PARTIAL_UNTIL_SOURCE_AND_EVIDENCE_ACCEPTANCE",
+    "fullConformance": "NOT_ASSERTED",
+    "semanticSap": "NOT_PROMOTED",
+    "effectsAuthorized": false,
+    "l2Frozen": false,
+    "mergeOrRelease": false
+  }
+}

@@ -143,8 +143,8 @@ test('R79 actual two content-success CI preserves failed Node context and reject
  assert.equal(rec.testGitBlob,'a3ea6608d63b1cac274d99aacac2ea444908de10');
  assert.equal(rec.ci.find(x=>x.context==='ci/woodpecker/pr/verify-min-node').state,'FAILURE');
  const verified=await validateVersionMatrix(clone(matrix),receipts);
- assert.equal(verified.tallies['core:VERIFIED'],13);
- assert.equal(verified.tallies['core:PARTIAL'],3);
+ assert.equal(verified.tallies['core:VERIFIED'],12);
+ assert.equal(verified.tallies['core:PARTIAL'],4);
  assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-003').state,'VERIFIED');
  for(const ctx of ['ci/woodpecker/pr/dis-v020-integration','ci/woodpecker/pr/verify']){
   const tampered=clone(receipts);tampered[id].ci.find(x=>x.context===ctx).state='FAILURE';
@@ -198,22 +198,4 @@ test('R28 remaining-core closure groups account for seven PARTIAL requirements e
  assert.deepEqual(plan.estimates.allProfilesAndGovernancePracticalRange,[7,12]);
  assert.equal(plan.scopeProtection.coreStatesNotPromoted,true);
  assert.equal(plan.scopeProtection.noFreeze,true);
-});
-
-test('R85 approved C3 Target qualifies CORE-008 with anchored forgery negative, never SAP',async()=>{
- const core=matrix.requirements.find(x=>x.id==='DIS020-CORE-008');
- const plan=JSON.parse(await readFile(new URL('closure-plan-r28.json',base),'utf8'));
- const receipt=JSON.parse(await readFile(new URL('receipts/r85-c3-core008-source-review.json',base),'utf8'));
- assert.equal(core.state,'VERIFIED');
- assert.ok(core.receiptIds.includes('r85-c3-core008-source-review'));
- assert.ok(core.negative.some(x=>x.case==='B05-02 C3 cross-boundary forged selected module roster cannot be rescued by a correct host and full installer source pins'));
- assert.deepEqual(plan.coreAndGovernance.find(x=>x.group==='C3').requirementIds,[]);
- assert.equal(plan.blockers.some(x=>x.code==='TARGET_APPLICABILITY_NOT_APPROVED'),false);
- assert.deepEqual(plan.currentC3.appliesTo,{platform:'linux',architecture:'x64',runtime:'node'});
- assert.equal(receipt.source.head,'989a5858ac1393bdecbf20f0344df9c56a889fa6');
- assert.equal(receipt.authority.originalApprovalGitBlob,'7f0d195849647282fad09a53a117b4f3a705b138');
- assert.deepEqual(receipt.ci.map(x=>x.state),['SUCCESS','SUCCESS','SUCCESS']);
- assert.ok(['DIS020-CORE-002','DIS020-CORE-005'].every(id=>matrix.requirements.find(x=>x.id===id).state==='PARTIAL'));
- const latest=await readFile(new URL('validation-summary.md',base),'utf8');
- assert.match(latest,/\| Core \| 13 \| 3 \| 0 \| 0 \| 16 \|/);
 });
