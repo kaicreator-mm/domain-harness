@@ -7,7 +7,7 @@
   "originCommit": null,
   "originTree": null,
   "testPath": "examples/dis-v020-native-sdk/b18-r23-ev16-full-source.test.mjs",
-  "testGitBlob": "607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460",
+  "testGitBlob": "8aa27a9911dbed8874c90face38d8af96b665b43",
   "receipt": "receipts/r64-b18-ev16-full-original-source-native-ci.json",
   "sourceHead": null,
   "checks": [],
@@ -23,6 +23,7 @@
   ],
   "limits": [
     "Native new exact CI NOT_RUN or PENDING at this prequalification snapshot",
-    "No independent semantic reviewer or full original RFC HTML raw bytes; full EV16 0/2 qualified"
+    "No independent semantic reviewer or full original RFC HTML raw bytes; full EV16 0/2 qualified",
+    "R64 R1 test Git Blob 8aa27a9911dbed8874c90face38d8af96b665b43 (R0 was 607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460); original R0 exact a0da2aa00e052b6dda215a63fa80641b8ef125e8 Woodpecker #2350/1 native FAILURE, original R1 exact b011497b085c96735d09a4952302be36ac41b36a #2353/1 native FAILURE, #2353/2 and /3 SUCCESS. Both native runs remain unqualified; R1 first failure logs unavailable via GitHub connector. B18 stays 0/1; no inherited CI PASS, independent semantic SAP, Effect, or Core promotion."
   ]
 }
