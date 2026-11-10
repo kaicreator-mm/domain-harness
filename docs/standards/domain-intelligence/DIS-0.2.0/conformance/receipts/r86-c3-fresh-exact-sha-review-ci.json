@@ -1,0 +1,95 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r86-c3-fresh-exact-sha-review-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "C3_FRESH_SOURCE_FIRST_EXACT_SHA_REVIEW_AND_REPAIR",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "c21a7763c1d4539f5ae062f24faead6c9a5f1a9b",
+    "tree": "b7d678417ed61fd70231dff309275109c5abdc18"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2415/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2415/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2415/3"
+    }
+  ],
+  "implementation": {
+    "exactHead": "1c9826bcfecdbd83c57a466e624eec4defb29604",
+    "tree": "275fb915dc136b91e04c7ab66de2cbcc80eb9aab",
+    "testPath": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+    "testGitBlob": "a59f5c7e4b36803c957db729b9a5a1a1380679a8",
+    "woodpecker": [
+      "https://ci.kaicreator.com/repos/18/pipeline/2410/1",
+      "https://ci.kaicreator.com/repos/18/pipeline/2410/2",
+      "https://ci.kaicreator.com/repos/18/pipeline/2410/3"
+    ]
+  },
+  "authority": {
+    "productIssue": 1496,
+    "approvalComment": 6777762870,
+    "originalApprovalGitBlob": "7f0d195849647282fad09a53a117b4f3a705b138",
+    "approvedTarget": {
+      "platform": "linux",
+      "architecture": "x64",
+      "runtime": "node"
+    }
+  },
+  "review": {
+    "source": "Fresh independent exact-SHA review in a new ZCode session context; GitHub identity is the same org account, not a distinct human — Product/L1 acceptance is still required",
+    "admitted": "CORE008_STAYS_PARTIAL_PENDING_PRODUCT_ACCEPTANCE",
+    "p0": 0,
+    "p1Repaired": 3,
+    "p2Repaired": 1
+  },
+  "observations": [
+    "R1 s5 + R3 s3, Product/L1 #1496 record, BUILD/Contracts/Microkernel source, B03/B05 tests and Woodpecker #2409-#2415 step logs were re-read from source; no author report was substituted for source evidence.",
+    "Selected linux/x64/node Demo Target closure is complete: exact BUILD module roster byte-verified (DIS_BUILD_BYTES_DRIFT), full consumed original-source set installer-pinned (requireAllSourcesPinned), selected target == installer expectedTarget == real process host in one native KDP boot; DIS_C3_SELECTED_CLOSURE re-emitted at this exact HEAD in #2415/1.",
+    "Drift/missing/unselected-source/wrong-target negatives all reject in contract code and executed on the Linux worker (#2415/1): DIS_TARGET_MODULE_DRIFT, DIS_TARGET_CLOSURE_INCOMPLETE, DIS_TARGET_MODULE_UNSELECTED, DIS_SOURCE_ANCHOR_STALE, DIS_SOURCE_ANCHOR_NOT_CONSUMED, DIS_SOURCE_ANCHOR_COVERAGE_INCOMPLETE, DIS_TARGET_INSTALLED_MISMATCH, DIS_TARGET_HOST_MISMATCH, DIS_TARGET_UNSELECTED.",
+    "Portable byte-identical implementations are correctly distinguishable from Target-label disguise: label alone cannot qualify (B03 R40 same-roster counterexample), labelled artifacts boot only on the real matching host with an independent installer anchor; per-OS-different-bytes is not a normative requirement.",
+    "Interim VERIFIED flip at ebaae7de (#2412/#2413) and its readiness-gate iteration (959602b2, #2414) were CI-red on one data bug (r85 receipt missing from the top-level receipts inventory) and preceded any completed independent review; state restored to PARTIAL with all evidence preserved."
+  ],
+  "repairHistory": [
+    {
+      "sourceHead": "989a5858ac1393bdecbf20f0344df9c56a889fa6",
+      "pipeline": "#2411",
+      "status": "BASELINE_QUALIFIED"
+    },
+    {
+      "sourceHead": "ebaae7de7f3e9a5450b679edc16b47281e669b51",
+      "pipeline": "#2413",
+      "status": "NOT_QUALIFIED",
+      "finding": "MATRIX_RECEIPT_INVALID x7: r85 receipt referenced but not inventoried; promotion also lacked review-acceptance authority"
+    },
+    {
+      "sourceHead": "959602b2c7b7c9b38243024a1ee0a0aaaddc5162",
+      "pipeline": "#2414",
+      "status": "NOT_QUALIFIED",
+      "finding": "same MATRIX_RECEIPT_INVALID root cause; readiness-gate edit chased misdiagnosis"
+    },
+    {
+      "sourceHead": "c21a7763c1d4539f5ae062f24faead6c9a5f1a9b",
+      "pipeline": "#2415",
+      "status": "QUALIFIED",
+      "finding": "PARTIAL restored with evidence preserved, receipts inventory fixed, decision records checked in byte-identically, b03 linux-hardcoded boots guarded; #2415/1-3 all SUCCESS"
+    }
+  ],
+  "limitations": [
+    "This receipt pins the repaired review HEAD c21a7763; its own docs-commit CI is a separate identity and inherits nothing automatically.",
+    "CORE-008 remains PARTIAL by rule: Product/L1 acceptance of this completed fresh review plus single-Writer re-application of the scoped linux/x64/node promotion package is required before any VERIFIED flip; the closure-plan anti-promotion blocker stays fail-closed.",
+    "Independent Tally semantic SAP stays the separate DKE-owned C1 gate (CORE-002/005); source pins are structural (STRUCTURAL_ONLY), not per-load Git re-verification or hardware attestation.",
+    "No Windows/Android/other-Target qualification; no Effect, Freeze, Merge or Release authority claimed."
+  ]
+}

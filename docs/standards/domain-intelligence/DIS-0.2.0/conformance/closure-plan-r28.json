@@ -154,6 +154,8 @@
     "coreVerified": 12,
     "corePartial": 4,
     "semanticSapStillOpenForC1": true,
-    "nonApplicableOSNotQualified": true
+    "nonApplicableOSNotQualified": true,
+    "freshReviewReceiptId": "r86-c3-fresh-exact-sha-review-ci",
+    "repairHead": "c21a7763c1d4539f5ae062f24faead6c9a5f1a9b"
   }
 }

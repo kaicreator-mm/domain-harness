@@ -20,6 +20,8 @@ Product [#1496 explicit acceptance](https://github.com/kaicreator-mm/domain-harn
 
 **Limits:** no independent business truth/SAP, Effect permit, hardware attestation, malicious native sandbox, complete Core-016 closure, optional-profile promotion, L2 Freeze, merge or release.
 
+**Fresh-review CI closeout (receipt [r86](receipts/r86-c3-fresh-exact-sha-review-ci.json)):** repaired review HEAD `c21a7763c1d4539f5ae062f24faead6c9a5f1a9b` / TREE `b7d678417ed61fd70231dff309275109c5abdc18` — Woodpecker [#2415/1](https://ci.kaicreator.com/repos/18/pipeline/2415/1) native integration (re-emitted `DIS_C3_SELECTED_CLOSURE` linux/x64/node at this exact SHA; guarded b03 cases executed on Linux), [#2415/2](https://ci.kaicreator.com/repos/18/pipeline/2415/2) min-node, [#2415/3](https://ci.kaicreator.com/repos/18/pipeline/2415/3) verify — **3/3 SUCCESS**. Tallies unchanged: Core 12/16 VERIFIED, 4 PARTIAL (002/005/008/016), Optional 0/4, Governance 0/1.
+
 ### Normalized Demo plan / history (ADS #1362 practice)
 
 See [Demo index, dependency map and R1–R11 historical evidence](DEMO_INDEX.md). It maps every Core/optional/governance requirement to D00–D08 evidence questions, preserves original files and exact historical receipts, and keeps the failed R11 integration context open. This index is not a second machine matrix or frozen implementation Task DAG.
