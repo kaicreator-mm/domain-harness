@@ -213,6 +213,25 @@ test('R64 native full Tally graph tamper, false RFC source, fake SAP/Effect and 
  assert.equal(x.reader.query(origReq).lexicalGenericCacheNodes.length,2);
 });
 
+test('R64 origin allowlist is exact by original producer repo, commit, path and Git Blob, not a broad docs or executable relaxation',async()=>{
+ const x=await ctx;
+ const cases=[
+  {role:'tally',change:{commit:'0'.repeat(40)}},
+  {role:'tally',change:{repository:'example/tally'}},
+  {role:'tally',change:{path:'docs/versions/v2.1.1/knowledge/generated/untrusted.jsonld'}},
+  {role:'reader',change:{commit:'0'.repeat(40)}},
+  {role:'reader',change:{path:'docs/standards/dke/DKE-0.0.1/demos/unreviewed.mjs'}}
+ ];
+ for(const {role,change} of cases){
+  const id=SID[role];
+  const origin={...x.origins[id],...change};
+  const sources=x.sources.map(s=>s.id===id?{...s,origin}:s);
+  const trusted={...x.origins,[id]:origin};
+  assert.throws(()=>x.build(x.program,sources,trusted),
+   fail('DIS_SOURCE_ORIGIN_INVALID'),'unexpected origin accepted for '+role);
+ }
+});
+
 test('R64 native installer refuses changed original full graph sha, missing source or DATA-as-LOCAL Function source',async()=>{
  const x=await ctx;
  const bad={...x.installed,[SID.tally]:{
