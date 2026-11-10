@@ -3,13 +3,29 @@
   "batchId": "B21",
   "roundId": "B21-01",
   "globalRoundId": "R67",
-  "status": "CI_PENDING",
+  "status": "VERIFIED",
   "originCommit": "5258d1412c16e72ae4a4b23585df0fd482e1c061",
   "testPath": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
   "testGitBlob": "c3b429e350e9b6ecd2c02da0f0f241b5f8640fe3",
   "receipt": "receipts/r67-b21-34-round-full-ledger-ci.json",
-  "sourceHead": null,
-  "checks": [],
+  "sourceHead": "81073ac58090d11a2f26e3983ff85bdb247a194a",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2376/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2376/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2376/3"
+    }
+  ],
   "positive": [
     "R67 all 34 original B01-B20 scoped rounds retain independent named 3-context stored receipts and Matrix links"
   ],
@@ -40,6 +56,17 @@
       "native": "FAILURE",
       "status": "NOT_QUALIFIED",
       "finding": "R67 R1 failed native integration; source-first detected prior B13 forged ordinary origin expected FULL_LEDGER_ORIGINAL_SOURCE_DRIFT while extended checker returned FULL_LEDGER_REPAIR_LINEAGE_INVALID. Exact failed step log not available; code fix is a source-backed suspected cause, not an asserted authenticated CI root cause."
+    },
+    {
+      "sourceHead": "81073ac58090d11a2f26e3983ff85bdb247a194a",
+      "testBlob": "c3b429e350e9b6ecd2c02da0f0f241b5f8640fe3",
+      "pipeline": "#2376",
+      "native": "SUCCESS",
+      "status": "QUALIFIED",
+      "finding": "Same exact source native integration+compatibility+general verification all SUCCESS; full old B01–B20 historical 34-round evidence source/CI replay"
     }
-  ]
+  ],
+  "finalTree": "6da1c75a10c0d193ba507369465f9112589000d5",
+  "qualificationHead": "81073ac58090d11a2f26e3983ff85bdb247a194a",
+  "qualificationTree": "6da1c75a10c0d193ba507369465f9112589000d5"
 }
