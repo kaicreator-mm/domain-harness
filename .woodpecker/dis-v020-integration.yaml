@@ -66,6 +66,7 @@ steps:
       - node --import tsx --test --test-concurrency=1 examples/dis-v020-native-sdk/b11-cli-process.test.mjs
       - node --import tsx --test --test-concurrency=1 examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs
       - node --import tsx --test examples/dis-v020-native-sdk/c1-r31-critic-native.test.mjs
+      - node --import tsx --test examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs
       - node --test examples/dis-v020-conformance/validate.test.mjs
       # R83: real original DKE R33 source + B22 Reader against bounded authority model;
       # original Git Blob pins, 768 states, 771 real Reader calls, negative witnesses.
