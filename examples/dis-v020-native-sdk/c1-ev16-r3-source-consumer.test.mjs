@@ -14,27 +14,31 @@ import {EV16_R3_ORIGINS,makeEv16R3Reader} from './dke-ev16-r3-reader.mjs';
 
 const READER_ORIGIN=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'e02848d2d7a95d269a3ec46e6c39e76f9e80aa13',
+ commit:'c6af2078b29ab4e33877f9ed271860f7691fb61d',
  path:'examples/dis-v020-native-sdk/dke-ev16-r3-reader.mjs',
- gitBlob:'43ea2bc2b2bee887d03af9167b5356cd89f9ce78'
+ gitBlob:'2cdb5759190d72b00679e5ddd952178cd9ab7a0e'
 });
 const FN='dke.ev16.r3.sourceReview.inspect',CODE='dke-ev16-r3-reader',
- RECEIPT='dke-ev16-r3-original-source-receipt',ROUTE='dke-r31-r7-original-owner-route';
+ RECEIPT='dke-ev16-r3-original-source-receipt',ROUTE='dke-r31-r7-original-owner-route',
+ R1='dke-ev16-r1-reviewed-original-selected-consumer';
 const deny=code=>e=>e?.code===code;
 const prepared=(async()=>{
- const [f,receiptText,routingText,code]=await Promise.all([
+ const [f,receiptText,routingText,r1Text,code]=await Promise.all([
   makeNativeFixture(),
   readFile(new URL('./fixtures/dke-ev16-r3-original-source-repair-receipt.json',import.meta.url),'utf8'),
   readFile(new URL('./fixtures/dke-r31-r7-owner-route.json',import.meta.url),'utf8'),
+  readFile(new URL('./fixtures/dke-ev16-r1-selected-consumer-repair-receipt.json',import.meta.url),'utf8'),
   readFile(new URL('./dke-ev16-r3-reader.mjs',import.meta.url),'utf8')
  ]);
  assert.equal(sourceGitBlob(receiptText),EV16_R3_ORIGINS.receipt.gitBlob);
  assert.equal(sourceGitBlob(routingText),EV16_R3_ORIGINS.routing.gitBlob);
+ assert.equal(sourceGitBlob(r1Text),EV16_R3_ORIGINS.r1.gitBlob);
  assert.equal(sourceGitBlob(code),READER_ORIGIN.gitBlob);
- const reader=makeEv16R3Reader(receiptText,routingText);
+ const reader=makeEv16R3Reader(receiptText,routingText,r1Text);
  const add=[
   {id:RECEIPT,sourceText:receiptText,origin:EV16_R3_ORIGINS.receipt},
   {id:ROUTE,sourceText:routingText,origin:EV16_R3_ORIGINS.routing},
+  {id:R1,sourceText:r1Text,origin:EV16_R3_ORIGINS.r1},
   {id:CODE,sourceText:code,origin:READER_ORIGIN}
  ];
  const program=structuredClone(f.program);
@@ -48,7 +52,7 @@ const prepared=(async()=>{
   description:'Original D02+D04 source replay can be observed, never approved by inference',
   functions:[{
    id:FN,kind:'knowledge',effect:'none',
-   binding:{type:'local',sourceId:CODE},sourceDependencies:[RECEIPT,ROUTE],
+   binding:{type:'local',sourceId:CODE},sourceDependencies:[RECEIPT,ROUTE,R1],
    contract:{schema:'dis.v0.2.function-contract/1',version:'1.0.0',
     input:{type:'record',fields:{subject:'string'},additionalProperties:false},
     output:{type:'record',fields:{
@@ -56,6 +60,8 @@ const prepared=(async()=>{
      observationTier:'string',crossPublisherAuthority:'string',
      ownerReviewDecision:'string',formalEv16Cell:'string',
      originalGraphGitBlob:'string',r3ReceiptGitBlob:'string',r7RoutingGitBlob:'string',
+     r1IndependentReviewGitBlob:'string',selectedCqChecks:'number',
+     selectedQueryCount:'number',selectedConsumerCodeGitBlob:'string',
      sapQualified:'boolean',effectDispatched:'boolean'
     },additionalProperties:false},
     outcomes:{field:'status',classes:{UNKNOWN:'UNKNOWN'}},
@@ -65,12 +71,13 @@ const prepared=(async()=>{
   }]
  });
  const sources=[...f.sources,...add],expectedSourceOrigins={...f.expectedSourceOrigins,
-  [RECEIPT]:EV16_R3_ORIGINS.receipt,[ROUTE]:EV16_R3_ORIGINS.routing,[CODE]:READER_ORIGIN};
+  [RECEIPT]:EV16_R3_ORIGINS.receipt,[ROUTE]:EV16_R3_ORIGINS.routing,
+  [R1]:EV16_R3_ORIGINS.r1,[CODE]:READER_ORIGIN};
  const artifact=compileDisV020Aot({built:f.artifact.built,program,sources,expectedSourceOrigins});
  const registry={...f.registry,[FN]:{sourceId:CODE,sha256:sourceSha256(code),
   origin:READER_ORIGIN,gitBlob:READER_ORIGIN.gitBlob,execute:input=>reader.query(input)}};
  const installed=Object.fromEntries(add.map(x=>[x.id,{sha256:sourceSha256(x.sourceText),origin:x.origin}]));
- return {reader,receiptText,routingText,code,artifact,registry,installed};
+ return {reader,receiptText,routingText,r1Text,code,artifact,registry,installed};
 })();
 const activate=x=>loadDisV020Aot(x.artifact,{
  expectedDigest:x.artifact.digest,registry:x.registry,expectedSourcePins:x.installed,
@@ -80,11 +87,13 @@ test('C1 EV16 R3 two original DKE sources are selected DATA only by real AOT',as
  const x=await prepared,q=qualifyDisV020Artifact(x.artifact),f=q.functions.get(FN);
  assert.equal(f.definition.binding.sourceId,CODE);
  assert.equal(f.definition.effect,'none');
- assert.deepEqual(f.definition.sourceDependencies,[RECEIPT,ROUTE]);
+ assert.deepEqual(f.definition.sourceDependencies,[RECEIPT,ROUTE,R1]);
  assert.equal(q.pins.get(RECEIPT).origin.gitBlob,EV16_R3_ORIGINS.receipt.gitBlob);
  assert.equal(q.pins.get(ROUTE).origin.gitBlob,EV16_R3_ORIGINS.routing.gitBlob);
  assert.ok(q.sourceConsumers.get(RECEIPT).includes(FN));
  assert.ok(q.sourceConsumers.get(ROUTE).includes(FN));
+ assert.equal(q.pins.get(R1).origin.gitBlob,EV16_R3_ORIGINS.r1.gitBlob);
+ assert.ok(q.sourceConsumers.get(R1).includes(FN));
  const app=await activate(x);try{assert.equal(app.state,'READY')}finally{app.stop()}
 });
 test('C1 EV16 R3 actual KDP Function produces typed UNKNOWN and never source SAP',async()=>{
@@ -102,15 +111,21 @@ test('C1 EV16 R3 actual KDP Function produces typed UNKNOWN and never source SAP
    assert.equal(out.value.originalGraphGitBlob,'0f6007315fd7352fe6fd218effcfecf672cb4961');
    assert.equal(out.value.r3ReceiptGitBlob,EV16_R3_ORIGINS.receipt.gitBlob);
    assert.equal(out.value.r7RoutingGitBlob,EV16_R3_ORIGINS.routing.gitBlob);
+   assert.equal(out.value.r1IndependentReviewGitBlob,EV16_R3_ORIGINS.r1.gitBlob);
+   assert.equal(out.value.selectedCqChecks,21);
+   assert.equal(out.value.selectedQueryCount,10);
+   assert.equal(out.value.selectedConsumerCodeGitBlob,'70005ef7c181260a6aaf041b829927fc4d194bed');
    assert.equal(out.value.sapQualified,false);assert.equal(out.value.effectDispatched,false);
   }
  }finally{app.stop()}
 });
 test('C1 EV16 R3 provenance forgery or Owner/Effect escalation is rejected at source, AOT or SDK',async()=>{
  const x=await prepared;
- assert.throws(()=>makeEv16R3Reader(x.receiptText+' ',x.routingText),
+ assert.throws(()=>makeEv16R3Reader(x.receiptText+' ',x.routingText,x.r1Text),
   deny('DKE_EV16_R3_ORIGINAL_DATA_DRIFT'));
- assert.throws(()=>makeEv16R3Reader(x.receiptText,x.routingText+' '),
+ assert.throws(()=>makeEv16R3Reader(x.receiptText,x.routingText+' ',x.r1Text),
+  deny('DKE_EV16_R3_ORIGINAL_DATA_DRIFT'));
+ assert.throws(()=>makeEv16R3Reader(x.receiptText,x.routingText,x.r1Text+' '),
   deny('DKE_EV16_R3_ORIGINAL_DATA_DRIFT'));
  for(const input of [
   {subject:'EV16:D02+D04',ownerDecision:'APPROVED'},
