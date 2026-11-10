@@ -78,14 +78,17 @@ const verifiedWitnesses=new Map(Object.entries({
     }
   },
   "DIS020-CORE-008": {
-    "receiptId": "r9.5-baseline",
+    // R93: Product-accepted C3 structural promotion must remain anchored to
+    // the independently reviewed selected Linux/x64/Node evidence, not a
+    // generic historical R9.5 target rejection that predates its acceptance.
+    "receiptId": "r86-c3-fresh-exact-sha-review-ci",
     "positive": {
-      "path": "examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs",
-      "case": "AOT target drift fails closed"
+      "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+      "case": "B05-02 R45 selected Linux/x64 native BUILD + complete installer Source + Host close in one real KDP boot"
     },
     "negative": {
-      "path": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
-      "case": "B02-01 R35 install refuses tampered selected module bytes or unbound source before KDP boot"
+      "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+      "case": "B05-02 C3 cross-boundary forged selected module roster cannot be rescued by a correct host and full installer source pins"
     }
   },
   "DIS020-CORE-009": {

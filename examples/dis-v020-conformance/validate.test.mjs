@@ -81,6 +81,29 @@ test('R92 C3 accepted linux/x64/node Target is the sole newly promoted Core whil
   assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-'+id).state,'PARTIAL');
  assert.equal(matrix.requirements.filter(x=>x.profile==='optional-profile').every(x=>x.state==='NOT_RUN'),true);
 });
+test('R93 C3 VERIFIED cannot borrow generic R9.5 evidence or drop R86 selected-Host closure proof',async()=>{
+ const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async id=>[
+  id,JSON.parse(await readFile(new URL('receipts/'+id+'.json',base),'utf8'))
+ ])));
+ const row=matrix.requirements.find(r=>r.id==='DIS020-CORE-008');
+ const requiredPositive='B05-02 R45 selected Linux/x64 native BUILD + complete installer Source + Host close in one real KDP boot';
+ const requiredNegative='B05-02 C3 cross-boundary forged selected module roster cannot be rescued by a correct host and full installer source pins';
+ assert.equal(row.state,'VERIFIED');
+ assert.ok(row.receiptIds.includes('r86-c3-fresh-exact-sha-review-ci'));
+ assert.ok(row.positive.some(e=>e.case===requiredPositive));
+ assert.ok(row.negative.some(e=>e.case===requiredNegative));
+ const variants=[
+  x=>{x.receiptIds=x.receiptIds.filter(id=>id!=='r86-c3-fresh-exact-sha-review-ci');},
+  x=>{x.positive=x.positive.filter(e=>e.case!==requiredPositive);},
+  x=>{x.negative=x.negative.filter(e=>e.case!==requiredNegative);}
+ ];
+ for(const transform of variants){
+  const forged=structuredClone(matrix);
+  transform(forged.requirements.find(r=>r.id==='DIS020-CORE-008'));
+  await assert.rejects(validateVersionMatrix(forged,receipts),
+   rejects('MATRIX_VERIFIED_WITNESS_MISMATCH'));
+ }
+});
 test('machine validator rejects a VERIFIED requirement without positive or negative proof',async()=>{
  const v=clone(matrix);v.requirements[0].negative=[];
  await assert.rejects(validateVersionMatrix(v,{'r9.5-baseline':baseline}),rejects('MATRIX_UNSUPPORTED_VERIFIED'));
