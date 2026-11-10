@@ -1,4 +1,4 @@
-# DIS 0.2.0 — versioned conformance coverage snapshot (initial normalization)
+# DIS 0.2.0 — versioned conformance coverage snapshot (current machine Matrix)
 
 **Owner:** [version master #1499](https://github.com/kaicreator-mm/domain-harness/issues/1499), specification authority [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496), implementation [Draft PR #1497](https://github.com/kaicreator-mm/domain-harness/pull/1497).
 
@@ -6,11 +6,11 @@
 
 | Scope | VERIFIED | PARTIAL | NOT_RUN | OUT_OF_SCOPE | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Core | 9 | 7 | 0 | 0 | 16 |
+| Core | 12 | 4 | 0 | 0 | 16 |
 | Optional profiles | 0 | 0 | 4 | 0 | 4 |
 | Governance | 0 | 0 | 1 | 0 | 1 |
 
-**Current status: PARTIAL.** P0 gaps: Function version, I/O Schema / typed Outcome / Evidence; executable constraints and semantic collaboration; native progressive Interaction. P1 optional profiles: Harness+LLM, Experience/Local Evolution/Server promotion, cross-target variants. Governance: independent exact-SHA review and L2 Freeze.
+**Current status: PARTIAL — Core 12/16 VERIFIED (75%), four PARTIAL.** Remaining CORE-002/005 require independently qualified source-first Element/semantic ownership and accountable SAP; CORE-008 requires Product/L1 selected-Target applicability plus real selected implementation/host qualification; CORE-016 is the dependent final conformance closure. All four optional profiles remain NOT_RUN pending explicit applicability/enablement decision; governance GOV-001 is NOT_RUN (independent exact-SHA review and Product/L1/L2 Freeze). The historical chronology below intentionally retains its original per-round numbers; it must never be mistaken for the current top-line Matrix tally.
 
 ### Normalized Demo plan / history (ADS #1362 practice)
 
