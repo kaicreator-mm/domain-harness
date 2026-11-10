@@ -256,7 +256,7 @@ test('R90 reviewer: declared test evidence rejects substring, comments, strings 
   'genuine node test','genuine node test with suffix'
  ]);
  assert.equal(declared.has('genuine'),false);
- assert.equal(declaredTestCases("const re=/'/;\\ntest('after regex',()=>{})").has('after regex'),true);
+ assert.equal(declaredTestCases("const re=/'/;"+String.fromCharCode(10)+"test('after regex',()=>{})").has('after regex'),true);
 });
 test('R90 reviewer: future legitimate 100 percent coverage is not blocked by old progress tallies',()=>{
  // Only summary-count logic is being tested here. No synthetic receipt or
