@@ -1,0 +1,77 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r87-c1-ev16-r3-r7-original-source-native-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "C1_ORIGINAL_DKE_EV16_R3_R7_SOURCE_SELECTED_NATIVE_KNOWLEDGE_UNKNOWN_ONLY",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "cda0b7d1f4385a4f679cc4489959916b3a93b0f5",
+    "tree": "bc3ed31e5a7193c729a28e0968fe87fa6dc1f54b"
+  },
+  "originalExperiment": {
+    "branch": "experiment/dis-v020-dke-ev16-r3-consumer-r0",
+    "sourceHead": "9745b812e0ef9f5dce7d306ac8a4cf56112e220b",
+    "preflightFile": "docs/standards/domain-intelligence/DIS-0.2.0/conformance/experiments/c1-ev16-r3-readonly-native-candidate.json",
+    "authority": "ISOLATED_SOURCE_CANDIDATE_NOT_NATIVE_CI"
+  },
+  "native": {
+    "testPath": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+    "testGitBlob": "cf2ee229e300f001261a2b574506854d828098bc",
+    "readerPath": "examples/dis-v020-native-sdk/dke-ev16-r3-reader.mjs",
+    "readerGitBlob": "43ea2bc2b2bee887d03af9167b5356cd89f9ce78",
+    "mandatoryWoodpeckerPath": ".woodpecker/dis-v020-integration.yaml",
+    "mandatoryWoodpeckerGitBlob": "e4bb30630a6c3a095f26717384c4c440b8534aa0",
+    "originalDkeR3ReceiptGitBlob": "844a16219e31cc994d4d958e565879cb5e0c6872",
+    "originalDkeR7OwnerRoutingGitBlob": "6abb5fb59843845e594aedd749f78cbbe0efeea7",
+    "originalDkeSourceHead": "5659d8f56a53ef63981fe93a264cad6c453a94ed",
+    "originalTallyGraphGitBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2417/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2417/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2417/3"
+    }
+  ],
+  "observations": [
+    "Original DKE R3 independent source-first full original Tally/RFC source receipt and R7 bounded source Owner routing are exact Git copies selected as read-only DATA in DIS AOT and Native SDK/KDP.",
+    "The mandatory actual native test runs three selected original EV16/derived relation/unsupported Tally rule subjects, retains UNKNOWN and no publisher/Owner/SAP/Effect authority, with forged source/Owner/registry/exec-as-DATA negatives.",
+    "Current exact qualifying source has all three original Woodpecker statuses SUCCESS (#2417). Earlier #2416 three ERROR statuses were canceled when concurrent evidence-only Writer advanced PR; not an observed native assertion failure.",
+    "The separate source original Git reader had also passed three selected UNKNOWN queries and seven source/authority adversarial negatives in hosted V8 before native port; hosted V8 does not replace real Node."
+  ],
+  "limitations": [
+    "Source-selected structural/native UNKNOWN proof is not independent full DKE EV16 R8 semantic Oracle, source producer Owner decision, qualified SAP, approved Effects or release.",
+    "The original DKE frozen R8 remains 0/53 and SAP=0, Effects=0; Domain Source Owner quarantine of unsupported Tally DecisionModel remains.",
+    "Core-002,005,008,016 remain PARTIAL (12/16 VERIFIED); optional 0/4 and GOV-001 0/1 NOT_RUN; Product/L1 engineering acceptance is separate.",
+    "This is an evidence-only commit on an experiment branch. The SOURCE qualifying CI belongs to the unchanged Draft PR HEAD above, not this later receipt commit."
+  ],
+  "accounting": {
+    "coreVerified": 12,
+    "coreTotal": 16,
+    "corePartial": [
+      "DIS020-CORE-002",
+      "DIS020-CORE-005",
+      "DIS020-CORE-008",
+      "DIS020-CORE-016"
+    ],
+    "boundedHistoricalRounds": "B01–B22 36/36",
+    "optionalNotRun": 4,
+    "governanceNotRun": 1,
+    "dkeR8Verified": "0/53",
+    "sapQualified": 0,
+    "effectAuthorized": 0,
+    "freezeEligible": false,
+    "releaseEligible": false
+  }
+}
