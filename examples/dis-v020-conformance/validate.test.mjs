@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {validateCheckedInMatrix,validateVersionMatrix} from './validate.mjs';
+import {validateRoundEvidence} from './batch-audit.mjs';
 const base=new URL('../../docs/standards/domain-intelligence/DIS-0.2.0/conformance/',import.meta.url);
 const matrix=JSON.parse(await readFile(new URL('matrix.json',base),'utf8'));
 const baseline=JSON.parse(await readFile(new URL('receipts/r9.5-baseline.json',base),'utf8'));
@@ -127,6 +128,28 @@ test('R79 actual two content-success CI preserves failed Node context and reject
   const tampered=clone(receipts);tampered[id].ci.find(x=>x.context===ctx).state='FAILURE';
   await assert.rejects(validateVersionMatrix(clone(matrix),tampered),rejects('MATRIX_RECEIPT_INVALID'));
  }
+});
+test('R82 original B22 DKE native source is 3/3 exact SHA qualified and forged CI remains rejected',async()=>{
+ const dir=new URL('batches/B22/',base);
+ const [manifest,round,receipt,sourceText,ciFile]=await Promise.all([
+  readFile(new URL('manifest.json',dir),'utf8').then(JSON.parse),
+  readFile(new URL('rounds/B22-01/round.json',dir),'utf8').then(JSON.parse),
+  readFile(new URL('receipts/r82-b22-r33-source-native-ci.json',base),'utf8').then(JSON.parse),
+  readFile(new URL('../dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs',import.meta.url),'utf8'),
+  readFile(new URL('../../.woodpecker/dis-v020-integration.yaml',import.meta.url),'utf8')
+ ]);
+ const out=validateRoundEvidence({manifest,round,receipt,sourceText,ciFile,matrix});
+ assert.equal(out.ci,'STORED_CI_3_OF_3_SUCCESS');
+ assert.equal(out.currentBlobMatchesHistorical,true);
+ assert.equal(receipt.source.head,'fe2334e63d39a9c006746caad695f7e3c5ade97d');
+ assert.equal(receipt.source.tree,'e458b65cb718fd399915d22e0a35ebe8611dc99b');
+ assert.equal(receipt.testGitBlob,'a0eb607aeca433109a703b2e699c2eb719f5ed96');
+ assert.deepEqual(receipt.ci.map(x=>x.state),['SUCCESS','SUCCESS','SUCCESS']);
+ assert.equal(receipt.repairHistory.some(x=>x.pipeline==='#2395'&&x.status==='NOT_QUALIFIED'),true);
+ assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-005').state,'PARTIAL');
+ const forged=structuredClone(receipt);forged.ci[0].state='FAILURE';
+ assert.throws(()=>validateRoundEvidence({manifest,round,receipt:forged,sourceText,ciFile,matrix}),
+  e=>e?.code==='BATCH_CI_RECEIPT_INVALID');
 });
 test('R28 remaining-core closure groups account for seven PARTIAL requirements exactly once',async()=>{
  const plan=JSON.parse(await readFile(new URL('closure-plan-r28.json',base),'utf8'));
