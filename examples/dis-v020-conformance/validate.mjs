@@ -7,6 +7,13 @@ const base='docs/standards/domain-intelligence/DIS-0.2.0/conformance';
 const statuses=new Set(['VERIFIED','PARTIAL','NOT_RUN','OUT_OF_SCOPE']);
 const profiles=new Set(['core','optional-profile','governance']);
 const validId=/^DIS020-(?:CORE|OPT|GOV)-\d{3}$/;
+// #1499 fixes the version applicability universe: no omitted/renamed Core,
+// Optional or Governance requirement may make coverage appear complete.
+const requiredIds=new Set([
+ ...Array.from({length:16},(_,i)=>'DIS020-CORE-'+String(i+1).padStart(3,'0')),
+ ...Array.from({length:4},(_,i)=>'DIS020-OPT-'+String(i+1).padStart(3,'0')),
+ 'DIS020-GOV-001'
+]);
 const sha=/^[a-f0-9]{40}$/;
 const pathOk=p=>typeof p==='string'&&!!p&&!p.startsWith('/')&&!p.split('/').includes('..');
 const fail=(code)=>{throw Object.assign(new Error(code),{code})};
@@ -21,7 +28,16 @@ async function sourceText(path){
 }
 export async function validateVersionMatrix(matrix,receipts){
  if(matrix?.schema!=='dis.v0.2.conformance-matrix/1'||matrix.version!=='0.2.0'||
-    !Array.isArray(matrix.requirements)||matrix.requirements.length<16)fail('MATRIX_SCHEMA');
+    !Array.isArray(matrix.requirements))fail('MATRIX_SCHEMA');
+ // Check the complete canonical roster before touching filesystem/receipts.
+ // Format and uniqueness alone cannot prevent silent narrowing of the denominator.
+ if(matrix.requirements.length!==requiredIds.size)fail('MATRIX_REQUIREMENT_ROSTER_INVALID');
+ const seen=new Set();
+ for(const r of matrix.requirements){
+  if(typeof r?.id!=='string'||!validId.test(r.id)||seen.has(r.id))fail('MATRIX_DUP_OR_INVALID_ID');
+  seen.add(r.id);
+ }
+ if([...requiredIds].some(id=>!seen.has(id)))fail('MATRIX_REQUIREMENT_ROSTER_INVALID');
  const ids=new Set();const tallies={};
  for(const r of matrix.requirements){
   if(!validId.test(r.id)||ids.has(r.id))fail('MATRIX_DUP_OR_INVALID_ID');
