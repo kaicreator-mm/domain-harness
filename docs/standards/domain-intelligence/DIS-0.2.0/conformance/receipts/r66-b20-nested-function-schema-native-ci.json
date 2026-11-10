@@ -2,16 +2,32 @@
   "schema": "dis.v0.2.validation-receipt/1",
   "id": "r66-b20-nested-function-schema-native-ci",
   "disVersion": "0.2.0",
-  "status": "PENDING",
+  "status": "SUCCESS",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": null,
-    "tree": null
+    "head": "2616ca326d3c0e0dd06d9b68b8d2127d60ec4825",
+    "tree": "afa42ec88cfbdd9044b3fef253ea18db86548610"
   },
-  "originCommit": "4f47579814be7774f2407a6420e27c78b1d43a76",
+  "originCommit": "2616ca326d3c0e0dd06d9b68b8d2127d60ec4825",
   "testPath": "examples/dis-v020-native-sdk/b20-nested-function-schema.test.mjs",
   "testGitBlob": "239d925689ad7c90e7cece72f5db21e6aa31d96c",
-  "ci": [],
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2364/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2364/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2364/3"
+    }
+  ],
   "implementation": [
     "packages/contracts/dis-v020.mjs",
     "examples/dis-v020-native-sdk/b20-nested-function-schema.test.mjs"
@@ -19,7 +35,8 @@
   "testScope": "Real selected original xDownload Knowledge nested Function output Schema and conservative ABI; no physical Effects",
   "observations": [
     "Hosted V8 source-exact contract functions accept normal nested record and reject 5 malformed nested output categories plus versioned field drift.",
-    "Three native mandatory contexts have not jointly succeeded at any new exact B20 SHA."
+    "Three native mandatory contexts have not jointly succeeded at any new exact B20 SHA.",
+    "Original source 2616ca326d3c0e0dd06d9b68b8d2127d60ec4825 tree afa42ec88cfbdd9044b3fef253ea18db86548610 CI #2364/1-3 3/3 SUCCESS on mandatory integration, compatibility and verify; optional bounded nested record/array Function profile only."
   ],
   "limitations": [
     "This is bounded source-selected nested structural Function I/O/ABI conformance, not an independent business evidence Oracle, full Public Function schema or completed CORE-003.",
@@ -48,6 +65,16 @@
       "pipeline": "#2362",
       "native": "PENDING_OR_NOT_QUALIFIED",
       "finding": "Negative fixture source sharing corrected before qualification."
+    },
+    {
+      "sourceHead": "2616ca326d3c0e0dd06d9b68b8d2127d60ec4825",
+      "testBlob": "239d925689ad7c90e7cece72f5db21e6aa31d96c",
+      "pipeline": "#2364",
+      "native": "SUCCESS",
+      "finding": "R3 source-depth fix and selected original xDownload nested Knowledge native Function tests qualified across all 3 CI contexts."
     }
-  ]
+  ],
+  "qualificationHead": "2616ca326d3c0e0dd06d9b68b8d2127d60ec4825",
+  "qualificationTree": "afa42ec88cfbdd9044b3fef253ea18db86548610",
+  "qualificationMeaning": "BOUNDED_NATIVE_SELECTED_NESTED_FUNCTION_SCHEMA"
 }
