@@ -102,8 +102,27 @@ export function classifyDisV020KdpReceipt(contract,receipt){
  });
 }
 
-function validateShape(shape){
- keys(shape,['type','fields','optional','additionalProperties','allowAbsent']);
+// Opt-in bounded nested schema. Legacy string 'record'/'array' signatures stay
+// unchanged; only an explicit descriptor constrains nested contents.
+const MAX_SHAPE_DEPTH=5;
+function validateFieldType(type,depth){
+ if(typeof type==='string'){
+  if(!VALUE_TYPES.has(type))fail('DIS_FUNCTION_SCHEMA_INVALID');
+  return;
+ }
+ if(depth>MAX_SHAPE_DEPTH||!record(type))fail('DIS_FUNCTION_SCHEMA_INVALID');
+ if(type.type==='record'){validateShape(type,depth,false);return}
+ if(type.type!=='array')fail('DIS_FUNCTION_SCHEMA_INVALID');
+ keys(type,['type','items','minItems','maxItems']);
+ const min=type.minItems??0,max=type.maxItems??MAX;
+ if(type.items===undefined||!Number.isSafeInteger(min)||!Number.isSafeInteger(max)||
+    min<0||max<min||max>MAX)fail('DIS_FUNCTION_SCHEMA_INVALID');
+ validateFieldType(type.items,depth+1);
+}
+function validateShape(shape,depth=0,top=true){
+ if(depth>MAX_SHAPE_DEPTH)fail('DIS_FUNCTION_SCHEMA_INVALID');
+ keys(shape,top?['type','fields','optional','additionalProperties','allowAbsent']:
+  ['type','fields','optional','additionalProperties']);
  if(shape.type!=='record'||(shape.fields!==undefined&&!record(shape.fields))||
     (shape.additionalProperties!==undefined&&typeof shape.additionalProperties!=='boolean')||
     (shape.allowAbsent!==undefined&&typeof shape.allowAbsent!=='boolean'))
@@ -112,13 +131,46 @@ function validateShape(shape){
  if(Object.keys(fields).length>MAX||!arr(optional,true)||new Set(optional).size!==optional.length)
   fail('DIS_FUNCTION_SCHEMA_INVALID');
  for(const [name,type] of Object.entries(fields)){
-  if(!FIELD.test(name)||!VALUE_TYPES.has(type))fail('DIS_FUNCTION_SCHEMA_INVALID');
+  if(!FIELD.test(name))fail('DIS_FUNCTION_SCHEMA_INVALID');
+  validateFieldType(type,depth+1);
  }
  if(optional.some(name=>typeof name!=='string'||!Object.hasOwn(fields,name))||
     (shape.allowAbsent===true&&(Object.keys(fields).length!==0||
       shape.additionalProperties!==false)))
   fail('DIS_FUNCTION_SCHEMA_INVALID');
 }
+function valueMatchesField(type,value,depth=0){
+ if(depth>MAX_SHAPE_DEPTH)return false;
+ if(typeof type==='string'){
+  if(type==='record')return record(value);
+  if(type==='array')return Array.isArray(value);
+  return type==='number'?typeof value==='number'&&Number.isFinite(value):
+    typeof value===type;
+ }
+ if(type.type==='record')return valueMatchesShape(type,value,depth+1);
+ if(type.type!=='array'||!Array.isArray(value))return false;
+ if(value.length<(type.minItems??0)||value.length>(type.maxItems??MAX))return false;
+ for(let i=0;i<value.length;i++){
+  if(!Object.hasOwn(value,i)||!valueMatchesField(type.items,value[i],depth+1))return false;
+ }
+ return true;
+}
+function valueMatchesShape(shape,value,depth=0){
+ if(!record(value)||depth>MAX_SHAPE_DEPTH)return false;
+ const fields=shape.fields??{},optional=new Set(shape.optional??[]);
+ for(const [name,type] of Object.entries(fields)){
+  if(!Object.hasOwn(value,name)){
+   if(optional.has(name))continue;
+   return false;
+  }
+  if(!valueMatchesField(type,value[name],depth+1))return false;
+ }
+ return shape.additionalProperties!==false||
+  Object.keys(value).every(name=>Object.hasOwn(fields,name));
+}
+const sameFieldType=(a,b)=>typeof a==='string'&&typeof b==='string'?
+ a===b:typeof a==='object'&&a!==null&&typeof b==='object'&&b!==null&&
+ sha256Canonical(a)===sha256Canonical(b);
 function validateFunctionContract(c){
  keys(c,['schema','version','input','output','outcomes','evidence','compatibility']);
  if(c.schema!=='dis.v0.2.function-contract/1'||!/^[1-9][0-9]*\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/.test(c.version))fail('DIS_FUNCTION_CONTRACT_INVALID');
@@ -144,7 +196,8 @@ function validateFunctionContract(c){
 }
 /**
  * Bounded structural consumer-compatibility check, NOT independent evidence or
- * an authorization to replace an installed AOT. No recursive schema claims.
+ * an authorization to replace an installed AOT. Nested descriptors are opt-in;
+ * changing their structure within one major is conservatively breaking.
  * Same-version ABI drift and same-major breaking changes fail closed.
  */
 export function compareDisV020FunctionContracts(previous,next){
@@ -169,14 +222,16 @@ export function compareDisV020FunctionContracts(previous,next){
  if(prevIn.allowAbsent===true&&nextIn.allowAbsent!==true)broken();
  for(const [name,type] of Object.entries(nextInFields)){
   if(Object.hasOwn(prevInFields,name)){
-   if(prevInFields[name]!==type||(prevInOptional.has(name)&&!nextInOptional.has(name)))broken();
+   if(!sameFieldType(prevInFields[name],type)||
+      (prevInOptional.has(name)&&!nextInOptional.has(name)))broken();
   }else if(!nextInOptional.has(name)||prevIn.additionalProperties!==false)broken();
  }
  for(const name of Object.keys(prevInFields)){
   if(!Object.hasOwn(nextInFields,name)&&nextIn.additionalProperties===false)broken();
  }
  for(const [name,type] of Object.entries(prevOutFields)){
-  if(nextOutFields[name]!==type||(!prevOutOptional.has(name)&&nextOutOptional.has(name)))broken();
+  if(!sameFieldType(nextOutFields[name],type)||
+     (!prevOutOptional.has(name)&&nextOutOptional.has(name)))broken();
  }
  if(prevOut.additionalProperties===false&&
     (nextOut.additionalProperties!==false||
@@ -200,16 +255,7 @@ export function validateDisV020FunctionValue(contract,phase,value){
  // An explicitly zero-parameter LOCAL Function accepts no argument as well
  // as {}. This is not the same as accepting unknown/unvalidated fields.
  if(phase==='input'&&value===undefined&&shape.allowAbsent===true)return true;
- if(!record(value))fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
- const fields=shape.fields??{},optional=new Set(shape.optional??[]);
- for(const [name,type] of Object.entries(fields)){
-  if(!Object.hasOwn(value,name)&&optional.has(name))continue;
-  const v=value[name];
-  if(type==='record'?!record(v):type==='array'?!Array.isArray(v):
-     type==='number'?typeof v!=='number'||!Number.isFinite(v):typeof v!==type)
-   fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
- }
- if(shape.additionalProperties===false&&Object.keys(value).some(k=>!Object.hasOwn(fields,k)))
+ if(!valueMatchesShape(shape,value))
   fail(phase==='input'?'DIS_FUNCTION_INPUT_INVALID':'DIS_FUNCTION_OUTPUT_INVALID');
  return true;
 }
