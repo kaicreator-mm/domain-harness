@@ -13,6 +13,12 @@ export const EV16_R3_ORIGINS=Object.freeze({
   path:'docs/standards/dke/DKE-0.0.1/demos/ev16-d04-source-tier-r0/EV16_D02_D04_R3_REPAIR_EXECUTION_RECEIPT.json',
   gitBlob:'844a16219e31cc994d4d958e565879cb5e0c6872'
  }),
+ r1:Object.freeze({
+  repository:'kaicreator-mm/domain-forge',
+  commit:'bd15d5e433bd53808910a4069681b43fccff9f79',
+  path:'docs/standards/dke/DKE-0.0.1/demos/ev16-d04-source-tier-r0/EXECUTION_RECEIPT_R1_SELECTED_CONSUMER_REPAIR.json',
+  gitBlob:'4fe1b2ec9ae359e3b75c775267a7f354641006bd'
+ }),
  routing:Object.freeze({
   repository:'kaicreator-mm/domain-forge',
   commit:'5659d8f56a53ef63981fe93a264cad6c453a94ed',
@@ -27,12 +33,13 @@ const selection=Object.freeze({
 });
 const fail=code=>{const e=new Error(code);e.code=code;throw e};
 const parse=text=>{try{return JSON.parse(text)}catch{return null}};
-export function makeEv16R3Reader(receiptText,routingText){
- if(typeof receiptText!=='string'||typeof routingText!=='string'||
+export function makeEv16R3Reader(receiptText,routingText,r1Text){
+ if(typeof receiptText!=='string'||typeof routingText!=='string'||typeof r1Text!=='string'||
     sourceGitBlob(receiptText)!==EV16_R3_ORIGINS.receipt.gitBlob||
-    sourceGitBlob(routingText)!==EV16_R3_ORIGINS.routing.gitBlob)
+    sourceGitBlob(routingText)!==EV16_R3_ORIGINS.routing.gitBlob||
+    sourceGitBlob(r1Text)!==EV16_R3_ORIGINS.r1.gitBlob)
   fail('DKE_EV16_R3_ORIGINAL_DATA_DRIFT');
- const r=parse(receiptText),q=parse(routingText);
+ const r=parse(receiptText),q=parse(routingText),fresh=parse(r1Text);
  if(r?.schema!=='dke.ev16-d02-d04.r3-source-first-repair-replay/1'||
     r.source?.originalTallyNodes!==807||
     r.source?.inputGitBlobs?.graph!=='0f6007315fd7352fe6fd218effcfecf672cb4961'||
@@ -62,6 +69,25 @@ export function makeEv16R3Reader(receiptText,routingText){
     q.gates?.qualifiedSap!==0||q.gates?.authorizedEffects!==0||
     q.gates?.releaseEligible!==false)
   fail('DKE_EV16_R7_OWNER_BOUNDARY_INVALID');
+ if(fresh?.schema!=='dke.ev16.selected-consumer-independent-review-repair/1'||
+    fresh.exact?.reusedUnchangedR3VerifierGitBlob!=='b4b86af4b9def3db1a3817dd459c05ec0e2ea579'||
+    fresh.exact?.repairedConsumerGitBlob!=='70005ef7c181260a6aaf041b829927fc4d194bed'||
+    fresh.exact?.inputOriginalGitBlobs?.tallyGraph!==r.source.inputGitBlobs.graph||
+    fresh.exact?.inputOriginalGitBlobs?.scopedDecision!==r.source.inputGitBlobs.scope||
+    fresh.exact?.inputOriginalGitBlobs?.rfc9110!==r.source.inputGitBlobs.rfc9110||
+    fresh.exact?.inputOriginalGitBlobs?.rfc9111!==r.source.inputGitBlobs.rfc9111||
+    fresh.execution?.sourceR3?.sourceBlobVerification!=='ACTUAL_UTF8_GIT_BLOB_SHA1_MATCHED_4_OF_4'||
+    fresh.execution?.suite?.tests!==21||fresh.execution.suite.passed!==21||
+    fresh.execution.suite.failed!==0||
+    fresh.execution?.positive?.selectedQueries!==10||
+    fresh.execution.positive.root!=='UNKNOWN'||
+    fresh.execution?.negative?.additionalInvalidRequestsBlocked!==5||
+    fresh.gates?.sourceOwnerDecision!=='NOT_ATTESTED'||
+    fresh.gates?.independentOracle!=='NOT_QUALIFIED'||
+    fresh.gates?.formalEv16Cell!=='NOT_RUN'||
+    fresh.gates?.qualifiedR8Cells!=='0/53'||
+    fresh.gates?.qualifiedSap!==0||fresh.gates?.effectsAuthorized!==0)
+  fail('DKE_EV16_R1_REVIEW_SCOPE_INVALID');
  const byId=Object.fromEntries((q.decisionRouting??[]).map(x=>[x.id,x]));
  if(q.decisionRouting?.length!==6||
     byId.OD01?.productScope!=='CONFIRMED_ACCEPT_SCOPED'||
@@ -84,6 +110,10 @@ export function makeEv16R3Reader(receiptText,routingText){
    originalGraphGitBlob:r.source.inputGitBlobs.graph,
    r3ReceiptGitBlob:EV16_R3_ORIGINS.receipt.gitBlob,
    r7RoutingGitBlob:EV16_R3_ORIGINS.routing.gitBlob,
+   r1IndependentReviewGitBlob:EV16_R3_ORIGINS.r1.gitBlob,
+   selectedCqChecks:fresh.execution.suite.passed,
+   selectedQueryCount:fresh.execution.positive.selectedQueries,
+   selectedConsumerCodeGitBlob:fresh.exact.repairedConsumerGitBlob,
    sapQualified:false,effectDispatched:false
   });
  }});
