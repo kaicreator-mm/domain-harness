@@ -162,3 +162,37 @@ test('C1 EV16 R3 provenance forgery or Owner/Effect escalation is rejected at so
  try{await assert.rejects(app.invoke(FN,{subject:'EV16:D02+D04',approved:true}),e=>Boolean(e))}
  finally{app.stop()}
 });
+
+test('C1 EV16 R1 public native SDK preflight cannot invoke request getters or leak Proxy traps',async()=>{
+ const x=await prepared,app=await activate(x);
+ try{
+  let getterReads=0;
+  const changing={};
+  Object.defineProperty(changing,'subject',{enumerable:true,get(){
+   getterReads++;
+   return getterReads===1?'EV16:D02+D04':'se:UNSELECTED';
+  }});
+  await assert.rejects(app.invoke(FN,changing,{expectedContractVersion:'1.0.0'}),
+   deny('DIS_FUNCTION_INPUT_INVALID'));
+  assert.equal(getterReads,0,'native schema guard must not run the caller getter before Reader');
+  const trap=new Proxy({subject:'EV16:D02+D04'},{
+   getPrototypeOf(){throw Error('hostile pre-reader Proxy trap')}
+  });
+  await assert.rejects(app.invoke(FN,trap,{expectedContractVersion:'1.0.0'}),
+   deny('DIS_FUNCTION_INPUT_INVALID'));
+  await assert.rejects(app.invoke(FN,
+   {subject:'EV16:D02+D04',[Symbol('injected-privilege')]:true},
+   {expectedContractVersion:'1.0.0'}),deny('DIS_FUNCTION_INPUT_INVALID'));
+  const valid=await app.invoke(FN,{subject:'EV16:D02+D04'},
+   {expectedContractVersion:'1.0.0'});
+  assert.equal(valid.disposition,'UNKNOWN');
+  assert.equal(valid.authority,'NONE');
+  assert.equal(valid.evidence.attested,false);
+  assert.equal(valid.value.sapQualified,false);
+  assert.equal(valid.value.effectDispatched,false);
+  const original=x.reader.query({subject:'EV16:D02+D04'});
+  assert.equal(Object.isFrozen(original),true);
+  assert.equal(original.status,'UNKNOWN');
+  assert.equal(original.ownerReviewDecision,'NOT_RUN');
+ }finally{app.stop()}
+});
