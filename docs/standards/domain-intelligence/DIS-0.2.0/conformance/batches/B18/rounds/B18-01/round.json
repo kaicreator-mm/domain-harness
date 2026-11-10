@@ -3,27 +3,73 @@
   "batchId": "B18",
   "roundId": "B18-01",
   "globalRoundId": "R64",
-  "status": "CI_PENDING",
-  "originCommit": null,
-  "originTree": null,
+  "status": "VERIFIED",
+  "originCommit": "b011497b085c96735d09a4952302be36ac41b36a",
+  "originTree": "8032464207c5fb707d89167e3699e33a83ba421d",
   "testPath": "examples/dis-v020-native-sdk/b18-r23-ev16-full-source.test.mjs",
   "testGitBlob": "8aa27a9911dbed8874c90face38d8af96b665b43",
   "receipt": "receipts/r64-b18-ev16-full-original-source-native-ci.json",
-  "sourceHead": null,
-  "checks": [],
+  "sourceHead": "ab78c52d9b6717c6badb27b4542736f47c69bc42",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2355/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2355/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2355/3"
+    }
+  ],
   "positive": [
-    "Four exact full original Git Blobs selected in AOT: original Tally 807-node JSON-LD as DATA, original R8 and gate DATA, R23 Reader LOCAL",
-    "Actual installed selected KDP Knowledge Function yields typed UNKNOWN for EV16 with 807 nodes, 271 RelationshipAssertions, zero RFC9111 asserted join",
-    "Cross-request returned arrays do not poison the Reader's internal frozen source"
+    "R64 exact four complete original Git Blobs: real Tally graph DATA selected, R23 code is LOCAL, all pins visible in AOT",
+    "R64 actual selected KDP invoking original full-source-bound EV16 returns typed UNKNOWN, never RFC join or Effect",
+    "R64 native installer refuses changed original full graph sha, missing source or DATA-as-LOCAL Function source"
   ],
   "negative": [
-    "Changed original graph text, matrix or gate refused by full-payload Git Blob check",
-    "Forged source origin/install SHA, DATA-as-executable, wrong Function version or extra authority input rejected",
-    "No positive RFC↔Tally source claim, no SAP, no Effect"
+    "R64 native full Tally graph tamper, false RFC source, fake SAP/Effect and empty data fail closed at Reader construction",
+    "R64 origin allowlist is exact by original producer repo, commit, path and Git Blob, not a broad docs or executable relaxation",
+    "R64 native selected Knowledge rejects wrong EV, extra payload, false approvals and contract mismatch"
   ],
   "limits": [
-    "Native new exact CI NOT_RUN or PENDING at this prequalification snapshot",
-    "No independent semantic reviewer or full original RFC HTML raw bytes; full EV16 0/2 qualified",
-    "R64 R1 test Git Blob 8aa27a9911dbed8874c90face38d8af96b665b43 (R0 was 607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460); original R0 exact a0da2aa00e052b6dda215a63fa80641b8ef125e8 Woodpecker #2350/1 native FAILURE, original R1 exact b011497b085c96735d09a4952302be36ac41b36a #2353/1 native FAILURE, #2353/2 and /3 SUCCESS. Both native runs remain unqualified; R1 first failure logs unavailable via GitHub connector. B18 stays 0/1; no inherited CI PASS, independent semantic SAP, Effect, or Core promotion."
-  ]
+    "Only the original full Tally graph, R8 matrix, and R22 gate source identities are authenticated; RFC 9111 complete raw HTML and independent source semantic Critic are NOT_RUN.",
+    "Original EV16 two cross-domain cells are not complete, no proven normative RFC↔Tally join; original R8 full EV16 stays 0/2 and all original R8 cells 0/53.",
+    "This round does not qualify independent domain source-owner semantic SAP, physical Effects, or Product/L1 scope; no Freeze, merge or release; CORE-016 stays PARTIAL.",
+    "Docs-only qualification archive commits after ab78c52d must qualify under their own exact SHA CI and never inherit #2355."
+  ],
+  "originalR0TestGitBlob": "607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460",
+  "originalR0SourceHead": "a0da2aa00e052b6dda215a63fa80641b8ef125e8",
+  "history": [
+    {
+      "sourceHead": "a0da2aa00e052b6dda215a63fa80641b8ef125e8",
+      "testBlob": "607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460",
+      "pipeline": "#2350",
+      "native": "FAILURE",
+      "finding": "Original contracts validatePins source-origin predicate rejected both the legitimate full Tally v2.1.1 docs/versions/v2.1.1/knowledge/generated/graph.jsonld DATA input and the original DKE R23 verified-reader.mjs LOCAL Reader; a source-level precondition failure reproduced locally, not an authenticated step traceback.",
+      "correction": "76e1f6b1ebf7f7f8b32532ebec29b4419bd4b0cf"
+    },
+    {
+      "sourceHead": "b011497b085c96735d09a4952302be36ac41b36a",
+      "testBlob": "8aa27a9911dbed8874c90face38d8af96b665b43",
+      "pipeline": "#2353",
+      "native": "FAILURE",
+      "finding": "After the allowlist repair, the retained R63 closeout 5154137d had appended two free-text rows (prose without {path,case}) to CORE-016 positive/negative; its own pipeline #2349 was canceled, so examples/dis-v020-conformance/validate.mjs fail-closed 4x MATRIX_CASE_INVALID once validatePins let the suite reach it.",
+      "correction": "ab78c52d9b6717c6badb27b4542736f47c69bc42"
+    },
+    {
+      "sourceHead": "ab78c52d9b6717c6badb27b4542736f47c69bc42",
+      "testBlob": "8aa27a9911dbed8874c90face38d8af96b665b43",
+      "pipeline": "#2355",
+      "native": "SUCCESS",
+      "finding": "R2 anchors both CORE-016 rows to real full-ledger-30.test.mjs cases and adds a free-text-evidence regression rejection; exact #2355/1 native, /2 compatibility, /3 verify 3/3 SUCCESS at ab78c52d with the unchanged R1 test Blob 8aa27a99."
+    }
+  ],
+  "qualificationHead": "ab78c52d9b6717c6badb27b4542736f47c69bc42",
+  "qualificationTree": "c127b719aafb08f9c7452fc33b3cc5830fae6d7b"
 }

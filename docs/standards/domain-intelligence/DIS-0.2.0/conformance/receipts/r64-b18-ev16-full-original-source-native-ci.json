@@ -2,16 +2,32 @@
   "schema": "dis.v0.2.validation-receipt/1",
   "id": "r64-b18-ev16-full-original-source-native-ci",
   "disVersion": "0.2.0",
-  "status": "PENDING",
+  "status": "SUCCESS",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": null,
-    "tree": null
+    "head": "ab78c52d9b6717c6badb27b4542736f47c69bc42",
+    "tree": "c127b719aafb08f9c7452fc33b3cc5830fae6d7b"
   },
-  "originCommit": null,
+  "originCommit": "b011497b085c96735d09a4952302be36ac41b36a",
   "testPath": "examples/dis-v020-native-sdk/b18-r23-ev16-full-source.test.mjs",
   "testGitBlob": "8aa27a9911dbed8874c90face38d8af96b665b43",
-  "ci": [],
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2355/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2355/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2355/3"
+    }
+  ],
   "originalSources": [
     {
       "id": "r8",
@@ -61,6 +77,40 @@
     "Four Git original Blobs have been copied byte-exact into DIS Git blob storage, but the complete source's new native CI must run at this new exact code SHA before VERIFIED.",
     "This Function only returns UNKNOWN and source-integrity observations; external RFC full raw HTML, semantic Critic/owner, SAP/Effects are unqualified.",
     "The old 31/31 bounded DIS Demo rounds are historically VERIFIED; B18 is not included until fresh exact CI success.",
-    "R64 R1 test Git Blob 8aa27a9911dbed8874c90face38d8af96b665b43 (R0 was 607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460); original R0 exact a0da2aa00e052b6dda215a63fa80641b8ef125e8 Woodpecker #2350/1 native FAILURE, original R1 exact b011497b085c96735d09a4952302be36ac41b36a #2353/1 native FAILURE, #2353/2 and /3 SUCCESS. Both native runs remain unqualified; R1 first failure logs unavailable via GitHub connector. B18 stays 0/1; no inherited CI PASS, independent semantic SAP, Effect, or Core promotion."
-  ]
+    "The old 31/31 bounded DIS Demo rounds are historically VERIFIED; B18 R2 qualified fresh at exact ab78c52d #2355/1-3 3/3 SUCCESS with R0 #2350/1 and R1 #2353/1 native FAILURE retained in repairHistory."
+  ],
+  "observations": [
+    "R64 test is a fresh native selected full-original-source suite; four original Git Blobs (Tally 807-node graph DATA, DKE R8 matrix DATA, R22 gate DATA, R23 Reader LOCAL_CODE) are byte-exact copies selected through the real DIS AOT/SDK/KDP pipeline.",
+    "Selected Function returns typed UNKNOWN for EV16 with zero asserted RFC9111 joins; independent SAP and Effects stay false. No positive RFC-Tally source claim is made.",
+    "R0 #2350/1 FAILURE was a contracts validatePins source-origin predicate over-rejection reproduced locally before repair; R1 #2353/1 FAILURE exposed retained R63 closeout free-text matrix rows fail-closed as 4x MATRIX_CASE_INVALID once the suite reached the conformance validator; R2 #2355/1-3 all three contexts SUCCESS at the same R1 test Blob 8aa27a99.",
+    "Both native failures and their repairs stay on record; the final qualification is fresh exact-source CI, not an inherited or promoted PASS."
+  ],
+  "repairHistory": [
+    {
+      "sourceHead": "a0da2aa00e052b6dda215a63fa80641b8ef125e8",
+      "testBlob": "607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460",
+      "pipeline": "#2350",
+      "native": "FAILURE",
+      "finding": "Original contracts validatePins source-origin predicate rejected both the legitimate full Tally v2.1.1 docs/versions/v2.1.1/knowledge/generated/graph.jsonld DATA input and the original DKE R23 verified-reader.mjs LOCAL Reader; a source-level precondition failure reproduced locally, not an authenticated step traceback.",
+      "correction": "76e1f6b1ebf7f7f8b32532ebec29b4419bd4b0cf"
+    },
+    {
+      "sourceHead": "b011497b085c96735d09a4952302be36ac41b36a",
+      "testBlob": "8aa27a9911dbed8874c90face38d8af96b665b43",
+      "pipeline": "#2353",
+      "native": "FAILURE",
+      "finding": "Retained R63 closeout 5154137d free-text CORE-016 evidence rows (prose without {path,case}, its own pipeline #2349 canceled) fail-closed 4x MATRIX_CASE_INVALID in the conformance validator once validatePins let the suite reach it.",
+      "correction": "ab78c52d9b6717c6badb27b4542736f47c69bc42"
+    },
+    {
+      "sourceHead": "ab78c52d9b6717c6badb27b4542736f47c69bc42",
+      "testBlob": "8aa27a9911dbed8874c90face38d8af96b665b43",
+      "pipeline": "#2355",
+      "native": "SUCCESS",
+      "finding": "R2 anchors both CORE-016 rows to real full-ledger-30.test.mjs cases and adds a free-text-evidence regression rejection; exact #2355/1 native, /2 compatibility, /3 verify 3/3 SUCCESS."
+    }
+  ],
+  "qualificationHead": "ab78c52d9b6717c6badb27b4542736f47c69bc42",
+  "qualificationTree": "c127b719aafb08f9c7452fc33b3cc5830fae6d7b",
+  "qualificationMeaning": "B18 R64 native full-original Tally EV16 source-bound selected Knowledge Function; original four Git Blobs byte-exact, typed UNKNOWN read-only, at exact ab78c52d with #2355 three-context SUCCESS; R0/#2350 and R1/#2353 native failures preserved as history, not reclassified."
 }
