@@ -87,8 +87,16 @@ test('B04-02 R42 fake SAP approval or historical reviewer byte substitution is r
 test('B04-02 R42 Core semantic or Target promotion without actual owner and approved scope is rejected',()=>{
  const r=clone(baseline);r.matrix.requirements.find(x=>x.id==='DIS020-CORE-002').state='VERIFIED';
  assert.throws(()=>inspectClosure(r),reject('CLOSURE_DAG_GAP'));
- const t=clone(baseline);t.matrix.requirements.find(x=>x.id==='DIS020-CORE-008').state='VERIFIED';
- assert.throws(()=>inspectClosure(t),reject('CLOSURE_DAG_GAP'));
+ // R85: CORE-008 is now legitimately VERIFIED for the *approved*
+ // linux/x64/node Demo Target. Recreate the old unapproved Product gate as
+ // an adversarial mutant, rather than treating current acceptance as a flaw.
+ const accepted=inspectClosure(clone(baseline));
+ assert.equal(accepted.remaining.some(x=>x.id==='DIS020-CORE-008'),false);
+ assert.equal(accepted.sourceReview.sap,'UNQUALIFIED');
+ const t=clone(baseline);
+ t.plan.blockers.push({code:'TARGET_APPLICABILITY_NOT_APPROVED',
+  blocks:['DIS020-CORE-008'],requires:'Simulated missing Product Target approval'});
+ assert.throws(()=>inspectClosure(t),reject('CLOSURE_UNQUALIFIED_TARGET_PROMOTION'));
 });
 test('B04-02 R42 skipped dependency, fake governance and incomplete prior round audit fail closed',()=>{
  const r=clone(baseline);r.plan.coreAndGovernance[0].requirementIds.pop();
