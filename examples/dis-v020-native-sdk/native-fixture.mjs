@@ -97,6 +97,23 @@ export async function makeNativeFixture(){
   compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
  });
  const find=id=>program.elements.flatMap(e=>e.functions).find(fn=>fn.id===id);
+ // R72 descriptions are specific author-supplied Function purpose metadata;
+ // never derive these from Element tags or claim that they confer source SAP.
+ for(const [id,description] of Object.entries({
+  "orders.appInit": "Initialize the selected orders business app after required KDP packages are ready; no Effect permission",
+  "orders.approve": "Submit a selected orders approval intent to KDP governance; admission is not business execution",
+  "tally.assessTaskEvidence": "Read original Tally task evidence as advisory Rule observation without issuing Claim authority",
+  "tally.projectReleaseReadiness": "Read original Tally release readiness projection as advisory Rule, not independent RQ authorization",
+  "runx.createPresenceObserver": "Create original Runx agent-presence observer with process-local state, not an execution lease",
+  "xdownload.describePolicy": "Read source-selected xDownload policy as Knowledge without starting an acquisition",
+  "xdownload.interaction.inspect": "Inspect a download goal and request missing Intent information with no Effect",
+  "xdownload.interaction.confirm": "Check confirmed download Intent for a separate KDP request without granting Effect",
+  "xdownload.confirmDownload": "Request governed xDownload acquisition via KDP Intent; a receipt does not prove download success"
+})){
+  const fn=find(id);if(!fn)throw new Error('missing selected public Function description: '+id);
+  fn.description=description;
+ }
+
  // R16: typed KDP admission contract is separate from a LOCAL observation.
  // A real KDP admitted receipt is NOT evidence that an Effect completed.
  find('orders.approve').receiptContract={

@@ -422,8 +422,11 @@ export function qualifyDisV020Artifact(artifact){
   unique(e.dependsOn,'DIS_DEPENDENCY_DUPLICATE');
   elements.set(e.id,e);
   for(const f of e.functions){
-   keys(f,['id','kind','effect','binding','optional','contract','receiptContract','handleContract','sourceDependencies']);
+   keys(f,['id','kind','description','effect','binding','optional','contract','receiptContract','handleContract','sourceDependencies']);
    if(f.optional!==undefined&&typeof f.optional!=='boolean')fail('DIS_FUNCTION_INVALID');
+   if(f.description!==undefined&&(
+      typeof f.description!=='string'||!f.description.trim()||
+      f.description.length>2048))fail('DIS_FUNCTION_DESCRIPTION_INVALID');
    if(!id(f.id)||functions.has(f.id)||!FUNCTION_KINDS.has(f.kind)||
       !['none','governed'].includes(f.effect))fail('DIS_FUNCTION_INVALID');
    if(f.contract!==undefined)validateFunctionContract(f.contract);
@@ -579,4 +582,40 @@ export function qualifyDisV020Artifact(artifact){
  return {functions,elements,selected,pins,target,semanticRelations:Object.freeze(semanticRelations),
   sourceConsumers:new Map([...sourceConsumers].map(([sourceId,ids])=>
     [sourceId,Object.freeze(ids.sort())]))};
+}
+
+
+// R72: public Function description and typed I/O inventory for *actual*
+// selected AOT Functions. Strict metadata check is opt-in for legacy
+// experimental DIS 0.2 artifacts; no missing description is fabricated from
+// an Element's description or a source name. The result is NOT SAP or a
+// business-validity oracle, and is not a certificate that CORE-003 is closed.
+export function inspectDisV020PublicFunctionCoverage(artifact){
+ const qualified=qualifyDisV020Artifact(artifact);
+ const rows=[];
+ for(const [id,selected] of qualified.functions){
+  const fn=selected.definition;
+  if(typeof fn.description!=='string'||!fn.description.trim()||
+     fn.description.length>2048)
+   fail('DIS_PUBLIC_FUNCTION_DESCRIPTION_REQUIRED');
+  const typedIO=fn.contract!==undefined;
+  rows.push(Object.freeze({
+   id,kind:fn.kind,binding:fn.binding.type,description:fn.description,
+   typedIO,profile:typedIO?'TYPED_IO':
+    fn.receiptContract!==undefined?'KDP_ADMISSION_RECEIPT_ONLY':
+    fn.handleContract!==undefined?'LOCAL_HANDLE_METHODS_ONLY':
+    fn.kind==='init'?'APP_INIT_LIFECYCLE_ONLY':'UNQUALIFIED_PUBLIC_IO'
+  }));
+ }
+ rows.sort((a,b)=>a.id.localeCompare(b.id));
+ const gaps=rows.filter(x=>!x.typedIO);
+ return Object.freeze({
+  functions:rows.length,descriptionsPresent:rows.length,
+  typedIOFunctions:rows.length-gaps.length,
+  missingTypedIO:Object.freeze(gaps.map(x=>x.id)),
+  rows:Object.freeze(rows),
+  fullCore003Ready:gaps.length===0,
+  independentSAP:false,
+  effectExecutionProven:false
+ });
 }
