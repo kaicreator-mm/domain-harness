@@ -9,7 +9,12 @@ export const ORIGINAL=Object.freeze({
  nativeTestBlob:'a0eb607aeca433109a703b2e699c2eb719f5ed96',
  readerBlob:'650a0690774698b30992cddeed7791e6093f3b2d',
  sourceR32Checker:'4cb132e06969fe60a28aa7ce376aa8d112309e37',
- selectedCounts:Object.freeze({QUARANTINE_FATAL:233,REVIEW_SOFT:3769,STRUCTURAL_CANDIDATE:906474})
+ selectedCounts:Object.freeze({QUARANTINE_FATAL:233,REVIEW_SOFT:3769,STRUCTURAL_CANDIDATE:906474}),
+ tierHashes:Object.freeze({
+  QUARANTINE_FATAL:'0e9a875ecf88c40e477067d4f09298b8df4fed33384dd011d662ce4f301ec949',
+  REVIEW_SOFT:'2bf208ced4ee4a347f211861ab4461a5d467ee2a285ea23505b13140c085aeb9',
+  STRUCTURAL_CANDIDATE:'d92a9b806568966e37f52f40f2c99fabe03bb5f10e964283638d8b2db846323f'
+ })
 });
 const REQUIRE_CONTEXT=new Set([
  'ci/woodpecker/pr/dis-v020-integration','ci/woodpecker/pr/verify-min-node',
@@ -30,6 +35,14 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
     Object.keys(r.counts).length!==3||
     Object.entries(ORIGINAL.selectedCounts).some(([k,v])=>r.counts[k]!==v)||
     Object.values(r.counts).reduce((a,v)=>a+v,0)!==r.rows||
+    !isObject(r.canonicalRowSha256)||
+    Object.keys(r.canonicalRowSha256).length!==3||
+    Object.entries(ORIGINAL.tierHashes).some(([k,v])=>r.canonicalRowSha256[k]!==v)||
+    r.hardReasons?.WITH_FROM_REQUIRED_IC!==228||
+    r.hardReasons?.IC_WITH_FROM_GO_SELF_REFERENCE!==3||
+    r.hardReasons?.RELATION_ASPECT_INVALID!==2||
+    r.softEvidence?.IPI!==3736||r.softEvidence?.IGI!==19||
+    r.softEvidence?.ISS!==12||r.softEvidence?.ISM!==2||
     out?.qualification?.sapQualified!==0||out?.qualification?.independentCritic!=='NOT_RUN'||
     out?.qualification?.disEffects!=='NONE')fail('ORIGINAL_SOURCE_EVIDENCE_INVALID');
  if(receipt?.id!=='r82-b22-r33-source-native-ci'||receipt?.status!=='SUCCESS'||
