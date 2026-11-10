@@ -94,12 +94,17 @@ export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins
   app=await load(artifact.built,{store,tenantId,deploymentIdentity});
   const selected=qualified.functions.get(artifact.program.appInit);
   if(!selected||selected.definition.kind!=='init')refuse('DIS_INIT_NOT_SELECTED');
-  const result=await delegates.get(artifact.program.appInit)(Object.freeze({
+  const initContext=Object.freeze({
    appId:artifact.built.appId,domainIds:Object.freeze(artifact.program.domains.map(x=>x.id)),
    buildPin:artifact.built.subjectDigest,aotDigest:artifact.digest,
    functions:Object.freeze([...qualified.functions.keys()].filter(x=>x!==artifact.program.appInit))
-  }));
+  });
+  if(selected.definition.initContract?.input!==undefined)
+   validateDisV020FunctionValue({input:selected.definition.initContract.input},'input',initContext);
+  const result=await delegates.get(artifact.program.appInit)(initContext);
   if(!result||!['READY','DEGRADED'].includes(result.status))refuse('DIS_INIT_BLOCKED');
+  if(selected.definition.initContract?.output!==undefined)
+   validateDisV020FunctionValue({output:selected.definition.initContract.output},'output',result);
   const unavailable=result.unavailable??[];
   if(!Array.isArray(unavailable)||new Set(unavailable).size!==unavailable.length)refuse('DIS_INIT_INVALID');
   for(const id of absentOptional){
@@ -128,9 +133,11 @@ export async function loadDisV020Aot(artifact,{expectedDigest,expectedSourcePins
    functions:Object.freeze([...qualified.functions.keys()].filter(x=>x!==artifact.program.appInit)),
    contractVersions:Object.freeze(Object.fromEntries([...qualified.functions]
     .filter(([,x])=>x.definition.contract!==undefined||
-      x.definition.receiptContract!==undefined||x.definition.handleContract!==undefined)
+      x.definition.receiptContract!==undefined||x.definition.handleContract!==undefined||
+      x.definition.initContract!==undefined)
     .map(([id,x])=>[id,x.definition.contract?.version??
-       x.definition.receiptContract?.version??x.definition.handleContract.version]))),
+       x.definition.receiptContract?.version??x.definition.handleContract?.version??
+       x.definition.initContract.version]))),
    async invoke(id,input,options={}){
     if(!open)refuse('DIS_APP_NOT_READY');
     const entry=qualified.functions.get(id);

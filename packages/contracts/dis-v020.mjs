@@ -71,6 +71,27 @@ export function validateDisV020LocalHandle(contract,value){
   fail('DIS_LOCAL_HANDLE_INVALID');
  return true;
 }
+
+/** Business App Init has a typed lifecycle envelope, not a second Kernel. */
+function validateAppInitContract(c){
+ keys(c,['schema','version','input','output','outcomes','compatibility']);
+ if(c.schema!=='dis.v0.2.app-init-contract/1'||!SEMVER.test(c.version)||
+    c.input===undefined||c.output===undefined)
+  fail('DIS_APP_INIT_CONTRACT_INVALID');
+ validateShape(c.input);validateShape(c.output);
+ const i=c.input.fields??{},o=c.output.fields??{};
+ if(i.appId!=='string'||i.domainIds!=='array'||i.buildPin!=='string'||
+    i.aotDigest!=='string'||i.functions!=='array'||o.status!=='string')
+  fail('DIS_APP_INIT_SCHEMA_INVALID');
+ keys(c.outcomes,['READY','DEGRADED','BLOCKED','FAILED']);
+ for(const state of ['READY','DEGRADED','BLOCKED','FAILED'])
+  if(c.outcomes[state]!==state)fail('DIS_APP_INIT_OUTCOMES_INVALID');
+ keys(c.compatibility,['major','minReader','maxReaderExclusive']);
+ if(!Number.isSafeInteger(c.compatibility.major)||c.compatibility.major<1||
+    Number(c.version.split('.')[0])!==c.compatibility.major||
+    c.compatibility.minReader!=='0.2.0'||c.compatibility.maxReaderExclusive!=='0.3.0')
+  fail('DIS_APP_INIT_COMPATIBILITY_INVALID');
+}
 function validateKdpReceiptContract(contract){
  keys(contract,['schema','version','statusMap','compatibility','input','output']);
  if(contract.schema!=='dis.v0.2.kdp-receipt-contract/1'||!SEMVER.test(contract.version))
@@ -433,7 +454,7 @@ export function qualifyDisV020Artifact(artifact){
   unique(e.dependsOn,'DIS_DEPENDENCY_DUPLICATE');
   elements.set(e.id,e);
   for(const f of e.functions){
-   keys(f,['id','kind','description','effect','binding','optional','contract','receiptContract','handleContract','sourceDependencies']);
+   keys(f,['id','kind','description','effect','binding','optional','contract','receiptContract','handleContract','initContract','sourceDependencies']);
    if(f.optional!==undefined&&typeof f.optional!=='boolean')fail('DIS_FUNCTION_INVALID');
    if(f.description!==undefined&&(
       typeof f.description!=='string'||!f.description.trim()||
@@ -443,6 +464,7 @@ export function qualifyDisV020Artifact(artifact){
    if(f.contract!==undefined)validateFunctionContract(f.contract);
    if(f.receiptContract!==undefined)validateKdpReceiptContract(f.receiptContract);
    if(f.handleContract!==undefined)validateLocalHandleContract(f.handleContract);
+   if(f.initContract!==undefined)validateAppInitContract(f.initContract);
    keys(f.binding,['type','sourceId','intentId']);
    const b=f.binding;
    // Interaction is an ordinary Element service, never a new Effect authority.
@@ -454,6 +476,9 @@ export function qualifyDisV020Artifact(artifact){
    if(f.handleContract!==undefined&&(f.kind!=='stateful'||f.effect!=='none'||
       b.type!=='local'||f.contract!==undefined))
     fail('DIS_LOCAL_HANDLE_BINDING_UNSUPPORTED');
+   if(f.initContract!==undefined&&(f.kind!=='init'||b.type!=='local'||
+      f.contract!==undefined||f.receiptContract!==undefined||
+      f.handleContract!==undefined))fail('DIS_INIT_CONTRACT_BINDING_UNSUPPORTED');
    if(f.sourceDependencies!==undefined){
     if(b.type!=='local'||!arr(f.sourceDependencies)||
        new Set(f.sourceDependencies).size!==f.sourceDependencies.length||
@@ -610,10 +635,12 @@ export function inspectDisV020PublicFunctionCoverage(artifact){
      fn.description.length>2048)
    fail('DIS_PUBLIC_FUNCTION_DESCRIPTION_REQUIRED');
   const typedIO=fn.contract!==undefined||
-   (fn.receiptContract?.input!==undefined&&fn.receiptContract?.output!==undefined);
+   (fn.receiptContract?.input!==undefined&&fn.receiptContract?.output!==undefined)||
+   (fn.initContract?.input!==undefined&&fn.initContract?.output!==undefined);
   rows.push(Object.freeze({
    id,kind:fn.kind,binding:fn.binding.type,description:fn.description,
    typedIO,profile:fn.contract!==undefined?'TYPED_LOCAL_IO':
+    fn.initContract?.input!==undefined?'TYPED_APP_INIT_IO':
     fn.receiptContract?.input!==undefined?'TYPED_KDP_ADMISSION_IO':
     fn.receiptContract!==undefined?'KDP_ADMISSION_RECEIPT_ONLY':
     fn.handleContract!==undefined?'LOCAL_HANDLE_METHODS_ONLY':

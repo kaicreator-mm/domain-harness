@@ -114,6 +114,17 @@ export async function makeNativeFixture(){
   fn.description=description;
  }
 
+ // R74 App Init selected typed Context and readiness lifecycle; no KDP Effect.
+ find('orders.appInit').initContract={
+  schema:'dis.v0.2.app-init-contract/1',version:'1.0.0',
+  input:{type:'record',fields:{
+   appId:'string',domainIds:'array',buildPin:'string',
+   aotDigest:'string',functions:'array'
+  },additionalProperties:false},
+  output:{type:'record',fields:{status:'string'},additionalProperties:true},
+  outcomes:{READY:'READY',DEGRADED:'DEGRADED',BLOCKED:'BLOCKED',FAILED:'FAILED'},
+  compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
+ };
  // R16: typed KDP admission contract is separate from a LOCAL observation.
  // A real KDP admitted receipt is NOT evidence that an Effect completed.
  find('orders.approve').receiptContract={

@@ -37,14 +37,15 @@ test('R72 selected Tally Runx xDownload and Orders nine public Functions have ex
 });
 test('R72/R73 selected Function inventory keeps two special non-JSON I/O gaps visible',async()=>{
  const f=await selected,a=inspectDisV020PublicFunctionCoverage(f.artifact);
- assert.equal(a.typedIOFunctions,7);
+ assert.equal(a.typedIOFunctions,8);
  assert.deepEqual([...a.missingTypedIO].sort(),[
-  'orders.appInit','runx.createPresenceObserver'
+  'runx.createPresenceObserver'
  ]);
+ assert.equal(a.rows.find(x=>x.id==='orders.appInit').profile,'TYPED_APP_INIT_IO');
  assert.equal(a.rows.filter(x=>x.profile==='TYPED_KDP_ADMISSION_IO').length,2);
  assert.equal(a.rows.filter(x=>x.profile==='KDP_ADMISSION_RECEIPT_ONLY').length,0);
  assert.equal(a.rows.filter(x=>x.profile==='LOCAL_HANDLE_METHODS_ONLY').length,1);
- assert.equal(a.rows.filter(x=>x.profile==='APP_INIT_LIFECYCLE_ONLY').length,1);
+ assert.equal(a.rows.filter(x=>x.profile==='APP_INIT_LIFECYCLE_ONLY').length,0);
  assert.equal(a.fullCore003Ready,false);
  assert.equal(a.independentSAP,false);
  assert.equal(a.effectExecutionProven,false);
@@ -118,4 +119,43 @@ test('R73 incomplete or forged KDP schema fails source-selected AOT qualificatio
   assert.throws(()=>build(f,p),fail(error));
  }
  assert.equal(inspectDisV020PublicFunctionCoverage(f.artifact).independentSAP,false);
+});
+
+test('R74 selected Business App Init has typed Context / READY lifecycle and no public ingress',async()=>{
+ const f=await selected,a=inspectDisV020PublicFunctionCoverage(f.artifact);
+ assert.equal(a.typedIOFunctions,8);
+ const fn=f.program.elements.flatMap(e=>e.functions).find(x=>x.id==='orders.appInit');
+ assert.equal(fn.initContract.schema,'dis.v0.2.app-init-contract/1');
+ assert.equal(fn.initContract.input.fields.aotDigest,'string');
+ assert.equal(fn.initContract.output.fields.status,'string');
+ assert.equal(fn.initContract.outcomes.DEGRADED,'DEGRADED');
+ assert.equal(a.independentSAP,false);
+ const app=await loadDisV020Aot(f.artifact,{expectedDigest:f.artifact.digest,
+  registry:f.registry,store:new PlainCasDocStore(),tenantId:'tenant:dis-r74-init'});
+ try{
+  assert.equal(app.state,'READY');
+  assert.equal(app.contractVersions['orders.appInit'],'1.0.0');
+  await assert.rejects(app.invoke('orders.appInit',{}),fail('DIS_FUNCTION_UNBOUND'));
+ }finally{app.stop()}
+});
+test('R74 forged App Init Schema and fake outcome cannot grant startup authority',async()=>{
+ const f=await selected;
+ for(const [change,code] of [
+  [x=>{x.input.fields.aotDigest='boolean'},'DIS_APP_INIT_SCHEMA_INVALID'],
+  [x=>{x.output.fields.status='number'},'DIS_APP_INIT_SCHEMA_INVALID'],
+  [x=>{x.outcomes.READY='SUCCEEDED'},'DIS_APP_INIT_OUTCOMES_INVALID'],
+  [x=>{x.compatibility.major=2},'DIS_APP_INIT_COMPATIBILITY_INVALID']
+ ]){
+  const p=clone(f.program);
+  const fn=p.elements.flatMap(e=>e.functions).find(x=>x.id==='orders.appInit');
+  change(fn.initContract);
+  assert.throws(()=>build(f,p),fail(code));
+ }
+ const p=clone(f.program);
+ const fn=p.elements.flatMap(e=>e.functions).find(x=>x.id==='orders.appInit');
+ fn.initContract.output.fields.evidenceRefs='number';
+ const changed=build(f,p);
+ await assert.rejects(loadDisV020Aot(changed,{expectedDigest:changed.digest,
+  registry:f.registry,store:new PlainCasDocStore(),tenantId:'tenant:dis-r74-invalid-output'}),
+  fail('DIS_FUNCTION_OUTPUT_INVALID'));
 });
