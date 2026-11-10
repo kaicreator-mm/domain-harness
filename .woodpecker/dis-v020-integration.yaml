@@ -42,6 +42,7 @@ steps:
       - node --test examples/dis-v020-conformance/validate.test.mjs
       - node --test examples/dis-v020-conformance/full-ledger.test.mjs
       - node --test examples/dis-v020-conformance/full-ledger-30.test.mjs
+      - node --test examples/dis-v020-conformance/full-ledger-34.test.mjs
       - node --test examples/dis-v020-conformance/batch-audit.test.mjs
       - node --test examples/dis-v020-conformance/batch-ledger-18.test.mjs
       - node --test examples/dis-v020-conformance/closure-audit.test.mjs

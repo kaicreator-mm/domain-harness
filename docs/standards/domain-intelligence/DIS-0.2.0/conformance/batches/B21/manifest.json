@@ -1,0 +1,41 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B21",
+  "status": "IN_PROGRESS",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "5258d1412c16e72ae4a4b23585df0fd482e1c061",
+    "verifiedRounds": 34,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "CORE-016 complete 34-round source/CI ledger readback across B01-B20, strict repaired provenance and negative tampering",
+  "rounds": [
+    {
+      "batchRoundId": "B21-01",
+      "globalRoundId": "R67",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
+      "testGitBlob": "84b38dad5e56b27239b61b563c7d864c8c345433",
+      "originalSourceHead": "5258d1412c16e72ae4a4b23585df0fd482e1c061",
+      "sourceHead": null,
+      "checks": [],
+      "receipt": "receipts/r67-b21-34-round-full-ledger-ci.json"
+    }
+  ],
+  "verifiedRounds": 0,
+  "pendingRounds": 1,
+  "unstartedRounds": 0,
+  "noAutomaticCorePromotion": true,
+  "limitations": [
+    "All historical source Git Blobs/CI URLs are stored versioned evidence, not a live reexecution of every historical code snapshot or independent semantic SAP.",
+    "B18 original R0 source vs R1 qualifying test origin has verified separate failure history; do not collapse, relabel or auto-inherit an R0 PASS.",
+    "CORE-016 remains PARTIAL until all applicable Core MUSTs are independently and source-first qualified; no Freeze, Effect, merge or release."
+  ]
+}

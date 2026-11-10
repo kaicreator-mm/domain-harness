@@ -1,4 +1,4 @@
-/** Full DIS 0.2 demo evidence ledger over heterogeneous B01–B12 schemas.
+/** Full DIS 0.2 demo evidence ledger over heterogeneous B01–B20 schemas.
  * This is a READ-ONLY consistency audit of stored source/CI receipts.
  * GitHub live statuses/independent SAP are separate proof obligations.
  */
@@ -31,21 +31,39 @@ export function validateFullRound({batch,manifest,entry,round,receipt,sourceText
  const path=round.testPath??entry.testPath??entry.test;
  const identity=entry.originalSourceHead??entry.originSourceHead;
  const eblob=entry.qualifyingTestGitBlob??entry.testGitBlob;
+ // Older repaired rounds can record the R0 source in the manifest but the
+ // R1 test's real source as the original of the ultimately qualified test.
+ // The two identities are acceptable ONLY with byte-specific R0->R1 failure
+ // history in BOTH independently versioned round and manifest records.
+ const repairedTestOrigin=round.originCommit!==identity;
+ if(repairedTestOrigin&&!(
+   sha.test(identity)&&sha.test(round.originCommit)&&
+   entry.originalR0SourceHead===identity&&round.originalR0SourceHead===identity&&
+   Array.isArray(entry.history)&&Array.isArray(round.history)&&
+   [entry.history,round.history].every(history=>
+     history.some(h=>h.sourceHead===identity&&h.native==='FAILURE')&&
+     history.some(h=>h.sourceHead===round.originCommit&&
+       h.testBlob===round.testGitBlob&&h.native==='FAILURE'))
+ ))fail('FULL_LEDGER_REPAIR_LINEAGE_INVALID');
+ // R63/R64 originally used qualificationTree (not finalTree). Do not invent
+ // a later Git tree: where both names are present, require byte agreement.
+ const roundTree=round.finalTree??round.qualificationTree;
+ if(round.finalTree!==undefined&&round.qualificationTree!==undefined&&
+    round.finalTree!==round.qualificationTree)fail('FULL_LEDGER_RECEIPT_SOURCE_DRIFT');
  if(!safe(path)||!path.endsWith('.test.mjs')||!sha.test(round.originCommit)||
     !sha.test(round.testGitBlob)||!sha.test(round.sourceHead)||
-    !sha.test(round.finalTree)||!sha.test(identity)||
-    round.originCommit!==identity||
+    !sha.test(roundTree)||!sha.test(identity)||
     (eblob!==undefined&&eblob!==round.testGitBlob)||
     (entry.testPath!==undefined&&entry.testPath!==path)||
     (entry.test!==undefined&&entry.test!==path))
   fail('FULL_LEDGER_ORIGINAL_SOURCE_DRIFT');
  if(entry.sourceHead!==round.sourceHead||receipt.source?.repository!=='kaicreator-mm/domain-harness'||
-    receipt.source.head!==round.sourceHead||receipt.source.tree!==round.finalTree||
+    receipt.source.head!==round.sourceHead||receipt.source.tree!==roundTree||
     receipt.id!==round.receipt?.match(/^receipts\/([a-z0-9.-]+)\.json$/)?.[1]||
     entry.receipt!==round.receipt||
     (receipt.testGitBlob??receipt.sourceTestBlob)!==round.testGitBlob||
     (receipt.testPath!==undefined&&receipt.testPath!==path)||
-    (entry.qualificationTree!==undefined&&entry.qualificationTree!==round.finalTree))
+    (entry.qualificationTree!==undefined&&entry.qualificationTree!==roundTree))
   fail('FULL_LEDGER_RECEIPT_SOURCE_DRIFT');
  for(const checks of [entry.checks,round.checks,receipt.ci]){
   if(!Array.isArray(checks)||checks.length!==3||
@@ -65,7 +83,7 @@ export function validateFullRound({batch,manifest,entry,round,receipt,sourceText
     !ciText.includes(' '+path))
   fail('FULL_LEDGER_TEST_NOT_IN_NATIVE_CI');
  return Object.freeze({id:entry.batchRoundId,round:entry.globalRoundId??round.globalRoundId,
-  batch,receipt:receipt.id,sourceHead:round.sourceHead,sourceTree:round.finalTree,
+  batch,receipt:receipt.id,sourceHead:round.sourceHead,sourceTree:roundTree,
   originalSourceHead:round.originCommit,originalTestGitBlob:round.testGitBlob,
   currentTestGitBlob:blob(sourceText),sourceMatchesCurrent:blob(sourceText)===round.testGitBlob,
   pipeline:urls[0][1],ci:'STORED_EXACT_SOURCE_CI_3_OF_3_SUCCESS',semanticSAP:'NOT_INFERRED'});

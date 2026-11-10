@@ -1,0 +1,28 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r67-b21-34-round-full-ledger-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": null,
+    "tree": null
+  },
+  "originCommit": "5258d1412c16e72ae4a4b23585df0fd482e1c061",
+  "testPath": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
+  "testGitBlob": "84b38dad5e56b27239b61b563c7d864c8c345433",
+  "ci": [],
+  "implementation": [
+    "examples/dis-v020-conformance/full-ledger.mjs",
+    "examples/dis-v020-conformance/full-ledger-34.test.mjs"
+  ],
+  "testScope": "34 historical B01-B20 scoped rounds original source/CI receipt and Matrix source integrity",
+  "observations": [
+    "Current source/test are committed as an incremental pending B21 candidate, not yet Native CI qualified."
+  ],
+  "limitations": [
+    "All historical source Git Blobs/CI URLs are stored versioned evidence, not a live reexecution of every historical code snapshot or independent semantic SAP.",
+    "B18 original R0 source vs R1 qualifying test origin has verified separate failure history; do not collapse, relabel or auto-inherit an R0 PASS.",
+    "CORE-016 remains PARTIAL until all applicable Core MUSTs are independently and source-first qualified; no Freeze, Effect, merge or release."
+  ]
+}
