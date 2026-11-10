@@ -26,6 +26,27 @@ test('B04-02 R42 exact historical source ledger and 21 requirement DAG leave 7 s
  ]);
  assert.equal(r.remaining.every(x=>x.positiveCases>0&&x.negativeCases>0),true);
 });
+test('R68 dynamic Core inventory can count a hypothesized qualified C2 item 10/16 without granting semantic owner authority',()=>{
+ const x=clone(baseline),id='DIS020-CORE-003';
+ x.matrix.requirements.find(r=>r.id===id).state='VERIFIED';
+ const group=x.plan.coreAndGovernance.find(g=>g.group==='C2');
+ group.requirementIds=group.requirementIds.filter(x=>x!==id);
+ const out=inspectClosure(x);
+ assert.equal(out.verifiedCore,10);assert.equal(out.partialCore,6);
+ assert.equal(out.remaining.length,6);
+ assert.equal(out.remaining.some(r=>r.id===id),false);
+ assert.equal(out.formalFreezeEligible,false);
+ assert.equal(out.sourceReview.sap,'UNQUALIFIED');
+});
+test('R68 a claimed Core promotion without closing its planned normative gap remains fail closed',()=>{
+ const x=clone(baseline);
+ x.matrix.requirements.find(r=>r.id==='DIS020-CORE-003').state='VERIFIED';
+ assert.throws(()=>inspectClosure(x),reject('CLOSURE_DAG_GAP'));
+ const y=clone(baseline);y.matrix.requirements.find(r=>r.id==='DIS020-CORE-005').state='VERIFIED';
+ y.plan.coreAndGovernance.find(g=>g.group==='C1').requirementIds=
+  y.plan.coreAndGovernance.find(g=>g.group==='C1').requirementIds.filter(id=>id!=='DIS020-CORE-005');
+ assert.throws(()=>inspectClosure(y),reject('CLOSURE_UNQUALIFIED_SEMANTIC_PROMOTION'));
+});
 test('B04-02 R42 fake SAP approval or historical reviewer byte substitution is rejected',()=>{
  const r=clone(baseline);r.review.globalSAPQualification='QUALIFIED';
  assert.throws(()=>inspectClosure(r),reject('CLOSURE_SAP_OWNER_AUTHORITY_NOT_PROVEN'));

@@ -7,7 +7,7 @@ const fail=code=>{throw Object.assign(new Error(code),{code})};
 const GROUPS=Object.freeze({
  C1:'Independent original source owner, Element cohesion and SAP semantic reviewer acceptance',
  C2:'Complete applicable Function ABI/Evidence and Domain-owned state obligations',
- C3:'Approved actual OS Target implementation selection and required UI transport scope',
+ C3:'Approved *applicable* selected Target implementation and UI-neutral Interaction scope (not compulsory every OS or production UI channel)',
  C4:'All applicable Core MUSTs and exact receipt-source coverage fully qualified'
 });
 export function decideB04Readiness({closure,sourceAudit,claimedApproval=undefined}){
@@ -24,8 +24,11 @@ export function decideB04Readiness({closure,sourceAudit,claimedApproval=undefine
  if(closure.sourceReview.independent!==false||closure.sourceReview.sap!=='UNQUALIFIED'||
     closure.sourceReview.locatorRepair!=='OPEN')
   fail('READINESS_SOURCE_OWNER_UNACCEPTED');
- if(closure.formalFreezeEligible!==false||closure.partialCore!==7||
-    closure.remaining.length!==7||
+ // A future properly qualified 10/16, 11/16, etc. cannot be
+ // rejected merely because the original R42 inventory was 9/16.
+ // The source/SAP, unresolved scope blockers and freeze gates still apply.
+ if(closure.formalFreezeEligible!==false||
+    closure.remaining.length!==closure.partialCore||
     closure.remaining.some(x=>x.status!=='PARTIAL'||!Object.hasOwn(GROUPS,x.group)))
   fail('READINESS_PREMATURE_CLOSURE');
  const blockers=closure.remaining.map(r=>Object.freeze({

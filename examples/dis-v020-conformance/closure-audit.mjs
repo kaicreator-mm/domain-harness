@@ -36,12 +36,15 @@ export function inspectClosure({matrix,plan,review,proposal,reviewBlob,proposalB
  const governance=matrix.requirements.filter(x=>x.profile==='governance');
  if(core.length!==16||optional.length!==4||governance.length!==1)
   fail('CLOSURE_REQUIREMENT_CARDINALITY_DRIFT');
- const unverified=core.filter(x=>x.state!=='VERIFIED'),partial=core.filter(x=>x.state==='PARTIAL');
- if(unverified.length!==7||partial.length!==7)
+ // The inventory cannot encode yesterday's 9/16 as an invariant:
+ // it would reject the next genuinely qualified Core closure forever.
+ // Qualification is assessed separately using source evidence + authority.
+ if(core.some(x=>!['VERIFIED','PARTIAL'].includes(x.state)))
   fail('CLOSURE_UNEXPECTED_CORE_STATE');
+ const unverified=core.filter(x=>x.state!=='VERIFIED'),partial=core.filter(x=>x.state==='PARTIAL');
  const expected=unverified.map(x=>x.id).sort();
  const scheduled=plan.coreAndGovernance.flatMap(x=>x.requirementIds).filter(x=>x.startsWith('DIS020-CORE-')).sort();
- if(JSON.stringify(expected)!==JSON.stringify(scheduled)||new Set(scheduled).size!==7)
+ if(JSON.stringify(expected)!==JSON.stringify(scheduled)||new Set(scheduled).size!==scheduled.length)
   fail('CLOSURE_DAG_GAP');
  if(['DIS020-CORE-002','DIS020-CORE-005'].some(id=>core.find(x=>x.id===id).state==='VERIFIED'))
   fail('CLOSURE_UNQUALIFIED_SEMANTIC_PROMOTION');
@@ -57,7 +60,7 @@ export function inspectClosure({matrix,plan,review,proposal,reviewBlob,proposalB
   fail('CLOSURE_GOVERNANCE_PREMATURE');
  return Object.freeze({
   schema:'dis.v0.2.c4-closure-inventory/1',
-  totalCore:16,verifiedCore:9,partialCore:7,
+  totalCore:core.length,verifiedCore:core.length-partial.length,partialCore:partial.length,
   optionalNotRun:optional.filter(x=>x.state==='NOT_RUN').length,
   governanceNotRun:governance.filter(x=>x.state==='NOT_RUN').length,
   priorRoundReceiptsAudited:batchAudit.auditedRounds,
