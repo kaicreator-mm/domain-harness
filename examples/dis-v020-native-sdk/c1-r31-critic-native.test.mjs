@@ -126,6 +126,19 @@ test('C1 forged reviewer/Owner flags and source bytes are denied before authorit
  unselected['not-selected-r31-source']={...unselected[DATA]};
  await assert.rejects(activate({...x,installed:unselected}),
   deny('DIS_SOURCE_ANCHOR_NOT_CONSUMED'));
+ // C1/R90: the review Markdown is a single exact whitelisted DATA origin,
+ // NOT a general docs/ Markdown executable source.
+ const forgedCode=structuredClone(x.artifact);
+ const fd=forgedCode.program.elements.find(e=>e.id==='dke.r31.source-first-review').functions[0];
+ fd.binding.sourceId=REVIEW;
+ fd.sourceDependencies=[DATA];
+ assert.throws(()=>qualifyDisV020Artifact(forgedCode),
+  deny('DIS_DATA_SOURCE_EXECUTION_FORBIDDEN'));
+ const arbitraryMarkdown=structuredClone(x.artifact);
+ arbitraryMarkdown.sources.find(p=>p.id===REVIEW).origin.path=
+  'docs/standards/dke/DKE-0.0.1/demos/UNREVIEWED_REPORT.md';
+ assert.throws(()=>qualifyDisV020Artifact(arbitraryMarkdown),
+  deny('DIS_SOURCE_ORIGIN_INVALID'));
  const fake={...x.registry,[FN]:{...x.registry[FN],sha256:'0'.repeat(64)}};
  await assert.rejects(activate({...x,registry:fake}),deny('DIS_LOCAL_REGISTRY_MISMATCH'));
  const app=await activate(x);

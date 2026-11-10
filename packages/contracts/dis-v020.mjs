@@ -34,7 +34,14 @@ const R64_SOURCE_EXCEPTIONS=Object.freeze([
  Object.freeze({role:'LOCAL_CODE',repository:'kaicreator-mm/domain-forge',
   commit:'38f5c6bbb93873f5042dd0afd31e6b051639d41d',
   path:'docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r23-ev16-bound-reader/verified-reader.mjs',
-  gitBlob:'b0e02389abc156cbd8006371765d597ebf86c61c'})
+  gitBlob:'b0e02389abc156cbd8006371765d597ebf86c61c'}),
+ // C1/R90: one exact source-first independently reviewed R31 Markdown report
+ // may be AOT-pinned as read-only DATA. Do NOT add a docs-wide Markdown
+ // exception: executable LOCAL binding is explicitly forbidden for this pin.
+ Object.freeze({role:'DATA',repository:'kaicreator-mm/domain-forge',
+  commit:'4667becfdc9bfb382bbe830150fa7c9af4533ba2',
+  path:'docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r31-d02-firstparty-source-cq/INDEPENDENT_SOURCE_FIRST_R31_REVIEW.md',
+  gitBlob:'10cc8aeade4b9019105490c08995aa7496e093f4'})
 ]);
 const r64Exception=origin=>R64_SOURCE_EXCEPTIONS.find(item=>
  origin!==null&&typeof origin==='object'&&
