@@ -2,16 +2,32 @@
   "schema": "dis.v0.2.validation-receipt/1",
   "id": "r65-b19-r26-typed-source-native-ci",
   "disVersion": "0.2.0",
-  "status": "PENDING",
+  "status": "SUCCESS",
   "source": {
     "repository": "kaicreator-mm/domain-harness",
-    "head": null,
-    "tree": null
+    "head": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+    "tree": "4a98014f5f33b73bc43f25e9d6ed13fd36046530"
   },
-  "originCommit": null,
+  "originCommit": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
   "testPath": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
   "testGitBlob": "096003852a253b4a3921ebfd88c2ca75baed48b4",
-  "ci": [],
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/3"
+    }
+  ],
   "originalSources": [
     {
       "id": "r8",
@@ -65,10 +81,11 @@
     "selectedNativeCases": 8
   },
   "limitations": [
-    "R26 Reader selected native CI NOT_RUN at this candidate checkpoint; B19 must remain 0/1 until fresh exact-head 3/3 SUCCESS.",
-    "Historical B18/R64 remains 1/1 VERIFIED on original R23 Reader c37b0908... at #2355; original 32 bounded rounds must not be relabeled.",
-    "R26 source strict 76 source-bound direct request vectors are a bounded I/O proof, NOT original EV16 2/2 or source-independent SAP.",
-    "DKE original R8 0/53 full, original EV16 0/2, SAP=0, Effects=0; RFC Editor raw bytes and independent semantic Critic NOT_RUN; no Freeze, merge, release."
+    "R65 is source-selected native ABI/Reader type and installer provenance conformance only; not a positive independently accepted RFC↔Tally relation or DKE SAP.",
+    "Original full DKE R8 EV16 remains 0/2, whole 53 EV cells 0/53; SAP=0 Effects=0, independent source-first semantic reviewer and full RFC Editor publisher raw-byte pin NOT_RUN.",
+    "Historical original B18/R64 source c37b09082a50eeec7e17c17ecd9366a79c4ce8ae remains unchanged and separately qualified at #2355. New R26 Reader b0e02389abc156cbd8006371765d597ebf86c61c is selected only in B19/R65.",
+    "Original R26 76 hosted V8 negatives and newly executed B19 native 76 vectors are separate source-execution contexts, not proof of all arbitrary JavaScript objects or arbitrary consumer graph completeness.",
+    "No Core automatic promotion, Product/L2 Freeze, merge, release or physical Effect."
   ],
   "upstream": {
     "producerHead": "38f5c6bbb93873f5042dd0afd31e6b051639d41d",
@@ -77,5 +94,13 @@
     "previousHostedV8": "76/76 PASS",
     "oldR23ReaderGitBlob": "c37b09082a50eeec7e17c17ecd9366a79c4ce8ae"
   },
-  "qualification": "PENDING_FRESH_3_CONTEXT_EXACT_SHA_NATIVE"
+  "qualification": "BOUNDED_NATIVE_R26_TYPED_READER_SOURCE_CONSUMPTION",
+  "qualificationHead": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+  "qualificationTree": "4a98014f5f33b73bc43f25e9d6ed13fd36046530",
+  "observations": [
+    "Original complete Tally 807-node/271-relationship JSON-LD, R8 matrix, and R22 Gate are authentic AOT DATA; DKE R26 Reader Git Blob b0e023... is new exact producer-commit pinned LOCAL_CODE.",
+    "Actual original code native DIS AOT→SDK→KDP B19/R65 test was mandatory in Woodpecker #2357/1 integration and the same exact HEAD earned #2357/2 and #2357/3 SUCCESS.",
+    "Eight native B19 tests include complete original four source checks, read-only typed UNKNOWN, forged provenance and DATA-as-LOCAL refusal, 76 R26 typed/scope negative vectors, 1.0.0 to 1.1.0 ABI compatibility and old R23 Reader installer downgrade rejection.",
+    "Source authenticity and typed negatives are not independent domain-semantic SAP or positive RFC↔Tally linkage."
+  ]
 }
