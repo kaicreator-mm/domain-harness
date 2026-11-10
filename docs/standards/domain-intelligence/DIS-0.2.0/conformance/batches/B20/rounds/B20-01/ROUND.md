@@ -1,12 +1,11 @@
-# DIS B20-01 / R66 — source-selected nested Function Schema
+# DIS B20-01 / R66 — native selected nested Schema
 
-Status: **CI_BLOCKED / 0-of-1**. Historical B01–B19 remain **33/33 VERIFIED**. New B20 is not qualified; Core still **9/16 VERIFIED + 7 PARTIAL**.
+# DIS B20-01 / R66 — exact native nested Function Schema closeout
 
-This study directly targets **CORE-003**, not additional DKE SAP or synthetic Target labels. New opt-in bounded nested record / typed array descriptors are enforced inside the public DIS Contracts validator and checked through an actual AOT-selected xDownload Knowledge Function. Legacy bare `record` / `array` fields preserve their old semantics. Deep shape drift across the same major is conservatively incompatible. No LOCAL Function may grant KDP Effect or business evidence authority.
+**VERIFIED 1/1**, original exact code [`2616ca326d3c0e0dd06d9b68b8d2127d60ec4825`](https://github.com/kaicreator-mm/domain-harness/commit/2616ca326d3c0e0dd06d9b68b8d2127d60ec4825), TREE `afa42ec88cfbdd9044b3fef253ea18db86548610`, mandatory native selected xDownload test Git Blob `239d925689ad7c90e7cece72f5db21e6aa31d96c`. Original Woodpecker [#2364/1 integration](https://ci.kaicreator.com/repos/18/pipeline/2364/1), [#2364/2 compatibility](https://ci.kaicreator.com/repos/18/pipeline/2364/2), [#2364/3 generic verify](https://ci.kaicreator.com/repos/18/pipeline/2364/3) **3/3 SUCCESS for the same source commit**. Original failing/error #2360–#2363 remain historical source-specific evidence, not retroactively PASS.
 
-Exact R1 original code `4f47579814be7774f2407a6420e27c78b1d43a76`, TREE `43cc4b5ae254331ef33fac3f7467ea3e5e741eca`, B20 test Git Blob `1d305c4c342be263963c912543098d787dc42823`. Original #2360/1 integration ERROR was superseded by R1; #2361/1 native integration ERROR, other two contexts pending at readback. These are not SUCCESS receipts. The source-exact hosted V8 checks covered nested valid/wrong-type/missing/extra/cardinality/ABI examples but **not** real Node/KDP.
+Selected `xdownload.inspectPolicyTree` exercises optional bounded nested Function output schemas with typed records and arrays through real DIS AOT→SDK→KDP and original pinned xDownload policy data. Existing bare record/array behavior is unchanged, invalid nested depth/cardinality/schema and same-major structural drift fail closed. The R3 source-depth inconsistency was corrected before this qualified code HEAD, and new native regression exists in the exact test Blob. Read-only source data, no SAP, external Effect or owner authority.
 
-Next: inspect real #2361/1 Woodpecker step log (or obtain matching local native repro) and fix in the same Writer; fresh exact-SHA 3/3 CI before adding R66 to Matrix and closing B20 receipt, round, manifest and summary. Do not infer CI error cause or change owner SAP.
+**Historic B01–B19 33/33 + newly qualified B20/R66 1/1 = 34/34 bounded native/demo rounds VERIFIED**. Core remains **9/16 VERIFIED, 7 PARTIAL**; Optional **4 NOT_RUN**, Governance **1 NOT_RUN**. The new R66 is evidence for CORE-003 and CORE-016 but does not turn either full requirement into VERIFIED. DKE original R8 full 0/53, EV16 full 0/2, source-independent semantic critic NOT_RUN, SAP=0, Effects=0. No Product L2 Freeze, merge or release.
 
-
-R2 source-level self-audit: detach only mutable policy data subtrees before adversarial mutation; do not clone live Functions. Historical CI sources retained. B20 remains 0/1.
+[Machine receipt](../../receipts/r66-b20-nested-function-schema-native-ci.json) · [B20 manifest](manifest.json) · [round](rounds/B20-01/round.json) · [matrix](../../matrix.json).
