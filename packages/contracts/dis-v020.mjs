@@ -97,27 +97,34 @@ export function validateDisV020LocalHandle(contract,value){
 export function bindDisV020LocalHandle(contract,value){
  validateDisV020LocalHandle(contract,value);
  if(contract.methodIO===undefined)return value;
- return new Proxy(value,{
-  get(target,key){
-   const original=Reflect.get(target,key,target);
-   if(typeof key!=='string'||!Object.hasOwn(contract.methodIO,key))return original;
-   const io=contract.methodIO[key];
-   return (...args)=>{
-    if(args.length!==io.args.length||args.some((x,i)=>!valueMatchesShape(io.args[i],x)))
-     fail('DIS_LOCAL_HANDLE_INPUT_INVALID');
-    const result=Reflect.apply(original,target,args);
-    if(io.returns==='void'){
-     if(result!==undefined)fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID');
-    }else if(io.returns==='nullable-record'){
-     if(result!==null&&!valueMatchesShape(io.record,result))
-      fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID');
-    }else if(!Array.isArray(result)||result.length>MAX||
-      result.some(x=>!valueMatchesShape(io.record,x)))
+ // Do not expose the Runx class instance/prototype or its TS-private
+ // runtime fields. These methods are the entire selected public surface.
+ const api=Object.create(null);
+ for(const name of [...contract.methods]){
+  const original=value[name],io=structuredClone(contract.methodIO[name]);
+  const invoke=(...args)=>{
+   if(args.length!==io.args.length||args.some((x,i)=>!valueMatchesShape(io.args[i],x)))
+    fail('DIS_LOCAL_HANDLE_INPUT_INVALID');
+   const result=Reflect.apply(original,value,args);
+   if(io.returns==='void'){
+    if(result!==undefined)fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID');
+    return undefined;
+   }
+   if(io.returns==='nullable-record'){
+    if(result!==null&&!valueMatchesShape(io.record,result))
      fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID');
-    return result;
-   };
-  }
- });
+    // Return a detached read-only observation, not the mutable source row.
+    return result===null?null:Object.freeze(structuredClone(result));
+   }
+   if(!Array.isArray(result)||result.length>MAX||
+      result.some(x=>!valueMatchesShape(io.record,x)))
+    fail('DIS_LOCAL_HANDLE_OUTPUT_INVALID');
+   return Object.freeze(result.map(x=>Object.freeze(structuredClone(x))));
+  };
+  Object.defineProperty(api,name,{value:Object.freeze(invoke),enumerable:true,
+   writable:false,configurable:false});
+ }
+ return Object.freeze(api);
 }
 /** Business App Init has a typed lifecycle envelope, not a second Kernel. */
 function validateAppInitContract(c){
