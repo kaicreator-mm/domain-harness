@@ -8,13 +8,17 @@ when:
 labels:
   backend: local
 
-# The default plugin clone does one partial fetch (filter=tree:0) and one
-# lazily-promisor-fetched hard reset; a single transient github.com egress
-# hiccup (HTTP2 framing curl 16, SSL unexpected EOF, DNS "Could not resolve
-# host") then fails every context with no test evidence (#2391/2, #2395/1-3).
-# Same fetch/reset recipe, only bounded-retried; no test gate changes.
-clone:
-  clone:
+# Transient worker github.com egress (HTTP2 framing curl 16, SSL unexpected
+# EOF, DNS, TCP connect timeout) fails the default clone with exit 128 and
+# zero test evidence (#2391/2, #2395/1-3, #2398). A yaml `clone:` section
+# cannot fix this on this infrastructure: on the local backend the compiler
+# drops yaml clone containers and the agent executes the plugin-git binary
+# directly, ignoring any step commands. So do the clone as a normal step,
+# which does execute its commands here, with a bounded retry.
+skip_clone: true
+
+steps:
+  - name: clone-retry
     image: bash
     commands:
       - git init --object-format sha1
@@ -31,7 +35,6 @@ clone:
         done
       - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
 
-steps:
   - name: dis-v020-integration
     image: bash
     commands:
