@@ -60,7 +60,16 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
     manifest?.qualificationHead!==ORIGINAL.nativeHead||
     !Array.isArray(manifest.rounds)||manifest.rounds.length!==1||
     manifest.rounds[0]?.testGitBlob!==ORIGINAL.nativeTestBlob||
-    manifest.rounds[0]?.sourceHead!==ORIGINAL.nativeHead)
+    manifest.rounds[0]?.sourceHead!==ORIGINAL.nativeHead||
+    manifest.rounds[0]?.status!=='VERIFIED'||
+    manifest.pendingRounds!==0||manifest.unstartedRounds!==0||
+    manifest.noAutomaticCorePromotion!==true||
+    !Array.isArray(manifest.qualificationChecks)||manifest.qualificationChecks.length!==3||
+    manifest.qualificationChecks.some(x=>!REQUIRE_CONTEXT.has(x.context)||x.state!=='SUCCESS'||
+      !receipt.ci.some(y=>y.context===x.context&&y.state===x.state&&y.url===x.url))||
+    !Array.isArray(manifest.rounds[0].checks)||manifest.rounds[0].checks.length!==3||
+    manifest.rounds[0].checks.some(x=>!receipt.ci.some(y=>y.context===x.context&&
+      y.state===x.state&&y.url===x.url)))
     fail('B22_BATCH_INTEGRITY_INVALID');
  const req=matrix?.requirements;
  if(!Array.isArray(req))fail('MATRIX_UNAVAILABLE');
