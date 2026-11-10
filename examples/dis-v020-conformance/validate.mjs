@@ -85,6 +85,29 @@ async function sourceText(path){
  }
  return fileCache.get(path);
 }
+/**
+ * R91 version-closeout prerequisite (necessary, not sufficient).
+ * Source receipts prove individual cases, not that every other applicable
+ * Core has been independently qualified. Avoid falsely accepting C4/C5
+ * because CORE-016 or GOV-001 happens to have historical test evidence.
+ * OUT_OF_SCOPE is allowed here only as a structural state; the existing
+ * per-requirement decisionUrl verification still applies below.
+ */
+export function assertCloseoutDependencies(matrix){
+ if(!Array.isArray(matrix?.requirements))fail('MATRIX_SCHEMA');
+ const byId=new Map(matrix.requirements.map(r=>[r?.id,r]));
+ const c4=byId.get('DIS020-CORE-016');
+ if(c4?.state==='VERIFIED'){
+  for(let index=1;index<=15;index++){
+   const id='DIS020-CORE-'+String(index).padStart(3,'0');
+   if(!['VERIFIED','OUT_OF_SCOPE'].includes(byId.get(id)?.state))
+    fail('MATRIX_CORE016_DEPENDENCY_OPEN');
+  }
+ }
+ const gov=byId.get('DIS020-GOV-001');
+ if(gov?.state==='VERIFIED'&&c4?.state!=='VERIFIED')
+  fail('MATRIX_GOV_DEPENDENCY_OPEN');
+}
 export async function validateVersionMatrix(matrix,receipts){
  if(matrix?.schema!=='dis.v0.2.conformance-matrix/1'||matrix.version!=='0.2.0'||
     !Array.isArray(matrix.requirements))fail('MATRIX_SCHEMA');
@@ -97,6 +120,8 @@ export async function validateVersionMatrix(matrix,receipts){
   seen.add(r.id);
  }
  if([...requiredIds].some(id=>!seen.has(id)))fail('MATRIX_REQUIREMENT_ROSTER_INVALID');
+ // Closeout cannot outrun applicable Core or version-wide conformance.
+ assertCloseoutDependencies(matrix);
  const ids=new Set();const tallies={};
  for(const r of matrix.requirements){
   if(!validId.test(r.id)||ids.has(r.id))fail('MATRIX_DUP_OR_INVALID_ID');
