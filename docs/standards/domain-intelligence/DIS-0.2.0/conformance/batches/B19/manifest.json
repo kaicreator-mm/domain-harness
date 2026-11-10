@@ -1,0 +1,42 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B19",
+  "status": "IN_PROGRESS",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "9bd06d98e340262231a17f555aa2f2b5c1e198e6",
+    "verifiedRounds": 32,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "R26 exact-blob source-selected incremental versioned DIS Knowledge Reader, strong typed request rejection and source-origin installer downgrade refusal; not positive RFC↔Tally SAP",
+  "rounds": [
+    {
+      "batchRoundId": "B19-01",
+      "globalRoundId": "R65",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+      "testGitBlob": "096003852a253b4a3921ebfd88c2ca75baed48b4",
+      "originalSourceHead": null,
+      "sourceHead": null,
+      "checks": [],
+      "receipt": "receipts/r65-b19-r26-typed-source-native-ci.json"
+    }
+  ],
+  "verifiedRounds": 0,
+  "pendingRounds": 1,
+  "unstartedRounds": 0,
+  "noAutomaticCorePromotion": true,
+  "limitations": [
+    "R26 Reader selected native CI NOT_RUN at this candidate checkpoint; B19 must remain 0/1 until fresh exact-head 3/3 SUCCESS.",
+    "Historical B18/R64 remains 1/1 VERIFIED on original R23 Reader c37b0908... at #2355; original 32 bounded rounds must not be relabeled.",
+    "R26 source strict 76 source-bound direct request vectors are a bounded I/O proof, NOT original EV16 2/2 or source-independent SAP.",
+    "DKE original R8 0/53 full, original EV16 0/2, SAP=0, Effects=0; RFC Editor raw bytes and independent semantic Critic NOT_RUN; no Freeze, merge, release."
+  ]
+}

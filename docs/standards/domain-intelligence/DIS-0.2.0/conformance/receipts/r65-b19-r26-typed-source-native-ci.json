@@ -1,0 +1,81 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r65-b19-r26-typed-source-native-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": null,
+    "tree": null
+  },
+  "originCommit": null,
+  "testPath": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+  "testGitBlob": "096003852a253b4a3921ebfd88c2ca75baed48b4",
+  "ci": [],
+  "originalSources": [
+    {
+      "id": "r8",
+      "repo": "kaicreator-mm/domain-forge",
+      "commit": "0b2f1ae58b309a5eb9d3e89ac2e13ca915f1b211",
+      "originPath": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/EV_CROSS_DOMAIN_MATRIX_R8.json",
+      "path": "examples/dis-v020-native-sdk/fixtures/dke-r23-ev16-r8.json",
+      "sha": "8cab8ead10d90a440c85fec86b01fd408022ae2c",
+      "role": "DATA"
+    },
+    {
+      "id": "tally",
+      "repo": "kaicreator-mm/tally",
+      "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+      "originPath": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+      "path": "examples/dis-v020-native-sdk/fixtures/dke-r23-ev16-tally-full.jsonld",
+      "sha": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+      "role": "DATA"
+    },
+    {
+      "id": "gate",
+      "repo": "kaicreator-mm/domain-forge",
+      "commit": "0b2f1ae58b309a5eb9d3e89ac2e13ca915f1b211",
+      "originPath": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r22-ev16-explicit-source-join/FROZEN_CASE_GATE.json",
+      "path": "examples/dis-v020-native-sdk/fixtures/dke-r23-ev16-gate.json",
+      "sha": "4afea8ce6333a25439f7ec17bf5c396ef3e1b59b",
+      "role": "DATA"
+    },
+    {
+      "id": "reader",
+      "repo": "kaicreator-mm/domain-forge",
+      "commit": "38f5c6bbb93873f5042dd0afd31e6b051639d41d",
+      "originPath": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r23-ev16-bound-reader/verified-reader.mjs",
+      "path": "examples/dis-v020-native-sdk/dke-r26-ev16-reader.mjs",
+      "sha": "b0e02389abc156cbd8006371765d597ebf86c61c",
+      "role": "LOCAL_CODE"
+    }
+  ],
+  "counts": {
+    "originalTallyGraphNodes": 807,
+    "originalTypedRelationshipAssertions": 271,
+    "originalExplicitRFC9111Nodes": 0,
+    "originalEV16SelectedCells": 2,
+    "originalFullEV16Qualified": 0,
+    "strictBooleanMutationVectors": 48,
+    "strictStringMutationVectors": 15,
+    "typedTrueDenialVectors": 8,
+    "wrongSourceOrEVVectors": 3,
+    "keyRosterVectors": 2,
+    "typedRequestNegativesTotal": 76,
+    "selectedNativeCases": 8
+  },
+  "limitations": [
+    "R26 Reader selected native CI NOT_RUN at this candidate checkpoint; B19 must remain 0/1 until fresh exact-head 3/3 SUCCESS.",
+    "Historical B18/R64 remains 1/1 VERIFIED on original R23 Reader c37b0908... at #2355; original 32 bounded rounds must not be relabeled.",
+    "R26 source strict 76 source-bound direct request vectors are a bounded I/O proof, NOT original EV16 2/2 or source-independent SAP.",
+    "DKE original R8 0/53 full, original EV16 0/2, SAP=0, Effects=0; RFC Editor raw bytes and independent semantic Critic NOT_RUN; no Freeze, merge, release."
+  ],
+  "upstream": {
+    "producerHead": "38f5c6bbb93873f5042dd0afd31e6b051639d41d",
+    "readerGitBlob": "b0e02389abc156cbd8006371765d597ebf86c61c",
+    "nativeNodeSourceReplay": "NOT_RUN_IN_THIS_ROUND",
+    "previousHostedV8": "76/76 PASS",
+    "oldR23ReaderGitBlob": "c37b09082a50eeec7e17c17ecd9366a79c4ce8ae"
+  },
+  "qualification": "PENDING_FRESH_3_CONTEXT_EXACT_SHA_NATIVE"
+}

@@ -1,0 +1,30 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B19",
+  "roundId": "B19-01",
+  "globalRoundId": "R65",
+  "status": "CI_PENDING",
+  "originCommit": null,
+  "originTree": null,
+  "testPath": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+  "testGitBlob": "096003852a253b4a3921ebfd88c2ca75baed48b4",
+  "receipt": "receipts/r65-b19-r26-typed-source-native-ci.json",
+  "sourceHead": null,
+  "checks": [],
+  "positive": [
+    "Original complete Tally 807-node/271-relationship graph DATA and original DKE R8/Gate DATA source identities unchanged; DKE R26 Reader selected as pinned LOCAL_CODE",
+    "Real DIS AOT→SDK→KDP selected read-only Function remains UNKNOWN/authority NONE under compatible 1.1.0 typed contract",
+    "Original 76 R26 strict request-type/source/scope adversarial vectors executed as mandatory native selected test, not just prior hosted V8"
+  ],
+  "negative": [
+    "All 8 Boolean and 3 String fields strictly typed; falsey non-booleans rejected before returning UNKNOWN",
+    "Old R23 Reader full original source SHA/commit rejected by independently installed R26 source pin",
+    "Forged producer repo/path/commit, false source RFC Join/SAP, DATA-as-LOCAL, malformed public input and stale version fail closed"
+  ],
+  "limits": [
+    "R26 Reader selected native CI NOT_RUN at this candidate checkpoint; B19 must remain 0/1 until fresh exact-head 3/3 SUCCESS.",
+    "Historical B18/R64 remains 1/1 VERIFIED on original R23 Reader c37b0908... at #2355; original 32 bounded rounds must not be relabeled.",
+    "R26 source strict 76 source-bound direct request vectors are a bounded I/O proof, NOT original EV16 2/2 or source-independent SAP.",
+    "DKE original R8 0/53 full, original EV16 0/2, SAP=0, Effects=0; RFC Editor raw bytes and independent semantic Critic NOT_RUN; no Freeze, merge, release."
+  ]
+}

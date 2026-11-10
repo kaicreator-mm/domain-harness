@@ -17,7 +17,7 @@ const REL_KINDS=new Set(['depends-on','constrains','cooperates','defines']);
 // DKE producer JSON-LD/receipt content is a provenance DATA dependency,
 // never a Function executable. Keep the allowance narrow, Git-blob pinned.
 const DKE_DATA_ORIGIN=/^docs\/standards\/dke\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:json|json\.zlib\.b64|mjs\.zlib\.b64)$/;
-// B18/R64 source-specific exception: a real Tally JSON-LD Knowledge DATA file is
+// B18/R64 + B19/R65 source-specific exceptions: a real Tally JSON-LD Knowledge DATA file is
 // not executable, and the DKE R23 original Reader is source-pinned LOCAL code.
 // Do not expand docs/ or .mjs broadly; the original Git commit + Blob are mandatory.
 const R64_SOURCE_EXCEPTIONS=Object.freeze([
@@ -28,7 +28,13 @@ const R64_SOURCE_EXCEPTIONS=Object.freeze([
  Object.freeze({role:'LOCAL_CODE',repository:'kaicreator-mm/domain-forge',
   commit:'1f3b39a2a6716c1e977e726fd3737d9bd590a412',
   path:'docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r23-ev16-bound-reader/verified-reader.mjs',
-  gitBlob:'c37b09082a50eeec7e17c17ecd9366a79c4ce8ae'})
+  gitBlob:'c37b09082a50eeec7e17c17ecd9366a79c4ce8ae'}),
+ // B19/R65: R26 strict-typed reusable Reader; exact producer commit+Git Blob
+ // is an additional LOCAL_CODE source, never a docs-wide executable exception.
+ Object.freeze({role:'LOCAL_CODE',repository:'kaicreator-mm/domain-forge',
+  commit:'38f5c6bbb93873f5042dd0afd31e6b051639d41d',
+  path:'docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r23-ev16-bound-reader/verified-reader.mjs',
+  gitBlob:'b0e02389abc156cbd8006371765d597ebf86c61c'})
 ]);
 const r64Exception=origin=>R64_SOURCE_EXCEPTIONS.find(item=>
  origin!==null&&typeof origin==='object'&&
