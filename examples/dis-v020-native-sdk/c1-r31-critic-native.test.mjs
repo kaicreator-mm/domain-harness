@@ -12,7 +12,7 @@ import {makeNativeFixture} from './native-fixture.mjs';
 import {R31_ORIGINS,makeR31CriticReader} from './dke-r31-critic-reader.mjs';
 const R_ORIGIN=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'3bf6d05687faecd961a6fff43faeaa8955960c63',
+ commit:'4f0b5203cbdd5e98de6bb6e120ea2a2a808b45ba',
  path:'examples/dis-v020-native-sdk/dke-r31-critic-reader.mjs',
  gitBlob:'0e7dcf1fb500cd0df60eefc8a4ad605293f79ed9'
 });
