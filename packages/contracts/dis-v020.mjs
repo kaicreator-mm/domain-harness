@@ -383,6 +383,33 @@ export function compareDisV020ElementContracts(previous,next){
   if(!target||f.kind!==target.kind||f.effect!==target.effect||
      sha256Canonical(f.binding)!==sha256Canonical(target.binding))
    fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+  // R76: every selected Public Function contract is a separate ABI
+  // obligation. Membership and binding alone do not prove compatibility.
+  for(const key of ['contract','receiptContract','initContract','handleContract']){
+   const before=f[key],after=target[key];
+   if((before===undefined)!==(after===undefined))
+    fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+   if(before===undefined)continue;
+   if(key==='contract'){
+    try{compareDisV020FunctionContracts(before,after)}
+    catch{fail('DIS_ELEMENT_ABI_INCOMPATIBLE')}
+    continue;
+   }
+   if(!SEMVER.test(before.version)||!SEMVER.test(after.version))
+    fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+   const av=before.version.split('.').map(Number),
+    bv=after.version.split('.').map(Number);
+   if(av[0]!==bv[0]||bv[1]<av[1]||
+      (bv[1]===av[1]&&bv[2]<av[2]))
+    fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+   // No verified relaxed variance rule for these special interfaces:
+   // a changed KDP admission, Init lifecycle or process-local method
+   // contract must not be called same-major consumer-compatible.
+   const {version:oldVersion,...oldShape}=before;
+   const {version:newVersion,...newShape}=after;
+   if(sha256Canonical(oldShape)!==sha256Canonical(newShape))
+    fail('DIS_ELEMENT_ABI_INCOMPATIBLE');
+  }
  }
  if(previous.dependsOn.some(id=>!next.dependsOn.includes(id)))
   fail('DIS_ELEMENT_ABI_INCOMPATIBLE');

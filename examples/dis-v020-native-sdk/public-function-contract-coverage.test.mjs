@@ -4,7 +4,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectDisV020PublicFunctionCoverage,qualifyDisV020Artifact}
+import {inspectDisV020PublicFunctionCoverage,qualifyDisV020Artifact,compareDisV020ElementContracts}
  from '@kaicreator/domain-harness-contracts/dis-v020';
 import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
@@ -220,4 +220,22 @@ test('R75 forged clock, method output, and unsafe source-selected method schema 
   mutate(h);
   assert.throws(()=>build(f,p),fail(code));
  }
+});
+
+test('R76 real selected Function compatibility denies hidden Handle, Init and KDP policy drift under a same-major Element bump',async()=>{
+ const f=await selected;
+ const element=id=>structuredClone(f.program.elements.find(x=>x.id===id));
+ for(const [id,mutate] of [
+  ['runx.agent.presence',x=>{x.functions[0].handleContract.methodIO.latest.record.fields.last_seen_at='number'}],
+  ['orders.init',x=>{x.functions[0].initContract.output.fields.status='number'}],
+  ['orders.approval',x=>{x.functions[0].receiptContract.statusMap.denied='ADMITTED'}]
+ ]){
+  const old=element(id),newer=structuredClone(old);newer.version='1.1.0';
+  mutate(newer);
+  assert.throws(()=>compareDisV020ElementContracts(old,newer),
+   fail('DIS_ELEMENT_ABI_INCOMPATIBLE'),id);
+ }
+ const old=element('runx.agent.presence'),newer=structuredClone(old);
+ newer.version='1.1.0';newer.functions[0].handleContract.version='1.1.0';
+ assert.equal(compareDisV020ElementContracts(old,newer).compatible,true);
 });
