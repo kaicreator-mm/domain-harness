@@ -1,0 +1,104 @@
+{
+  "schema": "dis.v0.2.c3-target-applicability/1",
+  "authority": {
+    "masterIssue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+    "productL1Issue": "https://github.com/kaicreator-mm/domain-harness/issues/1496",
+    "implementationPR": "https://github.com/kaicreator-mm/domain-harness/pull/1497",
+    "baseHead": "3bf6d05687faecd961a6fff43faeaa8955960c63",
+    "baseTree": "d25cca649a3856f016ea83ee1309f994a100fd1a"
+  },
+  "assessment": "PARTIAL_REAL_HOST_BOUNDARY_PROVEN_TARGET_SPECIFIC_BUILD_NOT_PROVEN",
+  "sourcePins": {
+    "normativeR3": {
+      "path": "docs/standards/domain-intelligence/DIS-0.2.0/FULL_SCOPE_REPAIRS_R3.zh-CN.md",
+      "gitBlob": "2ca531cd8174d178c5808a86f0e511b6117782c6",
+      "section": "3"
+    },
+    "normativeR1": {
+      "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+      "gitBlob": "b927f6af79566f768ce02b7a17ff2c1e3417a689",
+      "section": "5"
+    },
+    "matrix": {
+      "path": "docs/standards/domain-intelligence/DIS-0.2.0/conformance/matrix.json",
+      "gitBlob": "e904b87377ccc0a3db0568140590b6484bcd0f41",
+      "requirement": "DIS020-CORE-008",
+      "state": "PARTIAL"
+    },
+    "sameBytesTargetLabels": {
+      "path": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+      "gitBlob": "e4e91b820bc4e551d3b40270102115524755f9bf"
+    },
+    "hostCurrent": {
+      "path": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+      "gitBlob": "8f099b6158ad5a71b5bc0f0375046e7280723588"
+    },
+    "fullSourcePins": {
+      "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+      "gitBlob": "e66c8839dbab6551f2c0a33f2db867c9a7e1cc75"
+    },
+    "actualConsumer": {
+      "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+      "gitBlob": "242930c5b10f629a13115a45069f2814f6042316"
+    },
+    "installedTarget": {
+      "path": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+      "gitBlob": "f10a3b8f4452d8bf6db7343d10085590df69d3f9"
+    }
+  },
+  "qualifiedHistoricalEvidence": {
+    "head": "4964edbc9e1c8a0152a90ee1c121b8620c961d3f",
+    "woodpecker": {
+      "native": "#2403/1 SUCCESS",
+      "minNode": "#2403/2 SUCCESS",
+      "general": "#2403/3 SUCCESS"
+    }
+  },
+  "newHostProof": {
+    "head": "3bf6d05687faecd961a6fff43faeaa8955960c63",
+    "status": "PENDING_CI",
+    "pipeline": [
+      "https://ci.kaicreator.com/repos/18/pipeline/2404/1",
+      "https://ci.kaicreator.com/repos/18/pipeline/2404/2",
+      "https://ci.kaicreator.com/repos/18/pipeline/2404/3"
+    ],
+    "note": "New required CI test asserts host Linux/x64 in CI and emits STRUCTURAL_ONLY selected target/modules/digest; original CI 2404 outcome is not imported."
+  },
+  "sourceConfirmed": [
+    "B03/R40 proves same canonical BUILD module SHA roster can be labeled Linux or Windows, with differing AOT digest but no platform in original built module payload.",
+    "B03/R39 verifies independent installer selected Target against AOT pre-KDP, not physical target implementation compatibility.",
+    "B05/R44 checks real runtime process OS/arch and rejects mislabelled OS/CPU; new source forces Linux/x64 actual CI host when CI_COMMIT_SHA provided.",
+    "B05/R45 pins all selected first-party sources; R46 consumes original Tally/Runx/xDownload and KDP without independent semantic SAP or physical Effect."
+  ],
+  "openGaps": [
+    "Actual target-specific BUILD/Package/implementation/dependency closure, not identical modules retagged per OS.",
+    "Product/L1 explicit applicability decision whether Linux/x64/node is the only mandatory bounded Demo profile.",
+    "Original #2404 exact-SHA required CI pass and captured target module observations after new host assertion."
+  ],
+  "recommendedProductDecision": {
+    "selectedDemoProfile": "linux/x64/node",
+    "scope": "BOUNDED_SINGLE_TARGET_DEMO",
+    "otherTargets": "NOT_CLAIMED",
+    "requiresActualTargetSpecificImplementationBeforeCorePass": true,
+    "requiresIndependentSAPForCore002005": true,
+    "ownerDecisionStatus": "NOT_DECIDED"
+  },
+  "negativeAdmissionRule": "Target labels, same module hashes, CI success and host identity alone do not imply CORE008_VERIFIED, physical host compatibility, independent SAP, or effect authorization.",
+  "accounting": {
+    "coreVerified": 12,
+    "coreTotal": 16,
+    "corePartialIds": [
+      "DIS020-CORE-002",
+      "DIS020-CORE-005",
+      "DIS020-CORE-008",
+      "DIS020-CORE-016"
+    ],
+    "optionalNotRun": 4,
+    "governanceNotRun": 1,
+    "dkeSap": 0,
+    "disEffects": 0,
+    "merge": false,
+    "freeze": false,
+    "release": false
+  }
+}
