@@ -1,0 +1,9 @@
+# DIS B18-01 / R64 — full-original Tally EV16 source-bound selected native Function
+
+**CI_PENDING until exact new R64 source earns 3/3 mandatory Woodpecker statuses.** No inherited R63 #2348 success.
+
+This round consumes DKE [R23 original source-bound Reader](https://github.com/kaicreator-mm/domain-forge/blob/1f3b39a2a6716c1e977e726fd3737d9bd590a412/docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r23-ev16-bound-reader/REPORT.md) as real LOCAL Knowledge code, and selects complete original Tally v2.1.1 807-node graph `0f6007315fd7352fe6fd218effcfecf672cb4961`, original DKE R8 matrix `8cab8ead10d90a440c85fec86b01fd408022ae2c` and R22 gate `4afea8ce6333a25439f7ec17bf5c396ef3e1b59b` as source-locked read-only DATA. Original Reader source Git Blob `c37b09082a50eeec7e17c17ecd9366a79c4ce8ae`. All FOUR original Git Blob copies are byte exact in new DIS repository.
+
+Selected `compileDisV020Aot → loadDisV020Aot → app.invoke('dke.ev16.readSourceBound', {targetEV:'EV16'})` must return `UNKNOWN`, zero asserted RFC9111/Cache-Control joins, 807 nodes/271 RelationshipAssertions, false independent SAP and false Effects. Tests reject false RFC raw byte pin, added fake RFC source relation, altered graph content, altered selected installer SHA, DATA-as-LOCAL, arbitrary input authority, wrong EV, and cross-request alias modification. Woodpecker test invocation is mandatory in `.woodpecker/dis-v020-integration.yaml` (no Node major version constraint here).
+
+**Scope:** B01–B17 **31/31 verified historical bounded rounds**, B18 **0/1 pending**. Core remains 9/16 VERIFIED, 7 PARTIAL; Optional 4 NOT_RUN, Governance 1 NOT_RUN. Original R8 EV16 full 0/2, all original R8 53 cells 0/53. No independent original RFC Editor semantic source Critic/owner or raw HTML source pin, no SAP, Effects, Freeze, merge or release.

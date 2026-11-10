@@ -1,0 +1,41 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B18",
+  "status": "IN_PROGRESS",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "5154137d79f95a6d30dce150393f2dc33b49731e",
+    "verifiedRounds": 31,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "DKE R23 full original source byte-bound EV16 RFC↔Tally read-only UNKNOWN through real DIS AOT→SDK→KDP, not independent EV16 source-semantic SAP",
+  "rounds": [
+    {
+      "batchRoundId": "B18-01",
+      "globalRoundId": "R64",
+      "status": "CI_PENDING",
+      "testPath": "examples/dis-v020-native-sdk/b18-r23-ev16-full-source.test.mjs",
+      "testGitBlob": "607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460",
+      "originalSourceHead": null,
+      "sourceHead": null,
+      "checks": [],
+      "receipt": "receipts/r64-b18-ev16-full-original-source-native-ci.json"
+    }
+  ],
+  "verifiedRounds": 0,
+  "pendingRounds": 1,
+  "unstartedRounds": 0,
+  "noAutomaticCorePromotion": true,
+  "limitations": [
+    "Only the original full Tally graph, R8 matrix, and R22 gate source identities are authenticated; RFC 9111 complete raw HTML and independent source semantic Critic are NOT_RUN.",
+    "Original EV16 two cross-domain cells are not complete, no proven normative RFC↔Tally join.",
+    "SAP=0, Effects=0, no physical procedure or Product Freeze, merge or release."
+  ]
+}

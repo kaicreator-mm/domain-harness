@@ -1,0 +1,28 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B18",
+  "roundId": "B18-01",
+  "globalRoundId": "R64",
+  "status": "CI_PENDING",
+  "originCommit": null,
+  "originTree": null,
+  "testPath": "examples/dis-v020-native-sdk/b18-r23-ev16-full-source.test.mjs",
+  "testGitBlob": "607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460",
+  "receipt": "receipts/r64-b18-ev16-full-original-source-native-ci.json",
+  "sourceHead": null,
+  "checks": [],
+  "positive": [
+    "Four exact full original Git Blobs selected in AOT: original Tally 807-node JSON-LD as DATA, original R8 and gate DATA, R23 Reader LOCAL",
+    "Actual installed selected KDP Knowledge Function yields typed UNKNOWN for EV16 with 807 nodes, 271 RelationshipAssertions, zero RFC9111 asserted join",
+    "Cross-request returned arrays do not poison the Reader's internal frozen source"
+  ],
+  "negative": [
+    "Changed original graph text, matrix or gate refused by full-payload Git Blob check",
+    "Forged source origin/install SHA, DATA-as-executable, wrong Function version or extra authority input rejected",
+    "No positive RFC↔Tally source claim, no SAP, no Effect"
+  ],
+  "limits": [
+    "Native new exact CI NOT_RUN or PENDING at this prequalification snapshot",
+    "No independent semantic reviewer or full original RFC HTML raw bytes; full EV16 0/2 qualified"
+  ]
+}

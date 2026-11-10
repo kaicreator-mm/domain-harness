@@ -1,0 +1,65 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r64-b18-ev16-full-original-source-native-ci",
+  "disVersion": "0.2.0",
+  "status": "PENDING",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": null,
+    "tree": null
+  },
+  "originCommit": null,
+  "testPath": "examples/dis-v020-native-sdk/b18-r23-ev16-full-source.test.mjs",
+  "testGitBlob": "607c2eb0a2fc68eb23e634a6ed4f0c1be03dd460",
+  "ci": [],
+  "originalSources": [
+    {
+      "id": "r8",
+      "repo": "kaicreator-mm/domain-forge",
+      "commit": "0b2f1ae58b309a5eb9d3e89ac2e13ca915f1b211",
+      "originPath": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/EV_CROSS_DOMAIN_MATRIX_R8.json",
+      "path": "examples/dis-v020-native-sdk/fixtures/dke-r23-ev16-r8.json",
+      "sha": "8cab8ead10d90a440c85fec86b01fd408022ae2c",
+      "role": "DATA"
+    },
+    {
+      "id": "tally",
+      "repo": "kaicreator-mm/tally",
+      "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+      "originPath": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+      "path": "examples/dis-v020-native-sdk/fixtures/dke-r23-ev16-tally-full.jsonld",
+      "sha": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+      "role": "DATA"
+    },
+    {
+      "id": "gate",
+      "repo": "kaicreator-mm/domain-forge",
+      "commit": "0b2f1ae58b309a5eb9d3e89ac2e13ca915f1b211",
+      "originPath": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r22-ev16-explicit-source-join/FROZEN_CASE_GATE.json",
+      "path": "examples/dis-v020-native-sdk/fixtures/dke-r23-ev16-gate.json",
+      "sha": "4afea8ce6333a25439f7ec17bf5c396ef3e1b59b",
+      "role": "DATA"
+    },
+    {
+      "id": "reader",
+      "repo": "kaicreator-mm/domain-forge",
+      "commit": "1f3b39a2a6716c1e977e726fd3737d9bd590a412",
+      "originPath": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r23-ev16-bound-reader/verified-reader.mjs",
+      "path": "examples/dis-v020-native-sdk/dke-r23-ev16-reader.mjs",
+      "sha": "c37b09082a50eeec7e17c17ecd9366a79c4ce8ae",
+      "role": "LOCAL_CODE"
+    }
+  ],
+  "counts": {
+    "originalTallyGraphNodes": 807,
+    "originalTypedRelationshipAssertions": 271,
+    "originalExplicitRFC9111Nodes": 0,
+    "originalEV16SelectedCells": 2,
+    "originalFullEV16Qualified": 0
+  },
+  "limits": [
+    "Four Git original Blobs have been copied byte-exact into DIS Git blob storage, but the complete source's new native CI must run at this new exact code SHA before VERIFIED.",
+    "This Function only returns UNKNOWN and source-integrity observations; external RFC full raw HTML, semantic Critic/owner, SAP/Effects are unqualified.",
+    "The old 31/31 bounded DIS Demo rounds are historically VERIFIED; B18 is not included until fresh exact CI success."
+  ]
+}
