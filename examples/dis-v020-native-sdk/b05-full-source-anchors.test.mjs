@@ -82,7 +82,10 @@ test('B05-02 R45 selected Linux/x64 native BUILD + complete installer Source + H
   }));
  }finally{app.stop()}
 });
-test('B05-02 C3 cross-boundary forged selected module roster cannot be rescued by a correct host and full installer source pins',async()=>{
+test('B05-02 C3 cross-boundary forged selected module roster cannot be rescued by a correct host and full installer source pins',async(t)=>{
+ // createTarget needs an applicable DIS Target platform; darwin hosts have
+ // no selected Target contract at all and skip like the positive above.
+ if(!supported)return t.skip('No applicable DIS Target for this native runtime');
  const f=await fixture,a=createTarget(f),pins=allOriginalPins(f);
  const drift=clone(a);
  drift.program.target.selectedModules[0].moduleSha256='0'.repeat(64);

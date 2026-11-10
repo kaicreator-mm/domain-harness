@@ -28,7 +28,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { packTarballFrom, stagePackedWorkspaces, stageNewWorkspaceTarballs } from '../../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
 
@@ -50,9 +50,11 @@ const LEGACY_ORPHAN_ROOTS = new Set([
 function extractTarball(tarballPath: string, destination: string): string {
   const packageRoot = join(destination, 'package');
   mkdirSync(destination, { recursive: true });
-  // A relative archive name avoids drive-letter remote-path parsing on
-  // Windows, while -C extracts into the isolated destination on GNU/bsdtar.
-  execFileSync('tar', ['-xzf', basename(tarballPath), '-C', destination], { cwd: dirname(tarballPath) });
+  // Relative operands only: GNU tar parses a leading `C:` as a remote host
+  // spec (`-C C:\…` and `-C C:/…` both refuse) and eats backslash escapes,
+  // so the archive is addressed forward-slashed from inside the destination
+  // on every host tar (GNU/bsdtar/Linux) without any `-C` drive letter.
+  execFileSync('tar', ['-xzf', relative(destination, tarballPath).replaceAll('\\', '/')], { cwd: destination });
   return packageRoot;
 }
 

@@ -304,7 +304,7 @@
         },
         {
           "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
-          "case": "B05-02 R45 targeted native Tally Runx xDownload original sources all have independent installer exact pins"
+          "case": "B05-02 R45 selected Linux/x64 native BUILD + complete installer Source + Host close in one real KDP boot"
         },
         {
           "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
@@ -1038,7 +1038,7 @@
         },
         {
           "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
-          "case": "B05-02 R45 targeted native Tally Runx xDownload original sources all have independent installer exact pins"
+          "case": "B05-02 R45 selected Linux/x64 native BUILD + complete installer Source + Host close in one real KDP boot"
         },
         {
           "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
