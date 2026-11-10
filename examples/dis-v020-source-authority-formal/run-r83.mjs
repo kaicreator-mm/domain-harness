@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {validateOriginalEvidence,modelCheck,ORIGINAL,stateOf,futureRowSap,actualB22Observation} from './model-r83.mjs';
 import {runR83Tests} from './test-r83.mjs';
+import {makeR33OriginalGoReader} from '../dis-v020-native-sdk/dke-r33-go-reader.mjs';
 const FILES={
  producer:'examples/dis-v020-native-sdk/fixtures/dke-r33-original-full-triage-receipt.json',
  nativeReceipt:'docs/standards/domain-intelligence/DIS-0.2.0/conformance/receipts/r82-b22-r33-source-native-ci.json',
@@ -17,7 +18,7 @@ const FILES={
 };
 const EXPECTED_CODE_BLOBS={
  model:'bca64ed278d3e12ee4a0e65533c89901eb94157d',
- tests:'b634bd7a99ab013f84e5d9367a6fc18a9546b7ec'
+ tests:'7a3b5cec986978e03d997341170467d772d1e04b'
 };
 const blob=s=>{
  const b=Buffer.from(s,'utf8'),h=createHash('sha1');
@@ -37,9 +38,10 @@ if(pins.producerBlob!==ORIGINAL.producerBlob||
  blob(raw.tests)!==EXPECTED_CODE_BLOBS.tests)
  throw Error('R83_ORIGINAL_CODE_OR_RECEIPT_GIT_BLOB_DRIFT');
 const parsed=['producer','nativeReceipt','batch','matrix'].map(k=>JSON.parse(raw[k]));
+const selectedRealReader=makeR33OriginalGoReader(raw.producer);
 const result=runR83Tests(...parsed,pins,{
  validateOriginalEvidence,modelCheck,ORIGINAL,stateOf,futureRowSap,actualB22Observation
-});
+},selectedRealReader);
 console.log(JSON.stringify({...result,sourcePins:{
  originalProducerBlob:pins.producerBlob,
  nativeTestBlob:pins.nativeTestBlob,readerBlob:pins.readerBlob,
