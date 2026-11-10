@@ -1430,7 +1430,10 @@
           "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
           "case": "R62 native independent graph replay verifies original baseline/partial/hypothetical and conservative missing-publisher-source gate"
         },
-        "R63 native full B01–B16 30-source-round historical ledger replay with source-matched three-context CI and R61/R62 repair history"
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-30.test.mjs",
+          "case": "R63 every B01-B16 source-qualified round (30/30) has unique historical Git+3-context CI receipt and matrix link, without SAP promotion"
+        }
       ],
       "negative": [
         {
@@ -1537,7 +1540,10 @@
           "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
           "case": "R62 compressed upstream DATA cannot masquerade as LOCAL code, installer drift and forged Function Effect rejected"
         },
-        "R63 missing matrix receipt, source SHA mismatch, wrong test Blob and false audit assertion are fail-closed with #2346/#2347 historical failures preserved"
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-30.test.mjs",
+          "case": "R63 forged Woodpecker source pipeline / missing matrix receipt / fake native test are rejected"
+        }
       ],
       "receiptIds": [
         "r9.5-baseline",

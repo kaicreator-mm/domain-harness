@@ -28,6 +28,18 @@ test('machine validator rejects invented test names or silently changed required
  const v=clone(matrix);v.requirements[0].positive[0].case='fictional non-existent native proof';
  await assert.rejects(validateVersionMatrix(v,{'r9.5-baseline':baseline}),rejects('MATRIX_CASE_NOT_FOUND'));
 });
+// R64 regression: the R63 closeout once appended free-text summary rows to
+// CORE-016 evidence; prose without a runnable {path,case} anchor must stay
+// fail-closed instead of silently counting as machine-checkable proof.
+test('machine validator rejects free-text evidence rows without path and case anchors',async()=>{
+ const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async rid=>[
+  rid,JSON.parse(await readFile(new URL('receipts/'+rid+'.json',base),'utf8'))
+ ])));
+ const v=clone(matrix);
+ v.requirements.find(x=>x.id==='DIS020-CORE-016').positive
+   .push('R63 prose summary of a historical ledger replay without a runnable test anchor');
+ await assert.rejects(validateVersionMatrix(v,receipts),rejects('MATRIX_CASE_INVALID'));
+});
 test('version conformance is incomplete until all applicable MUST requirements are verified',async()=>{
  const r=await validateCheckedInMatrix();
  const complete=!(r.tallies['core:PARTIAL']||r.tallies['core:NOT_RUN']);
