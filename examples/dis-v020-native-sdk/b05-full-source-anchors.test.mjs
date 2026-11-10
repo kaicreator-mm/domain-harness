@@ -32,17 +32,66 @@ const boot=(f,a,expectedSourcePins,extra={})=>loadDisV020Aot(a,{
  registry:f.registry,store:new PlainCasDocStore(),tenantId:'tenant:b05-complete-source',
  requireAllSourcesPinned:true,expectedSourcePins,...extra
 });
-test('B05-02 R45 targeted native Tally Runx xDownload original sources all have independent installer exact pins',async(t)=>{
+test('B05-02 R45 selected Linux/x64 native BUILD + complete installer Source + Host close in one real KDP boot',async(t)=>{
+ // Required CI must execute, not skip, the same positive that proves both
+ // canonical BUILD module selection and independent full source closure.
+ // Non-CI developer hosts remain portable; no invented OS variant code.
+ const ciSha=process.env.CI_COMMIT_SHA;
+ if(ciSha!==undefined){
+  assert.match(ciSha,/^[a-f0-9]{40}$/,'C3 original CI commit SHA required');
+  assert.deepEqual(actual,{platform:'linux',architecture:'x64',runtime:'node'});
+ }
  if(!supported)return t.skip('No applicable DIS Target for this native runtime');
  const f=await fixture,a=createTarget(f),pins=allOriginalPins(f);
+ const qualified=qualifyDisV020Artifact(a);
+ assert.deepEqual(qualified.target.platform,actual.platform);
+ assert.deepEqual(qualified.target.architecture,actual.architecture);
+ assert.deepEqual(qualified.target.runtime,'node');
+ const moduleRoster=f.artifact.built.modules.map(m=>({packageId:m.packageId,moduleSha256:m.moduleSha256}));
+ assert.deepEqual(qualified.target.selectedModules,moduleRoster);
+ assert.equal(qualified.selected.size,moduleRoster.length);
+ for(const m of f.artifact.built.modules){
+  assert.equal(sourceSha256(m.moduleSource),m.moduleSha256,'C3 actual BUILD module bytes pinned');
+  assert.equal(qualified.selected.get(m.packageId)?.moduleSha256,m.moduleSha256);
+  for(const dep of m.dependencies??[]){
+   assert.ok(qualified.selected.has(dep),'C3 missing selected BUILD dependency: '+dep);
+  }
+ }
+ const consumed=[...qualified.sourceConsumers].filter(([,consumers])=>consumers.length>0)
+  .map(([id])=>id).sort();
+ assert.deepEqual(Object.keys(pins).sort(),consumed,'C3 independent installer pins entire actually consumed Function source set');
+ for(const [id,pin] of Object.entries(pins)){
+  assert.equal(qualified.pins.get(id)?.sha256,pin.sha256);
+  assert.deepEqual(qualified.pins.get(id)?.origin,pin.origin);
+ }
  const app=await boot(f,a,pins);
  try{
+  assert.deepEqual(app.selectedTarget,actual);
   assert.deepEqual(app.actualHostTarget,actual);
+  assert.equal(app.aotDigest,a.digest);
   const observation=await app.invoke('tally.assessTaskEvidence',{});
   assert.equal(observation.kind,'OBSERVATION');
+  assert.equal(observation.disposition,'UNKNOWN');
   assert.equal(observation.authority,'NONE');
   assert.equal(observation.evidence.attested,false);
+  if(ciSha!==undefined)console.log('DIS_C3_SELECTED_CLOSURE='+JSON.stringify({
+   schema:'dis.v0.2.c3-selected-closure/1',sourceHead:ciSha,
+   selectedTarget:app.selectedTarget,actualHostTarget:app.actualHostTarget,
+   modules:moduleRoster,sourceIds:consumed,aotDigest:a.digest,
+   sourceAuthority:'STRUCTURAL_ONLY',sapQualified:false,effectAuthorized:false
+  }));
  }finally{app.stop()}
+});
+test('B05-02 C3 cross-boundary forged selected module roster cannot be rescued by a correct host and full installer source pins',async()=>{
+ const f=await fixture,a=createTarget(f),pins=allOriginalPins(f);
+ const drift=clone(a);
+ drift.program.target.selectedModules[0].moduleSha256='0'.repeat(64);
+ assert.throws(()=>qualifyDisV020Artifact(drift),reject('DIS_TARGET_MODULE_DRIFT'));
+ const missing=clone(a);
+ missing.program.target.selectedModules.pop();
+ assert.throws(()=>qualifyDisV020Artifact(missing),reject('DIS_TARGET_CLOSURE_INCOMPLETE'));
+ await assert.rejects(boot(f,a,pins,{expectedTarget:{...actual,platform:actual.platform==='linux'?'windows':'linux'}}),
+  reject('DIS_TARGET_INSTALLED_MISMATCH'));
 });
 test('B05-02 R45 removing one consumed Domain original source pin cannot admit a target',async()=>{
  const f=await fixture,pins=allOriginalPins(f),a=f.artifact;
