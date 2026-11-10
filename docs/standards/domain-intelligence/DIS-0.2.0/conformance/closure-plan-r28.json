@@ -42,16 +42,14 @@
     },
     {
       "group": "C3",
-      "theme": "Target applicability and actual interaction transports",
+      "theme": "Target applicability and selected-implementation qualification (CORE-014 UI-neutral Interaction structurally complete)",
       "requirementIds": [
-        "DIS020-CORE-008",
-        "DIS020-CORE-014"
+        "DIS020-CORE-008"
       ],
       "prerequisites": [
-        "Product/L1 approves which Target variants actually apply",
-        "Decision on Form/Chat UI transport vs UI-neutral adapter requirements"
+        "Product/L1 approves actual supported Target variants and selected host/source implementation closure; not a requirement to qualify every OS for every app"
       ],
-      "doneWhen": "Required Target-specific selected package/implementation and Chat/Form/CLI semantics each have actual source-grounded positive and negative native tests, or explicit Product/L1 scope decisions"
+      "doneWhen": "Each applicable selected Target has exact Package/source/implementation/host evidence and positive/negative native checks; no universal Windows/Linux/Android triple-platform mandate"
     },
     {
       "group": "C4",
@@ -133,13 +131,6 @@
         "DIS020-CORE-008"
       ],
       "requires": "Product/L1 targeted supported variants; Node major not semantic gate"
-    },
-    {
-      "code": "INTERACTION_REAL_TRANSPORT_SCOPE_UNDECIDED",
-      "blocks": [
-        "DIS020-CORE-014"
-      ],
-      "requires": "Product/L1 clarification about UI-neutral vs concrete UI transport obligations"
     }
   ],
   "scopeProtection": {

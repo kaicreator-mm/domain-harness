@@ -54,7 +54,11 @@ test('R69 UI-neutral selected Interaction hypothetical closure uses source-deriv
  assert.equal(result.remaining.some(x=>x.id===id),false);
  assert.equal(result.sourceReview.sap,'UNQUALIFIED');
  assert.equal(result.formalFreezeEligible,false);
- const blocked=clone(x);blocked.plan.blockers=clone(baseline.plan.blockers);
+ const blocked=clone(x);blocked.plan.blockers.push({
+  code:'INTERACTION_REAL_TRANSPORT_SCOPE_UNDECIDED',
+  blocks:['DIS020-CORE-014'],
+  requires:'Independent decision missing'
+ });
  assert.throws(()=>inspectClosure(blocked),reject('CLOSURE_UNQUALIFIED_TRANSPORT_PROMOTION'));
 });
 test('R68 a claimed Core promotion without closing its planned normative gap remains fail closed',()=>{
