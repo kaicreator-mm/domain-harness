@@ -6,11 +6,19 @@
 
 | Scope | VERIFIED | PARTIAL | NOT_RUN | OUT_OF_SCOPE | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Core | 12 | 4 | 0 | 0 | 16 |
+| Core | 13 | 3 | 0 | 0 | 16 |
 | Optional profiles | 0 | 0 | 4 | 0 | 4 |
 | Governance | 0 | 0 | 1 | 0 | 1 |
 
-**Current status: PARTIAL — Core 12/16 VERIFIED (75%), four PARTIAL.** Remaining CORE-002/005 require independently qualified source-first Element/semantic ownership and accountable SAP; CORE-008 requires Product/L1 selected-Target applicability plus real selected implementation/host qualification; CORE-016 is the dependent final conformance closure. All four optional profiles remain NOT_RUN pending explicit applicability/enablement decision; governance GOV-001 is NOT_RUN (independent exact-SHA review and Product/L1/L2 Freeze). The historical chronology below intentionally retains its original per-round numbers; it must never be mistaken for the current top-line Matrix tally.
+**Current status: PARTIAL — Core 13/16 VERIFIED (81.25%), three PARTIAL (CORE-002/005/016).** CORE-008 is VERIFIED ONLY for Product/L1-approved linux/x64/node selected Target and original B03/B05 exact native closure. CORE-002/005 still require independent source-first Element and semantic SAP ownership; CORE-016 still requires full version closeout. All four optional profiles remain NOT_RUN pending explicit applicability/enablement decision; governance GOV-001 is NOT_RUN (independent exact-SHA review and Product/L1/L2 Freeze). The historical chronology below intentionally retains its original per-round numbers; it must never be mistaken for the current top-line Matrix tally.
+
+### R85 independent C3/CORE-008 reviewer qualification — current decision (2026-11-11)
+
+Product [#1496 explicit acceptance](https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6777762870) limits the required DIS v0.2 Demo Target to **linux/x64/node**. [R85 source-review receipt](receipts/r85-c3-core008-source-review.json) cross-checks original B03/B05 source tests and negative cases, canonical BUILD selected Package/Function/Resource/dependency digest closure, complete installer Source Pins and real KDP boot/Host binding. Qualifying code HEAD `1c9826bcfecdbd83c57a466e624eec4defb29604` Woodpecker [#2410/1–3](https://ci.kaicreator.com/repos/18/pipeline/2410/1) and audited docs HEAD `989a5858ac1393bdecbf20f0344df9c56a889fa6` [#2411/1–3](https://ci.kaicreator.com/repos/18/pipeline/2411/1) were each 3/3 SUCCESS.
+
+**Qualification:** CORE-008 **VERIFIED within that single Target**. No Windows/Android demo execution is required or claimed, and identical portable source bytes across OS labels do not invalidate a genuinely exact selected module/installer/Host binding. DKE SAP is independently governed under CORE-002/005; it is not a Target-only structure blocker. Historical R84 and R28 source records are preserved as historical, including their old PARTIAL findings. This new Matrix/docs change still requires fresh exact-SHA CI on its own HEAD; never inherit #2411 as the new SHA result.
+
+**Limits:** no independent business truth/SAP, Effect permit, hardware attestation, malicious native sandbox, complete Core-016 closure, optional-profile promotion, L2 Freeze, merge or release.
 
 ### Normalized Demo plan / history (ADS #1362 practice)
 

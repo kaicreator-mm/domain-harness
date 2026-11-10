@@ -983,7 +983,7 @@
       "id": "DIS020-CORE-008",
       "title": "Target-specific package dependency and implementation selection",
       "profile": "core",
-      "state": "PARTIAL",
+      "state": "VERIFIED",
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "5"
@@ -1107,6 +1107,10 @@
         {
           "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
           "case": "B05-03 R46 stale independent source pin denies selected native KDP boot before side effects"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 C3 cross-boundary forged selected module roster cannot be rescued by a correct host and full installer source pins"
         }
       ],
       "receiptIds": [
@@ -1119,9 +1123,10 @@
         "r44-b05-host-target-ci",
         "r45-b05-source-closure-ci",
         "r46-b05-target-original-consumer-ci",
-        "r84-c3-selected-closure-ci"
+        "r84-c3-selected-closure-ci",
+        "r85-c3-core008-source-review"
       ],
-      "note": "BUILD target digest/check exists; no independent Windows/Linux/Android selected package conformance matrix. D04 applicability review: Product/L1 has not approved an applicable Target list; no implicit Linux/Windows/Android PASS from one selected BUILD. B02 R35–R37 source-pinned native C3 positive+negative cases are versioned; still PARTIAL pending exact full-suite CI plus Product/L1 Target/transport applicability. The current DIS AOT lacks explicit OS Target selector. B02 R35/R37 bounded exact source #2280/1–3 3/3 SUCCESS; selection tied to Tally/xDownload original source/BUILD, but no OS-specific native Target variant contract; CORE remains PARTIAL. B03 R38–R40 candidate typed target/installer checks and DKE semantic authority negative are actual source-committed, new target identity is optional and bound to canonical module SHA roster; physical OS variant/independent SAP source owner not yet qualified. No automatic Core promotion. B03 exact final R38/R39/R40 new native target ABI and independent installer anchor qualified at 2d04fa512b5928c3796dbc6d1173a966c55a6286 / #2284/1–3 3/3 SUCCESS; same module bytes can still label linux/windows and cannot prove physical Target variants, so remains PARTIAL. B05 native real process OS/arch preflight, optional complete installer original source locks and actual Tally/Runx/xDownload/KDP invocation candidate. It remains a bounded C2/C3 implementation; it is not distinct per-OS module source or independent Tally semantic SAP acceptance. No Core promotion without authoritative scope and exact CI. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. C3 selected Linux/x64 BUILD + complete installer Source + Host closure in one real KDP boot positive (renamed B05-02 R45 case) and its cross-boundary forged-roster negative passed exact-SHA Woodpecker #2410/1-3 3/3 SUCCESS at repaired HEAD 1c9826bcfecdbd83c57a466e624eec4defb29604 after #2409/1 failed only on stale Matrix anchor names (MATRIX_CASE_NOT_FOUND, receipt r84-c3-selected-closure-ci); this proves real host qualification on one applicable CI Target, but Product/L1 Target applicability decision, distinct per-OS module source variants and independent Tally SAP remain unqualified, so CORE-008 stays PARTIAL."
+      "note": "R85 C3 CORE-008 VERIFIED **only** for Product #1496 explicitly accepted applicable DIS v0.2.0 Demo Target linux/x64/node (Issue comment #6777762870; original decision Git Blob 7f0d195849647282fad09a53a117b4f3a705b138). B03 R38–40 and B05 R44–46 positive/negative native cases select original Tally/xDownload/Runx canonical BUILD module digest roster; AOT Package, Function, declared Resource/Source/Dependency closure, independently pinned entire consumed original-source set, installer-selected Target, actual Linux/x64 Node Host and real KDP/SDK Business observation (OBSERVATION/UNKNOWN/NONE). Cases reject forged/missing module SHA or list, unselected dependency, wrong actual OS/arch, absent/forged source pin, unauthorized SAP/Effect. Qualifying code HEAD 1c9826bcfecdbd83c57a466e624eec4defb29604 Woodpecker #2410/1–3 SUCCESS; unchanged code at docs HEAD 989a5858ac1393bdecbf20f0344df9c56a889fa6 #2411/1–3 SUCCESS; R84 historical receipt, R85 scoped independent source review. Different per-OS source bytes are NOT mandatory: portable implementations can be byte-identical so long as selected Target/manifest/installer and actual host bind. Windows/Android/other Targets are not required or qualified in this bounded Demo; they are not universally OUT_OF_SCOPE in future products. This is only C3 structural Target/Package/Function/Source closure, not DKE SAP or business truth (separate C1 CORE-002/005), malicious-native sandbox, hardware attestation, KDP Effect grant, all Core MUSTs, L2 Freeze, Merge or Release."
     },
     {
       "id": "DIS020-CORE-009",

@@ -2,6 +2,8 @@
 
 **权威来源：** [Product/L1 #1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)、[Demo 主 Issue #1499](https://github.com/kaicreator-mm/domain-harness/issues/1499)、[Draft PR #1497](https://github.com/kaicreator-mm/domain-harness/pull/1497)。对应机器计划：[closure-plan-r28.json](closure-plan-r28.json)。
 
+> **R85 最新判定（本文件后文 R28 轮次和阻塞为历史规划）：** Product/L1 #1496 已批准 `linux/x64/node` 为唯一 Demo 必需 Target；B03/B05 #2410 和 #2411 原始三条 Woodpecker 精确 SHA SUCCESS，独立源码审核后 CORE-008 限界 **VERIFIED**。无需跨 OS 源码字节不同；DKE SAP 继续由 C1 CORE-002/005 管理，不阻塞 C3 结构闭包。当前 CORE 13/16 VERIFIED、3 PARTIAL；参阅 [R85 receipt](receipts/r85-c3-core008-source-review.json)、[机器 closure plan](closure-plan-r28.json) 和 [Matrix](matrix.json)。不授权 Freeze/Merge/Release。
+
 ## 本轮验证结果与收据
 
 R27 上一提交 `349b58f985970aeeaf77621a4451154e4cd6a353` / TREE `d310878eeb2127adbfc4fa9d2bb368446e6d203b` 已由 GitHub exact-SHA 状态核实 Woodpecker **#2263/1 Integration、#2263/2 compatibility、#2263/3 general Verify 全 SUCCESS**。本轮将事实固定为 [r27-native-impact-ci.json](receipts/r27-native-impact-ci.json)，并以机械矩阵关联 CORE-003、CORE-005、CORE-016 的 **限定范围**正反例；仍是 9/16 VERIFIED，7/16 PARTIAL。R28 写文档的**新 HEAD**需要独立 CI，不能直接继承 R27 的 PASS。

@@ -38,14 +38,15 @@
     },
     {
       "group": "C3",
-      "theme": "Target applicability and selected-implementation qualification (CORE-014 UI-neutral Interaction structurally complete)",
-      "requirementIds": [
-        "DIS020-CORE-008"
-      ],
+      "theme": "C3 CLOSED for Product-approved linux/x64/node bounded Demo — CORE-008 VERIFIED",
+      "requirementIds": [],
       "prerequisites": [
-        "Product/L1 approves actual supported Target variants and selected host/source implementation closure; not a requirement to qualify every OS for every app"
+        "FULFILLED: Product/L1 #1496 explicit only-applicable linux/x64/node Demo Target #6777762870",
+        "FULFILLED: B03/B05 selected canonical BUILD/Source/Installer/real Host/KDP and native negatives; #2410/1-3 + #2411/1-3 exact SHA all SUCCESS",
+        "Not required: different raw source bytes per OS; portable code may share exact bytes",
+        "DKE independent SAP remains only C1 CORE-002/005, NOT a pure C3 structural Target gate"
       ],
-      "doneWhen": "Each applicable selected Target has exact Package/source/implementation/host evidence and positive/negative native checks; no universal Windows/Linux/Android triple-platform mandate"
+      "doneWhen": "Completed for the single approved Target. Future OS expansion requires new Product decision and exact native runs, not inherited status."
     },
     {
       "group": "C4",
@@ -120,13 +121,6 @@
         "DIS020-CORE-005"
       ],
       "requires": "DKE or original source owner independent semantic authority, no synthetic approval"
-    },
-    {
-      "code": "TARGET_APPLICABILITY_NOT_APPROVED",
-      "blocks": [
-        "DIS020-CORE-008"
-      ],
-      "requires": "Product/L1 targeted supported variants; Node major not semantic gate"
     }
   ],
   "scopeProtection": {
@@ -136,5 +130,20 @@
     "noFreeze": true,
     "noRelease": true,
     "nodeMajorIsNotSemanticGate": true
+  },
+  "currentC3": {
+    "status": "VERIFIED_BOUNDED_LINUX_X64_NODE",
+    "closedRequirement": "DIS020-CORE-008",
+    "appliesTo": {
+      "platform": "linux",
+      "architecture": "x64",
+      "runtime": "node"
+    },
+    "productDecision": "https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6777762870",
+    "receiptId": "r85-c3-core008-source-review",
+    "coreVerified": 13,
+    "corePartial": 3,
+    "semanticSapStillOpenForC1": true,
+    "nonApplicableOSNotQualified": true
   }
 }
