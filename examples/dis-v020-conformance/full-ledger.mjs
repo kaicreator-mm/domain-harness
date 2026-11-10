@@ -60,8 +60,14 @@ export function validateFullRound({batch,manifest,entry,round,receipt,sourceText
      ['ERROR','FAILURE'].includes(h.integration??h.native))&&
    round.history.some(h=>h.sourceHead===round.sourceHead&&
      h.testBlob===round.testGitBlob&&h.native==='SUCCESS');
-  if(!r64VersionedHistory&&!r66FinalizedOrigin)
-   fail('FULL_LEDGER_REPAIR_LINEAGE_INVALID');
+  if(!r64VersionedHistory&&!r66FinalizedOrigin){
+   // Preserve the pre-R67 public error for forged ordinary round origins.
+   // Only an explicitly recorded original R0/R1 lineage (B18) or a
+   // finalized-test-source lineage (B20) has the more specific error.
+   fail(round.originCommit===round.sourceHead||
+      entry.originalR0SourceHead===identity?
+     'FULL_LEDGER_REPAIR_LINEAGE_INVALID':'FULL_LEDGER_ORIGINAL_SOURCE_DRIFT');
+  }
  }
  // R63/R64 originally used qualificationTree (not finalTree). Do not invent
  // a later Git tree: where both names are present, require byte agreement.

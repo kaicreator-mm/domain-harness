@@ -34,6 +34,12 @@ test('R67 all 34 original B01-B20 scoped rounds retain independent named 3-conte
  assert.deepEqual([r.coreVerified,r.corePartial,r.optionalNotRun,r.governanceNotRun],[9,7,4,1]);
  assert.equal(r.versionFreezeEligible,false);assert.equal(r.independentSemanticSAP,'NOT_CLAIMED');
 });
+test('R67 preserves pre-existing B13 ordinary forged source origin rejection code',async()=>{
+ const a=await roundFixture('B12');
+ assert.equal(a.entry.originalSourceHead,a.round.originCommit);
+ const mutated=clone(a);mutated.round.originCommit='0'.repeat(40);
+ assert.throws(()=>validateFullRound(mutated),reject('FULL_LEDGER_ORIGINAL_SOURCE_DRIFT'));
+});
 test('R67 R64 R0->R1 repaired test origin cannot be forged without BOTH historical failure pedigrees',async()=>{
  const r=await roundFixture('B18');
  assert.equal(validateFullRound(r).sourceHead,'ab78c52d9b6717c6badb27b4542736f47c69bc42');

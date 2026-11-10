@@ -10,7 +10,7 @@
   },
   "originCommit": "5258d1412c16e72ae4a4b23585df0fd482e1c061",
   "testPath": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
-  "testGitBlob": "f72980e5b953e2fc9e2cafcd785133ee454aacca",
+  "testGitBlob": "c3b429e350e9b6ecd2c02da0f0f241b5f8640fe3",
   "ci": [],
   "implementation": [
     "examples/dis-v020-conformance/full-ledger.mjs",
@@ -18,13 +18,15 @@
   ],
   "testScope": "34 historical B01-B20 scoped rounds original source/CI receipt and Matrix source integrity",
   "observations": [
-    "Current source/test are committed as an incremental pending B21 candidate, not yet Native CI qualified."
+    "Current source/test are committed as an incremental pending B21 candidate, not yet Native CI qualified.",
+    "R67 R1 #2375/1 FAILURE; R2 restores original B13 generic forged source-origin error semantics, separately retests R64/R66 special lineage."
   ],
   "limitations": [
     "All historical source Git Blobs/CI URLs are stored versioned evidence, not a live reexecution of every historical code snapshot or independent semantic SAP.",
     "B18 original R0 source vs R1 qualifying test origin has verified separate failure history; do not collapse, relabel or auto-inherit an R0 PASS.",
     "CORE-016 remains PARTIAL until all applicable Core MUSTs are independently and source-first qualified; no Freeze, Effect, merge or release.",
-    "R67 R1 adds explicitly bound B20 finalized original failure / final exact source success; no core status change, no native PASS inferred."
+    "R67 R1 adds explicitly bound B20 finalized original failure / final exact source success; no core status change, no native PASS inferred.",
+    "R67 R2 repair must earn new exact-source 3/3 CI; #2375 failed and is never inherited."
   ],
   "repairHistory": [
     {
@@ -32,6 +34,14 @@
       "testBlob": "84b38dad5e56b27239b61b563c7d864c8c345433",
       "status": "SUPERSEDED_BEFORE_NATIVE_QUALIFICATION",
       "finding": "R0 audited repair lineage did not distinguish B18 selected R1 test from B20 final native test source."
+    },
+    {
+      "sourceHead": "da088191d341bc4ed9d3723da46ffe66442b7cc8",
+      "testBlob": "f72980e5b953e2fc9e2cafcd785133ee454aacca",
+      "pipeline": "#2375",
+      "native": "FAILURE",
+      "status": "NOT_QUALIFIED",
+      "finding": "Likely ordinary-origin error precedence regression found by source inspection, genuine step log not available."
     }
   ]
 }
