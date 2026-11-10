@@ -1,0 +1,46 @@
+{
+  "schema": "dis.v020.core016-governance-dependency.failure-first/1",
+  "date": "2026-11-11",
+  "authority": {
+    "masterIssue": 1499,
+    "productIssue": 1496,
+    "pr": 1497
+  },
+  "source": {
+    "prHead": "a406927e9408424a09776e3896c1aa7ed1d0e9ef",
+    "validatorPath": "examples/dis-v020-conformance/validate.mjs",
+    "validatorGitBlob": "406578d36518e4c77f299df764b29f4ffc5c6406",
+    "matrixGitBlob": "b6b1468fbba76bf8a7c4ae8189483d8b5363856f"
+  },
+  "method": "Executed exact GitHub-readback validateVersionMatrix source in hosted V8 with sourceText only replaced by controlled test-declaration stub; cloned real version Matrix with synthetic valid-shaped evidence and 21 canonical IDs to isolate dependency check. Did not alter live Matrix or claim any actual CI.",
+  "red": [
+    {
+      "id": "CORE016_ONLY_VERIFIED",
+      "input": "15 Core NOT_RUN; CORE-016 VERIFIED; 4 OPT NOT_RUN; GOV NOT_RUN",
+      "oldValidator": "ACCEPTED",
+      "expected": "MATRIX_CORE016_DEPENDENCY_OPEN",
+      "risk": "Version-level conformance could be falsely claimed complete while required Core open"
+    },
+    {
+      "id": "GOV001_ONLY_VERIFIED",
+      "input": "16 Core NOT_RUN; 4 OPT NOT_RUN; GOV-001 VERIFIED",
+      "oldValidator": "ACCEPTED",
+      "expected": "MATRIX_GOV_DEPENDENCY_OPEN",
+      "risk": "Governance closeout could be falsely claimed with no C4 version closeout"
+    }
+  ],
+  "severity": "P1_VERSION_COMPLETION_QUALIFICATION_BYPASS",
+  "repairGoal": "Enforce CORE016 VERIFIED only after 001-015 all VERIFIED or explicitly OUT_OF_SCOPE; GOV001 VERIFIED only if CORE016 VERIFIED, while allowing legitimate eventual 16/16 and preserving optional applicability separately.",
+  "countsUnchanged": {
+    "coreVerified": 12,
+    "corePartial": 4,
+    "optionalNotRun": 4,
+    "govNotRun": 1
+  },
+  "notClaimed": [
+    "independent Product/L1 acceptance",
+    "real synthetic CI SUCCESS",
+    "DKE SAP qualification",
+    "release/freeze/merge"
+  ]
+}
