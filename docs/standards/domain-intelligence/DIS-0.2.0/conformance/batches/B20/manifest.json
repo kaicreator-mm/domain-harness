@@ -2,7 +2,7 @@
   "schema": "dis.v0.2.demo-batch/1",
   "version": "0.2.0",
   "batchId": "B20",
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "masterIssue": 1499,
   "productIssue": 1496,
   "pr": 1497,
@@ -20,17 +20,35 @@
     {
       "batchRoundId": "B20-01",
       "globalRoundId": "R66",
-      "status": "CI_BLOCKED",
+      "status": "VERIFIED",
       "testPath": "examples/dis-v020-native-sdk/b20-nested-function-schema.test.mjs",
       "testGitBlob": "239d925689ad7c90e7cece72f5db21e6aa31d96c",
       "originalSourceHead": "4f47579814be7774f2407a6420e27c78b1d43a76",
-      "sourceHead": null,
-      "checks": [],
-      "receipt": "receipts/r66-b20-nested-function-schema-native-ci.json"
+      "sourceHead": "2616ca326d3c0e0dd06d9b68b8d2127d60ec4825",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2364/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2364/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2364/3"
+        }
+      ],
+      "receipt": "receipts/r66-b20-nested-function-schema-native-ci.json",
+      "qualificationHead": "2616ca326d3c0e0dd06d9b68b8d2127d60ec4825",
+      "qualificationTree": "afa42ec88cfbdd9044b3fef253ea18db86548610"
     }
   ],
-  "verifiedRounds": 0,
-  "pendingRounds": 1,
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
   "unstartedRounds": 0,
   "noAutomaticCorePromotion": true,
   "limitations": [
@@ -39,5 +57,24 @@
     "SAP=0, Effects=0, independent review/L2 Freeze/merge/release not authorized.",
     "R66 R2 self-audit: original getPolicy() references a module-level mutable GUARD_DECLARED_BYTES_OK inside workflowDefinition; R1 negative execution could taint future native fixtures. Repair clones only workflowDefinition and intentBindings via JSON before mutation; original source/production getPolicy remains unchanged. Prior test blob af4a59ba2514f8824b772a33a22055b369776e5b superseded by 1d305c4c342be263963c912543098d787dc42823; prior #2361 integration ERROR and #2362 intermediate pending are not native qualification.",
     "R66 R3 source-depth consistency defect: original schema validator admitted nested primitive at depth=6 but runtime matcher rejected any such value. Original-source V8 replay demonstrated acceptance/matching disagreement at depth=5 nested record wrappers. Repair places depth gate before primitive-kind branch and adds source-specific B20 native negative. New test Git Blob 239d925689ad7c90e7cece72f5db21e6aa31d96c, CI NOT YET QUALIFIED; earlier #2363 belongs to old source."
+  ],
+  "qualificationHead": "2616ca326d3c0e0dd06d9b68b8d2127d60ec4825",
+  "qualificationTree": "afa42ec88cfbdd9044b3fef253ea18db86548610",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2364/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2364/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2364/3"
+    }
   ]
 }
