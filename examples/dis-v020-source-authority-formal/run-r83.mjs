@@ -17,8 +17,8 @@ const FILES={
  tests:'examples/dis-v020-source-authority-formal/test-r83.mjs'
 };
 const EXPECTED_CODE_BLOBS={
- model:'bca64ed278d3e12ee4a0e65533c89901eb94157d',
- tests:'7a3b5cec986978e03d997341170467d772d1e04b'
+ model:'039be3c9637b44a1248ea727e7380a4bde642b29',
+ tests:'cb9ef88f37d3ac531dfd0e7163c6f2d18404c874'
 };
 const blob=s=>{
  const b=Buffer.from(s,'utf8'),h=createHash('sha1');

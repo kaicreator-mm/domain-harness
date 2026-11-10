@@ -75,7 +75,22 @@ export function runR83Tests(producer,receipt,manifest,matrix,pins,model,reader){
   ['native-ci-link',v=>v[1].ci[1].url='https://ci.kaicreator.com/repos/18/pipeline/2398/2'],
   ['batch-candidate',v=>v[2].rounds[0].status='NOT_RUN'],
   ['core-matrix-drift',v=>v[3].requirements.find(x=>x.id==='DIS020-CORE-003').state='PARTIAL'],
-  ['producer-blob-pin',v=>v[4].producerBlob='0'.repeat(40)]
+  ['producer-blob-pin',v=>v[4].producerBlob='0'.repeat(40)],
+  // Coordinated forged provenance: keep all 3 status labels green, but swap
+  // which original Woodpecker job URL backs native vs compatibility evidence.
+  ['coordinated-ci-context-job-swap',v=>{
+   const ci=v[1].ci,first=ci.find(x=>x.context==='ci/woodpecker/pr/dis-v020-integration'),
+    second=ci.find(x=>x.context==='ci/woodpecker/pr/verify-min-node');
+   const tmp=first.url;first.url=second.url;second.url=tmp;
+   for(const list of [v[2].qualificationChecks,v[2].rounds[0].checks])
+    for(const row of list)row.url=ci.find(x=>x.context===row.context).url;
+  }],
+  // Count stays 12/4, but semantically mandatory CORE-005 has been forged.
+  ['coordinated-core-state-swap',v=>{
+   const a=v[3].requirements.find(x=>x.id==='DIS020-CORE-005'),
+    b=v[3].requirements.find(x=>x.id==='DIS020-CORE-009');
+   const state=a.state;a.state=b.state;b.state=state;
+  }]
  ];
  const negative=[];
  for(const [name,mutate] of mutations){

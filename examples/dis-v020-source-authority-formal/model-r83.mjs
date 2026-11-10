@@ -16,10 +16,12 @@ export const ORIGINAL=Object.freeze({
   STRUCTURAL_CANDIDATE:'d92a9b806568966e37f52f40f2c99fabe03bb5f10e964283638d8b2db846323f'
  })
 });
-const REQUIRE_CONTEXT=new Set([
- 'ci/woodpecker/pr/dis-v020-integration','ci/woodpecker/pr/verify-min-node',
- 'ci/woodpecker/pr/verify'
-]);
+const CI_JOBS=Object.freeze({
+ 'ci/woodpecker/pr/dis-v020-integration':'https://ci.kaicreator.com/repos/18/pipeline/2397/1',
+ 'ci/woodpecker/pr/verify-min-node':'https://ci.kaicreator.com/repos/18/pipeline/2397/2',
+ 'ci/woodpecker/pr/verify':'https://ci.kaicreator.com/repos/18/pipeline/2397/3'
+});
+const REQUIRE_CONTEXT=new Set(Object.keys(CI_JOBS));
 const fail=(code)=>{throw new Error(code)};
 const isObject=x=>x&&typeof x==='object'&&!Array.isArray(x);
 export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
@@ -54,7 +56,7 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
  if(!Array.isArray(receipt.ci)||receipt.ci.length!==3||
     new Set(receipt.ci.map(x=>x.context)).size!==3||
     receipt.ci.some(x=>!REQUIRE_CONTEXT.has(x.context)||x.state!=='SUCCESS'||
-       !/^https:\/\/ci\.kaicreator\.com\/repos\/18\/pipeline\/2397\/[123]$/.test(x.url)))
+       x.url!==CI_JOBS[x.context]))
     fail('B22_NATIVE_CI_NOT_SOURCE_QUALIFIED');
  if(manifest?.batchId!=='B22'||manifest?.status!=='VERIFIED'||manifest?.verifiedRounds!==1||
     manifest?.qualificationHead!==ORIGINAL.nativeHead||
@@ -73,6 +75,19 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
     fail('B22_BATCH_INTEGRITY_INVALID');
  const req=matrix?.requirements;
  if(!Array.isArray(req))fail('MATRIX_UNAVAILABLE');
+ // A 12/4 count alone is insufficient: swapping a blocked MUST with a
+ // completed one must never be accepted as the same R82 authority baseline.
+ const required=new Map();
+ const partial=new Set(['002','005','008','016']);
+ for(let n=1;n<=16;n++){
+  const suffix=String(n).padStart(3,'0');
+  required.set('DIS020-CORE-'+suffix,partial.has(suffix)?'PARTIAL':'VERIFIED');
+ }
+ for(let n=1;n<=4;n++)required.set('DIS020-OPT-'+String(n).padStart(3,'0'),'NOT_RUN');
+ required.set('DIS020-GOV-001','NOT_RUN');
+ if(req.length!==required.size||new Set(req.map(x=>x.id)).size!==required.size||
+    req.some(x=>!required.has(x.id)||x.state!==required.get(x.id)))
+   fail('MATRIX_REQUIREMENT_STATE_DRIFT');
  const counts={};
  for(const x of req){const k=x.profile+':'+x.state;counts[k]=(counts[k]||0)+1}
  for(const [k,v] of Object.entries({'core:VERIFIED':12,'core:PARTIAL':4,
