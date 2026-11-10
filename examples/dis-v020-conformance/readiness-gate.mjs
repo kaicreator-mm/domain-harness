@@ -43,9 +43,12 @@ export function decideB04Readiness({closure,sourceAudit,claimedApproval=undefine
   priorTestBlobDriftCount:sourceAudit.currentBlobDrifts.length,
   releaseEligible:false,freezeEligible:false,mergeEligible:false,
   independentSourceOwnerAccepted:false,independentSAP:false,
-  unqualifiedHostTarget:true,
+  // C3 Target qualification is an independent structural gate. It must not
+  // be kept artificially open after Product's scoped Target decision and
+  // the exact BUILD/installer/Host evidence were independently accepted.
+  unqualifiedHostTarget:closure.remaining.some(x=>x.id==='DIS020-CORE-008'),
   blockers,
-  next:[GROUPS.C1,GROUPS.C3,GROUPS.C2,GROUPS.C4,
+  next:[...new Set(closure.remaining.map(x=>GROUPS[x.group])),
    'Fresh independent exact-SHA C5 Product/L1/L2 review after C4 full coverage'],
   lesson:'Previously qualified exact-SHA native evidence remains historical; source byte drift and semantic owner authority are separate dimensions.'
  });
