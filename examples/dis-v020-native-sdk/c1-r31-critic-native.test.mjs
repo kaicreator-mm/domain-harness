@@ -119,8 +119,13 @@ test('C1 forged reviewer/Owner flags and source bytes are denied before authorit
  ])assert.throws(()=>x.reader.query(input),deny('DKE_R31_CRITIC_SELECTION_INVALID'));
  const wrong=structuredClone(x.installed);wrong[DATA].origin.gitBlob='0'.repeat(40);
  await assert.rejects(activate({...x,installed:wrong}),deny('DIS_SOURCE_ANCHOR_STALE'));
- const missing=structuredClone(x.installed);delete missing[REVIEW];
- await assert.rejects(activate({...x,installed:missing}),e=>Boolean(e));
+ // Source anchors intentionally support independently pinned subsets. A
+ // missing anchor is not a forbidden admission unless the caller asks for
+ // full closure; test a truly unselected extra anchor instead.
+ const unselected=structuredClone(x.installed);
+ unselected['not-selected-r31-source']={...unselected[DATA]};
+ await assert.rejects(activate({...x,installed:unselected}),
+  deny('DIS_SOURCE_ANCHOR_NOT_CONSUMED'));
  const fake={...x.registry,[FN]:{...x.registry[FN],sha256:'0'.repeat(64)}};
  await assert.rejects(activate({...x,registry:fake}),deny('DIS_LOCAL_REGISTRY_MISMATCH'));
  const app=await activate(x);
