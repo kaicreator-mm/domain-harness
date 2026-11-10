@@ -35,7 +35,7 @@ test('R72 selected Tally Runx xDownload and Orders nine public Functions have ex
   assert.equal(observation.evidence.attested,false);
  }finally{app.stop()}
 });
-test('R72/R73 selected Function inventory keeps two special non-JSON I/O gaps visible',async()=>{
+test('R72–R75 selected Function inventory distinguishes nine typed profiles without certifying source SAP',async()=>{
  const f=await selected,a=inspectDisV020PublicFunctionCoverage(f.artifact);
  assert.equal(a.typedIOFunctions,9);
  assert.deepEqual(a.missingTypedIO,[]);
@@ -45,7 +45,9 @@ test('R72/R73 selected Function inventory keeps two special non-JSON I/O gaps vi
  assert.equal(a.rows.filter(x=>x.profile==='KDP_ADMISSION_RECEIPT_ONLY').length,0);
  assert.equal(a.rows.filter(x=>x.profile==='LOCAL_HANDLE_METHODS_ONLY').length,0);
  assert.equal(a.rows.filter(x=>x.profile==='APP_INIT_LIFECYCLE_ONLY').length,0);
- assert.equal(a.fullCore003Ready,false);
+ // Structural completeness is now true; exact-source CI and independent
+ // semantic qualifications are still separate release/CORE gates.
+ assert.equal(a.fullCore003Ready,true);
  assert.equal(a.independentSAP,false);
  assert.equal(a.effectExecutionProven,false);
 });
