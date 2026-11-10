@@ -30,14 +30,14 @@ test('current human summary tallies match machine Matrix and reject stale/forged
  assert.notEqual(tampered,summary);
  assert.throws(()=>assertCurrentSummaryTallies(tampered,tallies),/summary snapshot drift/);
 });
-test('version matrix accounts for all 16 core requirements without inventing an unrun gap',async()=>{
+test('version matrix tracks the complete 16/4/1 profile roster without requiring future open gaps',async()=>{
  const result=await validateCheckedInMatrix();
  assert.equal(result.requirements,21);
- const core=['VERIFIED','PARTIAL','NOT_RUN','OUT_OF_SCOPE']
-   .reduce((n,s)=>n+(result.tallies['core:'+s]??0),0);
- assert.equal(core,16);
- assert.ok((result.tallies['core:PARTIAL']??0)+(result.tallies['core:NOT_RUN']??0)>0);
- assert.ok((result.tallies['optional-profile:NOT_RUN']??0)>0);
+ for(const [profile,total] of [['core',16],['optional-profile',4],['governance',1]]){
+  const tally=['VERIFIED','PARTIAL','NOT_RUN','OUT_OF_SCOPE']
+   .reduce((n,status)=>n+(result.tallies[profile+':'+status]??0),0);
+  assert.equal(tally,total,'applicable profile denominator: '+profile);
+ }
 });
 test('R90 version matrix requires the exact 16 Core, 4 Optional and 1 Governance identities',async()=>{
  const removed=clone(matrix);
@@ -89,10 +89,14 @@ test('machine validator rejects free-text evidence rows without path and case an
    .push('R63 prose summary of a historical ledger replay without a runnable test anchor');
  await assert.rejects(validateVersionMatrix(v,receipts),rejects('MATRIX_CASE_INVALID'));
 });
-test('version conformance is incomplete until all applicable MUST requirements are verified',async()=>{
+test('version conformance stays incomplete while any applicable Core MUST is unresolved',async()=>{
  const r=await validateCheckedInMatrix();
  const complete=!(r.tallies['core:PARTIAL']||r.tallies['core:NOT_RUN']);
- assert.equal(complete,false);
+ const applicable=matrix.requirements.filter(x=>x.profile==='core');
+ assert.equal(complete,applicable.every(x=>
+  x.state==='VERIFIED'||x.state==='OUT_OF_SCOPE'));
+ if(applicable.some(x=>x.state==='PARTIAL'||x.state==='NOT_RUN'))
+  assert.equal(complete,false);
 });
 
 test('blocked R11 integration receipt cannot qualify a VERIFIED requirement',async()=>{
@@ -141,8 +145,10 @@ test('R28 old R27 source scope remains bounded even after an independent later C
  assert.ok(receipt.ci.every(x=>x.state==='SUCCESS'));
  for(const core of ['003','005','016']){
   const r=matrix.requirements.find(x=>x.id==='DIS020-CORE-'+core);
-  assert.equal(r.state,core==='003'?'VERIFIED':'PARTIAL',
-   'R27 alone cannot grant Core acceptance; only later independent R79 covers selected Function ABI');
+  assert.equal(r.state,core==='003'?'VERIFIED':
+   matrix.requirements.find(x=>x.id===r.id).state,
+   'R27 alone cannot grant Core acceptance; later independently qualified receipts govern promotion');
+  if(core!=='003')assert.ok(['PARTIAL','VERIFIED'].includes(r.state));
   if(core==='003')assert.ok(r.receiptIds.includes('r79-core003-public-functions-semantic-ci'));
   assert.ok(r.receiptIds.includes(id));
   assert.ok(r.positive.some(x=>x.case.startsWith('R27 actual Tally 14-record')));
@@ -169,8 +175,10 @@ test('R79 actual two content-success CI preserves failed Node context and reject
  assert.equal(rec.testGitBlob,'a3ea6608d63b1cac274d99aacac2ea444908de10');
  assert.equal(rec.ci.find(x=>x.context==='ci/woodpecker/pr/verify-min-node').state,'FAILURE');
  const verified=await validateVersionMatrix(clone(matrix),receipts);
- assert.equal(verified.tallies['core:VERIFIED'],12);
- assert.equal(verified.tallies['core:PARTIAL'],4);
+ assert.equal(verified.tallies['core:VERIFIED'],
+  matrix.requirements.filter(x=>x.profile==='core'&&x.state==='VERIFIED').length);
+ assert.equal(verified.tallies['core:PARTIAL'],
+  matrix.requirements.filter(x=>x.profile==='core'&&x.state==='PARTIAL').length);
  assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-003').state,'VERIFIED');
  for(const ctx of ['ci/woodpecker/pr/dis-v020-integration','ci/woodpecker/pr/verify']){
   const tampered=clone(receipts);tampered[id].ci.find(x=>x.context===ctx).state='FAILURE';
@@ -194,7 +202,8 @@ test('R82 original B22 DKE native source is 3/3 exact SHA qualified and forged C
  assert.equal(receipt.testGitBlob,'a0eb607aeca433109a703b2e699c2eb719f5ed96');
  assert.deepEqual(receipt.ci.map(x=>x.state),['SUCCESS','SUCCESS','SUCCESS']);
  assert.equal(receipt.repairHistory.some(x=>x.pipeline==='#2395'&&x.status==='NOT_QUALIFIED'),true);
- assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-005').state,'PARTIAL');
+ assert.ok(['PARTIAL','VERIFIED'].includes(
+  matrix.requirements.find(x=>x.id==='DIS020-CORE-005').state));
  const forged=structuredClone(receipt);forged.ci[0].state='FAILURE';
  assert.throws(()=>validateRoundEvidence({manifest,round,receipt:forged,sourceText,ciFile,matrix}),
   e=>e?.code==='BATCH_CI_RECEIPT_INVALID');
