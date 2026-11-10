@@ -94,7 +94,6 @@
     "previousHostedV8": "76/76 PASS",
     "oldR23ReaderGitBlob": "c37b09082a50eeec7e17c17ecd9366a79c4ce8ae"
   },
-  "qualification": "BOUNDED_NATIVE_R26_TYPED_READER_SOURCE_CONSUMPTION",
   "qualificationHead": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
   "qualificationTree": "4a98014f5f33b73bc43f25e9d6ed13fd36046530",
   "observations": [
@@ -102,5 +101,15 @@
     "Actual original code native DIS AOT→SDK→KDP B19/R65 test was mandatory in Woodpecker #2357/1 integration and the same exact HEAD earned #2357/2 and #2357/3 SUCCESS.",
     "Eight native B19 tests include complete original four source checks, read-only typed UNKNOWN, forged provenance and DATA-as-LOCAL refusal, 76 R26 typed/scope negative vectors, 1.0.0 to 1.1.0 ABI compatibility and old R23 Reader installer downgrade rejection.",
     "Source authenticity and typed negatives are not independent domain-semantic SAP or positive RFC↔Tally linkage."
+  ],
+  "qualificationMeaning": "BOUNDED_NATIVE_R26_TYPED_READER_SOURCE_CONSUMPTION",
+  "repairHistory": [
+    {
+      "sourceHead": "17ff09dff92f8e941f2db6c257cf97eea6492126",
+      "pipeline": "#2358",
+      "native": "FAILURE",
+      "finding": "Stored R65 successful native receipt incorrectly used reserved qualification field. Source-exact validateVersionMatrix() accepts qualification only for DIS_SEMANTIC_ONLY; a general 3/3 SUCCESS receipt with any qualification property deterministically throws MATRIX_RECEIPT_INVALID.",
+      "correction": "Move non-authoritative result scope label to qualificationMeaning; do not relax validator, weaken tests, or requalify original #2357 code CI."
+    }
   ]
 }
