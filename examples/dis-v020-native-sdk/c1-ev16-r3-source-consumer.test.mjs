@@ -14,9 +14,9 @@ import {EV16_R3_ORIGINS,makeEv16R3Reader} from './dke-ev16-r3-reader.mjs';
 
 const READER_ORIGIN=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'c6af2078b29ab4e33877f9ed271860f7691fb61d',
+ commit:'a930237035e466ec9ab15d93e9dfa8f5ceae2d01',
  path:'examples/dis-v020-native-sdk/dke-ev16-r3-reader.mjs',
- gitBlob:'2cdb5759190d72b00679e5ddd952178cd9ab7a0e'
+ gitBlob:'177a36d35955cae02deb2c9bcdb349f0107a447c'
 });
 const FN='dke.ev16.r3.sourceReview.inspect',CODE='dke-ev16-r3-reader',
  RECEIPT='dke-ev16-r3-original-source-receipt',ROUTE='dke-r31-r7-original-owner-route',
@@ -127,6 +127,23 @@ test('C1 EV16 R3 provenance forgery or Owner/Effect escalation is rejected at so
   deny('DKE_EV16_R3_ORIGINAL_DATA_DRIFT'));
  assert.throws(()=>makeEv16R3Reader(x.receiptText,x.routingText,x.r1Text+' '),
   deny('DKE_EV16_R3_ORIGINAL_DATA_DRIFT'));
+ // R1 red→green: a changing getter previously changed the selected subject
+ // after the allowlist read and returned UNKNOWN for an unselected claim.
+ let getterReads=0;
+ const accessor={};
+ Object.defineProperty(accessor,'subject',{enumerable:true,get(){
+  getterReads++;return getterReads<=2?'EV16:D02+D04':'se:UNSELECTED';
+ }});
+ assert.throws(()=>x.reader.query(accessor),deny('DKE_EV16_R3_SUBJECT_INVALID'));
+ assert.equal(getterReads,0,'the unauthorized getter must never execute');
+ const throwing=new Proxy({subject:'EV16:D02+D04'},{
+  ownKeys(){throw new Error('hostile query Proxy')}
+ });
+ assert.throws(()=>x.reader.query(throwing),deny('DKE_EV16_R3_SUBJECT_INVALID'));
+ const inherited=Object.create({subject:'EV16:D02+D04'});
+ assert.throws(()=>x.reader.query(inherited),deny('DKE_EV16_R3_SUBJECT_INVALID'));
+ assert.throws(()=>x.reader.query({subject:'EV16:D02+D04',[Symbol('effect')]:true}),
+  deny('DKE_EV16_R3_SUBJECT_INVALID'));
  for(const input of [
   {subject:'EV16:D02+D04',ownerDecision:'APPROVED'},
   {subject:'EV16:D02+D04',effect:true},

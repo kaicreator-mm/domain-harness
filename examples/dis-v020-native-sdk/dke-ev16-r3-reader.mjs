@@ -97,13 +97,26 @@ export function makeEv16R3Reader(receiptText,routingText,r1Text){
     byId.OD06?.productScope!=='MITIGATION_CONFIRMED_KEEP_OPEN')
   fail('DKE_EV16_R7_DECISION_ROUTE_INVALID');
  return Object.freeze({query(input){
-  if(!input||typeof input!=='object'||Array.isArray(input)||
-     Object.keys(input).length!==1||typeof input.subject!=='string'||
-     !Object.hasOwn(selection,input.subject))
-    fail('DKE_EV16_R3_SUBJECT_INVALID');
+  // Snapshot the ONE declared own data property exactly once. A getter,
+  // Proxy trap, inherited key, symbol or post-check value change cannot
+  // choose a different source after validation.
+  let subject;
+  try{
+   if(!input||typeof input!=='object'||Array.isArray(input)||
+      Object.getPrototypeOf(input)!==Object.prototype)
+     fail('DKE_EV16_R3_SUBJECT_INVALID');
+   const keys=Reflect.ownKeys(input);
+   if(keys.length!==1||keys[0]!=='subject')
+     fail('DKE_EV16_R3_SUBJECT_INVALID');
+   const own=Object.getOwnPropertyDescriptor(input,'subject');
+   if(!own||!Object.hasOwn(own,'value')||
+      typeof own.value!=='string'||!Object.hasOwn(selection,own.value))
+     fail('DKE_EV16_R3_SUBJECT_INVALID');
+   subject=own.value;
+  }catch{fail('DKE_EV16_R3_SUBJECT_INVALID')}
   return Object.freeze({
-   status:'UNKNOWN',subject:input.subject,
-   sourceVerdict:selection[input.subject],
+   status:'UNKNOWN',subject,
+   sourceVerdict:selection[subject],
    observationTier:'ORIGINAL_TALLY_RFC_SOURCE_PREFLIGHT_ONLY',
    crossPublisherAuthority:'NONE',ownerReviewDecision:'NOT_RUN',
    formalEv16Cell:'NOT_RUN',
