@@ -320,12 +320,34 @@ function isC3Target(t){
 }
 export function assertC3NativeWorkflow(workflow){
  if(typeof workflow!=='string')fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
- const nativeCommands=workflow.split(String.fromCharCode(10))
-  .filter(x=>/^\s*-\s*node --import tsx --test /.test(x));
- const used=new Set(nativeCommands.flatMap(x=>x.trim().split(/\s+/)));
- if(!used.has('examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs')||
-    !used.has('examples/dis-v020-native-sdk/b05-host-target.test.mjs')||
-    !workflow.split(String.fromCharCode(10)).some(x=>/^\s*-\s*node --test examples\/dis-v020-conformance\/validate\.test\.mjs\s*$/.test(x)))
+ // Look only at literal top-level commands in the required integration step.
+ // Scanning arbitrary YAML text accepted test commands printed inside inert
+ // block scalars, other unrelated steps and shell here-documents as "run".
+ const lines=workflow.split(/\r?\n/);
+ const steps=lines.map((line,i)=>/^  - name: dis-v020-integration\s*$/.test(line)?i:-1)
+  .filter(i=>i>=0);
+ if(steps.length!==1)fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
+ const start=steps[0];
+ const next=lines.findIndex((line,i)=>i>start&&/^  - name: /.test(line));
+ const stepLines=lines.slice(start+1,next<0?lines.length:next);
+ // A PR CI step skipped by Woodpecker's when/failure/dependency controls is
+ // not a mandatory native witness, regardless of text under commands.
+ if(stepLines.some(x=>/^    (?:when|failure|depends_on|detach):/.test(x)))
+  fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
+ const commandIndex=stepLines.findIndex(x=>/^    commands:\s*$/.test(x));
+ if(commandIndex<0)fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
+ // Exactly six spaces + "- " denotes a direct YAML list item under
+ // commands; block-scalar contents are more deeply indented, not executed
+ // YAML list commands. Ban shell metacharacters and wrappers such as
+ // "|| true", "echo", "sh -c", redirects and conditional suppression.
+ const direct=stepLines.slice(commandIndex+1)
+  .filter(x=>/^      - node (?:--import tsx --test|--test) [A-Za-z0-9_./ -]+$/.test(x))
+  .map(x=>x.slice(8));
+ const nativeArgs=new Set(direct.filter(x=>x.startsWith('node --import tsx --test '))
+  .flatMap(x=>x.split(/\s+/)));
+ if(!nativeArgs.has('examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs')||
+    !nativeArgs.has('examples/dis-v020-native-sdk/b05-host-target.test.mjs')||
+    !direct.includes('node --test examples/dis-v020-conformance/validate.test.mjs'))
   fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
  return true;
 }
