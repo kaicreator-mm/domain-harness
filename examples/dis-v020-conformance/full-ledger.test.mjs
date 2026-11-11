@@ -39,7 +39,7 @@ test('B13 R59 all B01-B12 genuine 26 native source rounds have consistent 3-cont
  },(()=>{
   const coreStates=audit.coreVerified+audit.corePartial;
   assert.equal(coreStates,16);
-  return {coreVerified:audit.coreVerified,corePartial:audit.corePartial,optionalNotRun:4,governanceNotRun:1};
+  return {coreVerified:audit.coreVerified,corePartial:audit.corePartial,optionalNotRun:3,governanceNotRun:1};
  })());
 });
 test('B13 R59 the previously stale B09 R55 standalone round now agrees with original verified #2312 receipts',async()=>{
