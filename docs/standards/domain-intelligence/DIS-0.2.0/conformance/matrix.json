@@ -1015,6 +1015,7 @@
       "title": "Target-specific package dependency and implementation selection",
       "profile": "core",
       "state": "VERIFIED",
+      "qualifiedTarget": {"platform": "linux", "architecture": "x64", "runtime": "node"},
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "5"
