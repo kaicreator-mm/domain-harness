@@ -18,9 +18,10 @@ const FILES={
 };
 const EXPECTED_CODE_BLOBS={
  // R93: model blob updated together with the R82→R93 authority-baseline
- // snapshot (Product-accepted scoped CORE-008 admission witnessed by r86);
+ // snapshot (Product-accepted scoped CORE-008 witnessed by r86, plus O1
+ // R94 PARTIAL native fixture-only provider with no semantic qualification);
  // test blob unchanged. The pin keeps failing closed on unreviewed edits.
- model:'48d39ff26281f29528d9f55242fa4c2bce70f633',
+ model:'9d48a33f6df5a41c79f1fa7b968ba33372014f62',
  tests:'cb9ef88f37d3ac531dfd0e7163c6f2d18404c874'
 };
 const blob=s=>{
