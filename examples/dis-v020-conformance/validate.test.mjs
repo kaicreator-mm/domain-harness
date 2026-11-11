@@ -79,7 +79,10 @@ test('R92 C3 accepted linux/x64/node Target is the sole newly promoted Core whil
  assert.equal(plan.blockers.some(x=>x.blocks?.includes('DIS020-CORE-008')),false);
  for(const id of ['002','005','016'])
   assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-'+id).state,'PARTIAL');
- assert.equal(matrix.requirements.filter(x=>x.profile==='optional-profile').every(x=>x.state==='NOT_RUN'),true);
+ // R94 O1 is a PARTIAL native fixture-provider bridge; other optional profiles stay unrun.
+ assert.equal(matrix.requirements.find(x=>x.id==='DIS020-OPT-001').state,'PARTIAL');
+ for(const id of ['002','003','004'])
+  assert.equal(matrix.requirements.find(x=>x.id==='DIS020-OPT-'+id).state,'NOT_RUN');
 });
 test('R93 C3 VERIFIED cannot borrow generic R9.5 evidence or drop R86 selected-Host closure proof',async()=>{
  const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async id=>[
@@ -494,7 +497,10 @@ test('R91 closeout: a legitimate future fully qualified Core is structurally rea
   'a legitimate future 16/16 must not be hard-blocked by a historic counter');
  // Optional profile applicability has its own Product/decision gate; its
  // NOT_RUN count is not silently promoted or reinterpreted here.
- assert.equal(future.requirements.filter(x=>x.profile==='optional-profile'&&x.state==='NOT_RUN').length,4);
+ assert.deepEqual(
+  future.requirements.filter(x=>x.profile==='optional-profile').map(x=>[x.id,x.state]),
+  matrix.requirements.filter(x=>x.profile==='optional-profile').map(x=>[x.id,x.state])
+ );
 });
 
 test('R91 closeout: other Core OUT_OF_SCOPE remains conditionally admissible only under existing decisionUrl gate',()=>{
