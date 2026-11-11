@@ -22,11 +22,11 @@ import {
 
 const O2_SOURCE=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'eb83c90b4a1086b4d13d4d351c3dd9fafa2c1c29',
+ commit:'1bf75c11bc4bb603683cd22b358409dc4630ea3a',
  path:'examples/dis-v020-native-sdk/o2-experience-gate.mjs',
- gitBlob:'6eb261f376fea04c9d23acabe323e8439f7e1f50'
+ gitBlob:'c2f252e5236571753404adb208bcd8721d529da6'
 });
-const gitBlob=value=>createHash('sha1').update(Buffer.from('blob '+Buffer.byteLength(value)+'\\0')).update(value).digest('hex');
+const gitBlob=value=>createHash('sha1').update(Buffer.from('blob '+Buffer.byteLength(value)+'\0')).update(value).digest('hex');
 const basePromise=makeNativeFixture();
 async function makeO2App(){
  const base=await basePromise;
