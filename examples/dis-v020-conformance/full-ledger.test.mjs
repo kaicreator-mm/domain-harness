@@ -41,6 +41,36 @@ test('B13 R59 all B01-B12 genuine 26 native source rounds have consistent 3-cont
   assert.equal(coreStates,16);
   return {coreVerified:audit.coreVerified,corePartial:audit.corePartial,optionalNotRun:3,governanceNotRun:1};
  })());
+ // R95: O1's R94 PARTIAL transition is the authoritative matrix state (same
+ // roster as model-r83 and the R95 review). Witness it explicitly so future
+ // optional transitions fail closed until re-witnessed here.
+ const {matrix:liveMatrix}=await basePromise;
+ assert.deepEqual(liveMatrix.requirements.filter(x=>x.profile==='optional-profile')
+  .map(x=>[x.id,x.state]),[['DIS020-OPT-001','PARTIAL'],['DIS020-OPT-002','NOT_RUN'],
+  ['DIS020-OPT-003','NOT_RUN'],['DIS020-OPT-004','NOT_RUN']]);
+});
+test('B13 R59 forged optional-state promotion and stale NOT_RUN demotion cannot satisfy exact ledger counters',async()=>{
+ const audit=await auditFullDisLedger({stopBefore:'B13'});
+ const exact={coreVerified:audit.coreVerified,corePartial:audit.corePartial,
+  optionalNotRun:audit.optionalNotRun,governanceNotRun:audit.governanceNotRun};
+ const tally=m=>{const t={coreVerified:0,corePartial:0,optionalNotRun:0,governanceNotRun:0};
+  for(const r of m.requirements){
+   if(r.profile==='core'&&r.state==='VERIFIED')t.coreVerified++;
+   else if(r.profile==='core'&&r.state==='PARTIAL')t.corePartial++;
+   else if(r.profile==='optional-profile'&&r.state==='NOT_RUN')t.optionalNotRun++;
+   else if(r.profile==='governance'&&r.state==='NOT_RUN')t.governanceNotRun++;
+  }return t};
+ const {matrix}=await basePromise;
+ assert.deepEqual(tally(matrix),exact);
+ // Promoting an unrun optional profile silently changes the exact counters.
+ const promoted=clone(matrix);
+ promoted.requirements.find(x=>x.id==='DIS020-OPT-002').state='PARTIAL';
+ assert.notDeepEqual(tally(promoted),exact);
+ // The demoted matrix reproduces exactly the stale optionalNotRun:4 snapshot
+ // that #2448/1 rejected: a demotion must never satisfy the live counters.
+ const demoted=clone(matrix);
+ demoted.requirements.find(x=>x.id==='DIS020-OPT-001').state='NOT_RUN';
+ assert.notDeepEqual(tally(demoted),exact);
 });
 test('B13 R59 the previously stale B09 R55 standalone round now agrees with original verified #2312 receipts',async()=>{
  const data=await readFile(new URL('batches/B09/rounds/B09-01/round.json',base),'utf8');
