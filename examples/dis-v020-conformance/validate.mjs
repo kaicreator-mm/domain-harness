@@ -318,6 +318,18 @@ function isC3Target(t){
   Object.keys(t).sort().join(',')==='architecture,platform,runtime'&&
   Object.entries(C3_TARGET).every(([k,v])=>t[k]===v);
 }
+export function assertC3NativeWorkflow(workflow){
+ if(typeof workflow!=='string')fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
+ const nativeCommands=workflow.split(String.fromCharCode(10))
+  .filter(x=>/^\s*-\s*node --import tsx --test /.test(x));
+ const used=new Set(nativeCommands.flatMap(x=>x.trim().split(/\s+/)));
+ if(!used.has('examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs')||
+    !used.has('examples/dis-v020-native-sdk/b05-host-target.test.mjs')||
+    !workflow.split(String.fromCharCode(10)).some(x=>/^\s*-\s*node --test examples\/dis-v020-conformance\/validate\.test\.mjs\s*$/.test(x)))
+  fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
+ return true;
+}
+
 async function assertC3ScopedAdmission(matrix,receipts){
  const row=matrix.requirements.find(x=>x.id==='DIS020-CORE-008');
  if(row?.state!=='VERIFIED')return;
@@ -354,13 +366,7 @@ async function assertC3ScopedAdmission(matrix,receipts){
   fail('MATRIX_C3_PRODUCT_OR_TARGET_DRIFT');
  // A correct unmodified test file is useless if it has been silently removed
  // from the actually executing Woodpecker native suite.
- const workflow=await sourceText('.woodpecker/dis-v020-integration.yaml');
- const nativeCommands=workflow.split(String.fromCharCode(10)).filter(x=>new RegExp('^\\s*-\\s*node --import tsx --test ').test(x));
- const used=new Set(nativeCommands.flatMap(x=>x.trim().split(/\s+/)));
- if(!used.has('examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs')||
-    !used.has('examples/dis-v020-native-sdk/b05-host-target.test.mjs')||
-    !workflow.includes('node --test examples/dis-v020-conformance/validate.test.mjs'))
-  fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
+ assertC3NativeWorkflow(await sourceText('.woodpecker/dis-v020-integration.yaml'));
 }
 
 export async function validateVersionMatrix(matrix,receipts){
