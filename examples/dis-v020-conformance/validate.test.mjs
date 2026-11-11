@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {validateCheckedInMatrix,validateVersionMatrix,declaredTestCases} from './validate.mjs';
+import {validateCheckedInMatrix,validateVersionMatrix,declaredTestCases,assertCloseoutDependencies} from './validate.mjs';
 import {validateRoundEvidence} from './batch-audit.mjs';
 const base=new URL('../../docs/standards/domain-intelligence/DIS-0.2.0/conformance/',import.meta.url);
 const matrix=JSON.parse(await readFile(new URL('matrix.json',base),'utf8'));
@@ -347,4 +347,45 @@ test('R90 reviewer: future legitimate 100 percent coverage is not blocked by old
  assert.doesNotThrow(()=>assertCurrentSummaryTallies(future,{
   'core:VERIFIED':16,'optional-profile:VERIFIED':4,'governance:VERIFIED':1
  }));
+});
+
+test('R91 closeout: CORE-016 VERIFIED cannot bypass unresolved applicable Core MUST',async()=>{
+ const forged=clone(matrix);
+ assert.equal(forged.requirements.find(x=>x.id==='DIS020-CORE-002').state,'PARTIAL');
+ forged.requirements.find(x=>x.id==='DIS020-CORE-016').state='VERIFIED';
+ await assert.rejects(validateVersionMatrix(forged,{}),
+  rejects('MATRIX_CORE016_DEPENDENCY_OPEN'));
+});
+
+test('R91 closeout: Governance VERIFIED cannot bypass CORE-016 version completion',async()=>{
+ const forged=clone(matrix);
+ forged.requirements.find(x=>x.id==='DIS020-GOV-001').state='VERIFIED';
+ await assert.rejects(validateVersionMatrix(forged,{}),
+  rejects('MATRIX_GOV_DEPENDENCY_OPEN'));
+});
+
+test('R91 closeout: a legitimate future fully qualified Core is structurally reachable',()=>{
+ const future=clone(matrix);
+ for(const row of future.requirements){
+  if(row.profile==='core')row.state='VERIFIED';
+ }
+ future.requirements.find(x=>x.id==='DIS020-GOV-001').state='VERIFIED';
+ assert.doesNotThrow(()=>assertCloseoutDependencies(future),
+  'a legitimate future 16/16 must not be hard-blocked by a historic counter');
+ // Optional profile applicability has its own Product/decision gate; its
+ // NOT_RUN count is not silently promoted or reinterpreted here.
+ assert.equal(future.requirements.filter(x=>x.profile==='optional-profile'&&x.state==='NOT_RUN').length,4);
+});
+
+test('R91 closeout: other Core OUT_OF_SCOPE remains conditionally admissible only under existing decisionUrl gate',()=>{
+ const future=clone(matrix);
+ for(const row of future.requirements){
+  if(row.profile==='core')row.state='VERIFIED';
+ }
+ future.requirements.find(x=>x.id==='DIS020-CORE-002').state='OUT_OF_SCOPE';
+ assert.doesNotThrow(()=>assertCloseoutDependencies(future));
+ // State consistency is a NECESSARY dependency gate, not enough to waive
+ // applicable mandatory obligations. The standard validator still requires
+ // a version-specific Product decision URL before any OUT_OF_SCOPE acceptance.
+ assert.equal(future.requirements.find(x=>x.id==='DIS020-CORE-002').decisionUrl,undefined);
 });
