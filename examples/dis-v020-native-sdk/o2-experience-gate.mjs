@@ -107,7 +107,10 @@ export function dedupeIndependentCases(rows){
  const cohortByCase=new Map(),cohortByRun=new Map(),excluded=[],eligible=[];
  for(const row of values){
   if(!plain(row))throw new TypeError('O2_CASE_INVALID');
-  const replay=read(row,'cacheHit')===true||read(row,'retry')===true;
+  const cacheHit=read(row,'cacheHit'),retryFlag=read(row,'retry');
+  const replay=cacheHit===true||retryFlag===true;
+  const replayFlagInvalid=(cacheHit!==undefined&&typeof cacheHit!=='boolean')||
+   (retryFlag!==undefined&&typeof retryFlag!=='boolean');
   const cohort=read(row,'sourceCohort'),caseKey=read(row,'independentCaseKey'),runId=read(row,'runId');
   if(!validText(cohort)||!validText(caseKey)||!validText(runId)){
    excluded.push(Object.freeze({reason:replay?'CACHE_OR_RETRY_NOT_INDEPENDENT':'SOURCE_LINEAGE_INCOMPLETE'}));continue;
@@ -118,7 +121,8 @@ export function dedupeIndependentCases(rows){
   if(cohortByRun.has(runId))union(cohort,cohortByRun.get(runId));
   else cohortByRun.set(runId,cohort);
   // Replays join the same lineage graph but never earn independent credit.
-  if(replay)excluded.push(Object.freeze({reason:'CACHE_OR_RETRY_NOT_INDEPENDENT'}));
+  if(replayFlagInvalid)excluded.push(Object.freeze({reason:'REPLAY_FLAG_INVALID'}));
+  else if(replay)excluded.push(Object.freeze({reason:'CACHE_OR_RETRY_NOT_INDEPENDENT'}));
   else eligible.push(cohort);
  }
  const roots=new Set(eligible.map(find));
