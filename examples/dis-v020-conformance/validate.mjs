@@ -336,6 +336,13 @@ export function assertC3NativeWorkflow(workflow){
   fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
  const commandIndex=stepLines.findIndex(x=>/^    commands:\s*$/.test(x));
  if(commandIndex<0)fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
+ // Even direct-looking test commands are not executed when the script exits
+ // successfully before reaching them. Fail closed instead of allowing an
+ // "exit 0" short circuit to turn skipped tests into a green C3 witness.
+ if(stepLines.slice(commandIndex+1)
+  .filter(line=>!/^\s*#/.test(line))
+  .some(line=>/(?:^|[\s;|&])exit(?:\s|$)/.test(line)))
+  fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
  // Exactly six spaces + "- " denotes a direct YAML list item under
  // commands; block-scalar contents are more deeply indented, not executed
  // YAML list commands. Ban shell metacharacters and wrappers such as
