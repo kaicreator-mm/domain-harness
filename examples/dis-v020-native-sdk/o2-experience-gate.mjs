@@ -45,6 +45,11 @@ const safeArray=value=>{
  }catch{return null}
 };
 const validText=x=>typeof x==='string'&&x.length>0&&x.length<=512&&!/[\u0000-\u001f]/.test(x);
+// Cohort/case/run identity must be a canonical opaque token, never a display
+// label. Reject blank, padded, non-NFC and invisible aliases rather than
+// silently trimming and crediting ambiguous source lineage.
+const validLineageId=x=>validText(x)&&x.trim()===x&&
+ x.normalize('NFC')===x&&!/[\u007f-\u009f\u00ad\u200b-\u200d\u2060]/u.test(x);
 const validGit=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const VERSION_KEYS=Object.freeze([
  'contractDigest','implementationDigest','knowledgeDigest','packageDigest',
@@ -125,7 +130,7 @@ export function dedupeIndependentCases(rows){
   const replayFlagInvalid=(cacheHit!==undefined&&typeof cacheHit!=='boolean')||
    (retryFlag!==undefined&&typeof retryFlag!=='boolean');
   const cohort=read(row,'sourceCohort'),caseKey=read(row,'independentCaseKey'),runId=read(row,'runId');
-  const sourceOK=validText(cohort),caseOK=validText(caseKey),runOK=validText(runId);
+  const sourceOK=validLineageId(cohort),caseOK=validLineageId(caseKey),runOK=validLineageId(runId);
   const node=sourceOK?cohort:Symbol('unattributed-source-cohort');
   find(node);
   if(caseOK){
@@ -164,7 +169,7 @@ export function validateCohortPartition(partitions){
   groups[name]=rows;
   for(const row of rows){
    const cohort=plain(row)?read(row,'sourceCohort'):undefined;
-   if(!validText(cohort))return Object.freeze({status:'UNKNOWN',disjoint:false,reason:'SOURCE_COHORT_MISSING'});
+   if(!validLineageId(cohort))return Object.freeze({status:'UNKNOWN',disjoint:false,reason:'SOURCE_COHORT_MISSING'});
    if(owners.has(cohort)&&owners.get(cohort)!==name)
     return Object.freeze({status:'LEAKED',disjoint:false,reason:'SOURCE_COHORT_CROSSES_PARTITIONS'});
    owners.set(cohort,name);
@@ -173,7 +178,7 @@ export function validateCohortPartition(partitions){
    for(const [field,seen] of [['independentCaseKey',cases],['runId',runs]]){
     const key=read(row,field);
     if(key===undefined)continue;
-    if(!validText(key))return Object.freeze({status:'UNKNOWN',disjoint:false,reason:'PARTITION_LINEAGE_INVALID'});
+    if(!validLineageId(key))return Object.freeze({status:'UNKNOWN',disjoint:false,reason:'PARTITION_LINEAGE_INVALID'});
     if(seen.has(key)&&seen.get(key)!==name)
      return Object.freeze({status:'LEAKED',disjoint:false,reason:'CASE_OR_RUN_CROSSES_PARTITIONS'});
     seen.set(key,name);
