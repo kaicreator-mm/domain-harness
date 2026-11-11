@@ -305,7 +305,7 @@ const C3_PINNED_BLOBS=new Map([
 ]);
 function gitBlobSha(text){
  const b=Buffer.from(text,'utf8');
- return createHash('sha1').update(Buffer.from('blob '+b.length+'\\0')).update(b).digest('hex');
+ return createHash('sha1').update('blob '+b.length).update(Buffer.from([0])).update(b).digest('hex');
 }
 export function assertPinnedC3Source(path,content){
  const expected=C3_PINNED_BLOBS.get(path);
@@ -341,10 +341,11 @@ async function assertC3ScopedAdmission(matrix,receipts){
  if(approval.sourceAuthority?.decisionUrl!==C3_PRODUCT_URL||
     approval.sourceAuthority?.kind!=='USER_CHAT_DECISION_TRANSCRIBED'||
     approval.decision!=='ACCEPT_COMPLETED_C3_INDEPENDENT_ENGINEERING_REVIEW'||
-    approval.review?.receiptId!==C3_R86||!isC3Target(approval.scope)||
-    !isC3Target(scope.selectedApplicableTarget)&&
-      !(scope.selectedApplicableTarget?.platform==='linux'&&
-        scope.selectedApplicableTarget?.architecture==='x64'&&scope.selectedApplicableTarget?.runtime==='node')||
+    approval.review?.receiptId!==C3_R86||
+    approval.scope?.onlyApplicableDemoTarget!==true||
+    !Object.entries(C3_TARGET).every(([k,v])=>approval.scope?.[k]===v)||
+    scope.selectedApplicableTarget?.profile!=='bounded DIS v0.2.0 Demo; actual selected Woodpecker Linux/x64/Node worker only'||
+    !Object.entries(C3_TARGET).every(([k,v])=>scope.selectedApplicableTarget?.[k]===v)||
     c3?.status!=='VERIFIED_PRODUCT_ACCEPTED_LINUX_X64_NODE'||
     c3?.productAcceptanceUrl!==C3_PRODUCT_URL||
     c3?.freshReviewReceiptId!==C3_R86||
@@ -354,8 +355,8 @@ async function assertC3ScopedAdmission(matrix,receipts){
  // A correct unmodified test file is useless if it has been silently removed
  // from the actually executing Woodpecker native suite.
  const workflow=await sourceText('.woodpecker/dis-v020-integration.yaml');
- const nativeCommands=workflow.split('\\n').filter(x=>/^\\s*-\\s*node --import tsx --test /u.test(x));
- const used=new Set(nativeCommands.flatMap(x=>x.trim().split(/\\s+/)));
+ const nativeCommands=workflow.split(String.fromCharCode(10)).filter(x=>new RegExp('^\\s*-\\s*node --import tsx --test ').test(x));
+ const used=new Set(nativeCommands.flatMap(x=>x.trim().split(/\s+/)));
  if(!used.has('examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs')||
     !used.has('examples/dis-v020-native-sdk/b05-host-target.test.mjs')||
     !workflow.includes('node --test examples/dis-v020-conformance/validate.test.mjs'))
