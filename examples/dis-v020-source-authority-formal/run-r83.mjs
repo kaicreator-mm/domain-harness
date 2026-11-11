@@ -20,11 +20,10 @@ const EXPECTED_CODE_BLOBS={
  // R93: model blob updated together with the R82→R93 authority-baseline
  // snapshot (Product-accepted scoped CORE-008 witnessed by r86, plus O1
  // R94 PARTIAL native fixture-only provider with no semantic qualification).
- // R95: test blob updated only to add the two review-tracked Optional-state
- // negative mutations (no model/production logic change). The pin keeps
- // failing closed on unreviewed edits.
- model:'9d48a33f6df5a41c79f1fa7b968ba33372014f62',
- tests:'ba89818bfdcae5eca52613f8efd1e24469af23a3'
+ // R95: bind each requirement ID to its exact Core/Optional/Governance profile;
+ // add Optional demotion and same-state Core/Optional profile-swap negatives.
+ model:'673d3c1a12ccd0a368c3cabdb90d361027eb08b2',
+ tests:'4bfe5918c7048f025ebb3b98b2a8f11f37300b93'
 };
 const blob=s=>{
  const b=Buffer.from(s,'utf8'),h=createHash('sha1');

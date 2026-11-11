@@ -96,7 +96,15 @@ export function runR83Tests(producer,receipt,manifest,matrix,pins,model,reader){
   // the honest PARTIAL O1 native candidate as VERIFIED must fail exactly
   // like a Core roster drift; the exact 13/3 + O1-PARTIAL roster stays pinned.
   ['optional-opt002-not-run-promotion',v=>v[3].requirements.find(x=>x.id==='DIS020-OPT-002').state='PARTIAL'],
-  ['optional-opt001-partial-to-verified',v=>v[3].requirements.find(x=>x.id==='DIS020-OPT-001').state='VERIFIED']
+  ['optional-opt001-partial-to-verified',v=>v[3].requirements.find(x=>x.id==='DIS020-OPT-001').state='VERIFIED'],
+  ['optional-opt001-partial-demotion-to-not-run',v=>v[3].requirements.find(x=>x.id==='DIS020-OPT-001').state='NOT_RUN'],
+  // Same-state CORE↔OPT swap preserves aggregate counters; ID→profile must
+  // still remain authoritative in the standalone R83 source gate.
+  ['optional-core-profile-swap-same-partial-state',v=>{
+   const core=v[3].requirements.find(x=>x.id==='DIS020-CORE-002');
+   const opt=v[3].requirements.find(x=>x.id==='DIS020-OPT-001');
+   const prior=core.profile;core.profile=opt.profile;opt.profile=prior;
+  }]
  ];
  const negative=[];
  for(const [name,mutate] of mutations){

@@ -82,10 +82,13 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
  // CORE-002/005/016 remain unresolved and must not be promoted by this update.
  // R94 explicitly tracks native O1 PARTIAL while other optional profiles are NOT_RUN.
  const required=new Map();
+ const expectedProfile=new Map();
  const partial=new Set(['002','005','016']);
  for(let n=1;n<=16;n++){
   const suffix=String(n).padStart(3,'0');
-  required.set('DIS020-CORE-'+suffix,partial.has(suffix)?'PARTIAL':'VERIFIED');
+  const id='DIS020-CORE-'+suffix;
+  required.set(id,partial.has(suffix)?'PARTIAL':'VERIFIED');
+  expectedProfile.set(id,'core');
  }
  // O1 R94 source-selected SDK Knowledge/fixture provider is an honest
  // PARTIAL native candidate. O2/O3/O4 remain NOT_RUN; this is no claim of
@@ -93,11 +96,16 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
  for(let n=1;n<=4;n++){
   const id='DIS020-OPT-'+String(n).padStart(3,'0');
   required.set(id,n===1?'PARTIAL':'NOT_RUN');
+  expectedProfile.set(id,'optional-profile');
  }
  required.set('DIS020-GOV-001','NOT_RUN');
+ expectedProfile.set('DIS020-GOV-001','governance');
+ // The requirement ID owns its profile. Aggregate counts alone can hide a
+ // same-state CORE↔OPT swap (e.g. CORE-002 PARTIAL ↔ OPT-001 PARTIAL).
  if(req.length!==required.size||new Set(req.map(x=>x.id)).size!==required.size||
-    req.some(x=>!required.has(x.id)||x.state!==required.get(x.id)))
-   fail('MATRIX_REQUIREMENT_STATE_DRIFT');
+    req.some(x=>!required.has(x.id)||x.state!==required.get(x.id)||
+      x.profile!==expectedProfile.get(x.id)))
+   fail('MATRIX_REQUIREMENT_STATE_OR_PROFILE_DRIFT');
  const counts={};
  for(const x of req){const k=x.profile+':'+x.state;counts[k]=(counts[k]||0)+1}
  for(const [k,v] of Object.entries({'core:VERIFIED':13,'core:PARTIAL':3,
