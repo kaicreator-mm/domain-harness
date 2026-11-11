@@ -1,0 +1,190 @@
+{
+  "schema": "dke.ev14.blueprint-sourced-impact-edge-scope/2",
+  "outputLabel": "DKE_209_EV14_BLUEPRINT_DEPENDENCY_DERIVED_IMPACT_R1",
+  "date": "2026-11-11",
+  "authority": {
+    "productIssue": 207,
+    "masterIssue": 209,
+    "existingDraftPr": 208,
+    "priorPrHead": "0873e98539393c0aac5db07edba3851eecfdee09",
+    "blueprintOriginalGitBlob": "52722c7317285552bda8892bf0c4dd76904cbcb9",
+    "earlierSourceImpactDemoGitBlob": "b7060243ef031c975eedbc18b6f6d17189e7d97f",
+    "originalR8MatrixGitBlob": "8cab8ead10d90a440c85fec86b01fd408022ae2c",
+    "blueprintOriginalPath": "docs/standards/dke/DKE-0.0.1/demos/ev14-domain-blueprint-r0/BLUEPRINT_CANDIDATE_R1_SAP.json",
+    "blueprintRevision": "EV14_BLUEPRINT_R1_ELEMENT_SAP_CANDIDATE",
+    "semanticAssuranceProfileSchema": "dke.semantic-assurance-profile/0.1",
+    "elementSapProfiles": 6,
+    "elementSapValidationCases": 36,
+    "qualifiedElementSAPs": 0
+  },
+  "status": "BOUNDED_EXPLICIT_EDGE_SOURCE_CONTEXT_CANDIDATE_NOT_PRODUCT_L2",
+  "sourceEvents": [
+    {
+      "id": "GO_EVIDENCE",
+      "sourceClaimKeys": [
+        "R33_NATIVE",
+        "GO_SLICE_NATIVE"
+      ],
+      "meaning": "Prospective change to dated GO GAF/OBO provenance or derivative annotation; NO actual original GAF mutation"
+    },
+    {
+      "id": "HTTP_EVIDENCE",
+      "sourceClaimKeys": [
+        "RFC9110",
+        "RFC9111"
+      ],
+      "meaning": "Prospective RFC source revision; NO actual publisher RFC revision"
+    }
+  ],
+  "edgeScopes": [
+    {
+      "from": "EV14-PROVENANCE",
+      "to": "EV14-GO",
+      "scopes": [
+        "GO_EVIDENCE"
+      ],
+      "why": "GO original-source provenance concerns the GO child"
+    },
+    {
+      "from": "EV14-PROVENANCE",
+      "to": "EV14-HTTP",
+      "scopes": [
+        "HTTP_EVIDENCE"
+      ],
+      "why": "HTTP publisher-source provenance concerns the HTTP child"
+    },
+    {
+      "from": "EV14-GO",
+      "to": "EV14-NONENTAILMENT",
+      "scopes": [
+        "GO_EVIDENCE"
+      ],
+      "why": "GO evidence can change cross-publisher non-entailment witness applicability"
+    },
+    {
+      "from": "EV14-HTTP",
+      "to": "EV14-NONENTAILMENT",
+      "scopes": [
+        "HTTP_EVIDENCE"
+      ],
+      "why": "HTTP semantics can change transport non-entailment witness applicability"
+    },
+    {
+      "from": "EV14-NONENTAILMENT",
+      "to": "EV14-QUALIFICATION",
+      "scopes": [
+        "GO_EVIDENCE",
+        "HTTP_EVIDENCE"
+      ],
+      "why": "Either source can require re-evaluating independent scope qualification"
+    },
+    {
+      "from": "EV14-QUALIFICATION",
+      "to": "EV14-ROOT",
+      "scopes": [
+        "GO_EVIDENCE",
+        "HTTP_EVIDENCE"
+      ],
+      "why": "Parent/Root cannot silently remain qualified when a child or global invariant invalidates"
+    }
+  ],
+  "semantics": {
+    "graphAuthority": "EV14 BLUEPRINT 'verificationPlanDag.edges' defines structural dependency pairs; edgeScopes annotate source-context selectors and must match those pairs exactly",
+    "sourceRevisionVsElementInvalidation": "Independent source-byte identity stays unchanged for sibling publisher; impacted Element verification obligations can be invalidated without rewriting any source bytes",
+    "semanticGraphCycle": "Allowed, but unrelated to executable DAG or dependency propagation; do not derive invalidation by traversing semanticLinks",
+    "policyRevision": "If annotation policy changes, exact Git Blob pin invalidates verifier until explicitly reviewed; policy candidates cannot silently promote",
+    "noFalseCompleteness": "Historical GO 36 rows represent bounded source samples, not full canonical GO KG; sourceEvents are hypothetical",
+    "qualification": "NO_R8_CELL_PROMOTION_NO_SAP_NO_EFFECTS",
+    "elementSourceOwnership": "EVERY semanticClaims.sourceRefs AND validationCases.sourceRefs MUST BE A SUBSET OF THE OWNING ELEMENT.sourceClaims; cross-element evidence must be represented as an explicit shared constraint dependency and cannot silently remain local-current."
+  },
+  "expectedForDefault": {
+    "GO_EVIDENCE": {
+      "direct": [
+        "EV14-GO",
+        "EV14-NONENTAILMENT",
+        "EV14-PROVENANCE"
+      ],
+      "impacted": [
+        "EV14-GO",
+        "EV14-NONENTAILMENT",
+        "EV14-PROVENANCE",
+        "EV14-QUALIFICATION",
+        "EV14-ROOT"
+      ],
+      "unaffected": [
+        "EV14-HTTP"
+      ]
+    },
+    "HTTP_EVIDENCE": {
+      "direct": [
+        "EV14-HTTP",
+        "EV14-NONENTAILMENT",
+        "EV14-PROVENANCE"
+      ],
+      "impacted": [
+        "EV14-HTTP",
+        "EV14-NONENTAILMENT",
+        "EV14-PROVENANCE",
+        "EV14-QUALIFICATION",
+        "EV14-ROOT"
+      ],
+      "unaffected": [
+        "EV14-GO"
+      ]
+    }
+  },
+  "gate": {
+    "reviewStatus": "NOT_INDEPENDENTLY_REVIEWED",
+    "sourceOwner": "NOT_ATTESTED",
+    "fullCanonicalKg": "NOT_RUN",
+    "actualOriginalSourceRevision": "NOT_PERFORMED",
+    "formalEv14": "NOT_RUN",
+    "qualifiedR8": "0/53",
+    "SAP": 0,
+    "Effects": 0,
+    "semanticAssuranceProfiles": "CANDIDATE_NOT_QUALIFIED",
+    "qualifiedElementSAPs": 0,
+    "canonicalGraph": "NOT_PRESENT_BOUNDED_SOURCE_SLICE_ONLY"
+  },
+  "correction": {
+    "type": "P1_DIRECT_SOURCE_REFERENCE_OMISSION_REPAIRED",
+    "before": [
+      "EV14-GO",
+      "EV14-PROVENANCE"
+    ],
+    "after": [
+      "EV14-GO",
+      "EV14-NONENTAILMENT",
+      "EV14-PROVENANCE"
+    ],
+    "sourceProof": "BLUEPRINT_CANDIDATE.elements[EV14-NONENTAILMENT].sourceClaims includes GO_SLICE_NATIVE",
+    "rule": "Direct invalidation must be derived from actual Element sourceClaims, not an older hardcoded impact list.",
+    "formalPromotion": "NONE"
+  },
+  "impactSemantics": {
+    "directElementOwners": "Derived from each Element.sourceClaims",
+    "transitiveTopology": "Blueprint.verificationPlanDag.edges only; policy.edgeScopes are scope annotations only",
+    "invalidatedElementSap": "For every impacted Element, invalidate its attached SAP profile, all its assurance obligations, CQ statuses and validation case currentness",
+    "invalidatedOwnedConstraints": "Derived from ownedConstraintRefs of impacted Element profiles",
+    "dependentConstraintProfiles": "Any Element profile referencing an invalidated owned constraint is marked DEPENDENT_REVIEW_REQUIRED; this does not claim its local source bytes changed",
+    "unaffectedLocalProfiles": "A sibling Element's local profile may remain source-current only if none of its sourceClaims changed; any shared/global constraint closure still requires review",
+    "noPromotion": "Invalidation and replay never authorizes SAP qualification, Root, Effects or R8",
+    "invalidatedCompositionCases": "When the event reaches Blueprint.root, invalidate every case in the CROSS_ELEMENT_COMPOSITION_ONLY validationBundle as a separate set; do not mix these with the 30 per-Element SAP case IDs."
+  },
+  "sourceClosureRepair": {
+    "finding": "P1_SAP_CLAIM_AND_CASE_SOURCE_OWNERSHIP_GAP",
+    "status": "INTEGRATED_IN_ACTIVE_PR_208",
+    "changes": [
+      "EV14-NONENTAILMENT now owns R33_NATIVE in sourceClaims and sourceSnapshot because NON-C02 and its validation cases cite R33_NATIVE.",
+      "EV14-HTTP-05 is now HTTP-local and no longer cites GO_SLICE_NATIVE; cross-publisher absence belongs to EV14-NONENTAILMENT."
+    ],
+    "invalidationConsequence": "GO_EVIDENCE invalidates the NONENTAILMENT profile and its R33-dependent claims/cases; HTTP profile local cases no longer contain an undeclared GO source dependency."
+  },
+  "compositionInvalidation": {
+    "role": "CROSS_ELEMENT_COMPOSITION_CASES_ONLY; ELEMENT_LEVEL_SEMANTIC_OBLIGATIONS_ARE_ATTACHED_TO_EACH_ELEMENT.semanticAssuranceProfile",
+    "trigger": "ROOT_ELEMENT_PROFILE_INVALIDATED",
+    "caseSelection": "ALL_BLUEPRINT_VALIDATION_BUNDLE_CASES",
+    "requiredBehavior": "INVALIDATE_ALL_COMPOSITION_CASES_AND_REQUIRE_FULL_BUNDLE_REPLAY",
+    "reason": "The original eight-case bundle is separate from per-Element SAP cases; any source event that reaches Root invalidates the composed child/global state and must prevent stale bundle-case reuse."
+  }
+}
