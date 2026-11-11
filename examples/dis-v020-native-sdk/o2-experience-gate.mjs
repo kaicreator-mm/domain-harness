@@ -47,9 +47,11 @@ const safeArray=value=>{
 const validText=x=>typeof x==='string'&&x.length>0&&x.length<=512&&!/[\u0000-\u001f]/.test(x);
 // Cohort/case/run identity must be a canonical opaque token, never a display
 // label. Reject blank, padded, non-NFC and invisible aliases rather than
-// silently trimming and crediting ambiguous source lineage.
+// silently trimming and crediting ambiguous source lineage. Unicode's
+// Default_Ignorable_Code_Point covers bidi controls, invisible separators,
+// grapheme joiners and variation selectors without rejecting visible scripts.
 const validLineageId=x=>validText(x)&&x.trim()===x&&
- x.normalize('NFC')===x&&!/[\u007f-\u009f\u00ad\u200b-\u200d\u2060]/u.test(x);
+ x.normalize('NFC')===x&&!/[\u007f-\u009f\p{Default_Ignorable_Code_Point}]/u.test(x);
 const validGit=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const VERSION_KEYS=Object.freeze([
  'contractDigest','implementationDigest','knowledgeDigest','packageDigest',
