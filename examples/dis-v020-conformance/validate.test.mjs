@@ -171,6 +171,53 @@ test('R93 original C3 positive and negative native files cannot disappear from C
  }
 });
 
+test('R93 P1: inert YAML, unrelated step and skipped integration cannot retain C3 native qualification',async()=>{
+ const workflow=await readFile(new URL('../../.woodpecker/dis-v020-integration.yaml',import.meta.url),'utf8');
+ assert.equal(assertC3NativeWorkflow(workflow),true);
+ const inert=[
+  'steps:',
+  '  - name: dis-v020-integration',
+  '    image: bash',
+  '    commands:',
+  "      - echo 'C3 native test execution omitted'",
+  '      - |',
+  "        cat <<'INERT_C3_TEXT'",
+  '        - node --import tsx --test examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs examples/dis-v020-native-sdk/b05-host-target.test.mjs',
+  '        - node --test examples/dis-v020-conformance/validate.test.mjs',
+  '        INERT_C3_TEXT'
+ ].join('\n');
+ // This used to PASS: the parser saw both filenames in a shell heredoc
+ // although no command actually ran the original native tests.
+ assert.throws(()=>assertC3NativeWorkflow(inert),
+  rejects('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED'));
+ const decoy=[
+  'steps:',
+  '  - name: unrelated-documentation',
+  '    image: bash',
+  '    commands:',
+  '      - node --import tsx --test examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs examples/dis-v020-native-sdk/b05-host-target.test.mjs',
+  '      - node --test examples/dis-v020-conformance/validate.test.mjs',
+  '  - name: dis-v020-integration',
+  '    image: bash',
+  '    commands:',
+  "      - echo 'integration has no C3 tests'"
+ ].join('\n');
+ assert.throws(()=>assertC3NativeWorkflow(decoy),
+  rejects('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED'));
+ const manualOnly=workflow.replace(
+  '  - name: dis-v020-integration\n    image:',
+  '  - name: dis-v020-integration\n    when:\n      - event: manual\n    image:');
+ assert.notEqual(manualOnly,workflow);
+ assert.throws(()=>assertC3NativeWorkflow(manualOnly),
+  rejects('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED'));
+ const swallowing=workflow.replace(
+  '      - node --test examples/dis-v020-conformance/validate.test.mjs',
+  '      - node --test examples/dis-v020-conformance/validate.test.mjs || true');
+ assert.notEqual(swallowing,workflow);
+ assert.throws(()=>assertC3NativeWorkflow(swallowing),
+  rejects('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED'));
+});
+
 test('machine validator rejects a VERIFIED requirement without positive or negative proof',async()=>{
  const v=clone(matrix);v.requirements[0].negative=[];
  await assert.rejects(validateVersionMatrix(v,{'r9.5-baseline':baseline}),rejects('MATRIX_UNSUPPORTED_VERIFIED'));
