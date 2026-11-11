@@ -39,14 +39,13 @@ test('B13 R59 all B01-B12 genuine 26 native source rounds have consistent 3-cont
  },(()=>{
   const coreStates=audit.coreVerified+audit.corePartial;
   assert.equal(coreStates,16);
-  return {coreVerified:audit.coreVerified,corePartial:audit.corePartial,optionalNotRun:3,governanceNotRun:1};
+  return {coreVerified:audit.coreVerified,corePartial:audit.corePartial,optionalNotRun:2,governanceNotRun:1};
  })());
- // R95: O1's R94 PARTIAL transition is the authoritative matrix state (same
- // roster as model-r83 and the R95 review). Witness it explicitly so future
- // optional transitions fail closed until re-witnessed here.
+ // R98: O1 and O2 have partial native evidence, neither is optional VERIFIED.
+ // Witness the full roster to avoid silent optional state/pin drift.
  const {matrix:liveMatrix}=await basePromise;
  assert.deepEqual(liveMatrix.requirements.filter(x=>x.profile==='optional-profile')
-  .map(x=>[x.id,x.state]),[['DIS020-OPT-001','PARTIAL'],['DIS020-OPT-002','NOT_RUN'],
+  .map(x=>[x.id,x.state]),[['DIS020-OPT-001','PARTIAL'],['DIS020-OPT-002','PARTIAL'],
   ['DIS020-OPT-003','NOT_RUN'],['DIS020-OPT-004','NOT_RUN']]);
 });
 test('B13 R59 forged optional-state promotion and stale NOT_RUN demotion cannot satisfy exact ledger counters',async()=>{
@@ -62,12 +61,12 @@ test('B13 R59 forged optional-state promotion and stale NOT_RUN demotion cannot 
   }return t};
  const {matrix}=await basePromise;
  assert.deepEqual(tally(matrix),exact);
- // Promoting an unrun optional profile silently changes the exact counters.
+ // Falsely marking unrun O3 as partially executed changes exact live counters.
  const promoted=clone(matrix);
- promoted.requirements.find(x=>x.id==='DIS020-OPT-002').state='PARTIAL';
+ promoted.requirements.find(x=>x.id==='DIS020-OPT-003').state='PARTIAL';
  assert.notDeepEqual(tally(promoted),exact);
- // The demoted matrix reproduces exactly the stale optionalNotRun:4 snapshot
- // that #2448/1 rejected: a demotion must never satisfy the live counters.
+ // Demoting actual O1 partial evidence to NOT_RUN reintroduces stale counting;
+ // the original #2448/1 failure was an earlier, different 4-unrun snapshot.
  const demoted=clone(matrix);
  demoted.requirements.find(x=>x.id==='DIS020-OPT-001').state='NOT_RUN';
  assert.notDeepEqual(tally(demoted),exact);
