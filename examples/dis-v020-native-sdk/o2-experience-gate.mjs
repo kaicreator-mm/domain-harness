@@ -103,8 +103,21 @@ export function dedupeIndependentCases(rows){
   if(!parent.has(x))parent.set(x,x);
   const p=parent.get(x);if(p!==x)parent.set(x,find(p));return parent.get(x);
  };
- const union=(a,b)=>{const x=find(a),y=find(b);if(x!==y)parent.set(x<y?y:x,x<y?x:y)};
+ // Invalid but linkable rows participate in the lineage equivalence graph,
+ // without ever earning independent-case credit. An opaque per-row token
+ // represents an absent source cohort; it can connect two otherwise distinct
+ // cohorts via a shared case/run, even when the bridge precedes both records.
+ const union=(a,b)=>{
+  const x=find(a),y=find(b);
+  if(x===y)return;
+  // Prefer stable real cohort names over anonymous bridge tokens, preserving
+  // canonical representative identity across insertion order.
+  const xt=typeof x==='string',yt=typeof y==='string';
+  const keep=xt&&yt?(x<y?x:y):xt?x:yt?y:x;
+  parent.set(keep===x?y:x,keep);
+ };
  const cohortByCase=new Map(),cohortByRun=new Map(),excluded=[],eligible=[];
+ let incompleteLineage=false;
  for(const row of values){
   if(!plain(row))throw new TypeError('O2_CASE_INVALID');
   const cacheHit=read(row,'cacheHit'),retryFlag=read(row,'retry');
@@ -112,14 +125,22 @@ export function dedupeIndependentCases(rows){
   const replayFlagInvalid=(cacheHit!==undefined&&typeof cacheHit!=='boolean')||
    (retryFlag!==undefined&&typeof retryFlag!=='boolean');
   const cohort=read(row,'sourceCohort'),caseKey=read(row,'independentCaseKey'),runId=read(row,'runId');
-  if(!validText(cohort)||!validText(caseKey)||!validText(runId)){
-   excluded.push(Object.freeze({reason:replay?'CACHE_OR_RETRY_NOT_INDEPENDENT':'SOURCE_LINEAGE_INCOMPLETE'}));continue;
+  const sourceOK=validText(cohort),caseOK=validText(caseKey),runOK=validText(runId);
+  const node=sourceOK?cohort:Symbol('unattributed-source-cohort');
+  find(node);
+  if(caseOK){
+   if(cohortByCase.has(caseKey))union(node,cohortByCase.get(caseKey));
+   else cohortByCase.set(caseKey,node);
   }
-  find(cohort);
-  if(cohortByCase.has(caseKey))union(cohort,cohortByCase.get(caseKey));
-  else cohortByCase.set(caseKey,cohort);
-  if(cohortByRun.has(runId))union(cohort,cohortByRun.get(runId));
-  else cohortByRun.set(runId,cohort);
+  if(runOK){
+   if(cohortByRun.has(runId))union(node,cohortByRun.get(runId));
+   else cohortByRun.set(runId,node);
+  }
+  if(!sourceOK||!caseOK||!runOK){
+   incompleteLineage=true;
+   excluded.push(Object.freeze({reason:replay?'CACHE_OR_RETRY_NOT_INDEPENDENT':'SOURCE_LINEAGE_INCOMPLETE'}));
+   continue;
+  }
   // Replays join the same lineage graph but never earn independent credit.
   if(replayFlagInvalid)excluded.push(Object.freeze({reason:'REPLAY_FLAG_INVALID'}));
   else if(replay)excluded.push(Object.freeze({reason:'CACHE_OR_RETRY_NOT_INDEPENDENT'}));
@@ -129,6 +150,7 @@ export function dedupeIndependentCases(rows){
  return Object.freeze({
   independentCohortCount:roots.size,
   cohorts:Object.freeze([...roots].sort()),
+  incompleteLineage,
   excluded:Object.freeze(excluded)
  });
 }
