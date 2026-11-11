@@ -22,9 +22,9 @@ import {
 
 const O2_SOURCE=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'f6101cc672ce60c78c52fa8e57a23a6398dad8f1',
+ commit:'6784388ad64ff5ef378426c0f32eab6aa7895135',
  path:'examples/dis-v020-native-sdk/o2-experience-gate.mjs',
- gitBlob:'9c99f5f23fa43c333f552e57e0277aa22e9f2bf1'
+ gitBlob:'5beefd3ea67c04c46e8aa1fd722da3b729a78dc0'
 });
 const gitBlob=value=>createHash('sha1').update(Buffer.from('blob '+Buffer.byteLength(value)+'\0')).update(value).digest('hex');
 const basePromise=makeNativeFixture();
@@ -262,4 +262,42 @@ test('O2 malformed cache/retry flags never credit independent cohorts but still 
  ]);
  assert.equal(malformedOnly.independentCohortCount,0);
  assert.deepEqual(malformedOnly.excluded,[{reason:'REPLAY_FLAG_INVALID'}]);
+});
+
+test('O2 R100 missing-cohort case/run bridge cannot double-credit independent cases',()=>{
+ const input=[
+  {sourceCohort:'source:A',independentCaseKey:'case:1',runId:'run:1'},
+  {sourceCohort:'source:B',independentCaseKey:'case:2',runId:'run:2'},
+  {sourceCohort:'',independentCaseKey:'case:1',runId:'run:2'}
+ ];
+ const out=dedupeIndependentCases(input);
+ assert.equal(out.independentCohortCount,1);
+ assert.deepEqual(out.cohorts,['source:A']);
+ assert.equal(out.incompleteLineage,true);
+ assert.deepEqual(out.excluded,[{reason:'SOURCE_LINEAGE_INCOMPLETE'}]);
+});
+test('O2 R100 out-of-order and mixed missing-key bridges remain conservatively connected',()=>{
+ const expected=[
+  {sourceCohort:'source:A',independentCaseKey:'case:1',runId:'run:1'},
+  {sourceCohort:'source:B',independentCaseKey:'case:2',runId:'run:2'}
+ ];
+ const before={sourceCohort:'',independentCaseKey:'case:1',runId:'run:2'};
+ const partial={sourceCohort:'source:A',independentCaseKey:'case:2'};
+ const noSource={independentCaseKey:'case:1',runId:'run:2',cacheHit:true};
+ for(const rows of [
+  [before,...expected],
+  [...expected,partial],
+  [noSource,...expected],
+  [expected[0],partial,expected[1]]
+ ]){
+  const out=dedupeIndependentCases(rows);
+  assert.equal(out.independentCohortCount,1);
+  assert.deepEqual(out.cohorts,['source:A']);
+  assert.equal(out.incompleteLineage,true);
+  assert.equal(out.excluded.length,1);
+ }
+ // Legitimately disjoint fully attributed case cohorts still count separately.
+ const good=dedupeIndependentCases(expected);
+ assert.equal(good.independentCohortCount,2);
+ assert.equal(good.incompleteLineage,false);
 });

@@ -1904,12 +1904,20 @@
         {
           "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
           "case": "O2 accessor-shaped observations and sparse cohort arrays fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R100 missing-cohort case/run bridge cannot double-credit independent cases"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R100 out-of-order and mixed missing-key bridges remain conservatively connected"
         }
       ],
       "receiptIds": [
         "r97-o2-native-no-trust-ci"
       ],
-      "note": "R97 reconciles real native O2/D06 fail-closed readiness evidence, previously unregistered: source HEAD b5f7c76117674ef312e8e8595016c91dbb337837 and Woodpecker #2462/1–3 exact-SHA 3/3 SUCCESS. AOT-selected xDownload Interaction and the selected LOCAL Experience gate preserve LearningObservation/UNKNOWN and deny forged caller PASS, invalid independent cohort/cache/retry/holdout claims, Experience reuse and unauthorized export. Native gate has no trusted ExecutionTrace issuer, no independent business Validator receipt verifier, no real qualified Experience issuance or exact reuse, and no independently authenticated cross-Domain holdout. PARTIAL only; no SAP, Effect or governance promotion. R97 historical receipt is bound to pre-reconciliation HEAD; the accounting commit requires its own 3-context CI and independent review."
+      "note": "R97 reconciles real native O2/D06 fail-closed readiness evidence, previously unregistered: source HEAD b5f7c76117674ef312e8e8595016c91dbb337837 and Woodpecker #2462/1–3 exact-SHA 3/3 SUCCESS. AOT-selected xDownload Interaction and the selected LOCAL Experience gate preserve LearningObservation/UNKNOWN and deny forged caller PASS, invalid independent cohort/cache/retry/holdout claims, Experience reuse and unauthorized export. Native gate has no trusted ExecutionTrace issuer, no independent business Validator receipt verifier, no real qualified Experience issuance or exact reuse, and no independently authenticated cross-Domain holdout. PARTIAL only; no SAP, Effect or governance promotion. R97 historical receipt is bound to pre-reconciliation HEAD; the accounting commit requires its own 3-context CI and independent review. R100 independent R99-P2-01 repair candidate: incomplete but linkable source-cohort rows are retained in the lineage graph via non-credit anonymous bridge nodes; exact native out-of-order, missing-key, cache and case/run link negatives added. Source helper is pinned to H1 6784388ad64ff5ef378426c0f32eab6aa7895135 / Blob 5beefd3ea67c04c46e8aa1fd722da3b729a78dc0. New HEAD CI and fresh independent post-repair review are required; O2 stays PARTIAL."
     },
     {
       "id": "DIS020-OPT-003",
