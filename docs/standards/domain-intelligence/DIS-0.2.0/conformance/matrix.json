@@ -1926,6 +1926,18 @@
         {
           "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
           "case": "O2 R101 partition fail closes on blank padded noncanonical lineage without rejecting internal spaces"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R102 invisible Unicode source case run aliases cannot mint independent cohorts"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R102 invisible aliases in synthesis holdout negative fail closed while visible Unicode stays valid"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R102 invisible lineage bridge never credits cache retry clones regardless of order"
         }
       ],
       "receiptIds": [
