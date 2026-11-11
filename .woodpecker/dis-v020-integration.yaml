@@ -68,6 +68,8 @@ steps:
       - node --import tsx --test examples/dis-v020-native-sdk/c1-r31-critic-native.test.mjs
       - node --import tsx --test examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs
       - node --import tsx --test examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs
+      # O2/D06: real selected xDownload SDK observation; no Experience until trusted Trace/Oracle receipts exist.
+      - node --import tsx --test examples/dis-v020-native-sdk/o2-experience-native.test.mjs
       - node --test examples/dis-v020-conformance/validate.test.mjs
       # R83: real original DKE R33 source + B22 Reader against bounded authority model;
       # original Git Blob pins, 768 states, 771 real Reader calls, negative witnesses.
