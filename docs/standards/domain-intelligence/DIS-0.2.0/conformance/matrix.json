@@ -67,7 +67,8 @@
     "r86-c3-fresh-exact-sha-review-ci",
     "r88-c1-ev16-r3-r1-query-snapshot-native-ci",
     "r89-d02-parent-split-semantic-static-r30-native-ci",
-    "r96-o1-source-observation-ci"
+    "r96-o1-source-observation-ci",
+    "r97-o2-native-no-trust-ci"
   ],
   "requirements": [
     {
@@ -1852,16 +1853,63 @@
       "id": "DIS020-OPT-002",
       "title": "Experience provenance, validator, exact reuse and independent holdout",
       "profile": "optional-profile",
-      "state": "NOT_RUN",
+      "state": "PARTIAL",
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "9"
       },
-      "implementation": [],
-      "positive": [],
-      "negative": [],
-      "receiptIds": [],
-      "note": "R2 planned E01-E06,N01-N12 not executed as native profile."
+      "implementation": [
+        "examples/dis-v020-native-sdk/o2-experience-gate.mjs",
+        "examples/dis-v020-native-sdk/o2-experience-native.test.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 native AOT→SDK consumes original xDownload interaction but emits only LearningObservation"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 repeated runs, cache hits and same-case source clones do not inflate independent cohorts"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 METHOD_REUSE can only request re-execution and revalidation, never replay an Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 privacy defaults to local-only and consent never causes implicit export"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 caller-supplied PASS, attested flag, trace and validator JSON cannot mint Experience"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 missing trusted Trace or Validator receipt remains NEED_MORE_EVIDENCE"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 synthesis, holdout and negative partitions reject source-cohort leakage"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 cross-partition case and run clones block despite distinct declared cohort strings"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 malformed cache/retry flags never credit independent cohorts but still link lineage"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 accessor-shaped observations and sparse cohort arrays fail closed"
+        }
+      ],
+      "receiptIds": [
+        "r97-o2-native-no-trust-ci"
+      ],
+      "note": "R97 reconciles real native O2/D06 fail-closed readiness evidence, previously unregistered: source HEAD b5f7c76117674ef312e8e8595016c91dbb337837 and Woodpecker #2462/1–3 exact-SHA 3/3 SUCCESS. AOT-selected xDownload Interaction and the selected LOCAL Experience gate preserve LearningObservation/UNKNOWN and deny forged caller PASS, invalid independent cohort/cache/retry/holdout claims, Experience reuse and unauthorized export. Native gate has no trusted ExecutionTrace issuer, no independent business Validator receipt verifier, no real qualified Experience issuance or exact reuse, and no independently authenticated cross-Domain holdout. PARTIAL only; no SAP, Effect or governance promotion. R97 historical receipt is bound to pre-reconciliation HEAD; the accounting commit requires its own 3-context CI and independent review."
     },
     {
       "id": "DIS020-OPT-003",

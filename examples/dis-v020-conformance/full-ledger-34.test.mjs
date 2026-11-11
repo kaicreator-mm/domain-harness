@@ -35,7 +35,7 @@ test('R67 all 34 original B01-B20 scoped rounds retain independent named 3-conte
  assert.deepEqual([r.coreVerified,r.corePartial,r.optionalNotRun,r.governanceNotRun],[
   live.filter(x=>x.profile==='core'&&x.state==='VERIFIED').length,
   live.filter(x=>x.profile==='core'&&x.state==='PARTIAL').length,
-  3,1
+  2,1
  ]);
  assert.equal(r.versionFreezeEligible,false);assert.equal(r.independentSemanticSAP,'NOT_CLAIMED');
 });

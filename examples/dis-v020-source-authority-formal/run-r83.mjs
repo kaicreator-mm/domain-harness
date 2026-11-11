@@ -20,10 +20,10 @@ const EXPECTED_CODE_BLOBS={
  // R93: model blob updated together with the R82→R93 authority-baseline
  // snapshot (Product-accepted scoped CORE-008 witnessed by r86, plus O1
  // R94 PARTIAL native fixture-only provider with no semantic qualification).
- // R95: bind each requirement ID to its exact Core/Optional/Governance profile;
+ // R95/R97: bind each requirement ID to its exact Core/Optional/Governance profile;
  // add Optional demotion and same-state Core/Optional profile-swap negatives.
- model:'228f13a8df31cd266a5c7eb13c7688137dd39e4e',
- tests:'6348ac56b0291652fc1c96d38f3af8d44358fc97'
+ model:'574ca91705e3b6bafd6486e619406a099ea02558',
+ tests:'173174a8d635e8738f0c434365512ad506b6c560'
 };
 const blob=s=>{
  const b=Buffer.from(s,'utf8'),h=createHash('sha1');

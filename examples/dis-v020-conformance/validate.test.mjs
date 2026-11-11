@@ -79,9 +79,16 @@ test('R92 C3 accepted linux/x64/node Target is the sole newly promoted Core whil
  assert.equal(plan.blockers.some(x=>x.blocks?.includes('DIS020-CORE-008')),false);
  for(const id of ['002','005','016'])
   assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-'+id).state,'PARTIAL');
- // R94 O1 is a PARTIAL native fixture-provider bridge; other optional profiles stay unrun.
+ // R97 O1 + O2 native readiness remain PARTIAL; no trusted O2 Experience issuer.
  assert.equal(matrix.requirements.find(x=>x.id==='DIS020-OPT-001').state,'PARTIAL');
- for(const id of ['002','003','004'])
+ const o2=matrix.requirements.find(x=>x.id==='DIS020-OPT-002');
+ assert.equal(o2.state,'PARTIAL');
+ assert.ok(o2.receiptIds.includes('r97-o2-native-no-trust-ci'));
+ assert.ok(o2.positive.some(e=>e.case.includes('only LearningObservation')));
+ assert.ok(o2.negative.some(e=>e.case.includes('cannot mint Experience')));
+ assert.equal(result.tallies['optional-profile:PARTIAL'],2);
+ assert.equal(result.tallies['optional-profile:NOT_RUN'],2);
+ for(const id of ['003','004'])
   assert.equal(matrix.requirements.find(x=>x.id==='DIS020-OPT-'+id).state,'NOT_RUN');
 });
 test('R93 C3 VERIFIED cannot borrow generic R9.5 evidence or drop R86 selected-Host closure proof',async()=>{

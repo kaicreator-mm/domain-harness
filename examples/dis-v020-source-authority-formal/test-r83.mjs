@@ -95,9 +95,9 @@ export function runR83Tests(producer,receipt,manifest,matrix,pins,model,reader){
   }],
   // R95 review P2-R95-OPTIONAL-NEGATIVE-COVERAGE: dedicated Optional-state
   // negatives. Promoting an unrun optional profile or silently certifying
-  // the honest PARTIAL O1 native candidate as VERIFIED must fail exactly
-  // like a Core roster drift; the exact 13/3 + O1-PARTIAL roster stays pinned.
-  ['optional-opt002-not-run-promotion',v=>v[3].requirements.find(x=>x.id==='DIS020-OPT-002').state='PARTIAL'],
+  // either honest PARTIAL O1/O2 native candidate as VERIFIED must fail exactly
+  // like a Core roster drift; the exact 13/3 + O1/O2-PARTIAL roster stays pinned.
+  ['optional-opt002-partial-to-verified',v=>v[3].requirements.find(x=>x.id==='DIS020-OPT-002').state='VERIFIED'],
   ['optional-opt001-partial-to-verified',v=>v[3].requirements.find(x=>x.id==='DIS020-OPT-001').state='VERIFIED'],
   ['optional-opt001-partial-demotion-to-not-run',v=>v[3].requirements.find(x=>x.id==='DIS020-OPT-001').state='NOT_RUN'],
   // Same-state CORE↔OPT swap preserves aggregate counters; ID→profile must

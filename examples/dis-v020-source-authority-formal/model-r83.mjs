@@ -90,7 +90,7 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
  // R93: the baseline tracks the Product-accepted scoped CORE-008 admission
  // (linux/x64/Node Demo Target, witnessed by r86-c3-fresh-exact-sha-review-ci);
  // CORE-002/005/016 remain unresolved and must not be promoted by this update.
- // R94 explicitly tracks native O1 PARTIAL while other optional profiles are NOT_RUN.
+ // R97 tracks bounded native O1 and O2 PARTIAL; O3/O4 remain NOT_RUN.
  const required=new Map();
  const expectedProfile=new Map();
  const partial=new Set(['002','005','016']);
@@ -100,12 +100,11 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
   required.set(id,partial.has(suffix)?'PARTIAL':'VERIFIED');
   expectedProfile.set(id,'core');
  }
- // O1 R94 source-selected SDK Knowledge/fixture provider is an honest
- // PARTIAL native candidate. O2/O3/O4 remain NOT_RUN; this is no claim of
- // an AOT-pinned or real LLM provider or independent SAP qualification.
+ // O1 fixture Provider and O2 native fail-closed LearningObservation are
+ // PARTIAL. Neither has trusted Experience/Provider issuance; O3/O4 remain NOT_RUN.
  for(let n=1;n<=4;n++){
   const id='DIS020-OPT-'+String(n).padStart(3,'0');
-  required.set(id,n===1?'PARTIAL':'NOT_RUN');
+  required.set(id,n<=2?'PARTIAL':'NOT_RUN');
   expectedProfile.set(id,'optional-profile');
  }
  required.set('DIS020-GOV-001','NOT_RUN');
@@ -119,7 +118,7 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
  const counts={};
  for(const x of req){const k=x.profile+':'+x.state;counts[k]=(counts[k]||0)+1}
  for(const [k,v] of Object.entries({'core:VERIFIED':13,'core:PARTIAL':3,
-     'optional-profile:PARTIAL':1,'optional-profile:NOT_RUN':3,
+     'optional-profile:PARTIAL':2,'optional-profile:NOT_RUN':2,
      'governance:NOT_RUN':1}))
     if(counts[k]!==v)fail('CORE_SCOPE_DRIFT_'+k);
  return {sourceRows:r.rows,sourceTiers:{...r.counts},nativeSourceHead:ORIGINAL.nativeHead,

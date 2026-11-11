@@ -19,7 +19,7 @@ test('B04-02 R42 exact historical source ledger and 21 requirement DAG leave 7 s
  assert.equal(r.remaining.length,r.partialCore);
  assert.equal(r.optionalNotRun,matrix.requirements.filter(x=>
   x.profile==='optional-profile'&&x.state==='NOT_RUN').length);
- assert.equal(r.optionalNotRun,3);assert.equal(r.governanceNotRun,1);
+ assert.equal(r.optionalNotRun,2);assert.equal(r.governanceNotRun,1);
  assert.equal(r.formalFreezeEligible,false);
  assert.equal(r.sourceReview.locatorRepair,'OPEN');
  assert.equal(r.sourceReview.sap,'UNQUALIFIED');
