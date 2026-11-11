@@ -104,23 +104,24 @@ export function dedupeIndependentCases(rows){
   const p=parent.get(x);if(p!==x)parent.set(x,find(p));return parent.get(x);
  };
  const union=(a,b)=>{const x=find(a),y=find(b);if(x!==y)parent.set(x<y?y:x,x<y?x:y)};
- const cohortByCase=new Map(),cohortByRun=new Map(),excluded=[];
+ const cohortByCase=new Map(),cohortByRun=new Map(),excluded=[],eligible=[];
  for(const row of values){
   if(!plain(row))throw new TypeError('O2_CASE_INVALID');
-  if(read(row,'cacheHit')===true||read(row,'retry')===true){
-   excluded.push(Object.freeze({reason:'CACHE_OR_RETRY_NOT_INDEPENDENT'}));continue;
-  }
+  const replay=read(row,'cacheHit')===true||read(row,'retry')===true;
   const cohort=read(row,'sourceCohort'),caseKey=read(row,'independentCaseKey'),runId=read(row,'runId');
   if(!validText(cohort)||!validText(caseKey)||!validText(runId)){
-   excluded.push(Object.freeze({reason:'SOURCE_LINEAGE_INCOMPLETE'}));continue;
+   excluded.push(Object.freeze({reason:replay?'CACHE_OR_RETRY_NOT_INDEPENDENT':'SOURCE_LINEAGE_INCOMPLETE'}));continue;
   }
   find(cohort);
   if(cohortByCase.has(caseKey))union(cohort,cohortByCase.get(caseKey));
   else cohortByCase.set(caseKey,cohort);
   if(cohortByRun.has(runId))union(cohort,cohortByRun.get(runId));
   else cohortByRun.set(runId,cohort);
+  // Replays join the same lineage graph but never earn independent credit.
+  if(replay)excluded.push(Object.freeze({reason:'CACHE_OR_RETRY_NOT_INDEPENDENT'}));
+  else eligible.push(cohort);
  }
- const roots=new Set([...parent.keys()].map(find));
+ const roots=new Set(eligible.map(find));
  return Object.freeze({
   independentCohortCount:roots.size,
   cohorts:Object.freeze([...roots].sort()),
@@ -130,7 +131,7 @@ export function dedupeIndependentCases(rows){
 /** Synthesis/Holdout/Negative must be disjoint by source cohort, not row ID. */
 export function validateCohortPartition(partitions){
  if(!plain(partitions))throw new TypeError('O2_PARTITION_INVALID');
- const names=['synthesis','holdout','negative'],owners=new Map(),groups=Object.create(null);
+ const names=['synthesis','holdout','negative'],owners=new Map(),cases=new Map(),runs=new Map(),groups=Object.create(null);
  for(const name of names){
   const rows=safeArray(read(partitions,name));
   if(!rows)return Object.freeze({status:'UNKNOWN',disjoint:false,reason:'PARTITION_MISSING_OR_INVALID'});
@@ -141,11 +142,21 @@ export function validateCohortPartition(partitions){
    if(owners.has(cohort)&&owners.get(cohort)!==name)
     return Object.freeze({status:'LEAKED',disjoint:false,reason:'SOURCE_COHORT_CROSSES_PARTITIONS'});
    owners.set(cohort,name);
+   // Declared cohort aliases cannot mask overlapping case/run lineage.
+   // This is a structural check, not an authenticated independent holdout.
+   for(const [field,seen] of [['independentCaseKey',cases],['runId',runs]]){
+    const key=read(row,field);
+    if(key===undefined)continue;
+    if(!validText(key))return Object.freeze({status:'UNKNOWN',disjoint:false,reason:'PARTITION_LINEAGE_INVALID'});
+    if(seen.has(key)&&seen.get(key)!==name)
+     return Object.freeze({status:'LEAKED',disjoint:false,reason:'CASE_OR_RUN_CROSSES_PARTITIONS'});
+    seen.set(key,name);
+   }
   }
  }
  if(!groups.synthesis.length||!groups.holdout.length||!groups.negative.length)
   return Object.freeze({status:'NEED_MORE_EVIDENCE',disjoint:true,reason:'PARTITION_EMPTY'});
- return Object.freeze({status:'DISJOINT',disjoint:true,reason:'SOURCE_COHORTS_DISJOINT'});
+ return Object.freeze({status:'DISJOINT',disjoint:true,reason:'DECLARED_COHORTS_DISJOINT_UNATTESTED'});
 }
 /**
  * Compatibility classification only. It never authorizes reuse because
