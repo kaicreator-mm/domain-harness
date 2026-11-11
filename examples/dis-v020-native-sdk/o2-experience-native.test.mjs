@@ -22,9 +22,9 @@ import {
 
 const O2_SOURCE=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'1bf75c11bc4bb603683cd22b358409dc4630ea3a',
+ commit:'13a329e641020b8b4ac55b104b17496420989fe9',
  path:'examples/dis-v020-native-sdk/o2-experience-gate.mjs',
- gitBlob:'c2f252e5236571753404adb208bcd8721d529da6'
+ gitBlob:'34456f6f2fb2af441315ac6b26e7d89e06418c39'
 });
 const gitBlob=value=>createHash('sha1').update(Buffer.from('blob '+Buffer.byteLength(value)+'\0')).update(value).digest('hex');
 const basePromise=makeNativeFixture();
