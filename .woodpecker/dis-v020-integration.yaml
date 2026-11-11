@@ -67,6 +67,7 @@ steps:
       - node --import tsx --test --test-concurrency=1 examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs
       - node --import tsx --test examples/dis-v020-native-sdk/c1-r31-critic-native.test.mjs
       - node --import tsx --test examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs
+      - node --import tsx --test examples/dis-v020-native-sdk/c2-dke-canonical-kg-r4-failclosed.test.mjs
       - node --import tsx --test examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs
       # O2/D06: real selected xDownload SDK observation; no Experience until trusted Trace/Oracle receipts exist.
       - node --import tsx --test examples/dis-v020-native-sdk/o2-experience-native.test.mjs
