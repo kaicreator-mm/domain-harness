@@ -210,6 +210,12 @@ test('R93 P1: inert YAML, unrelated step and skipped integration cannot retain C
  assert.notEqual(manualOnly,workflow);
  assert.throws(()=>assertC3NativeWorkflow(manualOnly),
   rejects('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED'));
+ const earlySuccess=workflow.replace(
+  '  - name: dis-v020-integration\n    image: bash\n    commands:',
+  '  - name: dis-v020-integration\n    image: bash\n    commands:\n      - exit 0');
+ assert.notEqual(earlySuccess,workflow);
+ assert.throws(()=>assertC3NativeWorkflow(earlySuccess),
+  rejects('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED'));
  const swallowing=workflow.replace(
   '      - node --test examples/dis-v020-conformance/validate.test.mjs',
   '      - node --test examples/dis-v020-conformance/validate.test.mjs || true');
