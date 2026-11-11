@@ -22,9 +22,9 @@ import {
 
 const O2_SOURCE=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'13a329e641020b8b4ac55b104b17496420989fe9',
+ commit:'5ba951e9b34b455c898a804a3d72c297d1f03356',
  path:'examples/dis-v020-native-sdk/o2-experience-gate.mjs',
- gitBlob:'34456f6f2fb2af441315ac6b26e7d89e06418c39'
+ gitBlob:'a620c3b73869380ab26b0cccc0863779294a8860'
 });
 const gitBlob=value=>createHash('sha1').update(Buffer.from('blob '+Buffer.byteLength(value)+'\0')).update(value).digest('hex');
 const basePromise=makeNativeFixture();
@@ -216,4 +216,34 @@ test('O2 accessor-shaped observations and sparse cohort arrays fail closed',()=>
  const rows=new Array(1);
  Object.defineProperty(rows,'0',{get(){throw new Error('must not run')},enumerable:true});
  assert.throws(()=>dedupeIndependentCases(rows),/O2_CASE_LIST_INVALID/);
+});
+
+test('O2 replay-only lineages bridge case cohorts but do not earn independent credit',()=>{
+ const r=dedupeIndependentCases([
+  {sourceCohort:'source:A',independentCaseKey:'case:1',runId:'run:1'},
+  {sourceCohort:'source:B',independentCaseKey:'case:2',runId:'run:2'},
+  {sourceCohort:'source:B',independentCaseKey:'case:1',runId:'run:3',retry:true},
+  {sourceCohort:'source:C',independentCaseKey:'case:3',runId:'run:4',cacheHit:true}
+ ]);
+ assert.equal(r.independentCohortCount,1);
+ assert.deepEqual(r.cohorts,['source:A']);
+ assert.equal(r.excluded.length,2);
+});
+
+test('O2 cross-partition case and run clones block despite distinct declared cohort strings',()=>{
+ for(const field of ['independentCaseKey','runId']){
+  const r=validateCohortPartition({
+   synthesis:[{sourceCohort:'source:A',[field]:'shared'}],
+   holdout:[{sourceCohort:'source:B',[field]:'shared'}],
+   negative:[{sourceCohort:'source:C'}]
+  });
+  assert.equal(r.status,'LEAKED');
+  assert.equal(r.reason,'CASE_OR_RUN_CROSSES_PARTITIONS');
+ }
+ const separate=validateCohortPartition({
+  synthesis:[{sourceCohort:'source:A'}],
+  holdout:[{sourceCohort:'source:B'}],
+  negative:[{sourceCohort:'source:C'}]
+ });
+ assert.equal(separate.reason,'DECLARED_COHORTS_DISJOINT_UNATTESTED');
 });
