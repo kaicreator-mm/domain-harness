@@ -22,9 +22,9 @@ import {
 
 const O2_SOURCE=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'5ba951e9b34b455c898a804a3d72c297d1f03356',
+ commit:'f6101cc672ce60c78c52fa8e57a23a6398dad8f1',
  path:'examples/dis-v020-native-sdk/o2-experience-gate.mjs',
- gitBlob:'a620c3b73869380ab26b0cccc0863779294a8860'
+ gitBlob:'9c99f5f23fa43c333f552e57e0277aa22e9f2bf1'
 });
 const gitBlob=value=>createHash('sha1').update(Buffer.from('blob '+Buffer.byteLength(value)+'\0')).update(value).digest('hex');
 const basePromise=makeNativeFixture();
@@ -246,4 +246,20 @@ test('O2 cross-partition case and run clones block despite distinct declared coh
   negative:[{sourceCohort:'source:C'}]
  });
  assert.equal(separate.reason,'DECLARED_COHORTS_DISJOINT_UNATTESTED');
+});
+
+test('O2 malformed cache/retry flags never credit independent cohorts but still link lineage',()=>{
+ const merged=dedupeIndependentCases([
+  {sourceCohort:'source:A',independentCaseKey:'case:1',runId:'run:1'},
+  {sourceCohort:'source:B',independentCaseKey:'case:2',runId:'run:2'},
+  {sourceCohort:'source:B',independentCaseKey:'case:1',runId:'run:3',cacheHit:'true'}
+ ]);
+ assert.equal(merged.independentCohortCount,1);
+ assert.deepEqual(merged.cohorts,['source:A']);
+ assert.deepEqual(merged.excluded,[{reason:'REPLAY_FLAG_INVALID'}]);
+ const malformedOnly=dedupeIndependentCases([
+  {sourceCohort:'source:C',independentCaseKey:'case:3',runId:'run:4',retry:1}
+ ]);
+ assert.equal(malformedOnly.independentCohortCount,0);
+ assert.deepEqual(malformedOnly.excluded,[{reason:'REPLAY_FLAG_INVALID'}]);
 });
