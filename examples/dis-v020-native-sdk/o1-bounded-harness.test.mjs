@@ -91,16 +91,19 @@ test('O1 R94 fake model PASS, Effect claims, oversized output, failures and conc
    id:'fixture-o1-provider',propose:async()=>{throw Error('provider failed')}
   }});
   assert.equal((await broken.run('advisory')).reason,'PROVIDER_ERROR');
-  let resolve;
-  const pending=new Promise(r=>resolve=r);
+  // No synchronous resolve() before the selected SDK's asynchronous
+  // invoke reaches provider.propose: reserve budget before the await.
   let calls=0;
   const concurrent=makeO1BoundedHarness({app,provider:{
-   id:'fixture-o1-provider',propose:async()=>{calls++;return pending}
+   id:'fixture-o1-provider',propose:async()=>{
+    calls++;
+    await Promise.resolve();
+    return {suggestion:'candidate only'};
+   }
   },maxCalls:1});
-  const first=concurrent.run('advisory');
-  const second=concurrent.run('advisory');
-  resolve({suggestion:'candidate only'});
-  const results=await Promise.all([first,second]);
+  const results=await Promise.all([
+   concurrent.run('advisory'),concurrent.run('advisory')
+  ]);
   assert.equal(calls,1);
   assert.deepEqual(results.map(x=>x.reason).sort(),
    ['BUDGET_EXHAUSTED','MODEL_PROPOSAL_NOT_DOMAIN_TRUTH'].sort());
