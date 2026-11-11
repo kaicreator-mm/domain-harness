@@ -163,6 +163,11 @@ test('blocked R11 integration receipt cannot qualify a VERIFIED requirement',asy
  const blocked=JSON.parse(await readFile(new URL('receipts/r11-integration-blocked.json',base),'utf8'));
  const v=clone(matrix);
  v.requirements[0].receiptIds=['r11-integration-blocked'];
+ // Swapping out the witnessed receipt trips the R90 VERIFIED-witness gate
+ // before the per-receipt status check; either rejection is fail-closed and
+ // the BLOCKED receipt never qualifies a VERIFIED requirement.
+ await assert.rejects(validateVersionMatrix(v,{'r11-integration-blocked':blocked}),rejects('MATRIX_VERIFIED_WITNESS_MISMATCH'));
+ v.requirements[0].receiptIds=[...matrix.requirements[0].receiptIds,'r11-integration-blocked'];
  await assert.rejects(validateVersionMatrix(v,{'r11-integration-blocked':blocked}),rejects('MATRIX_RECEIPT_INVALID'));
 });
 

@@ -75,10 +75,13 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
     fail('B22_BATCH_INTEGRITY_INVALID');
  const req=matrix?.requirements;
  if(!Array.isArray(req))fail('MATRIX_UNAVAILABLE');
- // A 12/4 count alone is insufficient: swapping a blocked MUST with a
+ // An aggregate count alone is insufficient: swapping a blocked MUST with a
  // completed one must never be accepted as the same R82 authority baseline.
+ // R93: the baseline tracks the Product-accepted scoped CORE-008 admission
+ // (linux/x64/Node Demo Target, witnessed by r86-c3-fresh-exact-sha-review-ci);
+ // CORE-002/005/016 remain unresolved and must not be promoted by this update.
  const required=new Map();
- const partial=new Set(['002','005','008','016']);
+ const partial=new Set(['002','005','016']);
  for(let n=1;n<=16;n++){
   const suffix=String(n).padStart(3,'0');
   required.set('DIS020-CORE-'+suffix,partial.has(suffix)?'PARTIAL':'VERIFIED');
@@ -90,11 +93,11 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
    fail('MATRIX_REQUIREMENT_STATE_DRIFT');
  const counts={};
  for(const x of req){const k=x.profile+':'+x.state;counts[k]=(counts[k]||0)+1}
- for(const [k,v] of Object.entries({'core:VERIFIED':12,'core:PARTIAL':4,
+ for(const [k,v] of Object.entries({'core:VERIFIED':13,'core:PARTIAL':3,
      'optional-profile:NOT_RUN':4,'governance:NOT_RUN':1}))
     if(counts[k]!==v)fail('CORE_SCOPE_DRIFT_'+k);
  return {sourceRows:r.rows,sourceTiers:{...r.counts},nativeSourceHead:ORIGINAL.nativeHead,
-   coreVerified:12,corePartial:4,independentSap:0,effects:0};
+   coreVerified:13,corePartial:3,independentSap:0,effects:0};
 }
 const FIELDS=['sourcePin','rowMembership','independentCritic','ownerAccepted',
   'evidenceValidated','targetMatched','kdpPermit','policyPermit'];

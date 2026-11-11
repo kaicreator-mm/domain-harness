@@ -17,7 +17,10 @@ const FILES={
  tests:'examples/dis-v020-source-authority-formal/test-r83.mjs'
 };
 const EXPECTED_CODE_BLOBS={
- model:'039be3c9637b44a1248ea727e7380a4bde642b29',
+ // R93: model blob updated together with the R82→R93 authority-baseline
+ // snapshot (Product-accepted scoped CORE-008 admission witnessed by r86);
+ // test blob unchanged. The pin keeps failing closed on unreviewed edits.
+ model:'48d39ff26281f29528d9f55242fa4c2bce70f633',
  tests:'cb9ef88f37d3ac531dfd0e7163c6f2d18404c874'
 };
 const blob=s=>{
