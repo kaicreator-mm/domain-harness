@@ -1,4 +1,5 @@
 import {readFile,stat} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -284,6 +285,83 @@ export function assertCloseoutDependencies(matrix){
  if(gov?.state==='VERIFIED'&&c4?.state!=='VERIFIED')
   fail('MATRIX_GOV_DEPENDENCY_OPEN');
 }
+
+/**
+ * R93 C3 evidence integrity: a historical receipt ID and a declared test()
+ * title are only lookup pointers, not immutable evidence. For the already
+ * Product-accepted linux/x64/node admission, pin the original audited bytes.
+ * Legitimate future replacement requires a NEW independent source review and
+ * a deliberately updated witness. No automatic product or semantic approval.
+ */
+const C3_R86='r86-c3-fresh-exact-sha-review-ci';
+const C3_PRODUCT_URL='https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293';
+const C3_TARGET={platform:'linux',architecture:'x64',runtime:'node'};
+const C3_PINNED_BLOBS=new Map([
+ ['docs/standards/domain-intelligence/DIS-0.2.0/conformance/receipts/r86-c3-fresh-exact-sha-review-ci.json','c4896b7e1c9fc6f508161771c9329abbbb28d608'],
+ ['docs/standards/domain-intelligence/DIS-0.2.0/conformance/decisions/C3_PRODUCT_ACCEPTED_FRESH_REVIEW_2026-11-11.json','b582567e117db7890ad12a5d4b695cefda0de7a0'],
+ ['docs/standards/domain-intelligence/DIS-0.2.0/conformance/decisions/C3_USER_ACCEPTED_LINUX_X64_NODE_2026-11-11.json','7f0d195849647282fad09a53a117b4f3a705b138'],
+ ['examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs','a59f5c7e4b36803c957db729b9a5a1a1380679a8'],
+ ['examples/dis-v020-native-sdk/b05-host-target.test.mjs','8f099b6158ad5a71b5bc0f0375046e7280723588']
+]);
+function gitBlobSha(text){
+ const b=Buffer.from(text,'utf8');
+ return createHash('sha1').update(Buffer.from('blob '+b.length+'\\0')).update(b).digest('hex');
+}
+export function assertPinnedC3Source(path,content){
+ const expected=C3_PINNED_BLOBS.get(path);
+ if(!expected)fail('MATRIX_C3_WITNESS_UNTRACKED_PATH');
+ if(gitBlobSha(content)!==expected)fail('MATRIX_C3_WITNESS_BYTES_DRIFT');
+ return true;
+}
+function isC3Target(t){
+ return t!==null&&typeof t==='object'&&!Array.isArray(t)&&
+  Object.keys(t).sort().join(',')==='architecture,platform,runtime'&&
+  Object.entries(C3_TARGET).every(([k,v])=>t[k]===v);
+}
+async function assertC3ScopedAdmission(matrix,receipts){
+ const row=matrix.requirements.find(x=>x.id==='DIS020-CORE-008');
+ if(row?.state!=='VERIFIED')return;
+ if(!isC3Target(row.qualifiedTarget)||!matrix.receipts?.includes(C3_R86)||
+   !row.receiptIds.includes(C3_R86))fail('MATRIX_C3_TARGET_OR_WITNESS_UNAUTHORIZED');
+ const fileTexts=new Map();
+ for(const path of C3_PINNED_BLOBS.keys()){
+  const content=await sourceText(path);
+  assertPinnedC3Source(path,content);
+  fileTexts.set(path,content);
+ }
+ const receipt=JSON.parse(fileTexts.get(base+'/receipts/'+C3_R86+'.json'));
+ // Validator callers cannot supply a different generic SUCCESS receipt under
+ // the genuine R86 ID. The receipt file itself is immutable by its Git Blob.
+ if(JSON.stringify(receipts[C3_R86])!==JSON.stringify(receipt))
+  fail('MATRIX_C3_WITNESS_RECEIPT_REPLACED');
+ const approval=JSON.parse(fileTexts.get(base+'/decisions/C3_PRODUCT_ACCEPTED_FRESH_REVIEW_2026-11-11.json'));
+ const scope=JSON.parse(fileTexts.get(base+'/decisions/C3_USER_ACCEPTED_LINUX_X64_NODE_2026-11-11.json'));
+ const plan=JSON.parse(await sourceText(base+'/closure-plan-r28.json'));
+ const c3=plan.currentC3;
+ if(approval.sourceAuthority?.decisionUrl!==C3_PRODUCT_URL||
+    approval.sourceAuthority?.kind!=='USER_CHAT_DECISION_TRANSCRIBED'||
+    approval.decision!=='ACCEPT_COMPLETED_C3_INDEPENDENT_ENGINEERING_REVIEW'||
+    approval.review?.receiptId!==C3_R86||!isC3Target(approval.scope)||
+    !isC3Target(scope.selectedApplicableTarget)&&
+      !(scope.selectedApplicableTarget?.platform==='linux'&&
+        scope.selectedApplicableTarget?.architecture==='x64'&&scope.selectedApplicableTarget?.runtime==='node')||
+    c3?.status!=='VERIFIED_PRODUCT_ACCEPTED_LINUX_X64_NODE'||
+    c3?.productAcceptanceUrl!==C3_PRODUCT_URL||
+    c3?.freshReviewReceiptId!==C3_R86||
+    !isC3Target(c3?.appliesTo)||
+    c3?.closedRequirement!=='DIS020-CORE-008')
+  fail('MATRIX_C3_PRODUCT_OR_TARGET_DRIFT');
+ // A correct unmodified test file is useless if it has been silently removed
+ // from the actually executing Woodpecker native suite.
+ const workflow=await sourceText('.woodpecker/dis-v020-integration.yaml');
+ const nativeCommands=workflow.split('\\n').filter(x=>/^\\s*-\\s*node --import tsx --test /u.test(x));
+ const used=new Set(nativeCommands.flatMap(x=>x.trim().split(/\\s+/)));
+ if(!used.has('examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs')||
+    !used.has('examples/dis-v020-native-sdk/b05-host-target.test.mjs')||
+    !workflow.includes('node --test examples/dis-v020-conformance/validate.test.mjs'))
+  fail('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED');
+}
+
 export async function validateVersionMatrix(matrix,receipts){
  if(matrix?.schema!=='dis.v0.2.conformance-matrix/1'||matrix.version!=='0.2.0'||
     !Array.isArray(matrix.requirements))fail('MATRIX_SCHEMA');
@@ -349,6 +427,7 @@ export async function validateVersionMatrix(matrix,receipts){
   }
   const key=r.profile+':'+r.state;tallies[key]=(tallies[key]??0)+1;
  }
+ await assertC3ScopedAdmission(matrix,receipts);
  return Object.freeze({requirements:matrix.requirements.length,tallies});
 }
 export async function validateCheckedInMatrix(){
