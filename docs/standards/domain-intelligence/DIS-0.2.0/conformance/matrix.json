@@ -68,7 +68,8 @@
     "r88-c1-ev16-r3-r1-query-snapshot-native-ci",
     "r89-d02-parent-split-semantic-static-r30-native-ci",
     "r96-o1-source-observation-ci",
-    "r97-o2-native-no-trust-ci"
+    "r97-o2-native-no-trust-ci",
+    "r100-o2-cohort-bridge-r99-repair-ci"
   ],
   "requirements": [
     {
@@ -1915,9 +1916,10 @@
         }
       ],
       "receiptIds": [
-        "r97-o2-native-no-trust-ci"
+        "r97-o2-native-no-trust-ci",
+        "r100-o2-cohort-bridge-r99-repair-ci"
       ],
-      "note": "R97 reconciles real native O2/D06 fail-closed readiness evidence, previously unregistered: source HEAD b5f7c76117674ef312e8e8595016c91dbb337837 and Woodpecker #2462/1–3 exact-SHA 3/3 SUCCESS. AOT-selected xDownload Interaction and the selected LOCAL Experience gate preserve LearningObservation/UNKNOWN and deny forged caller PASS, invalid independent cohort/cache/retry/holdout claims, Experience reuse and unauthorized export. Native gate has no trusted ExecutionTrace issuer, no independent business Validator receipt verifier, no real qualified Experience issuance or exact reuse, and no independently authenticated cross-Domain holdout. PARTIAL only; no SAP, Effect or governance promotion. R97 historical receipt is bound to pre-reconciliation HEAD; the accounting commit requires its own 3-context CI and independent review. R100 independent R99-P2-01 repair candidate: incomplete but linkable source-cohort rows are retained in the lineage graph via non-credit anonymous bridge nodes; exact native out-of-order, missing-key, cache and case/run link negatives added. Source helper is pinned to H1 6784388ad64ff5ef378426c0f32eab6aa7895135 / Blob 5beefd3ea67c04c46e8aa1fd722da3b729a78dc0. New HEAD CI and fresh independent post-repair review are required; O2 stays PARTIAL."
+      "note": "R97 reconciles real native O2/D06 fail-closed readiness evidence, previously unregistered: source HEAD b5f7c76117674ef312e8e8595016c91dbb337837 and Woodpecker #2462/1–3 exact-SHA 3/3 SUCCESS. AOT-selected xDownload Interaction and the selected LOCAL Experience gate preserve LearningObservation/UNKNOWN and deny forged caller PASS, invalid independent cohort/cache/retry/holdout claims, Experience reuse and unauthorized export. Native gate has no trusted ExecutionTrace issuer, no independent business Validator receipt verifier, no real qualified Experience issuance or exact reuse, and no independently authenticated cross-Domain holdout. PARTIAL only; no SAP, Effect or governance promotion. R97 historical receipt is bound to pre-reconciliation HEAD; the accounting commit requires its own 3-context CI and independent review. R100 independent R99-P2-01 repair candidate: incomplete but linkable source-cohort rows are retained in the lineage graph via non-credit anonymous bridge nodes; exact native out-of-order, missing-key, cache and case/run link negatives added. Source helper is pinned to H1 6784388ad64ff5ef378426c0f32eab6aa7895135 / Blob 5beefd3ea67c04c46e8aa1fd722da3b729a78dc0. Native R100 implementation/test Matrix HEAD 6c11ef9b182a3a1b564db7f9129b4d920561b869 passed Woodpecker #2466/1–3 exact-SHA SUCCESS, receipt r100-o2-cohort-bridge-r99-repair-ci. Separate fresh independent R99 post-repair review and qualified Trace/Validator authority remain missing; O2 stays PARTIAL."
     },
     {
       "id": "DIS020-OPT-003",
