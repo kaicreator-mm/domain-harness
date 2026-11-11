@@ -20,12 +20,29 @@ export const CONTRACT=Object.freeze({
  evidence:{refField:'evidenceRefs',requiredFor:[]},
  compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
 });
-const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&
- (Object.getPrototypeOf(x)===Object.prototype||Object.getPrototypeOf(x)===null);
+const plain=x=>{
+ try{return x!==null&&typeof x==='object'&&!Array.isArray(x)&&
+  (Object.getPrototypeOf(x)===Object.prototype||Object.getPrototypeOf(x)===null)}
+ catch{return false}
+};
 const read=(x,k)=>{
- if(!plain(x))return undefined;
- const d=Object.getOwnPropertyDescriptor(x,k);
- return d&&Object.hasOwn(d,'value')?d.value:undefined;
+ try{
+  if(!plain(x))return undefined;
+  const d=Object.getOwnPropertyDescriptor(x,k);
+  return d&&Object.hasOwn(d,'value')?d.value:undefined;
+ }catch{return undefined}
+};
+const safeArray=value=>{
+ try{
+  if(!Array.isArray(value)||Reflect.ownKeys(value).length!==value.length+1)return null;
+  const result=[];
+  for(let i=0;i<value.length;i++){
+   const d=Object.getOwnPropertyDescriptor(value,String(i));
+   if(!d||!Object.hasOwn(d,'value'))return null;
+   result.push(d.value);
+  }
+  return result;
+ }catch{return null}
 };
 const validText=x=>typeof x==='string'&&x.length>0&&x.length<=512&&!/[\u0000-\u001f]/.test(x);
 const validGit=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
@@ -80,14 +97,15 @@ export function assessExperience(input){
  * excluded rather than guessed independent.
  */
 export function dedupeIndependentCases(rows){
- if(!Array.isArray(rows))throw new TypeError('O2_CASE_LIST_INVALID');
+ const values=safeArray(rows);
+ if(!values)throw new TypeError('O2_CASE_LIST_INVALID');
  const parent=new Map(),find=x=>{
   if(!parent.has(x))parent.set(x,x);
   const p=parent.get(x);if(p!==x)parent.set(x,find(p));return parent.get(x);
  };
  const union=(a,b)=>{const x=find(a),y=find(b);if(x!==y)parent.set(y,x)};
  const cohortByCase=new Map(),cohortByRun=new Map(),excluded=[];
- for(const row of rows){
+ for(const row of values){
   if(!plain(row))throw new TypeError('O2_CASE_INVALID');
   if(read(row,'cacheHit')===true||read(row,'retry')===true){
    excluded.push(Object.freeze({reason:'CACHE_OR_RETRY_NOT_INDEPENDENT'}));continue;
@@ -112,10 +130,11 @@ export function dedupeIndependentCases(rows){
 /** Synthesis/Holdout/Negative must be disjoint by source cohort, not row ID. */
 export function validateCohortPartition(partitions){
  if(!plain(partitions))throw new TypeError('O2_PARTITION_INVALID');
- const names=['synthesis','holdout','negative'],owners=new Map();
+ const names=['synthesis','holdout','negative'],owners=new Map(),groups=Object.create(null);
  for(const name of names){
-  const rows=read(partitions,name);
-  if(!Array.isArray(rows))return Object.freeze({status:'UNKNOWN',disjoint:false,reason:'PARTITION_MISSING'});
+  const rows=safeArray(read(partitions,name));
+  if(!rows)return Object.freeze({status:'UNKNOWN',disjoint:false,reason:'PARTITION_MISSING_OR_INVALID'});
+  groups[name]=rows;
   for(const row of rows){
    const cohort=plain(row)?read(row,'sourceCohort'):undefined;
    if(!validText(cohort))return Object.freeze({status:'UNKNOWN',disjoint:false,reason:'SOURCE_COHORT_MISSING'});
@@ -124,7 +143,7 @@ export function validateCohortPartition(partitions){
    owners.set(cohort,name);
   }
  }
- if(!partitions.synthesis.length||!partitions.holdout.length||!partitions.negative.length)
+ if(!groups.synthesis.length||!groups.holdout.length||!groups.negative.length)
   return Object.freeze({status:'NEED_MORE_EVIDENCE',disjoint:true,reason:'PARTITION_EMPTY'});
  return Object.freeze({status:'DISJOINT',disjoint:true,reason:'SOURCE_COHORTS_DISJOINT'});
 }
@@ -159,8 +178,11 @@ export function classifyReuse(candidate,current){
  return Object.freeze({decision:'REUSE_KIND_UNSUPPORTED',reusable:false});
 }
 /** Default local-only. Consent only creates a reviewable submission candidate. */
-export function classifyExport({consent=false,sanitized=false,scope='local-only'}={}){
- if(scope!=='local-only'||consent!==true||sanitized!==true)
+export function classifyExport(input={}){
+ const consent=read(input,'consent')===true;
+ const sanitized=read(input,'sanitized')===true;
+ const scope=read(input,'scope')??'local-only';
+ if(scope!=='local-only'||!consent||!sanitized)
   return Object.freeze({decision:'LOCAL_ONLY',exportAllowed:false});
  return Object.freeze({decision:'SUBMISSION_REVIEW_REQUIRED',exportAllowed:false});
 }
