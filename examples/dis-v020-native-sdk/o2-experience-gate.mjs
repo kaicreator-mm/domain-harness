@@ -103,7 +103,7 @@ export function dedupeIndependentCases(rows){
   if(!parent.has(x))parent.set(x,x);
   const p=parent.get(x);if(p!==x)parent.set(x,find(p));return parent.get(x);
  };
- const union=(a,b)=>{const x=find(a),y=find(b);if(x!==y)parent.set(y,x)};
+ const union=(a,b)=>{const x=find(a),y=find(b);if(x!==y)parent.set(x<y?y:x,x<y?x:y)};
  const cohortByCase=new Map(),cohortByRun=new Map(),excluded=[];
  for(const row of values){
   if(!plain(row))throw new TypeError('O2_CASE_INVALID');
