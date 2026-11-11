@@ -9,7 +9,7 @@
  */
 export const CONTRACT=Object.freeze({
  schema:'dis.v0.2.function-contract/1',version:'1.0.0',
- input:{type:'record',fields:{observation:'record'},optional:['traceReceipt','validatorReceipt','context'],additionalProperties:false},
+ input:{type:'record',fields:{observation:'record',traceReceipt:'record',validatorReceipt:'record',context:'record'},optional:['traceReceipt','validatorReceipt','context'],additionalProperties:false},
  output:{type:'record',fields:{
   status:'string',reason:'string',experienceIssued:'boolean',
   observedDisposition:'string',sourceId:'string',sourceGitBlob:'string',
