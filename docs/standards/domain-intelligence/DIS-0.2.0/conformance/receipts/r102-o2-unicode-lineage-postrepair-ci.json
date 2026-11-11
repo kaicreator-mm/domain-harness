@@ -1,0 +1,108 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r102-o2-unicode-lineage-postrepair-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "R101_P2_03_UNICODE_DEFAULT_IGNORABLE_COHORT_CASE_RUN_LINEAGE_REPAIR_NATIVE",
+  "outputLabel": "DIE_DIS_R102_O2_UNICODE_LINEAGE_SINGLE_WRITER_REPAIR",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "pr": 1497,
+    "implementationHead": "2490e7655f79b6f3c40e7dd2f395b1dddab738f2",
+    "nativeTestHead": "60245a4367097b0de8c30977a2229705fe716e8b",
+    "matrixAndCiHead": "9c1f894a566551b486a29175e5ba60bee4ed37e8"
+  },
+  "reviewerFinding": "https://github.com/kaicreator-mm/domain-harness/pull/1497#pullrequestreview-5864737997",
+  "changedBlobs": {
+    "helper": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-gate.mjs",
+      "oldGitBlob": "059732a04f11450df3bbfa6eb12929ac4fc3f440",
+      "newGitBlob": "2f82147348ceb39b8577f3c982b1f968fe72c3ca"
+    },
+    "nativeTest": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+      "oldGitBlob": "67fa03b519a9936fb104700d9d348832ee37a99f",
+      "newGitBlob": "f59286c8844c5fdfcb50c2be944a8adffa85fd32",
+      "testDefinitions": 20,
+      "newTestDefinitions": 3
+    },
+    "matrix": {
+      "path": "docs/standards/domain-intelligence/DIS-0.2.0/conformance/matrix.json",
+      "oldGitBlob": "31b8f463c9cc23b97a3cf4b8b6d8d1425d94c876",
+      "newGitBlob": "fc2079ff4aad72ad11c8b46b6fbcd3e174429955",
+      "requirement": "DIS020-OPT-002",
+      "state": "PARTIAL",
+      "nativeCaseAnchorsMatched": 18
+    }
+  },
+  "originalR101": {
+    "r99ZeroCreditBridgePreserved": true,
+    "r100BlankPaddingNfcPolicyPreserved": true
+  },
+  "adversarialHostedV8": {
+    "source": "EXACT_ORIGINAL_GITHUB_HELPER_SOURCE_EVALUATED_AS_JS_WITH_EXPORT_ONLY_REMOVED_NOT_NATIVE_NODE",
+    "codePoints": [
+      "U+202E",
+      "U+2066",
+      "U+034F",
+      "U+FE0F",
+      "U+200E",
+      "U+2063"
+    ],
+    "preRepairBypassedDedupeAliases": 18,
+    "postRepairBlockedDedupeAliases": 18,
+    "postRepairBlockedPartitionAliases": 54,
+    "additional": "VISIBLE_UNICODE_AND_INTERNAL_SPACES_PASS; R99_REVERSE_BRIDGE_AND_CACHE_RETRY_PASS",
+    "method": "CANONICAL_ID_USES_UNICODE_DEFAULT_IGNORABLE_CODE_POINT_PROPERTY_NO_TRIM_AND_CREDIT"
+  },
+  "nativeCI": {
+    "exactSha": "9c1f894a566551b486a29175e5ba60bee4ed37e8",
+    "sourceWorkflow": {
+      "path": ".woodpecker/dis-v020-integration.yaml",
+      "gitBlob": "e6716e4bc460f77e1374502f30a3be1cf971ce3f",
+      "includesCommand": "node --import tsx --test examples/dis-v020-native-sdk/o2-experience-native.test.mjs"
+    },
+    "contexts": [
+      {
+        "context": "ci/woodpecker/pr/dis-v020-integration",
+        "state": "SUCCESS",
+        "url": "https://ci.kaicreator.com/repos/18/pipeline/2475/1"
+      },
+      {
+        "context": "ci/woodpecker/pr/verify-min-node",
+        "state": "SUCCESS",
+        "url": "https://ci.kaicreator.com/repos/18/pipeline/2475/2"
+      },
+      {
+        "context": "ci/woodpecker/pr/verify",
+        "state": "SUCCESS",
+        "url": "https://ci.kaicreator.com/repos/18/pipeline/2475/3"
+      }
+    ],
+    "observed": "ALL_THREE_GITHUB_EXACT_SHA_COMMIT_STATUSES_SUCCESS",
+    "jobExit": "SUCCESS_STATUS_IMPLIED_0_BUT_RAW_STEP_EXIT_CODE_NOT_FETCHED",
+    "nodeRuntime": "NODE_MAJOR_24_ASSERTED_IN_MIN_NODE_AND_VERIFY_YAML; EXACT_PATCH_NOT_EXTRACTED_FROM_LOG",
+    "totalO2NodeTestDefinitions": 20,
+    "actualPerCaseNodeTestCount": "NOT_EXTRACTED_FROM_RAW_CI_LOG",
+    "noGithubActions": true
+  },
+  "admission": {
+    "coreVerified": 13,
+    "coreTotal": 16,
+    "optional002": "PARTIAL",
+    "optionalQualified": 0,
+    "governanceQualified": 0,
+    "qualifiedElementSap": 0,
+    "Effects": 0,
+    "qualifiedExperience": false,
+    "L2Frozen": false,
+    "release": false
+  },
+  "independentNewShaReview": "PENDING",
+  "limitations": [
+    "The code/test/Matrix exact H3 SHA CI succeeded; this receipt documentation commit must be verified on its own later SHA.",
+    "CI status SUCCESS is not authenticated independent Domain Owner, business Oracle, Trace issuer, Validator receipt, holdout provenance, SAP or Experience issuance.",
+    "R101-P2-03 source fixed and native workflow PASS, but final independent post-repair Reviewer must close it.",
+    "Prior #2473/#2474 error statuses are not converted into code failures without raw first-failure logs; #2475 new exact SHA success is separately grounded."
+  ]
+}
