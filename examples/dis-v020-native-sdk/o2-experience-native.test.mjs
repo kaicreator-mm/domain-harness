@@ -22,9 +22,9 @@ import {
 
 const O2_SOURCE=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'d76d0b0b182a68c3c10286705beb46d4a64346cd',
+ commit:'2490e7655f79b6f3c40e7dd2f395b1dddab738f2',
  path:'examples/dis-v020-native-sdk/o2-experience-gate.mjs',
- gitBlob:'059732a04f11450df3bbfa6eb12929ac4fc3f440'
+ gitBlob:'2f82147348ceb39b8577f3c982b1f968fe72c3ca'
 });
 const gitBlob=value=>createHash('sha1').update(Buffer.from('blob '+Buffer.byteLength(value)+'\0')).update(value).digest('hex');
 const basePromise=makeNativeFixture();
@@ -354,6 +354,85 @@ test('O2 R101 partition fail closes on blank padded noncanonical lineage without
    assert.equal(result.status,'UNKNOWN');
    assert.equal(result.disjoint,false);
    assert.equal(result.reason,'PARTITION_LINEAGE_INVALID');
+  }
+ }
+});
+
+const R102_IGNORABLE_CODEPOINTS=Object.freeze([
+  0x202E, // RIGHT-TO-LEFT OVERRIDE
+  0x2066, // LEFT-TO-RIGHT ISOLATE
+  0x034F, // COMBINING GRAPHEME JOINER
+  0xFE0F, // VARIATION SELECTOR-16
+  0x200E, // LEFT-TO-RIGHT MARK
+  0x2063  // INVISIBLE SEPARATOR
+]);
+const r102Lineage=(cohort,caseKey,run)=>({
+ sourceCohort:cohort,independentCaseKey:caseKey,runId:run
+});
+
+test('O2 R102 invisible Unicode source case run aliases cannot mint independent cohorts',()=>{
+ const valid=r102Lineage('source:A','case:1','run:1');
+ const other=r102Lineage('source:B','case:2','run:2');
+ for(const cp of R102_IGNORABLE_CODEPOINTS){
+  const mark=String.fromCodePoint(cp);
+  for(const field of ['sourceCohort','independentCaseKey','runId']){
+   const untrusted={...other,[field]:other[field]+mark};
+   for(const rows of [[valid,untrusted],[untrusted,valid]]){
+    const out=dedupeIndependentCases(rows);
+    assert.equal(out.independentCohortCount,1,'U+'+cp.toString(16)+':'+field);
+    assert.deepEqual(out.cohorts,['source:A']);
+    assert.equal(out.incompleteLineage,true);
+    assert.deepEqual(out.excluded,[{reason:'SOURCE_LINEAGE_INCOMPLETE'}]);
+   }
+  }
+ }
+});
+
+test('O2 R102 invisible aliases in synthesis holdout negative fail closed while visible Unicode stays valid',()=>{
+ const base={
+  synthesis:[r102Lineage('source:North America','case:group one','run:unit one')],
+  holdout:[r102Lineage('source:東京','case:Café résumé','run:مرحبا 123')],
+  negative:[r102Lineage('source:杭州','case:δοκιμή two','run:देवनागरी ٣')]
+ };
+ assert.equal(validateCohortPartition(base).status,'DISJOINT');
+ assert.equal(dedupeIndependentCases([base.holdout[0]]).independentCohortCount,1);
+ for(const cp of R102_IGNORABLE_CODEPOINTS){
+  const mark=String.fromCodePoint(cp);
+  for(const section of ['synthesis','holdout','negative']){
+   for(const field of ['sourceCohort','independentCaseKey','runId']){
+    const input=structuredClone(base);
+    input[section][0][field]+=mark;
+    const result=validateCohortPartition(input);
+    assert.equal(result.status,'UNKNOWN','U+'+cp.toString(16)+':'+section+':'+field);
+    assert.equal(result.disjoint,false);
+    assert.equal(result.reason,field==='sourceCohort'?'SOURCE_COHORT_MISSING':'PARTITION_LINEAGE_INVALID');
+   }
+  }
+  const clone={
+   synthesis:[r102Lineage('source:A','case:1','run:1')],
+   holdout:[r102Lineage('source:A'+mark,'case:1'+mark,'run:1'+mark)],
+   negative:[r102Lineage('source:C','case:3','run:3')]
+  };
+  const result=validateCohortPartition(clone);
+  assert.equal(result.status,'UNKNOWN');
+  assert.equal(result.disjoint,false);
+ }
+});
+
+test('O2 R102 invisible lineage bridge never credits cache retry clones regardless of order',()=>{
+ const a=r102Lineage('source:A','case:1','run:1');
+ const b=r102Lineage('source:B','case:2','run:2');
+ for(const cp of R102_IGNORABLE_CODEPOINTS){
+  const marker=String.fromCodePoint(cp);
+  for(const replay of [{cacheHit:true},{retry:true}]){
+   const bridge={...r102Lineage('source:C'+marker,'case:1','run:2'),...replay};
+   for(const rows of [[a,b,bridge],[bridge,b,a]]){
+    const out=dedupeIndependentCases(rows);
+    assert.equal(out.independentCohortCount,1);
+    assert.deepEqual(out.cohorts,['source:A']);
+    assert.equal(out.incompleteLineage,true);
+    assert.deepEqual(out.excluded,[{reason:'CACHE_OR_RETRY_NOT_INDEPENDENT'}]);
+   }
   }
  }
 });
