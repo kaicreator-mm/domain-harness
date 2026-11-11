@@ -1015,7 +1015,11 @@
       "title": "Target-specific package dependency and implementation selection",
       "profile": "core",
       "state": "VERIFIED",
-      "qualifiedTarget": {"platform": "linux", "architecture": "x64", "runtime": "node"},
+      "qualifiedTarget": {
+        "platform": "linux",
+        "architecture": "x64",
+        "runtime": "node"
+      },
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "5"
@@ -1804,16 +1808,38 @@
       "id": "DIS020-OPT-001",
       "title": "Bounded Harness/LLM selected provider, budget and UNKNOWN handling",
       "profile": "optional-profile",
-      "state": "NOT_RUN",
+      "state": "PARTIAL",
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "8"
       },
-      "implementation": [],
-      "positive": [],
-      "negative": [],
+      "implementation": [
+        "examples/dis-v020-native-sdk/o1-bounded-harness.mjs",
+        "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+        "examples/dis-v020-native-sdk/native-fixture.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R94 actual selected xDownload native SDK Knowledge executes before bounded fixture-provider UNKNOWN fallback"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R94 provider-disabled and zero-budget paths preserve real SDK observation without model calls"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R94 unselected provider and forbidden Function/Effect entry fail closed before model fallback"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R94 fake model PASS, Effect claims, oversized output, failures and concurrency never certify semantic truth"
+        }
+      ],
       "receiptIds": [],
-      "note": "R2 design/negative vectors exist; no native v0.2 AOT + SDK integrated resolver/budget Demo."
+      "note": "R94 native selected existing xDownload Knowledge Function is invoked through actual canonical DIS v0.2 AOT→SDK/KDP before a bounded fixture-only provider fallback; explicit provider-disabled and max-call budget, UNKNOWN/authority NONE, no Effect, malformed claim and concurrent budget negatives are tested. This is PARTIAL candidate until exact-HEAD Woodpecker CI confirms execution. Provider selection is local fixture ID only, NOT AOT-locked original provider Function/source; no real LLM, tool loop, independent business Oracle or full Harness provider contract. Remaining for VERIFIED: AOT-bound provider identity/Function selection, real provider interface or representatively selected non-mock provider, end-to-end budget/time/loop and termination proof, exact source+CI evidence and independent review."
     },
     {
       "id": "DIS020-OPT-002",

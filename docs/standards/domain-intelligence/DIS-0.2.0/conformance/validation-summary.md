@@ -7,10 +7,16 @@
 | Scope | VERIFIED | PARTIAL | NOT_RUN | OUT_OF_SCOPE | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Core | 13 | 3 | 0 | 0 | 16 |
-| Optional profiles | 0 | 0 | 4 | 0 | 4 |
+| Optional profiles | 0 | 1 | 3 | 0 | 4 |
 | Governance | 0 | 0 | 1 | 0 | 1 |
 
-**Current status: PARTIAL — Core 13/16 VERIFIED (81.25%), three PARTIAL (CORE-002/005/016).** CORE-008 is VERIFIED **only** for Product-approved linux/x64/node bounded Demo: the requester accepted the completed independent C3 engineering review at [Product #1496 comment 6782273293](https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293); source R86 with #2415/1–3 exact-SHA CI and #2429/1–3 nonpromoted baseline remain historical. The new promotion commit requires its own exact-SHA CI before describing **13/16 as newly CI-qualified**. CORE-002/005 still need attributable original Tally Source Owner decisions and qualified independent semantic Oracle/SAP; CORE-016 waits for the remaining Core. All optional profiles are NOT_RUN and GOV-001 NOT_RUN. R85/R86 below are immutable **pre-acceptance history** (not current state).
+**Current status: PARTIAL — Core 13/16 VERIFIED (81.25%), three PARTIAL (CORE-002/005/016).** CORE-008 is VERIFIED **only** for Product-approved linux/x64/node bounded Demo: the requester accepted the completed independent C3 engineering review at [Product #1496 comment 6782273293](https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293); source R86 with #2415/1–3 exact-SHA CI and #2429/1–3 nonpromoted baseline remain historical. The new promotion commit requires its own exact-SHA CI before describing **13/16 as newly CI-qualified**. CORE-002/005 still need attributable original Tally Source Owner decisions and qualified independent semantic Oracle/SAP; CORE-016 waits for the remaining Core. Optional O1 is PARTIAL (native selected SDK + fixture provider bridge, no real/AOT-bound provider yet); O2–O4 remain NOT_RUN, and GOV-001 is NOT_RUN. R85/R86 below are immutable **pre-acceptance history** (not current state).
+
+### R94 — O1 bounded Harness candidate through selected native DIS consumer (2026-11-11)
+
+- [Native O1 integration test](../../../../examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs) boots the existing source-locked xDownload AOT→SDK/KDP Knowledge Function before invoking an intentionally **fixture-only** optional proposal provider; runs a selected-read-only positive, disabled/zero-budget, unselected provider/Effect, model false-PASS and concurrency negatives.
+- The provider is **not** AOT-pinned and is not a real LLM; its proposal stays `UNKNOWN / authority NONE / qualified false / Effect false`. This is a **PARTIAL engineering bridge** rather than verified optional profile conformance. At this source commit new exact SHA CI is required; prior #2444 green was for an earlier tree.
+- O1 remains in the optional closure plan until a genuinely AOT-selected provider/Function, complete budget/termination semantics and separate source-first review are qualified.
 
 ### R92 — C3 independent engineering review accepted, scoped promotion (2026-11-11)
 
