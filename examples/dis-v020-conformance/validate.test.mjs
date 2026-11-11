@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {validateCheckedInMatrix,validateVersionMatrix,declaredTestCases,assertCloseoutDependencies} from './validate.mjs';
+import {validateCheckedInMatrix,validateVersionMatrix,declaredTestCases,assertCloseoutDependencies,assertPinnedC3Source,assertC3NativeWorkflow} from './validate.mjs';
 import {validateRoundEvidence} from './batch-audit.mjs';
 const base=new URL('../../docs/standards/domain-intelligence/DIS-0.2.0/conformance/',import.meta.url);
 const matrix=JSON.parse(await readFile(new URL('matrix.json',base),'utf8'));
@@ -104,6 +104,73 @@ test('R93 C3 VERIFIED cannot borrow generic R9.5 evidence or drop R86 selected-H
    rejects('MATRIX_VERIFIED_WITNESS_MISMATCH'));
  }
 });
+
+test('R93 immutable C3 engineering witness rejects replaced R86, Product decision and native test bytes',async()=>{
+ const anchored=[
+  ['receipts/r86-c3-fresh-exact-sha-review-ci.json','docs/standards/domain-intelligence/DIS-0.2.0/conformance/receipts/r86-c3-fresh-exact-sha-review-ci.json',base],
+  ['decisions/C3_PRODUCT_ACCEPTED_FRESH_REVIEW_2026-11-11.json','docs/standards/domain-intelligence/DIS-0.2.0/conformance/decisions/C3_PRODUCT_ACCEPTED_FRESH_REVIEW_2026-11-11.json',base],
+  ['decisions/C3_USER_ACCEPTED_LINUX_X64_NODE_2026-11-11.json','docs/standards/domain-intelligence/DIS-0.2.0/conformance/decisions/C3_USER_ACCEPTED_LINUX_X64_NODE_2026-11-11.json',base],
+  ['../dis-v020-native-sdk/b05-full-source-anchors.test.mjs','examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs',import.meta.url],
+  ['../dis-v020-native-sdk/b05-host-target.test.mjs','examples/dis-v020-native-sdk/b05-host-target.test.mjs',import.meta.url]
+ ];
+ for(const [url,path,parent] of anchored){
+  const source=await readFile(new URL(url,parent),'utf8');
+  assert.equal(assertPinnedC3Source(path,source),true,'original source remains Git Blob identical');
+  await assert.rejects(async()=>assertPinnedC3Source(path,source+'\\n// forged source replacement\\n'),
+    rejects('MATRIX_C3_WITNESS_BYTES_DRIFT'));
+ }
+ assert.throws(()=>assertPinnedC3Source('unrelated-receipt.json','{}'),
+  rejects('MATRIX_C3_WITNESS_UNTRACKED_PATH'));
+});
+
+test('R93 C3 unrelated SUCCESS receipt cannot impersonate original R86 bytes',async()=>{
+ const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async id=>[
+  id,JSON.parse(await readFile(new URL('receipts/'+id+'.json',base),'utf8'))
+ ])));
+ assert.equal((await validateVersionMatrix(clone(matrix),receipts)).tallies['core:VERIFIED'],13);
+ const fake=clone(receipts);
+ fake['r86-c3-fresh-exact-sha-review-ci']={...clone(fake['r84-c3-selected-closure-ci']),id:'r86-c3-fresh-exact-sha-review-ci'};
+ await assert.rejects(validateVersionMatrix(clone(matrix),fake),
+  rejects('MATRIX_C3_WITNESS_RECEIPT_REPLACED'));
+});
+
+test('R93 C3 approved Target and R86 inventory cannot be changed while keeping VERIFIED',async()=>{
+ const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async id=>[
+  id,JSON.parse(await readFile(new URL('receipts/'+id+'.json',base),'utf8'))
+ ])));
+ for(const change of [
+  row=>{row.qualifiedTarget.platform='windows';},
+  row=>{row.qualifiedTarget.architecture='arm64';},
+  row=>{row.qualifiedTarget.runtime='browser';},
+  row=>{row.qualifiedTarget={...row.qualifiedTarget,otherPlatform:'android'};},
+  row=>{delete row.qualifiedTarget;}
+ ]){
+  const forged=clone(matrix);change(forged.requirements.find(x=>x.id==='DIS020-CORE-008'));
+  await assert.rejects(validateVersionMatrix(forged,receipts),
+   rejects('MATRIX_C3_TARGET_OR_WITNESS_UNAUTHORIZED'));
+ }
+ const absent=clone(matrix);
+ absent.receipts=absent.receipts.filter(id=>id!=='r86-c3-fresh-exact-sha-review-ci');
+ await assert.rejects(validateVersionMatrix(absent,receipts),
+  rejects('MATRIX_C3_TARGET_OR_WITNESS_UNAUTHORIZED'));
+});
+
+test('R93 original C3 positive and negative native files cannot disappear from CI execution',async()=>{
+ const path='../../.woodpecker/dis-v020-integration.yaml';
+ const workflow=await readFile(new URL(path,import.meta.url),'utf8');
+ assert.equal(assertC3NativeWorkflow(workflow),true);
+ for(const file of [
+  'examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs',
+  'examples/dis-v020-native-sdk/b05-host-target.test.mjs',
+  'node --test examples/dis-v020-conformance/validate.test.mjs'
+ ]){
+  const replaced=workflow.replace(file,'omitted-'+file);
+  assert.notEqual(replaced,workflow);
+  assert.throws(()=>assertC3NativeWorkflow(replaced),
+    rejects('MATRIX_C3_NATIVE_CI_CASE_NOT_EXECUTED'));
+ }
+});
+
 test('machine validator rejects a VERIFIED requirement without positive or negative proof',async()=>{
  const v=clone(matrix);v.requirements[0].negative=[];
  await assert.rejects(validateVersionMatrix(v,{'r9.5-baseline':baseline}),rejects('MATRIX_UNSUPPORTED_VERIFIED'));
