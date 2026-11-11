@@ -22,9 +22,9 @@ import {
 
 const O2_SOURCE=Object.freeze({
  repository:'kaicreator-mm/domain-harness',
- commit:'6784388ad64ff5ef378426c0f32eab6aa7895135',
+ commit:'d76d0b0b182a68c3c10286705beb46d4a64346cd',
  path:'examples/dis-v020-native-sdk/o2-experience-gate.mjs',
- gitBlob:'5beefd3ea67c04c46e8aa1fd722da3b729a78dc0'
+ gitBlob:'059732a04f11450df3bbfa6eb12929ac4fc3f440'
 });
 const gitBlob=value=>createHash('sha1').update(Buffer.from('blob '+Buffer.byteLength(value)+'\0')).update(value).digest('hex');
 const basePromise=makeNativeFixture();
@@ -300,4 +300,60 @@ test('O2 R100 out-of-order and mixed missing-key bridges remain conservatively c
  const good=dedupeIndependentCases(expected);
  assert.equal(good.independentCohortCount,2);
  assert.equal(good.incompleteLineage,false);
+});
+
+test('O2 R101 blank padded and noncanonical source case run tokens never mint independent cohorts',()=>{
+ const canonical={sourceCohort:'source:A',independentCaseKey:'case:1',runId:'run:1'};
+ for(const field of ['sourceCohort','independentCaseKey','runId']){
+  for(const malformed of [' ','  ',' padded ', '\u200bhidden', 'Cafe\u0301']){
+   const result=dedupeIndependentCases([{...canonical,[field]:malformed}]);
+   assert.equal(result.independentCohortCount,0,field+':'+malformed);
+   assert.equal(result.incompleteLineage,true,field+':'+malformed);
+   assert.deepEqual(result.excluded,[{reason:'SOURCE_LINEAGE_INCOMPLETE'}]);
+  }
+ }
+});
+test('O2 R101 padded aliases never receive credit and do not break conservative bridge grouping',()=>{
+ const a={sourceCohort:'source:A',independentCaseKey:'case:1',runId:'run:1'};
+ const padded={sourceCohort:' source:A ',independentCaseKey:'case:2',runId:'run:2'};
+ const bridge={sourceCohort:'source:B',independentCaseKey:'case:1',runId:'run:2',retry:true};
+ for(const input of [[a,padded,bridge],[bridge,padded,a],[padded,a,bridge]]){
+  const out=dedupeIndependentCases(input);
+  assert.equal(out.independentCohortCount,1);
+  assert.deepEqual(out.cohorts,['source:A']);
+  assert.equal(out.incompleteLineage,true);
+  assert.equal(out.excluded.length,2);
+ }
+ const genuine=dedupeIndependentCases([
+  {sourceCohort:'source:North America',independentCaseKey:'case:group one',runId:'run:unit one'},
+  {sourceCohort:'source:East Asia',independentCaseKey:'case:group two',runId:'run:unit two'}
+ ]);
+ assert.equal(genuine.independentCohortCount,2);
+ assert.equal(genuine.incompleteLineage,false);
+});
+test('O2 R101 partition fail closes on blank padded noncanonical lineage without rejecting internal spaces',()=>{
+ const valid={
+  synthesis:[{sourceCohort:'source:North America',independentCaseKey:'case:group one',runId:'run:unit one'}],
+  holdout:[{sourceCohort:'source:East Asia',independentCaseKey:'case:group two',runId:'run:unit two'}],
+  negative:[{sourceCohort:'source:South Asia',independentCaseKey:'case:group three',runId:'run:unit three'}]
+ };
+ assert.equal(validateCohortPartition(valid).status,'DISJOINT');
+ for(const cohort of [' ','  ',' source:North America ','\u200bghost','Cafe\u0301']){
+  const input=structuredClone(valid);
+  input.synthesis[0].sourceCohort=cohort;
+  const result=validateCohortPartition(input);
+  assert.equal(result.status,'UNKNOWN');
+  assert.equal(result.disjoint,false);
+  assert.equal(result.reason,'SOURCE_COHORT_MISSING');
+ }
+ for(const field of ['independentCaseKey','runId']){
+  for(const bad of [' ',' case:group one ','\u200bhidden']){
+   const input=structuredClone(valid);
+   input.holdout[0][field]=bad;
+   const result=validateCohortPartition(input);
+   assert.equal(result.status,'UNKNOWN');
+   assert.equal(result.disjoint,false);
+   assert.equal(result.reason,'PARTITION_LINEAGE_INVALID');
+  }
+ }
 });
