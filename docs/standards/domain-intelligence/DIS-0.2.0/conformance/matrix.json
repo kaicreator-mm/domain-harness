@@ -66,7 +66,8 @@
     "r85-c3-core008-source-review",
     "r86-c3-fresh-exact-sha-review-ci",
     "r88-c1-ev16-r3-r1-query-snapshot-native-ci",
-    "r89-d02-parent-split-semantic-static-r30-native-ci"
+    "r89-d02-parent-split-semantic-static-r30-native-ci",
+    "r96-o1-source-observation-ci"
   ],
   "requirements": [
     {
@@ -1836,10 +1837,16 @@
         {
           "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
           "case": "O1 R94 fake model PASS, Effect claims, oversized output, failures and concurrency never certify semantic truth"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R96 rejects FAILED/UNKNOWN or source-mismatched native observations before Provider fallback"
         }
       ],
-      "receiptIds": [],
-      "note": "R94 native selected existing xDownload Knowledge Function is invoked through actual canonical DIS v0.2 AOT→SDK/KDP before a bounded fixture-only provider fallback; explicit provider-disabled and max-call budget, UNKNOWN/authority NONE, no Effect, malformed claim and concurrent budget negatives are tested. This is PARTIAL candidate until exact-HEAD Woodpecker CI confirms execution. Provider selection is local fixture ID only, NOT AOT-locked original provider Function/source; no real LLM, tool loop, independent business Oracle or full Harness provider contract. Remaining for VERIFIED: AOT-bound provider identity/Function selection, real provider interface or representatively selected non-mock provider, end-to-end budget/time/loop and termination proof, exact source+CI evidence and independent review."
+      "receiptIds": [
+        "r96-o1-source-observation-ci"
+      ],
+      "note": "R94 native selected xDownload Knowledge Function is invoked through actual canonical DIS v0.2 AOT→SDK/KDP before a bounded fixture-only provider fallback. R95 exact HEAD ed25934d2fb5d24a4e6a767441b129172e426a97 passed Woodpecker #2450/1-3 3/3; R96 exact HEAD d4f0b8bb57090a994794f7c15a3eaa062627dd38 passed #2451/1-3 3/3. R96 additionally requires typed OBSERVED, contract v1.0.0 and the exact original xdownload-business source ID/Git Blob before provider fallback; FAILED/UNKNOWN/unpinned observations fail closed. Provider remains fixture-only, NOT AOT-locked and not a real LLM; no independent business Oracle, full Harness provider contract, tool loop or end-to-end timeout/termination proof. Therefore PARTIAL, not VERIFIED."
     },
     {
       "id": "DIS020-OPT-002",
