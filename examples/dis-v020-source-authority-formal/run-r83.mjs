@@ -22,8 +22,8 @@ const EXPECTED_CODE_BLOBS={
  // R94 PARTIAL native fixture-only provider with no semantic qualification).
  // R95: bind each requirement ID to its exact Core/Optional/Governance profile;
  // add Optional demotion and same-state Core/Optional profile-swap negatives.
- model:'673d3c1a12ccd0a368c3cabdb90d361027eb08b2',
- tests:'4bfe5918c7048f025ebb3b98b2a8f11f37300b93'
+ model:'228f13a8df31cd266a5c7eb13c7688137dd39e4e',
+ tests:'6348ac56b0291652fc1c96d38f3af8d44358fc97'
 };
 const blob=s=>{
  const b=Buffer.from(s,'utf8'),h=createHash('sha1');

@@ -24,6 +24,20 @@ const CI_JOBS=Object.freeze({
 const REQUIRE_CONTEXT=new Set(Object.keys(CI_JOBS));
 const fail=(code)=>{throw new Error(code)};
 const isObject=x=>x&&typeof x==='object'&&!Array.isArray(x);
+const exactContextChecks=(rows,receiptCi)=>{
+ if(!Array.isArray(rows)||rows.length!==REQUIRE_CONTEXT.size||
+    !Array.isArray(receiptCi)||receiptCi.length!==REQUIRE_CONTEXT.size)return false;
+ const byContext=new Map();
+ for(const row of rows){
+  if(!isObject(row)||!REQUIRE_CONTEXT.has(row.context)||byContext.has(row.context))return false;
+  byContext.set(row.context,row);
+ }
+ if(byContext.size!==REQUIRE_CONTEXT.size)return false;
+ return receiptCi.every(expected=>{
+  const actual=byContext.get(expected.context);
+  return actual?.state===expected.state&&actual?.url===expected.url;
+ });
+};
 export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
  if(!isObject(pins)||pins.producerBlob!==ORIGINAL.producerBlob||
     pins.nativeTestBlob!==ORIGINAL.nativeTestBlob||pins.readerBlob!==ORIGINAL.readerBlob)
@@ -66,12 +80,8 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
     manifest.rounds[0]?.status!=='VERIFIED'||
     manifest.pendingRounds!==0||manifest.unstartedRounds!==0||
     manifest.noAutomaticCorePromotion!==true||
-    !Array.isArray(manifest.qualificationChecks)||manifest.qualificationChecks.length!==3||
-    manifest.qualificationChecks.some(x=>!REQUIRE_CONTEXT.has(x.context)||x.state!=='SUCCESS'||
-      !receipt.ci.some(y=>y.context===x.context&&y.state===x.state&&y.url===x.url))||
-    !Array.isArray(manifest.rounds[0].checks)||manifest.rounds[0].checks.length!==3||
-    manifest.rounds[0].checks.some(x=>!receipt.ci.some(y=>y.context===x.context&&
-      y.state===x.state&&y.url===x.url)))
+    !exactContextChecks(manifest.qualificationChecks,receipt.ci)||
+    !exactContextChecks(manifest.rounds[0].checks,receipt.ci))
     fail('B22_BATCH_INTEGRITY_INVALID');
  const req=matrix?.requirements;
  if(!Array.isArray(req))fail('MATRIX_UNAVAILABLE');

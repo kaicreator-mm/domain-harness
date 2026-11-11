@@ -8,6 +8,18 @@ import {makeO1BoundedHarness} from './o1-bounded-harness.mjs';
 
 const fixture=makeNativeFixture();
 const deny=code=>e=>e?.code===code;
+const selectedApp=observation=>({
+ functions:Object.freeze(['xdownload.describePolicy']),
+ contractVersions:Object.freeze({'xdownload.describePolicy':'1.0.0'}),
+ invoke:async()=>observation
+});
+const selectedObservation=(overrides={})=>({
+ kind:'OBSERVATION',disposition:'OBSERVED',authority:'NONE',
+ value:{domainId:'downloads'},contractVersion:'1.0.0',
+ evidence:{source:{sourceId:'xdownload-business',sha256:'a'.repeat(64),
+  gitBlob:'a7dba9a896de0b84fc6d54093563adca2ccbcdfc'},attested:false},
+ ...overrides
+});
 async function withNative(visit){
  const f=await fixture;
  const app=await loadDisV020Aot(f.artifact,{
@@ -41,6 +53,37 @@ test('O1 R94 actual selected xDownload native SDK Knowledge executes before boun
   assert.equal((await harness.run('advisory')).reason,'BUDGET_EXHAUSTED');
   assert.equal(called,1);
  });
+});
+test('O1 R96 rejects FAILED/UNKNOWN or source-mismatched native observations before Provider fallback',async()=>{
+ const cases=[
+  ['failed-disposition',selectedObservation({disposition:'FAILED'})],
+  ['unknown-disposition',selectedObservation({disposition:'UNKNOWN'})],
+  ['wrong-source-id',selectedObservation({evidence:{source:{
+   sourceId:'other-source',sha256:'a'.repeat(64),
+   gitBlob:'a7dba9a896de0b84fc6d54093563adca2ccbcdfc'
+  },attested:false}})],
+  ['wrong-source-blob',selectedObservation({evidence:{source:{
+   sourceId:'xdownload-business',sha256:'a'.repeat(64),gitBlob:'0'.repeat(40)
+  },attested:false}})],
+  ['missing-source-witness',selectedObservation({evidence:{attested:false}})]
+ ];
+ for(const [name,observation] of cases){
+  let calls=0;
+  const harness=makeO1BoundedHarness({
+   app:selectedApp(observation),
+   provider:{id:'fixture-o1-provider',propose:async()=>{calls++;return {suggestion:'must not run'}}},
+   maxCalls:1
+  });
+  const result=await harness.run('advisory');
+  assert.equal(result.disposition,'UNKNOWN',name);
+  assert.equal(result.reason,'NATIVE_OBSERVATION_UNQUALIFIED',name);
+  assert.equal(result.authority,'NONE',name);
+  assert.equal(result.effectDispatched,false,name);
+  assert.equal(harness.remaining(),1,name);
+  assert.equal(calls,0,name);
+ }
+ assert.throws(()=>makeO1BoundedHarness({app:{invoke:async()=>null}}),
+  deny('O1_NATIVE_APP_NOT_SELECTED'));
 });
 test('O1 R94 provider-disabled and zero-budget paths preserve real SDK observation without model calls',async()=>{
  await withNative(async app=>{

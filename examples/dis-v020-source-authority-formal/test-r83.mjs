@@ -74,6 +74,8 @@ export function runR83Tests(producer,receipt,manifest,matrix,pins,model,reader){
   ['native-ci-failure',v=>v[1].ci[0].state='FAILURE'],
   ['native-ci-link',v=>v[1].ci[1].url='https://ci.kaicreator.com/repos/18/pipeline/2398/2'],
   ['batch-candidate',v=>v[2].rounds[0].status='NOT_RUN'],
+  ['batch-duplicate-qualification-context',v=>{v[2].qualificationChecks[1]={...v[2].qualificationChecks[0]}}],
+  ['batch-duplicate-round-context',v=>{v[2].rounds[0].checks[1]={...v[2].rounds[0].checks[0]}}],
   ['core-matrix-drift',v=>v[3].requirements.find(x=>x.id==='DIS020-CORE-003').state='PARTIAL'],
   ['producer-blob-pin',v=>v[4].producerBlob='0'.repeat(40)],
   // Coordinated forged provenance: keep all 3 status labels green, but swap
