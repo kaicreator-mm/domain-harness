@@ -59,6 +59,18 @@ const SEMVER=/^[1-9][0-9]*\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/;
 
 const FIELD=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const UNSAFE_METHODS=new Set(['constructor','prototype','__proto__','then']);
+// R115: direct API metadata must be own data, not Proxy/accessor values.
+// Snapshot nested fields before any caller getters; serialized AOT remains
+// separately selected and validated by BUILD/KDP.
+function ownDisContractData(parent,key,error){
+ try{
+  if(parent===null||typeof parent!=='object'||nodeTypes.isProxy(parent))
+   fail(error);
+  const slot=Object.getOwnPropertyDescriptor(parent,key);
+  if(!slot||!Object.hasOwn(slot,'value'))fail(error);
+  return slot.value;
+ }catch{fail(error)}
+}
 function validateLocalHandleContract(c){
  keys(c,['schema','version','methods','lifetime','factoryInput','methodIO']);
  if(c.schema!=='dis.v0.2.local-handle-contract/1'||!SEMVER.test(c.version)||
@@ -293,6 +305,11 @@ const sameFieldType=(a,b)=>typeof a==='string'&&typeof b==='string'?
  a===b:typeof a==='object'&&a!==null&&typeof b==='object'&&b!==null&&
  sha256Canonical(a)===sha256Canonical(b);
 function validateFunctionContract(c){
+ // R115: do not allow contract/evidence parent accessors to substitute an
+ // empty policy after R114 has validated its returned requiredFor array.
+ const evidence=ownDisContractData(c,'evidence','DIS_FUNCTION_EVIDENCE_INVALID');
+ const refField=ownDisContractData(evidence,'refField','DIS_FUNCTION_EVIDENCE_INVALID');
+ const requiredFor=ownDisContractData(evidence,'requiredFor','DIS_FUNCTION_EVIDENCE_INVALID');
  keys(c,['schema','version','input','output','outcomes','evidence','compatibility']);
  if(c.schema!=='dis.v0.2.function-contract/1'||!/^[1-9][0-9]*\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/.test(c.version))fail('DIS_FUNCTION_CONTRACT_INVALID');
  validateShape(c.input);validateShape(c.output);
@@ -303,15 +320,15 @@ function validateFunctionContract(c){
  for(const [tag,disposition] of Object.entries(c.outcomes.classes)){
   if(!FIELD.test(tag)||!OUTCOMES.has(disposition))fail('DIS_FUNCTION_OUTCOMES_INVALID');
  }
- keys(c.evidence,['refField','requiredFor']);
+ keys(evidence,['refField','requiredFor']);
  // R109: Array.some skips sparse indices; Set regards holes as undefined.
  // Validate every bounded own data slot before comparing evidence policies
  // or consuming them at runtime. Never execute caller-provided accessors.
- const requiredFor=c.evidence.requiredFor,requiredValues=[];
+ const requiredValues=[];
  try{
   // R114: BUILD disallows non-clonable Proxy data; reject direct ABI Proxy
   // arrays before trusting their forged length or indexed descriptors.
-  if(!FIELD.test(c.evidence.refField)||nodeTypes.isProxy(requiredFor)||
+  if(!FIELD.test(refField)||nodeTypes.isProxy(requiredFor)||
      !arr(requiredFor,true))
    fail('DIS_FUNCTION_EVIDENCE_INVALID');
   for(let i=0;i<requiredFor.length;i++){
@@ -411,21 +428,35 @@ export function validateDisV020FunctionValue(contract,phase,value){
  return true;
 }
 export function classifyDisV020FunctionOutcome(contract,value){
+ // R115: snapshot every consumed metadata parent/field without evaluating
+ // contract.evidence or outcomes getters; Proxy parents cannot forge policy.
+ const outcomes=ownDisContractData(contract,'outcomes','DIS_OUTCOME_UNDECLARED');
+ const evidence=ownDisContractData(contract,'evidence','DIS_EVIDENCE_INVALID');
+ const outcomeField=ownDisContractData(outcomes,'field','DIS_OUTCOME_UNDECLARED');
+ const classes=ownDisContractData(outcomes,'classes','DIS_OUTCOME_UNDECLARED');
+ const refField=ownDisContractData(evidence,'refField','DIS_EVIDENCE_INVALID');
+ const requiredFor=ownDisContractData(evidence,'requiredFor','DIS_EVIDENCE_INVALID');
  // R107: even direct callers of this exported helper must not supply
  // outer output accessors as evidence or status. The SDK additionally checks
  // the full output schema; this is a defensive direct-helper boundary.
  let tag,refs;
  try{
-  const statusSlot=Object.getOwnPropertyDescriptor(value,contract.outcomes.field);
+  const statusSlot=Object.getOwnPropertyDescriptor(value,outcomeField);
   if(!statusSlot||!Object.hasOwn(statusSlot,'value'))
    fail('DIS_OUTCOME_UNDECLARED');
   tag=statusSlot.value;
  }catch{fail('DIS_OUTCOME_UNDECLARED')}
- const disposition=typeof tag==='string'&&Object.hasOwn(contract.outcomes.classes,tag)?
-   contract.outcomes.classes[tag]:undefined;
- if(!disposition)fail('DIS_OUTCOME_UNDECLARED');
+ let disposition;
  try{
-  const refsSlot=Object.getOwnPropertyDescriptor(value,contract.evidence.refField);
+  if(typeof tag==='string'&&classes!==null&&typeof classes==='object'&&
+     !nodeTypes.isProxy(classes)){
+   const slot=Object.getOwnPropertyDescriptor(classes,tag);
+   if(slot&&Object.hasOwn(slot,'value'))disposition=slot.value;
+  }
+ }catch{fail('DIS_OUTCOME_UNDECLARED')}
+ if(!OUTCOMES.has(disposition))fail('DIS_OUTCOME_UNDECLARED');
+ try{
+  const refsSlot=Object.getOwnPropertyDescriptor(value,refField);
   if(refsSlot){
    if(!Object.hasOwn(refsSlot,'value'))fail('DIS_EVIDENCE_INVALID');
    refs=refsSlot.value;
@@ -453,7 +484,7 @@ export function classifyDisV020FunctionOutcome(contract,value){
  // Array.includes or index getter after it decided the outcome evidence.
  let requiredPolicy;
  try{
-  const raw=contract?.evidence?.requiredFor,values=[];
+  const raw=requiredFor,values=[];
   // R113: a Proxy may spoof array.length via get(), hiding mandatory policy.
   // Snapshot the own length data descriptor, just like indexed policy slots.
   // A Proxy can forge even its own length descriptor (including zero).
