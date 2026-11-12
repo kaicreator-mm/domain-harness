@@ -438,10 +438,13 @@ test('R109 new outcome tags are incompatible within same-major Function and nest
  assert.equal(compareDisV020FunctionContracts(previous,bumped).compatible,true);
  const newLabel=structuredClone(bumped);
  newLabel.outcomes.classes.r109Pending='UNKNOWN';
- assert.deepEqual(classifyDisV020FunctionOutcome(newLabel,{status:'r109Pending'}),{
+ // The selected Tally Function uses 'state', not 'status'. Honor the
+ // actual source-selected outcome field in both new/old consumer probes.
+ const newOutput={[previous.outcomes.field]:'r109Pending'};
+ assert.deepEqual(classifyDisV020FunctionOutcome(newLabel,newOutput),{
   disposition:'UNKNOWN',evidenceRefs:[]
  });
- assert.throws(()=>classifyDisV020FunctionOutcome(previous,{status:'r109Pending'}),
+ assert.throws(()=>classifyDisV020FunctionOutcome(previous,newOutput),
   fail('DIS_OUTCOME_UNDECLARED'));
  assert.throws(()=>compareDisV020FunctionContracts(previous,newLabel),
   fail('DIS_FUNCTION_ABI_INCOMPATIBLE'));
