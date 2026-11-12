@@ -634,3 +634,75 @@ test('R114 forged Proxy policy array length cannot silently waive mandatory evid
   status:'ok',evidenceRefs:['source:real']
  }),{disposition:'OBSERVED',evidenceRefs:['source:real']});
 });
+
+test('R115 direct Function outcome and ABI reject evidence parent Proxy/getters',async()=>{
+ const contract={outcomes:{field:'status',classes:{ok:'OBSERVED',pending:'UNKNOWN'}},
+  evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']}};
+ let reads=0;
+ const original=contract.evidence;
+ contract.evidence=new Proxy(original,{get(target,key,receiver){
+  reads++;return key==='requiredFor'?[]:Reflect.get(target,key,receiver);
+ }});
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+  fail('DIS_EVIDENCE_INVALID'));
+ assert.equal(reads,0,'must reject Proxy evidence parent before get trap');
+ contract.evidence={refField:'evidenceRefs'};
+ Object.defineProperty(contract.evidence,'requiredFor',{
+  enumerable:true,get(){reads++;return []}
+ });
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+  fail('DIS_EVIDENCE_INVALID'));
+ assert.equal(reads,0,'must reject parent requiredFor accessor before execution');
+ const outer={outcomes:contract.outcomes};
+ Object.defineProperty(outer,'evidence',{enumerable:true,get(){reads++;return {refField:'evidenceRefs',requiredFor:[]}}});
+ assert.throws(()=>classifyDisV020FunctionOutcome(outer,{status:'ok'}),
+  fail('DIS_EVIDENCE_INVALID'));
+ assert.equal(reads,0,'must reject contract evidence accessor');
+ contract.evidence=original;
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+  fail('DIS_EVIDENCE_REQUIRED'));
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{
+  status:'ok',evidenceRefs:['source:real']
+ }),{disposition:'OBSERVED',evidenceRefs:['source:real']});
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{status:'pending'}),{
+  disposition:'UNKNOWN',evidenceRefs:[]
+ });
+ const selectedFixture=await selected;
+ const old=structuredClone(selectedFixture.program.elements.find(e=>e.id==='tally.tasks').functions[0].contract);
+ const next=structuredClone(old);next.version='1.1.0';
+ assert.equal(compareDisV020FunctionContracts(old,next).compatible,true);
+ next.evidence=new Proxy(old.evidence,{get(target,key,receiver){
+  reads++;return key==='requiredFor'?[]:Reflect.get(target,key,receiver);
+ }});
+ assert.throws(()=>compareDisV020FunctionContracts(old,next),
+  fail('DIS_FUNCTION_EVIDENCE_INVALID'));
+ assert.equal(reads,0,'ABI comparison must reject Proxy metadata before invoking getters');
+ next.evidence={refField:old.evidence.refField};
+ Object.defineProperty(next.evidence,'requiredFor',{enumerable:true,
+  get(){reads++;return []}});
+ assert.throws(()=>compareDisV020FunctionContracts(old,next),
+  fail('DIS_FUNCTION_EVIDENCE_INVALID'));
+ assert.equal(reads,0);
+ next.evidence=structuredClone(old.evidence);
+ assert.equal(compareDisV020FunctionContracts(old,next).compatible,true);
+});
+
+test('R115 forged index own-descriptor on Proxy policy is rejected without traps',()=>{
+ const contract={outcomes:{field:'status',classes:{ok:'OBSERVED'}},
+  evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']}};
+ let traps=0;
+ contract.evidence.requiredFor=new Proxy(['OBSERVED'],{
+  getOwnPropertyDescriptor(target,key){
+   traps++;
+   const original=Reflect.getOwnPropertyDescriptor(target,key);
+   return key==='0'?{...original,value:'UNKNOWN'}:original;
+  },
+  get(target,key,receiver){traps++;return Reflect.get(target,key,receiver)}
+ });
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+  fail('DIS_EVIDENCE_INVALID'));
+ assert.equal(traps,0,'reject forged index own-descriptor before Proxy trap');
+ contract.evidence.requiredFor=['OBSERVED'];
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+  fail('DIS_EVIDENCE_REQUIRED'));
+});
