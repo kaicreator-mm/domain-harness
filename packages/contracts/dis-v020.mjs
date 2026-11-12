@@ -445,7 +445,22 @@ export function classifyDisV020FunctionOutcome(contract,value){
   // Revoked/hostile Proxy evidence is invalid; it never becomes a receipt.
  }
  if(refs!==undefined&&!witness)fail('DIS_EVIDENCE_INVALID');
- if(contract.evidence.requiredFor.includes(disposition)&&!witness)
+ // R112: the exported direct classifier must not call a caller-controlled
+ // Array.includes or index getter after it decided the outcome evidence.
+ let requiredPolicy;
+ try{
+  const raw=contract?.evidence?.requiredFor,values=[];
+  if(!Array.isArray(raw)||raw.length>MAX)fail('DIS_EVIDENCE_INVALID');
+  for(let i=0;i<raw.length;i++){
+   const slot=Object.getOwnPropertyDescriptor(raw,String(i));
+   if(!slot||!Object.hasOwn(slot,'value')||!OUTCOMES.has(slot.value))
+    fail('DIS_EVIDENCE_INVALID');
+   values.push(slot.value);
+  }
+  if(new Set(values).size!==values.length)fail('DIS_EVIDENCE_INVALID');
+  requiredPolicy=Object.freeze(values);
+ }catch{fail('DIS_EVIDENCE_INVALID')}
+ if(requiredPolicy.includes(disposition)&&!witness)
   fail('DIS_EVIDENCE_REQUIRED');
  return Object.freeze({disposition,evidenceRefs:witness??Object.freeze([])});
 }
