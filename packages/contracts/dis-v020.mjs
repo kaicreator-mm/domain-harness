@@ -190,7 +190,8 @@ export function classifyDisV020KdpReceipt(contract,receipt){
   fail('DIS_KDP_RECEIPT_INVALID');
  // Unrecognized statuses fail closed to UNKNOWN, never SUCCEEDED or ADMITTED.
  return Object.freeze({
-  admission:contract.statusMap[receipt.status]??'UNKNOWN',
+  admission:Object.hasOwn(contract.statusMap,receipt.status)?
+    contract.statusMap[receipt.status]:'UNKNOWN',
   execution:'NOT_PROVEN',businessEvidenceAttested:false
  });
 }

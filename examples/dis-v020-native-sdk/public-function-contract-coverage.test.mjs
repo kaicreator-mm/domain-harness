@@ -4,7 +4,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectDisV020PublicFunctionCoverage,qualifyDisV020Artifact,compareDisV020ElementContracts}
+import {inspectDisV020PublicFunctionCoverage,qualifyDisV020Artifact,compareDisV020ElementContracts,classifyDisV020KdpReceipt}
  from '@kaicreator/domain-harness-contracts/dis-v020';
 import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
@@ -253,4 +253,25 @@ test('R76 real selected Function compatibility denies hidden Handle, Init and KD
  const old=element('runx.agent.presence'),newer=structuredClone(old);
  newer.version='1.1.0';newer.functions[0].handleContract.version='1.1.0';
  assert.equal(compareDisV020ElementContracts(old,newer).compatible,true);
+});
+
+
+test('R104 KDP receipt prototype-key statuses remain typed UNKNOWN without Effect authority',()=>{
+ const contract={
+  schema:'dis.v0.2.kdp-receipt-contract/1',version:'1.0.0',
+  statusMap:{admitted:'ADMITTED',denied:'DENIED'},
+  compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
+ };
+ for(const [status,expected] of [
+  ['admitted','ADMITTED'],['denied','DENIED'],
+  ['toString','UNKNOWN'],['constructor','UNKNOWN'],
+  ['valueOf','UNKNOWN'],['hasOwnProperty','UNKNOWN'],
+  ['__proto__','UNKNOWN'],['missing','UNKNOWN']
+ ]){
+  const result=classifyDisV020KdpReceipt(contract,{status});
+  assert.deepEqual(result,{
+   admission:expected,execution:'NOT_PROVEN',businessEvidenceAttested:false
+  },status);
+  assert.equal(Object.isFrozen(result),true);
+ }
 });
