@@ -372,7 +372,8 @@ export function validateDisV020FunctionValue(contract,phase,value){
 }
 export function classifyDisV020FunctionOutcome(contract,value){
  const tag=value[contract.outcomes.field];
- const disposition=typeof tag==='string'?contract.outcomes.classes[tag]:undefined;
+ const disposition=typeof tag==='string'&&Object.hasOwn(contract.outcomes.classes,tag)?
+   contract.outcomes.classes[tag]:undefined;
  if(!disposition)fail('DIS_OUTCOME_UNDECLARED');
  const refs=value[contract.evidence.refField];
  const valid=Array.isArray(refs)&&refs.length>0&&refs.length<=MAX&&

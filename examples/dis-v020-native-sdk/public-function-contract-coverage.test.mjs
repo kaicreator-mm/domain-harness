@@ -4,7 +4,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectDisV020PublicFunctionCoverage,qualifyDisV020Artifact,compareDisV020ElementContracts,classifyDisV020KdpReceipt}
+import {inspectDisV020PublicFunctionCoverage,qualifyDisV020Artifact,compareDisV020ElementContracts,classifyDisV020KdpReceipt,classifyDisV020FunctionOutcome}
  from '@kaicreator/domain-harness-contracts/dis-v020';
 import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
@@ -273,5 +273,21 @@ test('R104 KDP receipt prototype-key statuses remain typed UNKNOWN without Effec
    admission:expected,execution:'NOT_PROVEN',businessEvidenceAttested:false
   },status);
   assert.equal(Object.isFrozen(result),true);
+ }
+});
+
+
+test('R105 Function outcome inherited labels cannot masquerade as typed dispositions',()=>{
+ const contract={
+  outcomes:{field:'status',classes:{ok:'OBSERVED',pending:'UNKNOWN'}},
+  evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']}
+ };
+ const observed=classifyDisV020FunctionOutcome(contract,{status:'ok',evidenceRefs:['source:demo']});
+ assert.deepEqual(observed,{disposition:'OBSERVED',evidenceRefs:['source:demo']});
+ for(const status of ['toString','constructor','valueOf','hasOwnProperty','__proto__','missing']){
+  assert.throws(
+   ()=>classifyDisV020FunctionOutcome(contract,{status,evidenceRefs:['source:demo']}),
+   fail('DIS_OUTCOME_UNDECLARED'),status
+  );
  }
 });
