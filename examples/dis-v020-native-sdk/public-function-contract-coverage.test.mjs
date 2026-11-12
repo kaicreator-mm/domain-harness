@@ -392,3 +392,41 @@ test('R107 outer status/evidence accessors and hostile Proxy never supply Functi
   disposition:'UNKNOWN',evidenceRefs:[]
  });
 });
+
+test('R108 KDP receipt outer status getters, inherited fields and hostile Proxy fail closed',()=>{
+ const contract={
+  schema:'dis.v0.2.kdp-receipt-contract/1',version:'1.0.0',
+  statusMap:{admitted:'ADMITTED',denied:'DENIED'},
+  compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
+ };
+ let getterCalls=0;
+ const getterReceipt={};
+ Object.defineProperty(getterReceipt,'status',{enumerable:true,
+  get(){getterCalls++;return 'admitted'}});
+ assert.throws(()=>classifyDisV020KdpReceipt(contract,getterReceipt),
+  fail('DIS_KDP_RECEIPT_INVALID'));
+ assert.equal(getterCalls,0,'caller status getter must never execute');
+ assert.throws(()=>classifyDisV020KdpReceipt(contract,{}),
+  fail('DIS_KDP_RECEIPT_INVALID'));
+ const inherited=Object.create({status:'admitted'});
+ assert.throws(()=>classifyDisV020KdpReceipt(contract,inherited),
+  fail('DIS_KDP_RECEIPT_INVALID'));
+ const hostileDescriptor=new Proxy({status:'admitted'},{
+  getOwnPropertyDescriptor(){throw new Error('hostile receipt')}
+ });
+ assert.throws(()=>classifyDisV020KdpReceipt(contract,hostileDescriptor),
+  fail('DIS_KDP_RECEIPT_INVALID'));
+ const hostilePrototype=new Proxy({status:'admitted'},{
+  getPrototypeOf(){throw new Error('hostile prototype')}
+ });
+ assert.throws(()=>classifyDisV020KdpReceipt(contract,hostilePrototype),
+  fail('DIS_KDP_RECEIPT_INVALID'));
+ for(const [status,admission] of [
+  ['admitted','ADMITTED'],['denied','DENIED'],['toString','UNKNOWN']
+ ]){
+  const result=classifyDisV020KdpReceipt(contract,{status});
+  assert.deepEqual(result,{admission,execution:'NOT_PROVEN',
+   businessEvidenceAttested:false});
+  assert.equal(Object.isFrozen(result),true);
+ }
+});
