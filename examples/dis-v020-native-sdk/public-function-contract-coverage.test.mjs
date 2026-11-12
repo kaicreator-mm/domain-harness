@@ -506,11 +506,11 @@ test('R110 Evidence policy comparison snapshots own slots without invoking Proxy
    return Reflect.get(target,key,receiver);
   }
  });
- // A proxy can return a different value from its own data descriptor.
- // The comparer must use the validated descriptor snapshot, never the raw
- // iterator / Array.includes path which would consume 'UNKNOWN'.
+ // A Proxy may forge its own descriptors, not just indexed reads; direct
+ // contract comparison must reject it without invoking indexed getters.
  next.evidence.requiredFor=untrusted;
- assert.equal(compareDisV020FunctionContracts(baseline,next).compatible,true);
+ assert.throws(()=>compareDisV020FunctionContracts(baseline,next),
+  fail('DIS_FUNCTION_EVIDENCE_INVALID'));
  assert.equal(indexReads,0);
  const succeeded=structuredClone(baseline);
  succeeded.outcomes.classes={complete:'SUCCEEDED'};
@@ -523,7 +523,8 @@ test('R110 Evidence policy comparison snapshots own slots without invoking Proxy
    return Reflect.get(target,key,receiver);
   }
  });
- assert.equal(compareDisV020FunctionContracts(succeeded,succeededNext).compatible,true);
+ assert.throws(()=>compareDisV020FunctionContracts(succeeded,succeededNext),
+  fail('DIS_FUNCTION_EVIDENCE_INVALID'));
  assert.equal(indexReads,0,'neither validation nor ABI comparison may evaluate an index trap');
 });
 
@@ -577,8 +578,9 @@ test('R112 direct classifier snapshots evidence policy; Proxy cannot waive manda
  });
  contract.evidence.requiredFor=forged;
  assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
-  fail('DIS_EVIDENCE_REQUIRED'));
- assert.equal(getCalls,0,'must snapshot own policy data, not invoke caller includes/index getters');
+  fail('DIS_EVIDENCE_INVALID'));
+ assert.equal(getCalls,0,'must reject policy Proxy before invoking its getter');
+ contract.evidence.requiredFor=['OBSERVED'];
  assert.deepEqual(classifyDisV020FunctionOutcome(contract,{
   status:'ok',evidenceRefs:['source:real']
  }),{disposition:'OBSERVED',evidenceRefs:['source:real']});
@@ -602,4 +604,33 @@ test('R112 direct classifier snapshots evidence policy; Proxy cannot waive manda
  assert.deepEqual(classifyDisV020FunctionOutcome(contract,{status:'pending'}),{
   disposition:'UNKNOWN',evidenceRefs:[]
  });
+});
+
+test('R114 forged Proxy policy array length cannot silently waive mandatory evidence',()=>{
+ const contract={outcomes:{field:'status',classes:{ok:'OBSERVED'}},
+  evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']}};
+ let traps=0;
+ for(const fakeLength of [0,-1]){
+  const forged=new Proxy(['OBSERVED'],{
+   get(target,key,receiver){
+    traps++;
+    return key==='length'?fakeLength:Reflect.get(target,key,receiver);
+   },
+   getOwnPropertyDescriptor(target,key){
+    traps++;
+    const slot=Reflect.getOwnPropertyDescriptor(target,key);
+    return key==='length'?{...slot,value:fakeLength}:slot;
+   }
+  });
+  contract.evidence.requiredFor=forged;
+  assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+   fail('DIS_EVIDENCE_INVALID'));
+ }
+ assert.equal(traps,0,'reject Proxy before invoking user-controlled traps');
+ contract.evidence.requiredFor=['OBSERVED'];
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+  fail('DIS_EVIDENCE_REQUIRED'));
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{
+  status:'ok',evidenceRefs:['source:real']
+ }),{disposition:'OBSERVED',evidenceRefs:['source:real']});
 });
