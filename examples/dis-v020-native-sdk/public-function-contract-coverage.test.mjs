@@ -291,3 +291,30 @@ test('R105 Function outcome inherited labels cannot masquerade as typed disposit
   );
  }
 });
+
+test('R106 sparse and accessor evidence cannot satisfy typed Function outcomes',()=>{
+ const contract={
+  outcomes:{field:'status',classes:{ok:'OBSERVED',pending:'UNKNOWN'}},
+  evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']}
+ };
+ const sparse=Array(1),partial=Array(2);
+ partial[0]='source:present';
+ let getterReads=0;
+ const accessor=['source:placeholder'];
+ Object.defineProperty(accessor,'0',{configurable:true,enumerable:true,
+  get(){getterReads++;return 'source:forged'}});
+ for(const refs of [sparse,partial,accessor]){
+  assert.throws(()=>classifyDisV020FunctionOutcome(contract,{
+   status:'ok',evidenceRefs:refs
+  }),fail('DIS_EVIDENCE_INVALID'));
+ }
+ assert.equal(getterReads,0,'classification must not execute an evidence index getter');
+ const good=classifyDisV020FunctionOutcome(contract,{
+  status:'ok',evidenceRefs:['source:pinned']
+ });
+ assert.deepEqual(good,{disposition:'OBSERVED',evidenceRefs:['source:pinned']});
+ assert.equal(Object.isFrozen(good.evidenceRefs),true);
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{status:'pending'}),{
+  disposition:'UNKNOWN',evidenceRefs:[]
+ });
+});
