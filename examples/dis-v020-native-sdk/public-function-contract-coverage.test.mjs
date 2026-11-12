@@ -559,3 +559,47 @@ test('R111 runnable bounded engineering Function/AOT/SDK/KDP CLI proves real sel
   formalConformance:false,releaseEligible:false
  });
 });
+
+test('R112 direct classifier snapshots evidence policy; Proxy cannot waive mandatory refs',()=>{
+ const contract={
+  outcomes:{field:'status',classes:{ok:'OBSERVED',pending:'UNKNOWN'}},
+  evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']}
+ };
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+  fail('DIS_EVIDENCE_REQUIRED'));
+ let getCalls=0;
+ const forged=new Proxy(['OBSERVED'],{
+  get(target,key,receiver){
+   if(key==='includes'){getCalls++;return ()=>false}
+   if(key==='0'){getCalls++;return 'UNKNOWN'}
+   return Reflect.get(target,key,receiver);
+  }
+ });
+ contract.evidence.requiredFor=forged;
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+  fail('DIS_EVIDENCE_REQUIRED'));
+ assert.equal(getCalls,0,'must snapshot own policy data, not invoke caller includes/index getters');
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{
+  status:'ok',evidenceRefs:['source:real']
+ }),{disposition:'OBSERVED',evidenceRefs:['source:real']});
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{status:'pending'}),{
+  disposition:'UNKNOWN',evidenceRefs:[]
+ });
+ const sparse=Array(1),accessor=['OBSERVED'];
+ Object.defineProperty(accessor,'0',{configurable:true,enumerable:true,
+  get(){getCalls++;return 'OBSERVED'}
+ });
+ const hostile=new Proxy(['OBSERVED'],{
+  getOwnPropertyDescriptor(){throw new Error('untrusted policy descriptor')}
+ });
+ for(const invalid of [sparse,accessor,hostile,['UNKNOWN','UNKNOWN']]){
+  contract.evidence.requiredFor=invalid;
+  assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+   fail('DIS_EVIDENCE_INVALID'));
+ }
+ assert.equal(getCalls,0,'must not evaluate policy accessors on rejection');
+ contract.evidence.requiredFor=[];
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{status:'pending'}),{
+  disposition:'UNKNOWN',evidenceRefs:[]
+ });
+});
