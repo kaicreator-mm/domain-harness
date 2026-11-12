@@ -430,3 +430,56 @@ test('R108 KDP receipt outer status getters, inherited fields and hostile Proxy 
   assert.equal(Object.isFrozen(result),true);
  }
 });
+
+test('R109 new outcome tags are incompatible within same-major Function and nested Element contracts',async()=>{
+ const f=await selected;
+ const previous=structuredClone(f.program.elements.find(e=>e.id==='tally.tasks').functions[0].contract);
+ const bumped=structuredClone(previous);bumped.version='1.1.0';
+ assert.equal(compareDisV020FunctionContracts(previous,bumped).compatible,true);
+ const newLabel=structuredClone(bumped);
+ newLabel.outcomes.classes.r109Pending='UNKNOWN';
+ assert.deepEqual(classifyDisV020FunctionOutcome(newLabel,{status:'r109Pending'}),{
+  disposition:'UNKNOWN',evidenceRefs:[]
+ });
+ assert.throws(()=>classifyDisV020FunctionOutcome(previous,{status:'r109Pending'}),
+  fail('DIS_OUTCOME_UNDECLARED'));
+ assert.throws(()=>compareDisV020FunctionContracts(previous,newLabel),
+  fail('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+ const oldElement=structuredClone(f.program.elements.find(e=>e.id==='tally.tasks'));
+ const newElement=structuredClone(oldElement);
+ newElement.version='1.1.0';
+ newElement.functions[0].contract.version='1.1.0';
+ assert.equal(compareDisV020ElementContracts(oldElement,newElement).compatible,true);
+ newElement.functions[0].contract.outcomes.classes.r109Pending='UNKNOWN';
+ assert.throws(()=>compareDisV020ElementContracts(oldElement,newElement),
+  fail('DIS_ELEMENT_ABI_INCOMPATIBLE'));
+});
+
+test('R109 sparse, accessor and hostile evidence.requiredFor contracts fail closed before ABI or AOT',async()=>{
+ const f=await selected;
+ const previous=structuredClone(f.program.elements.find(e=>e.id==='tally.tasks').functions[0].contract);
+ const valid=structuredClone(previous);valid.version='1.1.0';
+ assert.equal(compareDisV020FunctionContracts(previous,valid).compatible,true);
+ let getterReads=0;
+ const sparse=Array(1),partial=Array(2);
+ partial[0]='SUCCEEDED';
+ const accessor=['SUCCEEDED'];
+ Object.defineProperty(accessor,'0',{
+  configurable:true,enumerable:true,get(){getterReads++;return 'SUCCEEDED'}
+ });
+ const hostile=new Proxy(['SUCCEEDED'],{
+  getOwnPropertyDescriptor(){throw new Error('hostile evidence policy')}
+ });
+ for(const invalid of [sparse,partial,accessor,hostile]){
+  const next=structuredClone(valid);
+  next.evidence.requiredFor=invalid;
+  assert.throws(()=>compareDisV020FunctionContracts(previous,next),
+   fail('DIS_FUNCTION_EVIDENCE_INVALID'));
+  const program=structuredClone(f.program);
+  program.elements.find(e=>e.id==='tally.tasks').functions[0].contract.evidence.requiredFor=invalid;
+  assert.throws(()=>build(f,program),fail('DIS_FUNCTION_EVIDENCE_INVALID'));
+ }
+ assert.equal(getterReads,0,'evidence obligation accessors must not execute');
+ const normal=structuredClone(valid);normal.evidence.requiredFor=['SUCCEEDED'];
+ assert.equal(compareDisV020FunctionContracts(previous,normal).compatible,true);
+});
