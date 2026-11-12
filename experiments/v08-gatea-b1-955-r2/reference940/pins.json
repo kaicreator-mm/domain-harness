@@ -1,0 +1,22 @@
+{
+  "kernel": {
+    "path": "kernel",
+    "digest": "2603c0f8f5d99be875a6686f150732b9543ca3d1"
+  },
+  "sdk": {
+    "path": "sdk",
+    "digest": "cc871232411fb29b6f4cae2f9241d6d0a878a92f"
+  },
+  "approval": {
+    "path": "business-approval",
+    "digest": "09ec388f260f87aafc43caa05293809ad6e56fe6"
+  },
+  "learning": {
+    "path": "business-learning",
+    "digest": "b9111ffe526b35f9608e6d9a1adba99dbce2166b"
+  },
+  "support": {
+    "path": "support",
+    "digest": "b47aa27bbbe920c3d6e8619ae720774e92bd8fdf"
+  }
+}
