@@ -450,8 +450,15 @@ export function classifyDisV020FunctionOutcome(contract,value){
  let requiredPolicy;
  try{
   const raw=contract?.evidence?.requiredFor,values=[];
-  if(!Array.isArray(raw)||raw.length>MAX)fail('DIS_EVIDENCE_INVALID');
-  for(let i=0;i<raw.length;i++){
+  // R113: a Proxy may spoof array.length via get(), hiding mandatory policy.
+  // Snapshot the own length data descriptor, just like indexed policy slots.
+  if(!Array.isArray(raw))fail('DIS_EVIDENCE_INVALID');
+  const lengthSlot=Object.getOwnPropertyDescriptor(raw,'length');
+  const policyLength=lengthSlot?.value;
+  if(!lengthSlot||!Object.hasOwn(lengthSlot,'value')||
+     !Number.isSafeInteger(policyLength)||policyLength>MAX)
+   fail('DIS_EVIDENCE_INVALID');
+  for(let i=0;i<policyLength;i++){
    const slot=Object.getOwnPropertyDescriptor(raw,String(i));
    if(!slot||!Object.hasOwn(slot,'value')||!OUTCOMES.has(slot.value))
     fail('DIS_EVIDENCE_INVALID');
