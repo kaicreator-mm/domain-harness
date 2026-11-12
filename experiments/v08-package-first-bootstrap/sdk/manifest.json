@@ -1,0 +1,79 @@
+{
+  "id": "sdk",
+  "version": "0.0.1",
+  "definitionId": "sdk.definition@1",
+  "dependencies": [
+    {
+      "id": "kernel",
+      "version": "0.0.1"
+    }
+  ],
+  "components": [
+    {
+      "id": "rule",
+      "kind": "tool",
+      "implementation": "sdk.rule.impl@1",
+      "provides": [
+        {
+          "id": "rule.eval@1",
+          "operations": [
+            "test"
+          ]
+        }
+      ],
+      "requires": []
+    },
+    {
+      "id": "workflow",
+      "kind": "semantic",
+      "implementation": "sdk.workflow.impl@1",
+      "provides": [
+        {
+          "id": "workflow.run@1",
+          "operations": [
+            "run"
+          ]
+        }
+      ],
+      "requires": [
+        {
+          "id": "rule.eval@1",
+          "operations": [
+            "test"
+          ]
+        },
+        {
+          "id": "business.action@1",
+          "operations": [
+            "run"
+          ]
+        },
+        {
+          "id": "effect.record@1",
+          "operations": [
+            "record"
+          ]
+        },
+        {
+          "id": "state.commit@1",
+          "operations": [
+            "read",
+            "commit"
+          ]
+        },
+        {
+          "id": "business.workflow@1",
+          "operations": [
+            "resolve"
+          ]
+        }
+      ]
+    }
+  ],
+  "selections": {
+    "rule.eval@1": "sdk@0.0.1/rule#sdk.rule.impl@1",
+    "workflow.run@1": "sdk@0.0.1/workflow#sdk.workflow.impl@1"
+  },
+  "module": "impl.mjs",
+  "moduleDigest": "d238638553d730d6e7bc9a692a852c976f68ff56"
+}
