@@ -4,7 +4,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectDisV020PublicFunctionCoverage,qualifyDisV020Artifact,compareDisV020ElementContracts,classifyDisV020KdpReceipt,classifyDisV020FunctionOutcome}
+import {inspectDisV020PublicFunctionCoverage,qualifyDisV020Artifact,compareDisV020ElementContracts,compareDisV020FunctionContracts,classifyDisV020KdpReceipt,classifyDisV020FunctionOutcome}
  from '@kaicreator/domain-harness-contracts/dis-v020';
 import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
@@ -314,6 +314,80 @@ test('R106 sparse and accessor evidence cannot satisfy typed Function outcomes',
  });
  assert.deepEqual(good,{disposition:'OBSERVED',evidenceRefs:['source:pinned']});
  assert.equal(Object.isFrozen(good.evidenceRefs),true);
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{status:'pending'}),{
+  disposition:'UNKNOWN',evidenceRefs:[]
+ });
+});
+
+test('R107 Evidence obligation changes are incompatible within same-major Function and Element ABI',async()=>{
+ const previous={
+  schema:'dis.v0.2.function-contract/1',version:'1.0.0',
+  input:{type:'record',fields:{},additionalProperties:false},
+  output:{type:'record',fields:{status:'string',evidenceRefs:'array'},
+   optional:['evidenceRefs'],additionalProperties:false},
+  outcomes:{field:'status',classes:{ok:'OBSERVED'}},
+  evidence:{refField:'evidenceRefs',requiredFor:[]},
+  compatibility:{major:1,minReader:'0.2.0',maxReaderExclusive:'0.3.0'}
+ };
+ const next=structuredClone(previous);next.version='1.1.0';
+ assert.equal(compareDisV020FunctionContracts(previous,next).compatible,true);
+ assert.deepEqual(classifyDisV020FunctionOutcome(previous,{status:'ok'}),{
+  disposition:'OBSERVED',evidenceRefs:[]
+ });
+ const tighter=structuredClone(next);tighter.evidence.requiredFor=['OBSERVED'];
+ assert.throws(()=>classifyDisV020FunctionOutcome(tighter,{status:'ok'}),
+  fail('DIS_EVIDENCE_REQUIRED'));
+ assert.throws(()=>compareDisV020FunctionContracts(previous,tighter),
+  fail('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+ const required=structuredClone(previous);required.evidence.requiredFor=['OBSERVED'];
+ assert.throws(()=>compareDisV020FunctionContracts(required,next),
+  fail('DIS_FUNCTION_ABI_INCOMPATIBLE'));
+ const f=await selected;
+ const oldElement=structuredClone(f.program.elements.find(e=>e.id==='tally.tasks'));
+ const newElement=structuredClone(oldElement);
+ newElement.version='1.1.0';
+ newElement.functions[0].contract.version='1.1.0';
+ assert.equal(compareDisV020ElementContracts(oldElement,newElement).compatible,true);
+ newElement.functions[0].contract.evidence.requiredFor.push('OBSERVED');
+ assert.throws(()=>compareDisV020ElementContracts(oldElement,newElement),
+  fail('DIS_ELEMENT_ABI_INCOMPATIBLE'));
+});
+
+test('R107 outer status/evidence accessors and hostile Proxy never supply Function outcome witnesses',()=>{
+ const contract={
+  outcomes:{field:'status',classes:{ok:'OBSERVED',pending:'UNKNOWN'}},
+  evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']}
+ };
+ let getterCalls=0;
+ const evidenceGetter={status:'ok'};
+ Object.defineProperty(evidenceGetter,'evidenceRefs',{
+  get(){getterCalls++;return ['source:forged']}
+ });
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,evidenceGetter),
+  fail('DIS_EVIDENCE_INVALID'));
+ const statusGetter={evidenceRefs:['source:forged']};
+ Object.defineProperty(statusGetter,'status',{
+  get(){getterCalls++;return 'ok'}
+ });
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,statusGetter),
+  fail('DIS_OUTCOME_UNDECLARED'));
+ assert.equal(getterCalls,0);
+ const hostile=new Proxy({status:'ok',evidenceRefs:['source:forged']},{
+  getOwnPropertyDescriptor(){throw new Error('hostile outer descriptor')}
+ });
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,hostile),
+  fail('DIS_OUTCOME_UNDECLARED'));
+ const hostileRefs=new Proxy({status:'ok',evidenceRefs:['source:forged']},{
+  getOwnPropertyDescriptor(target,key){
+   if(key==='evidenceRefs')throw new Error('hostile evidence descriptor');
+   return Reflect.getOwnPropertyDescriptor(target,key);
+  }
+ });
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,hostileRefs),
+  fail('DIS_EVIDENCE_INVALID'));
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{
+  status:'ok',evidenceRefs:['source:real']
+ }),{disposition:'OBSERVED',evidenceRefs:['source:real']});
  assert.deepEqual(classifyDisV020FunctionOutcome(contract,{status:'pending'}),{
   disposition:'UNKNOWN',evidenceRefs:[]
  });
