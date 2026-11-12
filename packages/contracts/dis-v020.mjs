@@ -466,6 +466,9 @@ export function classifyDisV020FunctionOutcome(contract,value){
  // missing slots or accessor getters. Capture each own data slot exactly once.
  let witness;
  try{
+  // R116: a Proxy can forge indexed own data descriptors for outcome evidence
+  // refs just as it can for requiredFor. Do not mint a witness from Proxy data.
+  if(nodeTypes.isProxy(refs))fail('DIS_EVIDENCE_INVALID');
   if(Array.isArray(refs)&&refs.length>0&&refs.length<=MAX){
    const length=refs.length,normalized=[];
    for(let i=0;i<length;i++){
