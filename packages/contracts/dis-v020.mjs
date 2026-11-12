@@ -186,12 +186,21 @@ function validateKdpReceiptContract(contract){
 /** Only a genuine KDP send() result carries KDP authority; this helper alone grants none. */
 export function classifyDisV020KdpReceipt(contract,receipt){
  validateKdpReceiptContract(contract);
- if(!record(receipt)||typeof receipt.status!=='string'||!receipt.status)
-  fail('DIS_KDP_RECEIPT_INVALID');
+ // R108: a caller-provided receipt is not an authority-bearing KDP message.
+ // Reject inherited/accessor status and throwing Proxy traps; never invoke
+ // untrusted getters or classify a status from multiple inconsistent reads.
+ let status;
+ try{
+  if(!record(receipt))fail('DIS_KDP_RECEIPT_INVALID');
+  const slot=Object.getOwnPropertyDescriptor(receipt,'status');
+  if(!slot||!Object.hasOwn(slot,'value')||typeof slot.value!=='string'||
+     slot.value.length===0)fail('DIS_KDP_RECEIPT_INVALID');
+  status=slot.value;
+ }catch{fail('DIS_KDP_RECEIPT_INVALID')}
  // Unrecognized statuses fail closed to UNKNOWN, never SUCCEEDED or ADMITTED.
  return Object.freeze({
-  admission:Object.hasOwn(contract.statusMap,receipt.status)?
-    contract.statusMap[receipt.status]:'UNKNOWN',
+  admission:Object.hasOwn(contract.statusMap,status)?
+    contract.statusMap[status]:'UNKNOWN',
   execution:'NOT_PROVEN',businessEvidenceAttested:false
  });
 }
