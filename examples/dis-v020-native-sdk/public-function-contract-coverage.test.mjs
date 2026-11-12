@@ -471,15 +471,20 @@ test('R109 sparse, accessor and hostile evidence.requiredFor contracts fail clos
   getOwnPropertyDescriptor(){throw new Error('hostile evidence policy')}
  });
  for(const invalid of [sparse,partial,accessor,hostile]){
-  const next=structuredClone(valid);
-  next.evidence.requiredFor=invalid;
-  assert.throws(()=>compareDisV020FunctionContracts(previous,next),
+  const newer=structuredClone(valid);
+  newer.evidence.requiredFor=invalid;
+  assert.throws(()=>compareDisV020FunctionContracts(previous,newer),
    fail('DIS_FUNCTION_EVIDENCE_INVALID'));
+ }
+ // BUILD first structuredClones caller program before AOT qualification.
+ // Test the serializable sparse input there; don't make a Proxy/Get accessor
+ // cloning error masquerade as a Function contract error or execute getters.
+ for(const invalid of [sparse,partial]){
   const program=structuredClone(f.program);
   program.elements.find(e=>e.id==='tally.tasks').functions[0].contract.evidence.requiredFor=invalid;
   assert.throws(()=>build(f,program),fail('DIS_FUNCTION_EVIDENCE_INVALID'));
  }
- assert.equal(getterReads,0,'evidence obligation accessors must not execute');
+ assert.equal(getterReads,0,'evidence obligation accessors must not execute in the contract comparator');
  const normal=structuredClone(valid);normal.evidence.requiredFor=['SUCCEEDED'];
  assert.equal(compareDisV020FunctionContracts(previous,normal).compatible,true);
 });
