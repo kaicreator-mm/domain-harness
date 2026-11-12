@@ -4,6 +4,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {inspectDisV020PublicFunctionCoverage,qualifyDisV020Artifact,compareDisV020ElementContracts,compareDisV020FunctionContracts,classifyDisV020KdpReceipt,classifyDisV020FunctionOutcome}
  from '@kaicreator/domain-harness-contracts/dis-v020';
 import {compileDisV020Aot} from '@kaicreator/domain-harness-build/dis-v020';
@@ -523,4 +525,37 @@ test('R110 Evidence policy comparison snapshots own slots without invoking Proxy
  });
  assert.equal(compareDisV020FunctionContracts(succeeded,succeededNext).compatible,true);
  assert.equal(indexReads,0,'neither validation nor ABI comparison may evaluate an index trap');
+});
+
+test('R111 runnable bounded engineering Function/AOT/SDK/KDP CLI proves real selected native calls without claiming Effect',()=>{
+ const cli=fileURLToPath(new URL('./bounded-engineering-demo.mjs',import.meta.url));
+ const native=spawnSync(process.execPath,['--import','tsx',cli],{
+  cwd:process.cwd(),encoding:'utf8',timeout:120_000,maxBuffer:1024*1024
+ });
+ assert.equal(native.error,undefined,String(native.error));
+ assert.equal(native.status,0,native.stderr||'runnable DIS Demo exited nonzero');
+ const demo=JSON.parse(native.stdout);
+ assert.equal(demo.schema,'dis.v0.2.bounded-engineering-demo/1');
+ assert.equal(demo.selectedTarget,'linux/x64/node');
+ assert.match(demo.aotDigest,/^[0-9a-f]{64}$/);
+ assert.ok(demo.sourcePins>=6);
+ assert.equal(demo.typedFunctionProfiles,9);
+ assert.equal(demo.appInit,'READY');
+ assert.deepEqual(demo.tally,{
+  kind:'OBSERVATION',authority:'NONE',
+  state:'UNQUALIFIED_INPUT',taskClaimAttested:false
+ });
+ assert.deepEqual(demo.xdownload,{
+  kind:'OBSERVATION',authority:'NONE',
+  policyDomain:'downloads',acquisitionExecuted:false
+ });
+ assert.deepEqual(demo.orders,{
+  kind:'KDP_RECEIPT',authority:'KDP',
+  receiptStatus:'admitted',effectExecutionProven:false
+ });
+ assert.deepEqual(demo.qualification,{
+  engineeringOnly:true,independentSAP:false,qualifiedEcpProducer:false,
+  trustedProductionAnchor:false,externalHostEffectExecuted:false,
+  formalConformance:false,releaseEligible:false
+ });
 });
