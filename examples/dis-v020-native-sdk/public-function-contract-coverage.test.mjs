@@ -491,3 +491,36 @@ test('R109 sparse, accessor and hostile evidence.requiredFor contracts fail clos
  const normal=structuredClone(valid);normal.evidence.requiredFor=['SUCCEEDED'];
  assert.equal(compareDisV020FunctionContracts(previous,normal).compatible,true);
 });
+
+test('R110 Evidence policy comparison snapshots own slots without invoking Proxy indexed reads',async()=>{
+ const f=await selected;
+ const baseline=structuredClone(f.program.elements.find(e=>e.id==='tally.tasks').functions[0].contract);
+ const next=structuredClone(baseline);
+ next.version='1.1.0';
+ let indexReads=0;
+ const untrusted=new Proxy([...baseline.evidence.requiredFor],{
+  get(target,key,receiver){
+   if(key==='0'){indexReads++;return 'UNKNOWN'}
+   return Reflect.get(target,key,receiver);
+  }
+ });
+ // A proxy can return a different value from its own data descriptor.
+ // The comparer must use the validated descriptor snapshot, never the raw
+ // iterator / Array.includes path which would consume 'UNKNOWN'.
+ next.evidence.requiredFor=untrusted;
+ assert.equal(compareDisV020FunctionContracts(baseline,next).compatible,true);
+ assert.equal(indexReads,0);
+ const succeeded=structuredClone(baseline);
+ succeeded.outcomes.classes={complete:'SUCCEEDED'};
+ succeeded.evidence.requiredFor=['SUCCEEDED'];
+ const succeededNext=structuredClone(succeeded);
+ succeededNext.version='1.1.0';
+ succeededNext.evidence.requiredFor=new Proxy(['SUCCEEDED'],{
+  get(target,key,receiver){
+   if(key==='0'){indexReads++;throw new Error('untrusted index read')}
+   return Reflect.get(target,key,receiver);
+  }
+ });
+ assert.equal(compareDisV020FunctionContracts(succeeded,succeededNext).compatible,true);
+ assert.equal(indexReads,0,'neither validation nor ABI comparison may evaluate an index trap');
+});
