@@ -706,3 +706,31 @@ test('R115 forged index own-descriptor on Proxy policy is rejected without traps
  assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
   fail('DIS_EVIDENCE_REQUIRED'));
 });
+
+test('R116 forged evidenceRefs descriptor is not classified as a real Function witness',()=>{
+ const contract={outcomes:{field:'status',classes:{ok:'OBSERVED',pending:'UNKNOWN'}},
+  evidence:{refField:'evidenceRefs',requiredFor:['OBSERVED']}};
+ let traps=0;
+ const forged=new Proxy(['source:real'],{
+  getOwnPropertyDescriptor(target,key){
+   traps++;
+   const slot=Reflect.getOwnPropertyDescriptor(target,key);
+   return key==='0'?{...slot,value:'source:forged'}:slot;
+  },
+  get(target,key,receiver){
+   traps++;return Reflect.get(target,key,receiver);
+  }
+ });
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{
+  status:'ok',evidenceRefs:forged
+ }),fail('DIS_EVIDENCE_INVALID'));
+ assert.equal(traps,0,'evidenceRefs Proxy must be rejected before any traps');
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{
+  status:'ok',evidenceRefs:['source:real']
+ }),{disposition:'OBSERVED',evidenceRefs:['source:real']});
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'ok'}),
+  fail('DIS_EVIDENCE_REQUIRED'));
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{status:'pending'}),{
+  disposition:'UNKNOWN',evidenceRefs:[]
+ });
+});
