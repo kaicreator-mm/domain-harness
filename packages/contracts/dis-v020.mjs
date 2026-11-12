@@ -376,11 +376,27 @@ export function classifyDisV020FunctionOutcome(contract,value){
    contract.outcomes.classes[tag]:undefined;
  if(!disposition)fail('DIS_OUTCOME_UNDECLARED');
  const refs=value[contract.evidence.refField];
- const valid=Array.isArray(refs)&&refs.length>0&&refs.length<=MAX&&
-  refs.every(x=>typeof x==='string'&&x.length>0&&x.length<=2048);
- if(refs!==undefined&&!valid)fail('DIS_EVIDENCE_INVALID');
- if(contract.evidence.requiredFor.includes(disposition)&&!valid)fail('DIS_EVIDENCE_REQUIRED');
- return Object.freeze({disposition,evidenceRefs:Object.freeze(valid?[...refs]:[])});
+ // R106: Array.every skips sparse holes; never mint an evidence witness from
+ // missing slots or accessor getters. Capture each own data slot exactly once.
+ let witness;
+ try{
+  if(Array.isArray(refs)&&refs.length>0&&refs.length<=MAX){
+   const length=refs.length,normalized=[];
+   for(let i=0;i<length;i++){
+    const slot=Object.getOwnPropertyDescriptor(refs,String(i));
+    if(!slot||!Object.hasOwn(slot,'value')||typeof slot.value!=='string'||
+       slot.value.length===0||slot.value.length>2048)break;
+    normalized.push(slot.value);
+   }
+   if(normalized.length===length)witness=Object.freeze(normalized);
+  }
+ }catch{
+  // Revoked/hostile Proxy evidence is invalid; it never becomes a receipt.
+ }
+ if(refs!==undefined&&!witness)fail('DIS_EVIDENCE_INVALID');
+ if(contract.evidence.requiredFor.includes(disposition)&&!witness)
+  fail('DIS_EVIDENCE_REQUIRED');
+ return Object.freeze({disposition,evidenceRefs:witness??Object.freeze([])});
 }
 
 
