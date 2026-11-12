@@ -303,9 +303,22 @@ function validateFunctionContract(c){
   if(!FIELD.test(tag)||!OUTCOMES.has(disposition))fail('DIS_FUNCTION_OUTCOMES_INVALID');
  }
  keys(c.evidence,['refField','requiredFor']);
- if(!FIELD.test(c.evidence.refField)||!arr(c.evidence.requiredFor,true)||
-  new Set(c.evidence.requiredFor).size!==c.evidence.requiredFor.length||
-  c.evidence.requiredFor.some(x=>!OUTCOMES.has(x)))fail('DIS_FUNCTION_EVIDENCE_INVALID');
+ // R109: Array.some skips sparse indices; Set regards holes as undefined.
+ // Validate every bounded own data slot before comparing evidence policies
+ // or consuming them at runtime. Never execute caller-provided accessors.
+ const requiredFor=c.evidence.requiredFor,requiredValues=[];
+ try{
+  if(!FIELD.test(c.evidence.refField)||!arr(requiredFor,true))
+   fail('DIS_FUNCTION_EVIDENCE_INVALID');
+  for(let i=0;i<requiredFor.length;i++){
+   const slot=Object.getOwnPropertyDescriptor(requiredFor,String(i));
+   if(!slot||!Object.hasOwn(slot,'value')||!OUTCOMES.has(slot.value))
+    fail('DIS_FUNCTION_EVIDENCE_INVALID');
+   requiredValues.push(slot.value);
+  }
+ }catch{fail('DIS_FUNCTION_EVIDENCE_INVALID')}
+ if(new Set(requiredValues).size!==requiredValues.length)
+  fail('DIS_FUNCTION_EVIDENCE_INVALID');
  if(Object.values(c.outcomes.classes).includes('SUCCEEDED')&&!c.evidence.requiredFor.includes('SUCCEEDED'))
   fail('DIS_EVIDENCE_POLICY_WEAK');
  keys(c.compatibility,['major','minReader','maxReaderExclusive']);
@@ -360,8 +373,13 @@ export function compareDisV020FunctionContracts(previous,next){
     previous.evidence.refField!==next.evidence.refField||
     previous.compatibility.minReader!==next.compatibility.minReader||
     previous.compatibility.maxReaderExclusive!==next.compatibility.maxReaderExclusive)broken();
+ // R109: a new outcome label accepted by a newer producer is unknown to
+ // an old same-major consumer and must not be advertised as ABI compatible.
+ if(Object.keys(previous.outcomes.classes).length!==
+    Object.keys(next.outcomes.classes).length)broken();
  for(const [status,disposition] of Object.entries(previous.outcomes.classes)){
-  if(next.outcomes.classes[status]!==disposition)broken();
+  if(!Object.hasOwn(next.outcomes.classes,status)||
+     next.outcomes.classes[status]!==disposition)broken();
  }
  // R107: either tightening (old OBSERVED without refs becomes invalid)
  // or relaxing evidence obligations changes the observable contract policy.
