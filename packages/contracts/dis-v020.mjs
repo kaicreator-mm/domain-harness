@@ -4,6 +4,7 @@
  * This additive ABI has no authority to admit, execute, or mint KDP permits.
  */
 import {createHash} from 'node:crypto';
+import {types as nodeTypes} from 'node:util';
 import {sha256Canonical} from './dist/digest.js';
 
 export const DIS_V020_PROGRAM='dis.v0.2.program/1';
@@ -308,7 +309,10 @@ function validateFunctionContract(c){
  // or consuming them at runtime. Never execute caller-provided accessors.
  const requiredFor=c.evidence.requiredFor,requiredValues=[];
  try{
-  if(!FIELD.test(c.evidence.refField)||!arr(requiredFor,true))
+  // R114: BUILD disallows non-clonable Proxy data; reject direct ABI Proxy
+  // arrays before trusting their forged length or indexed descriptors.
+  if(!FIELD.test(c.evidence.refField)||nodeTypes.isProxy(requiredFor)||
+     !arr(requiredFor,true))
    fail('DIS_FUNCTION_EVIDENCE_INVALID');
   for(let i=0;i<requiredFor.length;i++){
    const slot=Object.getOwnPropertyDescriptor(requiredFor,String(i));
@@ -452,11 +456,13 @@ export function classifyDisV020FunctionOutcome(contract,value){
   const raw=contract?.evidence?.requiredFor,values=[];
   // R113: a Proxy may spoof array.length via get(), hiding mandatory policy.
   // Snapshot the own length data descriptor, just like indexed policy slots.
-  if(!Array.isArray(raw))fail('DIS_EVIDENCE_INVALID');
+  // A Proxy can forge even its own length descriptor (including zero).
+  // Reject it before trusting those descriptors; no Proxy traps executed.
+  if(nodeTypes.isProxy(raw)||!Array.isArray(raw))fail('DIS_EVIDENCE_INVALID');
   const lengthSlot=Object.getOwnPropertyDescriptor(raw,'length');
   const policyLength=lengthSlot?.value;
   if(!lengthSlot||!Object.hasOwn(lengthSlot,'value')||
-     !Number.isSafeInteger(policyLength)||policyLength>MAX)
+     !Number.isSafeInteger(policyLength)||policyLength<0||policyLength>MAX)
    fail('DIS_EVIDENCE_INVALID');
   for(let i=0;i<policyLength;i++){
    const slot=Object.getOwnPropertyDescriptor(raw,String(i));
