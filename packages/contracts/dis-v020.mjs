@@ -319,13 +319,16 @@ function validateFunctionContract(c){
  }catch{fail('DIS_FUNCTION_EVIDENCE_INVALID')}
  if(new Set(requiredValues).size!==requiredValues.length)
   fail('DIS_FUNCTION_EVIDENCE_INVALID');
- if(Object.values(c.outcomes.classes).includes('SUCCEEDED')&&!c.evidence.requiredFor.includes('SUCCEEDED'))
+ if(Object.values(c.outcomes.classes).includes('SUCCEEDED')&&!requiredValues.includes('SUCCEEDED'))
   fail('DIS_EVIDENCE_POLICY_WEAK');
  keys(c.compatibility,['major','minReader','maxReaderExclusive']);
  if(!Number.isSafeInteger(c.compatibility.major)||c.compatibility.major<1||
   Number(c.version.split('.')[0])!==c.compatibility.major||
   c.compatibility.minReader!=='0.2.0'||c.compatibility.maxReaderExclusive!=='0.3.0')
   fail('DIS_FUNCTION_COMPATIBILITY_INVALID');
+ // R110: preserve one validated own-data snapshot; do not re-read a caller
+ // Proxy while checking policy obligations or ABI compatibility.
+ return Object.freeze(requiredValues);
 }
 /**
  * Bounded structural consumer-compatibility check, NOT independent evidence or
@@ -334,7 +337,8 @@ function validateFunctionContract(c){
  * Same-version ABI drift and same-major breaking changes fail closed.
  */
 export function compareDisV020FunctionContracts(previous,next){
- validateFunctionContract(previous);validateFunctionContract(next);
+ const oldRequiredValues=validateFunctionContract(previous),
+   newRequiredValues=validateFunctionContract(next);
  const v1=previous.version.split('.').map(Number),v2=next.version.split('.').map(Number);
  if(v1[0]!==v2[0]||v2[1]<v1[1]||
     (v2[1]===v1[1]&&v2[2]<v1[2]))
@@ -384,8 +388,8 @@ export function compareDisV020FunctionContracts(previous,next){
  // R107: either tightening (old OBSERVED without refs becomes invalid)
  // or relaxing evidence obligations changes the observable contract policy.
  // Treat both directions as breaking within the same major.
- const oldRequired=new Set(previous.evidence.requiredFor),
-   newRequired=new Set(next.evidence.requiredFor);
+ const oldRequired=new Set(oldRequiredValues),
+   newRequired=new Set(newRequiredValues);
  if(oldRequired.size!==newRequired.size||
     [...oldRequired].some(disposition=>!newRequired.has(disposition)))
   broken();
