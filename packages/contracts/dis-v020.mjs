@@ -354,9 +354,14 @@ export function compareDisV020FunctionContracts(previous,next){
  for(const [status,disposition] of Object.entries(previous.outcomes.classes)){
   if(next.outcomes.classes[status]!==disposition)broken();
  }
- for(const disposition of previous.evidence.requiredFor){
-  if(!next.evidence.requiredFor.includes(disposition))broken();
- }
+ // R107: either tightening (old OBSERVED without refs becomes invalid)
+ // or relaxing evidence obligations changes the observable contract policy.
+ // Treat both directions as breaking within the same major.
+ const oldRequired=new Set(previous.evidence.requiredFor),
+   newRequired=new Set(next.evidence.requiredFor);
+ if(oldRequired.size!==newRequired.size||
+    [...oldRequired].some(disposition=>!newRequired.has(disposition)))
+  broken();
  return Object.freeze({compatible:true,from:previous.version,to:next.version});
 }
 export function validateDisV020FunctionValue(contract,phase,value){
@@ -371,11 +376,26 @@ export function validateDisV020FunctionValue(contract,phase,value){
  return true;
 }
 export function classifyDisV020FunctionOutcome(contract,value){
- const tag=value[contract.outcomes.field];
+ // R107: even direct callers of this exported helper must not supply
+ // outer output accessors as evidence or status. The SDK additionally checks
+ // the full output schema; this is a defensive direct-helper boundary.
+ let tag,refs;
+ try{
+  const statusSlot=Object.getOwnPropertyDescriptor(value,contract.outcomes.field);
+  if(!statusSlot||!Object.hasOwn(statusSlot,'value'))
+   fail('DIS_OUTCOME_UNDECLARED');
+  tag=statusSlot.value;
+ }catch{fail('DIS_OUTCOME_UNDECLARED')}
  const disposition=typeof tag==='string'&&Object.hasOwn(contract.outcomes.classes,tag)?
    contract.outcomes.classes[tag]:undefined;
  if(!disposition)fail('DIS_OUTCOME_UNDECLARED');
- const refs=value[contract.evidence.refField];
+ try{
+  const refsSlot=Object.getOwnPropertyDescriptor(value,contract.evidence.refField);
+  if(refsSlot){
+   if(!Object.hasOwn(refsSlot,'value'))fail('DIS_EVIDENCE_INVALID');
+   refs=refsSlot.value;
+  }
+ }catch{fail('DIS_EVIDENCE_INVALID')}
  // R106: Array.every skips sparse holes; never mint an evidence witness from
  // missing slots or accessor getters. Capture each own data slot exactly once.
  let witness;
