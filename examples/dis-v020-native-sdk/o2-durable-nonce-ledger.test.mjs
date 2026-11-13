@@ -104,7 +104,9 @@ test('O2 four children wait at a ready/go barrier before racing to reserve exact
    children.push({child,ready,result});
   }
   await Promise.all(children.map(c=>c.ready));
-  for(const c of children)c.child.stdin.write('GO\n');
+  // Closing the pipe after GO is essential: a flowing Node stdin keeps
+  // the child event loop alive even after the once('data') callback fires.
+  for(const c of children)c.child.stdin.end('GO\n');
   const results=await Promise.all(children.map(c=>c.result));
   assert.deepEqual(results.sort(),['false','false','false','true']);
  }finally{for(const c of children){if(c.child.exitCode===null)c.child.kill()}}
