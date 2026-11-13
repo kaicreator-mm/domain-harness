@@ -115,6 +115,76 @@ test('R86 P2-01 missing selected contract version denies without promise rejecti
  const result=await issuer.capture({input:input('run:missing-version'),runId:'run:missing-version'});
  assert.equal(result.status,'UNKNOWN');assert.equal(result.experienceIssued,false);
 });
+
+const assertUnknown=result=>{
+ assert.equal(result.status,'UNKNOWN');
+ assert.equal(result.traceVerified,false);
+ assert.equal(result.experienceIssued,false);
+ assert.equal(result.qualified,false);
+ assert.equal(result.authority,'NONE');
+ assert.equal(result.effectDispatched,false);
+ assert.equal(result.exportAllowed,false);
+};
+
+test('R86 P1-03 outer capture/consume arguments reject Proxy and Getter without executing traps',async()=>{
+ const runId='run:p103-outer',args=input(runId);
+ const {issuer,verifier}=make();
+ const out=await issuer.capture({input:args,runId});
+ assert.equal(out.status,'ISSUED_TRACE_ONLY');
+ let traps=0,reads=0;
+ const hostileProxy=value=>new Proxy(value,{
+  getPrototypeOf(){traps++;throw Error('FORBIDDEN_PROXY_TRAP')},
+  ownKeys(){traps++;throw Error('FORBIDDEN_PROXY_TRAP')},
+  get(){traps++;throw Error('FORBIDDEN_PROXY_TRAP')},
+  getOwnPropertyDescriptor(){traps++;throw Error('FORBIDDEN_PROXY_TRAP')}
+ });
+ assertUnknown(await issuer.capture(hostileProxy({input:args,runId})));
+ assertUnknown(verifier.consume(hostileProxy({receipt:out.receipt,input:args,observation:out.observation,runId})));
+ const captureGetter={runId};
+ Object.defineProperty(captureGetter,'input',{enumerable:true,get(){reads++;throw Error('FORBIDDEN_GETTER')}});
+ const consumeGetter={input:args,observation:out.observation,runId};
+ Object.defineProperty(consumeGetter,'receipt',{enumerable:true,get(){reads++;throw Error('FORBIDDEN_GETTER')}});
+ assertUnknown(await issuer.capture(captureGetter));
+ assertUnknown(verifier.consume(consumeGetter));
+ assert.equal(traps,0);
+ assert.equal(reads,0);
+});
+
+test('R86 P1-03 nested inputDigest and observationDigest Symbol.toPrimitive never execute',async()=>{
+ const runId='run:p103-coercion',args=input(runId);
+ const {issuer,verifier}=make();
+ const out=await issuer.capture({input:args,runId});
+ assert.equal(out.status,'ISSUED_TRACE_ONLY');
+ for(const field of ['inputDigest','observationDigest']){
+  let coercions=0;
+  const hostile={};
+  Object.defineProperty(hostile,Symbol.toPrimitive,{enumerable:true,get(){
+   coercions++;throw Error('FORBIDDEN_SYMBOL_TO_PRIMITIVE');
+  }});
+  const payload={...out.receipt.payload,[field]:hostile};
+  const receipt={...out.receipt,payload};
+  assertUnknown(verifier.consume({receipt,input:args,observation:out.observation,runId}));
+  assert.equal(coercions,0);
+ }
+});
+
+test('R86 P1-03 null-prototype and noncanonical external argument records fail closed',async()=>{
+ const runId='run:p103-null-prototype',args=input(runId);
+ const {issuer,verifier}=make();
+ const out=await issuer.capture({input:args,runId});
+ assert.equal(out.status,'ISSUED_TRACE_ONLY');
+ const captureArgs=Object.assign(Object.create(null),{input:args,runId});
+ const consumeArgs=Object.assign(Object.create(null),{
+  receipt:out.receipt,input:args,observation:out.observation,runId
+ });
+ assertUnknown(await issuer.capture(captureArgs));
+ assertUnknown(verifier.consume(consumeArgs));
+ const nullPayload=Object.assign(Object.create(null),out.receipt.payload);
+ const receipt={...out.receipt,payload:nullPayload};
+ assertUnknown(verifier.consume({receipt,input:args,observation:out.observation,runId}));
+ assertUnknown(await issuer.capture(new Date()));
+});
+
 test('R86 P2-02 installer AOT digest pin is mandatory but tenant remains a Host trust assumption',async()=>{
  const keys=pair();
  assert.throws(()=>createControlledTraceIssuer({app:app(),...keys,scope:'tenant:test'}),/O2_TRACE_HOST_CONFIGURATION/);
