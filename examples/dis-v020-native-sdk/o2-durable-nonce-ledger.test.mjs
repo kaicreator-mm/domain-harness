@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync,mkdirSync,chmodSync,symlinkSync,statSync,readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createO2DurableNonceLedger} from './o2-durable-nonce-ledger.mjs';
 const PIN='a'.repeat(64),SCOPE='tenant:one';
-const fixture=fn=>{const base=mkdtempSync(join(tmpdir(),'dis-o2-nonce-'));try{return fn(join(base,'trusted'),base)}finally{rmSync(base,{recursive:true,force:true})}};
+const fixture=async fn=>{const base=mkdtempSync(join(tmpdir(),'dis-o2-nonce-'));try{return await fn(join(base,'trusted'),base)}finally{rmSync(base,{recursive:true,force:true})}};
 const make=directory=>createO2DurableNonceLedger({directory,scope:SCOPE,expectedAotDigest:PIN});
 
 test('O2 durable ledger creates restrictive no-plaintext markers and rejects duplicate issuer/verifier claims across reopened instances',()=>fixture(dir=>{
@@ -62,11 +62,15 @@ test('O2 durable ledger rejects unsupported/untrusted directories, traversal, ma
  assert.equal(ledger.consume('run:perm-change'),false);
 }));
 
-test('O2 durable ledger atomic create admits one of multiple competing processes only',()=>fixture(dir=>{
+test('O2 durable ledger atomic create admits exactly one of four concurrent processes',()=>fixture(async dir=>{
  const moduleUrl=pathToFileURL(fileURLToPath(new URL('./o2-durable-nonce-ledger.mjs',import.meta.url))).href;
- const script=`import {createO2DurableNonceLedger} from ${JSON.stringify(moduleUrl)};console.log(createO2DurableNonceLedger({directory:process.argv[1],scope:'tenant:one',expectedAotDigest:'${PIN}'}).reserve('run:atomic'))`;
- const p1=spawnSync(process.execPath,['--input-type=module','-e',script,dir],{encoding:'utf8'});
- const p2=spawnSync(process.execPath,['--input-type=module','-e',script,dir],{encoding:'utf8'});
- assert.equal(p1.status,0,p1.stderr);assert.equal(p2.status,0,p2.stderr);
- assert.deepEqual([p1.stdout.trim(),p2.stdout.trim()].sort(),['false','true']);
+ const script="import {createO2DurableNonceLedger} from "+JSON.stringify(moduleUrl)+";console.log(createO2DurableNonceLedger({directory:process.argv[1],scope:'tenant:one',expectedAotDigest:'"+PIN+"'}).reserve('run:atomic'))";
+ const run=()=>new Promise((resolve,reject)=>{
+  const child=spawn(process.execPath,['--input-type=module','-e',script,dir]);let stdout='',stderr='';
+  child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
+  child.on('error',reject);child.on('close',code=>resolve({code,stdout,stderr}));
+ });
+ const results=await Promise.all([run(),run(),run(),run()]);
+ assert.ok(results.every(r=>r.code===0),JSON.stringify(results));
+ assert.deepEqual(results.map(r=>r.stdout.trim()).sort(),['false','false','false','true']);
 }));
