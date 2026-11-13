@@ -507,6 +507,11 @@ export function classifyDisV020FunctionOutcome(contract,value){
   if(new Set(values).size!==values.length)fail('DIS_EVIDENCE_INVALID');
   requiredPolicy=Object.freeze(values);
  }catch{fail('DIS_EVIDENCE_INVALID')}
+ // R117: a valid source contract may be mutated after admission. Never
+ // classify SUCCEEDED when its mandatory Evidence policy has been erased.
+ // This direct-helper invariant is not an Effect or KDP permit.
+ if(disposition==='SUCCEEDED'&&!requiredPolicy.includes('SUCCEEDED'))
+  fail('DIS_EVIDENCE_POLICY_WEAK');
  if(requiredPolicy.includes(disposition)&&!witness)
   fail('DIS_EVIDENCE_REQUIRED');
  return Object.freeze({disposition,evidenceRefs:witness??Object.freeze([])});
