@@ -740,27 +740,29 @@ test('R117 mutated admitted SUCCEEDED evidence policy cannot waive its mandatory
  const contract=structuredClone(f.program.elements.find(e=>e.id==='tally.tasks').functions[0].contract);
  contract.outcomes.classes={complete:'SUCCEEDED',pending:'UNKNOWN'};
  contract.evidence.requiredFor=['SUCCEEDED'];
+ const outcomeField=contract.outcomes.field;
+ assert.equal(outcomeField,'state','selected original Tally rule reports outcome in state');
  const original=structuredClone(contract);
  assert.equal(compareDisV020FunctionContracts(contract,original).compatible,true,
   'SUCCEEDED with required evidence is a valid Function contract');
- assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'complete'}),
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{[outcomeField]:'complete'}),
   fail('DIS_EVIDENCE_REQUIRED'));
  assert.deepEqual(classifyDisV020FunctionOutcome(contract,{
-  status:'complete',evidenceRefs:['source:valid']
+  [outcomeField]:'complete',evidenceRefs:['source:valid']
  }),{disposition:'SUCCEEDED',evidenceRefs:['source:valid']});
  const existing=contract.evidence.requiredFor;
  existing.length=0; // mutate the same once-validated in-memory policy
- assert.throws(()=>classifyDisV020FunctionOutcome(contract,{status:'complete'}),
+ assert.throws(()=>classifyDisV020FunctionOutcome(contract,{[outcomeField]:'complete'}),
   fail('DIS_EVIDENCE_POLICY_WEAK'));
  assert.throws(()=>classifyDisV020FunctionOutcome(contract,{
-  status:'complete',evidenceRefs:['source:valid']
+  [outcomeField]:'complete',evidenceRefs:['source:valid']
  }),fail('DIS_EVIDENCE_POLICY_WEAK'),
   'success classification must reject weakened policy even with nonempty refs');
- assert.deepEqual(classifyDisV020FunctionOutcome(contract,{status:'pending'}),{
+ assert.deepEqual(classifyDisV020FunctionOutcome(contract,{[outcomeField]:'pending'}),{
   disposition:'UNKNOWN',evidenceRefs:[]
  });
  contract.evidence.requiredFor=['SUCCEEDED'];
  assert.deepEqual(classifyDisV020FunctionOutcome(contract,{
-  status:'complete',evidenceRefs:['source:valid']
+  [outcomeField]:'complete',evidenceRefs:['source:valid']
  }),{disposition:'SUCCEEDED',evidenceRefs:['source:valid']});
 });
