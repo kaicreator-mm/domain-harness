@@ -71,6 +71,8 @@ steps:
       - node --import tsx --test examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs
       # O2/D06: real selected xDownload SDK observation; no Experience until trusted Trace/Oracle receipts exist.
       - node --import tsx --test examples/dis-v020-native-sdk/o2-experience-native.test.mjs
+      # R55/R56: scope-limited original DKE EV16:D02 R8 provenance, two Element Knowledge Functions; no SAP/Root/Effect promotion.
+      - node --import tsx --test examples/dis-v020-native-sdk/b23-r55-ev16-d02-scoped-cell.test.mjs
       - node --test examples/dis-v020-conformance/validate.test.mjs
       # R83: real original DKE R33 source + B22 Reader against bounded authority model;
       # original Git Blob pins, 768 states, 771 real Reader calls, negative witnesses.
