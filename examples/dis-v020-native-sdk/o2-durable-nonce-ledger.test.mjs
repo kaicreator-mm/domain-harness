@@ -1,13 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync,mkdirSync,chmodSync,symlinkSync,statSync,readdirSync} from 'node:fs';
+import {mkdtempSync,rmSync,mkdirSync,chmodSync,symlinkSync,statSync,readdirSync,openSync,closeSync,fsyncSync,existsSync,constants} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createO2DurableNonceLedger} from './o2-durable-nonce-ledger.mjs';
 const PIN='a'.repeat(64),SCOPE='tenant:one';
-const fixture=async fn=>{const base=mkdtempSync(join(tmpdir(),'dis-o2-nonce-'));try{return await fn(join(base,'trusted'),base)}finally{rmSync(base,{recursive:true,force:true})}};
+const fixture=async fn=>{
+ const base=mkdtempSync(join(tmpdir(),'dis-o2-nonce-')),root=join(base,'trusted');
+ try{
+  // The Host, never the ledger constructor, pre-provisions the private root.
+  mkdirSync(root,{mode:0o700});
+  const fd=openSync(base,constants.O_RDONLY|constants.O_DIRECTORY);
+  try{fsyncSync(fd)}finally{closeSync(fd)}
+  return await fn(root,base);
+ }finally{rmSync(base,{recursive:true,force:true})}
+};
 const make=directory=>createO2DurableNonceLedger({directory,scope:SCOPE,expectedAotDigest:PIN});
 
 test('O2 durable ledger creates restrictive no-plaintext markers and rejects duplicate issuer/verifier claims across reopened instances',()=>fixture(dir=>{
@@ -50,7 +59,7 @@ test('O2 durable ledger namespaces phases, scope and AOT pin; no reuse across th
 
 test('O2 durable ledger rejects unsupported/untrusted directories, traversal, malformed nonce and changed permissions',()=>fixture((dir,base)=>{
  assert.throws(()=>make('relative/path'),/HOST_CONFIGURATION/);
- const link=join(base,'symlink');mkdirSync(dir,{mode:0o700});symlinkSync(dir,link);
+ const link=join(base,'symlink');symlinkSync(dir,link);
  assert.throws(()=>make(link),/UNTRUSTED_DIRECTORY/);
  const ledger=make(dir);
  for(const bad of ['../outside','x'.repeat(130),null,{},Symbol('coerce')]){
@@ -62,15 +71,41 @@ test('O2 durable ledger rejects unsupported/untrusted directories, traversal, ma
  assert.equal(ledger.consume('run:perm-change'),false);
 }));
 
-test('O2 durable ledger atomic create admits exactly one of four concurrent processes',()=>fixture(async dir=>{
+test('O2 durable ledger blocks unprovisioned root and untrusted parent; never auto-mkdir',()=>fixture((dir,base)=>{
+ const missing=join(base,'not-provisioned');
+ assert.equal(existsSync(missing),false);
+ assert.throws(()=>make(missing),/UNTRUSTED_DIRECTORY/);
+ assert.equal(existsSync(missing),false);
+ chmodSync(base,0o777);
+ assert.throws(()=>make(dir),/UNTRUSTED_DIRECTORY/);
+ assert.throws(()=>createO2DurableNonceLedger({directory:dir,scope:SCOPE,expectedAotDigest:PIN}),/UNTRUSTED_DIRECTORY/);
+}));
+
+test('O2 four children wait at a ready/go barrier before racing to reserve exactly one nonce',{timeout:10000},()=>fixture(async dir=>{
  const moduleUrl=pathToFileURL(fileURLToPath(new URL('./o2-durable-nonce-ledger.mjs',import.meta.url))).href;
- const script="import {createO2DurableNonceLedger} from "+JSON.stringify(moduleUrl)+";console.log(createO2DurableNonceLedger({directory:process.argv[1],scope:'tenant:one',expectedAotDigest:'"+PIN+"'}).reserve('run:atomic'))";
- const run=()=>new Promise((resolve,reject)=>{
-  const child=spawn(process.execPath,['--input-type=module','-e',script,dir]);let stdout='',stderr='';
-  child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
-  child.on('error',reject);child.on('close',code=>resolve({code,stdout,stderr}));
- });
- const results=await Promise.all([run(),run(),run(),run()]);
- assert.ok(results.every(r=>r.code===0),JSON.stringify(results));
- assert.deepEqual(results.map(r=>r.stdout.trim()).sort(),['false','false','false','true']);
+ const script="import {createO2DurableNonceLedger} from "+JSON.stringify(moduleUrl)+
+  ";const l=createO2DurableNonceLedger({directory:process.argv[1],scope:'tenant:one',expectedAotDigest:'"+PIN+
+  "'});console.log('READY');process.stdin.once('data',()=>{console.log(l.reserve('run:atomic'));});";
+ const children=[];
+ try{
+  for(let i=0;i<4;i++){
+   const child=spawn(process.execPath,['--input-type=module','-e',script,dir]);
+   let stdout='',stderr='',readyDone=false;
+   let readyResolve,readyReject;
+   const ready=new Promise((resolve,reject)=>{readyResolve=resolve;readyReject=reject});
+   const result=new Promise((resolve,reject)=>{
+    child.on('error',reject);
+    child.on('close',code=>code===0?resolve(stdout.trim().split(/\s+/).at(-1)):reject(Error('CHILD_EXIT '+code+' '+stderr)));
+   });
+   child.stdout.on('data',chunk=>{stdout+=chunk;if(!readyDone&&stdout.includes('READY\n')){readyDone=true;readyResolve()}});
+   child.stderr.on('data',chunk=>stderr+=chunk);
+   child.on('error',readyReject);
+   child.on('close',code=>{if(!readyDone)readyReject(Error('CHILD_NOT_READY '+code+' '+stderr))});
+   children.push({child,ready,result});
+  }
+  await Promise.all(children.map(c=>c.ready));
+  for(const c of children)c.child.stdin.write('GO\n');
+  const results=await Promise.all(children.map(c=>c.result));
+  assert.deepEqual(results.sort(),['false','false','false','true']);
+ }finally{for(const c of children){if(c.child.exitCode===null)c.child.kill()}}
 }));

@@ -4,14 +4,18 @@
  * local filesystem. It is NOT tenant attestation, business validation,
  * distributed consensus, Experience qualification, or an Effect authority.
  *
- * Host owns an absolute 0700 directory on a local filesystem with durable
- * fsync semantics and no other same-UID actors modifying the directory.
+ * Host MUST pre-provision both an absolute owner-only 0700 root and its
+ * owner-only 0700 direct parent on a durable local filesystem. This module
+ * NEVER mkdir(s) the ledger root. It fsyncs the parent before accepting any
+ * nonce to make the root directory entry durable. More distant ancestors are
+ * installed durably by trusted Host provisioning. No untrusted same-UID actor
+ * may mutate the path hierarchy. Markers are file+directory fsynced.
  * Shared/NFS/container-ephemeral volumes and hostile same-UID directory
  * renaming are NOT proven safe; other platforms fail closed.
  */
 import {createHash} from 'node:crypto';
-import {constants,closeSync,fsyncSync,lstatSync,mkdirSync,openSync,realpathSync,writeSync} from 'node:fs';
-import {isAbsolute,resolve,join} from 'node:path';
+import {constants,closeSync,fsyncSync,lstatSync,openSync,realpathSync,writeSync} from 'node:fs';
+import {isAbsolute,resolve,join,dirname} from 'node:path';
 
 const TOKEN=/^[a-zA-Z][a-zA-Z0-9._:/-]{0,127}$/;
 const HEX64=/^[a-f0-9]{64}$/;
@@ -21,17 +25,27 @@ export function createO2DurableNonceLedger({directory,scope,expectedAotDigest}={
  if(process.platform!=='linux'||typeof directory!=='string'||!isAbsolute(directory)||
   !TOKEN.test(scope)||typeof scope!=='string'||typeof expectedAotDigest!=='string'||!HEX64.test(expectedAotDigest))
   throw Error('O2_NONCE_LEDGER_HOST_CONFIGURATION');
- const root=resolve(directory);
+ const root=resolve(directory),parent=dirname(root);
+ // Direct parent must be private: an untrusted user cannot rename the root
+ // between validation and the marker's path-based O_EXCL open.
  function requireTrustedRoot(){
-  const s=lstatSync(root);
-  if(!s.isDirectory()||s.isSymbolicLink()||(s.mode&0o077)!==0||
-     (typeof process.getuid==='function'&&s.uid!==process.getuid())||realpathSync(root)!==root)
-   throw Error('O2_NONCE_LEDGER_UNTRUSTED_DIRECTORY');
+  if(root===parent)throw Error('O2_NONCE_LEDGER_UNTRUSTED_DIRECTORY');
+  for(const path of [parent,root]){
+   const s=lstatSync(path);
+   if(!s.isDirectory()||s.isSymbolicLink()||(s.mode&0o077)!==0||
+      (typeof process.getuid==='function'&&s.uid!==process.getuid())||realpathSync(path)!==path)
+    throw Error('O2_NONCE_LEDGER_UNTRUSTED_DIRECTORY');
+  }
  }
+ // Never create an uncommitted root implicitly. A power loss must not be
+ // able to erase this directory entry and allow a previously issued nonce.
+ let parentFd;
  try{
-  mkdirSync(root,{recursive:true,mode:0o700});
   requireTrustedRoot();
+  parentFd=openSync(parent,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);
+  fsyncSync(parentFd);
  }catch{throw Error('O2_NONCE_LEDGER_UNTRUSTED_DIRECTORY')}
+ finally{if(parentFd!==undefined){try{closeSync(parentFd)}catch{}}}
  function mark(phase,runId){
   if(typeof runId!=='string'||!TOKEN.test(runId))return false;
   let fd,dirfd;

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync} from 'node:crypto';
-import {mkdtempSync,rmSync,chmodSync} from 'node:fs';
+import {mkdtempSync,rmSync,chmodSync,mkdirSync,openSync,closeSync,fsyncSync,constants} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createO2DurableNonceLedger} from './o2-durable-nonce-ledger.mjs';
@@ -11,7 +11,15 @@ const AOT='d'.repeat(64),FUNCTION='xdownload.interaction.inspect',SCOPE='tenant:
 const observation=()=>({kind:'OBSERVATION',disposition:'NEEDS_CONFIRMATION',authority:'NONE',contractVersion:'1.0.0',value:{status:'PENDING_USER_CONFIRMATION'},evidence:{attested:false,source:{sourceId:'xdownload-interaction',sha256:'a'.repeat(64),gitBlob:SOURCE}}});
 const app={aotDigest:AOT,contractVersions:{[FUNCTION]:'1.0.0'},functions:[FUNCTION],invoke:async()=>observation()};
 const input=runId=>({channel:'cli',requestId:runId,url:'https://example.com/media/test.mp4',declaredBytes:2048});
-const withDir=async fn=>{const dir=mkdtempSync(join(tmpdir(),'dis-o2-durable-int-'));try{await fn(dir)}finally{rmSync(dir,{recursive:true,force:true})}};
+const withDir=async fn=>{
+ const base=mkdtempSync(join(tmpdir(),'dis-o2-durable-int-')),dir=join(base,'trusted');
+ try{
+  mkdirSync(dir,{mode:0o700});
+  const fd=openSync(base,constants.O_RDONLY|constants.O_DIRECTORY);
+  try{fsyncSync(fd)}finally{closeSync(fd)}
+  await fn(dir);
+ }finally{rmSync(base,{recursive:true,force:true})}
+};
 const ledger=dir=>createO2DurableNonceLedger({directory:dir,scope:SCOPE,expectedAotDigest:AOT});
 const issuer=(keys,durable)=>createControlledTraceIssuer({app,...keys,scope:SCOPE,expectedAotDigest:AOT,nonceLedger:durable});
 const verifier=(keys,durable)=>createControlledTraceVerifier({publicKey:keys.publicKey,scope:SCOPE,expectedAotDigest:AOT,nonceLedger:durable});
