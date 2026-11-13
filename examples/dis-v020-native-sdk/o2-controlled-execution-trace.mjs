@@ -6,7 +6,9 @@
  *
  * No signed receipt from this module can mint Experience, PASS, Effect,
  * independent samples, cross-tenant reuse, export or release qualification.
- * Ephemeral in-memory replay protection is not crash-durable authority.
+ * Default replay protection is in-memory. An optional trusted Linux Host
+ * durable nonce ledger can reject replay across local process restarts; this
+ * does not attest tenant identity or a distributed/ephemeral filesystem.
  * expectedAotDigest MUST come from an independently trusted Host installer pin.
  * Scope/tenant binding still relies on trusted Host app construction: the SDK
  * exposes AOT digest but no independently attestable tenant identity.
@@ -102,13 +104,17 @@ const checkObserved=x=>ownRecord(x)&&x.kind==='OBSERVATION'&&x.authority==='NONE
  typeof x.disposition==='string'&&ownRecord(x.evidence)&&x.evidence.attested===false&&
  ownRecord(x.evidence.source)&&x.evidence.source.sourceId===SOURCE&&x.evidence.source.gitBlob===BLOB&&
  typeof x.evidence.source.sha256==='string'&&HEX64.test(x.evidence.source.sha256);
+const validHostNonceLedger=(ledger,scope,pin,method)=>ledger===null||
+ (ledger&&Object.isFrozen(ledger)&&ledger.scope===scope&&ledger.expectedAotDigest===pin&&
+  typeof ledger[method]==='function');
 const FIELDS=['version','scope','runId','functionId','sourceId','sourceGitBlob','aotDigest','contractVersion','inputDigest','observationDigest','disposition','authority','privacyScope','effectDispatched','experienceIssued'];
 
-export function createControlledTraceIssuer({app,privateKey,publicKey,scope,expectedAotDigest,maxWaitMs=15000}={}){
+export function createControlledTraceIssuer({app,privateKey,publicKey,scope,expectedAotDigest,maxWaitMs=15000,nonceLedger=null}={}){
  if(!app||typeof app.invoke!=='function'||!Array.isArray(app.functions)||!app.functions.includes(FUNCTION)||!isToken(scope)||
   !HEX64.test(expectedAotDigest)||app.aotDigest!==expectedAotDigest||
   app.contractVersions?.[FUNCTION]!=='1.0.0'||
   !Number.isSafeInteger(maxWaitMs)||maxWaitMs<1||maxWaitMs>60000)throw Error('O2_TRACE_HOST_CONFIGURATION');
+ if(!validHostNonceLedger(nonceLedger,scope,expectedAotDigest,'reserve'))throw Error('O2_TRACE_NONCE_LEDGER_MISMATCH');
  const key=validKeys(privateKey,publicKey),reserved=new Set();
  return Object.freeze({
   async capture(args){
@@ -119,6 +125,11 @@ export function createControlledTraceIssuer({app,privateKey,publicKey,scope,expe
    let inputDigest,safeInput;
    try{safeInput=canonicalSnapshot(input);inputDigest=digest(safeInput)}catch{return deny('O2_INPUT_UNSAFE')}
    if(reserved.has(runId))return deny('O2_RUN_REPLAY');
+   if(nonceLedger!==null){
+    let durable=false;
+    try{durable=nonceLedger.reserve(runId)===true}catch{}
+    if(!durable)return deny('O2_DURABLE_NONCE_UNAVAILABLE_OR_REPLAY');
+   }
    reserved.add(runId); // before async invoke: concurrent clones never mint two receipts
    let observation;
    try{observation=await withDeadline(()=>app.invoke(FUNCTION,safeInput,{expectedContractVersion:'1.0.0'}),maxWaitMs)}catch{return deny('O2_NATIVE_UNAVAILABLE_OR_TIMEOUT')}
@@ -139,10 +150,11 @@ export function createControlledTraceIssuer({app,privateKey,publicKey,scope,expe
   }
  });
 }
-export function createControlledTraceVerifier({publicKey,scope,expectedAotDigest}={}){
+export function createControlledTraceVerifier({publicKey,scope,expectedAotDigest,nonceLedger=null}={}){
  if(!isToken(scope)||!HEX64.test(expectedAotDigest))throw Error('O2_TRACE_VERIFIER_SCOPE_OR_AOT_PIN');
  const pinnedKey=publicKey?.type==='public'?publicKey:createPublicKey(publicKey);
  if(pinnedKey.asymmetricKeyType!=='ed25519')throw Error('O2_TRACE_KEY_TYPE');
+ if(!validHostNonceLedger(nonceLedger,scope,expectedAotDigest,'consume'))throw Error('O2_TRACE_NONCE_LEDGER_MISMATCH');
  const consumed=new Set();
  return Object.freeze({
   consume(args){
@@ -169,6 +181,11 @@ export function createControlledTraceVerifier({publicKey,scope,expectedAotDigest
    try{valid=verify(null,data,pinnedKey,Buffer.from(receipt.signature,'base64url'))}catch{}
    if(!valid)return deny('O2_TRACE_SIGNATURE_INVALID');
    if(consumed.has(runId))return deny('O2_TRACE_REPLAY');
+   if(nonceLedger!==null){
+    let durable=false;
+    try{durable=nonceLedger.consume(runId)===true}catch{}
+    if(!durable)return deny('O2_DURABLE_NONCE_UNAVAILABLE_OR_REPLAY');
+   }
    consumed.add(runId);
    // A signed execution-origin record is NOT a professional business Validator.
    return Object.freeze({status:'VERIFIED_TRACE_ONLY',reason:'INDEPENDENT_BUSINESS_VALIDATOR_MISSING',
