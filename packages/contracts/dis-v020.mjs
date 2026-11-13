@@ -42,7 +42,14 @@ const R64_SOURCE_EXCEPTIONS=Object.freeze([
  Object.freeze({role:'DATA',repository:'kaicreator-mm/domain-forge',
   commit:'4667becfdc9bfb382bbe830150fa7c9af4533ba2',
   path:'docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r31-d02-firstparty-source-cq/INDEPENDENT_SOURCE_FIRST_R31_REVIEW.md',
-  gitBlob:'10cc8aeade4b9019105490c08995aa7496e093f4'})
+  gitBlob:'10cc8aeade4b9019105490c08995aa7496e093f4'}),
+ // R56: exact R54 D02 original SAP runner is source-backed DATA ONLY,
+ // even though its original Forge source file has an .mjs extension.
+ // No general docs/.mjs executable-role relaxation or SAP promotion.
+ Object.freeze({role:'DATA',repository:'kaicreator-mm/domain-forge',
+  commit:'a528be96018c8283a34ef72af777398dcf741ee4',
+  path:'docs/standards/dke/DKE-0.0.1/demos/ev16-d04-source-tier-r0/ev16-d02-original-sap-r0.mjs',
+  gitBlob:'81cbe1e7fac1602907034213dfba962686e2204e'})
 ]);
 const r64Exception=origin=>R64_SOURCE_EXCEPTIONS.find(item=>
  origin!==null&&typeof origin==='object'&&

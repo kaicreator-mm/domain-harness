@@ -206,7 +206,9 @@ test('R55 modified original SAP/graph bytes and forged provenance or executable 
  assert.throws(()=>x.compile(x.program,x.sources,wrong),
   invalid('DIS_SOURCE_ORIGIN_UNTRUSTED'));
  const p=structuredClone(x.program);
- p.elements.find(e=>e.id===KEY.req.element).functions[0].binding.sourceId=SID.sap;
+ const illicit=p.elements.find(e=>e.id===KEY.req.element).functions[0];
+ illicit.binding.sourceId=SID.sap;
+ delete illicit.sourceDependencies; // isolate real DATA-as-LOCAL guard, not duplicate dependency rejection
  assert.throws(()=>x.compile(p),invalid('DIS_DATA_SOURCE_EXECUTION_FORBIDDEN'));
 });
 test('R55 forged parent/SAP/Effect, other cells and ABI version are not accepted',async()=>{
