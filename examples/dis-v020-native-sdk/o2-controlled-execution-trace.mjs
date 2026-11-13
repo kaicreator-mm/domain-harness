@@ -30,6 +30,13 @@ function ownRecord(x,expected=null){
   return keys.every(k=>{const d=Object.getOwnPropertyDescriptor(x,k);return !!d&&Object.hasOwn(d,'value')&&d.enumerable===true});
  }catch{return false}
 }
+/** Read untrusted public method arguments only after exact plain-data validation. */
+function ownDataValues(x,expected){
+ if(!ownRecord(x,expected))return null;
+ const values=Object.create(null);
+ for(const key of expected)values[key]=Object.getOwnPropertyDescriptor(x,key).value;
+ return values;
+}
 function strictJSON(value){
  const visited=new Set();
  function walk(v,depth){
@@ -104,7 +111,10 @@ export function createControlledTraceIssuer({app,privateKey,publicKey,scope,expe
   !Number.isSafeInteger(maxWaitMs)||maxWaitMs<1||maxWaitMs>60000)throw Error('O2_TRACE_HOST_CONFIGURATION');
  const key=validKeys(privateKey,publicKey),reserved=new Set();
  return Object.freeze({
-  async capture({input,runId}={}){
+  async capture(args){
+   const params=ownDataValues(args,['input','runId']);
+   if(!params)return deny('O2_CAPTURE_ARGUMENTS_INVALID');
+   const input=params.input,runId=params.runId;
    if(!isToken(runId)||!ownRecord(input)||input.requestId!==runId)return deny('O2_RUN_ID_INVALID');
    let inputDigest,safeInput;
    try{safeInput=canonicalSnapshot(input);inputDigest=digest(safeInput)}catch{return deny('O2_INPUT_UNSAFE')}
@@ -135,7 +145,10 @@ export function createControlledTraceVerifier({publicKey,scope,expectedAotDigest
  if(pinnedKey.asymmetricKeyType!=='ed25519')throw Error('O2_TRACE_KEY_TYPE');
  const consumed=new Set();
  return Object.freeze({
-  consume({receipt,input,observation,runId}={}){
+  consume(args){
+   const params=ownDataValues(args,['receipt','input','observation','runId']);
+   if(!params)return deny('O2_VERIFY_ARGUMENTS_INVALID');
+   const receipt=params.receipt,input=params.input,observation=params.observation,runId=params.runId;
    if(!isToken(runId)||!ownRecord(receipt,['payload','signature'])||
       !ownRecord(receipt.payload,FIELDS)||typeof receipt.signature!=='string'||
       !/^[A-Za-z0-9_-]{86}$/.test(receipt.signature))return deny('O2_TRACE_RECEIPT_INVALID');
@@ -144,7 +157,8 @@ export function createControlledTraceVerifier({publicKey,scope,expectedAotDigest
       p.sourceId!==SOURCE||p.sourceGitBlob!==BLOB||p.aotDigest!==expectedAotDigest||p.authority!=='NONE'||
       p.privacyScope!=='local-only'||p.effectDispatched!==false||p.experienceIssued!==false||
       p.contractVersion!=='1.0.0'||
-      !HEX64.test(p.inputDigest)||!HEX64.test(p.observationDigest))return deny('O2_TRACE_SCOPE_OR_SCHEMA_MISMATCH');
+      typeof p.inputDigest!=='string'||!HEX64.test(p.inputDigest)||
+      typeof p.observationDigest!=='string'||!HEX64.test(p.observationDigest))return deny('O2_TRACE_SCOPE_OR_SCHEMA_MISMATCH');
    let data,actualInputHash,actualObservationHash;
    try{data=Buffer.from(strictJSON(p));actualInputHash=digest(input);actualObservationHash=digest(observation)}
    catch{return deny('O2_TRACE_UNSAFE_REPLAY_INPUT')}
