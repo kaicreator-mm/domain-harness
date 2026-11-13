@@ -131,9 +131,12 @@ const prepared=(async()=>{
     ownerElementId:spec.owner,sourceClaimId:spec.claim,
     sourceGraphGitBlob:ORIGINS.graph.gitBlob,
     sapRunnerGitBlob:ORIGINS.sap.gitBlob,
+    // The R54 GitHub review link and 1/53 count are external reference
+    // metadata, NOT AOT-pinned adjudication or an independently signed SAP.
+    // The signed-source scope is the raw Forge SAP DATA / original graph only.
     upstreamForgeHead:UPSTREAM,r54ReviewUrl:R54,
     reviewedScopedCellCount:1,originalR8CellCount:53,
-    scopedReviewObserved:'EXTERNAL_NON_WRITER_ACCEPT_SCOPED',
+    scopedReviewObserved:'EXTERNAL_REFERENCE_NOT_AOT_ATTESTED',
     sourceBytesVerified:true,sapQualified:false,fullOriginalR8Qualified:false,
     parentQualified:false,rootQualified:false,effectDispatched:false};
   }
@@ -182,7 +185,9 @@ test('R55 real selected SDK/KDP knowledge Functions preserve scoped 1/53 vs form
    assert.equal(r.value.upstreamForgeHead,UPSTREAM);
    assert.equal(r.value.reviewedScopedCellCount,1);
    assert.equal(r.value.originalR8CellCount,53);
-   assert.equal(r.value.scopedReviewObserved,'EXTERNAL_NON_WRITER_ACCEPT_SCOPED');
+   assert.equal(r.value.scopedReviewObserved,'EXTERNAL_REFERENCE_NOT_AOT_ATTESTED');
+   // This URL is an external reference, not a selected source pin or proof.
+   assert.equal(Object.values(x.expectedPins).some(p=>p.origin.path===R54),false);
    assert.equal(r.value.sapQualified,false);
    assert.equal(r.value.fullOriginalR8Qualified,false);
    assert.equal(r.value.parentQualified,false);
@@ -211,7 +216,7 @@ test('R55 modified original SAP/graph bytes and forged provenance or executable 
  delete illicit.sourceDependencies; // isolate real DATA-as-LOCAL guard, not duplicate dependency rejection
  assert.throws(()=>x.compile(p),invalid('DIS_DATA_SOURCE_EXECUTION_FORBIDDEN'));
 });
-test('R55 forged parent/SAP/Effect, other cells and ABI version are not accepted',async()=>{
+test('R55 untrusted caller requests and wrong outcome tags fail closed; forged valid UNKNOWN cannot authorize SAP, Root or Effect',async()=>{
  const x=await prepared,app=await boot(x);
  try{
   for(const spec of Object.values(KEY)){
@@ -224,19 +229,46 @@ test('R55 forged parent/SAP/Effect, other cells and ABI version are not accepted
     {expectedContractVersion:'2.0.0'}),invalid('DIS_FUNCTION_VERSION_MISMATCH'));
   }
  }finally{app.stop()}
+ // Independent R58 P2 counterexample: status UNKNOWN is a VALID typed tag,
+ // so generic Function I/O does NOT reject forged business qualification
+ // booleans solely because their values are true. Treat the delegate's
+ // entire value as untrusted until a separate adjudication receipt is pinned.
+ const fakeValue={
+  status:'UNKNOWN',subject:'EV16:D02',ownerElementId:KEY.req.owner,
+  sourceClaimId:KEY.req.claim,sourceGraphGitBlob:ORIGINS.graph.gitBlob,
+  sapRunnerGitBlob:ORIGINS.sap.gitBlob,upstreamForgeHead:UPSTREAM,
+  r54ReviewUrl:R54,reviewedScopedCellCount:53,originalR8CellCount:53,
+  scopedReviewObserved:'FORMAL_FULL_APPROVED',sourceBytesVerified:true,
+  sapQualified:true,fullOriginalR8Qualified:true,
+  parentQualified:true,rootQualified:true,effectDispatched:true
+ };
  const forged={...x.registry,[KEY.req.function]:{
-  ...x.registry[KEY.req.function],execute:()=>({
-   status:'SUCCEEDED',subject:'EV16:D02',ownerElementId:KEY.req.owner,
-   sourceClaimId:KEY.req.claim,sourceGraphGitBlob:ORIGINS.graph.gitBlob,
-   sapRunnerGitBlob:ORIGINS.sap.gitBlob,upstreamForgeHead:UPSTREAM,
-   r54ReviewUrl:R54,reviewedScopedCellCount:53,originalR8CellCount:53,
-   scopedReviewObserved:'FORMAL_FULL_APPROVED',sourceBytesVerified:true,
-   sapQualified:true,fullOriginalR8Qualified:true,
-   parentQualified:true,rootQualified:true,effectDispatched:true
-  })
+  ...x.registry[KEY.req.function],execute:()=>({...fakeValue})
  }};
- const badApp=await boot({...x,registry:forged});
- try{await assert.rejects(badApp.invoke(KEY.req.function,
-  {subject:'EV16:D02'}),invalid('DIS_OUTCOME_UNDECLARED'))}
- finally{badApp.stop()}
+ const fakeApp=await boot({...x,registry:forged});
+ try{
+  const out=await fakeApp.invoke(KEY.req.function,{subject:'EV16:D02'});
+  assert.equal(out.kind,'OBSERVATION');
+  assert.equal(out.disposition,'UNKNOWN');
+  assert.equal(out.authority,'NONE');
+  assert.equal(out.evidence.attested,false);
+  assert.equal(Object.hasOwn(out,'executionPermit'),false);
+  // Deliberately accepted *as data*; NOT a proof that true flags were
+  // rejected, nor any basis to mark CORE-002/005 or the 53 R8 cells VERIFIED.
+  assert.equal(out.value.sapQualified,true);
+  assert.equal(out.value.effectDispatched,true);
+  assert.equal(out.value.reviewedScopedCellCount,53);
+  assert.equal(out.value.scopedReviewObserved,'FORMAL_FULL_APPROVED');
+ }finally{fakeApp.stop()}
+ // A separate invalid outcome-tag vector tests only the generic ABI gate,
+ // not DKE-specific semantic qualification correctness.
+ const invalidTag={...x.registry,[KEY.req.function]:{
+  ...x.registry[KEY.req.function],
+  execute:()=>({...fakeValue,status:'SUCCEEDED'})
+ }};
+ const tagApp=await boot({...x,registry:invalidTag});
+ try{
+  await assert.rejects(tagApp.invoke(KEY.req.function,{subject:'EV16:D02'}),
+   invalid('DIS_OUTCOME_UNDECLARED'));
+ }finally{tagApp.stop()}
 });
