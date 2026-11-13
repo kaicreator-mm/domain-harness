@@ -14,8 +14,8 @@ test('R83 actual selected xDownload AOT→SDK interaction receives controlled si
   store:new PlainCasDocStore(),tenantId:'tenant:dis-o2-r83-host'});
  try{
   const keys=generateKeyPairSync('ed25519'),scope='tenant:dis-o2-r83-host';
-  const issuer=createControlledTraceIssuer({app,...keys,scope,maxWaitMs:15000});
-  const verifier=createControlledTraceVerifier({publicKey:keys.publicKey,scope});
+  const issuer=createControlledTraceIssuer({app,...keys,scope,expectedAotDigest:f.artifact.digest,maxWaitMs:15000});
+  const verifier=createControlledTraceVerifier({publicKey:keys.publicKey,scope,expectedAotDigest:f.artifact.digest});
   const input={channel:'cli',requestId:'run:native-001',url:'https://example.com/media/sample.mp4',declaredBytes:2048};
   const captured=await issuer.capture({input,runId:input.requestId});
   assert.equal(captured.status,'ISSUED_TRACE_ONLY');
