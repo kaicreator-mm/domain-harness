@@ -76,6 +76,8 @@ steps:
       # O2 R83: controlled signed execution-origin Trace via real xDownload AOT→SDK; never business PASS/Experience.
       - node --test examples/dis-v020-native-sdk/o2-controlled-execution-trace.test.mjs
       - node --import tsx --test examples/dis-v020-native-sdk/o2-controlled-execution-trace-native.test.mjs
+      # O2 R89 optional Linux Host durable nonce: actual fsync/reopen/cross-process and signed Trace fail-closed tests; NO Experience/Effect promotion.
+      - node --test examples/dis-v020-native-sdk/o2-durable-nonce-ledger.test.mjs examples/dis-v020-native-sdk/o2-durable-trace.test.mjs
       # O3 R63: no trusted rule interpreter/atomic Task pin; mandatory Candidate+Shadow-only safety fixture, NOT E07 activation.
       - node --test examples/dis-v020-evolution-demo/o3-shadow-candidate.test.mjs
       # R55/R56: scope-limited original DKE EV16:D02 R8 provenance, two Element Knowledge Functions; no SAP/Root/Effect promotion.
