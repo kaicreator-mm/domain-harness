@@ -81,6 +81,37 @@ test('O2 durable ledger blocks unprovisioned root and untrusted parent; never au
  assert.throws(()=>createO2DurableNonceLedger({directory:dir,scope:SCOPE,expectedAotDigest:PIN}),/UNTRUSTED_DIRECTORY/);
 }));
 
+
+test('O2 P2 ancestor chain rejects nonsticky writable grandparent but accepts private restored chain',()=>fixture((dir,base)=>{
+ const unsafe=join(base,'untrusted-grandparent');
+ const direct=join(unsafe,'private-parent'),root=join(direct,'ledger');
+ mkdirSync(unsafe,{mode:0o700});
+ mkdirSync(direct,{mode:0o700});
+ mkdirSync(root,{mode:0o700});
+ const safe=make(root);
+ assert.equal(safe.reserve('run:before'),true);
+ chmodSync(unsafe,0o777);
+ assert.throws(()=>make(root),/UNTRUSTED_DIRECTORY/);
+ assert.equal(safe.reserve('run:while-untrusted'),false);
+ chmodSync(unsafe,0o700);
+ assert.equal(make(root).reserve('run:after'),true);
+}));
+
+test('O2 P2 invalid scope never invokes toString, valueOf or Symbol.toPrimitive',()=>fixture(dir=>{
+ let coercions=0;
+ const adversaries=[
+  {toString(){coercions++;return 'tenant:coerced'}},
+  {[Symbol.toPrimitive](){coercions++;return 'tenant:coerced'}},
+  Object(Symbol('adversary')),
+  Symbol('coerce'),
+  new Proxy({toString(){coercions++;return 'tenant:coerced'}},{get(){coercions++;throw Error('COERCION_TRAP')}})
+ ];
+ for(const scope of adversaries){
+  assert.throws(()=>createO2DurableNonceLedger({directory:dir,scope,expectedAotDigest:PIN}),/HOST_CONFIGURATION/);
+ }
+ assert.equal(coercions,0);
+}));
+
 test('O2 four children wait at a ready/go barrier before racing to reserve exactly one nonce',{timeout:10000},()=>fixture(async dir=>{
  const moduleUrl=pathToFileURL(fileURLToPath(new URL('./o2-durable-nonce-ledger.mjs',import.meta.url))).href;
  const script="import {createO2DurableNonceLedger} from "+JSON.stringify(moduleUrl)+
