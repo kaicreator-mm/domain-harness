@@ -94,7 +94,7 @@ export function makeO3Shadow({app,candidate,maxWaitMs=1000}={}){
     ]);
     if(!selectedObservation(observation))return result('SOURCE_OBSERVATION_UNQUALIFIED');
     return result('MATCHED_READ_ONLY_CANDIDATE_NOT_QUALIFIED',{
-     candidateDigest:candidate.digest,shadowMatched:true,
+     candidateDigest:c.digest,shadowMatched:true,
      observedSourceGitBlob:SOURCE_BLOB
     });
    }catch{return result('SHADOW_OBSERVATION_UNKNOWN')}
