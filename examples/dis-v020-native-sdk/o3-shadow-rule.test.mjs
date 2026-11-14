@@ -31,13 +31,13 @@ test('O3 unknown operator, Effect, code, source drift, accessor, Proxy and pollu
  const inherited=Object.create({schema:'fake'});Object.assign(inherited,candidate());
  assert.throws(()=>prepareO3ShadowCandidate(inherited),blocked('O3_RULE_NOT_SELECTED_OR_UNSAFE'));
 });
-test('O3 transparent Proxy inputs are rejected before any trap or nested observation side effect',async()=>{
- let traps=0;
+test('O3 Proxy candidates and nested evidence reject before reflection; async root stays unknown',async()=>{
+ let traps=0;const getKeys=[];
  const trap=x=>new Proxy(x,{
   getPrototypeOf(t){traps++;return Reflect.getPrototypeOf(t)},
   ownKeys(t){traps++;return Reflect.ownKeys(t)},
   getOwnPropertyDescriptor(t,k){traps++;return Reflect.getOwnPropertyDescriptor(t,k)},
-  get(t,k,r){traps++;return Reflect.get(t,k,r)}
+  get(t,k,r){traps++;getKeys.push(String(k));return Reflect.get(t,k,r)}
  });
  assert.throws(()=>prepareO3ShadowCandidate(trap(candidate())),
   blocked('O3_RULE_NOT_SELECTED_OR_UNSAFE'));
@@ -47,6 +47,7 @@ test('O3 transparent Proxy inputs are rejected before any trap or nested observa
   blocked('O3_CANDIDATE_UNQUALIFIED'));
  assert.equal(traps,0,'qualified-looking candidate Proxy must not execute caller traps');
  for(const wrap of ['root','nested']){
+  const before=traps;
   const o=observation();
   if(wrap==='nested')o.evidence.source=trap(o.evidence.source);
   const value=wrap==='root'?trap(o):o;
@@ -56,7 +57,12 @@ test('O3 transparent Proxy inputs are rejected before any trap or nested observa
   assert.equal(got.ruleActivated,false);
   assert.equal(got.experienceIssued,false);
   assert.equal(got.effectDispatched,false);
-  assert.equal(traps,0,'observation Proxy must not execute caller traps');
+  if(wrap==='nested')assert.equal(traps,before,'nested Proxy parser must not invoke traps');
+  else{
+   // Promise resolution may inspect .then before any async receiver can reject a Proxy.
+   assert.equal(traps,getKeys.length,'root Proxy must not reach reflection traps');
+   assert.ok(getKeys.every(k=>k==='then'),'root Proxy only tolerates Promise thenable inspection');
+  }
  }
 });
 test('O3 fake qualification, wrong target and unsupported budgets cannot activate',()=>{
