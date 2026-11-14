@@ -4,6 +4,7 @@
  * No caller-supplied qualification or activation authority is accepted.
  */
 import {createHash} from 'node:crypto';
+import {types as nodeUtilTypes} from 'node:util';
 
 const FN='xdownload.describePolicy';
 const VERSION='1.0.0';
@@ -13,6 +14,8 @@ const MAX_RULE_BYTES=2048;
 const fail=code=>{throw Object.assign(new Error(code),{code})};
 function record(obj, keys){
  try{
+  // Node's native Proxy check runs before reflective operations or caller traps.
+  if(nodeUtilTypes.isProxy(obj))return null;
   if(obj===null||typeof obj!=='object'||Array.isArray(obj))return null;
   if(Object.getPrototypeOf(obj)!==Object.prototype && Object.getPrototypeOf(obj)!==null)return null;
   const names=Reflect.ownKeys(obj);
@@ -28,6 +31,8 @@ function record(obj, keys){
 }
 function read(obj,k){
  try{
+  // Untrusted nested observation objects must not execute Proxy traps.
+  if(nodeUtilTypes.isProxy(obj))return undefined;
   if(obj===null||typeof obj!=='object'||Array.isArray(obj))return undefined;
   if(Object.getPrototypeOf(obj)!==Object.prototype&&Object.getPrototypeOf(obj)!==null)return undefined;
   const d=Object.getOwnPropertyDescriptor(obj,k);
