@@ -31,6 +31,34 @@ test('O3 unknown operator, Effect, code, source drift, accessor, Proxy and pollu
  const inherited=Object.create({schema:'fake'});Object.assign(inherited,candidate());
  assert.throws(()=>prepareO3ShadowCandidate(inherited),blocked('O3_RULE_NOT_SELECTED_OR_UNSAFE'));
 });
+test('O3 transparent Proxy inputs are rejected before any trap or nested observation side effect',async()=>{
+ let traps=0;
+ const trap=x=>new Proxy(x,{
+  getPrototypeOf(t){traps++;return Reflect.getPrototypeOf(t)},
+  ownKeys(t){traps++;return Reflect.ownKeys(t)},
+  getOwnPropertyDescriptor(t,k){traps++;return Reflect.getOwnPropertyDescriptor(t,k)},
+  get(t,k,r){traps++;return Reflect.get(t,k,r)}
+ });
+ assert.throws(()=>prepareO3ShadowCandidate(trap(candidate())),
+  blocked('O3_RULE_NOT_SELECTED_OR_UNSAFE'));
+ assert.equal(traps,0,'candidate Proxy must not execute caller traps');
+ const c=prepareO3ShadowCandidate(candidate());
+ assert.throws(()=>makeO3Shadow({app:app(),candidate:trap(c)}),
+  blocked('O3_CANDIDATE_UNQUALIFIED'));
+ assert.equal(traps,0,'qualified-looking candidate Proxy must not execute caller traps');
+ for(const wrap of ['root','nested']){
+  const o=observation();
+  if(wrap==='nested')o.evidence.source=trap(o.evidence.source);
+  const value=wrap==='root'?trap(o):o;
+  const got=await makeO3Shadow({app:app(value),candidate:c}).probe();
+  assert.equal(got.reason,'SOURCE_OBSERVATION_UNQUALIFIED');
+  assert.equal(got.qualified,false);
+  assert.equal(got.ruleActivated,false);
+  assert.equal(got.experienceIssued,false);
+  assert.equal(got.effectDispatched,false);
+  assert.equal(traps,0,'observation Proxy must not execute caller traps');
+ }
+});
 test('O3 fake qualification, wrong target and unsupported budgets cannot activate',()=>{
  const c=prepareO3ShadowCandidate(candidate());
  assert.throws(()=>makeO3Shadow({app:app(),candidate:{...c,qualified:true}}),blocked('O3_CANDIDATE_UNQUALIFIED'));
