@@ -1,0 +1,55 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r35-b02-selected-target-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "B02_R35_NATIVE_SELECTED_SOURCE_NOT_MULTITARGET",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "1a803ac452348dc73afea1483a9283cfe527abfc",
+    "tree": "8a478066e61e304c77b9515ee6e92712734b61f4"
+  },
+  "originCommit": "2181072c1a5101366b90ec8aa2c65dde9c571b15",
+  "originTree": "30ba4e1b8909a30850366911bd996247890a8f0e",
+  "sourceTestBlob": "f76cd33303363848753f870c4797833c54a2fd88",
+  "casePath": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "2181072c1a5101366b90ec8aa2c65dde9c571b15",
+      "native": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2278/1"
+    },
+    {
+      "sourceHead": "1a803ac452348dc73afea1483a9283cfe527abfc",
+      "native": "SUCCESS",
+      "minNode": "SUCCESS",
+      "verify": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    }
+  ],
+  "observations": [
+    "The original standalone round code/test Git Blob is present unchanged in the later cumulative #2280/1–3 full-suite exact-source 3/3 SUCCESS.",
+    "Earlier integration ERROR retained at the old original SHA; it is not falsely reported as old-sha PASS."
+  ],
+  "limits": [
+    "This checks actual original Tally/xDownload selected Node Business sources; Windows/Linux/Android Target selection contract is not implemented.",
+    "Real KDP Effect authority remains separate; no local interaction can grant Effect permission."
+  ]
+}

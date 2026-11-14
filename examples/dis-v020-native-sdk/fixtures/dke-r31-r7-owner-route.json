@@ -1,0 +1,100 @@
+{
+  "schema": "dke.r31.source-owner-authority-routing/1",
+  "date": "2026-11-11",
+  "authority": {
+    "masterIssue": 209,
+    "productIssue": 207,
+    "productPr": 208,
+    "prInputHead": "2aae13382c60b95b12af2c4b540384094539f866",
+    "userScopeApprovalGitBlob": "d5747c057c92bc357cc68053e43d96b36427e02c",
+    "originalTallyGraphGitBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+    "sourceFirstR31Head": "4667becfdc9bfb382bbe830150fa7c9af4533ba2",
+    "ev16R3ReceiptGitBlob": "844a16219e31cc994d4d958e565879cb5e0c6872"
+  },
+  "rationale": "Product #207 demands a separate LLM validator ROLE/RUN with original-evidence-first judgement (distinct model/provider optional); it does not mandate an external authenticated human for exploratory Critic. Product scope approval is already recorded; original producer truth and publisher rights remain separate. Do not impose blanket duplicate Owner approval for source-quarantined facts.",
+  "exactProductL1Criterion": "A separate LLM validator role/run creates critiques and counterexamples from original evidence, requirements and contracts; distinct model/provider if useful, but independent inputs/task are more important than model branding.",
+  "decisionRouting": [
+    {
+      "id": "OD01",
+      "subject": "se:CLM-REQ-FUNCTIONAL-DOC-METHODS",
+      "productScope": "CONFIRMED_ACCEPT_SCOPED",
+      "useOnly": "CS2023 curriculum examples use case OR user stories; not production mandate",
+      "originalSourceOwner": "NOT_ATTESTED",
+      "promotion": "REVIEW_ONLY_NO_SAP"
+    },
+    {
+      "id": "OD02",
+      "subject": "se:CLM-TVV-0001",
+      "productScope": "CONFIRMED_ACCEPT_SCOPED",
+      "useOnly": "CS2023 V&V teaching distinction; not customer acceptance proof",
+      "originalSourceOwner": "NOT_ATTESTED",
+      "promotion": "REVIEW_ONLY_NO_SAP"
+    },
+    {
+      "id": "OD03",
+      "subject": "se:REL-TVV-0020",
+      "productScope": "CONFIRMED_ROOT_OWNED_DERIVED_HOLD_UNKNOWN",
+      "useOnly": "NIST/CS2023 analogy is not publisher-authored normative interstandard requirement",
+      "originalSourceOwner": "NOT_ATTESTED",
+      "promotion": "UNKNOWN_QUARANTINED_NO_SAP"
+    },
+    {
+      "id": "OD04",
+      "subject": "Root + Requirements Child + V&V Child",
+      "productScope": "CONFIRMED_BOUNDED",
+      "useOnly": "No new Global solely for tentative derived edge; child validation cannot authorize Root",
+      "originalSourceOwner": "NOT_ATTESTED",
+      "promotion": "CANDIDATE_DECOMPOSITION_ONLY"
+    },
+    {
+      "id": "OD05",
+      "subject": "se:DM-REQ-FUNCTIONAL-DOC-METHOD",
+      "productScope": "MITIGATION_CONFIRMED_KEEP_OPEN",
+      "useOnly": "original Tally uniform-method requirement is unsupported; exclude from accepted SAP and qualified cross-domain rules",
+      "originalSourceOwner": "TALLY_PRODUCER_DECISION_PENDING",
+      "promotion": "QUARANTINE_NO_AUTO_PUBLISHER_AUTHORITY"
+    },
+    {
+      "id": "OD06",
+      "subject": "CS2023 full text/license",
+      "productScope": "MITIGATION_CONFIRMED_KEEP_OPEN",
+      "useOnly": "bounded independent paraphrase + official publisher link only; no bulk reproduction",
+      "originalSourceOwner": "PUBLISHER_RIGHTS_UNRESOLVED_ONLY_IF_BULK_REUSE",
+      "promotion": "SCOPED_REFERENCE_ONLY"
+    }
+  ],
+  "gates": {
+    "productScopeApproval": "CONFIRMED_DO_NOT_REQUEST_AGAIN",
+    "sourceOwnerDecisionForUnqualifiedOriginalClaims": "PENDING_ONLY_FOR_UNRESOLVED_SOURCE_PRODUCER_OBLIGATIONS",
+    "sourceOwnerDecisionMayBeSelfSignedByAssistant": false,
+    "independentCriticMode": "SEPARATE_LLM_VALIDATOR_ROLE_OR_RUN_AND_EVIDENCE_FIRST",
+    "externalAuthenticatedHumanReviewerMandatoryForProductExploration": false,
+    "sourceFirstR31Critic": "BOUNDED_REVIEW_DONE",
+    "sourceFirstD04Critic": "BOUNDED_REVIEW_REPAIRED",
+    "ev16R3Critic": "SOURCE_FIRST_STAGE0_RECORDED_LIMITED_CONTEXT_INDEPENDENCE",
+    "ev16SourceDataConsumption": "R3_ORIGINAL_GRAPH_AND_PUBLISHED_RFC_GIT_BLOB_23_23_PASS",
+    "ev16OfficialFrozenCell": "NOT_RUN",
+    "qualifiedCells": "0/53",
+    "qualifiedSap": 0,
+    "authorizedEffects": 0,
+    "releaseEligible": false
+  },
+  "scopePartition": {
+    "allowNow": [
+      "continue source-pinned CQ exploration",
+      "run nonpromoting original-source checks",
+      "prepare original-source/qualified Oracle EV16 Cell obligations",
+      "separately route Tally unsupported original DecisionModel to source steward"
+    ],
+    "neverInfer": [
+      "user scope acceptance automatically signs the original Tally content",
+      "publisher copyright permission follows from source linked citations",
+      "same GitHub transport identity proves a separate human expert",
+      "R31/D04/EV16 bounded evidence qualifies R8 or SAP",
+      "derived cross-publisher relation is a published requirement"
+    ],
+    "sourceOwnerIfNeeded": "Original Tally producer owner must adjudicate its own unsupported DecisionModel; no reopening a closed v2.1.1 pilot or original graph mutation without separate authority",
+    "deferredRights": "No full-publisher-text republication in present scoped Demo; if later requested, require rights review before distribution"
+  },
+  "provenanceNote": "This document classifies already-recorded user choices and owner responsibilities. It is an assistant-authored routing/qualification proposal, NOT an authenticated Source Owner ReviewDecision or formal domain acceptance."
+}

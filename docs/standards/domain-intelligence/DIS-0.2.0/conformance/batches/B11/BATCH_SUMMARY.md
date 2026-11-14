@@ -1,0 +1,7 @@
+# B11 R57 — real OS CLI selected DIS Interaction
+
+**B11-01/R57 VERIFIED 1/1, version Core NOT_COMPLETE.** Source `b5762ae29ac7234d45d8bc1cbf974faebad39e2e`, TREE `24c6b44490b471d2c89066ea89662bf552603169`, original native test Git Blob `c6d1149bea35324a6b6ef721bd445de948218153`, full Woodpecker #2323/1–3 **3/3 SUCCESS**.
+
+Original CLI OS entry source commit `aa1c4287d8d8b1e19110d4978bfb93079a3517bf`, Git Blob `ebc54ae8351007aba510708509e1a9c142343c9f`. Actual child processes pass argv into canonical selected xDownload `inspect`/`confirm` through DIS native AOT, SDK and KDP. Confirmed still PENDING_AUTHORIZATION/authority NONE, unconfirmed NEEDS_CONFIRMATION, concurrent requests isolated, forged execution/owner flags and secret-token URL rejected. R0 mistaken typed disposition expected REJECTED but source mapping is FAILED; original R0 test Git Blob `9f0b608d36dd065b761ac5f83533a3b4bc5c302f` and #2322 native failure preserved.
+
+**Cumulative B01–B11 25/25 scoped Demo rounds VERIFIED; Core 9/16 VERIFIED (56.25%) +7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN.** Real CLI demo is not a production distribution, independent SAP/semantic acceptance or KDP physical Effect, and no merge/Freeze/release.

@@ -1,0 +1,106 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B05",
+  "roundId": "B05-01",
+  "globalRoundId": "R44",
+  "status": "VERIFIED",
+  "startParent": "9d44c1b32a96774a10cd6e7a3e3e9174368b39a5",
+  "testPath": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+  "testGitBlob": "650ac196f2df5fe9ba24f05f86edded9c41819e5",
+  "receipt": "receipts/r44-b05-host-target-ci.json",
+  "positive": [
+    "B05-01 R44 real runtime OS and CPU architecture match selected original canonical Business/KDP modules",
+    "B05-01 R44 legacy untargeted artifacts remain usable but cannot inherit a claimed host qualification"
+  ],
+  "negative": [
+    "B05-01 R44 caller and AOT agreeing on a wrong OS label cannot bypass the real runtime host identity",
+    "B05-01 R44 caller and AOT agreeing on a wrong architecture cannot boot the KDP"
+  ],
+  "boundary": "Actual process.platform/process.arch check independently of artifact and installer; no cryptographic host attestation or per-OS module difference.",
+  "originCommit": "36bcdca50d1b79b82bc0944d4691979631010707",
+  "originTree": "a992a31dc4267e688c584cac5b6f621a8e7274c3",
+  "sourceHead": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+  "finalTree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "36bcdca50d1b79b82bc0944d4691979631010707",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2290/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2290/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2290/3"
+        }
+      ]
+    },
+    {
+      "sourceHead": "42fc7bde28bdbc653113651f2f87aa1021df614c",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/3"
+        }
+      ],
+      "meaning": "Cumulative three-round native replay"
+    },
+    {
+      "head": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+      "tree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+        }
+      ],
+      "meaning": "Final exact full-suite source, original test Blob unchanged"
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B08",
+  "roundId": "B08-01",
+  "globalRoundId": "R54",
+  "status": "VERIFIED",
+  "originCommit": "d20622f226e40ffe75981d3df75ad7ff941a215f",
+  "originTree": "02dd0c7bd5d8420a864d29e5d3cd8751d060bfcc",
+  "testPath": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+  "testGitBlob": "80ecb069278d4112cf38098bfbcb5f5d1465e498",
+  "receipt": "receipts/r54-b08-real-dke-knowledge-consumer-ci.json",
+  "sourceHead": "23dbb0ea5dabe661fb2a309adba00e4dbffe0c89",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2309/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2309/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2309/3"
+    }
+  ],
+  "positive": [
+    "B08-01 R54 original DKE #209 R6 Git receipt is actual selected native DIS Knowledge dependency",
+    "B08-01 R54 two actual Tally source versions distinguish new graph evidence without SAP upgrade"
+  ],
+  "negative": [
+    "B08-01 R54 changed DKE source, false producer approval and source-origin mismatch fail closed",
+    "B08-01 R54 independently installer-pinned DKE input, Function schema and forged outcome refuse privilege"
+  ],
+  "limits": [
+    "DKE upstream producer verified Git Source is generated, not independent source-owner meaning approval.",
+    "Original full Tally graph source bytes were checked by DKE #209, NOT rerun inside native DIS; this round directly consumes original DKE receipt bytes pinned by Git Blob.",
+    "No browser/OS Host Effect or production permission, Core-006/003 remain PARTIAL.",
+    "DKE SAP_QUALIFIED=0; independent semantic review remains absent."
+  ],
+  "originalR0TestGitBlob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
+  "repairHistory": [
+    {
+      "head": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+      "blob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
+      "decision": "SOURCE_COMMITTED_R0; OLD-version UNKNOWN output mistakenly emitted empty evidenceRefs, forbidden by existing typed outcome validator"
+    },
+    {
+      "head": "ac1b5bea527a0df63bb75d08368cc0b202ceea2a",
+      "ci": "Woodpecker #2307/1 FAILURE",
+      "decision": "HISTORICAL_FAILURE; not qualified; no assumption about exact failing step without Woodpecker logs"
+    },
+    {
+      "head": "269804b8a4be9d262deb61e1764d9030612dc01e",
+      "readerGitBlob": "ab0cb7d9fed146f419ef7555fcdc8a406f25db10",
+      "decision": "R1 reader omits evidenceRefs on no-source UNKNOWN"
+    },
+    {
+      "head": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
+      "blob": "503d34cc3d5049c036ba590e66b4092c52958c9e",
+      "decision": "R1 test pin updated to repaired reader, output Schema evidenceRefs optional, asserts old version absence instead of false declared evidence"
+    },
+    {
+      "head": "c798f433ef9cffeb808b2c91b6c2923f5a406524",
+      "ci": "Woodpecker #2308/1 FAILURE",
+      "decision": "R1 typed UNKNOWN contract fixed, but existing DIS SourceOrigin validation rejects original DKE docs/standards/dke original JSON path; exact failing step unavailable"
+    },
+    {
+      "head": "8c8b29713c3f7aed70d448e707ab65d9234582fa",
+      "codeGitBlob": "fa2fb30875653eaa1eeb32ffbbc97fbb01210c34",
+      "decision": "R2 contract allows bounded DKE JSON DATA origin but prohibits executable LOCAL binding"
+    },
+    {
+      "head": "d20622f226e40ffe75981d3df75ad7ff941a215f",
+      "testGitBlob": "80ecb069278d4112cf38098bfbcb5f5d1465e498",
+      "decision": "R2 newly verifies docs DATA-only acceptance plus JS/path traversal negatives"
+    }
+  ],
+  "finalTree": "fab96c9328a7bae37336b30a18f3cdc8d131a396",
+  "history": [
+    {
+      "head": "422e0e7c245bbb9d34916d471e243ac52a1ee3d5",
+      "blob": "f5d43f8c6080511241272124f2c8be2f7d8e2ab5",
+      "decision": "SOURCE_COMMITTED_R0; OLD-version UNKNOWN output mistakenly emitted empty evidenceRefs, forbidden by existing typed outcome validator"
+    },
+    {
+      "head": "ac1b5bea527a0df63bb75d08368cc0b202ceea2a",
+      "ci": "Woodpecker #2307/1 FAILURE",
+      "decision": "HISTORICAL_FAILURE; not qualified; no assumption about exact failing step without Woodpecker logs"
+    },
+    {
+      "head": "269804b8a4be9d262deb61e1764d9030612dc01e",
+      "readerGitBlob": "ab0cb7d9fed146f419ef7555fcdc8a406f25db10",
+      "decision": "R1 reader omits evidenceRefs on no-source UNKNOWN"
+    },
+    {
+      "head": "79e62556ed799a52dc8a8437cc17a4da3a96f97f",
+      "blob": "503d34cc3d5049c036ba590e66b4092c52958c9e",
+      "decision": "R1 test pin updated to repaired reader, output Schema evidenceRefs optional, asserts old version absence instead of false declared evidence"
+    },
+    {
+      "head": "c798f433ef9cffeb808b2c91b6c2923f5a406524",
+      "ci": "Woodpecker #2308/1 FAILURE",
+      "decision": "R1 typed UNKNOWN contract fixed, but existing DIS SourceOrigin validation rejects original DKE docs/standards/dke original JSON path; exact failing step unavailable"
+    },
+    {
+      "head": "8c8b29713c3f7aed70d448e707ab65d9234582fa",
+      "codeGitBlob": "fa2fb30875653eaa1eeb32ffbbc97fbb01210c34",
+      "decision": "R2 contract allows bounded DKE JSON DATA origin but prohibits executable LOCAL binding"
+    },
+    {
+      "head": "d20622f226e40ffe75981d3df75ad7ff941a215f",
+      "testGitBlob": "80ecb069278d4112cf38098bfbcb5f5d1465e498",
+      "decision": "R2 newly verifies docs DATA-only acceptance plus JS/path traversal negatives"
+    },
+    {
+      "head": "23dbb0ea5dabe661fb2a309adba00e4dbffe0c89",
+      "tree": "fab96c9328a7bae37336b30a18f3cdc8d131a396",
+      "CI": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2309/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2309/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2309/3"
+        }
+      ],
+      "status": "SUCCESS",
+      "meaning": "Actual final R2 Git source replayed full mandatory native+compatibility+verify Woodpecker #2309 3/3 SUCCESS"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "schema": "dis.v0.2.product-l1-c3-engineering-review-acceptance/1",
+  "version": "0.2.0",
+  "date": "2026-11-11",
+  "sourceAuthority": {
+    "kind": "USER_CHAT_DECISION_TRANSCRIBED",
+    "githubAccountNotIndependentSourceOwner": true,
+    "productIssue": 1496,
+    "decisionCommentId": 6782273293,
+    "decisionUrl": "https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293",
+    "previousTargetScopeCommentId": 6777762870
+  },
+  "decision": "ACCEPT_COMPLETED_C3_INDEPENDENT_ENGINEERING_REVIEW",
+  "scope": {
+    "platform": "linux",
+    "architecture": "x64",
+    "runtime": "node",
+    "onlyApplicableDemoTarget": true
+  },
+  "promotion": {
+    "requirementId": "DIS020-CORE-008",
+    "from": "PARTIAL",
+    "to": "VERIFIED",
+    "qualification": "SCOPED_TARGET_STRUCTURAL_NATIVE_ONLY",
+    "prePromotionQualifiedHead": "a406927e9408424a09776e3896c1aa7ed1d0e9ef",
+    "prePromotionCI": [
+      "https://ci.kaicreator.com/repos/18/pipeline/2429/1",
+      "https://ci.kaicreator.com/repos/18/pipeline/2429/2",
+      "https://ci.kaicreator.com/repos/18/pipeline/2429/3"
+    ],
+    "promotionHeadCI": "PENDING_AFTER_COMMIT"
+  },
+  "review": {
+    "exactHead": "c21a7763c1d4539f5ae062f24faead6c9a5f1a9b",
+    "receiptId": "r86-c3-fresh-exact-sha-review-ci",
+    "contexts": [
+      "https://ci.kaicreator.com/repos/18/pipeline/2415/1",
+      "https://ci.kaicreator.com/repos/18/pipeline/2415/2",
+      "https://ci.kaicreator.com/repos/18/pipeline/2415/3"
+    ],
+    "p0Open": 0,
+    "p1Open": 0
+  },
+  "unchangedGates": {
+    "core002": "PARTIAL",
+    "core005": "PARTIAL",
+    "core016": "PARTIAL",
+    "optional": "NOT_RUN",
+    "governance": "NOT_RUN",
+    "sapQualified": false,
+    "independentSourceOwnerAccepted": false,
+    "effectAuthorized": false,
+    "merge": false,
+    "l2Freeze": false,
+    "release": false
+  },
+  "limitations": [
+    "No Windows/Android/multi-Target qualification",
+    "No semantic SAP or Tally Source Owner decision",
+    "No hostile-native OS attestation or physical Effects",
+    "Old CI success cannot qualify the new promotion HEAD"
+  ]
+}

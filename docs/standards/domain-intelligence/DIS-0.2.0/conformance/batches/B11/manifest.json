@@ -1,0 +1,94 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B11",
+  "status": "VERIFIED",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "c3a9b254ecd3a70a936f00990047cd131835c7cc",
+    "qualifiedPriorRounds": 24,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "CORE-014 actual OS process CLI invocation of selected native xDownload Interaction: confirmed, nonconfirmed, isolated sessions, Effect spoof and private URL negatives",
+  "rounds": [
+    {
+      "batchRoundId": "B11-01",
+      "globalRoundId": "R57",
+      "status": "VERIFIED",
+      "testPath": "examples/dis-v020-native-sdk/b11-cli-process.test.mjs",
+      "originalSourceHead": "475a0c2f12de164fd6149f812fee754d26f1aa6b",
+      "testGitBlob": "c6d1149bea35324a6b6ef721bd445de948218153",
+      "receipt": "receipts/r57-b11-real-cli-native-ci.json",
+      "sourceHead": "b5762ae29ac7234d45d8bc1cbf974faebad39e2e",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2323/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2323/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2323/3"
+        }
+      ],
+      "originalR0SourceHead": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
+      "originalR0TestGitBlob": "9f0b608d36dd065b761ac5f83533a3b4bc5c302f",
+      "history": [
+        {
+          "head": "a7c25ea73aa3f4eacf7006bba15cb5b2edf0e449",
+          "testGitBlob": "9f0b608d36dd065b761ac5f83533a3b4bc5c302f",
+          "status": "SOURCE_REVIEW_CORRECTED",
+          "finding": "R0 test incorrectly expected typed disposition REJECTED for original native Function's business status REJECTED. Existing Function contract maps that status to FAILED."
+        },
+        {
+          "head": "475a0c2f12de164fd6149f812fee754d26f1aa6b",
+          "blob": "c6d1149bea35324a6b6ef721bd445de948218153",
+          "status": "R1_CANDIDATE",
+          "finding": "Same Builder corrected expected native typed disposition to FAILED, preserved original Effect/authority/credential negatives; awaiting exact cumulative CI."
+        }
+      ],
+      "qualificationTree": "24c6b44490b471d2c89066ea89662bf552603169"
+    }
+  ],
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
+  "unstartedRounds": 0,
+  "noAutomaticCorePromotion": true,
+  "limitations": [
+    "Native CLI process is an actual Node argv→AOT/SDK/KDP consumer, but a scoped demo, not a production CLI binary/distribution or OS-level integration of every target.",
+    "Selected original xDownload Interaction is advisory: even with --confirm, READY_FOR_KDP means PENDING_AUTHORIZATION, never a KDP Effect permit or actual download.",
+    "Physical OS child-process invocation adds transport evidence missing from B02 in-process CLI adapter; B06 already independently qualified loopback HTTP Form/Chat.",
+    "Complete CORE-014 needs Product/L1 actual required transports/architecture applicability and independent conformance approval; preserve PARTIAL."
+  ],
+  "qualificationHead": "b5762ae29ac7234d45d8bc1cbf974faebad39e2e",
+  "qualificationTree": "24c6b44490b471d2c89066ea89662bf552603169",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2323/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2323/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2323/3"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "schema": "dke.r18.source-dag-replay-plan/v1",
+  "masterIssue": 209,
+  "baseCommit": "e74521dff040c78a83014b69f0b36e190bce80e3",
+  "goal": "Actually execute a source-grounded transitive knowledge invalidation and read-only consumer projection, not just R17 direct-role check",
+  "source": {
+    "author": "FrameworkComputer/RTCRework",
+    "readmeBlob": "dbdfc6ba1556689864d733401f7c8f824d965cdf",
+    "readmePath": "../r16-d05-real-method-dag/README.md",
+    "guide203": "2023-11-12",
+    "targetGuide79": "2026-07-02",
+    "targetGuideRawSHA": null
+  },
+  "frozenObservations": {
+    "guide203": [
+      {
+        "referenceStep": 16,
+        "meaning": "REMOVE_MAINBOARD"
+      },
+      {
+        "referenceStep": 17,
+        "meaning": "REASSEMBLE_MAINBOARD"
+      }
+    ],
+    "guide79": [
+      {
+        "step": 16,
+        "role": "REMOVE_SSD"
+      },
+      {
+        "step": 17,
+        "role": "DISCONNECT_SPEAKER"
+      },
+      {
+        "step": 26,
+        "role": "REMOVE_MAINBOARD"
+      },
+      {
+        "step": 28,
+        "role": "PLACE_MAINBOARD"
+      }
+    ]
+  },
+  "requiredBehavior": [
+    "verify exact original upstream README Git Blob using actual original bytes",
+    "generate directed evidence DAG with source roots, cross-guide references, D05 method and read-only consumer",
+    "invalidate only affected downstream subgraph when both reference semantics mismatch",
+    "do not invalidate unrelated source-grounded RTC knowledge",
+    "do not auto-remap 16→26 or 17→28",
+    "if hypothetical target repairs semantic match, still block on absent full upstream raw hashes and independent Critic",
+    "reject unknown nodes, synthetic role overrides, bypass attempts, duplicate deps, cycle, false SAP/Effects",
+    "run native Node with local original bytes; version exact source+receipt, independently verify Git readback"
+  ],
+  "qualification": {
+    "independentSemanticCritic": "NOT_RUN",
+    "originalD05Full": 0,
+    "originalR8Full": 0,
+    "autonomousEV": 0,
+    "sap": 0,
+    "effects": 0,
+    "physicalRepair": "NOT_RUN"
+  },
+  "constraint": "No new Issue, no Release/L2 Freeze, no new Node major requirement; keep baseline R17 intact."
+}

@@ -1,0 +1,98 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r102-c2-dke-canonical-kg-r4-failclosed-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "R7_DIE_BRIDGE_SOURCE_NATIVE_SEAM_REAL_DKE_CANONICAL_KG_R4_DATA_FAIL_CLOSED",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "92f86f25e2915c79cdf377948d815cdb6faba4cf",
+    "tree": "f2d0b7b50fdbfe6a309ec68e82103fcd91d066d5",
+    "dataCommit": "5b7b5b1004fd5e44d34c76fcff923e3cc554d084",
+    "testCommit": "92f86f25e2915c79cdf377948d815cdb6faba4cf"
+  },
+  "dkeSource": {
+    "repository": "kaicreator-mm/domain-forge",
+    "pullRequest": 208,
+    "dataHead": "a5ebbc4a6779cbf8b3c076b1296ae658ec25d67a",
+    "blueprint": {
+      "path": "docs/standards/dke/DKE-0.0.1/demos/ev14-domain-blueprint-r0/BLUEPRINT_CANDIDATE_R1_SAP.json",
+      "gitBlob": "52722c7317285552bda8892bf0c4dd76904cbcb9",
+      "localFixturePath": "examples/dis-v020-native-sdk/fixtures/dke-ev14-blueprint-r1-sap.json",
+      "localFixtureGitBlob": "52722c7317285552bda8892bf0c4dd76904cbcb9"
+    },
+    "impactEdgeScopePolicy": {
+      "path": "docs/standards/dke/DKE-0.0.1/demos/ev14-domain-blueprint-r0/IMPACT_EDGE_SCOPE_POLICY_R2.json",
+      "gitBlob": "ad0cf8a40f1f13303ba7ffb1ce268fc489dee5cf",
+      "localFixturePath": "examples/dis-v020-native-sdk/fixtures/dke-ev14-impact-edge-scope-policy-r2.json",
+      "localFixtureGitBlob": "ad0cf8a40f1f13303ba7ffb1ce268fc489dee5cf"
+    },
+    "byteEqualityProof": "committed DIS fixture Git blobs equal the upstream Forge blobs at head a5ebbc4 byte for byte (52722c73.../ad0cf8a4...), so the consumed KG/DEDS candidate data is the real original source, not a paraphrase"
+  },
+  "native": {
+    "reader": {
+      "path": "examples/dis-v020-native-sdk/dke-canonical-kg-r4-reader.mjs",
+      "gitBlob": "893853b5a9521ed4ab3fd377cb432c1eecc55aef",
+      "originCommit": "5b7b5b1004fd5e44d34c76fcff923e3cc554d084"
+    },
+    "test": {
+      "path": "examples/dis-v020-native-sdk/c2-dke-canonical-kg-r4-failclosed.test.mjs",
+      "gitBlob": "d4c25cfc13bc868f358195ca4c4c6fd88bb1b25e",
+      "cases": 6
+    },
+    "integrationYaml": {
+      "path": ".woodpecker/dis-v020-integration.yaml",
+      "gitBlob": "e6716e4bc460f77e1374502f30a3be1cf971ce3f"
+    },
+    "seams": [
+      "compileDisV020Aot (tooling/build/dis-v020.mjs) — source origin trust map, git blob byte pins, qualification gate",
+      "loadDisV020Aot (packages/microkernel/dis-v020.mjs) — expectedDigest trust anchor, installer source anchors, local registry preflight, real KDP load, typed OBSERVATION invoke"
+    ]
+  },
+  "execution": {
+    "localWindows": {
+      "node": "v24.21.0",
+      "platform": "win32",
+      "command": "node --import tsx --test examples/dis-v020-native-sdk/c2-dke-canonical-kg-r4-failclosed.test.mjs",
+      "exitCode": 0,
+      "tests": 6,
+      "passed": 6,
+      "failed": 0
+    },
+    "ci": {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2471/1",
+      "node": "v24.21.0",
+      "platform": "linux",
+      "exitCode": 0,
+      "tests": 6,
+      "passed": 6,
+      "failed": 0,
+      "allContexts": [
+        {"context": "ci/woodpecker/pr/dis-v020-integration", "state": "SUCCESS", "url": "https://ci.kaicreator.com/repos/18/pipeline/2471/1"},
+        {"context": "ci/woodpecker/pr/verify-min-node", "state": "SUCCESS", "url": "https://ci.kaicreator.com/repos/18/pipeline/2471/2"},
+        {"context": "ci/woodpecker/pr/verify", "state": "SUCCESS", "url": "https://ci.kaicreator.com/repos/18/pipeline/2471/3"}
+      ]
+    }
+  },
+  "failClosedNegatives": [
+    {"class": "UNQUALIFIED_SAP", "refusal": ["DIS_ELEMENT_VALIDATION_INVALID at qualify for validation.authority SAP_QUALIFIED/OWNER_ATTESTED/DOMAIN_ORACLE", "DIS_FUNCTION_INPUT_INVALID for injected sap/qualification/ownerDecision fields", "reader asserts all six Forge SAP profiles stay CANDIDATE_NOT_QUALIFIED with disEffectsAuthorized false"], "result": "BLOCKED"},
+    {"class": "WRONG_SOURCE_OWNER", "refusal": ["DIS_SOURCE_ORIGIN_UNTRUSTED at compile when the trusted origin map attributes the Forge blueprint to another repository", "DIS_SOURCE_DOMAIN_MISMATCH when the consuming domain does not declare kaicreator-mm/domain-forge"], "result": "BLOCKED"},
+    {"class": "STALE_PIN", "refusal": ["DIS_BUILD_SOURCE_BYTES_DRIFT at compile when bytes drift under the current blob pin", "DIS_SOURCE_ANCHOR_STALE at load when the installer anchor pins the retired R0 Blueprint blob 93f12dea21cf77121ddf2d28bacbd60e88ede91e"], "result": "BLOCKED"},
+    {"class": "EFFECT_IMPERSONATION", "refusal": ["DIS_DATA_SOURCE_EXECUTION_FORBIDDEN when DKE DATA is bound as executable local code", "DIS_INTENT_INVALID for governed KDP intent without a selected business route", "DIS_LOCAL_NOT_QUALIFIED for local observation claiming governed effect or effect-kind binding", "DIS_LOCAL_REGISTRY_MISMATCH for forged registry digest", "invoke result is OBSERVATION authority NONE evidence.attested false and never a KDP permit"], "result": "BLOCKED"}
+  ],
+  "noFabricatedPositive": "The only positive case is a typed UNKNOWN candidate observation over the real candidate data: Root UNKNOWN, fullyQualifiedR8 0/53, qualifiedElementSAPs 0, qualifiedEffects 0, staticExecutableDagEdges 0, planDagEdges 6. No qualified positive was constructed or claimed.",
+  "observations": [
+    "Real Forge KG/DEDS candidate DATA (Blueprint R1 per-Element SAP candidate + R2 source-scoped impact edge policy) now flows through the real DIS AOT compile and SDK/KDP load seams natively in CI, on the exact heads pinned above.",
+    "Git blob equality between the DIS fixtures and the upstream Forge blobs makes the byte-exact provenance independently checkable from either repository.",
+    "Reader-level drift (DKE_EV14_KG_R4_ORIGINAL_DATA_DRIFT), scope invalidation (DKE_EV14_KG_R4_*_INVALID) and hostile input (getter/Proxy/inherited/symbol/injected authority) refusals are all asserted.",
+    "Concurrent-writer note: upstream advanced d56462af→90ee6d6e during preparation (R101 O2 lineage work took receipt id r101); this work rebased cleanly and uses r102."
+  ],
+  "limits": [
+    "No SAP, Oracle, Source Owner, Effect, R8 Cell or L2 qualification is granted, attested or promoted by this receipt; Forge R8 remains 0/53 and every consumed SAP profile remains CANDIDATE_NOT_QUALIFIED.",
+    "The consumed Forge data is a bounded source-receipt projection (36 GO rows + RFC references), not the full canonical publisher KG.",
+    "The Forge PR #208 head that carried the data (a5ebbc4) and this PR's receipts evolve independently; later commits on either side require their own CI and inherit nothing automatically.",
+    "The Woodpecker lane branch label reported by the server (dis/0.1.0-l2-candidate) is a server-side labeling artifact; GitHub statuses above are checked on exactly the pinned SHAs."
+  ]
+}

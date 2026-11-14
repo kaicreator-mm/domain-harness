@@ -1,0 +1,43 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r18-r20-native-integration-repaired",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "R18_R20_NATIVE_INTEGRATION_REPAIR_EXACT_SHA",
+  "notCurrentHead": true,
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "dfba82a7723d709ee22acd65b079fdcc98000f69",
+    "tree": "57b789dff8039888f39e7045e0216b9962ae87fb"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2243/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2243/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2243/3"
+    }
+  ],
+  "observations": [
+    "First-failure diagnosis from authenticated Woodpecker step logs, not CI status: #2240/1, #2241/1 and #2242/1 all failed on exactly one test, 'native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule', whose assert.throws validator received DisV020Error DIS_KDP_RECEIPT_BINDING_UNSUPPORTED from qualifyDisV020Artifact's R16 receipt-binding guard instead of the expected DIS_LOCAL_NOT_QUALIFIED.",
+    "Root cause: R19 installed a typed receipt contract on xdownload.confirmDownload, so the legacy negative test that mutated only binding.type now violated the earlier R16 guard; the product check order is load-bearing and pinned by the dedicated R16 test, so the defect was the incomplete fixture mutation, not product code.",
+    "Repair: the downgrade test clone now also strips receiptContract, restoring a pure KDP_INTENT-to-LOCAL downgrade mutation; 65/65 native consumer tests pass including R18 (3), R19 (4), R19.1 (3) and R20 (4), and the two CI commands after the previously failing one (conformance matrix validator 6/6, v010-c01 assembly 12/12) ran to completion in #2243/1 with 170 passing cases.",
+    "Reproduced before repair on Node v26.13.0 (65 tests, 1 fail) and verified after repair on Node v24.21.0 matching the CI worker; per the 2026-11-08 Owner clarification these are runtime execution facts, not semantic Node-version gates.",
+    "Local full gate outside the PR lanes: lint and typecheck green; test:root 449+21 passing under Node v24.21.0; the pre-existing Windows-only tar path failure in domain-harness-node packed-stage-equivalence P2-01 reproduces on clean base 4f48c22f, is outside the PR #1497 write-set and is not part of any PR CI context."
+  ],
+  "limits": [
+    "Historical SUCCESS receipt pinned to exact HEAD dfba82a7723d709ee22acd65b079fdcc98000f69 only; the commit adding this receipt and any later commit are not automatically covered.",
+    "verify-min-node is recorded as a factual CI context per the 2026-11-08 Owner clarification, not as a semantic conformance gate.",
+    "CORE-003 remains PARTIAL: full public Function profiles, complete recursive I/O schema vocabulary, independent business evidence attestation and broad cross-version ABI compatibility are still open.",
+    "R18 #2239 stays canceled and the #2240/#2241/#2242 failures stay immutable negative history; this receipt repairs the lane at the new exact SHA and does not rewrite them."
+  ]
+}

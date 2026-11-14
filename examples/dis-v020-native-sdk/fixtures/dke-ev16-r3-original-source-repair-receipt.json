@@ -1,0 +1,218 @@
+{
+  "schema": "dke.ev16-d02-d04.r3-source-first-repair-replay/1",
+  "outputTag": "DKE_EV16_D02_D04_FRESH_INDEPENDENT_REVIEW_REPAIR_R3",
+  "timestampNote": "GitHub commit timestamp is the authoritative publication time; hosted V8 actual replay in current task",
+  "authority": {
+    "masterIssue": 209,
+    "draftPr": 208,
+    "stage0CommentId": 6779441577,
+    "firstPassUrl": "https://github.com/kaicreator-mm/domain-forge/issues/209#issuecomment-6779441577",
+    "reviewedParentHead": "e3698df14a4affe8b787200c7de22d5ed983cd19",
+    "reviewedParentTree": "06f2c22ba26a7bd82068c69afd9ef1943115b44c"
+  },
+  "source": {
+    "scriptPreRepairBlob": "f6a68687259ed6cd6f30b895cbfe84fa7cf7e4a7",
+    "originalTallyProducer": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+    "inputGitBlobs": {
+      "graph": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+      "scope": "d5747c057c92bc357cc68053e43d96b36427e02c",
+      "rfc9110": "19a88abcb4df0744df2d55c6d1af53125b6d9bd2",
+      "rfc9111": "cef95c761dfcbc6f649019efa2cf5f97dc5f9020"
+    },
+    "originalTallyNodes": 807,
+    "rawRfcBytesFromPreviouslyCommittedExactPin": true
+  },
+  "actualExecution": {
+    "runtime": "CONNECTED_HOSTED_V8_EVAL_OF_LITERAL_GITHUB_ORIGINAL_MODULE_AND_REPAIRED_MODULE",
+    "nativeNode": "NOT_RUN",
+    "before": {
+      "passed": 10,
+      "total": 10,
+      "firstFailOpen": {
+        "case": "TALLY_CLAIM_SEMANTIC_TEXT_DRIFT_WITH_ORIGINAL_PIN",
+        "actual": "BOUNDED_ORIGINAL_TWO_DOMAIN_CQ"
+      }
+    },
+    "after": {
+      "passed": 23,
+      "total": 23,
+      "failed": 0,
+      "additionalNegative": 13,
+      "rawExactGitBlobChecks": 4,
+      "exactRawSourcePinsMatched": true,
+      "composition": {
+        "status": "UNKNOWN_NO_CROSS_PUBLISHER_ENTAILMENT",
+        "mode": "SOURCE_PREFLIGHT_ONLY_NO_EV16_CELL_EXECUTION",
+        "parentQualified": false
+      },
+      "tests": [
+        {
+          "id": "actual-original-publisher-and-Tally",
+          "expected": "BOUNDED_ORIGINAL_TWO_DOMAIN_CQ",
+          "actual": "BOUNDED_ORIGINAL_TWO_DOMAIN_CQ",
+          "passed": true
+        },
+        {
+          "id": "fake-Tally-original",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "fake-approved-graph-claim",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "silent-unsupported-rule-removal",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "forged-Owner-attestation",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "derived-crosscut-promoted",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "RFC-410-semantics-forged",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "RFC-no-store-semantics-forged",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "fake-P2-closure",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "wrong-RFC-source-Git-blob",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-graph-Claim-drift-original-pin-unchanged",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-raw-graph-byte-drift",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-nested-semantic-Claim-drift",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-rfc9110-outside-section-drift",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-rfc9111-outside-section-drift",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-unknown-Owner-field-smuggled",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-raw-scope-byte-drift",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-F2-false-parent-PASS",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-F2-forged-cross-publisher-link",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-F2-forged-Owner-approval",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-F2-forged-Effect",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-F2-false-SAP",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        },
+        {
+          "id": "r3-extra-untrusted-pin-authority",
+          "expected": "BLOCK",
+          "actual": "BLOCK",
+          "passed": true
+        }
+      ]
+    },
+    "afterSameWitness": {
+      "status": "BLOCK",
+      "reason": "SOURCE_PROJECTION_NOT_BOUND_TO_BYTES"
+    }
+  },
+  "findings": {
+    "P0": 0,
+    "P1Found": 1,
+    "P1Repaired": 1,
+    "P1Open": 0,
+    "P2Open": 2,
+    "P1": "Caller-supplied Git pins were not checked against actual raw graph/RFC/scope content and F2 composition had no mandatory explicit pending/UNKNOWN guard",
+    "P2": [
+      "No independently attested identity or accredited cross-domain semantic oracle in this session",
+      "Source release/currentness and source-owner ReviewDecision remain separate; historical RFC source pin may not prove future publisher revision"
+    ]
+  },
+  "qualification": {
+    "strictFreshDifferentIdentity": "NOT_ATTESTED_IN_THIS_CONVERSATION",
+    "sourceFirstReadingOrder": true,
+    "ownerReviewDecision": "NOT_RUN",
+    "formalEv16Cell": "NOT_RUN_OWNER_GATE",
+    "D02": "0/5",
+    "D04": "0/12",
+    "R8": "0/53",
+    "SAP": 0,
+    "effects": 0,
+    "releaseEligible": false
+  }
+}

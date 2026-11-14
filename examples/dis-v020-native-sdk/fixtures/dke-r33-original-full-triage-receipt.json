@@ -1,0 +1,488 @@
+{
+  "receiptVersion": "R33-R1",
+  "generatedAtUTC": "2026-11-10T13:38:24Z",
+  "triageBlob": "7dfc6f8a0ee1cfb9d5f8b29795668e62f8b942ca",
+  "testBlob": "52a9a04cd15d7a7e1cc52ec30ac385752b383c59",
+  "cliBlob": "c97e89c98d0d4f000beafe3edf635c48ef1aa1da",
+  "r32CheckerBlobVerifiedAtRuntime": "4cb132e06969fe60a28aa7ce376aa8d112309e37",
+  "noSourceCodeModifiedDuringThisRound": true,
+  "host": "local Windows workstation (kaicreator-mm workspace), Git Bash, fnm Node",
+  "node": "v24.21.0",
+  "command": "node run-r33.mjs --gaf=C:/xDev/kAiCreator/_tmp/r30-go-release/orig/HUMAN-uniprot.gaf.gz",
+  "headAtExecution": "a958a8f2d9dcd68a3e7fa9f702bb3d0437325fb4",
+  "exitCode": 0,
+  "verdict": "SOURCE_SCOPED_DISPOSITIONS_COMPUTED",
+  "qualification": "NOT_QUALIFIED",
+  "fixtureSuite": {
+    "passed": 13,
+    "total": 13,
+    "log": "test-r33.mjs exit 0; {\"passed\":13,\"total\":13,\"originalGzip\":\"NOT_RUN\",\"qualification\":\"NOT_QUALIFIED\"}"
+  },
+  "sourceIdentity": {
+    "gzipSha256VerifiedPreflightByHostSha256sum": true,
+    "gzipSha256VerifiedPreflightByCli": true,
+    "decompressedSha256Recomputed": true,
+    "path": "C:/xDev/kAiCreator/_tmp/r30-go-release/orig/HUMAN-uniprot.gaf.gz",
+    "gzipBytes": 12109254,
+    "gzipSha256": "a0afba19dfb1f8fa996bc1bdcd61fd0c9bd4cf0d2bf2509d09ac86993c0e70a2",
+    "decompressedBytes": 177827252,
+    "decompressedSha256": "11278a15e30b13fa3c40203a7fd06432575d94dfbdd232cb815d94a1e19beb81"
+  },
+  "initialFailR33R0": {
+    "status": "FAIL_CLOSED_PREFLIGHT_NO_OUTPUT",
+    "symptom": "run-r33.mjs threw R32_CHECKER_SOURCE_BLOB_DRIFT before any streaming",
+    "capturedStderr": [
+      "Error: R32_CHECKER_SOURCE_BLOB_DRIFT",
+      "    at file:///C:/xDev/kAiCreator/domain-forge/i209-r33-zcode/docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r33-go-ic-source-triage/run-r33.mjs:23:50",
+      "",
+      "Node.js v24.21.0"
+    ],
+    "rootCause": "Git for Windows system core.autocrlf=true checked the worktree out with CRLF; the pinned R32 checker blob is LF. Node readFileSync hashed raw CRLF bytes (sha1 97a273e0f170f7ce51a99df4d1eeb584db3662b5), while git hash-object applied the clean filter and masked the drift (returned 4cb132e0...). The fail-closed pin behaved exactly as designed; the checkout was byte-skewed.",
+    "repair": "No script modified. Worktree-scoped core.autocrlf=false (extensions.worktreeConfig=true; config written to .git/worktrees/i209-r33-zcode/config.worktree only, other worktrees untouched), then full deterministic rewrite: git ls-files -z | xargs rm -f && git checkout HEAD -- . (714 tracked files, byte-exact LF). Note: git status round-trip forgiveness showed the CRLF tree as clean and checkout-index -f -a did not rewrite; rm+checkout HEAD was the reliable rewrite. Post-repair git hash-object (no filters) = 4cb132e06969fe60a28aa7ce376aa8d112309e37.",
+    "verification": "node test-r33.mjs 13/13 PASS, then two consecutive full-file runs produced byte-identical JSON output."
+  },
+  "determinism": {
+    "repeatRuns": 2,
+    "byteIdenticalOutput": true,
+    "method": "diff of stdout JSON between run 1 and run 2"
+  },
+  "reconciliation": {
+    "rows": 910476,
+    "countsSum": 910476,
+    "fatalBreakdownSum": "228 WITH_FROM_REQUIRED_IC + 2 RELATION_ASPECT_INVALID + 3 IC_WITH_FROM_GO_SELF_REFERENCE = 233",
+    "softEvidenceSum": "IPI 3736 + IGI 19 + ISS 12 + ISM 2 = 3769",
+    "r32HistoricalDelta": "R32 fatal 230 -> R33 fatal 233: +3 new GORULE:0000016 self-reference violations; soft identical 3769; IC_WITH_FROM_GO_WITNESS_MISSING 0 hits (no non-GO nonempty With/From IC row exists in this publisher file)",
+    "r32ReferenceStatus": "GAF22_FORMAT_REJECT (recomputed live by the R32 scanner during this run)"
+  },
+  "runOutput": {
+    "schema": "dke.r33.go-source-triage/1",
+    "status": "SOURCE_SCOPED_DISPOSITIONS_COMPUTED",
+    "source": {
+      "url": "https://release.geneontology.org/2026-08-05/annotations/gaf/HUMAN-uniprot.gaf.gz",
+      "gzipSha256": "a0afba19dfb1f8fa996bc1bdcd61fd0c9bd4cf0d2bf2509d09ac86993c0e70a2",
+      "gzipBytes": 12109254,
+      "sourceSnapshot": "2026-07-26",
+      "producerAuthority": "CDN_BYTES_SHA256_MATCH_ONLY_UNSIGNED",
+      "r32GateGitBlob": "4cb132e06969fe60a28aa7ce376aa8d112309e37"
+    },
+    "results": {
+      "rows": 910476,
+      "counts": {
+        "QUARANTINE_FATAL": 233,
+        "REVIEW_SOFT": 3769,
+        "STRUCTURAL_CANDIDATE": 906474
+      },
+      "hardReasons": {
+        "WITH_FROM_REQUIRED_IC": 228,
+        "RELATION_ASPECT_INVALID": 2,
+        "IC_WITH_FROM_GO_SELF_REFERENCE": 3
+      },
+      "softEvidence": {
+        "IPI": 3736,
+        "IGI": 19,
+        "ISS": 12,
+        "ISM": 2
+      },
+      "samples": {
+        "QUARANTINE_FATAL": [
+          {
+            "line": 18026,
+            "db": "UniProtKB",
+            "dbObjectId": "O00410",
+            "evidence": "IC",
+            "goId": "GO:0031965",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 19122,
+            "db": "UniProtKB",
+            "dbObjectId": "O00468",
+            "evidence": "IC",
+            "goId": "GO:0031012",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 19204,
+            "db": "UniProtKB",
+            "dbObjectId": "O00469",
+            "evidence": "IDA",
+            "goId": "GO:0008475",
+            "errors": [
+              "RELATION_ASPECT_INVALID"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 29212,
+            "db": "UniProtKB",
+            "dbObjectId": "O14793",
+            "evidence": "IC",
+            "goId": "GO:0061450",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 31811,
+            "db": "UniProtKB",
+            "dbObjectId": "O14933",
+            "evidence": "IC",
+            "goId": "GO:0005737",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 43734,
+            "db": "UniProtKB",
+            "dbObjectId": "O15533",
+            "evidence": "IC",
+            "goId": "GO:0005783",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 45637,
+            "db": "UniProtKB",
+            "dbObjectId": "O43187",
+            "evidence": "IC",
+            "goId": "GO:0005737",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 47730,
+            "db": "UniProtKB",
+            "dbObjectId": "O43318",
+            "evidence": "IC",
+            "goId": "GO:0005737",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 47731,
+            "db": "UniProtKB",
+            "dbObjectId": "O43318",
+            "evidence": "IC",
+            "goId": "GO:0005737",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 52599,
+            "db": "UniProtKB",
+            "dbObjectId": "O43612",
+            "evidence": "IC",
+            "goId": "GO:0005576",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 54603,
+            "db": "UniProtKB",
+            "dbObjectId": "O43734",
+            "evidence": "IC",
+            "goId": "GO:0005737",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          },
+          {
+            "line": 54604,
+            "db": "UniProtKB",
+            "dbObjectId": "O43734",
+            "evidence": "IC",
+            "goId": "GO:0031234",
+            "errors": [
+              "WITH_FROM_REQUIRED_IC"
+            ],
+            "reviewReasons": []
+          }
+        ],
+        "REVIEW_SOFT": [
+          {
+            "line": 2634,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A5B9",
+            "evidence": "IPI",
+            "goId": "GO:0042105",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 2980,
+            "db": "UniProtKB",
+            "dbObjectId": "A0AVF1",
+            "evidence": "IPI",
+            "goId": "GO:0030992",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 3223,
+            "db": "UniProtKB",
+            "dbObjectId": "A0JLT2",
+            "evidence": "IPI",
+            "goId": "GO:0070847",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 4686,
+            "db": "UniProtKB",
+            "dbObjectId": "A2RRP1",
+            "evidence": "IPI",
+            "goId": "GO:0070939",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 5711,
+            "db": "UniProtKB",
+            "dbObjectId": "A4GXA9",
+            "evidence": "IPI",
+            "goId": "GO:1905347",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 5969,
+            "db": "UniProtKB",
+            "dbObjectId": "A5D8V6",
+            "evidence": "IPI",
+            "goId": "GO:0000813",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 5971,
+            "db": "UniProtKB",
+            "dbObjectId": "A5D8V6",
+            "evidence": "IPI",
+            "goId": "GO:0000813",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 6162,
+            "db": "UniProtKB",
+            "dbObjectId": "A5X5Y0",
+            "evidence": "IPI",
+            "goId": "GO:1904602",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 6314,
+            "db": "UniProtKB",
+            "dbObjectId": "A6H8Y1",
+            "evidence": "IPI",
+            "goId": "GO:0000126",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 7649,
+            "db": "UniProtKB",
+            "dbObjectId": "A6NHQ2",
+            "evidence": "IPI",
+            "goId": "GO:0005730",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 7654,
+            "db": "UniProtKB",
+            "dbObjectId": "A6NHQ2",
+            "evidence": "IPI",
+            "goId": "GO:0031428",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          },
+          {
+            "line": 8121,
+            "db": "UniProtKB",
+            "dbObjectId": "A6NJ78",
+            "evidence": "IPI",
+            "goId": "GO:0034708",
+            "errors": [],
+            "reviewReasons": [
+              "WITH_FROM_SOFT_EVIDENCE_OBLIGATION"
+            ]
+          }
+        ],
+        "STRUCTURAL_CANDIDATE": [
+          {
+            "line": 5,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IPI",
+            "goId": "GO:0005515",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 6,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IEA",
+            "goId": "GO:0008486",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 7,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "ISS",
+            "goId": "GO:0008486",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 8,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IEA",
+            "goId": "GO:0016462",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 9,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IEA",
+            "goId": "GO:0016787",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 10,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IBA",
+            "goId": "GO:0052845",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 11,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IBA",
+            "goId": "GO:0071544",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 12,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IBA",
+            "goId": "GO:1901909",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 13,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IBA",
+            "goId": "GO:0005634",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 14,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IBA",
+            "goId": "GO:0005737",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 15,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "ISS",
+            "goId": "GO:0005737",
+            "errors": [],
+            "reviewReasons": []
+          },
+          {
+            "line": 16,
+            "db": "UniProtKB",
+            "dbObjectId": "A0A024RBG1",
+            "evidence": "IEA",
+            "goId": "GO:0005737",
+            "errors": [],
+            "reviewReasons": []
+          }
+        ]
+      },
+      "canonicalRowSha256": {
+        "QUARANTINE_FATAL": "0e9a875ecf88c40e477067d4f09298b8df4fed33384dd011d662ce4f301ec949",
+        "REVIEW_SOFT": "2bf208ced4ee4a347f211861ab4461a5d467ee2a285ea23505b13140c085aeb9",
+        "STRUCTURAL_CANDIDATE": "d92a9b806568966e37f52f40f2c99fabe03bb5f10e964283638d8b2db846323f"
+      },
+      "checksumMeaning": "SHA256 of each ordered UTF8 GAF data row plus LF; NOT the original binary gzip hash"
+    },
+    "r32Reference": {
+      "fatalErrorCount": 230,
+      "softEvidenceObligations": 3769,
+      "publishedSourceOriginalDisposition": "GAF22_FORMAT_REJECT"
+    },
+    "qualification": {
+      "semanticQualification": "NOT_QUALIFIED",
+      "independentCritic": "NOT_RUN",
+      "sapQualified": 0,
+      "d03FullQualified": "0/15",
+      "r8FullQualified": "0/53",
+      "disNative": "NOT_RUN",
+      "disEffects": "NONE"
+    }
+  }
+}

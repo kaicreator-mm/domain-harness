@@ -1,0 +1,75 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B03",
+  "roundId": "B03-02",
+  "globalRoundId": "R39",
+  "status": "VERIFIED",
+  "startParent": "1ad7748842bb02693790e0f3cd2081cfb0fd113f",
+  "testBlob": "f10a3b8f4452d8bf6db7343d10085590df69d3f9",
+  "sourceHead": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+  "receipt": "receipts/r39-b03-installer-target-ci.json",
+  "tests": {
+    "positive": [
+      "B03-02 R39 independently installed exact Target accepts original Tally xDownload canonical BUILD without Effect",
+      "B03-02 R39 legacy unqualified Target cannot be interpreted as independently pinned"
+    ],
+    "negative": [
+      "B03-02 R39 targeted AOT requires independent installed Target, not a self-authorizing program label",
+      "B03-02 R39 correct Target identity never overrides stale installer AOT or source pin"
+    ]
+  },
+  "limitations": [
+    "Installer expectedTarget is a trusted caller-provided exact selection identity, not physical OS detection or product certification.",
+    "Target selection does not supersede installer digest/source anchor or KDP Effect authority."
+  ],
+  "originCommit": "b57c20126bcd6b64f2e5031486d1bab5a6dabc4f",
+  "originTree": "13d100190e7a2c572952a38cbf20a76d8b3b64af",
+  "finalTree": "d2a4fa1bdb14a939067c551353de2e158ec6498d",
+  "testGitBlob": "f10a3b8f4452d8bf6db7343d10085590df69d3f9",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+    }
+  ],
+  "history": [
+    {
+      "head": "b57c20126bcd6b64f2e5031486d1bab5a6dabc4f",
+      "native": "SUCCESS",
+      "minNode": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2283/1"
+    },
+    {
+      "head": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+        }
+      ],
+      "meaning": "Exact later full-suite requalification preserving original immutable source test Blob"
+    }
+  ]
+}

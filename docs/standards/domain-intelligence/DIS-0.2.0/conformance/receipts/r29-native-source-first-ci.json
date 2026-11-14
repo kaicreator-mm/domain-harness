@@ -1,0 +1,41 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r29-native-source-first-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "R29_NATIVE_TWO_BUSINESS_SOURCE_FIRST_CASE_ELEMENT_PROPOSAL_AND_UNQUALIFIED_SAP",
+  "notCurrentHead": true,
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "91e48b1b0d6a30173cc0b3cce001040878e381bb",
+    "tree": "6e4a57a6c8be275337fc816c85cc41c4a634c632"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2266/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2266/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2266/3"
+    }
+  ],
+  "observations": [
+    "R29 includes actual source-first DKE one-model review ledger and proposed original Tally GH source-locator overlay, both reused without editing Git Blob identity and exercised by native selected Business Knowledge readers.",
+    "Original 807-node full-graph identity and selected 14-node projection are bound, with original GH Case outcome locator gap between 16:24 and 23:03 still OPEN.",
+    "Two case-specific Element semantic owner proposals are compared with a generic incident Element; separate actual selected Business Package ownership does not itself prove independent semantic Element ownership.",
+    "After the exact R29 same-writer negative-fixture repair, Woodpecker #2266/1, #2266/2 and #2266/3 all reported SUCCESS at exactly this HEAD."
+  ],
+  "limits": [
+    "One-model source-first reviewer is not independent domain Oracle; no authoritative Tally source-owner acceptance, approved GH locator repair or qualified SAP.",
+    "R29 is historical SHA-only; R30 changes to mandatory Element version and source-linked validation require their own exact-SHA CI.",
+    "No release, Freeze, active Effect or automatic source adoption. CORE-002, CORE-005, CORE-003, CORE-016 remain PARTIAL."
+  ]
+}

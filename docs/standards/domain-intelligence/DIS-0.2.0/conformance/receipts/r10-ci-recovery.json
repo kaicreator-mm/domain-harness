@@ -1,0 +1,50 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r10-ci-recovery",
+  "disVersion": "0.2.0",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "c9cc8d63e13b150cf462af05a58daef5748f0030",
+    "tree": "82bdbd004e39eeb620d115b82075c39e9ae5d3e3"
+  },
+  "status": "SUCCESS",
+  "scope": "HISTORICAL_EXACT_SHA",
+  "notCurrentHead": true,
+  "recoversFrom": "r10-candidate-blocked",
+  "blockCause": "CI infrastructure, not candidate code: npm runs unreviewed dependency install scripts with only an advisory warning, so better-sqlite3's install script fetched its prebuilt binary from github.com releases on every npm ci. The worker's direct GitHub egress returned 504s, prebuild-install fell back to node-gyp, and the agent image ships no make, so npm ci exited 1 in all three workflows (pipelines 2227 and 2228). package.json and package-lock.json are byte-identical to the R9.5 baseline (pipeline 2223 SUCCESS at 7954bd91 with the same lockfile).",
+  "fix": "npm ci in all three PR workflows now pins the better-sqlite3 prebuild download to the npmmirror binary mirror via npm_config_better_sqlite3_binary_host_mirror (a native prebuild-install mirror option); npmmirror mirrors every release asset 1:1. A local Node24 full gate also exposed and fixed a staged/live pack inventory divergence in the new-workspace test staging (packed-fixture-stage.ts), which is not exercised by PR CI.",
+  "counts": {
+    "native27": 27,
+    "bridge34": 34,
+    "physical7": 7,
+    "sourceConsumer26": 26,
+    "sourceSelected9": 9,
+    "totalNamed": 103,
+    "additionalContexts": {
+      "conformanceMatrixValidator": 5,
+      "c01ExternalEffectAssembly": 12
+    }
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2229/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2229/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2229/3"
+    }
+  ],
+  "limits": [
+    "Same limits as r9.5-baseline: named Demo cases are not distinct DIS requirements; later commits must not inherit PASS.",
+    "Interaction DIS020-CORE-014 stays PARTIAL: no real Chat/Form/CLI UI transport, no external download Host execution, cross-mode conformance not demonstrated.",
+    "Harness/LLM, Experience/Evolution optional profiles and governance freeze remain NOT_RUN."
+  ]
+}

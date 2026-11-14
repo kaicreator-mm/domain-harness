@@ -1,0 +1,39 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r19.1-integration-blocked",
+  "disVersion": "0.2.0",
+  "status": "BLOCKED",
+  "notCurrentHead": true,
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "4af4cfd82cd6983970279f454e365ecd2b338089",
+    "tree": "7517d615f12f92dc26967c6790d96ff16cdf214f"
+  },
+  "scope": "R19.1_PREVIOUS_EXACT_SHA_INTEGRATION_FAILURE",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "FAILURE",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2241/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2241/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2241/3"
+    }
+  ],
+  "observations": [
+    "R19.1 exact source had DIS integration failure despite both other Woodpecker checks succeeding.",
+    "All source-level checks of source-real Tally release input, xDownload policy output, zero-argument schema were partial targeted probes, not the failed integrated SDK lane."
+  ],
+  "limits": [
+    "The first Woodpecker failed step is unavailable via the GitHub status connector and CI website is inaccessible from this session.",
+    "This negative record is not a PASS and is not referenced as support for any VERIFIED requirement.",
+    "R20 new Handle contract and native tests are in successor commit, not present here."
+  ]
+}

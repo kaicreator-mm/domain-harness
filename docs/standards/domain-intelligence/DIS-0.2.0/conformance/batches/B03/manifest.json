@@ -1,0 +1,163 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B03",
+  "status": "VERIFIED",
+  "mode": "DELIVERY_FIRST_SEPARATELY_COMMITTED_EXACT_SHA_ROUNDS",
+  "masterIssue": 1499,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "44ab1177f0c8c7f5a66a258feba1fcfbb7228bbe",
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1,
+    "ci": "Woodpecker #2281/1-3 SUCCESS"
+  },
+  "target": "C3 actual Target selected digest/installer anchor contract; source/SAP authority admission separation. No invented OS Target variant validation.",
+  "rounds": [
+    {
+      "batchRoundId": "B03-01",
+      "globalRoundId": "R38",
+      "status": "VERIFIED",
+      "test": "examples/dis-v020-native-sdk/b03-target-closure.test.mjs",
+      "originalHead": null,
+      "receipt": "receipts/r38-b03-target-roster-ci.json",
+      "result": "EXACT_SHA_3_OF_3_SUCCESS",
+      "originalSourceHead": "1ad7748842bb02693790e0f3cd2081cfb0fd113f",
+      "sourceHead": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+      "testGitBlob": "c2323cfa3e307bf8f4bd3729870663c45d3e8b90",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+        }
+      ]
+    },
+    {
+      "batchRoundId": "B03-02",
+      "globalRoundId": "R39",
+      "status": "VERIFIED",
+      "test": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+      "originalHead": null,
+      "receipt": "receipts/r39-b03-installer-target-ci.json",
+      "result": "EXACT_SHA_3_OF_3_SUCCESS",
+      "originalSourceHead": "b57c20126bcd6b64f2e5031486d1bab5a6dabc4f",
+      "sourceHead": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+      "testGitBlob": "f10a3b8f4452d8bf6db7343d10085590df69d3f9",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+        }
+      ]
+    },
+    {
+      "batchRoundId": "B03-03",
+      "globalRoundId": "R40",
+      "status": "VERIFIED",
+      "test": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+      "originalHead": null,
+      "receipt": "receipts/r40-b03-target-sap-boundary-ci.json",
+      "result": "EXACT_SHA_3_OF_3_SUCCESS",
+      "originalSourceHead": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+      "sourceHead": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+      "testGitBlob": "e4e91b820bc4e551d3b40270102115524755f9bf",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+        }
+      ]
+    }
+  ],
+  "acceptance": "Each round committed independently, final test Blob and exact 3/3 CI in own receipt, failures/repairs never retroactive PASS. Batch final full replay may requalify earlier unmodified Blobs.",
+  "authorityLimit": "Optional experimental Target selection identity and module digest label does not certify installed physical OS, independent source owner, SAP or Product/L1 applicability.",
+  "nextGate": "Independent source owner/semantic Oracle and actual per-Target implementation from approved Product/L1 scope.",
+  "statusCounts": {
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "qualificationHead": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+  "qualificationTree": "d2a4fa1bdb14a939067c551353de2e158ec6498d",
+  "history": [
+    {
+      "head": "1ad7748842bb02693790e0f3cd2081cfb0fd113f",
+      "native": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2282/1"
+    },
+    {
+      "head": "b57c20126bcd6b64f2e5031486d1bab5a6dabc4f",
+      "native": "SUCCESS",
+      "minNode": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2283/1"
+    },
+    {
+      "head": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+        }
+      ]
+    }
+  ],
+  "batchResult": "3 individually source-committed rounds, 11 named native cases, final #2284/1-3 3/3 SUCCESS. No real multi-Target/source/SAP qualification.",
+  "coreStateAfter": {
+    "verified": 9,
+    "partial": 7
+  },
+  "optionalStateAfter": {
+    "notRun": 4
+  },
+  "governanceStateAfter": {
+    "notRun": 1
+  }
+}

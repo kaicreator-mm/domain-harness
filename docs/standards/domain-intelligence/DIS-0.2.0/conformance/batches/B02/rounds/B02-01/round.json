@@ -1,0 +1,61 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B02",
+  "roundId": "B02-01",
+  "globalRoundId": "R35",
+  "status": "VERIFIED",
+  "startParent": "8ad01592e6f3d4ccc533be12b170a957e0da99ab",
+  "sourceHead": "1a803ac452348dc73afea1483a9283cfe527abfc",
+  "finalTree": "8a478066e61e304c77b9515ee6e92712734b61f4",
+  "receipt": "receipts/r35-b02-selected-target-ci.json",
+  "testPath": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+  "positive": [
+    "B02-01 R35 real selected Tally and xDownload Business packages resolve original source and KDP implementation without target fiction"
+  ],
+  "negative": [
+    "B02-01 R35 install refuses tampered selected module bytes or unbound source before KDP boot",
+    "B02-01 R35 undeclared runtime Target selection is rejected, not implicitly treated as Windows/Linux/Android conformance"
+  ],
+  "requirements": [
+    "DIS020-CORE-008"
+  ],
+  "sourceBoundary": "Actual selected Tally/xDownload Business and capability route only; no target-specific multi-OS AOT. Real Host operations not invoked.",
+  "ciStatus": "VERIFIED",
+  "notes": [
+    "Source-pinned package and KDP Route selection is not a proof of Windows/Linux/Android Target specialization."
+  ],
+  "originCommit": "2181072c1a5101366b90ec8aa2c65dde9c571b15",
+  "originTree": "30ba4e1b8909a30850366911bd996247890a8f0e",
+  "testGitBlob": "f76cd33303363848753f870c4797833c54a2fd88",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "2181072c1a5101366b90ec8aa2c65dde9c571b15",
+      "native": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2278/1"
+    },
+    {
+      "sourceHead": "1a803ac452348dc73afea1483a9283cfe527abfc",
+      "native": "SUCCESS",
+      "minNode": "SUCCESS",
+      "verify": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r14-d01-ci-recovered",
+  "disVersion": "0.2.0",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "51a39d293c06402835a28ac9a766f94d4933eccc",
+    "tree": "9c1676c446f30e2b150b1d1b4dd047d1aac6eb30"
+  },
+  "status": "SUCCESS",
+  "scope": "HISTORICAL_EXACT_SHA_R11_WITH_R13_VALIDATOR_REPAIR",
+  "notCurrentHead": true,
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2234/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2234/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2234/3"
+    }
+  ],
+  "observed": [
+    "Three GitHub combined status contexts at exact SHA were read as success on 2026-11-08.",
+    "The existing R11 original-source Function Contract positive/negative tests and R13 validator repair were present at that SHA.",
+    "Prior R11 integration FAILURE (2232/1) remains preserved in separate blocked receipt; this success does not rewrite it."
+  ],
+  "limits": [
+    "This record verifies the named R11 Function checks only, not full CORE-003; KDP_INTENT typed receipts, independent business evidence attestation, all Function schema and cross-version compatibility remain open.",
+    "The newly authored D02/D03 candidate tests are NOT covered by #2234; require their own exact-SHA Woodpecker status.",
+    "Woodpecker status proves CI contexts, not an independent semantic oracle, external Host Effect or L2 authority."
+  ]
+}

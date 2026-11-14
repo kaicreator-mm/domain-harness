@@ -1,0 +1,480 @@
+{
+  "schema": "dke.cross-domain-benchmark-selection/3",
+  "version": "R8",
+  "status": "DOMAIN_DESIGN_SELECTED_NO_D05_EXECUTION",
+  "authority": {
+    "issue": "https://github.com/kaicreator-mm/domain-forge/issues/209",
+    "parentSelectionRef": "1edcdded9153819172984c3381df72b5e20ffd3f",
+    "replacesActiveR7": "R7 unchanged historically; R8 adds D05, does not remove D01-D04"
+  },
+  "domainSelection": [
+    {
+      "id": "D01",
+      "name": "NIST SSDF v1.1 vulnerability response (RV)",
+      "sourceStatus": "HISTORICAL_BOUNDED_ORACLE_UNQUALIFIED",
+      "originalSource": {
+        "url": "https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-218.pdf",
+        "pilotOracle": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/data/source_oracle.json",
+        "rawSourceSha256": null
+      }
+    },
+    {
+      "id": "D02",
+      "name": "Tally software engineering knowledge graph",
+      "sourceStatus": "PINNED_ORIGINAL_GRAPH; CLAIMS_NOT_QUALIFIED",
+      "originalSource": {
+        "repo": "kaicreator-mm/tally",
+        "ref": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+        "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+        "gitBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+      }
+    },
+    {
+      "id": "D03",
+      "name": "Gene Ontology (GO ontology + organism-specific GOA/GAF)",
+      "sourceStatus": "OFFICIAL_SOURCE_DISCOVERED; EXACT_DATASETS_NOT_YET_SNAPSHOTTED",
+      "originalSource": {
+        "ontology": "https://geneontology.org/docs/download-ontology/",
+        "annotations": "https://geneontology.org/docs/download-go-annotations/",
+        "annotationFormat": "https://geneontology.org/docs/go-annotation-file-gaf-format-2.2/",
+        "semantics": "https://geneontology.org/docs/ontology-relations/",
+        "rawOntologySha256": null,
+        "rawGafSha256": null,
+        "releaseDate": null
+      }
+    },
+    {
+      "id": "D04",
+      "name": "IETF HTTP Semantics + HTTP Caching RFCs",
+      "sourceStatus": "AUTHORITATIVE_RFC_PAGES_VERIFIED; EXACT_SOURCE_BYTES_NOT_YET_SNAPSHOTTED",
+      "originalSource": {
+        "rfc9110": "https://www.rfc-editor.org/rfc/rfc9110.html",
+        "rfc9111": "https://www.rfc-editor.org/rfc/rfc9111.html",
+        "errata": "https://www.rfc-editor.org/series/rfc-errata/",
+        "rawRfc9110Sha256": null,
+        "rawRfc9111Sha256": null,
+        "verifiedErrataSnapshotSha256": null
+      }
+    },
+    {
+      "id": "D05",
+      "name": "Notebook computer hardware fault diagnosis and repair knowledge",
+      "domainClass": "evidence-bounded-causal-diagnosis-and-repair-procedures",
+      "priority": "CORE_CHALLENGE",
+      "sourceStatus": "OFFICIAL_SOURCE_URLS_VERIFIED; RAW_BYTES_AND_REVISION_PIN_NOT_YET_CAPTURED",
+      "originalSource": {
+        "primaryMaker": "Lenovo",
+        "device": "ThinkPad T480 machine types 20L5/20L6",
+        "officialManual": "https://download.lenovo.com/pccbbs/mobiles_pdf/t480_hmm_en.pdf",
+        "officialSupport": "https://pcsupport.lenovo.com/gb/en/products/laptops-and-netbooks/thinkpad-t-series-laptops/thinkpad-t480-type-20l5-20l6/document-userguide",
+        "officialFRUVideoIndex": "https://support.lenovo.com/us/en/solutions/ht510663",
+        "secondaryMaker": "Framework",
+        "secondaryDevice": "Framework Laptop 13 11th Gen Intel Core",
+        "officialBlinkCode": "https://knowledgebase.frame.work/framework-laptop-13-blink-code-diagnostic-SJKOFf_Dxl",
+        "officialMainboardReset": "https://guides.frame.work/Guide/Fully%2BResetting%2Bthe%2BMainboard%2BState/113?permalink=1",
+        "primaryPdfSha256": null,
+        "secondaryHtmlSnapshotsSha256": null,
+        "usageRights": "Lenovo manual copyrighted; link, cite, limited factual extraction only. Source terms for full reproduction/ML training need separate review. iFixit API excluded due to explicit LLM training prohibition and non-commercial API conditions."
+      },
+      "scopedKnowledge": {
+        "primary": "T480 symptoms/error→diagnostic-test→possible FRU/action sequence; power and display examples; mandatory maintenance safety context; part/model compatibility",
+        "secondary": "Framework 11th Gen Intel no-power/reset cases; POST blink diagnostic meaning; different model generation/board assumptions",
+        "minimumSourceClausesToSample": 30,
+        "preliminaryCaseTargets": {
+          "symptomDiagnosticChains": 6,
+          "precautionPreconditions": 4,
+          "modelApplicabilityAndReplacement": 4,
+          "unknownOrInsufficientObservation": 4,
+          "crossManufacturerTransferNegatives": 4,
+          "sourceChangeOrMethodAOTInvalidation": 4
+        },
+        "note": "These are experiment DESIGN targets, not sourced/executed counts or proof of any physical repair."
+      },
+      "epistemicConstraints": [
+        "Observed symptom is not a confirmed defective part; uncertainty must remain if independent diagnostic evidence absent",
+        "Decision trees must retain conditional order and safety prerequisites; no risky intervention proposed from incomplete evidence",
+        "Never transfer FRU/connector/BIOS/reset rule across vendor or laptop generation without exact model/version support",
+        "Source-validated repair recommendation != observed successful repair; physical repair verification remains NOT_RUN",
+        "Never treat diagnostic simulation as external hardware trace or technician signoff"
+      ],
+      "candidateTools": [
+        "python schema/source clause checker",
+        "SHACL only if graph native",
+        "Souffle for cause/step dependency reachability when nontrivial",
+        "Z3 for conditional constraints when nontrivial",
+        "no default probabilistic engine absent justified probabilistic diagnostic benchmark"
+      ]
+    }
+  ],
+  "evCrossDomain": [
+    {
+      "id": "EV01",
+      "domains": [
+        "D01",
+        "D03",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV02",
+      "domains": [
+        "D04",
+        "D03"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": false
+    },
+    {
+      "id": "EV03",
+      "domains": [
+        "D01",
+        "D04",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV04",
+      "domains": [
+        "D02",
+        "D03",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV05",
+      "domains": [
+        "D04",
+        "D03",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV06",
+      "domains": [
+        "D03",
+        "D02",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV07",
+      "domains": [
+        "D03",
+        "D01",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV08",
+      "domains": [
+        "D03",
+        "D04",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV09",
+      "domains": [
+        "D04",
+        "D01",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV10",
+      "domains": [
+        "D01",
+        "D03",
+        "D04",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV11",
+      "domains": [
+        "D04",
+        "D03",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV12",
+      "domains": [
+        "D03",
+        "D04",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV13",
+      "domains": [
+        "D02",
+        "D03",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV14",
+      "domains": [
+        "D03",
+        "D04"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": false
+    },
+    {
+      "id": "EV15",
+      "domains": [
+        "D04",
+        "D03"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": false
+    },
+    {
+      "id": "EV16",
+      "domains": [
+        "D04",
+        "D02"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": false
+    },
+    {
+      "id": "EV17",
+      "domains": [
+        "D03",
+        "D01",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    },
+    {
+      "id": "EV18",
+      "domains": [
+        "D01",
+        "D02",
+        "D03",
+        "D04",
+        "D05"
+      ],
+      "executionStatus": "NOT_RUN_R8_CROSS_DOMAIN",
+      "priorEvidence": "HISTORICAL_ONLY",
+      "oracle": "NEEDS_INDEPENDENT_LOCK",
+      "mandatory": "source-grounded evaluator + tool receipts + provenance + limits + per-round experience",
+      "priorR7Execution": "NOT_RUN_OR_UNRELATED_PRIOR_ONLY",
+      "newD05Scope": true
+    }
+  ],
+  "repairCasePlan": [
+    {
+      "id": "D05-R01",
+      "kind": "diagnosis",
+      "expected": "same symptom has multiple candidate causes; no definitive FRU without observations",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R02",
+      "kind": "diagnosis",
+      "expected": "source-backed diagnostic test and action sequence preserved",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R03",
+      "kind": "negative",
+      "expected": "intermittent failure does not force replacement without reproducible evidence",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R04",
+      "kind": "procedure",
+      "expected": "safety/disable-power prerequisites retained before repair steps",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R05",
+      "kind": "procedure",
+      "expected": "repair sequence dependency violations rejected",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R06",
+      "kind": "model",
+      "expected": "T480 MT 20L5/20L6 applicability and part matching preserved",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R07",
+      "kind": "model",
+      "expected": "Framework 11th Gen-specific reset not generalized to other laptop generations",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R08",
+      "kind": "evidence",
+      "expected": "POST blink code observation cannot certify actual failed component without follow-on evidence",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R09",
+      "kind": "unknown",
+      "expected": "missing diagnostic observation yields UNKNOWN and information request, not invented fix",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R10",
+      "kind": "multi-source",
+      "expected": "Lenovo and Framework alternative procedures are isolated by model/board source",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R11",
+      "kind": "evolution",
+      "expected": "confirmed failure case with trusted observation becomes candidate method experience; model claim alone rejected",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R12",
+      "kind": "aot",
+      "expected": "pinned repair checks reused by method, not stale repair outcome; model/version drift invalidates",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R13",
+      "kind": "tool-ablation",
+      "expected": "compare cheapest Python diagnostics to graph/SMT marginal catches; avoid mandatory full solver stack",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    },
+    {
+      "id": "D05-R14",
+      "kind": "human-evidence",
+      "expected": "source-only proposed repair remains NOT_PHYSICALLY_VERIFIED; no false repaired status",
+      "status": "NOT_RUN",
+      "sourceQualification": "NEEDS_EXACT_SNAPSHOT"
+    }
+  ],
+  "measurements": [
+    "source-clause coverage and verified source-locator accuracy",
+    "diagnostic false-positive/false-negative by hypothetical/test fixture",
+    "UNKNOWN abstention, risk-gate omissions, cross-model scope mistakes",
+    "tool marginal detection, runtime, false rejection",
+    "AOT reuse exact-context hit/invalidation",
+    "evolution experience origin, heldout cross-maker transfer failure",
+    "real external repair success rate NOT_MEASURED"
+  ],
+  "statuses": {
+    "D05SourceSnapshot": "NOT_DONE",
+    "D05IndependentOracle": "NOT_DONE",
+    "D05CaseExecution": "NOT_RUN_14_OF_14",
+    "D05EVExecution": "NOT_RUN_14_SELECTED_EV_CELLS",
+    "allR8CrossDomainResults": "NOT_RUN",
+    "historicalR3R4R5Receipts": "NOT_RELABELED",
+    "domainForgeQualification": "NO"
+  }
+}

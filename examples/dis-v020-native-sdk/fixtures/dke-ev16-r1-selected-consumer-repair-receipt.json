@@ -1,0 +1,118 @@
+{
+  "schema": "dke.ev16.selected-consumer-independent-review-repair/1",
+  "outputLabel": "DKE_EV16_SELECTED_CONSUMER_INDEPENDENT_REVIEW_REPAIR_R1",
+  "date": "2026-11-11",
+  "authority": {
+    "masterIssue": 209,
+    "productIssue": 207,
+    "draftPr": 208,
+    "originalReview": "https://github.com/kaicreator-mm/domain-forge/pull/208#pullrequestreview-5850117440",
+    "reviewerKind": "FRESH_LLM_SOURCE_FIRST_TECHNICAL_AUDIT_NOT_HUMAN_OWNER_ATTESTATION"
+  },
+  "exact": {
+    "initialHead": "7ca180d6f3a490f6f566a63060f33ef0330ae566",
+    "initialSourceGitBlob": "3b7f2d77bc892f4ef449956a18e02a3a8c8fccde",
+    "repairedImplementationHead": "6539049f2fb001c0a5d55d48b4e61916c218e356",
+    "repairedImplementationTree": "db105ae42f6a01e78a45d3d11916c06469e2de9b",
+    "repairedConsumerPath": "docs/standards/dke/DKE-0.0.1/demos/ev16-d04-source-tier-r0/ev16-selected-consumer-r0.mjs",
+    "repairedConsumerGitBlob": "70005ef7c181260a6aaf041b829927fc4d194bed",
+    "reusedUnchangedR3VerifierGitBlob": "b4b86af4b9def3db1a3817dd459c05ec0e2ea579",
+    "inputOriginalGitBlobs": {
+      "tallyGraph": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+      "scopedDecision": "d5747c057c92bc357cc68053e43d96b36427e02c",
+      "rfc9110": "19a88abcb4df0744df2d55c6d1af53125b6d9bd2",
+      "rfc9111": "cef95c761dfcbc6f649019efa2cf5f97dc5f9020"
+    },
+    "historicalR0ReceiptGitBlob": "1bc34b3f226fb152f1c72f20f88b256e7ab45395"
+  },
+  "execution": {
+    "runtime": "CONNECTED_HOSTED_V8_ACTUAL_GITHUB_READBACK_SOURCE_EVALUATION_NOT_NATIVE_NODE_OR_CI",
+    "sourceR3": {
+      "status": "BOUNDED_ORIGINAL_TWO_DOMAIN_CQ",
+      "sourceBlobVerification": "ACTUAL_UTF8_GIT_BLOB_SHA1_MATCHED_4_OF_4",
+      "originalGraphNodes": 807,
+      "originalSourceCqs": 8,
+      "composition": "UNKNOWN_NO_CROSS_PUBLISHER_ENTAILMENT"
+    },
+    "suite": {
+      "tests": 21,
+      "passed": 21,
+      "failed": 0,
+      "historicalChecksPreserved": 11,
+      "newAdversarialChecks": 10
+    },
+    "positive": {
+      "selectedQueries": 10,
+      "domains": {
+        "D04": 4,
+        "D02": 4,
+        "ROOT": 2
+      },
+      "refutedCategoricalClaims": 4,
+      "scopedEducationalObservations": 2,
+      "unknownClaims": 4,
+      "root": "UNKNOWN",
+      "rootQualified": false
+    },
+    "negative": {
+      "existingInvalidRequestsBlocked": 6,
+      "additionalInvalidRequestsBlocked": 5,
+      "additionalCases": [
+        "forged sourceRef",
+        "injected params",
+        "forged requestedEffect/authority",
+        "prototype queryId",
+        "throwing queryId getter"
+      ],
+      "all": "BLOCK"
+    },
+    "sourcePinAttack": {
+      "class": "POSTCHECK_DYNAMIC_PIN_READ",
+      "result": "NO_FORGED_EVIDENCE_AFTER_REPAIR"
+    },
+    "queryAttack": {
+      "class": "GETTER_QUERYID_MUTATION",
+      "result": "BLOCK_WITHOUT_INVOKING_GETTER"
+    },
+    "lookupAttack": {
+      "class": "EXPORTED_MUTABLE_CLAIM_CATALOG",
+      "result": "LOOKUP_VALUE_ENTRIES_FROZEN"
+    },
+    "returnTampering": {
+      "class": "MUTABLE_OBSERVATION_AND_ROOT_QUALIFICATION",
+      "result": "OUTPUT_ROOT_RESPONSES_EVIDENCE_FROZEN"
+    },
+    "additionalSourceInputs": "ORIGINAL_FOUR_PUBLISHED_GIT_BLOBS_NO_RFC_REDOWNLOAD_OR_R33_GO_RESCAN",
+    "nativeNode": "NOT_RUN",
+    "woodpecker": "NO_CONTEXTS_RETURNED_FOR_REPAIRED_IMPLEMENTATION_HEAD"
+  },
+  "findings": {
+    "P0": 0,
+    "P1Found": 3,
+    "P1Repaired": 3,
+    "P1Open": 0,
+    "P2": [
+      "Independent original Tally Source Owner and accredited semantic/domain Oracle decisions still NOT_ATTESTED; unsupported uniform-method DM and derived cross-publisher relation remain UNKNOWN/quarantined",
+      "This is bounded in-process read-only Hosted-V8 consumer, not native DIS AOT/SDK/KDP Host, publisher currentness attestation, or a complete official EV16/R8 integration receipt"
+    ]
+  },
+  "gates": {
+    "sourceOwnerDecision": "NOT_ATTESTED",
+    "independentOracle": "NOT_QUALIFIED",
+    "root": "UNKNOWN",
+    "formalEv16Cell": "NOT_RUN",
+    "qualifiedR8Cells": "0/53",
+    "d02Cells": "0/5",
+    "d04Cells": "0/12",
+    "qualifiedSap": 0,
+    "effectsAuthorized": 0,
+    "noMerge": true,
+    "noFreeze": true,
+    "noRelease": true
+  },
+  "notes": [
+    "R0 receipt and original R3 source verifier remain unchanged; this independent R1 receipt binds the implementation/test Git Blob and verified original source identities",
+    "The follow-up docs/receipt commit has a distinct later HEAD; this receipt must never be interpreted as a new exact SHA Woodpecker or native Node success",
+    "Object.freeze only guards direct JS object mutation inside this bounded API; it does not cryptographically authenticate arbitrary copied or serialized outputs across a separate trust boundary"
+  ]
+}

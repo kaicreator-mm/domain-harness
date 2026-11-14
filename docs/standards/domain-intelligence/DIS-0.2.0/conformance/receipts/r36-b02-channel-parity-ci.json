@@ -1,0 +1,55 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r36-b02-channel-parity-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "B02_R36_UI_NEUTRAL_CHANNEL_PARITY",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "1a803ac452348dc73afea1483a9283cfe527abfc",
+    "tree": "8a478066e61e304c77b9515ee6e92712734b61f4"
+  },
+  "originCommit": "d79e83c8536afee6aa406b090e1fa086f439f038",
+  "originTree": "af9897efbd32ff9f7dd8a48723d701925d911076",
+  "sourceTestBlob": "d48bd86fff26c534e6ed0199b1420718ddf096b0",
+  "casePath": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "d79e83c8536afee6aa406b090e1fa086f439f038",
+      "native": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2279/1"
+    },
+    {
+      "sourceHead": "1a803ac452348dc73afea1483a9283cfe527abfc",
+      "native": "SUCCESS",
+      "minNode": "SUCCESS",
+      "verify": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    }
+  ],
+  "observations": [
+    "The original standalone round code/test Git Blob is present unchanged in the later cumulative #2280/1–3 full-suite exact-source 3/3 SUCCESS.",
+    "Earlier integration ERROR retained at the old original SHA; it is not falsely reported as old-sha PASS."
+  ],
+  "limits": [
+    "Chat/Form/CLI adapters are UI-neutral demo consumers; no deployed UI products or browser transport claimed.",
+    "Real KDP Effect authority remains separate; no local interaction can grant Effect permission."
+  ]
+}

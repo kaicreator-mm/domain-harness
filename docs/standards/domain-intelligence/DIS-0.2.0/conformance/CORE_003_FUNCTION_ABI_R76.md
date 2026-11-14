@@ -1,0 +1,5 @@
+# DIS 0.2.0 CORE-003 R76 — same-major Public Function ABI drift gate
+
+Status **SOURCE_COMMITTED / exact-source native CI pending**. Existing Element compatibility comparison protected Function IDs and bindings, but did not detect a changed type/outcome/effect-adjacent policy in any Function's selected nested contract. R76 applies the existing variance-aware LOCAL Function comparator; KDP Receipt, Business App Init and Runx PROCESS_LOCAL Handle must preserve selected Schema/authority semantics even across same-major version bumps (the independent version string can advance). Contract deletion, silent shape drift and incompatible same-major changes fail closed.
+
+Actual selected Orders/Runx source test distinguishes malicious Handle return-field change, forged Init output and KDP admission alteration from a permitted schema-preserving Handle version bump. This closes a concrete structural compatibility hole; no owner SAP or Effect success is inferred. CORE-003 remains PARTIAL pending new 3-context CI and machine evidence qualification. Baseline Core 11/16; historical scoped rounds 35/35; no Freeze/merge/release.

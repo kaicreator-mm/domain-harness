@@ -1,0 +1,56 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r100-o2-cohort-bridge-r99-repair-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "R99_P2_01_O2_MALFORMED_LINKABLE_LINEAGE_BRIDGE_NEGATIVES_NATIVE_SDK_SELECTED",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "6c11ef9b182a3a1b564db7f9129b4d920561b869",
+    "tree": "89ad7d004348a001ef4e89fcf21bd849b782bf0e"
+  },
+  "native": {
+    "o2Helper": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-gate.mjs",
+      "gitBlob": "5beefd3ea67c04c46e8aa1fd722da3b729a78dc0",
+      "originCommit": "6784388ad64ff5ef378426c0f32eab6aa7895135"
+    },
+    "o2Test": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+      "gitBlob": "4259aa1b04961645110d2e720cdfe077a59614ce"
+    },
+    "integrationYaml": {
+      "path": ".woodpecker/dis-v020-integration.yaml",
+      "gitBlob": "0609f76c6f6b50ef5deb067d3ce211db8cf31eb5"
+    }
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2466/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2466/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2466/3"
+    }
+  ],
+  "observations": [
+    "R99 independently reported a malformed sourceCohort row whose shared case/run keys connect two apparent independent cohorts. Original source returned two roots (overcount); R100 native negative asserts one.",
+    "Original xDownload source is selected by canonical BUILD and SDK/KDP; R100 O2 helper is a LOCAL no-effect knowledge/readiness consumer pinned by repository/commit/Git Blob.",
+    "Anonymous invalid-source cohort nodes connect known case/run graph edges without earning independent case credit; out-of-order and partial missing-key variants and retry/cache bridges are native-tested.",
+    "Integration/Min-Node/Verify Woodpecker #2466/1-3 all SUCCESS at the identical R100 source/test HEAD."
+  ],
+  "limits": [
+    "No independent authenticated ExecutionTrace issuer or real independent business Validator/Oracle; no trusted Experience, reuse authorization or SAP qualification.",
+    "R99 independent source-first review was on pre-repair HEAD 68625aa5; the post-repair source requires fresh independent reviewer recheck.",
+    "This receipt is a historical exact source run; the later documentation/receipt registration commit requires its own GitHub status and cannot inherit #2466.",
+    "Unqualified source-case cohorts and derived nonauthoritative count cannot authorize KDP Effect, business truth, or Server Promotion."
+  ]
+}

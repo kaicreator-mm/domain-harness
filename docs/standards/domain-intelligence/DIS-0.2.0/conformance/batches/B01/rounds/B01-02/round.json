@@ -1,0 +1,87 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B01",
+  "roundId": "B01-02",
+  "globalRoundId": "R33",
+  "status": "VERIFIED",
+  "requirements": [
+    "DIS020-CORE-006",
+    "DIS020-CORE-003"
+  ],
+  "startParent": "af2ebeaaa66c9701a82dd063b6b1d6816a3049a8",
+  "sourceHead": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+  "finalTree": "707a0b11b9a8691b7dc7efad7c5d91d3e735edda",
+  "receipt": "receipts/r33-b01-state-ci.json",
+  "testPath": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+  "positive": [
+    "B01-02 R33 real Runx Stateful handles isolate each invocation, source and process-local ownership",
+    "B01-02 R33 Domain-owned Stateful presence does not mutate Tally Rule or xDownload Knowledge outputs"
+  ],
+  "negative": [
+    "B01-02 R33 source-real Runx token mismatch cannot create presence or grant lease",
+    "B01-02 R33 SDK stop denies new Stateful and Effect ingress, but existing in-process handles are not remotely revoked"
+  ],
+  "sourceExamples": [
+    "Runx environment-agent-presence.ts pinned by native-fixture",
+    "Tally original Business Rule and xDownload original Business Knowledge"
+  ],
+  "resultBoundary": "A returned process-local handle remains usable after app.stop; only SDK ingress is stopped. This is not KDP execution lease, persistent Domain storage, or remote revocation. Historical R33 first native CI failed, original-source repair requalification pending.",
+  "ciContexts": [
+    "ci/woodpecker/pr/dis-v020-integration",
+    "ci/woodpecker/pr/verify-min-node",
+    "ci/woodpecker/pr/verify"
+  ],
+  "ciUrls": [],
+  "findings": [
+    {
+      "kind": "SOURCE_REVIEW_P1_TEST_ASSERTION",
+      "firstSourceHead": "0a404d343827d95ee6c08d962a369dc44c52f98b",
+      "firstCI": "https://ci.kaicreator.com/repos/18/pipeline/2274/1",
+      "result": "FAILURE",
+      "evidence": "Original xDownload getPolicy() reconstructs decisionSchema.isValid and Effect handler functions at every call. Whole getPolicy() deepEqual incorrectly requires ephemeral JS Function identity; this is neither business state nor contract equality.",
+      "repair": "Compare only stable source-owned policy fields and effect semantics; do not call or compare new callback identities.",
+      "repairCI": "PENDING"
+    }
+  ],
+  "lessons": [
+    "Own state at the returned Domain Function handle, not KDP claim or arbitrary Host lease.",
+    "Distinguish stop() ingress closure from revocation of previously returned in-process references."
+  ],
+  "fullCorePromoted": false,
+  "metadata": "Round-specific final source SHA and CI receipt written after exact status readback.",
+  "result": "EXACT_SHA_3_OF_3_SUCCESS_AFTER_REPAIR",
+  "originCommit": "0a404d343827d95ee6c08d962a369dc44c52f98b",
+  "testGitBlob": "a460d8a199d735545b3ebb5e1c7c11588d683675",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+    }
+  ],
+  "history": [
+    {
+      "commit": "0a404d343827d95ee6c08d962a369dc44c52f98b",
+      "CI": "https://ci.kaicreator.com/repos/18/pipeline/2274/1",
+      "native": "FAILURE"
+    },
+    {
+      "commit": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+      "CI": "https://ci.kaicreator.com/repos/18/pipeline/2276/1",
+      "native": "SUCCESS",
+      "verifyMin": "SUCCESS",
+      "general": "SUCCESS",
+      "repair": "Source-owned xDownload getPolicy object equality now excludes recreated callback references"
+    }
+  ]
+}

@@ -24,6 +24,7 @@ const nodeGlobals = {
   clearInterval: 'readonly',
   globalThis: 'readonly',
   fetch: 'readonly',
+  structuredClone: 'readonly',
   require: 'readonly',
   module: 'writable',
   __dirname: 'readonly',

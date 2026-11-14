@@ -1,0 +1,7 @@
+# DIS v0.2.0 R77 — Runx method-only Handle isolation
+
+**SOURCE_COMMITTED / original exact SHA CI pending**. The R75 in-process `Proxy` enforced method I/O but exposed every other runtime property of the original class (including TS-private `liveAgents` Map) and returned mutable records pointing into original Domain state. This undermines the declared selected Function boundary even though KDP ownership was formally unchanged.
+
+R77 retains the original source-pinned instance **only in an SDK binding closure**, exposes a frozen null-prototype method-only facade containing the exactly declared `observe/list/latest` functions, checks arguments before original method invocation and validates return values. `list/latest` return detached frozen snapshots, never a live mutable record. The source-side business State stays with Runx; no SDK owner, remote revoke, KDP lease or unproved SAP is invented. Original `PROCESS_LOCAL` lifetime is unchanged; the facade can still be used after SDK ingress stop, so process-local state is not falsely treated as remote-revoked.
+
+The existing mandatory native test asserts no internal class field/prototype leakage, immutable result snapshots and prior negative input and output cases. This is required before promoting CORE-003; type metadata alone was insufficient. CORE remains 11/16 last fully qualified, 35/35 historic bounded rounds, 9/9 source typed profile candidate, and latest exact three-context native CI required. No Freeze/merge/release.

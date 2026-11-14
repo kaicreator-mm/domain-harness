@@ -1,0 +1,71 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B06",
+  "roundId": "B06-03",
+  "globalRoundId": "R49",
+  "status": "VERIFIED",
+  "startParent": "6b2a1d4e30c8b334074609a0f60ee7bc613cbcda",
+  "testPath": "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
+  "testGitBlob": "a74e6631c22b7729665629490e637c60d9ded234",
+  "receipt": "receipts/r49-b06-http-lifecycle-ci.json",
+  "positive": [
+    "B06-03 R49 simultaneous independent HTTP Chat/Form sessions cannot mix original selected Business intents"
+  ],
+  "negative": [
+    "B06-03 R49 no confirmation stays pending and cannot transform into KDP Effect permission",
+    "B06-03 R49 actual SDK STOP prevents further HTTP Function ingress without hidden Effect dispatch"
+  ],
+  "limitations": [
+    "Loopback HTTP is a demonstration of real network parsing/client consumption, not production UI or direct KDP effect.",
+    "Concurrency scope is six independent requests within one native SDK process, not distributed tenancy."
+  ],
+  "originCommit": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+  "originTree": "3e36df2a307d51311bf096c61adc40a3228ac81d",
+  "sourceHead": "272cc9e52df02a1261cc79b96fa2acd683e88680",
+  "finalTree": "98541d1fce171c392eaeaa8bbd5a8dc3af32b09a",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/3"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/2"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "4e0529eaf5299fb85c87fe2142e3ca3de1976510",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Per-round immutable commit; only final batch head is pushed to minimize canceled CI."
+    },
+    {
+      "head": "272cc9e52df02a1261cc79b96fa2acd683e88680",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/3"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/2"
+        }
+      ],
+      "meaning": "Exact later full-batch requalification preserving the original immutable source test Blob; first gates #2294/#2295 failed on an unrelated r41-r46 receipt validator regression, not these tests."
+    }
+  ]
+}
