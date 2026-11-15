@@ -59,3 +59,53 @@ test('R80 late provider resolution is never returned as authorized outcome',asyn
  await Promise.resolve();
  assert.equal(h.remaining(),0);
 });
+
+test('R138 O1 untrusted observation accessors and Proxies fail UNKNOWN without executing traps',async()=>{
+ let trapCalls=0,providerCalls=0;
+ const accessorTop=observation();
+ Object.defineProperty(accessorTop,'evidence',{get(){trapCalls++;return {source,attested:false}}});
+ // Use an own source to avoid mutating the shared fixture across tests.
+ const shadowedSource=observation();
+ shadowedSource.evidence.source={...source};
+ Object.defineProperty(shadowedSource.evidence.source,'sha256',{get(){trapCalls++;return 'a'.repeat(64)}});
+ const forgedProxy=new Proxy(observation(),{
+  get(){trapCalls++;throw Error('observation read must not execute')},
+  getPrototypeOf(){trapCalls++;return Object.prototype}
+ });
+ const nestedProxy=observation();
+ nestedProxy.evidence={...nestedProxy.evidence,source:new Proxy({...source},{
+  get(){trapCalls++;throw Error('source read must not execute')},
+  getPrototypeOf(){trapCalls++;return Object.prototype}
+ })};
+ // A top-level hostile Proxy cannot even be delivered as app.invoke's resolution value:
+ // ECMA-262 ResolvePromise performs one spec-mandated Get(value,'then') during promise
+ // resolution (engine layer, outside DIS inspection); its trap throws, so retrieval fails
+ // closed as NATIVE_OBSERVATION_UNAVAILABLE. Delivered-but-untrusted samples (accessors,
+ // nested Proxy) are rejected by snapshot validation as NATIVE_OBSERVATION_UNQUALIFIED.
+ // All four stay UNKNOWN/NONE/unqualified with zero provider calls and no budget spend.
+ for(const [name,sample,reason] of [['top accessor',accessorTop,'NATIVE_OBSERVATION_UNQUALIFIED'],
+                              ['source accessor',shadowedSource,'NATIVE_OBSERVATION_UNQUALIFIED'],
+                              ['top proxy',forgedProxy,'NATIVE_OBSERVATION_UNAVAILABLE'],
+                              ['nested proxy',nestedProxy,'NATIVE_OBSERVATION_UNQUALIFIED']]){
+  const h=makeO1BoundedHarness({app:app(async()=>sample),
+   provider:provider(async()=>{providerCalls++;return {suggestion:'fake truth'}})});
+  assertUnknown(await h.run('advisory'),reason);
+  assert.equal(h.remaining(),1,name);
+ }
+ assert.equal(trapCalls,1,'only the resolution-layer thenability read touches the proxy; DIS inspection executes none');
+ assert.equal(providerCalls,0,'unqualified observation must not invoke provider');
+});
+test('R138 O1 Proxy model suggestions cannot pass record validation or become truth',async()=>{
+ let trapCalls=0;
+ const suggested=new Proxy({suggestion:'model says PASS'},{
+  getPrototypeOf(){trapCalls++;return Object.prototype},
+  ownKeys(){trapCalls++;return ['suggestion']},
+  getOwnPropertyDescriptor(){trapCalls++;return {configurable:true,enumerable:true,value:'model says PASS'}}
+ });
+ const h=makeO1BoundedHarness({app:app(async()=>observation()),
+  provider:provider(async()=>suggested)});
+ const r=await h.run('advisory');
+ assertUnknown(r,'MODEL_OUTPUT_REJECTED');
+ assert.equal(trapCalls,0);
+ assert.equal(h.remaining(),0);
+});
