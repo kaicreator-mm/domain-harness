@@ -77,14 +77,22 @@ test('R138 O1 untrusted observation accessors and Proxies fail UNKNOWN without e
   get(){trapCalls++;throw Error('source read must not execute')},
   getPrototypeOf(){trapCalls++;return Object.prototype}
  })};
- for(const [name,sample] of [['top accessor',accessorTop],['source accessor',shadowedSource],
-                              ['top proxy',forgedProxy],['nested proxy',nestedProxy]]){
+ // A top-level hostile Proxy cannot even be delivered as app.invoke's resolution value:
+ // ECMA-262 ResolvePromise performs one spec-mandated Get(value,'then') during promise
+ // resolution (engine layer, outside DIS inspection); its trap throws, so retrieval fails
+ // closed as NATIVE_OBSERVATION_UNAVAILABLE. Delivered-but-untrusted samples (accessors,
+ // nested Proxy) are rejected by snapshot validation as NATIVE_OBSERVATION_UNQUALIFIED.
+ // All four stay UNKNOWN/NONE/unqualified with zero provider calls and no budget spend.
+ for(const [name,sample,reason] of [['top accessor',accessorTop,'NATIVE_OBSERVATION_UNQUALIFIED'],
+                              ['source accessor',shadowedSource,'NATIVE_OBSERVATION_UNQUALIFIED'],
+                              ['top proxy',forgedProxy,'NATIVE_OBSERVATION_UNAVAILABLE'],
+                              ['nested proxy',nestedProxy,'NATIVE_OBSERVATION_UNQUALIFIED']]){
   const h=makeO1BoundedHarness({app:app(async()=>sample),
    provider:provider(async()=>{providerCalls++;return {suggestion:'fake truth'}})});
-  assertUnknown(await h.run('advisory'),'NATIVE_OBSERVATION_UNQUALIFIED');
+  assertUnknown(await h.run('advisory'),reason);
   assert.equal(h.remaining(),1,name);
  }
- assert.equal(trapCalls,0,'observation inspection must not execute untrusted getters/traps');
+ assert.equal(trapCalls,1,'only the resolution-layer thenability read touches the proxy; DIS inspection executes none');
  assert.equal(providerCalls,0,'unqualified observation must not invoke provider');
 });
 test('R138 O1 Proxy model suggestions cannot pass record validation or become truth',async()=>{
