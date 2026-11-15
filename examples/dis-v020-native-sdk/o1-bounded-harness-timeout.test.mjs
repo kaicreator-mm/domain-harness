@@ -59,3 +59,45 @@ test('R80 late provider resolution is never returned as authorized outcome',asyn
  await Promise.resolve();
  assert.equal(h.remaining(),0);
 });
+
+test('R138 O1 untrusted observation accessors and Proxies fail UNKNOWN without executing traps',async()=>{
+ let trapCalls=0,providerCalls=0;
+ const accessorTop=observation();
+ Object.defineProperty(accessorTop,'evidence',{get(){trapCalls++;return {source,attested:false}}});
+ // Use an own source to avoid mutating the shared fixture across tests.
+ const shadowedSource=observation();
+ shadowedSource.evidence.source={...source};
+ Object.defineProperty(shadowedSource.evidence.source,'sha256',{get(){trapCalls++;return 'a'.repeat(64)}});
+ const forgedProxy=new Proxy(observation(),{
+  get(){trapCalls++;throw Error('observation read must not execute')},
+  getPrototypeOf(){trapCalls++;return Object.prototype}
+ });
+ const nestedProxy=observation();
+ nestedProxy.evidence={...nestedProxy.evidence,source:new Proxy({...source},{
+  get(){trapCalls++;throw Error('source read must not execute')},
+  getPrototypeOf(){trapCalls++;return Object.prototype}
+ })};
+ for(const [name,sample] of [['top accessor',accessorTop],['source accessor',shadowedSource],
+                              ['top proxy',forgedProxy],['nested proxy',nestedProxy]]){
+  const h=makeO1BoundedHarness({app:app(async()=>sample),
+   provider:provider(async()=>{providerCalls++;return {suggestion:'fake truth'}})});
+  assertUnknown(await h.run('advisory'),'NATIVE_OBSERVATION_UNQUALIFIED');
+  assert.equal(h.remaining(),1,name);
+ }
+ assert.equal(trapCalls,0,'observation inspection must not execute untrusted getters/traps');
+ assert.equal(providerCalls,0,'unqualified observation must not invoke provider');
+});
+test('R138 O1 Proxy model suggestions cannot pass record validation or become truth',async()=>{
+ let trapCalls=0;
+ const suggested=new Proxy({suggestion:'model says PASS'},{
+  getPrototypeOf(){trapCalls++;return Object.prototype},
+  ownKeys(){trapCalls++;return ['suggestion']},
+  getOwnPropertyDescriptor(){trapCalls++;return {configurable:true,enumerable:true,value:'model says PASS'}}
+ });
+ const h=makeO1BoundedHarness({app:app(async()=>observation()),
+  provider:provider(async()=>suggested)});
+ const r=await h.run('advisory');
+ assertUnknown(r,'MODEL_OUTPUT_REJECTED');
+ assert.equal(trapCalls,0);
+ assert.equal(h.remaining(),0);
+});
