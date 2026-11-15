@@ -84,6 +84,8 @@ steps:
       - node --import tsx --test examples/dis-v020-native-sdk/o2-controlled-execution-trace-native.test.mjs
       # O2 R140: separate Ed25519 Validator key, authenticated Trace join, no Experience promotion.
       - node --import tsx --test examples/dis-v020-native-sdk/o2-independent-validator-evidence.test.mjs
+      # O2 R143: two-key Validator binding plus Host local-fs durable replay across reconstructed Gates.
+      - node --import tsx --test examples/dis-v020-native-sdk/o2-independent-validator-durable-native.test.mjs
       # O2 R89 optional Linux Host durable nonce: actual fsync/reopen/cross-process and signed Trace fail-closed tests; NO Experience/Effect promotion.
       - node --test examples/dis-v020-native-sdk/o2-durable-nonce-ledger.test.mjs examples/dis-v020-native-sdk/o2-durable-trace.test.mjs
       # O3 R63: no trusted rule interpreter/atomic Task pin; mandatory Candidate+Shadow-only safety fixture, NOT E07 activation.
