@@ -74,6 +74,9 @@ steps:
       # O3 R121: data-only candidate+Shadow, selected xDownload Native; no local activation/Effect.
       - node --test examples/dis-v020-native-sdk/o3-shadow-rule.test.mjs
       - node --import tsx --test examples/dis-v020-native-sdk/o3-shadow-native.test.mjs
+      # O3 R137: in-process Shadow Task epoch pins, revoke race and selected AOT SDK; still NOT Full O3.
+      - node --test examples/dis-v020-native-sdk/o3-shadow-task-pin.test.mjs
+      - node --import tsx --test examples/dis-v020-native-sdk/o3-shadow-task-pin-native.test.mjs
       # O2/D06: real selected xDownload SDK observation; no Experience until trusted Trace/Oracle receipts exist.
       - node --import tsx --test examples/dis-v020-native-sdk/o2-experience-native.test.mjs
       # O2 R83: controlled signed execution-origin Trace via real xDownload AOT→SDK; never business PASS/Experience.
