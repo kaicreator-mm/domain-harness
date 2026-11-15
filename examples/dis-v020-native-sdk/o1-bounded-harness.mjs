@@ -3,6 +3,7 @@
  * explicitly bounded fixture provider. It is NOT a production Harness ABI,
  * an AOT-pinned provider, a real LLM, or a semantic/Effect authorization.
  */
+import {types} from 'node:util';
 const fail=code=>{throw Object.assign(new Error(code),{code})};
 // Limits awaiting untrusted asynchronous work, NOT uncooperative synchronous CPU
 // or remote side effects. A timeout never upgrades an observation/authorization.
@@ -19,15 +20,37 @@ const SELECTED_POLICY_SOURCE=Object.freeze({sourceId:'xdownload-business',gitBlo
 const hasSelectedNativeApp=app=>Array.isArray(app?.functions)&&
  app.functions.includes(SELECTED_POLICY_FUNCTION)&&
  app?.contractVersions?.[SELECTED_POLICY_FUNCTION]==='1.0.0';
-function isSelectedPolicyObservation(app,observed){
- const source=observed?.evidence?.source;
- return hasSelectedNativeApp(app)&&
-  observed?.kind==='OBSERVATION'&&observed?.disposition==='OBSERVED'&&
-  observed?.authority==='NONE'&&observed?.contractVersion==='1.0.0'&&
-  observed?.value?.domainId==='downloads'&&observed?.evidence?.attested===false&&
-  source?.sourceId===SELECTED_POLICY_SOURCE.sourceId&&
-  typeof source.sha256==='string'&&/^[a-f0-9]{64}$/.test(source.sha256)&&
-  source.gitBlob===SELECTED_POLICY_SOURCE.gitBlob;
+// O1/R138: observation is untrusted DATA. Do not execute getters/traps, and
+// snapshot checked primitives once; validation and public output use same bytes.
+const plainData=v=>{
+ if(v===null||typeof v!=='object'||Array.isArray(v)||types.isProxy(v))return false;
+ const p=Object.getPrototypeOf(v);
+ return p===Object.prototype||p===null;
+};
+const ownData=(v,key)=>{
+ if(!plainData(v))return undefined;
+ const d=Object.getOwnPropertyDescriptor(v,key);
+ return d&&Object.hasOwn(d,'value')?d.value:undefined;
+};
+function selectedPolicySnapshot(app,observed){
+ try{
+  if(!hasSelectedNativeApp(app)||!plainData(observed))return null;
+  const evidence=ownData(observed,'evidence');
+  const source=ownData(evidence,'source');
+  const value=ownData(observed,'value');
+  const contractVersion=ownData(observed,'contractVersion');
+  const sourceGitBlob=ownData(source,'gitBlob');
+  const observedDomain=ownData(value,'domainId');
+  return ownData(observed,'kind')==='OBSERVATION'&&
+   ownData(observed,'disposition')==='OBSERVED'&&
+   ownData(observed,'authority')==='NONE'&&contractVersion==='1.0.0'&&
+   observedDomain==='downloads'&&ownData(evidence,'attested')===false&&
+   ownData(source,'sourceId')===SELECTED_POLICY_SOURCE.sourceId&&
+   typeof ownData(source,'sha256')==='string'&&
+   /^[a-f0-9]{64}$/.test(ownData(source,'sha256'))&&
+   sourceGitBlob===SELECTED_POLICY_SOURCE.gitBlob
+    ?Object.freeze({contractVersion,sourceGitBlob,observedDomain}):null;
+ }catch{return null}
 }
 const outcome=(reason,suggestion=null)=>Object.freeze({
  kind:'OBSERVATION',disposition:'UNKNOWN',authority:'NONE',
@@ -35,8 +58,7 @@ const outcome=(reason,suggestion=null)=>Object.freeze({
 });
 function inspectSuggestion(value){
  try{
-  if(value===null||typeof value!=='object')return null;
-  if(Object.getPrototypeOf(value)!==Object.prototype)return null;
+  if(!plainData(value)||Object.getPrototypeOf(value)!==Object.prototype)return null;
   if(Reflect.ownKeys(value).length!==1)return null;
   const descriptor=Object.getOwnPropertyDescriptor(value,'suggestion');
   const suggestion=descriptor?.value;
@@ -65,14 +87,14 @@ export function makeO1BoundedHarness({app,provider=null,selectedProviderId='fixt
    let observed;
    try{observed=await withDeadline(()=>app.invoke('xdownload.describePolicy',{}),maxWaitMs)}
    catch(err){return outcome(err===TIMEOUT?'NATIVE_OBSERVATION_TIMEOUT':'NATIVE_OBSERVATION_UNAVAILABLE')}
-   if(!isSelectedPolicyObservation(app,observed))
-    return outcome('NATIVE_OBSERVATION_UNQUALIFIED');
+   const selected=selectedPolicySnapshot(app,observed);
+   if(selected===null)return outcome('NATIVE_OBSERVATION_UNQUALIFIED');
    if(mode==='policy')return Object.freeze({
     kind:'OBSERVATION',disposition:'OBSERVED',authority:'NONE',
     effectDispatched:false,sourceFunction:SELECTED_POLICY_FUNCTION,
-    contractVersion:observed.contractVersion,
-    sourceGitBlob:observed.evidence.source.gitBlob,
-    observedDomain:observed.value.domainId,qualified:false
+    contractVersion:selected.contractVersion,
+    sourceGitBlob:selected.sourceGitBlob,
+    observedDomain:selected.observedDomain,qualified:false
    });
    if(!enabled||provider===null)return outcome('PROVIDER_DISABLED');
    if(remaining===0)return outcome('BUDGET_EXHAUSTED');
