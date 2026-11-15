@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
+import {Buffer} from 'node:buffer';
 import {makeNativeFixture} from './native-fixture.mjs';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
 import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
@@ -16,6 +17,7 @@ const signed=(payload,key)=>({
 let seq=0;
 const denied=x=>{
  assert.equal(x.status,'UNKNOWN');
+ assert.equal(x.candidateContentDigestVerified,false);
  for(const key of ['qualified','experienceIssued','governanceApproved','serverPromotionAuthorized',
   'newAotBuilt','newAotActivated','artifactExported','effectDispatched'])
   assert.equal(x[key],false,key);
@@ -23,6 +25,7 @@ const denied=x=>{
 };
 const limited=x=>{
  assert.equal(x.status,'CANDIDATE_PREFLIGHT_VERIFIED_TECHNICAL_ONLY');
+ assert.equal(x.candidateContentDigestVerified,true);
  assert.equal(x.technicalEnvelopeVerified,true);
  assert.equal(x.traceVerified,true);
  assert.equal(x.validatorSignatureVerified,true);
@@ -60,12 +63,18 @@ async function withSelected(visit){
    experienceIssued:false,effectDispatched:false
   };
   const vReceipt=signed(validatorPayload,validator.privateKey);
+  const candidateBytes=Buffer.from(JSON.stringify({
+   schema:'dis.o4.server-meta-candidate/1',scope:SCOPE,runId,
+   selectedAotDigest:f.artifact.digest,ruleDigest:RULE,
+   selectedFunction:'xdownload.interaction.inspect',
+   disposition:'CANDIDATE_PREFLIGHT_ONLY'
+  }));
   const candidatePayload={
    version:'dis.o4.server-candidate-preflight/1',scope:SCOPE,runId,
    selectedAotDigest:f.artifact.digest,ruleDigest:RULE,
    traceSignature:captured.receipt.signature,validatorSignature:vReceipt.signature,
    observationDigest:captured.receipt.payload.observationDigest,
-   proposalDigest:sha('fixed-research-candidate:'+runId),
+   proposalDigest:sha(candidateBytes),
    consentScope:'local-only',disposition:'CANDIDATE_PREFLIGHT_ONLY',
    authorizedPromotion:false
   };
@@ -75,24 +84,67 @@ async function withSelected(visit){
    expectedAotDigest:f.artifact.digest,expectedRuleDigest:RULE
   };
   const gate=(changes={})=>createO4ThreeKeyServerCandidatePreflight({...config,...changes});
-  const packet=(p=candidatePayload,v=vReceipt)=>({
+  const packet=(p=candidatePayload,v=vReceipt,bytes=candidateBytes)=>({
    candidateEnvelope:signed(p,review.privateKey),
    validatorReceipt:v,traceReceipt:captured.receipt,
-   input:request,observation:captured.observation,runId
+   input:request,observation:captured.observation,runId,candidateBytes:bytes
   });
   return await visit({app,config,trace,validator,review,runId,gate,packet,
-   candidatePayload,validatorPayload,vReceipt,captured});
+   candidatePayload,candidateBytes,validatorPayload,vReceipt,captured});
  }finally{app.stop()}
 }
 
 test('O4 true selected AOT SDK: 3 independent signatures prove technical proposal preflight only',async()=>{
- await withSelected(({app,gate,packet,candidatePayload})=>{
+ await withSelected(({app,gate,packet,candidatePayload,candidateBytes})=>{
   const g=gate(),out=g.verifyProposal(packet());
   limited(out);
   assert.equal(out.proposalDigest,candidatePayload.proposalDigest);
+  assert.equal(sha(Buffer.from(out.candidateBytesBase64,'base64')),candidatePayload.proposalDigest);
+  assert.equal(Buffer.from(out.candidateBytesBase64,'base64').equals(candidateBytes),true);
+  // The immutable returned snapshot remains bound even if the caller mutates its original Buffer.
+  candidateBytes.fill(0);
+  assert.equal(sha(Buffer.from(out.candidateBytesBase64,'base64')),candidatePayload.proposalDigest);
   assert.equal(out.scope,'LOCAL_TECHNICAL_PREFLIGHT_ONLY');
-  assert.equal((g.verifyProposal(packet())).reason,'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
+  assert.equal(g.verifyProposal(packet(candidatePayload,undefined,Buffer.from(out.candidateBytesBase64,'base64'))).reason,
+   'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
   assert.equal(typeof app.activateLocalRule,'undefined');
+ });
+});
+
+test('O4 same signed digest with substituted candidate bytes is rejected before consuming Trace',async()=>{
+ await withSelected(({gate,packet,candidateBytes,candidatePayload,vReceipt})=>{
+  const g=gate({maxAttempts:4});
+  const substituted=Buffer.from(candidateBytes);
+  substituted[substituted.length-1]^=1;
+  const deniedResult=g.verifyProposal(packet(candidatePayload,vReceipt,substituted));
+  denied(deniedResult);
+  assert.equal(deniedResult.reason,'O4_CANDIDATE_CONTENT_DIGEST_MISMATCH');
+  // A mismatch cannot consume the valid Host Trace; the exact candidate still passes.
+  limited(g.verifyProposal(packet()));
+  assert.equal(g.verifyProposal(packet()).reason,'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
+ });
+});
+
+test('O4 malformed, oversized and non-Buffer candidate bytes fail closed without consuming Trace',async()=>{
+ await withSelected(({gate,packet,candidateBytes})=>{
+  const g=gate({maxAttempts:5});
+  const proxy=new Proxy(Buffer.from(candidateBytes),{
+   get(){throw Error('CANDIDATE_GET_TRAP')},
+   getPrototypeOf(){throw Error('CANDIDATE_PROTO_TRAP')},
+   ownKeys(){throw Error('CANDIDATE_KEYS_TRAP')}
+  });
+  const invalid=[
+   new Uint8Array(candidateBytes),
+   Buffer.alloc(0),
+   Buffer.alloc(1024*1024+1),
+   proxy
+  ];
+  for(const bytes of invalid){
+   const out=g.verifyProposal(packet(undefined,undefined,bytes));
+   denied(out);
+   assert.equal(out.reason,'O4_CANDIDATE_CONTENT_UNSAFE');
+  }
+  limited(g.verifyProposal(packet()));
  });
 });
 
@@ -133,7 +185,7 @@ test('O4 wrong verdict and scope/target/consent or forged authority cannot prefl
 
 test('O4 malformed nested Proxy, Getter and duplicated keys never execute attacker traps',async()=>{
  await withSelected(({gate,packet,config})=>{
-  const g=gate({maxAttempts:5});
+  const g=gate({maxAttempts:8});
   let traps=0;
   const proxy=new Proxy({},{
    get(){traps++;throw Error('ATTACKER_GET')},
@@ -150,9 +202,25 @@ test('O4 malformed nested Proxy, Getter and duplicated keys never execute attack
   denied(g.verifyProposal(y));
   const z=packet();z.validatorReceipt=proxy;
   denied(g.verifyProposal(z));
+  const q=packet();
+  Object.defineProperty(q,'candidateBytes',{
+   enumerable:true,get(){traps++;throw Error('CANDIDATE_GETTER')}
+  });
+  denied(g.verifyProposal(q));
+  const hostileInput={};
+  Object.defineProperty(hostileInput,'channel',{
+   enumerable:true,get(){traps++;throw Error('INPUT_GETTER')}
+  });
+  const h=packet();h.input=hostileInput;
+  denied(g.verifyProposal(h));
   assert.equal(traps,0);
   assert.throws(()=>gate({serverReviewPublicKey:config.validatorPublicKey}),
    /O4_THREE_SIGNER_KEYS_NOT_INDEPENDENT/);
+  const badLedger=Object.freeze({
+   scope:'tenant:other',expectedAotDigest:config.expectedAotDigest,
+   consume(){return true}
+  });
+  assert.throws(()=>gate({nonceLedger:badLedger}),/O4_HOST_NONCE_LEDGER_MISMATCH/);
   limited(g.verifyProposal(packet()));
  });
 });

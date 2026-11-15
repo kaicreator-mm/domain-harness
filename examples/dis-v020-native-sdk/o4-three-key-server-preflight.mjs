@@ -1,14 +1,17 @@
 /**
  * DIS O4 R147: three independently pinned Ed25519 *technical* evidence keys
- * can prove a proposed Server Meta candidate is cryptographically bound to
- * the selected AOT, Rule, execution Trace and independent Validator receipt.
+ * verifies that exact bounded candidate artifact bytes hash to the
+ * third-key-signed proposalDigest, alongside the selected AOT, Rule, execution
+ * Trace and independent Validator receipt.
  *
  * This is an in-process SERVER PREFLIGHT verifier; it is NOT an actual deployed
  * Server, professional Domain Oracle, Experience, Governance approval, Forge
- * Promotion, new AOT build/activation or Effect. No upload or disk mutation.
- * A reviewer SIGNATURE proves key possession, not authority to approve.
+ * Promotion, new AOT build/activation or Effect. It does not publish candidate
+ * bytes or dispatch an Effect. A configured trusted O2 nonce ledger may persist
+ * replay state. A reviewer SIGNATURE proves key possession, not authority.
  */
-import {createPublicKey,verify} from 'node:crypto';
+import {createHash,createPublicKey,verify} from 'node:crypto';
+import {Buffer} from 'node:buffer';
 import {types} from 'node:util';
 import {createO2IndependentValidatorEvidenceGate} from './o2-independent-validator-evidence.mjs';
 
@@ -16,6 +19,7 @@ const VERSION='dis.o4.server-candidate-preflight/1';
 const HEX=/^[a-f0-9]{64}$/;
 const TOKEN=/^[a-zA-Z][a-zA-Z0-9._:/-]{0,127}$/;
 const SIG=/^[A-Za-z0-9_-]{86}$/;
+const MAX_CANDIDATE_BYTES=1024*1024;
 const FIELDS=Object.freeze([
  'version','scope','runId','selectedAotDigest','ruleDigest',
  'traceSignature','validatorSignature','observationDigest','proposalDigest',
@@ -24,12 +28,23 @@ const FIELDS=Object.freeze([
 const deny=reason=>Object.freeze({
  status:'UNKNOWN',reason,technicalEnvelopeVerified:false,
  traceVerified:false,validatorSignatureVerified:false,
- serverReviewSignatureVerified:false,qualified:false,
+ serverReviewSignatureVerified:false,candidateContentDigestVerified:false,qualified:false,
  experienceIssued:false,governanceApproved:false,serverPromotionAuthorized:false,
  newAotBuilt:false,newAotActivated:false,artifactExported:false,
  effectDispatched:false,authority:'NONE'
 });
 const own=(x,k)=>Object.getOwnPropertyDescriptor(x,k)?.value;
+function snapshotCandidateBytes(value){
+ try{
+  if(types.isProxy(value)||!Buffer.isBuffer(value)||
+     Object.getPrototypeOf(value)!==Buffer.prototype||
+     !Number.isSafeInteger(value.byteLength)||value.byteLength<1||
+     value.byteLength>MAX_CANDIDATE_BYTES||
+     !(value.buffer instanceof ArrayBuffer))return null;
+  // Copy once: later caller mutation cannot change the bytes whose digest is checked.
+  return Buffer.from(value);
+ }catch{return null}
+}
 function exact(x,keys){
  try{
   if(x===null||typeof x!=='object'||Array.isArray(x)||types.isProxy(x)||
@@ -65,20 +80,29 @@ export function createO4ThreeKeyServerCandidatePreflight({
     der(traceKey).equals(der(reviewKey))||
     der(validatorKey).equals(der(reviewKey)))
   throw Error('O4_THREE_SIGNER_KEYS_NOT_INDEPENDENT');
- const validator=createO2IndependentValidatorEvidenceGate({
-  tracePublicKey:traceKey,validatorPublicKey:validatorKey,
-  scope,expectedAotDigest,expectedRuleDigest,nonceLedger
- });
+ let validator;
+ try{
+  validator=createO2IndependentValidatorEvidenceGate({
+   tracePublicKey:traceKey,validatorPublicKey:validatorKey,
+   scope,expectedAotDigest,expectedRuleDigest,nonceLedger
+  });
+ }catch(error){
+  if(error?.message==='O2_TRACE_NONCE_LEDGER_MISMATCH')
+   throw Error('O4_HOST_NONCE_LEDGER_MISMATCH');
+  throw error;
+ }
  let remaining=maxAttempts;
  return Object.freeze({
   verifyProposal(packet){
    if(remaining===0)return deny('O4_PREFLIGHT_ATTEMPT_BUDGET_EXHAUSTED');
    remaining--; // reserve before any cryptographic or replay-sensitive operation
-   if(!exact(packet,['candidateEnvelope','validatorReceipt','traceReceipt','input','observation','runId']))
+   if(!exact(packet,['candidateEnvelope','validatorReceipt','traceReceipt','input','observation','runId','candidateBytes']))
     return deny('O4_PROPOSAL_ARGUMENTS_UNSAFE');
    const envelope=own(packet,'candidateEnvelope'),vReceipt=own(packet,'validatorReceipt');
    const tReceipt=own(packet,'traceReceipt'),input=own(packet,'input');
    const observation=own(packet,'observation'),runId=own(packet,'runId');
+   const candidateBytes=snapshotCandidateBytes(own(packet,'candidateBytes'));
+   if(!candidateBytes)return deny('O4_CANDIDATE_CONTENT_UNSAFE');
    if(!exact(envelope,['payload','signature'])||
       !exact(vReceipt,['payload','signature'])||
       !exact(tReceipt,['payload','signature'])||
@@ -108,6 +132,11 @@ export function createO4ThreeKeyServerCandidatePreflight({
    try{signed=verify(null,Buffer.from(JSON.stringify(p)),reviewKey,Buffer.from(signature,'base64url'))}
    catch{return deny('O4_SERVER_REVIEW_SIGNATURE_INVALID')}
    if(!signed)return deny('O4_SERVER_REVIEW_SIGNATURE_INVALID');
+   // Bind the signed digest declaration to the exact candidate bytes supplied
+   // by the caller. A mismatch is rejected before O2 can consume the Trace nonce.
+   const actualProposalDigest=createHash('sha256').update(candidateBytes).digest('hex');
+   if(actualProposalDigest!==p.proposalDigest)
+    return deny('O4_CANDIDATE_CONTENT_DIGEST_MISMATCH');
    // Independent verified O2 two-key binding. This call consumes Host nonce
    // only after the third key signature is valid and correct policy is pinned.
    const verified=validator.consume({
@@ -126,6 +155,10 @@ export function createO4ThreeKeyServerCandidatePreflight({
     proposalDigest:p.proposalDigest,selectedAotDigest:expectedAotDigest,
     technicalEnvelopeVerified:true,traceVerified:true,
     validatorSignatureVerified:true,serverReviewSignatureVerified:true,
+    candidateContentDigestVerified:true,
+    // Immutable text snapshot for a downstream consumer to publish/use instead
+    // of the caller-owned Buffer that was supplied to this verification call.
+    candidateBytesBase64:candidateBytes.toString('base64'),
     qualified:false,experienceIssued:false,governanceApproved:false,
     serverPromotionAuthorized:false,newAotBuilt:false,newAotActivated:false,
     artifactExported:false,effectDispatched:false,authority:'NONE'
