@@ -1,12 +1,12 @@
 {
   "schema": "dis.formal-tools-g4-source-pins/1",
   "repository": "kaicreator-mm/formal-tools",
-  "commit": "319367063177dec22a6df64233fae2a5fceef00f",
+  "commit": "6991c7aae1026ea9bda9d49f43139e92437f0493",
   "files": [
     {
       "path": "packages/runner/js/solution-candidate.mjs",
       "snapshot": "snapshots/formal-tools/packages/runner/js/solution-candidate.mjs",
-      "gitBlob": "d611fceb85aeed890edf2c23dc615444cd6386ca"
+      "gitBlob": "199035c85b867a1124e169a393948eeb4f8912c0"
     },
     {
       "path": "packages/runner/js/solution-store.mjs",
@@ -40,7 +40,186 @@
     "commit": "2f573d4d5989b6dbf19d96584fef7ae6e66cbf2",
     "path": "benchmarks/llm-methods/g4/MODEL_SET.json",
     "sha256": "ccffedd71e77e85faea3a98aee7e8b9a0bb3242d3b5e7fbf4103a974b571c7f2",
-    "status": "PENDING_INDEPENDENT_REVIEW",
-    "note": "Digest of the bounded G4 xDownload Model Set candidate; the current DIS test fixture still uses evidence_gate=NOT_RUN and does not claim that this Method was executed or qualified."
+    "status": "ACCEPT_SCOPED_MERGED",
+    "note": "Historical PR #146 Model Set accepted scoped and merged without byte drift. Bounded Boolean abstraction engineering only; independent business Oracle/Host not certified.",
+    "accepted_review_head": "8669555a4e035f824647e39411620f7095b0c0b1",
+    "integrated_main_commit": "6991c7aae1026ea9bda9d49f43139e92437f0493"
+  },
+  "g4_method": {
+    "upstream_commit": "6991c7aae1026ea9bda9d49f43139e92437f0493",
+    "qualification": "ENGINEERING_ONLY",
+    "evidence_gate": "BYTES_BOUND_UNATTESTED",
+    "candidate_qualification": "NOT_ADMITTED",
+    "method_id": "xdownload_interaction_safety_cross_solver",
+    "frozen_cases": 5,
+    "native_pairs": 2,
+    "native_invocations": 20,
+    "files": [
+      {
+        "path": "benchmarks/llm-methods/g4/METHOD.json",
+        "snapshot": "snapshots/formal-tools/benchmarks/llm-methods/g4/METHOD.json",
+        "gitBlob": "674516df182739b8419c19eff64e24da074cf0de"
+      },
+      {
+        "path": "benchmarks/llm-methods/g4/MODEL_SET.json",
+        "snapshot": "snapshots/formal-tools/benchmarks/llm-methods/g4/MODEL_SET.json",
+        "gitBlob": "f2d38a858cc89e03d2deecc332dc2b120c632f02"
+      },
+      {
+        "path": "benchmarks/llm-methods/g4/PROBLEM.json",
+        "snapshot": "snapshots/formal-tools/benchmarks/llm-methods/g4/PROBLEM.json",
+        "gitBlob": "396ace645b6bfca6ec7fc50ebfa9484f40313eab"
+      },
+      {
+        "path": "benchmarks/llm-methods/g4/PROVENANCE.json",
+        "snapshot": "snapshots/formal-tools/benchmarks/llm-methods/g4/PROVENANCE.json",
+        "gitBlob": "2a456a9103e4c73ed0712077327a7fedb3834137"
+      },
+      {
+        "path": "benchmarks/llm-methods/g4/cases/01-valid-inspect-and-confirm.smt2",
+        "snapshot": "snapshots/formal-tools/benchmarks/llm-methods/g4/cases/01-valid-inspect-and-confirm.smt2",
+        "gitBlob": "666cc63209c1aeb4fcb38ae3659f0a11db8a805d"
+      },
+      {
+        "path": "benchmarks/llm-methods/g4/cases/02-unconfirmed-cannot-be-ready.smt2",
+        "snapshot": "snapshots/formal-tools/benchmarks/llm-methods/g4/cases/02-unconfirmed-cannot-be-ready.smt2",
+        "gitBlob": "c7596dbf1730285ab2290d1c31517d28f9e8233d"
+      },
+      {
+        "path": "benchmarks/llm-methods/g4/cases/03-invalid-input-cannot-be-ready.smt2",
+        "snapshot": "snapshots/formal-tools/benchmarks/llm-methods/g4/cases/03-invalid-input-cannot-be-ready.smt2",
+        "gitBlob": "d9ef670e296cb4feefad081787eaad15ce5b63fc"
+      },
+      {
+        "path": "benchmarks/llm-methods/g4/cases/04-undeclared-answer-and-forged-draft-cannot-be-ready.smt2",
+        "snapshot": "snapshots/formal-tools/benchmarks/llm-methods/g4/cases/04-undeclared-answer-and-forged-draft-cannot-be-ready.smt2",
+        "gitBlob": "a0a6d55e46b2e87b4f86eda15a7ab4b6c29e26d2"
+      },
+      {
+        "path": "benchmarks/llm-methods/g4/cases/05-effect-is-unreachable.smt2",
+        "snapshot": "snapshots/formal-tools/benchmarks/llm-methods/g4/cases/05-effect-is-unreachable.smt2",
+        "gitBlob": "6871c29c0758a8326a3aa6499bafd1a5b13d4a3f"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/01-valid-inspect-and-confirm.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/01-valid-inspect-and-confirm.cvc5.stdout",
+        "gitBlob": "6b8a2c3d2dbc9196e04acc2e1b66f5336eb1d21e"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/01-valid-inspect-and-confirm.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/01-valid-inspect-and-confirm.z3.stdout",
+        "gitBlob": "6b8a2c3d2dbc9196e04acc2e1b66f5336eb1d21e"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/02-unconfirmed-cannot-be-ready.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/02-unconfirmed-cannot-be-ready.cvc5.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/02-unconfirmed-cannot-be-ready.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/02-unconfirmed-cannot-be-ready.z3.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/03-invalid-input-cannot-be-ready.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/03-invalid-input-cannot-be-ready.cvc5.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/03-invalid-input-cannot-be-ready.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/03-invalid-input-cannot-be-ready.z3.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/04-undeclared-answer-and-forged-draft-cannot-be-ready.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/04-undeclared-answer-and-forged-draft-cannot-be-ready.cvc5.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/04-undeclared-answer-and-forged-draft-cannot-be-ready.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/04-undeclared-answer-and-forged-draft-cannot-be-ready.z3.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/05-effect-is-unreachable.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/05-effect-is-unreachable.cvc5.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/05-effect-is-unreachable.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/05-effect-is-unreachable.z3.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/EVIDENCE_INDEX.json",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/EVIDENCE_INDEX.json",
+        "gitBlob": "15a31993cf6e598ee9fc7ff90296c34578722462"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/PAIR-RERUN.json",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/PAIR-RERUN.json",
+        "gitBlob": "3e8078364624b809df94869c25a2b94cf9a7d939"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/PAIR.json",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/PAIR.json",
+        "gitBlob": "1a1c36a39fc9a0e1e9a21346d493dc9266262c36"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/01-valid-inspect-and-confirm.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/01-valid-inspect-and-confirm.cvc5.stdout",
+        "gitBlob": "6b8a2c3d2dbc9196e04acc2e1b66f5336eb1d21e"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/01-valid-inspect-and-confirm.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/01-valid-inspect-and-confirm.z3.stdout",
+        "gitBlob": "6b8a2c3d2dbc9196e04acc2e1b66f5336eb1d21e"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/02-unconfirmed-cannot-be-ready.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/02-unconfirmed-cannot-be-ready.cvc5.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/02-unconfirmed-cannot-be-ready.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/02-unconfirmed-cannot-be-ready.z3.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/03-invalid-input-cannot-be-ready.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/03-invalid-input-cannot-be-ready.cvc5.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/03-invalid-input-cannot-be-ready.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/03-invalid-input-cannot-be-ready.z3.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/04-undeclared-answer-and-forged-draft-cannot-be-ready.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/04-undeclared-answer-and-forged-draft-cannot-be-ready.cvc5.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/04-undeclared-answer-and-forged-draft-cannot-be-ready.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/04-undeclared-answer-and-forged-draft-cannot-be-ready.z3.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/05-effect-is-unreachable.cvc5.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/05-effect-is-unreachable.cvc5.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/05-effect-is-unreachable.z3.stdout",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/05-effect-is-unreachable.z3.stdout",
+        "gitBlob": "3f65111b0954e679bfb467ad35ba26124ae2b0e3"
+      },
+      {
+        "path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+        "snapshot": "snapshots/formal-tools/validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    ]
   }
 }
