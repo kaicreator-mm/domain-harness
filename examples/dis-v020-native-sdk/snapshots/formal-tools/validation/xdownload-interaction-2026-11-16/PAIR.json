@@ -1,0 +1,196 @@
+{
+  "schema": "formal-tools/xdownload-interaction-native-pair/0.1",
+  "observed_at": "2026-11-16",
+  "scope": "BOUNDED_INTERACTION_STATE_ABSTRACTION_ONLY",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "commit": "b3a962c673f2e623ccd3db8ba059c4bae456b9dd",
+    "path": "examples/dis-v020-interaction/download-goal.mjs",
+    "git_blob": "f57747aa7996c88833e72288a0acd594a7ce5468",
+    "sha256": "aa7dc083fd0a7dc6f9d98e0792058d567b16c1b4883f9fe9d80fa91733afe4c2",
+    "source_version": "dis.v0.2.download-interaction/1"
+  },
+  "model_set": {
+    "path": "benchmarks/llm-methods/g4/MODEL_SET.json",
+    "sha256": "ccffedd71e77e85faea3a98aee7e8b9a0bb3242d3b5e7fbf4103a974b571c7f2",
+    "case_count": 5,
+    "query_count": 5,
+    "semantics": "One independent SMT-LIB input and one check-sat per case; no push/pop or incremental option."
+  },
+  "host": {
+    "os": "Debian GNU/Linux 13 (trixie)",
+    "arch": "x86_64",
+    "glibc": "2.41",
+    "execution": "ChatGPT execution container",
+    "network": "not used for solver execution",
+    "node_version": "v22.16.0 (not used for solver invocation)"
+  },
+  "tool_pins": [
+    {
+      "id": "z3",
+      "version": "5.4.0",
+      "archive_sha256": "039d3f8c75e92ceb196bb1291d8602340541f1b1be2f0a1acf32d3c025f8ed16",
+      "binary_sha256": "e9d7e6e6d76c81b5ea3f06d165fc4cfd8afab92b74cdf94417380b5eed10845d"
+    },
+    {
+      "id": "cvc5",
+      "version": "1.4.2",
+      "archive_sha256": "b7a5f6d1740086347d8055dab7fd1216960e19ab7a769fa2b15c1ec76ed0c193",
+      "binary_sha256": "6aecddf466552b83bb5883756c7955e0c9d5ddcc6d7f45b48c2f6e06a741b102"
+    }
+  ],
+  "observations": [
+    {
+      "id": "case_valid",
+      "path": "benchmarks/llm-methods/g4/cases/01-valid-inspect-and-confirm.smt2",
+      "expected_status": "SAT",
+      "solvers": {
+        "z3": {
+          "status": "SAT",
+          "exit_code": 0,
+          "elapsed_ms": 101,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/01-valid-inspect-and-confirm.z3.stdout",
+          "stdout_sha256": "d9dbf94b05b8314af9ca7f2034e92685c33447917605a7243b1099c693a12e5e",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "status": "SAT",
+          "exit_code": 0,
+          "elapsed_ms": 33,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/01-valid-inspect-and-confirm.cvc5.stdout",
+          "stdout_sha256": "d9dbf94b05b8314af9ca7f2034e92685c33447917605a7243b1099c693a12e5e",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    },
+    {
+      "id": "case_unconfirmed",
+      "path": "benchmarks/llm-methods/g4/cases/02-unconfirmed-cannot-be-ready.smt2",
+      "expected_status": "UNSAT",
+      "solvers": {
+        "z3": {
+          "status": "UNSAT",
+          "exit_code": 0,
+          "elapsed_ms": 51,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/02-unconfirmed-cannot-be-ready.z3.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "status": "UNSAT",
+          "exit_code": 0,
+          "elapsed_ms": 6,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/02-unconfirmed-cannot-be-ready.cvc5.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    },
+    {
+      "id": "case_invalid_input",
+      "path": "benchmarks/llm-methods/g4/cases/03-invalid-input-cannot-be-ready.smt2",
+      "expected_status": "UNSAT",
+      "solvers": {
+        "z3": {
+          "status": "UNSAT",
+          "exit_code": 0,
+          "elapsed_ms": 10,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/03-invalid-input-cannot-be-ready.z3.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "status": "UNSAT",
+          "exit_code": 0,
+          "elapsed_ms": 6,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/03-invalid-input-cannot-be-ready.cvc5.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    },
+    {
+      "id": "case_undeclared_forged",
+      "path": "benchmarks/llm-methods/g4/cases/04-undeclared-answer-and-forged-draft-cannot-be-ready.smt2",
+      "expected_status": "UNSAT",
+      "solvers": {
+        "z3": {
+          "status": "UNSAT",
+          "exit_code": 0,
+          "elapsed_ms": 11,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/04-undeclared-answer-and-forged-draft-cannot-be-ready.z3.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "status": "UNSAT",
+          "exit_code": 0,
+          "elapsed_ms": 6,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/04-undeclared-answer-and-forged-draft-cannot-be-ready.cvc5.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    },
+    {
+      "id": "case_no_effect",
+      "path": "benchmarks/llm-methods/g4/cases/05-effect-is-unreachable.smt2",
+      "expected_status": "UNSAT",
+      "solvers": {
+        "z3": {
+          "status": "UNSAT",
+          "exit_code": 0,
+          "elapsed_ms": 57,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/05-effect-is-unreachable.z3.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "status": "UNSAT",
+          "exit_code": 0,
+          "elapsed_ms": 6,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/05-effect-is-unreachable.cvc5.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    }
+  ],
+  "pair_agreement": {
+    "compared_queries": 5,
+    "agree": 5,
+    "disagree": 0,
+    "sat": 1,
+    "unsat": 4,
+    "unknown": 0
+  },
+  "runner_experience": [
+    {
+      "experiment": "initial push/pop single-file prototype",
+      "solver": "cvc5",
+      "exit_code": 1,
+      "classification": "INVOCATION_ERROR_NOT_SOLVER_FAILURE",
+      "reason": "cvc5 requires --incremental for push/pop; final Method instead uses one check-sat per file, so the registered typed solve operation works without special flags.",
+      "stdout_path": "validation/xdownload-interaction-2026-11-16/cvc5-push-pop-initial.stdout"
+    }
+  ],
+  "authority": {
+    "qualification": "ENGINEERING_ONLY",
+    "independent_semantic_oracle": "NOT_ATTESTED",
+    "trusted_host_process_attestation": false,
+    "solution_promotable": false,
+    "business_claim_result": "UNVERIFIED",
+    "positive_replay": "BLOCKED_UNQUALIFIED",
+    "effect_dispatched": false
+  }
+}

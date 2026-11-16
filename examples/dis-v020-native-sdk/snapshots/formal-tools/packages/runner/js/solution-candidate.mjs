@@ -9,9 +9,14 @@ import { assessMethod } from "./method-planner.mjs";
 
 const sha = /^[a-f0-9]{64}$/;
 const ident = /^[a-z][a-z0-9_.-]{0,79}$/;
-const keys = ["schema","source_id","source_sha256","oracle_id","oracle_sha256",
+const keysV1 = ["schema","source_id","source_sha256","oracle_id","oracle_sha256",
   "model_sha256","tool_id","tool_version","tool_binary_sha256","platform",
   "evidence_sha256","evidence_gate"];
+const keysV2 = ["schema","source_id","source_sha256","oracle_id","oracle_source_id","oracle_sha256",
+  "model_sha256","tool_id","tool_version","tool_binary_sha256","platform",
+  "evidence_sha256","evidence_gate"];
+const provenanceKeys = p => p?.schema==="formal-tools/solution-provenance/0.1" ? keysV1
+  : p?.schema==="formal-tools/solution-provenance/0.2" ? keysV2 : null;
 const plain = x => x && typeof x === "object" && !Array.isArray(x) &&
   Object.getPrototypeOf(x) === Object.prototype;
 const canonical = x => Array.isArray(x) ? x.map(canonical) :
@@ -26,10 +31,13 @@ function parse(text,cap=131072) {
   return data;
 }
 function provenanceValid(p) {
-  return plain(p) && Object.keys(p).length===keys.length && keys.every(k=>Object.hasOwn(p,k)) &&
-    keys.every(k=>typeof p[k]==="string") &&
-    p.schema==="formal-tools/solution-provenance/0.1" &&
-    [p.source_id,p.oracle_id,p.tool_id].every(x=>ident.test(x)) &&
+  const keys=provenanceKeys(p);
+  const identities=p?.schema==="formal-tools/solution-provenance/0.2"
+    ? [p.source_id,p.oracle_id,p.oracle_source_id,p.tool_id]
+    : [p?.source_id,p?.oracle_id,p?.tool_id];
+  return plain(p) && !!keys && Object.keys(p).length===keys.length &&
+    keys.every(k=>Object.hasOwn(p,k)) && keys.every(k=>typeof p[k]==="string") &&
+    identities.every(x=>ident.test(x)) &&
     [p.source_sha256,p.oracle_sha256,p.model_sha256,p.tool_binary_sha256,p.evidence_sha256].every(x=>sha.test(x)) &&
     p.tool_version.length>0 && p.tool_version.length<=96 &&
     p.platform.length>0 && p.platform.length<=96 &&
@@ -49,9 +57,17 @@ export function sealSolutionCandidate({problem_json,method_json,provenance_json}
       return denied("no valid native-only G2 Method DAG");
     const source=problem.source_refs.find(s=>s.id===provenance.source_id);
     const oracle=problem.oracles.find(o=>o.id===provenance.oracle_id);
-    if(!source||source.sha256!==provenance.source_sha256||!oracle||
-       oracle.source_ref!==provenance.source_id||
-       oracle.frozen!==true||provenance.oracle_sha256!==source.sha256)
+    // The frozen Oracle is a separately pinned source dependency. It may be
+    // the same source for a deliberately self-referential fixture, but the
+    // schema must also represent a genuinely independent Oracle source.
+    const oracleSource=oracle&&problem.source_refs.find(s=>s.id===oracle.source_ref);
+    // v0.1 is legacy same-source only: its source_id explicitly doubles as
+    // oracle source identity. v0.2 carries oracle_source_id independently.
+    const oracleSourceId=provenance.schema==="formal-tools/solution-provenance/0.1"
+      ? provenance.source_id : provenance.oracle_source_id;
+    if(!source||source.sha256!==provenance.source_sha256||!oracle||!oracleSource||
+       oracle.source_ref!==oracleSourceId||
+       oracle.frozen!==true||provenance.oracle_sha256!==oracleSource.sha256)
       return denied("source/oracle does not match frozen G2 authority");
     if(!method.oracle_ids.includes(provenance.oracle_id) ||
        !method.steps.some(s=>s.tool_id===provenance.tool_id))
@@ -87,6 +103,10 @@ export function inspectCandidateReplay(candidate_json,current_provenance_json) {
     const {candidate_sha256,...body}=c;
     if(digest(body)!==candidate_sha256)return denied("candidate content hash mismatch");
     if(!provenanceValid(now))return denied("invalid current provenance");
+    if(c.provenance.schema!==now.schema)
+      return {status:"STALE",changed_fields:["schema"],
+        claim_result:"UNVERIFIED",replay_allowed:false,solution_promotable:false};
+    const keys=provenanceKeys(c.provenance);
     const changed=keys.filter(k=>c.provenance[k]!==now[k]);
     if(changed.length)return {status:"STALE",changed_fields:changed,
       claim_result:"UNVERIFIED",replay_allowed:false,solution_promotable:false};
