@@ -1,0 +1,43 @@
+{
+  "schema": "formal-tools/model-set/0.1",
+  "model_set_id": "xdownload_interaction_safety_cases",
+  "source_commit": "b3a962c673f2e623ccd3db8ba059c4bae456b9dd",
+  "source_git_blob": "f57747aa7996c88833e72288a0acd594a7ce5468",
+  "cases": [
+    {
+      "id": "case_valid",
+      "path": "benchmarks/llm-methods/g4/cases/01-valid-inspect-and-confirm.smt2",
+      "sha256": "024d6310636c6af2b585cf2c7d8ed3bb424c6176177e0c96f0996535c0de5022",
+      "expected_status": "SAT",
+      "purpose": "Valid input can reach AWAITING_CONFIRMATION and READY_FOR_KDP after explicit confirmation."
+    },
+    {
+      "id": "case_unconfirmed",
+      "path": "benchmarks/llm-methods/g4/cases/02-unconfirmed-cannot-be-ready.smt2",
+      "sha256": "7730fa095075fa5ee659c2401476f56d6ca2726c24358028b44717bb5835bbce",
+      "expected_status": "UNSAT",
+      "purpose": "Missing explicit confirmation cannot reach READY_FOR_KDP."
+    },
+    {
+      "id": "case_invalid_input",
+      "path": "benchmarks/llm-methods/g4/cases/03-invalid-input-cannot-be-ready.smt2",
+      "sha256": "61a0cc44113a55107b1342bdd5b8e7385236202f3d9f63b93d3fe9dbe6b8da0a",
+      "expected_status": "UNSAT",
+      "purpose": "Invalid channel, request ID, URL or byte size cannot reach READY_FOR_KDP."
+    },
+    {
+      "id": "case_undeclared_forged",
+      "path": "benchmarks/llm-methods/g4/cases/04-undeclared-answer-and-forged-draft-cannot-be-ready.smt2",
+      "sha256": "dd5a804c7bcbf0bf930eef61ac4c49df0f3d78bd1269aac0d8ea30761de6f5b6",
+      "expected_status": "UNSAT",
+      "purpose": "Undeclared answer fields and a forged draft-ready flag cannot bypass revalidation."
+    },
+    {
+      "id": "case_no_effect",
+      "path": "benchmarks/llm-methods/g4/cases/05-effect-is-unreachable.smt2",
+      "sha256": "dc9c6827b617990df18389c4444125ef59ceb4c701cc8c521879bb6ef07861f7",
+      "expected_status": "UNSAT",
+      "purpose": "Neither effect dispatch nor effect permission is reachable."
+    }
+  ]
+}

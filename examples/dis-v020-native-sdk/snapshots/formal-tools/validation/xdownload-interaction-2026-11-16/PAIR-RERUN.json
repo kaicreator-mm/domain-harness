@@ -1,0 +1,236 @@
+{
+  "schema": "formal-tools/xdownload-interaction-native-rerun/0.1",
+  "run_id": "g4-rerun-20261116T123757Z",
+  "observed_at": "2026-11-16T12:37:57Z",
+  "formal_tools_pr": 146,
+  "formal_tools_reviewed_head": "9c279eb6f3509c95a2c8f9016c39b2848bbe014f",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "commit": "b3a962c673f2e623ccd3db8ba059c4bae456b9dd",
+    "path": "examples/dis-v020-interaction/download-goal.mjs",
+    "git_blob": "f57747aa7996c88833e72288a0acd594a7ce5468",
+    "sha256": "aa7dc083fd0a7dc6f9d98e0792058d567b16c1b4883f9fe9d80fa91733afe4c2",
+    "source_version": "dis.v0.2.download-interaction/1"
+  },
+  "model_set": {
+    "path": "benchmarks/llm-methods/g4/MODEL_SET.json",
+    "sha256": "ccffedd71e77e85faea3a98aee7e8b9a0bb3242d3b5e7fbf4103a974b571c7f2",
+    "git_blob": "f2d38a858cc89e03d2deecc332dc2b120c632f02",
+    "case_count": 5,
+    "query_count": 5
+  },
+  "host": {
+    "os": "Debian GNU/Linux 13 (trixie)",
+    "arch": "x86_64",
+    "kernel": "6.18.57",
+    "glibc": "2.41-12+deb13u3",
+    "execution": "ChatGPT execution container",
+    "network": "not used for solver execution",
+    "node_version": "v22.16.0 (not used for solver invocation)"
+  },
+  "tool_pins": [
+    {
+      "id": "z3",
+      "version": "5.4.0",
+      "archive_sha256": "039d3f8c75e92ceb196bb1291d8602340541f1b1be2f0a1acf32d3c025f8ed16",
+      "binary_sha256": "e9d7e6e6d76c81b5ea3f06d165fc4cfd8afab92b74cdf94417380b5eed10845d"
+    },
+    {
+      "id": "cvc5",
+      "version": "1.4.2",
+      "archive_sha256": "b7a5f6d1740086347d8055dab7fd1216960e19ab7a769fa2b15c1ec76ed0c193",
+      "binary_sha256": "6aecddf466552b83bb5883756c7955e0c9d5ddcc6d7f45b48c2f6e06a741b102"
+    }
+  ],
+  "observations": [
+    {
+      "id": "case_valid",
+      "model_path": "benchmarks/llm-methods/g4/cases/01-valid-inspect-and-confirm.smt2",
+      "model_sha256": "024d6310636c6af2b585cf2c7d8ed3bb424c6176177e0c96f0996535c0de5022",
+      "git_blob": "666cc63209c1aeb4fcb38ae3659f0a11db8a805d",
+      "expected_status": "SAT",
+      "solvers": {
+        "z3": {
+          "version": "5.4.0",
+          "command": "z3 -smt2 01-valid-inspect-and-confirm.smt2",
+          "exit_code": 0,
+          "status": "SAT",
+          "elapsed_ms": 47,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/01-valid-inspect-and-confirm.z3.stdout",
+          "stdout_sha256": "d9dbf94b05b8314af9ca7f2034e92685c33447917605a7243b1099c693a12e5e",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "version": "1.4.2",
+          "command": "cvc5 --lang smt2 01-valid-inspect-and-confirm.smt2",
+          "exit_code": 0,
+          "status": "SAT",
+          "elapsed_ms": 9,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/01-valid-inspect-and-confirm.cvc5.stdout",
+          "stdout_sha256": "d9dbf94b05b8314af9ca7f2034e92685c33447917605a7243b1099c693a12e5e",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    },
+    {
+      "id": "case_unconfirmed",
+      "model_path": "benchmarks/llm-methods/g4/cases/02-unconfirmed-cannot-be-ready.smt2",
+      "model_sha256": "7730fa095075fa5ee659c2401476f56d6ca2726c24358028b44717bb5835bbce",
+      "git_blob": "c7596dbf1730285ab2290d1c31517d28f9e8233d",
+      "expected_status": "UNSAT",
+      "solvers": {
+        "z3": {
+          "version": "5.4.0",
+          "command": "z3 -smt2 02-unconfirmed-cannot-be-ready.smt2",
+          "exit_code": 0,
+          "status": "UNSAT",
+          "elapsed_ms": 45,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/02-unconfirmed-cannot-be-ready.z3.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "version": "1.4.2",
+          "command": "cvc5 --lang smt2 02-unconfirmed-cannot-be-ready.smt2",
+          "exit_code": 0,
+          "status": "UNSAT",
+          "elapsed_ms": 5,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/02-unconfirmed-cannot-be-ready.cvc5.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    },
+    {
+      "id": "case_invalid_input",
+      "model_path": "benchmarks/llm-methods/g4/cases/03-invalid-input-cannot-be-ready.smt2",
+      "model_sha256": "61a0cc44113a55107b1342bdd5b8e7385236202f3d9f63b93d3fe9dbe6b8da0a",
+      "git_blob": "d9ef670e296cb4feefad081787eaad15ce5b63fc",
+      "expected_status": "UNSAT",
+      "solvers": {
+        "z3": {
+          "version": "5.4.0",
+          "command": "z3 -smt2 03-invalid-input-cannot-be-ready.smt2",
+          "exit_code": 0,
+          "status": "UNSAT",
+          "elapsed_ms": 11,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/03-invalid-input-cannot-be-ready.z3.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "version": "1.4.2",
+          "command": "cvc5 --lang smt2 03-invalid-input-cannot-be-ready.smt2",
+          "exit_code": 0,
+          "status": "UNSAT",
+          "elapsed_ms": 5,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/03-invalid-input-cannot-be-ready.cvc5.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    },
+    {
+      "id": "case_undeclared_forged",
+      "model_path": "benchmarks/llm-methods/g4/cases/04-undeclared-answer-and-forged-draft-cannot-be-ready.smt2",
+      "model_sha256": "dd5a804c7bcbf0bf930eef61ac4c49df0f3d78bd1269aac0d8ea30761de6f5b6",
+      "git_blob": "a0a6d55e46b2e87b4f86eda15a7ab4b6c29e26d2",
+      "expected_status": "UNSAT",
+      "solvers": {
+        "z3": {
+          "version": "5.4.0",
+          "command": "z3 -smt2 04-undeclared-answer-and-forged-draft-cannot-be-ready.smt2",
+          "exit_code": 0,
+          "status": "UNSAT",
+          "elapsed_ms": 47,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/04-undeclared-answer-and-forged-draft-cannot-be-ready.z3.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "version": "1.4.2",
+          "command": "cvc5 --lang smt2 04-undeclared-answer-and-forged-draft-cannot-be-ready.smt2",
+          "exit_code": 0,
+          "status": "UNSAT",
+          "elapsed_ms": 6,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/04-undeclared-answer-and-forged-draft-cannot-be-ready.cvc5.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    },
+    {
+      "id": "case_no_effect",
+      "model_path": "benchmarks/llm-methods/g4/cases/05-effect-is-unreachable.smt2",
+      "model_sha256": "dc9c6827b617990df18389c4444125ef59ceb4c701cc8c521879bb6ef07861f7",
+      "git_blob": "6871c29c0758a8326a3aa6499bafd1a5b13d4a3f",
+      "expected_status": "UNSAT",
+      "solvers": {
+        "z3": {
+          "version": "5.4.0",
+          "command": "z3 -smt2 05-effect-is-unreachable.smt2",
+          "exit_code": 0,
+          "status": "UNSAT",
+          "elapsed_ms": 46,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/05-effect-is-unreachable.z3.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        },
+        "cvc5": {
+          "version": "1.4.2",
+          "command": "cvc5 --lang smt2 05-effect-is-unreachable.smt2",
+          "exit_code": 0,
+          "status": "UNSAT",
+          "elapsed_ms": 4,
+          "stdout_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/05-effect-is-unreachable.cvc5.stdout",
+          "stdout_sha256": "5c17dfcc2a8f1f30d9e96df6a9825a5030ade046d560332c19de74d93d591a18",
+          "stderr_path": "validation/xdownload-interaction-2026-11-16/rerun-20261116T123757Z/stderr.empty",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_empty": true
+        }
+      }
+    }
+  ],
+  "pair_agreement": {
+    "compared_queries": 5,
+    "agree": 5,
+    "disagree": 0,
+    "sat": 1,
+    "unsat": 4,
+    "unknown": 0
+  },
+  "execution_summary": {
+    "native_invocations": 10,
+    "exit_code_zero": 10,
+    "stderr_nonempty": 0,
+    "timeouts": 0,
+    "retries": 0
+  },
+  "authority": {
+    "qualification": "ENGINEERING_ONLY",
+    "independent_semantic_oracle": "NOT_ATTESTED",
+    "trusted_host_process_attestation": false,
+    "solution_promotable": false,
+    "business_claim_result": "UNVERIFIED",
+    "positive_replay": "BLOCKED_UNQUALIFIED",
+    "effect_dispatched": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "formal-tools/solution-provenance/0.1",
+  "source_id": "xdownload_interaction",
+  "source_sha256": "aa7dc083fd0a7dc6f9d98e0792058d567b16c1b4883f9fe9d80fa91733afe4c2",
+  "oracle_id": "xdownload_runtime_crosscheck",
+  "oracle_sha256": "aa7dc083fd0a7dc6f9d98e0792058d567b16c1b4883f9fe9d80fa91733afe4c2",
+  "model_sha256": "ccffedd71e77e85faea3a98aee7e8b9a0bb3242d3b5e7fbf4103a974b571c7f2",
+  "tool_id": "z3",
+  "tool_version": "5.4.0",
+  "tool_binary_sha256": "e9d7e6e6d76c81b5ea3f06d165fc4cfd8afab92b74cdf94417380b5eed10845d",
+  "platform": "debian13-x86_64-glibc-2.41",
+  "evidence_sha256": "5e19c66133732a85f670acee7af97eadb3cac5f368dbdaf15ffb80466845c231",
+  "evidence_gate": "BYTES_BOUND_UNATTESTED"
+}

@@ -1,0 +1,214 @@
+{
+  "schema": "formal-tools/method-proposal/0.1",
+  "method_id": "xdownload_interaction_safety_cross_solver",
+  "problem_id": "dis.xdownload.interaction.safety",
+  "goal_claim_ids": [
+    "claim1"
+  ],
+  "oracle_ids": [
+    "xdownload_runtime_crosscheck"
+  ],
+  "semantic_review": "PENDING",
+  "steps": [
+    {
+      "id": "z3_case_valid",
+      "tool_id": "z3",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_valid"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    },
+    {
+      "id": "cvc5_case_valid",
+      "tool_id": "cvc5",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_valid"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    },
+    {
+      "id": "z3_case_unconfirmed",
+      "tool_id": "z3",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_unconfirmed"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    },
+    {
+      "id": "cvc5_case_unconfirmed",
+      "tool_id": "cvc5",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_unconfirmed"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    },
+    {
+      "id": "z3_case_invalid_input",
+      "tool_id": "z3",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_invalid_input"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    },
+    {
+      "id": "cvc5_case_invalid_input",
+      "tool_id": "cvc5",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_invalid_input"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    },
+    {
+      "id": "z3_case_undeclared_forged",
+      "tool_id": "z3",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_undeclared_forged"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    },
+    {
+      "id": "cvc5_case_undeclared_forged",
+      "tool_id": "cvc5",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_undeclared_forged"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    },
+    {
+      "id": "z3_case_no_effect",
+      "tool_id": "z3",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_no_effect"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    },
+    {
+      "id": "cvc5_case_no_effect",
+      "tool_id": "cvc5",
+      "operation": "solve",
+      "claim_ids": [
+        "claim1"
+      ],
+      "provides": [
+        "logic.smt"
+      ],
+      "depends_on": [],
+      "source_refs": [
+        "xdownload_interaction",
+        "case_no_effect"
+      ],
+      "estimated_cost_units": 1,
+      "timeout_ms": 1000,
+      "destination": "LOCAL",
+      "output_classification": "PUBLIC"
+    }
+  ]
+}
