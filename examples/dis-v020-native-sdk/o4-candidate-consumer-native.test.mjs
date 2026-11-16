@@ -27,7 +27,7 @@ test('formal-tools G4 store snapshots are byte-identical to pinned main source',
  assert.equal(pins.repository,'kaicreator-mm/formal-tools');
  assert.equal(pins.commit,'319367063177dec22a6df64233fae2a5fceef00f');
  assert.equal(pins.model_set.status,'PENDING_INDEPENDENT_REVIEW');
- assert.equal(pins.model_set.commit,'9c279eb6f3509c95a2c8f9016c39b2848bbe014f');
+ assert.equal(pins.model_set.commit,'2f573d4d5989b6dbf19d96584fef7ae6e66cbf2');
  for(const entry of pins.files){
   const bytes=await readFile(new URL('./'+entry.snapshot,import.meta.url));
   assert.equal(gitBlobSha(bytes),entry.gitBlob,entry.path);
