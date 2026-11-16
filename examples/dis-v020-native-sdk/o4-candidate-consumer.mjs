@@ -105,8 +105,9 @@ export async function consumeVerifiedO4Candidate({
     !Number.isSafeInteger(input.declaredBytes)||input.declaredBytes<1||input.declaredBytes>1048576)
   return fail('BLOCKED','O4_SNAPSHOT_SCOPE_OR_FUNCTION_MISMATCH');
 
- // Bind the signed O4 candidate bytes to the current G4 Source and Model pins;
- // the G4 store then decides currentness and durable revocation.
+ // Bind the signed O4 candidate bytes to the current G4 Source, Oracle and Model pins;
+ // the current G4 Candidate schema still binds this demo Oracle hash to the Source hash;
+ // this is not an independently attested Oracle. The G4 store decides currentness/revocation.
  let provenance;
  try{provenance=JSON.parse(currentProvenanceJson)}catch{return fail('BLOCKED','G4_PROVENANCE_JSON_INVALID')}
  if(provenance?.schema!=='formal-tools/solution-provenance/0.1'||
