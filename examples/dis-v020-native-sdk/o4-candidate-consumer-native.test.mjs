@@ -22,57 +22,109 @@ const signed=(payload,key)=>({
  payload,signature:sign(null,Buffer.from(JSON.stringify(payload)),key).toString('base64url')
 });
 const pins=JSON.parse(await readFile(new URL('./fixtures/formal-tools-g4-source-pins.json',import.meta.url),'utf8'));
+const snapshotUrl=path=>new URL('./snapshots/formal-tools/'+path,import.meta.url);
+const snapshotJson=async path=>JSON.parse(await readFile(snapshotUrl(path),'utf8'));
 
 test('formal-tools G4 store snapshots are byte-identical to pinned main source',async()=>{
  assert.equal(pins.repository,'kaicreator-mm/formal-tools');
- assert.equal(pins.commit,'319367063177dec22a6df64233fae2a5fceef00f');
- assert.equal(pins.model_set.status,'PENDING_INDEPENDENT_REVIEW');
+ assert.equal(pins.commit,'6991c7aae1026ea9bda9d49f43139e92437f0493');
+ assert.equal(pins.model_set.status,'ACCEPT_SCOPED_MERGED');
+ assert.equal(pins.model_set.accepted_review_head,'8669555a4e035f824647e39411620f7095b0c0b1');
+ assert.equal(pins.g4_method.upstream_commit,pins.commit);
+ assert.equal(pins.g4_method.evidence_gate,'BYTES_BOUND_UNATTESTED');
+ assert.equal(pins.g4_method.candidate_qualification,'NOT_ADMITTED');
+ assert.equal(pins.g4_method.native_invocations,20);
  assert.equal(pins.model_set.commit,'2f573d4d5989b6dbf19d96584fef7ae6e66cbf2');
- for(const entry of pins.files){
+ for(const entry of [...pins.files,...pins.g4_method.files]){
   const bytes=await readFile(new URL('./'+entry.snapshot,import.meta.url));
   assert.equal(gitBlobSha(bytes),entry.gitBlob,entry.path);
  }
 });
 
-function g4Fixture({sourceSha,modelSha}){
- const problem={
-  schema:'formal-tools/problem-spec/0.1',problem_id:'dis.xdownload.o4_candidate_consumer',
-  source_refs:[{id:'xdownload_interaction',sha256:sourceSha,classification:'PUBLIC',
-   purpose:'source-pinned xDownload Interaction Function',consumer:'formal_tools'}],
-  requirements:[{id:'r1',source_ref:'xdownload_interaction',
-   text:'The selected xDownload Interaction Functions return observations and never dispatch an Effect.'}],
-  claims:[{id:'claim1',text:'The selected xDownload Interaction Functions return observations only.',
-   kind:'bounded_model',requirement_ids:['r1'],source_refs:['xdownload_interaction'],
-   capability_ids:['logic.smt']}],
-  oracles:[{id:'xdownload_oracle',source_ref:'xdownload_interaction',frozen:true,
-   positive_case_ids:['valid_confirmation'],negative_case_ids:['unsafe_url','oversized_input'],
-   review_identity:'unattested_demo_oracle'}],
-  capability_ids:['logic.smt'],
-  budget:{max_steps:3,max_depth:3,max_cost_units:10,max_total_time_ms:10000,max_retries:0},
-  policy:{allowed_tools:['z3'],allowed_operations:{z3:['solve']},destination:'LOCAL',
-   max_input_classification:'PUBLIC',allow_network:false}
- };
- const method={
-  schema:'formal-tools/method-proposal/0.1',method_id:'xdownload_observation_method',
-  problem_id:problem.problem_id,goal_claim_ids:['claim1'],oracle_ids:['xdownload_oracle'],
-  semantic_review:'PENDING',
-  steps:[{id:'step01',tool_id:'z3',operation:'solve',claim_ids:['claim1'],
-   provides:['logic.smt'],depends_on:[],source_refs:['xdownload_interaction'],
-   estimated_cost_units:2,timeout_ms:300,destination:'LOCAL',output_classification:'PUBLIC'}]
- };
- const provenance={
-  schema:'formal-tools/solution-provenance/0.1',
-  source_id:'xdownload_interaction',source_sha256:sourceSha,
-  oracle_id:'xdownload_oracle',oracle_sha256:sourceSha,
-  model_sha256:modelSha,oracle_sha256:sourceSha,
-  tool_id:'z3',tool_version:'5.4.0',
-  tool_binary_sha256:Z3_SHA,platform:'debian13-x86_64',
-  evidence_sha256:sha(Buffer.from('NOT_RUN:xdownload-method-not-executed')),
-  evidence_gate:'NOT_RUN'
- };
+test('G6 binds committed xDownload G4 Method and native two-pair source bytes',async()=>{
+ const b='benchmarks/llm-methods/g4/';
+ const e='validation/xdownload-interaction-2026-11-16/';
+ const [problem,method,provenance,modelSet,index,pair,rerun]=await Promise.all([
+  snapshotJson(b+'PROBLEM.json'),snapshotJson(b+'METHOD.json'),
+  snapshotJson(b+'PROVENANCE.json'),snapshotJson(b+'MODEL_SET.json'),
+  snapshotJson(e+'EVIDENCE_INDEX.json'),snapshotJson(e+'PAIR.json'),
+  snapshotJson(e+'PAIR-RERUN.json')
+ ]);
+ const [modelBytes,indexBytes,pairBytes,rerunBytes,sourceBytes]=await Promise.all([
+  readFile(snapshotUrl(b+'MODEL_SET.json')),
+  readFile(snapshotUrl(e+'EVIDENCE_INDEX.json')),
+  readFile(snapshotUrl(e+'PAIR.json')),
+  readFile(snapshotUrl(e+'PAIR-RERUN.json')),
+  readFile(new URL('../dis-v020-interaction/download-goal.mjs',import.meta.url))
+ ]);
+ assert.equal(gitBlobSha(sourceBytes),'f57747aa7996c88833e72288a0acd594a7ce5468');
+ assert.equal(provenance.source_sha256,sha(sourceBytes));
+ assert.equal(provenance.oracle_sha256,provenance.source_sha256,
+  'the legacy same-source Oracle is not independent professional Oracle evidence');
+ assert.equal(provenance.model_sha256,sha(modelBytes));
+ assert.equal(provenance.evidence_sha256,sha(indexBytes));
+ assert.equal(index.model_set.sha256,sha(modelBytes));
+ assert.equal(index.evidence[0].sha256,sha(pairBytes));
+ assert.equal(index.evidence[1].sha256,sha(rerunBytes));
+ assert.equal(index.source.sha256,sha(sourceBytes));
+ assert.equal(method.problem_id,problem.problem_id);
+ assert.equal(method.steps.length,10);
+ assert.equal(modelSet.cases.length,5);
+ assert.equal(provenance.tool_binary_sha256,Z3_SHA);
+ assert.equal(provenance.evidence_gate,'BYTES_BOUND_UNATTESTED');
+ assert.equal(pair.pair_agreement.agree,5);
+ assert.equal(pair.pair_agreement.disagree,0);
+ assert.equal(rerun.pair_agreement.agree,5);
+ assert.equal(rerun.execution_summary.native_invocations,10);
+ assert.equal(rerun.execution_summary.exit_code_zero,10);
+ assert.equal(pins.g4_method.native_invocations,20);
+ for(const fixture of modelSet.cases){
+  const bytes=await readFile(snapshotUrl(fixture.path));
+  assert.equal(sha(bytes),fixture.sha256,fixture.id);
+ }
+ for(const pack of [pair,rerun]){
+  assert.equal(pack.observations.length,5);
+  for(const observation of pack.observations){
+   for(const tool of ['z3','cvc5']){
+    const result=observation.solvers[tool];
+    const stdout=await readFile(snapshotUrl(result.stdout_path));
+    assert.equal(sha(stdout),result.stdout_sha256,observation.id+' '+tool);
+    assert.equal(stdout.toString('utf8').trim().toUpperCase(),observation.expected_status);
+    assert.equal(result.exit_code,0);
+    assert.equal(result.stderr_empty,true);
+    if(result.stderr_path){
+     const stderr=await readFile(snapshotUrl(result.stderr_path));
+     assert.equal(sha(stderr),result.stderr_sha256,observation.id+' '+tool+' stderr');
+    }
+   }
+  }
+ }
+});
+
+async function g4Fixture({sourceSha,modelSha}){
+ // These are exact copies of merged formal-tools G4 evidence: not a synthetic
+ // replacement Method, not newly executed solvers, and not an Oracle grant.
+ const b='benchmarks/llm-methods/g4/';
+ const [problemBytes,methodBytes,provenanceBytes]=await Promise.all([
+  readFile(snapshotUrl(b+'PROBLEM.json')),
+  readFile(snapshotUrl(b+'METHOD.json')),
+  readFile(snapshotUrl(b+'PROVENANCE.json'))
+ ]);
+ const problem=JSON.parse(problemBytes.toString('utf8'));
+ const method=JSON.parse(methodBytes.toString('utf8'));
+ const provenance=JSON.parse(provenanceBytes.toString('utf8'));
+ assert.equal(problem.source_refs.find(x=>x.id==='xdownload_interaction')?.sha256,sourceSha);
+ assert.equal(provenance.source_sha256,sourceSha);
+ assert.equal(provenance.oracle_sha256,sourceSha);
+ assert.equal(provenance.model_sha256,modelSha);
+ assert.equal(provenance.tool_binary_sha256,Z3_SHA);
+ assert.equal(provenance.evidence_gate,'BYTES_BOUND_UNATTESTED');
+ assert.equal(provenance.schema,'formal-tools/solution-provenance/0.1');
+ assert.equal(method.steps.length,10);
  return {problem,method,provenance,
-  problem_json:JSON.stringify(problem),method_json:JSON.stringify(method),
-  provenance_json:JSON.stringify(provenance)};
+  problem_json:problemBytes.toString('utf8'),
+  method_json:methodBytes.toString('utf8'),
+  provenance_json:provenanceBytes.toString('utf8')};
 }
 
 async function withScenario(visit){
@@ -84,7 +136,7 @@ async function withScenario(visit){
  const storeDir=mkdtempSync(join(tmpdir(),'dis-o4-g6-candidate-'));
  try{
   const sourceBytes=await readFile(new URL('../dis-v020-interaction/download-goal.mjs',import.meta.url));
-  const g4=g4Fixture({sourceSha:sha(sourceBytes),modelSha:pins.model_set.sha256});
+  const g4=await g4Fixture({sourceSha:sha(sourceBytes),modelSha:pins.model_set.sha256});
   assert.equal(pins.model_set.sha256,G4_MODEL_SET_SHA256);
   assert.notEqual(g4.provenance.model_sha256,fixture.artifact.digest,
    'formal Model Set digest must not alias the selected DIS AOT digest');
@@ -262,16 +314,25 @@ test('G6 rejects G4 Model Set drift independently from selected DIS AOT digest',
  });
 });
 
-test('G6 rejects G4 Oracle provenance drift independently from Source and Model pins',async()=>{
+test('G6 rejects G4 Source and Oracle identity/hash drift before Domain App invocation',async()=>{
  await withScenario(async s=>{
   const counted=countedApp(s.app);
-  const drift={...s.g4.provenance,oracle_sha256:'e'.repeat(64)};
-  const result=await consumeVerifiedO4Candidate({
-   preflightResult:s.preflight,app:counted.app,expectedScope:SCOPE,
-   expectedRuleDigest:RULE,storeDir:s.storeDir,currentProvenanceJson:JSON.stringify(drift)
-  });
-  assert.equal(result.status,'STALE');
-  assert.equal(result.reason,'G4_SOURCE_OR_MODEL_PROVENANCE_MISMATCH');
-  assert.equal(counted.calls,0);
+  const drifts=[
+   ['source_sha256','f'.repeat(64),'G4_SOURCE_OR_MODEL_PROVENANCE_MISMATCH'],
+   ['source_id','different_source','G4_PROVENANCE_DRIFT'],
+   ['oracle_sha256','e'.repeat(64),'G4_SOURCE_OR_MODEL_PROVENANCE_MISMATCH'],
+   ['oracle_id','different_oracle','G4_PROVENANCE_DRIFT']
+  ];
+  for(const [field,value,reason] of drifts){
+   const changed={...s.g4.provenance,[field]:value};
+   const result=await consumeVerifiedO4Candidate({
+    preflightResult:s.preflight,app:counted.app,expectedScope:SCOPE,
+    expectedRuleDigest:RULE,storeDir:s.storeDir,currentProvenanceJson:JSON.stringify(changed)
+   });
+   assert.equal(result.status,'STALE',field+': '+JSON.stringify(result));
+   assert.equal(result.reason,reason,field);
+   if(reason==='G4_PROVENANCE_DRIFT')assert.deepEqual(result.changedFields,[field]);
+   assert.equal(counted.calls,0,field);
+  }
  });
 });
