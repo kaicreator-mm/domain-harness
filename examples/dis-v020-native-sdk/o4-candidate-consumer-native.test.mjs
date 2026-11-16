@@ -183,7 +183,7 @@ test('G6 rejects a substituted Base64 snapshot before invoking the Domain App',a
  await withScenario(async s=>{
   const counted=countedApp(s.app);
   const first=s.preflight.candidateBytesBase64[0]==='A'?'B':'A';
-  const tampered={...s.preflight,candidateBytesBase64:first+s.preflight.candidateBytesBase64.slice(1)};
+  const tampered=Object.freeze({...s.preflight,candidateBytesBase64:first+s.preflight.candidateBytesBase64.slice(1)});
   const result=await consumeVerifiedO4Candidate({
    preflightResult:tampered,app:counted.app,expectedScope:SCOPE,
    expectedRuleDigest:RULE,storeDir:s.storeDir,currentProvenanceJson:s.g4.provenance_json
