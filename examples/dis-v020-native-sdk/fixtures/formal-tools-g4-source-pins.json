@@ -1,7 +1,7 @@
 {
   "schema": "dis.formal-tools-g4-source-pins/1",
   "repository": "kaicreator-mm/formal-tools",
-  "commit": "721c1f5854e697db4534958de0bd21ee70bca108",
+  "commit": "319367063177dec22a6df64233fae2a5fceef00f",
   "files": [
     {
       "path": "packages/runner/js/solution-candidate.mjs",
