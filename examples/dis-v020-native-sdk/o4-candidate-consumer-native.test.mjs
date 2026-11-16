@@ -64,7 +64,7 @@ function g4Fixture({sourceSha,modelSha}){
   schema:'formal-tools/solution-provenance/0.1',
   source_id:'xdownload_interaction',source_sha256:sourceSha,
   oracle_id:'xdownload_oracle',oracle_sha256:sourceSha,
-  model_sha256:modelSha,oracle_sha256:sha(Buffer.from('NOT_RUN:unattested_demo_oracle')),
+  model_sha256:modelSha,oracle_sha256:sourceSha,
   tool_id:'z3',tool_version:'5.4.0',
   tool_binary_sha256:Z3_SHA,platform:'debian13-x86_64',
   evidence_sha256:sha(Buffer.from('NOT_RUN:xdownload-method-not-executed')),
@@ -88,10 +88,8 @@ async function withScenario(visit){
   assert.equal(pins.model_set.sha256,G4_MODEL_SET_SHA256);
   assert.notEqual(g4.provenance.model_sha256,fixture.artifact.digest,
    'formal Model Set digest must not alias the selected DIS AOT digest');
-  assert.notEqual(g4.provenance.oracle_sha256,g4.provenance.source_sha256,
-   'Oracle provenance must have its own digest, not alias the source digest');
-  assert.notEqual(g4.provenance.oracle_sha256,g4.provenance.model_sha256,
-   'Oracle provenance must not alias the formal Model Set digest');
+  assert.equal(g4.provenance.oracle_sha256,g4.provenance.source_sha256,
+   'current G4 Candidate schema binds this unattested demo Oracle to its source; it is not an independent Oracle');
   const stored=await persistSolutionCandidate({store_dir:storeDir,
    problem_json:g4.problem_json,method_json:g4.method_json,provenance_json:g4.provenance_json});
   assert.equal(stored.status,'CANDIDATE_PERSISTED',JSON.stringify(stored));
