@@ -1,0 +1,37 @@
+{
+  "schema": "dis.formal-tools-g4-source-pins/1",
+  "repository": "kaicreator-mm/formal-tools",
+  "commit": "721c1f5854e697db4534958de0bd21ee70bca108",
+  "files": [
+    {
+      "path": "packages/runner/js/solution-candidate.mjs",
+      "snapshot": "snapshots/formal-tools/packages/runner/js/solution-candidate.mjs",
+      "gitBlob": "d611fceb85aeed890edf2c23dc615444cd6386ca"
+    },
+    {
+      "path": "packages/runner/js/solution-store.mjs",
+      "snapshot": "snapshots/formal-tools/packages/runner/js/solution-store.mjs",
+      "gitBlob": "b58ea9b5ddbc0b06e9f5300c8b2acecc47fe9878"
+    },
+    {
+      "path": "packages/runner/js/method-planner.mjs",
+      "snapshot": "snapshots/formal-tools/packages/runner/js/method-planner.mjs",
+      "gitBlob": "6d890e498d287b8b38f841df7561c1fd9259abfa"
+    },
+    {
+      "path": "packages/runner/js/problem-capabilities.mjs",
+      "snapshot": "snapshots/formal-tools/packages/runner/js/problem-capabilities.mjs",
+      "gitBlob": "383b79e5c8bf960ae66210c49b492a96e87f01e9"
+    },
+    {
+      "path": "packages/runner/js/native-catalog.mjs",
+      "snapshot": "snapshots/formal-tools/packages/runner/js/native-catalog.mjs",
+      "gitBlob": "02f628947be3e5c270d802be150ab220e14fc2b8"
+    },
+    {
+      "path": "registry/PROBLEM_CAPABILITIES.json",
+      "snapshot": "snapshots/formal-tools/registry/PROBLEM_CAPABILITIES.json",
+      "gitBlob": "faa89997c3f7c8c71da0a69aa90e8ff37461cde0"
+    }
+  ]
+}
