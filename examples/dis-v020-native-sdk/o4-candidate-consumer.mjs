@@ -25,8 +25,8 @@ const PRECHECK_FIELDS=[
  'effectDispatched','authority'
 ];
 const CANDIDATE_FIELDS=[
- 'schema','scope','runId','selectedAotDigest','ruleDigest','selectedFunction',
- 'disposition','solutionCandidateSha256','input'
+ 'schema','scope','runId','selectedAotDigest','sourceSha256','ruleDigest','selectedFunction',
+ 'continuationFunction','disposition','solutionCandidateSha256','input'
 ];
 const INPUT_FIELDS=['channel','requestId','url','declaredBytes'];
 const fail=(status,reason,extra={})=>Object.freeze({
@@ -94,8 +94,10 @@ export async function consumeVerifiedO4Candidate({
     candidate.scope!==expectedScope||!TOKEN.test(candidate.runId)||
     candidate.runId!==input.requestId||
     candidate.selectedAotDigest!==pre.selectedAotDigest||
+    !HEX.test(candidate.sourceSha256)||
     candidate.ruleDigest!==expectedRuleDigest||
     candidate.selectedFunction!=='xdownload.interaction.inspect'||
+    candidate.continuationFunction!=='xdownload.interaction.confirm'||
     candidate.disposition!=='CANDIDATE_PREFLIGHT_ONLY'||
     !HEX.test(candidate.solutionCandidateSha256)||
     !['chat','form','cli'].includes(input.channel)||
@@ -103,6 +105,15 @@ export async function consumeVerifiedO4Candidate({
     !Number.isSafeInteger(input.declaredBytes)||input.declaredBytes<1||input.declaredBytes>1048576)
   return fail('BLOCKED','O4_SNAPSHOT_SCOPE_OR_FUNCTION_MISMATCH');
 
+ // Bind the signed O4 candidate bytes to the current G4 Source and Model pins;
+ // the G4 store then decides currentness and durable revocation.
+ let provenance;
+ try{provenance=JSON.parse(currentProvenanceJson)}catch{return fail('BLOCKED','G4_PROVENANCE_JSON_INVALID')}
+ if(provenance?.schema!=='formal-tools/solution-provenance/0.1'||
+    provenance.source_sha256!==candidate.sourceSha256||
+    provenance.oracle_sha256!==candidate.sourceSha256||
+    provenance.model_sha256!==candidate.selectedAotDigest)
+  return fail('STALE','G4_SOURCE_OR_MODEL_PROVENANCE_MISMATCH');
  // The exact pinned formal-tools G4 store is the source of truth for drift and
  // revocation. A matching candidate is still explicitly unqualified.
  let replay;
@@ -135,15 +146,25 @@ export async function consumeVerifiedO4Candidate({
  try{
   const inspected=await app.invoke('xdownload.interaction.inspect',input);
   if(inspected?.kind!=='OBSERVATION'||inspected.authority!=='NONE'||
-     inspected.value?.effectDispatched!==false||inspected.value?.status!=='AWAITING_CONFIRMATION')
+     inspected.value?.authority!=='NONE'||inspected.value?.effectDispatched!==false||
+     inspected.value?.status!=='AWAITING_CONFIRMATION'||
+     inspected.value?.proposal?.channel!==input.channel||
+     inspected.value?.proposal?.requestId!==input.requestId||
+     inspected.value?.proposal?.url!==input.url||
+     inspected.value?.proposal?.declaredBytes!==input.declaredBytes)
    return fail('UNKNOWN','DIS_INTERACTION_INSPECTION_NOT_OBSERVED');
   const confirmed=await app.invoke('xdownload.interaction.confirm',{
    draft:inspected.value,answers:{},confirmed:true
   });
   if(confirmed?.kind!=='OBSERVATION'||confirmed.authority!=='NONE'||
-     confirmed.value?.effectDispatched!==false||confirmed.value?.status!=='READY_FOR_KDP'||
-     confirmed.value?.permittedEffect!==false||
-     confirmed.value?.prerequisite!=='A_SEPARATE_SELECTED_KDP_INTENT_CALL_IS_REQUIRED')
+     confirmed.value?.authority!=='NONE'||confirmed.value?.effectDispatched!==false||
+     confirmed.value?.status!=='READY_FOR_KDP'||confirmed.value?.permittedEffect!==false||
+     confirmed.value?.proposal?.channel!==input.channel||
+     confirmed.value?.proposal?.requestId!==input.requestId||
+     confirmed.value?.proposal?.url!==input.url||
+     confirmed.value?.proposal?.declaredBytes!==input.declaredBytes||
+     confirmed.value?.prerequisite!=='A_SEPARATE_SELECTED_KDP_INTENT_CALL_IS_REQUIRED'||
+     app.aotDigest!==candidate.selectedAotDigest)
    return fail('UNKNOWN','DIS_INTERACTION_CONFIRMATION_NOT_OBSERVED');
   return Object.freeze({
    status:'CONSUMED_OBSERVATION_ONLY',
