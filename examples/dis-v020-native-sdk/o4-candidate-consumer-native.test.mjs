@@ -64,7 +64,8 @@ function g4Fixture({sourceSha,modelSha}){
   schema:'formal-tools/solution-provenance/0.1',
   source_id:'xdownload_interaction',source_sha256:sourceSha,
   oracle_id:'xdownload_oracle',oracle_sha256:sourceSha,
-  model_sha256:modelSha,tool_id:'z3',tool_version:'5.4.0',
+  model_sha256:modelSha,oracle_sha256:sha(Buffer.from('NOT_RUN:unattested_demo_oracle')),
+  tool_id:'z3',tool_version:'5.4.0',
   tool_binary_sha256:Z3_SHA,platform:'debian13-x86_64',
   evidence_sha256:sha(Buffer.from('NOT_RUN:xdownload-method-not-executed')),
   evidence_gate:'NOT_RUN'
@@ -87,6 +88,10 @@ async function withScenario(visit){
   assert.equal(pins.model_set.sha256,G4_MODEL_SET_SHA256);
   assert.notEqual(g4.provenance.model_sha256,fixture.artifact.digest,
    'formal Model Set digest must not alias the selected DIS AOT digest');
+  assert.notEqual(g4.provenance.oracle_sha256,g4.provenance.source_sha256,
+   'Oracle provenance must have its own digest, not alias the source digest');
+  assert.notEqual(g4.provenance.oracle_sha256,g4.provenance.model_sha256,
+   'Oracle provenance must not alias the formal Model Set digest');
   const stored=await persistSolutionCandidate({store_dir:storeDir,
    problem_json:g4.problem_json,method_json:g4.method_json,provenance_json:g4.provenance_json});
   assert.equal(stored.status,'CANDIDATE_PERSISTED',JSON.stringify(stored));
@@ -106,7 +111,7 @@ async function withScenario(visit){
   const candidateBytes=Buffer.from(JSON.stringify({
    schema:'dis.o4.server-meta-candidate/2',scope:SCOPE,runId,
    selectedAotDigest:fixture.artifact.digest,modelSha256:g4.provenance.model_sha256,
-   sourceSha256:g4.provenance.source_sha256,
+   sourceSha256:g4.provenance.source_sha256,oracleSha256:g4.provenance.oracle_sha256,
    ruleDigest:RULE,selectedFunction:'xdownload.interaction.inspect',
    continuationFunction:'xdownload.interaction.confirm',disposition:'CANDIDATE_PREFLIGHT_ONLY',
    solutionCandidateSha256:stored.candidate_sha256,input
@@ -236,6 +241,20 @@ test('G6 rejects G4 Model Set drift independently from selected DIS AOT digest',
   const counted=countedApp(s.app);
   assert.notEqual(s.g4.provenance.model_sha256,s.fixture.artifact.digest);
   const drift={...s.g4.provenance,model_sha256:'f'.repeat(64)};
+  const result=await consumeVerifiedO4Candidate({
+   preflightResult:s.preflight,app:counted.app,expectedScope:SCOPE,
+   expectedRuleDigest:RULE,storeDir:s.storeDir,currentProvenanceJson:JSON.stringify(drift)
+  });
+  assert.equal(result.status,'STALE');
+  assert.equal(result.reason,'G4_SOURCE_OR_MODEL_PROVENANCE_MISMATCH');
+  assert.equal(counted.calls,0);
+ });
+});
+
+test('G6 rejects G4 Oracle provenance drift independently from Source and Model pins',async()=>{
+ await withScenario(async s=>{
+  const counted=countedApp(s.app);
+  const drift={...s.g4.provenance,oracle_sha256:'e'.repeat(64)};
   const result=await consumeVerifiedO4Candidate({
    preflightResult:s.preflight,app:counted.app,expectedScope:SCOPE,
    expectedRuleDigest:RULE,storeDir:s.storeDir,currentProvenanceJson:JSON.stringify(drift)
