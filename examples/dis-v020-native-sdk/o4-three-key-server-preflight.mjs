@@ -171,6 +171,13 @@ export function createO4ThreeKeyServerCandidatePreflight({
     // replay and durable-ledger I/O failure both remain UNKNOWN at this seam.
     return deny('O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
    }
+   // Read the private snapshot through captured intrinsics too; do not
+   // consult even its mutable realm prototype when serializing the Base64.
+   const candidateBytesBase64=Buffer.from(
+    TYPED_ARRAY_BUFFER_GET.call(candidateBytes),
+    TYPED_ARRAY_OFFSET_GET.call(candidateBytes),
+    TYPED_ARRAY_LENGTH_GET.call(candidateBytes)
+   ).toString('base64');
    // Deliberately cannot trigger network upload, promote, build/activate AOT
    // or mint authoritative governance, Experience or Effect receipts.
    return Object.freeze({
@@ -183,9 +190,7 @@ export function createO4ThreeKeyServerCandidatePreflight({
     candidateContentDigestVerified:true,
     // Immutable text snapshot for a downstream consumer to publish/use instead
     // of the caller-owned Buffer that was supplied to this verification call.
-    candidateBytesBase64:Buffer.from(
-     candidateBytes.buffer,candidateBytes.byteOffset,candidateBytes.byteLength
-    ).toString('base64'),
+    candidateBytesBase64,
     qualified:false,experienceIssued:false,governanceApproved:false,
     serverPromotionAuthorized:false,newAotBuilt:false,newAotActivated:false,
     artifactExported:false,effectDispatched:false,authority:'NONE'
