@@ -32,6 +32,7 @@ const UINT8_ARRAY=Uint8Array;
 const UINT8_ARRAY_SET=Uint8Array.prototype.set;
 const BUFFER_IS_BUFFER=Buffer.isBuffer;
 const BUFFER_PROTO=Buffer.prototype;
+const GET_OWN_PROPERTY_DESCRIPTOR=Object.getOwnPropertyDescriptor;
 const FIELDS=Object.freeze([
  'version','scope','runId','selectedAotDigest','ruleDigest',
  'traceSignature','validatorSignature','observationDigest','proposalDigest',
@@ -50,6 +51,11 @@ function snapshotCandidateBytes(value){
  try{
   if(types.isProxy(value)||!BUFFER_IS_BUFFER.call(Buffer,value)||
      Object.getPrototypeOf(value)!==BUFFER_PROTO)return null;
+  // Reject shadowing descriptors without invoking attacker-controlled getters.
+  // Intrinsic slots remain authoritative for the actual backing store and size.
+  if(GET_OWN_PROPERTY_DESCRIPTOR(value,'byteLength')!==undefined||
+     GET_OWN_PROPERTY_DESCRIPTOR(value,'buffer')!==undefined||
+     GET_OWN_PROPERTY_DESCRIPTOR(value,'length')!==undefined)return null;
   // Read the genuine TypedArray internal slots. Never touch caller-visible
   // own byteLength/buffer/length properties on this untrusted Buffer.
   const backingStore=TYPED_ARRAY_BUFFER_GET.call(value);
