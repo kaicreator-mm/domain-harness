@@ -25,7 +25,7 @@ const PRECHECK_FIELDS=[
  'effectDispatched','authority'
 ];
 const CANDIDATE_FIELDS=[
- 'schema','scope','runId','selectedAotDigest','sourceSha256','ruleDigest','selectedFunction',
+ 'schema','scope','runId','selectedAotDigest','modelSha256','sourceSha256','ruleDigest','selectedFunction',
  'continuationFunction','disposition','solutionCandidateSha256','input'
 ];
 const INPUT_FIELDS=['channel','requestId','url','declaredBytes'];
@@ -90,11 +90,11 @@ export async function consumeVerifiedO4Candidate({
  if(!candidate)return fail('BLOCKED','O4_SNAPSHOT_SCHEMA_INVALID');
  const input=exactDataRecord(candidate.input,INPUT_FIELDS);
  if(!input)return fail('BLOCKED','O4_SNAPSHOT_INPUT_INVALID');
- if(candidate.schema!=='dis.o4.server-meta-candidate/1'||
+ if(candidate.schema!=='dis.o4.server-meta-candidate/2'||
     candidate.scope!==expectedScope||!TOKEN.test(candidate.runId)||
     candidate.runId!==input.requestId||
     candidate.selectedAotDigest!==pre.selectedAotDigest||
-    !HEX.test(candidate.sourceSha256)||
+    !HEX.test(candidate.sourceSha256)||!HEX.test(candidate.modelSha256)||
     candidate.ruleDigest!==expectedRuleDigest||
     candidate.selectedFunction!=='xdownload.interaction.inspect'||
     candidate.continuationFunction!=='xdownload.interaction.confirm'||
@@ -112,7 +112,7 @@ export async function consumeVerifiedO4Candidate({
  if(provenance?.schema!=='formal-tools/solution-provenance/0.1'||
     provenance.source_sha256!==candidate.sourceSha256||
     provenance.oracle_sha256!==candidate.sourceSha256||
-    provenance.model_sha256!==candidate.selectedAotDigest)
+    provenance.model_sha256!==candidate.modelSha256)
   return fail('STALE','G4_SOURCE_OR_MODEL_PROVENANCE_MISMATCH');
  // The exact pinned formal-tools G4 store is the source of truth for drift and
  // revocation. A matching candidate is still explicitly unqualified.
