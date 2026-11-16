@@ -1,0 +1,758 @@
+{
+  "schema": "formal-tools/problem-capabilities/0.1",
+  "authority": {
+    "main_issue": 11,
+    "native_catalog": "packages/runner/js/native-catalog.mjs",
+    "baseline_main_sha": "41925288dd5b777d49c4e442d9731581895cb037"
+  },
+  "status": "DISCOVERY_ONLY_NOT_NATIVE_VALIDATED",
+  "semantics": {
+    "tool_result_states": [
+      "SAT",
+      "UNSAT",
+      "UNKNOWN",
+      "ERROR",
+      "TIMEOUT",
+      "NOT_RUN"
+    ],
+    "claim_result_states": [
+      "SUPPORTED_WITH_SCOPE",
+      "REFUTED",
+      "INCONCLUSIVE",
+      "UNVERIFIED",
+      "NEEDS_SOURCE"
+    ],
+    "availability_states": [
+      "NOT_ASSESSED",
+      "DOWNLOADED",
+      "INSTALLED",
+      "NATIVE_VERIFIED",
+      "UNAVAILABLE"
+    ],
+    "warning": "Registered tool metadata is not proof of installed or verified capability"
+  },
+  "capabilities": [
+    {
+      "id": "logic.smt",
+      "label": "SMT约束",
+      "limitations": "Only proves satisfiability of encoded formula",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "proof.deductive",
+      "label": "演绎证明",
+      "limitations": "Assumptions and proposition require semantic review",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "model.state",
+      "label": "状态模型检查",
+      "limitations": "Bounds/abstractions matter",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "model.relational",
+      "label": "关系模型",
+      "limitations": "Finite scopes may not prove universal properties",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "logic.rules",
+      "label": "规则推理",
+      "limitations": "Rule/closed-world assumptions matter",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "knowledge.rdf",
+      "label": "RDF/SHACL",
+      "limitations": "Shape compliance is not factual accuracy",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "opt.combinatorial",
+      "label": "组合优化",
+      "limitations": "Objective and feasibility are model-relative",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "opt.numerical",
+      "label": "数值优化",
+      "limitations": "Numerical tolerance/gap is significant",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "math.symbolic",
+      "label": "符号数学",
+      "limitations": "Domains and assumptions must be explicit",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "graph.algorithms",
+      "label": "图论/DAG",
+      "limitations": "Graph completeness must be verified",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "test.property",
+      "label": "属性测试",
+      "limitations": "No failure found does not prove correctness",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "test.fuzz",
+      "label": "模糊测试",
+      "limitations": "Coverage remains partial",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "code.verify",
+      "label": "程序验证",
+      "limitations": "Program semantics and boundedness matter",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "model.probabilistic",
+      "label": "概率模型检查",
+      "limitations": "Requires calibrated transition probabilities",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "stats.bayesian",
+      "label": "贝叶斯推断",
+      "limitations": "Posterior depends on model and data",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "planning.classical",
+      "label": "自动规划",
+      "limitations": "Action preconditions and effects are model-dependent",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "causal.inference",
+      "label": "因果推断",
+      "limitations": "Confounding and identifiability matter",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "causal.discovery",
+      "label": "因果发现",
+      "limitations": "Observed association is not causal proof",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "ontology.inference",
+      "label": "OWL推理",
+      "limitations": "Inference depends on ontology semantics",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "ontology.processing",
+      "label": "本体处理",
+      "limitations": "Transform correctness needs separate verification",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "code.syntax",
+      "label": "语法树分析",
+      "limitations": "Parsing does not verify semantic meaning",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "sim.discrete",
+      "label": "离散事件模拟",
+      "limitations": "Simulation has no automatic real-world validity",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    },
+    {
+      "id": "sim.agent",
+      "label": "多智能体模拟",
+      "limitations": "Agent assumptions are external",
+      "claim_scope": "FORMAL_CHECKABLE_WITH_EXPLICIT_MODEL"
+    }
+  ],
+  "tools": [
+    {
+      "id": "lean4",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "proof.deductive"
+      ],
+      "official_url": "https://lean-lang.org/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "z3",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "logic.smt"
+      ],
+      "official_url": "https://github.com/Z3Prover/z3",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "cvc5",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "logic.smt",
+        "proof.deductive"
+      ],
+      "official_url": "https://cvc5.github.io/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "tla-tlc",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "model.state"
+      ],
+      "official_url": "https://github.com/tlaplus/tlaplus",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "apalache",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "model.state",
+        "logic.smt"
+      ],
+      "official_url": "https://github.com/apalache-mc/apalache",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "alloy",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "model.relational",
+        "model.state"
+      ],
+      "official_url": "https://github.com/AlloyTools/org.alloytools.alloy",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "souffle",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "logic.rules"
+      ],
+      "official_url": "https://github.com/souffle-lang/souffle",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "rdf-shacl",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "knowledge.rdf"
+      ],
+      "official_url": "https://github.com/RDFLib/pySHACL",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "vampire",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "proof.deductive"
+      ],
+      "official_url": "https://github.com/vprover/vampire",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "clingo",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "logic.rules",
+        "opt.combinatorial"
+      ],
+      "official_url": "https://potassco.org/clingo/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "apache-jena",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "knowledge.rdf"
+      ],
+      "official_url": "https://jena.apache.org/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "prob",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "model.state"
+      ],
+      "official_url": "https://prob.hhu.de/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "dafny",
+      "origin": "native-ref",
+      "priority": "existing",
+      "capability_ids": [
+        "proof.deductive",
+        "code.verify"
+      ],
+      "official_url": "https://dafny.org/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "ortools",
+      "origin": "candidate",
+      "priority": "A",
+      "capability_ids": [
+        "opt.combinatorial",
+        "opt.numerical"
+      ],
+      "official_url": "https://developers.google.com/optimization",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "sympy",
+      "origin": "candidate",
+      "priority": "A",
+      "capability_ids": [
+        "math.symbolic"
+      ],
+      "official_url": "https://www.sympy.org/",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "networkx",
+      "origin": "candidate",
+      "priority": "A",
+      "capability_ids": [
+        "graph.algorithms"
+      ],
+      "official_url": "https://networkx.org/",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "minizinc",
+      "origin": "candidate",
+      "priority": "A",
+      "capability_ids": [
+        "opt.combinatorial"
+      ],
+      "official_url": "https://www.minizinc.org/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "fast-check",
+      "origin": "candidate",
+      "priority": "A",
+      "capability_ids": [
+        "test.property"
+      ],
+      "official_url": "https://fast-check.dev/",
+      "distribution": "npm",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "hypothesis",
+      "origin": "candidate",
+      "priority": "A",
+      "capability_ids": [
+        "test.property"
+      ],
+      "official_url": "https://hypothesis.readthedocs.io/",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "highs",
+      "origin": "candidate",
+      "priority": "A",
+      "capability_ids": [
+        "opt.numerical"
+      ],
+      "official_url": "https://highs.dev/",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "cbmc",
+      "origin": "candidate",
+      "priority": "A",
+      "capability_ids": [
+        "code.verify"
+      ],
+      "official_url": "https://www.cprover.org/cbmc/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "storm",
+      "origin": "candidate",
+      "priority": "B",
+      "capability_ids": [
+        "model.probabilistic"
+      ],
+      "official_url": "https://www.stormchecker.org/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "fast-downward",
+      "origin": "candidate",
+      "priority": "B",
+      "capability_ids": [
+        "planning.classical"
+      ],
+      "official_url": "https://www.fast-downward.org/",
+      "distribution": "source",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "dowhy",
+      "origin": "candidate",
+      "priority": "B",
+      "capability_ids": [
+        "causal.inference"
+      ],
+      "official_url": "https://www.pywhy.org/dowhy/",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "pymc",
+      "origin": "candidate",
+      "priority": "B",
+      "capability_ids": [
+        "stats.bayesian"
+      ],
+      "official_url": "https://www.pymc.io/",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "why3",
+      "origin": "candidate",
+      "priority": "B",
+      "capability_ids": [
+        "proof.deductive"
+      ],
+      "official_url": "https://why3.org/",
+      "distribution": "source",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "elk",
+      "origin": "candidate",
+      "priority": "B",
+      "capability_ids": [
+        "ontology.inference"
+      ],
+      "official_url": "https://github.com/liveontologies/elk-reasoner",
+      "distribution": "java",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "kani",
+      "origin": "candidate",
+      "priority": "B",
+      "capability_ids": [
+        "code.verify"
+      ],
+      "official_url": "https://model-checking.github.io/kani/",
+      "distribution": "rust",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "tree-sitter",
+      "origin": "candidate",
+      "priority": "B",
+      "capability_ids": [
+        "code.syntax"
+      ],
+      "official_url": "https://tree-sitter.github.io/tree-sitter/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "prism",
+      "origin": "candidate",
+      "priority": "C",
+      "capability_ids": [
+        "model.probabilistic"
+      ],
+      "official_url": "https://www.prismmodelchecker.org/",
+      "distribution": "native",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "nuxmv",
+      "origin": "candidate",
+      "priority": "C",
+      "capability_ids": [
+        "model.state"
+      ],
+      "official_url": "https://nuxmv.fbk.eu/",
+      "distribution": "license-review",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "aflpp",
+      "origin": "candidate",
+      "priority": "C",
+      "capability_ids": [
+        "test.fuzz"
+      ],
+      "official_url": "https://aflplus.plus/",
+      "distribution": "source",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "simpy",
+      "origin": "candidate",
+      "priority": "C",
+      "capability_ids": [
+        "sim.discrete"
+      ],
+      "official_url": "https://simpy.readthedocs.io/",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "DOMAIN_SIMULATOR"
+    },
+    {
+      "id": "mesa",
+      "origin": "candidate",
+      "priority": "C",
+      "capability_ids": [
+        "sim.agent"
+      ],
+      "official_url": "https://mesa.readthedocs.io/",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "DOMAIN_SIMULATOR"
+    },
+    {
+      "id": "causal-learn",
+      "origin": "candidate",
+      "priority": "C",
+      "capability_ids": [
+        "causal.discovery"
+      ],
+      "official_url": "https://github.com/py-why/causal-learn",
+      "distribution": "pypi",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    },
+    {
+      "id": "robot",
+      "origin": "candidate",
+      "priority": "C",
+      "capability_ids": [
+        "ontology.processing"
+      ],
+      "official_url": "https://robot.obolibrary.org/",
+      "distribution": "java",
+      "availability": "NOT_ASSESSED",
+      "runtime_verified": false,
+      "version": null,
+      "evidence_ref": null,
+      "license_status": "REVIEW_REQUIRED",
+      "consumer_scope": "FORMAL_TOOLS_GENERIC"
+    }
+  ]
+}
