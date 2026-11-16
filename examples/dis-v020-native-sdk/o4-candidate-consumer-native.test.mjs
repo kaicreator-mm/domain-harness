@@ -135,7 +135,7 @@ async function withScenario(visit){
   assert.equal(preflight.status,'CANDIDATE_PREFLIGHT_VERIFIED_TECHNICAL_ONLY');
   return await visit({app,storeDir,stored,g4,fixture,preflight,candidateBytes,input});
  }finally{
-  app.stop();
+  await app.stop();
   rmSync(storeDir,{recursive:true,force:true});
  }
 }
