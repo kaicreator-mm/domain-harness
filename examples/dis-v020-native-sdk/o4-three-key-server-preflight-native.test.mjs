@@ -223,15 +223,16 @@ test('O4 real durable nonce ledger is untouched by digest mismatch, consumes onc
   assert.equal(nonceLedger.consume(runId),false);
  },{durableLedger:true});
 
- await withSelected(({gate,packet,runId,ledgerRoot,nonceLedger})=>{
+ await withSelected(({gate,packet,ledgerRoot})=>{
+  const g=gate();
   chmodSync(ledgerRoot,0o777); // simulate trusted-ledger storage becoming unavailable
-  const failed=gate().verifyProposal(packet());
+  const failed=g.verifyProposal(packet());
   denied(failed);
   assert.equal(failed.reason,'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
   chmodSync(ledgerRoot,0o700);
-  // Restoring the directory and successfully claiming the nonce proves the
-  // failed O4 attempt did not create a durable consume marker.
-  assert.equal(nonceLedger.consume(runId),true);
+  // Retrying the same signed packet succeeds: neither O2's in-memory replay
+  // set nor the durable ledger consumed the nonce on storage failure.
+  limited(g.verifyProposal(packet()));
  },{durableLedger:true});
 });
 
