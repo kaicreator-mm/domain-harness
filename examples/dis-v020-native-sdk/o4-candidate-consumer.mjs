@@ -2,6 +2,8 @@
  * R155 G6 bounded consumer: verified O4 bytes -> pinned G4 candidate store ->
  * selected xDownload DIS AOT observation. This is NOT qualified Solution replay.
  *
+ * preflightResult must be passed directly from the trusted R154 gate in the
+ * same Host process; it is not an API for caller/LLM/network-deserialized data.
  * A G4 candidate may be inspected while unchanged, but remains
  * REPLAY_BLOCKED_UNQUALIFIED. This consumer therefore permits only local,
  * effect:none Interaction observations; it never dispatches KDP or an Effect.
@@ -59,9 +61,11 @@ const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 export async function consumeVerifiedO4Candidate({
  preflightResult,app,expectedScope,expectedRuleDigest,storeDir,currentProvenanceJson
 }={}){
+ if(!Object.isFrozen(preflightResult))return fail('BLOCKED','O4_PREFLIGHT_RESULT_NOT_DIRECT');
  const pre=exactDataRecord(preflightResult,PRECHECK_FIELDS);
  if(!pre)return fail('BLOCKED','O4_PREFLIGHT_RESULT_UNSAFE');
  if(pre.status!=='CANDIDATE_PREFLIGHT_VERIFIED_TECHNICAL_ONLY'||
+    pre.reason!=='INDEPENDENT_DOMAIN_ORACLE_GOVERNANCE_PROMOTION_AND_NEW_AOT_MISSING'||
     pre.scope!=='LOCAL_TECHNICAL_PREFLIGHT_ONLY'||
     pre.technicalEnvelopeVerified!==true||pre.traceVerified!==true||
     pre.validatorSignatureVerified!==true||pre.serverReviewSignatureVerified!==true||
