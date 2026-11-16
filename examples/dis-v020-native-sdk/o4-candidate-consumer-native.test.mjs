@@ -153,7 +153,7 @@ async function withScenario(visit){
 function countedApp(app){
  let calls=0,ids=[];
  const wrapped=Object.create(app);
- wrapped.invoke=async(id,...args)=>{calls++;ids.push(id);return app.invoke(id,...args)};
+ Object.defineProperty(wrapped,'invoke',{value:async(id,...args)=>{calls++;ids.push(id);return app.invoke(id,...args)}});
  return {app:wrapped,get calls(){return calls},get ids(){return [...ids]}};
 }
 
