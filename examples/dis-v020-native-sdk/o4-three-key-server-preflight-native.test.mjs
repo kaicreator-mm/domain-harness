@@ -3,11 +3,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {Buffer} from 'node:buffer';
+import {chmodSync,mkdirSync,mkdtempSync,readdirSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {makeNativeFixture} from './native-fixture.mjs';
 import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
 import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
 import {createControlledTraceIssuer} from './o2-controlled-execution-trace.mjs';
 import {createO4ThreeKeyServerCandidatePreflight} from './o4-three-key-server-preflight.mjs';
+import {createO2DurableNonceLedger} from './o2-durable-nonce-ledger.mjs';
 
 const SCOPE='tenant:dis-o4-r147-native',RULE='c'.repeat(64),base=makeNativeFixture();
 const sha=x=>createHash('sha256').update(x).digest('hex');
@@ -35,12 +39,13 @@ const limited=x=>{
   assert.equal(x[key],false,key);
  assert.equal(x.authority,'NONE');
 };
-async function withSelected(visit){
+async function withSelected(visit,{durableLedger=false}={}){
  const f=await base;
  const app=await loadDisV020Aot(f.artifact,{
   expectedDigest:f.artifact.digest,registry:f.registry,
   store:new PlainCasDocStore(),tenantId:SCOPE
  });
+ let ledgerParent=null,ledgerRoot=null,nonceLedger=null;
  try{
   const trace=generateKeyPairSync('ed25519');
   const validator=generateKeyPairSync('ed25519');
@@ -48,9 +53,17 @@ async function withSelected(visit){
   const runId='run:o4-r147-'+(++seq);
   const request={channel:'cli',requestId:runId,
    url:'https://example.com/media/o4-review.mp4',declaredBytes:2048};
+  if(durableLedger){
+   ledgerParent=mkdtempSync(join(tmpdir(),'dis-o4-r151-ledger-'));
+   ledgerRoot=join(ledgerParent,'ledger');
+   mkdirSync(ledgerRoot,{mode:0o700});
+   nonceLedger=createO2DurableNonceLedger({
+    directory:ledgerRoot,scope:SCOPE,expectedAotDigest:f.artifact.digest
+   });
+  }
   const issuer=createControlledTraceIssuer({
    app,privateKey:trace.privateKey,publicKey:trace.publicKey,
-   scope:SCOPE,expectedAotDigest:f.artifact.digest
+   scope:SCOPE,expectedAotDigest:f.artifact.digest,nonceLedger
   });
   const captured=await issuer.capture({input:request,runId});
   assert.equal(captured.status,'ISSUED_TRACE_ONLY');
@@ -83,15 +96,21 @@ async function withSelected(visit){
    serverReviewPublicKey:review.publicKey,scope:SCOPE,
    expectedAotDigest:f.artifact.digest,expectedRuleDigest:RULE
   };
-  const gate=(changes={})=>createO4ThreeKeyServerCandidatePreflight({...config,...changes});
+  const gate=(changes={})=>createO4ThreeKeyServerCandidatePreflight({
+   ...config,nonceLedger,...changes
+  });
   const packet=(p=candidatePayload,v=vReceipt,bytes=candidateBytes)=>({
    candidateEnvelope:signed(p,review.privateKey),
    validatorReceipt:v,traceReceipt:captured.receipt,
    input:request,observation:captured.observation,runId,candidateBytes:bytes
   });
   return await visit({app,config,trace,validator,review,runId,gate,packet,
-   candidatePayload,candidateBytes,validatorPayload,vReceipt,captured});
- }finally{app.stop()}
+   candidatePayload,candidateBytes,validatorPayload,vReceipt,captured,
+   nonceLedger,ledgerRoot,ledgerParent});
+ }finally{
+  app.stop();
+  if(ledgerParent)rmSync(ledgerParent,{recursive:true,force:true});
+ }
 }
 
 test('O4 true selected AOT SDK: 3 independent signatures prove technical proposal preflight only',async()=>{
@@ -146,6 +165,74 @@ test('O4 malformed, oversized and non-Buffer candidate bytes fail closed without
   }
   limited(g.verifyProposal(packet()));
  });
+});
+
+test('O4 genuine Buffer own accessors and SharedArrayBuffer cannot bypass intrinsic snapshot bounds',async()=>{
+ await withSelected(({gate,packet,candidateBytes})=>{
+  const g=gate({maxAttempts:8});
+  let traps=0;
+  const accessorBuffer=(key,read)=>{
+   const value=Buffer.from(candidateBytes);
+   Object.defineProperty(value,key,{
+    configurable:true,get(){traps++;return read?read():(()=>{throw Error('BUFFER_ACCESSOR_TRAP')})()}
+   });
+   return value;
+  };
+  for(const key of ['byteLength','buffer','length']){
+   const out=g.verifyProposal(packet(undefined,undefined,accessorBuffer(key)));
+   denied(out);
+   assert.equal(out.reason,'O4_CANDIDATE_CONTENT_UNSAFE');
+  }
+  const oversized=Buffer.alloc(1024*1024+1);
+  Object.defineProperty(oversized,'byteLength',{
+   configurable:true,get(){traps++;return 1}
+  });
+  const tooLarge=g.verifyProposal(packet(undefined,undefined,oversized));
+  denied(tooLarge);
+  assert.equal(tooLarge.reason,'O4_CANDIDATE_CONTENT_UNSAFE');
+  const shared=Buffer.from(new SharedArrayBuffer(candidateBytes.byteLength));
+  Uint8Array.prototype.set.call(shared,candidateBytes);
+  Object.defineProperty(shared,'buffer',{
+   configurable:true,get(){traps++;return new ArrayBuffer(candidateBytes.byteLength)}
+  });
+  const sharedOut=g.verifyProposal(packet(undefined,undefined,shared));
+  denied(sharedOut);
+  assert.equal(sharedOut.reason,'O4_CANDIDATE_CONTENT_UNSAFE');
+  assert.equal(traps,0);
+  limited(g.verifyProposal(packet()));
+ });
+});
+
+test('O4 real durable nonce ledger is untouched by digest mismatch, consumes once, and fails closed on replay or storage failure',async()=>{
+ await withSelected(({gate,packet,candidateBytes,runId,ledgerRoot,nonceLedger})=>{
+  const g=gate({maxAttempts:4});
+  const initial=readdirSync(ledgerRoot).length; // issuer reservation only
+  assert.equal(initial,1);
+  const substituted=Buffer.from(candidateBytes);
+  substituted[substituted.length-1]^=1;
+  const mismatch=g.verifyProposal(packet(undefined,undefined,substituted));
+  denied(mismatch);
+  assert.equal(mismatch.reason,'O4_CANDIDATE_CONTENT_DIGEST_MISMATCH');
+  assert.equal(readdirSync(ledgerRoot).length,initial);
+  limited(g.verifyProposal(packet()));
+  assert.equal(readdirSync(ledgerRoot).length,initial+1);
+  const replay=g.verifyProposal(packet());
+  denied(replay);
+  assert.equal(replay.reason,'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
+  assert.equal(readdirSync(ledgerRoot).length,initial+1);
+  assert.equal(nonceLedger.consume(runId),false);
+ },{durableLedger:true});
+
+ await withSelected(({gate,packet,runId,ledgerRoot,nonceLedger})=>{
+  chmodSync(ledgerRoot,0o777); // simulate trusted-ledger storage becoming unavailable
+  const failed=gate().verifyProposal(packet());
+  denied(failed);
+  assert.equal(failed.reason,'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
+  chmodSync(ledgerRoot,0o700);
+  // Restoring the directory and successfully claiming the nonce proves the
+  // failed O4 attempt did not create a durable consume marker.
+  assert.equal(nonceLedger.consume(runId),true);
+ },{durableLedger:true});
 });
 
 test('O4 forged third signature cannot consume valid Trace/Validator before a later valid proposal',async()=>{

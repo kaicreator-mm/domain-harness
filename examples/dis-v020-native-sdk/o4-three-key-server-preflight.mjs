@@ -8,7 +8,10 @@
  * Server, professional Domain Oracle, Experience, Governance approval, Forge
  * Promotion, new AOT build/activation or Effect. It does not publish candidate
  * bytes or dispatch an Effect. A configured trusted O2 nonce ledger may persist
- * replay state. A reviewer SIGNATURE proves key possession, not authority.
+ * replay state. The returned Base64 is only a verified input snapshot; this PR
+ * has no downstream publisher/installer. A future consumer MUST decode and use
+ * only that snapshot, never the caller-owned Buffer. A reviewer SIGNATURE proves
+ * key possession, not authority.
  */
 import {createHash,createPublicKey,verify} from 'node:crypto';
 import {Buffer} from 'node:buffer';
@@ -20,6 +23,15 @@ const HEX=/^[a-f0-9]{64}$/;
 const TOKEN=/^[a-zA-Z][a-zA-Z0-9._:/-]{0,127}$/;
 const SIG=/^[A-Za-z0-9_-]{86}$/;
 const MAX_CANDIDATE_BYTES=1024*1024;
+const TYPED_ARRAY_PROTO=Object.getPrototypeOf(Uint8Array.prototype);
+const TYPED_ARRAY_BUFFER_GET=Object.getOwnPropertyDescriptor(TYPED_ARRAY_PROTO,'buffer').get;
+const TYPED_ARRAY_OFFSET_GET=Object.getOwnPropertyDescriptor(TYPED_ARRAY_PROTO,'byteOffset').get;
+const TYPED_ARRAY_LENGTH_GET=Object.getOwnPropertyDescriptor(TYPED_ARRAY_PROTO,'byteLength').get;
+const ARRAY_BUFFER_LENGTH_GET=Object.getOwnPropertyDescriptor(ArrayBuffer.prototype,'byteLength').get;
+const UINT8_ARRAY=Uint8Array;
+const UINT8_ARRAY_SET=Uint8Array.prototype.set;
+const BUFFER_IS_BUFFER=Buffer.isBuffer;
+const BUFFER_PROTO=Buffer.prototype;
 const FIELDS=Object.freeze([
  'version','scope','runId','selectedAotDigest','ruleDigest',
  'traceSignature','validatorSignature','observationDigest','proposalDigest',
@@ -36,13 +48,23 @@ const deny=reason=>Object.freeze({
 const own=(x,k)=>Object.getOwnPropertyDescriptor(x,k)?.value;
 function snapshotCandidateBytes(value){
  try{
-  if(types.isProxy(value)||!Buffer.isBuffer(value)||
-     Object.getPrototypeOf(value)!==Buffer.prototype||
-     !Number.isSafeInteger(value.byteLength)||value.byteLength<1||
-     value.byteLength>MAX_CANDIDATE_BYTES||
-     !(value.buffer instanceof ArrayBuffer))return null;
-  // Copy once: later caller mutation cannot change the bytes whose digest is checked.
-  return Buffer.from(value);
+  if(types.isProxy(value)||!BUFFER_IS_BUFFER.call(Buffer,value)||
+     Object.getPrototypeOf(value)!==BUFFER_PROTO)return null;
+  // Read the genuine TypedArray internal slots. Never touch caller-visible
+  // own byteLength/buffer/length properties on this untrusted Buffer.
+  const backingStore=TYPED_ARRAY_BUFFER_GET.call(value);
+  const byteOffset=TYPED_ARRAY_OFFSET_GET.call(value);
+  const byteLength=TYPED_ARRAY_LENGTH_GET.call(value);
+  // The intrinsic ArrayBuffer getter throws for SharedArrayBuffer backing.
+  const backingLength=ARRAY_BUFFER_LENGTH_GET.call(backingStore);
+  if(!Number.isSafeInteger(byteLength)||byteLength<1||
+     byteLength>MAX_CANDIDATE_BYTES||!Number.isSafeInteger(byteOffset)||
+     byteOffset<0||byteOffset+byteLength>backingLength)return null;
+  // TypedArray#set's typed-array branch reads source internal slots, not
+  // attacker-defined own accessors. The destination is a fresh private copy.
+  const snapshot=new UINT8_ARRAY(byteLength);
+  UINT8_ARRAY_SET.call(snapshot,value);
+  return snapshot;
  }catch{return null}
 }
 function exact(x,keys){
@@ -144,8 +166,11 @@ export function createO4ThreeKeyServerCandidatePreflight({
    });
    if(verified.status!=='VALIDATOR_RECEIPT_VERIFIED_TECHNICAL'||
       verified.traceVerified!==true||verified.validatorSignatureVerified!==true||
-      verified.validatorVerdict!=='PASS')
+      verified.validatorVerdict!=='PASS'){
+    // O2 intentionally exposes one fail-closed Trace failure category here;
+    // replay and durable-ledger I/O failure both remain UNKNOWN at this seam.
     return deny('O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
+   }
    // Deliberately cannot trigger network upload, promote, build/activate AOT
    // or mint authoritative governance, Experience or Effect receipts.
    return Object.freeze({
@@ -158,7 +183,9 @@ export function createO4ThreeKeyServerCandidatePreflight({
     candidateContentDigestVerified:true,
     // Immutable text snapshot for a downstream consumer to publish/use instead
     // of the caller-owned Buffer that was supplied to this verification call.
-    candidateBytesBase64:candidateBytes.toString('base64'),
+    candidateBytesBase64:Buffer.from(
+     candidateBytes.buffer,candidateBytes.byteOffset,candidateBytes.byteLength
+    ).toString('base64'),
     qualified:false,experienceIssued:false,governanceApproved:false,
     serverPromotionAuthorized:false,newAotBuilt:false,newAotActivated:false,
     artifactExported:false,effectDispatched:false,authority:'NONE'
