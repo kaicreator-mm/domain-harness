@@ -1,0 +1,7 @@
+(set-logic QF_UF)
+(declare-const effect_dispatched Bool)
+(declare-const permitted_effect Bool)
+(assert (= effect_dispatched false))
+(assert (= permitted_effect false))
+(assert (or effect_dispatched permitted_effect))
+(check-sat)
