@@ -144,8 +144,17 @@ export async function consumeVerifiedO4Candidate({
     app.contractVersions?.['xdownload.interaction.confirm']!=='1.0.0')
   return fail('BLOCKED','DIS_INTERACTION_FUNCTION_NOT_SELECTED');
 
+ // exactDataRecord intentionally returns null-prototype records to keep
+ // untrusted snapshots inert. The selected DIS Function ABI requires an
+ // ordinary record, so materialize a fresh fixed-key DTO only after every
+ // field has passed the exact own-data/schema checks above.
+ const appInput=Object.freeze({
+  channel:input.channel,requestId:input.requestId,url:input.url,
+  declaredBytes:input.declaredBytes
+ });
+ let invokingFunction='xdownload.interaction.inspect';
  try{
-  const inspected=await app.invoke('xdownload.interaction.inspect',input);
+  const inspected=await app.invoke(invokingFunction,appInput);
   if(inspected?.kind!=='OBSERVATION'||inspected.authority!=='NONE'||
      inspected.value?.authority!=='NONE'||inspected.value?.effectDispatched!==false||
      inspected.value?.status!=='AWAITING_CONFIRMATION'||
@@ -154,7 +163,8 @@ export async function consumeVerifiedO4Candidate({
      inspected.value?.proposal?.url!==input.url||
      inspected.value?.proposal?.declaredBytes!==input.declaredBytes)
    return fail('UNKNOWN','DIS_INTERACTION_INSPECTION_NOT_OBSERVED');
-  const confirmed=await app.invoke('xdownload.interaction.confirm',{
+  invokingFunction='xdownload.interaction.confirm';
+  const confirmed=await app.invoke(invokingFunction,{
    draft:inspected.value,answers:{},confirmed:true
   });
   if(confirmed?.kind!=='OBSERVATION'||confirmed.authority!=='NONE'||
@@ -180,5 +190,19 @@ export async function consumeVerifiedO4Candidate({
    governanceApproved:false,serverPromotionAuthorized:false,
    effectDispatched:false,authority:'NONE'
   });
- }catch{return fail('UNKNOWN','DIS_DOMAIN_APP_INVOCATION_FAILED')}
+ }catch(error){
+  // Preserve only a bounded SDK error code and the selected Function ID.
+  // Never forward arbitrary messages, causes, paths or Host diagnostics.
+  let diagnosticCode='UNCLASSIFIED';
+  try{
+   const slot=error&&typeof error==='object'?
+    Object.getOwnPropertyDescriptor(error,'code'):undefined;
+   if(slot&&Object.hasOwn(slot,'value')&&typeof slot.value==='string'&&
+      /^DIS_[A-Z0-9_]{1,80}$/.test(slot.value))
+    diagnosticCode=slot.value;
+  }catch{}
+  return fail('UNKNOWN','DIS_DOMAIN_APP_INVOCATION_FAILED',{
+   failedFunction:invokingFunction,diagnosticCode
+  });
+ }
 }

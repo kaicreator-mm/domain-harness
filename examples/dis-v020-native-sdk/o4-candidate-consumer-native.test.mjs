@@ -151,10 +151,10 @@ async function withScenario(visit){
 }
 
 function countedApp(app){
- let calls=0,ids=[];
+ let calls=0,ids=[],inputs=[];
  const wrapped=Object.create(app);
- Object.defineProperty(wrapped,'invoke',{value:async(id,...args)=>{calls++;ids.push(id);return app.invoke(id,...args)}});
- return {app:wrapped,get calls(){return calls},get ids(){return [...ids]}};
+ Object.defineProperty(wrapped,'invoke',{value:async(id,...args)=>{calls++;ids.push(id);inputs.push(args[0]);return app.invoke(id,...args)}});
+ return {app:wrapped,get calls(){return calls},get ids(){return [...ids]},get inputs(){return [...inputs]}};
 }
 
 test('G6 consumes only the immutable verified Base64 snapshot through the real xDownload DIS AOT',async()=>{
@@ -176,6 +176,11 @@ test('G6 consumes only the immutable verified Base64 snapshot through the real x
   assert.deepEqual(counted.ids,[
    'xdownload.interaction.inspect','xdownload.interaction.confirm'
   ]);
+  // The internal exactDataRecord snapshot is null-prototype by design; only
+  // a fixed-key, frozen ordinary DTO may cross the selected Function ABI.
+  assert.equal(Object.getPrototypeOf(counted.inputs[0]),Object.prototype);
+  assert.equal(Object.isFrozen(counted.inputs[0]),true);
+  assert.equal(Object.getPrototypeOf(counted.inputs[1]),Object.prototype);
  });
 });
 
