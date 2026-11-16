@@ -131,13 +131,13 @@ export async function consumeVerifiedO4Candidate({
  try{
   const inspected=await app.invoke('xdownload.interaction.inspect',input);
   if(inspected?.kind!=='OBSERVATION'||inspected.authority!=='NONE'||
-     inspected.effectDispatched!==false||inspected.value?.status!=='AWAITING_CONFIRMATION')
+     inspected.value?.effectDispatched!==false||inspected.value?.status!=='AWAITING_CONFIRMATION')
    return fail('UNKNOWN','DIS_INTERACTION_INSPECTION_NOT_OBSERVED');
   const confirmed=await app.invoke('xdownload.interaction.confirm',{
    draft:inspected.value,answers:{},confirmed:true
   });
   if(confirmed?.kind!=='OBSERVATION'||confirmed.authority!=='NONE'||
-     confirmed.effectDispatched!==false||confirmed.value?.status!=='READY_FOR_KDP'||
+     confirmed.value?.effectDispatched!==false||confirmed.value?.status!=='READY_FOR_KDP'||
      confirmed.value?.permittedEffect!==false||
      confirmed.value?.prerequisite!=='A_SEPARATE_SELECTED_KDP_INTENT_CALL_IS_REQUIRED')
    return fail('UNKNOWN','DIS_INTERACTION_CONFIRMATION_NOT_OBSERVED');
