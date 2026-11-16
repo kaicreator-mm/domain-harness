@@ -1,0 +1,326 @@
+/** DIS O4 R147 actual AOT→SDK, triple independent Ed25519 technical preflight. */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHash,generateKeyPairSync,sign} from 'node:crypto';
+import {Buffer} from 'node:buffer';
+import {chmodSync,mkdirSync,mkdtempSync,readdirSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {makeNativeFixture} from './native-fixture.mjs';
+import {loadDisV020Aot} from '@kaicreator/domain-harness-microkernel/dis-v020';
+import {PlainCasDocStore} from '../../tests/assembly/helpers-v010.ts';
+import {createControlledTraceIssuer} from './o2-controlled-execution-trace.mjs';
+import {createO4ThreeKeyServerCandidatePreflight} from './o4-three-key-server-preflight.mjs';
+import {createO2DurableNonceLedger} from './o2-durable-nonce-ledger.mjs';
+
+const SCOPE='tenant:dis-o4-r147-native',RULE='c'.repeat(64),base=makeNativeFixture();
+const sha=x=>createHash('sha256').update(x).digest('hex');
+const signed=(payload,key)=>({
+ payload,signature:sign(null,Buffer.from(JSON.stringify(payload)),key).toString('base64url')
+});
+let seq=0;
+const denied=x=>{
+ assert.equal(x.status,'UNKNOWN');
+ assert.equal(x.candidateContentDigestVerified,false);
+ for(const key of ['qualified','experienceIssued','governanceApproved','serverPromotionAuthorized',
+  'newAotBuilt','newAotActivated','artifactExported','effectDispatched'])
+  assert.equal(x[key],false,key);
+ assert.equal(x.authority,'NONE');
+};
+const limited=x=>{
+ assert.equal(x.status,'CANDIDATE_PREFLIGHT_VERIFIED_TECHNICAL_ONLY');
+ assert.equal(x.candidateContentDigestVerified,true);
+ assert.equal(x.technicalEnvelopeVerified,true);
+ assert.equal(x.traceVerified,true);
+ assert.equal(x.validatorSignatureVerified,true);
+ assert.equal(x.serverReviewSignatureVerified,true);
+ for(const key of ['qualified','experienceIssued','governanceApproved','serverPromotionAuthorized',
+  'newAotBuilt','newAotActivated','artifactExported','effectDispatched'])
+  assert.equal(x[key],false,key);
+ assert.equal(x.authority,'NONE');
+};
+async function withSelected(visit,{durableLedger=false}={}){
+ const f=await base;
+ const app=await loadDisV020Aot(f.artifact,{
+  expectedDigest:f.artifact.digest,registry:f.registry,
+  store:new PlainCasDocStore(),tenantId:SCOPE
+ });
+ let ledgerParent=null,ledgerRoot=null,nonceLedger=null;
+ try{
+  const trace=generateKeyPairSync('ed25519');
+  const validator=generateKeyPairSync('ed25519');
+  const review=generateKeyPairSync('ed25519');
+  const runId='run:o4-r147-'+(++seq);
+  const request={channel:'cli',requestId:runId,
+   url:'https://example.com/media/o4-review.mp4',declaredBytes:2048};
+  if(durableLedger){
+   ledgerParent=mkdtempSync(join(tmpdir(),'dis-o4-r151-ledger-'));
+   ledgerRoot=join(ledgerParent,'ledger');
+   mkdirSync(ledgerRoot,{mode:0o700});
+   nonceLedger=createO2DurableNonceLedger({
+    directory:ledgerRoot,scope:SCOPE,expectedAotDigest:f.artifact.digest
+   });
+  }
+  const issuer=createControlledTraceIssuer({
+   app,privateKey:trace.privateKey,publicKey:trace.publicKey,
+   scope:SCOPE,expectedAotDigest:f.artifact.digest,nonceLedger
+  });
+  const captured=await issuer.capture({input:request,runId});
+  assert.equal(captured.status,'ISSUED_TRACE_ONLY');
+  const validatorPayload={
+   version:'dis.o2.independent-validator/1',scope:SCOPE,runId,
+   aotDigest:f.artifact.digest,ruleDigest:RULE,
+   traceSignature:captured.receipt.signature,
+   observationDigest:captured.receipt.payload.observationDigest,
+   verdict:'PASS',authority:'TECHNICAL_VALIDATION_ONLY',
+   experienceIssued:false,effectDispatched:false
+  };
+  const vReceipt=signed(validatorPayload,validator.privateKey);
+  const candidateBytes=Buffer.from(JSON.stringify({
+   schema:'dis.o4.server-meta-candidate/1',scope:SCOPE,runId,
+   selectedAotDigest:f.artifact.digest,ruleDigest:RULE,
+   selectedFunction:'xdownload.interaction.inspect',
+   disposition:'CANDIDATE_PREFLIGHT_ONLY'
+  }));
+  const candidatePayload={
+   version:'dis.o4.server-candidate-preflight/1',scope:SCOPE,runId,
+   selectedAotDigest:f.artifact.digest,ruleDigest:RULE,
+   traceSignature:captured.receipt.signature,validatorSignature:vReceipt.signature,
+   observationDigest:captured.receipt.payload.observationDigest,
+   proposalDigest:sha(candidateBytes),
+   consentScope:'local-only',disposition:'CANDIDATE_PREFLIGHT_ONLY',
+   authorizedPromotion:false
+  };
+  const config={
+   tracePublicKey:trace.publicKey,validatorPublicKey:validator.publicKey,
+   serverReviewPublicKey:review.publicKey,scope:SCOPE,
+   expectedAotDigest:f.artifact.digest,expectedRuleDigest:RULE
+  };
+  const gate=(changes={})=>createO4ThreeKeyServerCandidatePreflight({
+   ...config,nonceLedger,...changes
+  });
+  const packet=(p=candidatePayload,v=vReceipt,bytes=candidateBytes)=>({
+   candidateEnvelope:signed(p,review.privateKey),
+   validatorReceipt:v,traceReceipt:captured.receipt,
+   input:request,observation:captured.observation,runId,candidateBytes:bytes
+  });
+  return await visit({app,config,trace,validator,review,runId,gate,packet,
+   candidatePayload,candidateBytes,validatorPayload,vReceipt,captured,
+   nonceLedger,ledgerRoot,ledgerParent});
+ }finally{
+  app.stop();
+  if(ledgerParent)rmSync(ledgerParent,{recursive:true,force:true});
+ }
+}
+
+test('O4 true selected AOT SDK: 3 independent signatures prove technical proposal preflight only',async()=>{
+ await withSelected(({app,gate,packet,candidatePayload,candidateBytes})=>{
+  const g=gate(),out=g.verifyProposal(packet());
+  limited(out);
+  assert.equal(out.proposalDigest,candidatePayload.proposalDigest);
+  assert.equal(sha(Buffer.from(out.candidateBytesBase64,'base64')),candidatePayload.proposalDigest);
+  assert.equal(Buffer.from(out.candidateBytesBase64,'base64').equals(candidateBytes),true);
+  // The immutable returned snapshot remains bound even if the caller mutates its original Buffer.
+  candidateBytes.fill(0);
+  assert.equal(sha(Buffer.from(out.candidateBytesBase64,'base64')),candidatePayload.proposalDigest);
+  assert.equal(out.scope,'LOCAL_TECHNICAL_PREFLIGHT_ONLY');
+  assert.equal(g.verifyProposal(packet(candidatePayload,undefined,Buffer.from(out.candidateBytesBase64,'base64'))).reason,
+   'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
+  assert.equal(typeof app.activateLocalRule,'undefined');
+ });
+});
+
+test('O4 same signed digest with substituted candidate bytes is rejected before consuming Trace',async()=>{
+ await withSelected(({gate,packet,candidateBytes,candidatePayload,vReceipt})=>{
+  const g=gate({maxAttempts:4});
+  const substituted=Buffer.from(candidateBytes);
+  substituted[substituted.length-1]^=1;
+  const deniedResult=g.verifyProposal(packet(candidatePayload,vReceipt,substituted));
+  denied(deniedResult);
+  assert.equal(deniedResult.reason,'O4_CANDIDATE_CONTENT_DIGEST_MISMATCH');
+  // A mismatch cannot consume the valid Host Trace; the exact candidate still passes.
+  limited(g.verifyProposal(packet()));
+  assert.equal(g.verifyProposal(packet()).reason,'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
+ });
+});
+
+test('O4 malformed, oversized and non-Buffer candidate bytes fail closed without consuming Trace',async()=>{
+ await withSelected(({gate,packet,candidateBytes})=>{
+  const g=gate({maxAttempts:5});
+  const proxy=new Proxy(Buffer.from(candidateBytes),{
+   get(){throw Error('CANDIDATE_GET_TRAP')},
+   getPrototypeOf(){throw Error('CANDIDATE_PROTO_TRAP')},
+   ownKeys(){throw Error('CANDIDATE_KEYS_TRAP')}
+  });
+  const invalid=[
+   new Uint8Array(candidateBytes),
+   Buffer.alloc(0),
+   Buffer.alloc(1024*1024+1),
+   proxy
+  ];
+  for(const bytes of invalid){
+   const out=g.verifyProposal(packet(undefined,undefined,bytes));
+   denied(out);
+   assert.equal(out.reason,'O4_CANDIDATE_CONTENT_UNSAFE');
+  }
+  limited(g.verifyProposal(packet()));
+ });
+});
+
+test('O4 genuine Buffer own accessors and SharedArrayBuffer cannot bypass intrinsic snapshot bounds',async()=>{
+ await withSelected(({gate,packet,candidateBytes})=>{
+  const g=gate({maxAttempts:8});
+  let traps=0;
+  const accessorBuffer=(key,read)=>{
+   const value=Buffer.from(candidateBytes);
+   Object.defineProperty(value,key,{
+    configurable:true,get(){traps++;return read?read():(()=>{throw Error('BUFFER_ACCESSOR_TRAP')})()}
+   });
+   return value;
+  };
+  for(const key of ['byteLength','buffer','length']){
+   const out=g.verifyProposal(packet(undefined,undefined,accessorBuffer(key)));
+   denied(out);
+   assert.equal(out.reason,'O4_CANDIDATE_CONTENT_UNSAFE');
+  }
+  const oversized=Buffer.alloc(1024*1024+1);
+  Object.defineProperty(oversized,'byteLength',{
+   configurable:true,get(){traps++;return 1}
+  });
+  const tooLarge=g.verifyProposal(packet(undefined,undefined,oversized));
+  denied(tooLarge);
+  assert.equal(tooLarge.reason,'O4_CANDIDATE_CONTENT_UNSAFE');
+  const shared=Buffer.from(new SharedArrayBuffer(candidateBytes.byteLength));
+  Uint8Array.prototype.set.call(shared,candidateBytes);
+  Object.defineProperty(shared,'buffer',{
+   configurable:true,get(){traps++;return new ArrayBuffer(candidateBytes.byteLength)}
+  });
+  const sharedOut=g.verifyProposal(packet(undefined,undefined,shared));
+  denied(sharedOut);
+  assert.equal(sharedOut.reason,'O4_CANDIDATE_CONTENT_UNSAFE');
+  assert.equal(traps,0);
+  limited(g.verifyProposal(packet()));
+ });
+});
+
+test('O4 real durable nonce ledger is untouched by digest mismatch, consumes once, and fails closed on replay or storage failure',async()=>{
+ await withSelected(({gate,packet,candidateBytes,runId,ledgerRoot,nonceLedger})=>{
+  const g=gate({maxAttempts:4});
+  const initial=readdirSync(ledgerRoot).length; // issuer reservation only
+  assert.equal(initial,1);
+  const substituted=Buffer.from(candidateBytes);
+  substituted[substituted.length-1]^=1;
+  const mismatch=g.verifyProposal(packet(undefined,undefined,substituted));
+  denied(mismatch);
+  assert.equal(mismatch.reason,'O4_CANDIDATE_CONTENT_DIGEST_MISMATCH');
+  assert.equal(readdirSync(ledgerRoot).length,initial);
+  limited(g.verifyProposal(packet()));
+  assert.equal(readdirSync(ledgerRoot).length,initial+1);
+  const replay=g.verifyProposal(packet());
+  denied(replay);
+  assert.equal(replay.reason,'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
+  assert.equal(readdirSync(ledgerRoot).length,initial+1);
+  assert.equal(nonceLedger.consume(runId),false);
+ },{durableLedger:true});
+
+ await withSelected(({gate,packet,ledgerRoot})=>{
+  const g=gate();
+  chmodSync(ledgerRoot,0o777); // simulate trusted-ledger storage becoming unavailable
+  const failed=g.verifyProposal(packet());
+  denied(failed);
+  assert.equal(failed.reason,'O4_ORIGINAL_TWO_KEY_EVIDENCE_NOT_VERIFIED');
+  chmodSync(ledgerRoot,0o700);
+  // Retrying the same signed packet succeeds: neither O2's in-memory replay
+  // set nor the durable ledger consumed the nonce on storage failure.
+  limited(g.verifyProposal(packet()));
+ },{durableLedger:true});
+});
+
+test('O4 forged third signature cannot consume valid Trace/Validator before a later valid proposal',async()=>{
+ await withSelected(({gate,packet})=>{
+  const g=gate(),bad=packet();
+  bad.candidateEnvelope={...bad.candidateEnvelope,signature:'A'.repeat(86)};
+  const deniedResult=g.verifyProposal(bad);
+  denied(deniedResult);
+  assert.equal(deniedResult.reason,'O4_SERVER_REVIEW_SIGNATURE_INVALID');
+  limited(g.verifyProposal(packet()));
+ });
+});
+
+test('O4 wrong verdict and scope/target/consent or forged authority cannot preflight or burn Host Trace',async()=>{
+ await withSelected(({gate,packet,candidatePayload,validator,validatorPayload})=>{
+  const g=gate({maxAttempts:12});
+  for(const change of [
+   {scope:'tenant:other'},
+   {selectedAotDigest:'f'.repeat(64)},
+   {ruleDigest:'e'.repeat(64)},
+   {consentScope:'upload'},
+   {disposition:'APPROVED'},
+   {authorizedPromotion:true},
+   {proposalDigest:candidatePayload.selectedAotDigest}
+  ]){
+   const x=g.verifyProposal(packet({...candidatePayload,...change}));
+   denied(x);
+   assert.equal(x.reason,'O4_PROPOSAL_SCOPE_OR_POLICY_MISMATCH');
+  }
+  const failedReceipt=signed({...validatorPayload,verdict:'FAIL'},validator.privateKey);
+  const failedEnvelope={...candidatePayload,validatorSignature:failedReceipt.signature};
+  const y=g.verifyProposal(packet(failedEnvelope,failedReceipt));denied(y);
+  assert.equal(y.reason,'O4_PROPOSAL_SCOPE_OR_POLICY_MISMATCH');
+  limited(g.verifyProposal(packet()));
+ });
+});
+
+test('O4 malformed nested Proxy, Getter and duplicated keys never execute attacker traps',async()=>{
+ await withSelected(({gate,packet,config})=>{
+  const g=gate({maxAttempts:8});
+  let traps=0;
+  const proxy=new Proxy({},{
+   get(){traps++;throw Error('ATTACKER_GET')},
+   getPrototypeOf(){traps++;throw Error('ATTACKER_PROTO')},
+   ownKeys(){traps++;throw Error('ATTACKER_KEYS')}
+  });
+  const x=packet();
+  x.candidateEnvelope=proxy;
+  denied(g.verifyProposal(x));
+  const y=packet();
+  Object.defineProperty(y,'candidateEnvelope',{
+   enumerable:true,get(){traps++;throw Error('ATTACKER_GETTER')}
+  });
+  denied(g.verifyProposal(y));
+  const z=packet();z.validatorReceipt=proxy;
+  denied(g.verifyProposal(z));
+  const q=packet();
+  Object.defineProperty(q,'candidateBytes',{
+   enumerable:true,get(){traps++;throw Error('CANDIDATE_GETTER')}
+  });
+  denied(g.verifyProposal(q));
+  const hostileInput={};
+  Object.defineProperty(hostileInput,'channel',{
+   enumerable:true,get(){traps++;throw Error('INPUT_GETTER')}
+  });
+  const h=packet();h.input=hostileInput;
+  denied(g.verifyProposal(h));
+  assert.equal(traps,0);
+  assert.throws(()=>gate({serverReviewPublicKey:config.validatorPublicKey}),
+   /O4_THREE_SIGNER_KEYS_NOT_INDEPENDENT/);
+  const badLedger=Object.freeze({
+   scope:'tenant:other',expectedAotDigest:config.expectedAotDigest,
+   consume(){return true}
+  });
+  assert.throws(()=>gate({nonceLedger:badLedger}),/O4_HOST_NONCE_LEDGER_MISMATCH/);
+  limited(g.verifyProposal(packet()));
+ });
+});
+
+test('O4 attempts are reserved before work; no approval after max budget',async()=>{
+ await withSelected(({gate,packet})=>{
+  const g=gate({maxAttempts:1});
+  const x=packet();x.candidateEnvelope.signature='A'.repeat(86);
+  denied(g.verifyProposal(x));
+  const out=g.verifyProposal(packet());denied(out);
+  assert.equal(out.reason,'O4_PREFLIGHT_ATTEMPT_BUDGET_EXHAUSTED');
+  assert.equal(g.state().remaining,0);
+  assert.equal(g.state().serverPromotionAuthorized,false);
+ });
+});
