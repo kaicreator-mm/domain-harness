@@ -33,5 +33,14 @@
       "snapshot": "snapshots/formal-tools/registry/PROBLEM_CAPABILITIES.json",
       "gitBlob": "faa89997c3f7c8c71da0a69aa90e8ff37461cde0"
     }
-  ]
+  ],
+  "model_set": {
+    "repository": "kaicreator-mm/formal-tools",
+    "pull_request": 146,
+    "commit": "9c279eb6f3509c95a2c8f9016c39b2848bbe014f",
+    "path": "benchmarks/llm-methods/g4/MODEL_SET.json",
+    "sha256": "ccffedd71e77e85faea3a98aee7e8b9a0bb3242d3b5e7fbf4103a974b571c7f2",
+    "status": "PENDING_INDEPENDENT_REVIEW",
+    "note": "Digest of the bounded G4 xDownload Model Set candidate; the current DIS test fixture still uses evidence_gate=NOT_RUN and does not claim that this Method was executed or qualified."
+  }
 }
