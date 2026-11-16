@@ -182,6 +182,14 @@ test('G6 consumes only the immutable verified Base64 snapshot through the real x
 test('G6 rejects a substituted Base64 snapshot before invoking the Domain App',async()=>{
  await withScenario(async s=>{
   const counted=countedApp(s.app);
+  const mutable={...s.preflight};
+  const mutableResult=await consumeVerifiedO4Candidate({
+   preflightResult:mutable,app:counted.app,expectedScope:SCOPE,
+   expectedRuleDigest:RULE,storeDir:s.storeDir,currentProvenanceJson:s.g4.provenance_json
+  });
+  assert.equal(mutableResult.status,'BLOCKED');
+  assert.equal(mutableResult.reason,'O4_PREFLIGHT_RESULT_NOT_DIRECT');
+  assert.equal(counted.calls,0);
   const first=s.preflight.candidateBytesBase64[0]==='A'?'B':'A';
   const tampered=Object.freeze({...s.preflight,candidateBytesBase64:first+s.preflight.candidateBytesBase64.slice(1)});
   const result=await consumeVerifiedO4Candidate({
