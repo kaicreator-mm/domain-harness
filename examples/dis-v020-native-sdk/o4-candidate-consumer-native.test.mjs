@@ -16,6 +16,7 @@ import {consumeVerifiedO4Candidate} from './o4-candidate-consumer.mjs';
 
 const SCOPE='tenant:dis-o4-g6-consumer',RULE='d'.repeat(64);
 const Z3_SHA='e9d7e6e6d76c81b5ea3f06d165fc4cfd8afab92b74cdf94417380b5eed10845d';
+const G4_MODEL_SET_SHA256='ccffedd71e77e85faea3a98aee7e8b9a0bb3242d3b5e7fbf4103a974b571c7f2';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const signed=(payload,key)=>({
  payload,signature:sign(null,Buffer.from(JSON.stringify(payload)),key).toString('base64url')
@@ -25,6 +26,8 @@ const pins=JSON.parse(await readFile(new URL('./fixtures/formal-tools-g4-source-
 test('formal-tools G4 store snapshots are byte-identical to pinned main source',async()=>{
  assert.equal(pins.repository,'kaicreator-mm/formal-tools');
  assert.equal(pins.commit,'319367063177dec22a6df64233fae2a5fceef00f');
+ assert.equal(pins.model_set.status,'PENDING_INDEPENDENT_REVIEW');
+ assert.equal(pins.model_set.commit,'9c279eb6f3509c95a2c8f9016c39b2848bbe014f');
  for(const entry of pins.files){
   const bytes=await readFile(new URL('./'+entry.snapshot,import.meta.url));
   assert.equal(gitBlobSha(bytes),entry.gitBlob,entry.path);
@@ -80,7 +83,10 @@ async function withScenario(visit){
  const storeDir=mkdtempSync(join(tmpdir(),'dis-o4-g6-candidate-'));
  try{
   const sourceBytes=await readFile(new URL('../dis-v020-interaction/download-goal.mjs',import.meta.url));
-  const g4=g4Fixture({sourceSha:sha(sourceBytes),modelSha:fixture.artifact.digest});
+  const g4=g4Fixture({sourceSha:sha(sourceBytes),modelSha:pins.model_set.sha256});
+  assert.equal(pins.model_set.sha256,G4_MODEL_SET_SHA256);
+  assert.notEqual(g4.provenance.model_sha256,fixture.artifact.digest,
+   'formal Model Set digest must not alias the selected DIS AOT digest');
   const stored=await persistSolutionCandidate({store_dir:storeDir,
    problem_json:g4.problem_json,method_json:g4.method_json,provenance_json:g4.provenance_json});
   assert.equal(stored.status,'CANDIDATE_PERSISTED',JSON.stringify(stored));
@@ -98,8 +104,9 @@ async function withScenario(visit){
   const captured=await issuer.capture({input,runId});
   assert.equal(captured.status,'ISSUED_TRACE_ONLY');
   const candidateBytes=Buffer.from(JSON.stringify({
-   schema:'dis.o4.server-meta-candidate/1',scope:SCOPE,runId,
-   selectedAotDigest:fixture.artifact.digest,sourceSha256:g4.provenance.source_sha256,
+   schema:'dis.o4.server-meta-candidate/2',scope:SCOPE,runId,
+   selectedAotDigest:fixture.artifact.digest,modelSha256:g4.provenance.model_sha256,
+   sourceSha256:g4.provenance.source_sha256,
    ruleDigest:RULE,selectedFunction:'xdownload.interaction.inspect',
    continuationFunction:'xdownload.interaction.confirm',disposition:'CANDIDATE_PREFLIGHT_ONLY',
    solutionCandidateSha256:stored.candidate_sha256,input
@@ -220,6 +227,21 @@ test('G6 refuses a different selected AOT even when the G4 candidate remains unc
   });
   assert.equal(result.status,'STALE');
   assert.equal(result.reason,'DIS_SELECTED_AOT_DRIFT');
+  assert.equal(counted.calls,0);
+ });
+});
+
+test('G6 rejects G4 Model Set drift independently from selected DIS AOT digest',async()=>{
+ await withScenario(async s=>{
+  const counted=countedApp(s.app);
+  assert.notEqual(s.g4.provenance.model_sha256,s.fixture.artifact.digest);
+  const drift={...s.g4.provenance,model_sha256:'f'.repeat(64)};
+  const result=await consumeVerifiedO4Candidate({
+   preflightResult:s.preflight,app:counted.app,expectedScope:SCOPE,
+   expectedRuleDigest:RULE,storeDir:s.storeDir,currentProvenanceJson:JSON.stringify(drift)
+  });
+  assert.equal(result.status,'STALE');
+  assert.equal(result.reason,'G4_SOURCE_OR_MODEL_PROVENANCE_MISMATCH');
   assert.equal(counted.calls,0);
  });
 });
