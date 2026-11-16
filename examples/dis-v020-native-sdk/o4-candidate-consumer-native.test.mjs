@@ -24,7 +24,7 @@ const pins=JSON.parse(await readFile(new URL('./fixtures/formal-tools-g4-source-
 
 test('formal-tools G4 store snapshots are byte-identical to pinned main source',async()=>{
  assert.equal(pins.repository,'kaicreator-mm/formal-tools');
- assert.equal(pins.commit,'721c1f5854e697db4534958de0bd21ee70bca108');
+ assert.equal(pins.commit,'319367063177dec22a6df64233fae2a5fceef00f');
  for(const entry of pins.files){
   const bytes=await readFile(new URL('./'+entry.snapshot,import.meta.url));
   assert.equal(gitBlobSha(bytes),entry.gitBlob,entry.path);
