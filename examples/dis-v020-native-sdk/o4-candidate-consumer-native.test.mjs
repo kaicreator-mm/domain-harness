@@ -99,9 +99,9 @@ async function withScenario(visit){
   assert.equal(captured.status,'ISSUED_TRACE_ONLY');
   const candidateBytes=Buffer.from(JSON.stringify({
    schema:'dis.o4.server-meta-candidate/1',scope:SCOPE,runId,
-   selectedAotDigest:fixture.artifact.digest,ruleDigest:RULE,
-   selectedFunction:'xdownload.interaction.inspect',
-   disposition:'CANDIDATE_PREFLIGHT_ONLY',
+   selectedAotDigest:fixture.artifact.digest,sourceSha256:g4.provenance.source_sha256,
+   ruleDigest:RULE,selectedFunction:'xdownload.interaction.inspect',
+   continuationFunction:'xdownload.interaction.confirm',disposition:'CANDIDATE_PREFLIGHT_ONLY',
    solutionCandidateSha256:stored.candidate_sha256,input
   }));
   const validatorPayload={
