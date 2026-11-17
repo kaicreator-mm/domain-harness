@@ -8,6 +8,15 @@
  * The durable attempt/revocation fence is O_EXCL + fsync on one trusted local
  * filesystem. A crash leaving a lock refuses future work; never steals a lock.
  * No cross-host/NFS or hostile same-UID/clock guarantees are asserted.
+ *
+ * The pinned technical sources are a canonical immutable roster: the caller
+ * must pin exactly the three original O2/O4 files at their original Git blob
+ * IDs, never an arbitrary caller-chosen list (no roster attestation by
+ * composition). The durable root adopts O2's requireTrustedRoot scrutiny:
+ * absolute path, owner-only root and direct parent owned by this UID, every
+ * more distant ancestor owned by this UID or root and not writable by
+ * another UID (root-owned sticky entries like /tmp are supported), plus a
+ * parent directory fsync so the root's directory entry is durable.
  */
 import {createHash} from 'node:crypto';
 import {types} from 'node:util';
@@ -15,7 +24,7 @@ import {
   constants,existsSync,fsyncSync,lstatSync,mkdirSync,openSync,
   readFileSync,realpathSync,rmdirSync,closeSync,writeSync
 } from 'node:fs';
-import {join} from 'node:path';
+import {dirname,isAbsolute,join,resolve} from 'node:path';
 import {inspectStoredReplay} from
   './snapshots/formal-tools/packages/runner/js/solution-store.mjs';
 
@@ -32,6 +41,23 @@ const PROVENANCE_FIELDS=Object.freeze([
 ]);
 const ATTEMPT_FIELDS=Object.freeze([
   'candidateSha256','nonce','expiresAtMs','deployment'
+]);
+/**
+ * Canonical immutable Source Pin roster (P2-01): exactly the three original
+ * O2/O4 technical source files at their original Git blob IDs. A trusted H3
+ * Host configuration must pin exactly this roster — never more, never fewer,
+ * never re-blobbed, never substituted by caller-chosen files — so identity
+ * composition cannot infer roster attestation from an arbitrary list. Each
+ * entry is a bare file name; the caller-supplied absolute locations must
+ * resolve to these names and their bytes must re-hash to these blobs at use.
+ */
+export const PINNED_SOURCE_ROSTER=Object.freeze([
+  Object.freeze({file:'o2-durable-nonce-ledger.mjs',
+    gitBlob:'aa7ad81d7cb8eaa3438f98e9441b7a2e18f9e755'}),
+  Object.freeze({file:'o4-three-key-server-preflight.mjs',
+    gitBlob:'75116253598324fda47d22e0f7440c0e097cef50'}),
+  Object.freeze({file:'o4-candidate-consumer.mjs',
+    gitBlob:'bb417d6fe74fd774c5f750220e5f12759560e698'})
 ]);
 const deny=(status,reason)=>Object.freeze({
   status,reason,qualified:false,replayAllowed:false,
@@ -76,6 +102,33 @@ function provenanceValid(x){
     x.tool_version.length<=80&&HEX64.test(x.tool_binary_sha256)&&
     HEX64.test(x.evidence_sha256);
 }
+const baseName=x=>{
+  const s=String(x),i=Math.max(s.lastIndexOf('/'),s.lastIndexOf('\\'));
+  return i<0?s:s.slice(i+1);
+};
+// P2-01: the pinned list must BE the canonical roster — same length, each
+// roster entry matched by exactly one pin (bare file name + exact Git blob),
+// no substitutes, extras, duplicates or re-blobbed entries.
+function rosterExact(list){
+  if(!Array.isArray(list)||list.length!==PINNED_SOURCE_ROSTER.length)return false;
+  for(const p of list){
+    if(!p||typeof p!=='object'||Array.isArray(p)||
+       typeof p.path!=='string'||!p.path||
+       typeof p.gitBlob!=='string'||!HEX40.test(p.gitBlob))return false;
+  }
+  const seen=new Set();
+  for(const entry of PINNED_SOURCE_ROSTER){
+    const hits=[];
+    for(let i=0;i<list.length;i++){
+      if(seen.has(i))continue;
+      if(baseName(list[i].path)===entry.file&&list[i].gitBlob===entry.gitBlob)
+        hits.push(i);
+    }
+    if(hits.length!==1)return false;
+    seen.add(hits[0]);
+  }
+  return seen.size===list.length;
+}
 function durableCreate(root,name,content){
   let fd,dirFd;
   try{
@@ -98,13 +151,47 @@ function durableCreate(root,name,content){
     if(dirFd!==undefined){try{closeSync(dirFd)}catch{}}
   }
 }
+/**
+ * P2-02: the H3 durable root adopts O2's requireTrustedRoot scrutiny.
+ * Absolute path only; the root and its direct parent must be owner-only and
+ * owned by this UID; every more distant ancestor must be owned by this UID
+ * or by root and must not be writable by another UID (root-owned sticky
+ * entries like /tmp are supported, mirroring O2); each level is a real,
+ * non-symlink directory whose realpath equals the configured segment; and
+ * the parent directory is fsynced so the root's entry is durable before any
+ * marker is accepted. This is a path preflight for one trusted local host,
+ * not a defense against hostile same-UID renames or multi-host storage.
+ */
 function durableRoot(root){
-  if(typeof root!=='string'||root.length<1)return false;
+  if(typeof root!=='string'||!isAbsolute(root))return false;
   try{
-    const s=lstatSync(root);
-    return s.isDirectory()&&!s.isSymbolicLink()&&
-      realpathSync(root)===root&&
-      (s.mode&0o077)===0;
+    const start=resolve(root),parent=dirname(start);
+    if(start===parent)return false;
+    const uid=typeof process.getuid==='function'?process.getuid():null;
+    let path=start,depth=0;
+    while(true){
+      const s=lstatSync(path);
+      if(!s.isDirectory()||s.isSymbolicLink()||realpathSync(path)!==path)
+        return false;
+      if(depth<2){
+        if((s.mode&0o077)!==0||(uid!==null&&s.uid!==uid))return false;
+      }else{
+        const trustedOwner=uid===null?s.uid===0:s.uid===uid||s.uid===0;
+        const writable=(s.mode&0o022)!==0;
+        const rootOwnedSticky=s.uid===0&&(s.mode&0o1000)!==0;
+        if(!trustedOwner||(writable&&!rootOwnedSticky))return false;
+      }
+      if(dirname(path)===path)break;
+      path=dirname(path);depth++;
+    }
+    let dirFd;
+    try{
+      dirFd=openSync(parent,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);
+      fsyncSync(dirFd);
+    }finally{
+      if(dirFd!==undefined){try{closeSync(dirFd)}catch{/* already failing */}}
+    }
+    return true;
   }catch{return false}
 }
 
@@ -122,9 +209,7 @@ export function createH3HostAtomicReplayPrep({
   if(!durableRoot(ledgerDir)||typeof storeDir!=='string'||!storeDir||
      typeof provenancePath!=='string'||!provenancePath||
      !deploymentValid(deployment)||!provenanceValid(expected)||
-     !Array.isArray(pinnedFiles)||pinnedFiles.length<3||
-     pinnedFiles.some(x=>!x||typeof x.path!=='string'||!x.path||
-       typeof x.gitBlob!=='string'||!HEX40.test(x.gitBlob))||
+     !rosterExact(pinnedFiles)||
      typeof clock!=='function')
     throw Error('H3_TRUSTED_SINGLE_HOST_CONFIGURATION_REQUIRED');
 
