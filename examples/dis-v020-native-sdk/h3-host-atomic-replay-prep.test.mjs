@@ -36,6 +36,7 @@ async function fixture(visit){
  const root=mkdtempSync(join(tmpdir(),'g6-h3-atomic-'));
  const ledgerDir=join(root,'ledger'),storeDir=join(root,'store');
  mkdirSync(ledgerDir,{mode:0o700});
+ mkdirSync(storeDir,{mode:0o700});
  const problem=readFileSync(new URL('PROBLEM.json',g4),'utf8');
  const method=readFileSync(new URL('METHOD.json',g4),'utf8');
  const provBytes=readFileSync(new URL('PROVENANCE.json',g4),'utf8');
