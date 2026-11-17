@@ -12,7 +12,10 @@
  * The pinned technical sources are a canonical immutable roster: the caller
  * must pin exactly the three original O2/O4 files at their original Git blob
  * IDs, never an arbitrary caller-chosen list (no roster attestation by
- * composition). The durable root adopts O2's requireTrustedRoot scrutiny:
+ * composition). Pins are captured in a single read — the values the roster
+ * validation sees are exactly the values pinned for use, so accessor,
+ * Proxy or array-subclass configurations cannot split validation from use.
+ * The durable root adopts O2's requireTrustedRoot scrutiny (Linux-only):
  * absolute path, owner-only root and direct parent owned by this UID, every
  * more distant ancestor owned by this UID or root and not writable by
  * another UID (root-owned sticky entries like /tmp are supported), plus a
@@ -106,28 +109,33 @@ const baseName=x=>{
   const s=String(x),i=Math.max(s.lastIndexOf('/'),s.lastIndexOf('\\'));
   return i<0?s:s.slice(i+1);
 };
-// P2-01: the pinned list must BE the canonical roster — same length, each
-// roster entry matched by exactly one pin (bare file name + exact Git blob),
-// no substitutes, extras, duplicates or re-blobbed entries.
-function rosterExact(list){
-  if(!Array.isArray(list)||list.length!==PINNED_SOURCE_ROSTER.length)return false;
-  for(const p of list){
-    if(!p||typeof p!=='object'||Array.isArray(p)||
-       typeof p.path!=='string'||!p.path||
-       typeof p.gitBlob!=='string'||!HEX40.test(p.gitBlob))return false;
-  }
-  const seen=new Set();
-  for(const entry of PINNED_SOURCE_ROSTER){
-    const hits=[];
+// P2-01 (R2): single-read pin capture. Every pin property is read exactly
+// once, through record()'s own enumerable data-descriptor extraction, and
+// the captured values are both what the roster validation sees and what
+// gets pinned for use. Getters, Proxies and array subclasses therefore
+// cannot serve one value to validation and another to the trusted pin set
+// (no validate-then-reread phase). Any hostile shape — proxy entry, accessor
+// descriptor, wrong arity, substitute/extra/missing/duplicate/re-blobbed
+// entry, or a throwing property read — yields null and the constructor
+// raises the documented configuration error.
+function extractRosterPins(list){
+  try{
+    if(!Array.isArray(list)||list.length!==PINNED_SOURCE_ROSTER.length)return null;
+    const out=new Array(list.length).fill(null);
+    const seen=new Set();
     for(let i=0;i<list.length;i++){
-      if(seen.has(i))continue;
-      if(baseName(list[i].path)===entry.file&&list[i].gitBlob===entry.gitBlob)
-        hits.push(i);
+      const p=record(list[i],['path','gitBlob']);
+      if(!p||typeof p.path!=='string'||!p.path||
+         typeof p.gitBlob!=='string'||!HEX40.test(p.gitBlob))return null;
+      const file=baseName(p.path);
+      const match=PINNED_SOURCE_ROSTER.findIndex(entry=>
+        entry.file===file&&entry.gitBlob===p.gitBlob);
+      if(match<0||seen.has(match))return null;
+      seen.add(match);
+      out[i]=Object.freeze({path:p.path,gitBlob:p.gitBlob});
     }
-    if(hits.length!==1)return false;
-    seen.add(hits[0]);
-  }
-  return seen.size===list.length;
+    return seen.size===list.length?Object.freeze(out):null;
+  }catch{return null}
 }
 function durableCreate(root,name,content){
   let fd,dirFd;
@@ -163,6 +171,10 @@ function durableCreate(root,name,content){
  * not a defense against hostile same-UID renames or multi-host storage.
  */
 function durableRoot(root){
+  // P2-02 (R2): mirror O2's explicit platform gate — the UID/ancestor/parent
+  // fsync scrutiny is defined for one trusted local Linux filesystem; other
+  // platforms fail closed instead of passing on weaker semantics.
+  if(process.platform!=='linux')return false;
   if(typeof root!=='string'||!isAbsolute(root))return false;
   try{
     const start=resolve(root),parent=dirname(start);
@@ -206,16 +218,16 @@ export function createH3HostAtomicReplayPrep({
 }={}){
   const deployment=record(expectedDeployment,DEPLOYMENT_FIELDS);
   const expected=record(expectedProvenance,PROVENANCE_FIELDS);
+  // Pins are captured once, from the same reads the roster validation makes:
+  // caller-supplied identity has no authority at use and no second chance to
+  // differ between validation and use.
+  const pins=extractRosterPins(pinnedFiles);
   if(!durableRoot(ledgerDir)||typeof storeDir!=='string'||!storeDir||
      typeof provenancePath!=='string'||!provenancePath||
      !deploymentValid(deployment)||!provenanceValid(expected)||
-     !rosterExact(pinnedFiles)||
+     !pins||
      typeof clock!=='function')
     throw Error('H3_TRUSTED_SINGLE_HOST_CONFIGURATION_REQUIRED');
-
-  // Copy technical pins once: caller-supplied identity has no authority at use.
-  const pins=pinnedFiles.map(p=>Object.freeze({path:p.path,gitBlob:p.gitBlob}));
-  Object.freeze(pins);
   function pinnedSourceCurrent(){
     try{
       return pins.every(p=>{
