@@ -1,0 +1,179 @@
+{
+  "schema": "dke.ev16.d02.vv-selected-cq.two-leg-source-repin/1",
+  "outputLabel": "DIE_DKE_R143_VV_SELECTED_CQ_TWO_LEG_SOURCE_REPIN_PREPARED_UNQUALIFIED",
+  "asOf": "2026-11-15",
+  "state": "PREPARED_UNQUALIFIED",
+  "evidenceTier": "PUBLIC_SOURCE_BACKED_CANDIDATE_NOT_PROFESSIONAL_ORACLE",
+  "purpose": "Versioned repin of the only selected VV CQ (CS2023_VV_TEACHING) onto the exact p246 SECTION + p248 Learning-Outcome-2 PAGE two-leg source binding at Tally #399 a6dce1ad; the R123 prepared candidate stays byte-identical and nothing else in original D02 is rewritten",
+  "repinScope": {
+    "selectedCq": "CS2023_VV_TEACHING",
+    "bindingId": "se:SCB-CS2023-VV-R1",
+    "bindingRecordVersion": "0.1.0",
+    "bindingLifecycle": "ACTIVE",
+    "bindingScope": "SELECTED_CQ_RESEARCH_CANDIDATE_ONLY_NOT_FROZEN_R8_CELL",
+    "bindingAuthorityRecord": "https://github.com/kaicreator-mm/domain-intelligence-engineering/issues/2#issuecomment-6890002084",
+    "retainedBase": {
+      "file": "EV16_D02_REQ_VV_SOURCE_BACKED_SAP_PREP_R123.json",
+      "gitBlob": "bb25c02952b39637aeac6f25d4d030dfb6fae28b",
+      "ownerScopedStatus": "811_NODE_SCOPED_OWNER_STATUS_RETAINED_BYTE_IDENTICAL",
+      "originalClaimLifecycle": "106/106_PENDED_REVIEW_ZERO_REVIEW_DECISION"
+    },
+    "untouchedOriginal": "REQ obligation, composition, admission and all other original D02 content stay governed by the retained R123 candidate bytes; this repin adds only the selected VV CQ binding delta"
+  },
+  "vvObligationRef": {
+    "sap": "dke:sap.cs2023.vv-distinction",
+    "ownerElement": "dke:ev16.d02.se-verification-child",
+    "sourceTaxonomyNode": "se:NODE-CS2023-SE-VALIDATION"
+  },
+  "producer": {
+    "repo": "kaicreator-mm/tally",
+    "pr": 399,
+    "exactHead": "580b3ace16b4c28dbb1ff1b0a018d66896a3418d",
+    "frozenGraphGitBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+    "candidateGraphGitBlob": "a49ddf58a0c4a5b25ebdd4018c8234f64e6365e0",
+    "candidateNodes": 815,
+    "originalClaimLifecycle": "106/106_PENDED_REVIEW_ZERO_REVIEW_DECISION",
+    "reviewDecisions": 0,
+    "sourceOwnerDispositionScope": "TWO_CANONICAL_SOD_SCOPED_CANDIDATE_ONLY",
+    "provenanceBlobs": {
+      "selectedCqSourceBindingModule": "1ab226dcc10556a1d8786fdc231fed0fe09761f3",
+      "bindingSchema": "1610ecee391e380c69ff9a19c19dacf8760cb583",
+      "sourceOwnerSidecar": "c3abfea090500a58976e7a331d1cbcf397d602f4",
+      "ownerOverlay": "caaacfc3403918157991fe198668e0aa4e249262",
+      "canonicalProjectionTool": "0edc7b73bbfe9df47999110f5c8f2188ba24229c",
+      "canonicalMaterializerTool": "1d9d4ad105eac51e77406a3038a5dde9f11dc14f",
+      "canonicalTest": "2d0360504b997a04988ec5a33738bbac3f501f87",
+      "graphManifest": "7d7a4efb2df9281d0201bbff35d9728d6a0c00fb"
+    }
+  },
+  "selectedCqSourceBinding": {
+    "claim": {
+      "id": "se:CLM-TVV-0001",
+      "recordVersion": "0.1.0",
+      "canonicalSha256": "090f49a4d44bb0fb7a23408e3ca57b4dfc27a80a4a1fa94c8f87680c2f7afb97",
+      "reviewStatus": "PENDING",
+      "originalEdgeUnchanged": "SINGLE_SUPPORTED_BY_SECTION_EVIDENCE_BYTE_IDENTICAL"
+    },
+    "sectionLeg": {
+      "anchorType": "SECTION",
+      "locator": {
+        "id": "se:LOC-CS2023-SE-VALIDATION-KU",
+        "recordVersion": "0.1.1",
+        "canonicalSha256": "9878731436bd96e09ad1d4cf3a7529952d5a3f4660963c016b18d6d751f43947",
+        "pdfZeroBasedIndex": 245,
+        "printedPage": 246
+      },
+      "evidence": {
+        "id": "se:EVD-TVV-0003",
+        "canonicalSha256": "f08e84eb855ee94a333c143558086f8fdc79f32744ce3da8318dc7e5bb5c5507"
+      },
+      "anchorSummary": "SE-Validation knowledge unit section-start concepts page; shared 8-Evidence/5-Claim section anchor unchanged and consumed as before"
+    },
+    "outcomeLeg": {
+      "anchorType": "PAGE",
+      "locator": {
+        "id": "se:LOC-CS2023-SE-VALIDATION-LO2",
+        "recordVersion": "0.1.0",
+        "canonicalSha256": "1b75df53c55436f51a406e957291f778b8a7eea42760b4115dd14901a1cbab56",
+        "pdfZeroBasedIndex": 247,
+        "printedPage": 248
+      },
+      "evidence": {
+        "id": "se:EVD-TVV-0016",
+        "recordVersion": "0.1.0",
+        "canonicalSha256": "9f70ac020048ad46dd57c01a83952fc2ca7b3ee3a2c96cd605c9b5381a407a9c",
+        "lifecycle": "PENDING_REVIEW",
+        "extractionStatus": "EXTRACTED_PENDING_REVIEW"
+      },
+      "claimSupport": {
+        "id": "se:REL-TVV-0024",
+        "recordVersion": "0.1.0",
+        "canonicalSha256": "d91331a851705acb91f40f50834f0f4146c9f88bb4d5e0812dc160472f995e5e",
+        "subject": "se:CLM-TVV-0001",
+        "predicate": "se:SUPPORTED_BY",
+        "object": "se:EVD-TVV-0016",
+        "lifecycle": "PENDING_REVIEW"
+      },
+      "anchorSummary": "CS Core Illustrative Learning Outcome 2 'Distinguish between program validation and verification.' on the outcome-specific page; separately anchored from the section-start concepts page"
+    },
+    "twoLegInvariants": {
+      "distinctLocators": true,
+      "distinctPdfPages": true,
+      "singlePageDisguise": "REJECTED",
+      "claimLifecycleEffect": "NONE_ORIGINAL_AND_CANDIDATE_CLAIM_REMAIN_PENDING"
+    },
+    "selectedCqOverlayAdditions": [
+      "se:LOC-CS2023-SE-VALIDATION-LO2",
+      "se:EVD-TVV-0016",
+      "se:REL-TVV-0024"
+    ]
+  },
+  "cqNegativeAdditions": [
+    {
+      "name": "outcome_leg_semantic_inversion",
+      "mustReject": "The p248 LO2 outcome leg is inverted into 'program verification equals program validation', 'passing tests certifies stakeholder acceptance', a professional-standard definition of the two questions, or any approved-status claim for the outcome evidence or claim-support record"
+    },
+    {
+      "name": "source_collaboration_drift",
+      "mustReject": "Co-mutated producer overlay/sidecar/graph additions or re-pinned digests that redefine the LO2 evidence semantics, move the section or outcome pages, orphan the binding additions, or launder qualification while claiming unchanged source identity"
+    }
+  ],
+  "qualification": {
+    "candidate": true,
+    "professionalOracle": "NOT_ATTESTED",
+    "originalClaimReviewDecision": "NOT_RUN",
+    "qualifiedSap": false,
+    "qualifiedR8": false,
+    "effectAuthorized": false
+  },
+  "receipts": {
+    "writerNative": {
+      "role": "ORIGINAL_TALLY_SOURCE_WRITER_LOCAL_NATIVE",
+      "node": "v24.21.0",
+      "exactHead": "580b3ace16b4c28dbb1ff1b0a018d66896a3418d",
+      "canonicalSuite": "38/38_EXIT0",
+      "materializeSuite": "6/6_EXIT0",
+      "ownerVerifierSelfTest": "43/43_EXIT0_POS1_NEG29_UNKNOWN4_STALE9",
+      "canonicalFrozenAndReproduceChecks": "EXIT0",
+      "ref": "https://github.com/kaicreator-mm/tally/pull/399#issuecomment-6893267437"
+    },
+    "ownerVerifierReceipt": {
+      "ref": "https://github.com/kaicreator-mm/tally/pull/399#issuecomment-6893267437"
+    },
+    "independentReview": {
+      "verdict": "ACCEPT_SCOPED_CHANGED_SOURCE_AND_WRITER_NATIVE_RECEIPT",
+      "ref": "https://github.com/kaicreator-mm/tally/pull/399#pullrequestreview-5910375573",
+      "newP0": 0,
+      "newP1": 0,
+      "newP2": 0,
+      "scope": "R144 materializer and canonical test two-path parity, Writer same-head 38/38+6/6+43/43 receipt reviewed; no independent Node24 replay by Reviewer"
+    },
+    "producerCiTruth": {
+      "trailerCheck": "FAILURE_ON_FOUR_HISTORICAL_COMMITS_ONLY_A184B630_B226ECAA_1843E989_862AE64B",
+      "combinedStatuses": "NO_REPORTED_CI"
+    }
+  },
+  "admission": {
+    "state": "PREPARED_UNQUALIFIED",
+    "sourceOwnerScope": "SCOPED_ONLY",
+    "originalProducerReviewDecision": "NOT_RUN",
+    "professionalOracle": "NOT_ATTESTED",
+    "originalSapQualified": false,
+    "globalQualified": 0,
+    "parentQualified": false,
+    "rootQualified": false,
+    "frozenR8CellEligible": false,
+    "frozenR8Qualified": 0,
+    "effectAuthorized": false,
+    "productL2Qualified": false,
+    "releaseAuthorized": false
+  },
+  "pending": [
+    "QUALIFIED_ACCOUNTABLE_HUMAN_PROFESSIONAL_ORACLE_FOR_THE_SELECTED_ORIGINAL_CLAIM",
+    "ELIGIBLE_VERSIONED_TALLY_PRODUCER_REVIEW_DECISION_FOR_SELECTED_CLAIM",
+    "CHANGED_SHA_NON_WRITER_REVIEW_OF_THIS_REPIN",
+    "FORGE_NEW_EXACT_HEAD_CI_ON_THIS_REPIN",
+    "TALLY_PR399_TRAILER_CHECK_RESOLUTION_BEFORE_ANY_FINAL_INTEGRATION",
+    "ONE_ORIGINAL_FROZEN_R8_CELL_EXECUTION"
+  ]
+}
