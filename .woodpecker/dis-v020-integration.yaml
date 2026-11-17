@@ -92,6 +92,8 @@ steps:
       - node --test examples/dis-v020-evolution-demo/o3-shadow-candidate.test.mjs
       # R55/R56: scope-limited original DKE EV16:D02 R8 provenance, two Element Knowledge Functions; no SAP/Root/Effect promotion.
       - node --import tsx --test examples/dis-v020-native-sdk/b23-r55-ev16-d02-scoped-cell.test.mjs
+      # R155: current 815-node two-leg VV research read-only AOT/SDK consumer; frozen 807 B23/R23 untouched, OBSERVATION/UNKNOWN only.
+      - node --import tsx --test examples/dis-v020-native-sdk/r155-current-vv-815-research-consumer.test.mjs
       - node --test examples/dis-v020-conformance/validate.test.mjs
       # R83: real original DKE R33 source + B22 Reader against bounded authority model;
       # original Git Blob pins, 768 states, 771 real Reader calls, negative witnesses.
