@@ -289,3 +289,49 @@ test('H3 durable root refuses world-writable direct parent, non-absolute path an
   assert.throws(()=>createH3HostAtomicReplayPrep({...s.config,ledgerDir:'/'}),
    /H3_TRUSTED_SINGLE_HOST_CONFIGURATION_REQUIRED/);
  }));
+test('H3 pin capture is single-read: accessor entries, two-faced array subclasses and proxy lists cannot split validation from use',{skip:POSIX_ONLY},async()=>{
+ await fixture(async s=>{
+  const tamperedPath=join(s.root,'tampered-candidate-consumer.mjs');
+  writeFileSync(tamperedPath,'tampered');
+  // Array subclass whose overridden map() would serve tampered self-consistent
+  // pins to any second read phase: single-read capture must never call it.
+  class PinList extends Array{}
+  const subclassPins=PinList.from(s.config.pinnedFiles);
+  subclassPins.map=()=>[
+   {...s.config.pinnedFiles[0]},
+   {path:tamperedPath,gitBlob:s.config.pinnedFiles[1].gitBlob},
+   {...s.config.pinnedFiles[2]}
+  ];
+  const viaSubclass=createH3HostAtomicReplayPrep({...s.config,pinnedFiles:subclassPins});
+  const subclassResult=await viaSubclass.inspectAttempt(s.req);
+  denied(subclassResult);
+  assert.equal(subclassResult.reason,'H3_QUALIFICATION_AND_HOST_ROOTS_NOT_ADMITTED');
+  // Proxy-wrapped canonical list behaves as the canonical roster: entries are
+  // read once, pinned, and the attempt stays deny-only with canonical pins.
+  const viaProxy=createH3HostAtomicReplayPrep({...s.config,pinnedFiles:new Proxy(s.config.pinnedFiles,{})});
+  const proxyResult=await viaProxy.inspectAttempt({...s.req,nonce:'replay:single-read-proxy'});
+  denied(proxyResult);
+  assert.equal(proxyResult.reason,'H3_QUALIFICATION_AND_HOST_ROOTS_NOT_ADMITTED');
+  // Accessor descriptors are refused outright: a getter entry can never be
+  // validated one way and used another.
+  const accessorPin={...s.config.pinnedFiles[1]};
+  Object.defineProperty(accessorPin,'path',{enumerable:true,get:()=>
+   s.config.pinnedFiles[1].path});
+  assert.throws(()=>createH3HostAtomicReplayPrep({
+   ...s.config,pinnedFiles:[s.config.pinnedFiles[0],accessorPin,s.config.pinnedFiles[2]]}),
+   /H3_TRUSTED_SINGLE_HOST_CONFIGURATION_REQUIRED/);
+ });
+});
+test('H3 hostile pin containers fail closed with the documented configuration error',{skip:POSIX_ONLY},()=>
+ configFixture(s=>{
+  const throwingProxy=new Proxy(s.config.pinnedFiles,{get(){throw Error('TRAP')}});
+  assert.throws(()=>createH3HostAtomicReplayPrep({...s.config,pinnedFiles:throwingProxy}),
+   /H3_TRUSTED_SINGLE_HOST_CONFIGURATION_REQUIRED/);
+  const shortProxy=new Proxy(s.config.pinnedFiles,{get(t,k){return k==='length'?2:t[k]}});
+  assert.throws(()=>createH3HostAtomicReplayPrep({...s.config,pinnedFiles:shortProxy}),
+   /H3_TRUSTED_SINGLE_HOST_CONFIGURATION_REQUIRED/);
+ }));
+test('H3 durable root fails closed on non-linux platforms (O2-aligned gate)',{skip:process.platform==='linux'?'refusal is observable only off-linux':false},()=>
+ configFixture(s=>{
+  assert.throws(()=>s.guard(),/H3_TRUSTED_SINGLE_HOST_CONFIGURATION_REQUIRED/);
+ }));
