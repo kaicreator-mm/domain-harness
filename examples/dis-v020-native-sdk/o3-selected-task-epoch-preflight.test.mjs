@@ -170,12 +170,21 @@ test('nested selected app getter, Proxy and nonselected metadata are rejected be
  Object.defineProperty(selected,'0',{configurable:true,get:trap});
  reject({...mock(),functions:selected});
  reject({...mock(),functions:['some.otherFunction']});
+ const sparse=['xdownload.describePolicy'];sparse.length=2;
+ reject({...mock(),functions:sparse});
  let applyTraps=0;
  const callableProxy=new Proxy(async()=>observation(),{
    apply(){applyTraps++;throw Error('UNTRUSTED_CALLABLE_PROXY_APPLY')}
  });
  reject({...mock(),invoke:callableProxy});
- assert.equal(applyTraps,0,'callable Proxy invoke rejected before probe');
+ const boundCarrier=Function.prototype.bind.call(callableProxy,null);
+ assert.equal(typeof boundCarrier,'function');
+ assert.equal(applyTraps,0,'binding must not call the proxy');
+ reject({...mock(),invoke:boundCarrier});
+ Object.defineProperty(boundCarrier,'name',{value:'invoke',configurable:true});
+ reject({...mock(),invoke:boundCarrier});
+ reject({...mock(),invoke:(async()=>observation()).bind(null)});
+ assert.equal(applyTraps,0,'direct/bound/renamed carrier rejected without apply');
  assert.equal(reads,0,'source shape validation must not execute untrusted traps');
 });
 
