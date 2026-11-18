@@ -144,3 +144,50 @@ test('timeout is UNKNOWN, not permit; technical pin alone never attests installe
  assert.equal(result.tenantAttested,false);
  assert.equal(result.hostAttested,false);
 });
+
+
+test('nested selected app getter, Proxy and nonselected metadata are rejected before trap execution',()=>{
+ const opts=app=>({app,candidate:candidate(),expectedAotDigest:AOT,
+   expectedRuleDigest:RULE.digest});
+ let reads=0;
+ const trap=()=>{reads++;throw Error('UNTRUSTED_NESTED_APP_ACCESS')};
+ const reject=app=>assert.throws(()=>createO3SelectedTaskEpochPreflight(opts(app)),
+   {code:'O3_PREFLIGHT_SELECTED_APP_UNTRUSTED'});
+ for(const key of ['aotDigest','functions','contractVersions','invoke']){
+   const app=mock();
+   Object.defineProperty(app,key,{enumerable:true,configurable:true,get:trap});
+   reject(app);
+ }
+ reject(new Proxy(mock(),{get:trap,getPrototypeOf:trap,ownKeys:trap}));
+ reject({...mock(),functions:new Proxy(['xdownload.describePolicy'],{
+   get:trap,getPrototypeOf:trap,ownKeys:trap})});
+ reject({...mock(),contractVersions:new Proxy({'xdownload.describePolicy':'1.0.0'},{
+   get:trap,getPrototypeOf:trap,ownKeys:trap})});
+ const version={};
+ Object.defineProperty(version,'xdownload.describePolicy',{enumerable:true,get:trap});
+ reject({...mock(),contractVersions:version});
+ const selected=['xdownload.describePolicy'];
+ Object.defineProperty(selected,'0',{configurable:true,get:trap});
+ reject({...mock(),functions:selected});
+ reject({...mock(),functions:['some.otherFunction']});
+ assert.equal(reads,0,'source shape validation must not execute untrusted traps');
+});
+
+test('selected app metadata and invoke are pinned before caller-side nested mutation',async()=>{
+ let originalCalls=0,hostileCalls=0;
+ const app=mock(async()=>{originalCalls++;return observation()});
+ const p=create(app);
+ locked(p.publishShadowForFutureTasks());
+ const token=p.beginTask();
+ const trap=()=>{hostileCalls++;throw Error('POST_SELECTION_GETTER')};
+ Object.defineProperty(app,'invoke',{configurable:true,enumerable:true,get:trap});
+ app.functions=new Proxy(['not-selected'],{get:trap,getPrototypeOf:trap});
+ app.contractVersions=new Proxy({}, {get:trap,getPrototypeOf:trap});
+ Object.defineProperty(app,'aotDigest',{configurable:true,enumerable:true,get:trap});
+ const observed=await p.probeTask(token);locked(observed);
+ assert.equal(observed.shadowMatched,true);
+ assert.equal(originalCalls,1);
+ assert.equal(hostileCalls,0);
+ assert.equal(observed.authority,'NONE');
+ assert.equal(observed.effectDispatched,false);
+});
