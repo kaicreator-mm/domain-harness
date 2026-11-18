@@ -95,6 +95,9 @@ test('Proxy/accessor nested attestation, reused signature and fake selected sour
   assert.equal(fake.reason,'O2_INSTALLER_SELECTED_SOURCE_UNQUALIFIED');noAuthority(fake);
   const absent=inspectO2InstalledRuleTrustPreflight({...options,sourceObservation:null});
   assert.equal(absent.reason,'O2_INSTALLER_CLAIM_UNSAFE');noAuthority(absent);
+  const coercible={ [Symbol.toPrimitive](){calls++;throw Error('coercion trap')} };
+  const noCoercion=inspectO2InstalledRuleTrustPreflight({...options,receipt:{...signed,payload:{...payload,nonce:coercible}}});
+  assert.equal(noCoercion.reason,'O2_INSTALLER_SCHEMA_INVALID');noAuthority(noCoercion);
   assert.equal(calls,0);
  });
 });
