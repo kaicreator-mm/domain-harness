@@ -59,11 +59,22 @@ function captureSelectedApp(app,expectedAotDigest){
   const originalFunctions=selectedOwnOrInheritedData(app,'functions');
   const originalVersions=selectedOwnOrInheritedData(app,'contractVersions');
   const originalInvoke=selectedOwnOrInheritedData(app,'invoke');
+  // util.types.isProxy sees direct callable Proxies but not bound-function
+  // carriers around them. Function.prototype.toString does not invoke the
+  // callable; reject opaque native/bound carriers before reaching Reflect.apply.
+  // This is a conservative SHADOW-only shape guard, not executable provenance.
+  let invokeOpaque=true;
+  if(typeof originalInvoke==='function'&&!types.isProxy(originalInvoke)){
+    try {
+      const printable=Function.prototype.toString.call(originalInvoke);
+      invokeOpaque=typeof printable!=='string'||/\\{\\s*\\[native code\\]\\s*\\}/.test(printable);
+    }catch{invokeOpaque=true}
+  }
   if(!Array.isArray(originalFunctions)||types.isProxy(originalFunctions)||
      originalFunctions.length<1||originalFunctions.length>128||
      !originalVersions||typeof originalVersions!=='object'||
      Array.isArray(originalVersions)||types.isProxy(originalVersions)||
-     typeof originalInvoke!=='function'||types.isProxy(originalInvoke))
+     typeof originalInvoke!=='function'||types.isProxy(originalInvoke)||invokeOpaque)
     fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
   const names=[];
   try{
