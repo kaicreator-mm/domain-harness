@@ -67,7 +67,7 @@ function captureSelectedApp(app,expectedAotDigest){
   if(typeof originalInvoke==='function'&&!types.isProxy(originalInvoke)){
     try {
       const printable=Function.prototype.toString.call(originalInvoke);
-      invokeOpaque=typeof printable!=='string'||/\\{\\s*\\[native code\\]\\s*\\}/.test(printable);
+      invokeOpaque=typeof printable!=='string'||printable.includes('[native code]');
     }catch{invokeOpaque=true}
   }
   if(!Array.isArray(originalFunctions)||types.isProxy(originalFunctions)||
