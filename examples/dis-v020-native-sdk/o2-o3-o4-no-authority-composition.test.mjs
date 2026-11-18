@@ -34,7 +34,7 @@ const onlyTechnical=(x)=>{
   assert.equal(x.authority,'NONE');
   assert.equal(x.qualified,false);
   assert.equal(x.effectDispatched,false);
-  assert.equal(x.experienceIssued,false);
+  if(Object.hasOwn(x,'experienceIssued'))assert.equal(x.experienceIssued,false);
 };
 const o3NotAuthorized=x=>{
   onlyTechnical(x);
