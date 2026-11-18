@@ -63,7 +63,7 @@ function captureSelectedApp(app,expectedAotDigest){
      originalFunctions.length<1||originalFunctions.length>128||
      !originalVersions||typeof originalVersions!=='object'||
      Array.isArray(originalVersions)||types.isProxy(originalVersions)||
-     typeof originalInvoke!=='function')
+     typeof originalInvoke!=='function'||types.isProxy(originalInvoke))
     fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
   const names=[];
   try{
@@ -78,9 +78,30 @@ function captureSelectedApp(app,expectedAotDigest){
   if(!names.includes(SELECTED_FN)||version!=='1.0.0')
     fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
   const versions=Object.freeze(Object.assign(Object.create(null),{[SELECTED_FN]:version}));
+  // A pinned method is not a pinned receiver. The selected app can have
+  // private native state, so do not freeze/rebind it to a plain object.
+  // Refuse later caller mutations BEFORE passing control to the native method.
+  // This remains an in-process SHADOW diagnostic, not a Host trust guarantee.
+  const checkReceiverFresh=()=>{
+    if(selectedOwnOrInheritedData(app,'aotDigest')!==aotDigest||
+       selectedOwnOrInheritedData(app,'functions')!==originalFunctions||
+       selectedOwnOrInheritedData(app,'contractVersions')!==originalVersions||
+       selectedOwnOrInheritedData(app,'invoke')!==originalInvoke||
+       originalFunctions.length!==names.length||
+       selectedOwnOrInheritedData(originalVersions,SELECTED_FN)!==version)
+      fail('O3_PREFLIGHT_SELECTED_APP_STALE');
+    for(let i=0;i<names.length;i++){
+      const d=Object.getOwnPropertyDescriptor(originalFunctions,String(i));
+      if(!d||!Object.hasOwn(d,'value')||d.value!==names[i])
+        fail('O3_PREFLIGHT_SELECTED_APP_STALE');
+    }
+  };
   return Object.freeze({
     aotDigest,functions:Object.freeze(names),contractVersions:versions,
-    invoke:(...args)=>Reflect.apply(originalInvoke,app,args)
+    invoke:(...args)=>{
+      checkReceiverFresh();
+      return Reflect.apply(originalInvoke,app,args);
+    }
   });
 }
 
