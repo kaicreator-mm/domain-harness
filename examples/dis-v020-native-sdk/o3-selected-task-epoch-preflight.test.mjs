@@ -170,6 +170,12 @@ test('nested selected app getter, Proxy and nonselected metadata are rejected be
  Object.defineProperty(selected,'0',{configurable:true,get:trap});
  reject({...mock(),functions:selected});
  reject({...mock(),functions:['some.otherFunction']});
+ let applyTraps=0;
+ const callableProxy=new Proxy(async()=>observation(),{
+   apply(){applyTraps++;throw Error('UNTRUSTED_CALLABLE_PROXY_APPLY')}
+ });
+ reject({...mock(),invoke:callableProxy});
+ assert.equal(applyTraps,0,'callable Proxy invoke rejected before probe');
  assert.equal(reads,0,'source shape validation must not execute untrusted traps');
 });
 
@@ -185,9 +191,40 @@ test('selected app metadata and invoke are pinned before caller-side nested muta
  app.contractVersions=new Proxy({}, {get:trap,getPrototypeOf:trap});
  Object.defineProperty(app,'aotDigest',{configurable:true,enumerable:true,get:trap});
  const observed=await p.probeTask(token);locked(observed);
- assert.equal(observed.shadowMatched,true);
- assert.equal(originalCalls,1);
+ assert.equal(observed.reason,'SHADOW_OBSERVATION_UNKNOWN');
+ assert.equal(observed.shadowMatched,false);
+ assert.equal(originalCalls,0,'stale receiver must not invoke pinned method');
  assert.equal(hostileCalls,0);
  assert.equal(observed.authority,'NONE');
  assert.equal(observed.effectDispatched,false);
+});
+
+test('selected callable keeps original native receiver identity when metadata remains stable',async()=>{
+ let receiver;
+ const app=mock(async function selectedNativeInvoke(){
+   receiver=this;
+   return observation();
+ });
+ const p=create(app);
+ locked(p.publishShadowForFutureTasks());
+ const result=await p.probeTask(p.beginTask());locked(result);
+ assert.equal(result.shadowMatched,true);
+ assert.equal(receiver,app,'original selected native instance receiver preserved');
+ assert.equal(result.authority,'NONE');
+ assert.equal(result.effectDispatched,false);
+});
+
+test('in-place selected metadata drift after snapshot fails closed before invocation',async()=>{
+ let invoked=0;
+ const app=mock(async()=>{invoked++;return observation()});
+ const p=create(app);
+ locked(p.publishShadowForFutureTasks());
+ const token=p.beginTask();
+ app.contractVersions['xdownload.describePolicy']='2.0.0';
+ app.functions[0]='nonselected.function';
+ const out=await p.probeTask(token);locked(out);
+ assert.equal(out.reason,'SHADOW_OBSERVATION_UNKNOWN');
+ assert.equal(out.shadowMatched,false);
+ assert.equal(invoked,0);
+ assert.equal(out.effectDispatched,false);
 });
