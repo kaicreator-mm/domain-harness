@@ -62,7 +62,8 @@ function result(reason,status='BLOCKED',extra={}) {
 const deny=(reason,status='BLOCKED')=>result(reason,status);
 function proper(expected,payload){
   if(EXPECTED.some(key=>typeof expected[key]!=='string')||
-     [...EXPECTED].some(key=>typeof payload[key]!=='string')||
+     EXPECTED.some(key=>typeof payload[key]!=='string')||
+     typeof payload.schema!=='string'||typeof payload.nonce!=='string'||
      !HEX64.test(expected.aotDigest)||!HEX64.test(expected.sdkDigest)||
      !HEX64.test(expected.ruleDigest)||!HEX64.test(expected.installedBytesDigest)||
      !HEX40.test(expected.sourceGitBlob)||!NONCE.test(expected.nonceChallenge)||
