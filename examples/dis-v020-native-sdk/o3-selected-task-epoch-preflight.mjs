@@ -31,6 +31,91 @@ function capture(options){
   }catch{return null}
 }
 
+/** A native facade may have data fields on its prototype, but validation
+ * must never run a nested getter/Proxy, including functions/contractVersions.
+ * Pin the already-selected method and immutable metadata BEFORE Task creation.
+ * This is source-shape hardening, not trusted Host/installer attestation. */
+const SELECTED_FN='xdownload.describePolicy';
+function selectedOwnOrInheritedData(value,key){
+  let cursor=value;
+  try{
+    while(cursor!==null && cursor!==Object.prototype){
+      if(types.isProxy(cursor))fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
+      const d=Object.getOwnPropertyDescriptor(cursor,key);
+      if(d){
+        if(!Object.hasOwn(d,'value'))fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
+        return d.value;
+      }
+      cursor=Object.getPrototypeOf(cursor);
+    }
+  }catch{fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED')}
+  fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
+}
+function captureSelectedApp(app,expectedAotDigest){
+  if(!app||typeof app!=='object'||types.isProxy(app))
+    fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
+  const aotDigest=selectedOwnOrInheritedData(app,'aotDigest');
+  if(aotDigest!==expectedAotDigest)fail('O3_PREFLIGHT_SELECTED_AOT_MISMATCH');
+  const originalFunctions=selectedOwnOrInheritedData(app,'functions');
+  const originalVersions=selectedOwnOrInheritedData(app,'contractVersions');
+  const originalInvoke=selectedOwnOrInheritedData(app,'invoke');
+  // util.types.isProxy sees direct callable Proxies but not bound-function
+  // carriers around them. Function.prototype.toString does not invoke the
+  // callable; reject opaque native/bound carriers before reaching Reflect.apply.
+  // This is a conservative SHADOW-only shape guard, not executable provenance.
+  let invokeOpaque=true;
+  if(typeof originalInvoke==='function'&&!types.isProxy(originalInvoke)){
+    try {
+      const printable=Function.prototype.toString.call(originalInvoke);
+      invokeOpaque=typeof printable!=='string'||printable.includes('[native code]');
+    }catch{invokeOpaque=true}
+  }
+  if(!Array.isArray(originalFunctions)||types.isProxy(originalFunctions)||
+     originalFunctions.length<1||originalFunctions.length>128||
+     !originalVersions||typeof originalVersions!=='object'||
+     Array.isArray(originalVersions)||types.isProxy(originalVersions)||
+     typeof originalInvoke!=='function'||types.isProxy(originalInvoke)||invokeOpaque)
+    fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
+  const names=[];
+  try{
+    for(let i=0;i<originalFunctions.length;i++){
+      const d=Object.getOwnPropertyDescriptor(originalFunctions,String(i));
+      if(!d||!Object.hasOwn(d,'value')||typeof d.value!=='string')
+        fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
+      names.push(d.value);
+    }
+  }catch{fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED')}
+  const version=selectedOwnOrInheritedData(originalVersions,SELECTED_FN);
+  if(!names.includes(SELECTED_FN)||version!=='1.0.0')
+    fail('O3_PREFLIGHT_SELECTED_APP_UNTRUSTED');
+  const versions=Object.freeze(Object.assign(Object.create(null),{[SELECTED_FN]:version}));
+  // A pinned method is not a pinned receiver. The selected app can have
+  // private native state, so do not freeze/rebind it to a plain object.
+  // Refuse later caller mutations BEFORE passing control to the native method.
+  // This remains an in-process SHADOW diagnostic, not a Host trust guarantee.
+  const checkReceiverFresh=()=>{
+    if(selectedOwnOrInheritedData(app,'aotDigest')!==aotDigest||
+       selectedOwnOrInheritedData(app,'functions')!==originalFunctions||
+       selectedOwnOrInheritedData(app,'contractVersions')!==originalVersions||
+       selectedOwnOrInheritedData(app,'invoke')!==originalInvoke||
+       originalFunctions.length!==names.length||
+       selectedOwnOrInheritedData(originalVersions,SELECTED_FN)!==version)
+      fail('O3_PREFLIGHT_SELECTED_APP_STALE');
+    for(let i=0;i<names.length;i++){
+      const d=Object.getOwnPropertyDescriptor(originalFunctions,String(i));
+      if(!d||!Object.hasOwn(d,'value')||d.value!==names[i])
+        fail('O3_PREFLIGHT_SELECTED_APP_STALE');
+    }
+  };
+  return Object.freeze({
+    aotDigest,functions:Object.freeze(names),contractVersions:versions,
+    invoke:(...args)=>{
+      checkReceiverFresh();
+      return Reflect.apply(originalInvoke,app,args);
+    }
+  });
+}
+
 function noAuthority(reason,more={}){
   return Object.freeze({
     schema:'dis.v0.2.o3-selected-task-epoch-preflight/1',
@@ -53,16 +138,15 @@ export function createO3SelectedTaskEpochPreflight(options){
   if(!x)fail('O3_PREFLIGHT_OPTIONS_UNTRUSTED');
   const {app,candidate,expectedAotDigest,expectedRuleDigest}=x;
   const fixed=getO3FixedRuleTechnicalPin();
-  if(typeof expectedAotDigest!=='string'||!HEX.test(expectedAotDigest)||
-     !app||typeof app!=='object'||types.isProxy(app)||
-     app.aotDigest!==expectedAotDigest)
+  if(typeof expectedAotDigest!=='string'||!HEX.test(expectedAotDigest))
     fail('O3_PREFLIGHT_SELECTED_AOT_MISMATCH');
+  const selectedApp=captureSelectedApp(app,expectedAotDigest);
   if(typeof expectedRuleDigest!=='string'||!HEX.test(expectedRuleDigest)||
      expectedRuleDigest!==fixed.digest)
     fail('O3_PREFLIGHT_TECHNICAL_RULE_MISMATCH');
   // Reuses the strict candidate/source validator and opaque WeakMap task pin.
   const coordinator=makeO3ShadowTaskPin({
-    app,candidate,maxWaitMs:x.maxWaitMs??15000,
+    app:selectedApp,candidate,maxWaitMs:x.maxWaitMs??15000,
     maxTasks:x.maxTasks??16,maxEpochs:x.maxEpochs??32
   });
   const identity=Object.freeze({aotDigest:expectedAotDigest,
