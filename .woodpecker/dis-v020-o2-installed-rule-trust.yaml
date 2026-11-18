@@ -1,0 +1,37 @@
+# formal-tools #11 G6 / DIS #3 R180 B — negative-only O2 installer trust preflight.
+# No real trust roots, Host attestation, Effect, or positive Rule installation.
+when:
+  - event: pull_request
+  - event: manual
+labels:
+  backend: local
+skip_clone: true
+steps:
+  - name: clone-exact-sha
+    image: bash
+    commands:
+      - git init --object-format sha1
+      - git config --global --replace-all safe.directory "$CI_WORKSPACE"
+      - git remote add origin "$CI_REPO_CLONE_URL"
+      - |
+        n=0
+        while true; do
+          if git fetch --no-tags --depth=1 --filter=tree:0 origin "+$CI_COMMIT_SHA" && git reset --hard -q "$CI_COMMIT_SHA"; then break; fi
+          n=$((n+1))
+          if [ "$n" -ge 5 ]; then echo "clone failed after $n attempts"; exit 1; fi
+          echo "transient clone egress retry $n"
+          sleep 10
+        done
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+  - name: dis-o2-installed-rule-trust-node24
+    image: bash
+    commands:
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+      - node --version
+      - node -e "if(Number(process.versions.node.split('.')[0])<24)process.exit(1)"
+      - npm_config_better_sqlite3_binary_host_mirror=https://registry.npmmirror.com/-/binary/better-sqlite3 npm ci
+      - npm run build
+      - node --check examples/dis-v020-native-sdk/o2-installed-rule-trust-preflight.mjs
+      - node --check examples/dis-v020-native-sdk/o2-installed-rule-trust-preflight.test.mjs
+      - node --import tsx --test examples/dis-v020-native-sdk/o2-installed-rule-trust-preflight.test.mjs
+      - node --import tsx --test examples/dis-v020-native-sdk/o2-selected-rule-digest-guard.test.mjs
