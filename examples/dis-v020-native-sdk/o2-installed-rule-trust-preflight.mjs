@@ -19,19 +19,19 @@ export const O2_INSTALLER_PAYLOAD_SCHEMA='dis.v0.2.o2.installed-rule-attestation
 export const O2_REQUIRED_ATTESTATION_FIELDS=Object.freeze([...PAYLOAD]);
 
 /** All own-data; reject Proxy, getters, symbols and prototype drift without invocation. */
-function capture(value,keys,allowExtra=false){
+function capture(value,keys,allowExtra=false,optional=[]){
   if(!value||typeof value!=='object'||types.isProxy(value)||Array.isArray(value))return null;
   try {
     const proto=Object.getPrototypeOf(value);
     if(proto!==Object.prototype&&proto!==null)return null;
     const own=Reflect.ownKeys(value);
-    if(own.some(k=>typeof k!=='string'||(!allowExtra&&!keys.includes(k))))return null;
-    if(keys.some(k=>!own.includes(k))||(!allowExtra&&own.length!==keys.length))return null;
+    if(own.some(k=>typeof k!=='string'||(!allowExtra&&!keys.includes(k)&&!optional.includes(k))))return null;
+    if(keys.some(k=>!own.includes(k))||(!allowExtra&&own.length<keys.length))return null;
     const out=Object.create(null);
     for(const key of own){
       const d=Object.getOwnPropertyDescriptor(value,key);
       if(!d||!Object.hasOwn(d,'value')||!d.enumerable)return null;
-      if(keys.includes(key))out[key]=d.value;
+      if(keys.includes(key)||optional.includes(key))out[key]=d.value;
     }
     return out;
   }catch{return null}
@@ -61,7 +61,9 @@ function result(reason,status='BLOCKED',extra={}) {
 }
 const deny=(reason,status='BLOCKED')=>result(reason,status);
 function proper(expected,payload){
-  if(!HEX64.test(expected.aotDigest)||!HEX64.test(expected.sdkDigest)||
+  if(EXPECTED.some(key=>typeof expected[key]!=='string')||
+     [...EXPECTED].some(key=>typeof payload[key]!=='string')||
+     !HEX64.test(expected.aotDigest)||!HEX64.test(expected.sdkDigest)||
      !HEX64.test(expected.ruleDigest)||!HEX64.test(expected.installedBytesDigest)||
      !HEX40.test(expected.sourceGitBlob)||!NONCE.test(expected.nonceChallenge)||
      !ID.test(expected.tenantId)||!ID.test(expected.scope)||!ID.test(expected.deploymentId))
@@ -90,7 +92,7 @@ export function serializeO2UntrustedInstallerPayload(payload){
  * Verifying a signature over caller-supplied data is only a negative control.
  */
 export function inspectO2InstalledRuleTrustPreflight(options){
-  const x=capture(options,ROOT.filter(k=>k!=='observedNonces'&&k!=='revokedIssuerIds'),true);
+  const x=capture(options,ROOT.slice(0,4),false,ROOT.slice(4));
   if(!x)return deny('O2_INSTALLER_OPTIONS_UNSAFE');
   const expected=capture(x.expected,EXPECTED);
   const r=capture(x.receipt,RECEIPT);
