@@ -106,8 +106,10 @@ const PRECOMPILED: Record<string, FunctionInputValidator> = {
 
 const VALID_ASSESS_INPUT = { claims: [{ status: 'PASS' }, { status: 'UNKNOWN' }] };
 
-function buildTrustedBundle(): { manifest: ElementManifest; lock: ReturnType<typeof lockAot> } {
-  const manifest = parseElementManifest(RAW_MANIFEST);
+function buildTrustedBundle(patch?: (raw: typeof RAW_MANIFEST) => void): { manifest: ElementManifest; lock: ReturnType<typeof lockAot> } {
+  const raw = structuredClone(RAW_MANIFEST);
+  if (patch !== undefined) patch(raw);
+  const manifest = parseElementManifest(raw);
   const lock = lockAot(
     manifest,
     Object.fromEntries(FUNCTION_IDS.map((id) =>
@@ -161,8 +163,10 @@ function makeFixture(overrides: {
   bindings?: FunctionBindings;
   unbound?: string[];
   bindingOverrides?: Record<string, Record<string, unknown>>;
+  /** Patch the raw fixture manifest before the real parse/lock/bind chain. */
+  manifestPatch?: (raw: typeof RAW_MANIFEST) => void;
 } = {}) {
-  const { manifest, lock } = buildTrustedBundle();
+  const { manifest, lock } = buildTrustedBundle(overrides.manifestPatch);
   const tracked = makeTrackedCallables();
   const bindings: Record<string, Record<string, unknown>> = {};
   for (const id of FUNCTION_IDS) {
@@ -506,6 +510,36 @@ test('non-none effect modes are gated behind an existing Kernel/KDP Permit with 
   assert.equal(tracked.calls['acquire'], 0, 'external-effect implementation is never dispatched');
   assert.equal(tracked.totalCalls(), 0, 'no Permit is ever minted and no effect ever runs here');
   assert.deepEqual(envelope.remaining(), { steps: 8, workUnits: 32 }, 'effect gating never consumes budget');
+});
+
+test('an external-effect implementation is gated even when declared with effects none', async () => {
+  // Pathological but D1-legal declaration: parseElementManifest validates
+  // implementation and effects independently, so
+  // implementation:'external-effect' + effects:'none' parses, seals and binds
+  // normally — and must still never execute on this channel.
+  const { config, tracked, envelope } = makeFixture({
+    manifestPatch: (raw) => {
+      const element = raw.consumers[0].elements.find((candidate) => candidate.id === 'demo.effects');
+      if (element === undefined) throw new Error('fixture patch anchor missing: demo.effects');
+      const acquire = element.functions.find((candidate) => candidate.id === 'acquire');
+      if (acquire === undefined) throw new Error('fixture patch anchor missing: acquire');
+      acquire.effects = 'none';
+    },
+  });
+  const invoker = createFunctionInvoker(config);
+  const outcome = await invoker.invoke({ functionId: 'acquire', input: { anything: true } });
+  const rejected = rejectedOf(outcome, 'external-effect implementation must be gated');
+  assert.equal(rejected.code, 'EFFECT_PERMIT_REQUIRED');
+  assert.equal(rejected.permitRequired, true, 'an existing Kernel/KDP Permit is required');
+  assert.equal(rejected.output, null);
+  assert.equal(rejected.disposition, 'UNKNOWN');
+  assert.equal(rejected.functionId, 'acquire');
+  assert.ok(rejected.detail.includes('implementation:external-effect'), 'detail names the implementation kind');
+  assert.ok(rejected.detail.includes('effects:none'), 'detail names the effects mode');
+  assert.ok(rejected.detail.includes('Permit'), 'detail names the Permit requirement');
+  assert.equal(tracked.calls['acquire'], 0, 'zero execution of the external-effect callable');
+  assert.equal(tracked.totalCalls(), 0);
+  assert.deepEqual(envelope.remaining(), { steps: 8, workUnits: 32 }, 'zero budget spend on the gated call');
 });
 
 test('an executor throw surfaces as structured EXECUTION_FAILED without partial output', async () => {

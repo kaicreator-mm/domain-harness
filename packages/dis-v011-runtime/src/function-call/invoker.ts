@@ -12,8 +12,12 @@
  *      match the sealed pair, and whose sealed target matches the channel's
  *      expected target. There is no dynamic module search at call time and
  *      no package SHA recomputation — ever.
- *   2. **effect-free** — only `declaration.effects === 'none'` may execute
- *      directly. Any `idempotent` / `non-idempotent` implementation is
+ *   2. **effect-free** — only a Function whose declaration has
+ *      `effects === 'none'` AND an implementation other than
+ *      `external-effect` may execute directly. Any `idempotent` /
+ *      `non-idempotent` effects mode, and any `external-effect`
+ *      implementation even when declared `effects:'none'` (pathological but
+ *      D1-legal: D1 validates implementation and effects independently), is
  *      structurally rejected with the requirement for an existing Kernel/KDP
  *      Permit; this channel never mints a Permit and never dispatches an
  *      external effect (Effect authority stays with the existing Kernel
@@ -372,9 +376,9 @@ export function createFunctionInvoker(config: FunctionInvokerConfig): FunctionIn
         ? rejection('FUNCTION_NOT_BOUND', 'selected-but-unbound', 'NOT_PERFORMED')
         : rejection('FUNCTION_ID_UNKNOWN', 'not-selected', 'NOT_PERFORMED');
     }
-    if (entry.declaration.effects !== 'none') {
+    if (entry.declaration.effects !== 'none' || entry.declaration.implementation === 'external-effect') {
       return rejection('EFFECT_PERMIT_REQUIRED',
-        'effects:' + entry.declaration.effects
+        'implementation:' + entry.declaration.implementation + '+effects:' + entry.declaration.effects
         + ' requires an existing Kernel/KDP Permit; this channel never mints permits or dispatches effects',
         'NOT_PERFORMED', { permitRequired: true });
     }
