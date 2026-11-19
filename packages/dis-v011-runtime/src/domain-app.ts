@@ -45,8 +45,8 @@ export interface DomainAppConfig {
 
 /** The composed Domain App: A1 session gate + A2 selected-Function calls. */
 export interface DomainApp {
-  /** The A2 channel this app calls through (read-only composition view). */
-  readonly invoker: FunctionInvoker;
+  // The raw FunctionInvoker is intentionally not part of this public view.
+  // Callers must pass through invoke(), which enforces A1's READY gate.
   observe(): Readonly<AppSessionObservation>;
   start(): Promise<AppSessionStartResult>;
   /**
@@ -71,7 +71,6 @@ export function createDomainAppSession(config: DomainAppConfig): DomainApp {
     ? { packages: config.packages ?? [], app: config.app }
     : { packages: config.packages ?? [], app: config.app, disposeMode: config.disposeMode });
   return Object.freeze({
-    invoker,
     observe: (): Readonly<AppSessionObservation> => session.observe(),
     start: () => session.start(),
     // async so the A1 synchronous READY-gate rejection surfaces uniformly as
