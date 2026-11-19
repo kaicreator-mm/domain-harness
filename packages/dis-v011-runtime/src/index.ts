@@ -35,6 +35,30 @@ export type {
   BoundedStepTicket, BoundedStepContext, BoundedPlan, BoundedOutcome, BoundedEnvelope,
 } from './bounded/envelope.js';
 
+// A1 App-session lifecycle (#1541), A2 selected no-effect Function invocation
+// channel (#1542) and the I0 Domain App composition (#1543), wired at this
+// public entry. All stay inside this private runtime workspace; no SDK
+// contract surface changes.
+export {
+  APP_SESSION_STATES, AppSessionError, createAppSession, createAppSessionObserver,
+} from './app-init/index.js';
+export type {
+  AppSessionState, AppSessionErrorCode, AppSessionStepPhase, AppSessionDisposeMode,
+  AppLifecycleStep, AppSessionConfig, AppSessionStepRecord, AppSessionDisposeError,
+  AppSessionStartedResult, AppSessionStartFailedResult, AppSessionStartResult,
+  AppSessionStoppedResult, AppSessionStopFailedResult, AppSessionStopResult,
+  AppSessionObservation, AppSessionObserver, AppSession,
+} from './app-init/index.js';
+export { FunctionCallError } from './function-call/errors.js';
+export { createFunctionInvoker } from './function-call/invoker.js';
+export type {
+  FunctionInputValidator, FunctionBinding, FunctionBindingEntry, FunctionBindings,
+  FunctionCallRejectionCode, FunctionCallValidationStatus, InvokerFunctionInfo,
+  FunctionCallOutcome, FunctionInvokeRequest, FunctionInvoker, FunctionInvokerConfig,
+} from './function-call/invoker.js';
+export { createDomainAppSession } from './domain-app.js';
+export type { DomainAppConfig, DomainApp } from './domain-app.js';
+
 function businessModule(selection: Selection): string {
   const policy = { packageId: 'business-dis-player@0.11.0-dev.0', packageRevision: selection.revision,
     definitionId: selection.packageId, graphSha256: selection.graphSha256,

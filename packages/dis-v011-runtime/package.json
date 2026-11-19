@@ -1,6 +1,6 @@
 {
   "name": "@kaicreator/domain-harness-dis-v011-runtime",
-  "version": "0.11.0-dev.1",
+  "version": "0.11.0-dev.2",
   "private": true,
   "type": "module",
   "exports": { ".": "./dist/index.js", "./boot": "./dist/boot.js" },
