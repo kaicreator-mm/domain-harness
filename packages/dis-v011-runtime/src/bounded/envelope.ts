@@ -486,6 +486,15 @@ export function createBoundedEnvelope(config: {
       if (settled.kind === 'deadline') {
         return exhaustedOutcome<O>('wallClockMs', ledger.remaining, Object.freeze(events));
       }
+      // A plan may catch a BoundedBudgetExhaustedError thrown by ctx.step()
+      // and then resolve successfully. The authoritative reservation ledger
+      // still recorded exhaustion: never return a COMPLETED outcome afterward.
+      // Cast keeps the closure-mutated state visible to TypeScript's flow
+      // analysis; the flag is set synchronously by markExhausted().
+      const exhaustedAtSettlement = exhausted as BoundedBudgetAxis | null;
+      if (exhaustedAtSettlement !== null) {
+        return exhaustedOutcome<O>(exhaustedAtSettlement, ledger.remaining, Object.freeze(events));
+      }
       if (settled.kind === 'run') {
         record({ type: 'run-completed', at: clock.now(), attested: false, authority: 'NONE' });
         const provider: BoundedProviderLabel = Object.freeze({ kind: descriptor.kind, id: descriptor.id, attested: false, verified: false });
