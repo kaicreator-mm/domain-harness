@@ -79,6 +79,10 @@ export class InteractionContractError extends Error {
 const FUNCTION_ID = /^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)*$/;
 const INTENT_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const MAX_ROUTES = 128;
+const IMPLEMENTATION_KINDS: readonly string[] = ['rule', 'knowledge', 'code', 'stateful', 'external-effect'];
+const EFFECT_MODES: readonly string[] = ['none', 'idempotent', 'non-idempotent'];
+const CONFIG_KEYS: readonly string[] = ['functions', 'routes'];
+const ROUTE_KEYS: readonly string[] = ['intentId', 'functionId', 'label'];
 const MAX_OPTIONS = 16;
 const INVALID_ALIASES = new Set(['constructor', 'prototype', '__proto__']);
 
@@ -117,13 +121,17 @@ function ambiguous(intentId: string, options: readonly SelectedIntentOption[]): 
  */
 export function createSelectedInteraction(config: SelectedInteractionConfig): SelectedInteraction {
   if (!config || typeof config !== 'object' || Array.isArray(config)) rejectConfig('config');
+  for (const key of Object.keys(config)) if (!CONFIG_KEYS.includes(key)) rejectConfig('config.unknown:' + key);
   if (!Array.isArray(config.functions) || !Array.isArray(config.routes)) rejectConfig('inventory');
+  if (config.routes.length === 0) rejectConfig('routes.empty');
   if (config.routes.length > MAX_ROUTES) rejectConfig('routes.maximum');
 
   const functions = new Map<string, SelectedInteractionFunction>();
   for (const entry of config.functions) {
     if (!entry || typeof entry !== 'object' || !validFunctionId(entry.id)) rejectConfig('function.id');
     if (functions.has(entry.id)) rejectConfig('function.duplicate:' + entry.id);
+    if (!IMPLEMENTATION_KINDS.includes(entry.implementation)) rejectConfig('function.implementation');
+    if (!EFFECT_MODES.includes(entry.effects)) rejectConfig('function.effects');
     functions.set(entry.id, Object.freeze({
       id: entry.id, implementation: entry.implementation, effects: entry.effects,
     }));
@@ -132,6 +140,7 @@ export function createSelectedInteraction(config: SelectedInteractionConfig): Se
   const routes = new Map<string, SelectedIntentOption[]>();
   for (const [index, route] of config.routes.entries()) {
     if (!route || typeof route !== 'object') rejectConfig('routes[' + index + ']');
+    for (const key of Object.keys(route)) if (!ROUTE_KEYS.includes(key)) rejectConfig('route.unknown:' + key);
     if (!validIntentId(route.intentId)) rejectConfig('route.intentId');
     if (!validFunctionId(route.functionId)) rejectConfig('route.functionId');
     if (typeof route.label !== 'string' || route.label.length < 1 || route.label.length > 120) {
