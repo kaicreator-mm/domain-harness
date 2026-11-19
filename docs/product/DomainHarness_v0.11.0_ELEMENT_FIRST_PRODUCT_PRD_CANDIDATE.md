@@ -1,14 +1,14 @@
 # DomainHarness v0.11.0 — Element-First Architecture Foundation
 ## Product Requirements Document · R2 · Owner Review Candidate
 
-> **Status: PRODUCT/L1 REVIEW READY, OWNER APPROVAL PENDING; not Product Freeze, L2 Freeze, implementation authorization or release.**
+> **Status: OWNER SCOPE ACCEPTED on 2026-11-20; selected independent Product Review and remote version-branch Product Freeze checkpoint PENDING. Not L2 Freeze, implementation authorization or release.**
 > **Version master:** [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563) · **Product work item:** [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) · **Product PR:** [#1565](https://github.com/kaicreator-mm/domain-harness/pull/1565).
 > **Baseline branch:** `version/v0.11.0` (initial `b1b2c182c1cb49c1b63b1efaf57ff9132d9cf4b0`); **ADS:** v4.18.0 pinned `2c395c55569fe2edf3f4135f12d3d069e526d0b7`. This document **replaces** prior #1565 R0 PRD requirements where inconsistent.
 
 ```ini
 OUTPUT_LABEL=DOMAIN_HARNESS_V011_PRODUCT_L1_R2_FINAL_REVIEW_CANDIDATE
 VERSION=0.11.0
-TYPE=PRODUCT_L1_CANDIDATE_FOR_OWNER_REVIEW
+TYPE=PRODUCT_L1_OWNER_SCOPE_ACCEPTED_REVIEW_REQUIRED
 SCOPE=ELEMENT_FIRST_AND_COMPLETE_STRUCTURAL_FOUNDATION
 LEGACY_APP_ABI_COMPAT=NOT_REQUIRED
 LEGACY_FUNCTIONAL_PARITY=NOT_REQUIRED
@@ -26,7 +26,7 @@ RELEASE=NO
 
 ## 中文审核摘要（请优先审阅此节，再按需要阅读下方完整技术合同）
 
-**本 PRD 的待审核决定：** 将 v0.11.0 定义为**全新的 Element-First 架构基础版本**；旧 `v0.10.3` 的 App、SDK ABI、业务能力和底层机制**均无需兼容、保留或强制复用**。后续原有和新增业务能力全部按照 `0.11.x` 新架构实施。旧 Git tag/历史发行物不回写。本 PRD **尚未得到 Owner 审批**，也不构成 L2、Task DAG 或 Release。
+**本 PRD 已获 Owner 确认的产品范围：** 将 v0.11.0 定义为**全新的 Element-First 架构基础版本**；旧 `v0.10.3` 的 App、SDK ABI、业务能力和底层机制**均无需兼容、保留或强制复用**。后续原有和新增业务能力全部按照 `0.11.x` 新架构实施。旧 Git tag/历史发行物不回写。Owner 已在 2026-11-20 明确要求固化此 PRD；但当前确切 PR HEAD 的独立 Product Review 和远端 Product Freeze checkpoint 仍待完成，因此不构成 L2、Task DAG 或 Release。
 
 ### A. 0.11.0 必须交付的架构
 
@@ -64,7 +64,7 @@ RELEASE=NO
 
 ### D. 本轮请确认什么、什么留给 L2
 
-**请审核第 12 节 AR-01…AR-12（架构决定）以及第 10 节 AC01…AC10（退出验收）是否足以作为 0.11.0 的最终 Product 范围。** 你认可后才会完成 Product Freeze 与实施 L2。
+**Owner 已认可第 12 节 AR-01…AR-12（架构决定）和第 10 节 AC01…AC10（退出验收）构成 0.11.0 的产品范围。** 现在仍需由另一独立对话完成新 HEAD 的 Product Review，再建立远端 Product Freeze checkpoint，之后才进入 L2。
 
 **仅技术层面的 L2 待定**：具体 JSON Schema URI/字段拼写、TypeScript API/错误码、摘要算法、Lock 二进制或 JSON 序列化、Boot 启动函数签名、Node 最低版本与物理 Package 路径/测试写集。这些应遵守已确认 Product 语义，不是再次讨论是否采用 Element-First、是否支持旧 API、是否重复 Kernel。
 
@@ -378,9 +378,9 @@ The following outcomes are jointly required for the **v0.11.0 architecture found
 ## 13. ADS review/qualification and source authority
 
 1. **Product/L1**: current #1565 docs-only candidate changes must be reviewed on the *new exact HEAD* against [#1477](https://github.com/kaicreator-mm/domain-harness/issues/1477), accepted Boot/KDP successor [#1484](https://github.com/kaicreator-mm/domain-harness/issues/1484), Package analysis [#1480](https://github.com/kaicreator-mm/domain-harness/issues/1480) and DIS Element-First **draft** [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)/[#1497](https://github.com/kaicreator-mm/domain-harness/pull/1497). Original #1565 review was REWORK on the *prior* scope; it does not approve R2.
-2. **Owner review** of this complete PRD is requested **before** Product Freeze. Any unapproved question raised by Owner is recorded as a Product delta; no circular request for independent authorization to perform ordinary implementation planning.
+2. **Owner scope approval** is recorded in the linked discussion chronicle (2026-11-20). It is not an independent Product Review and does not replace the version-branch Product Freeze checkpoint. Future material Product changes require an explicit owner-controlled delta; ordinary implementation planning needs no repeated authorization.
 3. **L2** after approved Product Stage1: lock actual contract/API/schema/Boot+KDP init/Package graph and its exact source/readback; run targeted independent review. **Do not** claim DIS v0.2 Full 21/21 or official third-party business qualifications merely because DomainHarness implements a bounded subset.
 4. **Task DAG** only after L2: few coherent Outcomes with nonoverlapping write sets, e.g. Element+Package Schema/BUILD; Boot+KDP Package lifecycle; App Init+public SDK Basic E2E/packing. Avoid forcing the 12 architecture decisions into 12 separate tasks.
 5. **Native implementation/CI/Release** have not yet happened. A PRD document, private prototype, old CI or issue comment is not proof that the new v0.11.0 product works.
 
-**Review request:** Approve or comment on **AR-01…AR-12, `1.1 boundary and AC01…AC10**. Once approved they form the single v0.11.0 Product basis for L2; no further product-scope expansion is implied by the historic F01–F24 inventory.
+**Next required transition:** independent other-conversation source-first Product/L1 review of final PR HEAD and material delta → controlled Product Freeze checkpoint on `version/v0.11.0` → L2; the Owner has already accepted the current R2 scope. Historic F01–F24 do not expand v0.11.0 automatically.
