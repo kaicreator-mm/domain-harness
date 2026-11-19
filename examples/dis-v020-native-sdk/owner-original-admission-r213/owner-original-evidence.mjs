@@ -39,8 +39,11 @@ export const R213_GRANT=Object.freeze({
 export const R213_TIER=Object.freeze({
   name:'OWNER_ATTESTED_ORIGINAL_RESEARCH_ADMISSION',
   honesty:'BELOW_AND_DISTINCT_FROM_PROFESSIONAL_OR_PUBLISHER_OR_FORMAL_QUALIFICATION',
-  forbiddenTokens:['PROFESSIONAL_QUALIFICATION','PUBLISHER_LICENSED',
-    'ORIGINAL_SAP_QUALIFIED','FORMAL_ORIGINAL_E2E_VERIFIED']
+  // Morphological stems, not exact phrases: QUALIF catches QUALIFIED and
+  // QUALIFICATION(s), LICENSE catches LICENSED/LICENSING (independent-review
+  // hardening: substring-exact phrases missed e.g. PROFESSIONAL_QUALIFIED).
+  forbiddenTokens:['PROFESSIONAL','PUBLISHER','LICENSE','QUALIF',
+    'FORMAL_ORIGINAL_E2E']
 });
 export const R213_IDS=Object.freeze({
   registryId:'owner-original-admission-registry-r213',

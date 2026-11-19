@@ -158,10 +158,12 @@ test('committed original evidence verifies byte-exact; tier-confusion labels rej
   assert.equal(summary.forgeRepin.state,'PREPARED_UNQUALIFIED');
   // The fixed tier label itself must pass its own confusion guard…
   assert.equal(checkOwnerTierLabel(R213_TIER.name),true);
-  // …while impersonating labels are rejected.
+  // …while impersonating labels are rejected — including morphological
+  // variants (independent-review hardening probe class).
   for(const bad of ['OWNER_PROFESSIONAL_QUALIFICATION',
     'PUBLISHER_LICENSED_ORIGINAL','ORIGINAL_SAP_QUALIFIED_OWNER',
-    'FORMAL_ORIGINAL_E2E_VERIFIED'])
+    'FORMAL_ORIGINAL_E2E_VERIFIED','PROFESSIONAL_QUALIFIED_OWNER_ATTESTED',
+    'owner_attested_professional_qualification','LICENSED_RESEARCH_ADMISSION'])
     assert.throws(()=>checkOwnerTierLabel(bad),
       {message:/TIER_LABEL_CONFUSION_REJECTED/},bad);
   // UNKNOWN fail-closed: any drift of the committed evidence is rejected —
