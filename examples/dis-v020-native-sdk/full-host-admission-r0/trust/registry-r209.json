@@ -1,0 +1,55 @@
+{
+  "schema": "dis.v0.2.full-host-admission.trust-registry/1",
+  "recordId": "DIE_DIS3_R209_OWNER_ATTESTED_TRUST_REGISTRY",
+  "authorityModel": "OWNER_ATTESTED_STRUCTURAL_NOT_INTERPERSONAL",
+  "singleOwnerEcosystem": true,
+  "ownerGrant": {
+    "grantRef": "kaicreator-mm/domain-harness#1527 comment 7007585312",
+    "grantVerbatim": "我作为项目和Host所有人授权你继续完成，必要使用可以使用其它 LLM 的子智能体完成",
+    "grantedAt": "2026-11-19",
+    "rows": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "issuer": {
+    "issuerId": "owner-issuer-r209",
+    "spkiDerBase64Url": "MCowBQYDK2VwAyEAB050a_kNBI_VENQjZZQkE7vbBaG9hXHp2NGrg3yhLlM",
+    "fingerprintSha256": "2ebfd70db006bef9337e6a40284419d57aebcddc319a1aba02c1828dbb8d669a",
+    "revocationEpochFloor": 1,
+    "provisionedOutsideRepo": true
+  },
+  "host": {
+    "spkiDerBase64Url": "MCowBQYDK2VwAyEAbSv8e8vAWACxghZO6w83B_l9BuFJ3rAbJeAAAnpNwG4",
+    "fingerprintSha256": "ff3206cdbc4b61a96a3ee31350c718bd14361ea8ebe07cde6dcf6644dd81a99d",
+    "custody": "owner-controlled persistent Ed25519 generated outside repo; R50 historical Host bytes untouched"
+  },
+  "admission": {
+    "functionId": "dke.ev16.d02.vv.r188.observe",
+    "subjectBinding": "se:SCB-CS2023-VV-R1",
+    "tenantId": "tenant:r188-current815",
+    "deploymentId": "dep:r209-full-host-admission",
+    "scope": "dis.o2.full-host-admission.r188/v1",
+    "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+    "sdkDigest": "662b4f139e4e6a0990ba32f54cf2a2405e75fd419e37205aa72a0b15534b9b11",
+    "ruleDigest": "b37047e808c90626ca5e46f621293f89e8c6e9c4b57bfe7d8e5d3857794b80f3",
+    "installedBytesDigest": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632",
+    "sourceGitBlob": "234997708b5520d7f9ce5997eb7ad6ff963a5e68",
+    "sdkModulePath": "packages/microkernel/dis-v020.mjs"
+  },
+  "ecp": {
+    "functionId": "dke.ev16.d02.vv.r188.observe",
+    "purpose": "TRUSTED_INSTALL_ADMISSION_SAME_CALL_POSITIVE",
+    "approvedFor": "research-engineering same-call closure only; no formal qualification",
+    "formalQualification": false,
+    "grantRef": "kaicreator-mm/domain-harness#1527 comment 7007585312 row1"
+  },
+  "limits": {
+    "noConformancePromotion": true,
+    "observationRemains": "OBSERVATION_UNKNOWN_AUTHORITY_NONE",
+    "claimAttested": false,
+    "effectDispatched": false
+  }
+}

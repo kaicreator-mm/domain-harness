@@ -1,0 +1,43 @@
+# DIE #4 R209 / #1527 Phase B — ONE selected trusted Rule/Host admission
+# (owner-attested structural trust). Re-derives every pinned digest from the
+# exact HEAD bytes, verifies the committed installer grant against the pinned
+# issuer root and the committed live Host receipt against the pinned Host key,
+# and runs the full adversarial negative suite. The R188 deny boundary and the
+# untrusted-preflight gates stay green in their own workflows.
+when:
+  - event: pull_request
+  - event: manual
+labels:
+  backend: local
+skip_clone: true
+steps:
+  - name: clone-exact-sha
+    image: bash
+    commands:
+      - git init --object-format sha1
+      - git config --global --replace-all safe.directory "$CI_WORKSPACE"
+      - git remote add origin "$CI_REPO_CLONE_URL"
+      - |
+        n=0
+        while true; do
+          if git fetch --no-tags --depth=1 --filter=tree:0 origin "+$CI_COMMIT_SHA" && git reset --hard -q "$CI_COMMIT_SHA"; then break; fi
+          n=$((n+1))
+          if [ "$n" -ge 5 ]; then echo "clone failed after $n attempts"; exit 1; fi
+          echo "transient clone egress retry $n"
+          sleep 10
+        done
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+  - name: dis-full-host-admission-r0-node24
+    image: bash
+    commands:
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+      - node --version
+      - node -e "if(Number(process.versions.node.split('.')[0])<24)process.exit(1)"
+      - npm_config_better_sqlite3_binary_host_mirror=https://registry.npmmirror.com/-/binary/better-sqlite3 npm ci
+      - npm run build
+      - node --check examples/dis-v020-native-sdk/full-host-admission-r0/full-host-admission.mjs
+      - node --check examples/dis-v020-native-sdk/full-host-admission-r0/run-live-same-call.mjs
+      - node --check examples/dis-v020-native-sdk/full-host-admission-r0/full-host-admission-r0.test.mjs
+      - node --import tsx --test examples/dis-v020-native-sdk/full-host-admission-r0/full-host-admission-r0.test.mjs
+      - node --import tsx --test examples/dis-v020-native-sdk/r188-current815-o2-host-boundary.test.mjs
+      - node --import tsx --test examples/dis-v020-native-sdk/o2-installed-rule-trust-preflight.test.mjs

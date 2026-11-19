@@ -1,0 +1,14 @@
+{
+  "schema": "dis.v0.2.full-host-admission.live-evidence/1",
+  "mode": "replay-expected-deny",
+  "head": "6244a0cd-r209w-worktree",
+  "nodeVersion": "v24.21.0",
+  "platform": "linux",
+  "executedAtMs": 1795089096965,
+  "replayedNonce": "gRARQPuGhcFEHqnKJKl89QHR0m69ckrJ9xLvEowjTZCc",
+  "result": {
+    "status": "DENIED",
+    "reason": "ADM_NONCE_REPLAY",
+    "signed": false
+  }
+}

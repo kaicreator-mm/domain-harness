@@ -1,0 +1,47 @@
+{
+  "schema": "dis.v0.2.full-host-admission.live-evidence/1",
+  "mode": "same-call",
+  "head": "6244a0cd-r209w-worktree",
+  "note": "R209 live owner same-call, WSL node 24.21.0",
+  "nodeVersion": "v24.21.0",
+  "platform": "linux",
+  "executedAtMs": 1795089096451,
+  "executedAtIso": "2026-11-19T11:51:36.451Z",
+  "ledgerScope": "dis.o2.full-host-admission.r188/v1",
+  "ledgerDirectory": "/home/cc/dh-i1527-r209-ledger/ledger",
+  "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+  "result": {
+    "status": "SAME_CALL_ADMITTED_SIGNED_RECEIPT",
+    "authority": "OWNER_ATTESTED_STRUCTURAL",
+    "grantFingerprint": "ce9e279f9bdb00cc6f6f177ae0408d68ad7097ee02d9a7af9d762189be0b3f2c",
+    "issuerFingerprint": "2ebfd70db006bef9337e6a40284419d57aebcddc319a1aba02c1828dbb8d669a",
+    "hostFingerprint": "ff3206cdbc4b61a96a3ee31350c718bd14361ea8ebe07cde6dcf6644dd81a99d",
+    "nonce": "gRARQPuGhcFEHqnKJKl89QHR0m69ckrJ9xLvEowjTZCc",
+    "claimAttested": false,
+    "effectDispatched": false,
+    "singleOwnerEcosystem": true
+  },
+  "receipt": {
+    "payload": {
+      "schema": "dis.v0.2.full-host-admission.host-receipt/1",
+      "functionId": "dke.ev16.d02.vv.r188.observe",
+      "subject": "se:SCB-CS2023-VV-R1",
+      "tenantId": "tenant:r188-current815",
+      "deploymentId": "dep:r209-full-host-admission",
+      "scope": "dis.o2.full-host-admission.r188/v1",
+      "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+      "sdkDigest": "662b4f139e4e6a0990ba32f54cf2a2405e75fd419e37205aa72a0b15534b9b11",
+      "ruleDigest": "b37047e808c90626ca5e46f621293f89e8c6e9c4b57bfe7d8e5d3857794b80f3",
+      "installedBytesDigest": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632",
+      "issuerId": "owner-issuer-r209",
+      "grantFingerprint": "ce9e279f9bdb00cc6f6f177ae0408d68ad7097ee02d9a7af9d762189be0b3f2c",
+      "nonce": "gRARQPuGhcFEHqnKJKl89QHR0m69ckrJ9xLvEowjTZCc",
+      "observationDigest": "42cc0daffc95bcdaaae1580d5b76c89dd0f3ae7d830d45c2a3b9aa784bcf1412",
+      "observationDisposition": "OBSERVATION_UNKNOWN",
+      "claimAttested": false,
+      "effectDispatched": false,
+      "issuedAtMs": 1795089096451
+    },
+    "signatureBase64Url": "yWRubVeskhx4Av-pbJ4rAuKNA78jbjOUuyNLWU8M8KZ2ErqEQFUK-F-Wm0vNuyfN2m6sNfc3F70Kq2KGwYirCw"
+  }
+}

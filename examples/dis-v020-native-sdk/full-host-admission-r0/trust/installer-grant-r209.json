@@ -1,0 +1,21 @@
+{
+  "issuerId": "owner-issuer-r209",
+  "spkiDerBase64Url": "MCowBQYDK2VwAyEAB050a_kNBI_VENQjZZQkE7vbBaG9hXHp2NGrg3yhLlM",
+  "signatureBase64Url": "zQPyPDLCZXB-02W7mpM2VrN0Vd1rq5Efj2zwSAA0FtoE3dVjRaevbh3flYM5Du8TlfQJdJmhGWImLN6labUmAg",
+  "payload": {
+    "schema": "dis.v0.2.o2.installed-rule-attestation-candidate/1",
+    "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+    "sdkDigest": "662b4f139e4e6a0990ba32f54cf2a2405e75fd419e37205aa72a0b15534b9b11",
+    "ruleDigest": "b37047e808c90626ca5e46f621293f89e8c6e9c4b57bfe7d8e5d3857794b80f3",
+    "installedBytesDigest": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632",
+    "tenantId": "tenant:r188-current815",
+    "scope": "dis.o2.full-host-admission.r188/v1",
+    "deploymentId": "dep:r209-full-host-admission",
+    "sourceGitBlob": "234997708b5520d7f9ce5997eb7ad6ff963a5e68",
+    "nonceChallenge": "Frj1K4bWGlwKofYyI4ActTnnfmyjAVuY",
+    "issuedAtMs": 1795088677994,
+    "expiresAtMs": 1810640677994,
+    "nonce": "gRARQPuGhcFEHqnKJKl89QHR0m69ckrJ9xLvEowjTZCc",
+    "revocationEpoch": 1
+  }
+}
