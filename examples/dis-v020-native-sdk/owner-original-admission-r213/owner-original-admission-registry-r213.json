@@ -1,0 +1,47 @@
+{
+  "schema": "dis.v0.2.full-host-admission.registry/1",
+  "registryId": "owner-original-admission-registry-r213",
+  "trustTopology": "SINGLE_OWNER_ECOSYSTEM_STRUCTURAL_INDEPENDENCE_NOT_INTERPERSONAL",
+  "ownerGrant": {
+    "issue": "kaicreator-mm/domain-intelligence-engineering#155",
+    "commentId": 7016171014,
+    "recordedAtIso": "2026-11-19T17:04:36Z",
+    "grantScopeSha256": "c814f4246f9b4163cb5ef34107666669c2ea9af4ae591f9ee2435a21cf5943f2"
+  },
+  "revocationEpoch": 1,
+  "issuers": {
+    "owner-issuer-r213": {
+      "spkiDerBase64Url": "MCowBQYDK2VwAyEAbT5_Q2x2ZTwjErPv5s6Bf2ZeSoAq1ul_Nzx1aNTBCVg",
+      "spkiSha256": "d3e928b4ac70d116858fd640dd4c4aba72d2d54c45f947e5100d16800b66e694",
+      "activeSinceMs": 1795108688325,
+      "functionBindings": [
+        "dke.ev16.d02.vv.r188.observe"
+      ],
+      "custody": "OWNER_OPERATOR_CONTROLLED_FILE_OUTSIDE_REPO"
+    }
+  },
+  "hosts": {
+    "owner-admission-host-r213": {
+      "spkiDerBase64Url": "MCowBQYDK2VwAyEA2YkAgWoauu87N4HjYWgRy7aOkvYGVncRnHEXSy-VE48",
+      "spkiSha256": "7b3af4b453ee174acffcbfb5fa20dba85c553863ecdfbebf7b836571e75acaf9",
+      "kind": "ENGINEERING_ADMISSION_HOST_OWNER_ATTESTED_NOT_PRODUCTION_ORACLE"
+    }
+  },
+  "deployments": {
+    "deployment:dis-v020-owner-original-admission-r213": {
+      "tenantId": "tenant:owner-original-admission-r213",
+      "scope": "scope:r213-owner-original-path-admission",
+      "functionId": "dke.ev16.d02.vv.r188.observe",
+      "issuerId": "owner-issuer-r213",
+      "hostId": "owner-admission-host-r213",
+      "bindings": {
+        "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+        "sdkDigest": "71ca4c1316fd6158337d87c3a7930e2354122f0306ca557f2b87f9f73d5f3d22",
+        "ruleDigest": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632",
+        "installedBytesDigest": "d5822caf929fbc4c066f719b8a0327ddb0f0858973a686e923533f11c39ab980",
+        "sourceGitBlob": "234997708b5520d7f9ce5997eb7ad6ff963a5e68"
+      },
+      "validUntilMs": 1802884688325
+    }
+  }
+}
