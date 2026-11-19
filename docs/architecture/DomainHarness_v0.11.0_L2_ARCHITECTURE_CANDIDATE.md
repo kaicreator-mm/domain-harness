@@ -4,6 +4,7 @@
 > **状态：CANDIDATE_NOT_FROZEN。** 本文档不签 L2 Freeze、不授权源码写入、不物化 Native Task DAG；所有结论以本头部所锚定的 PRD 精确 blob 与 PR HEAD 为唯一产品语义权威。
 > 审核入口：L207（§8）是本候选的 P1 裁决项；§13 列出了与 R4 评论的全部校准出入与留给审核人的显式裁决点。
 > **R2 修订（2026-11-20）**：按 R6 独立审核（issuecomment 7023702117，VERDICT=REWORK）单轮修复 P1×4 + P2×2，逐项落点见 §13.5；除该清单所列修订外，正文与 R1 逐字一致。
+> **R2b 修订（2026-11-20）**：按 R5 独立审核（issuecomment 7023695190，VERDICT=REWORK，P0=0/P1=2/P2=5）单轮修复 F-1…F-7，逐项落点见 §13.6；其中 F-4/F-5 已由 R2 轮覆盖（§13.5 附带勘误与 P1-04），本清单只记余项。
 
 ```ini
 OUTPUT_LABEL=DOMAIN_HARNESS_V0110_L2_ARCHITECTURE_CANDIDATE_R2
@@ -35,13 +36,15 @@ CV-11: INHERITED_UNCHANGED
 CV-12: INHERITED_UNCHANGED
 CV_DEVIATIONS=NONE
 PRODUCT_STAGE1_REVIEW=ACCEPT_SCOPED_PRODUCT_L1_P0_0_P1_0_P2_0 (issuecomment:7022001862)
-PRODUCT_FREEZE=DONE (2026-11-19T21:54:24Z merge 22c6595b, checkpoint #1564 issuecomment:7023306608; CI=Owner 授权本地等价验证, pipeline 2666 合并时刻 pending 事后佐证)
+PRODUCT_FREEZE=DONE (2026-11-19T21:54:24Z merge 22c6595b, checkpoint #1564 issuecomment:7023306608; CI 事后佐证 issuecomment:7023821606)
 L2_FREEZE=NO
 SOURCE_WRITES=NOT_AUTHORIZED
 IMPLEMENTATION_DAG=NOT_ADMITTED
 R4_INPUT=issuecomment:7022648334
 R6_REVIEW_INPUT=issuecomment:7023702117
 R6_DISPOSITION=P1X4_P2X2_ALL_FIXED_SEE_SECTION_13_5
+R5_REVIEW_INPUT=issuecomment:7023695190
+R5_DISPOSITION=P1X2_P2X5_ALL_FIXED_SEE_SECTION_13_6 (F-4/F-5 已由 R2 轮 P1-04/附带勘误覆盖，本轮仅余项)
 LEGACY_COMPAT=NOT_REQUIRED_PER_PRD_AR11
 ```
 
@@ -69,7 +72,7 @@ LEGACY_COMPAT=NOT_REQUIRED_PER_PRD_AR11
 | F02 | `@kaicreator/domain-harness-contracts` 0.10.3：**零依赖**；exports `.`（types/import/require）；`files:["dist","README.md"]`；`src/index.ts` 现为 v0.10.2 ABI（digest / known-error-codes / errors / guards / identity / json / qualified-canonical / build-types / activation-types / import-types / llm-generate-v1） | packages/contracts |
 | F03 | `@kaicreator/domain-harness-build` 0.10.3（tooling/build）：依赖 `contracts 0.10.3`（**精确无前缀钉版**）；`src/index.ts` 导出 `buildV10App` + `projectSelectedComponents`（v0.10 Component 投影）；src 另有 build.ts / parser.ts / selected-closure.ts / import-policy.ts | tooling/build |
 | F04 | `@kaicreator/domain-harness-microkernel` 0.10.3：依赖 `contracts 0.10.3`；exports `.` + `./host-seam`；`src/domain-app.ts` = v0.10.2 `load(app)` 冻结 facade（`send/query/subscribe/stop` 四键，253 行），src 另有 host-seam.ts / internal/ / subscription-projection.ts | packages/microkernel |
-| F05 | `@kaicreator/domain-harness`（packages/domain-harness）**`private:true`、`version 0.2.0`**；依赖 `contracts 0.10.3` + `ajv ^8.17.1` + `json-schema-library 11.6.2` + `xstate ^5.26.0`；devDeps `jsonata`/`yaml`/`zod`；exports `.` + `./v2 ./v3 ./v4 ./v7 ./v7/execution ./v8 ./v8/host ./v8/dac ./v9 ./v9/deployment`（全部 legacy）；`src/index.ts` 首行 `DOMAIN_HARNESS_VERSION='0.2.0'` 并 re-export public-v2/v3/v4/v7 | packages/domain-harness |
+| F05 | `@kaicreator/domain-harness`（packages/domain-harness）**`private:true`、`version 0.2.0`**；依赖 `contracts 0.10.3` + `ajv ^8.17.1` + `json-schema-library 11.6.2` + `xstate ^5.26.0`；devDeps `jsonata`/`yaml`/`zod`；exports `.` + `./v2 ./v3 ./v4 ./workflow ./v7 ./v7/execution ./v8 ./v8/host ./v8/dac ./v9 ./v9/deployment`（全部 legacy）；`src/index.ts` 首行 `DOMAIN_HARNESS_VERSION='0.2.0'` 并 re-export public-v2/v3/v4/v7 | packages/domain-harness |
 | F06 | `@kaicreator/domain-harness-dis-v011-runtime` 0.11.0-dev.0（packages/dis-v011-runtime）：**private:true**；依赖 `@kaicreator/domain-harness 0.2.0`（private 包！）+ build 0.10.3 + contracts 0.10.3 + ajv。即 workspace 内已存在一条指向 private 根包的依赖链，R4 警告的"broken dependency"形态在 workspace 内真实存在 | packages/dis-v011-runtime/package.json |
 | F07 | workspace 其他包：`domain-harness-compiler`（0.2.0）、`host-node`（0.10.3，exports `.` + `./llm/openai` + `./llm/anthropic`）、`domain-harness-node`、`domain-harness-expo`；tooling 另有 `component-bridge` | packages/、tooling/ |
 
@@ -98,7 +101,7 @@ LEGACY_COMPAT=NOT_REQUIRED_PER_PRD_AR11
 
 | # | 事实 | 取证 |
 |---|---|---|
-| F14 | 根包名 self-import（bare `@kaicreator/domain-harness` 或 `/v2 /v3 /v4 /v7 /v8 /v9 …` 子路径）在 workspace 内共约 **150 个文件**：domain-harness-node 48、packages/domain-harness 内 42、domain-harness-compiler 33、domain-harness-expo 11、docs 9、root tests/ 8、dis-v011-runtime 3、examples 2。其中 **bare 根名导入约 20 个文件**（root tests 2 + DH tests 17 + 少量示例/私有 runtime）。全部内部包名引用（含 contracts/build/microkernel）合计 278 文件 | git grep 精确模式统计 |
+| F14 | 根包名 self-import（bare `@kaicreator/domain-harness` 或 `/v2 /v3 /v4 /v7 /v8 /v9 /workflow …` 子路径）在 workspace 内共约 **150 个文件**。其中 **bare 根名导入实测 64 个文件**（domain-harness-node 35、packages/domain-harness 17、domain-harness-expo 8、domain-harness-compiler 2、root tests/ 2；R5 独立审核复测一致）。全部内部包名引用（含 contracts/build/microkernel）合计 278 文件。执行期一律以 `git grep` 精确清单为准 | git grep 精确模式统计 |
 | F15 | legacy 测试运行方式：packages/domain-harness 的 test 脚本 = `npm run build && … node --import tsx --test "tests/**/*.test.ts" …`（先 build 后跑；dist 在 workspace 内完整存在）→ **只要 workspace exports map 不删 legacy 子路径，legacy 导入者零改动即可继续解析** | packages/domain-harness/package.json scripts |
 | F16 | **本地实验（隔离 _tmp 目录，npm 11.19.0）**：构造含 `publishConfig.exports` 覆盖的包并 `npm pack`，解包检查 tarball 内 package.json —— **`npm pack` 不应用 publishConfig 改写**（exports 原样保留 workspace 形态；publishConfig 只在 `npm publish` 时生效）。推论：T05 的发行物是 `npm pack` 产物而非 publish 产物，**凡依赖 publishConfig 实现发行面差异的方案在本验收路径上不成立** | 实验：_pubtest/pkg → tar -xOf 复核 |
 
@@ -137,7 +140,10 @@ export const CORE_CONTENT_KINDS = [
   'state-model', 'structured-data', 'interaction', 'document', 'validation',
 ] as const;
 export type CoreContentKind = (typeof CORE_CONTENT_KINDS)[number];
-/** 扩展 kind 必须带命名空间前缀 `dh-ext.<scope>.<kind>`；裸未注册 kind 视为 unknown。 */
+/** 扩展 kind 必须带命名空间前缀 `dh-ext.<scope>.<kind>`。
+ *  unknown 判定谓词（BUILD 实现，冻结）：isUnknownContentKind(k) = !CORE_CONTENT_KINDS.includes(k) && !k.startsWith('dh-ext.')
+ *  职责边界：DH_BUILD_SCHEMA_UNKNOWN_REQUIRED 只回答"认不认识这个 kind"（即上述谓词结果）；
+ *  已知 kind（core 或 dh-ext）的 schemaRef 解析失败 / schema 非法 / 内容不匹配归 DH_BUILD_SCHEMA_INVALID（§2.3）。 */
 export type ContentKind = CoreContentKind | `dh-ext.${string}`;
 
 export interface SchemaResourceRef {
@@ -241,8 +247,8 @@ export interface DomainDefinition {
 
 | 规则 ID（§9 错误码目录） | 触发条件 |
 |---|---|
-| `DH_BUILD_SCHEMA_UNKNOWN_REQUIRED` | required=true 的 content block 其 contentKind 未注册（core 或 dh-ext 均未解析成功） |
-| `DH_BUILD_SCHEMA_INVALID` | inline/ref schemaRef 无法解析、schema 本身非法、content block 未通过其 schema 校验 |
+| `DH_BUILD_SCHEMA_UNKNOWN_REQUIRED` | required=true 的 content block 其 contentKind 为 unknown（判定谓词见 §2.2：不在 CORE_CONTENT_KINDS 且无 `dh-ext.` 前缀） |
+| `DH_BUILD_SCHEMA_INVALID` | contentKind **已知**（core 或 dh-ext）但 inline/ref schemaRef 无法解析、schema 本身非法或 content block 未通过其 schema 校验（与 UNKNOWN_REQUIRED 的职责边界见 §2.2） |
 | `DH_BUILD_CONTENT_XOR` | value 与 ref 同时存在或同时缺失 |
 | `DH_BUILD_ELEMENT_ID_INVALID` | id 为空/非法字符/domain 内重复 |
 | `DH_BUILD_OUTCOMES_INVALID` | outcomes 不含 SUCCEEDED，或含未知 outcome 字面量 |
@@ -737,7 +743,7 @@ export interface DomainAppInspection {
 | `@kaicreator/domain-harness-microkernel` | packages/microkernel | Boot+KDP+Package System 运行时；`.`=dist/v011（boot/KdpPrimary/PackageSystem/DomainApp）、`./legacy`=旧 load facade、`./legacy/host-seam`=旧 host-seam | 0.11.0 | contracts `0.11.0`（精确串）；**零第三方** | T03 |
 | `@kaicreator/domain-harness` | packages/domain-harness | **唯一 canonical 公共 SDK 入口**（facade re-export v011 全面）；`.`=dist/v011、`./legacy`=旧根 index | 0.11.0 | contracts/build/microkernel 各 `0.11.0`（精确串）；**零第三方运行时依赖**（legacy 第三方全部降级 devDependencies，见 8.3） | T04 |
 
-- 版本策略：四包同版本 0.11.0，内部依赖边**精确版本串**（无 `^`），延续 F03/F08 的现有钉版惯例并被一致性脚本强制（F08）。
+- 版本策略：四包同版本 0.11.0，内部依赖边**精确版本串**（无 `^`），延续 F03/F08 的现有钉版惯例并被一致性脚本强制（F08）。**版本字段的物理修改时机见 §8.6（R5 审核 F-1 方案 (b)）：T01 不做 contracts 版本 bump，全部 version 字段改动归 T04 的 M-bump commit。**
 - `packages/dis-v011-runtime`（0.11.0-dev.0 private prototype）：**保持 private、不进入任何发行依赖链**（AR-12/D01）。M-bump 时其依赖字符串机械同步（否则 workspace install 失败），但其代码仅作参考；T05 明确禁止从它 import。
 
 ### 8.2 裁决二：microkernel 去留 —— 独立发布（方案 B），打包进根（方案 A）被否决
@@ -808,8 +814,8 @@ export interface DomainAppInspection {
 ```
 
 - **为什么保留 legacy 子路径条目而不是删除**：F14 实测约 150 个文件经根包名子路径导入 legacy 面；删除条目将迫使 T04 迁移全部 150 文件 —— 机械改动面过大、回归风险高、且违背"旧码仅参考、无迁移义务"的最小 diff 原则。保留条目 + files 围栏达成**同等行为约束**（consumer 拿不到旧 ABI），零 legacy 文件改动。
-- **bare 根名导入者必须迁移**：`.` 从 legacy 根 index 翻转为 v011 后，workspace 内约 20 个 bare `@kaicreator/domain-harness` 导入者会解析到 v011 而失败。T04 将这批文件（执行时以 grep 精确清单为准：root tests 2 + packages/domain-harness/tests 17 + 少量私有 runtime/示例）**机械改写为 `@kaicreator/domain-harness/legacy`**（等价语义：legacy 根 index 原样 re-export public-v2/v3/v4/v7）。这是本候选对任务写集的**显式 scoped 扩展**（§10），约 20 文件、仅 import specifier 字符串。
-- **build 包同构处理**：`.` → `dist/v011`（buildV011App）；`./legacy` → `dist/index.js`（buildV10App）；files `["dist/v011","README.md"]`。tooling 侧 ~20 个 legacy 自名导入文件按同法迁移或经 `./legacy` 解析（执行时 grep 清单）。
+- **bare 根名导入者必须迁移**：`.` 从 legacy 根 index 翻转为 v011 后，workspace 内 **64 个** bare `@kaicreator/domain-harness` 导入者（F14 实测：domain-harness-node 35、packages/domain-harness 17、domain-harness-expo 8、domain-harness-compiler 2、root tests/ 2）会解析到 v011 而失败。T04 将这批文件（执行时以 grep 精确清单为准）**机械改写为 `@kaicreator/domain-harness/legacy`**（等价语义：legacy 根 index 原样 re-export public-v2/v3/v4/v7）。这是本候选对任务写集的**显式 scoped 扩展**（§10），64 文件、仅 import specifier 字符串。
+- **build 包同构处理**：`.` → `dist/v011`（buildV011App）；`./legacy` → `dist/index.js`（buildV10App）；files `["dist/v011","README.md"]`。tooling 侧经 `@kaicreator/domain-harness-build` 自名导入的 legacy 文件（数量执行时以 grep 精确清单为准）按同法迁移或经 `./legacy` 解析。
 - **contracts 例外（scoped deviation，请审核人显式确认）**：contracts 的 `.` **保留 legacy v0.10.x 类型/常量面**，新增 `./v011` 子路径承载 0.11 canonical contracts。理由：contracts 是零依赖、无运行时行为的惰性类型/常量库，bare 导入者数百（全部 workspace 包的 V10 类型都来自它）；迁移不可行。R4 的围栏对象是"旧 App ABI"（可执行 facade），不是共享常量；`./v011` 的显式子路径使 T02/T03/T04/T05 的 0.11 代码可被 review 规则强制（"0.11 代码禁止从 contracts `.` 导入 v011 语义"）。发行物 files 维持 `["dist","README.md"]`（legacy 类型随包发行，无害且不可执行）。
 - **committed-dist 检查兼容**：根 build 链中的 `check-committed-dist.mjs` 语义不变（dist 不入库）；`files` 白名单变更只影响 pack 产物，不影响该检查。
 
@@ -836,13 +842,15 @@ export interface DomainAppInspection {
 
 ### 8.6 裁决六：版本一致性脚本与 M-bump（机械联动）
 
-- T01 落地 contracts 0.11.0 的**同一集成时刻**，由 T04 Writer 执行一次性 **M-bump commit**（否则 F08 推论的 install 断裂会阻塞 T02/T03）：
-  - 四 SDK 包 version → 0.11.0（contracts 由 T01 自改；**microkernel/build/host-node 的 package.json 属 T04**）；
+- **T01 写集收窄（R5 审核 F-1，采用方案 (b)）**：T01 对 `packages/contracts/package.json` **只允许新增 `./v011` export 条目，不做 0.10.3→0.11.0 版本 bump**（版本暂留 0.10.3；version bump + lockfile 全部归 T04 的 M-bump）。
+  理由（实测，npm 11.19.0 隔离实验）：contracts 版本 bump 而不同步 package-lock.json 会使 `npm ci` **exit 1**（lockfile 与 manifest 失配），且 `check:sdk-version-consistency`（root build 第一步，F08：contracts ≠ 其余三包版本即 BLOCK）必红；`.woodpecker/verify.yaml` 与 `verify-min-node.yaml` 的 `when: event: pull_request` **无分支过滤**，对本分支的任何 PR 都触发——即 T01 若自带版本 bump，其 PR 头部必然门禁红、无法经正常门禁合入。仅新增 export 条目不动版本与 lockfile，`npm ci` 与一致性检查均不受影响，T01 PR 可绿。
+- **M-bump commit**：由 T04 Writer 执行一次性机械联动（否则 F08 推论的 install 断裂会阻塞 T02/T03），**紧随 T01 合并执行，是 T04 两阶段介入的第一阶段**：
+  - 四 SDK 包 version → 0.11.0：**contracts、microkernel、build、host-node 的 package.json version 字段全部由 T04 修改**（contracts 的 bump 已从 T01 写集移入本步骤）；
   - 依赖字符串同步 `0.11.0` 的完整清单（执行时以 `git grep '"@kaicreator/domain-harness-' -- '**/package.json'` 复核）：tooling/build、packages/microkernel、packages/host-node、packages/domain-harness、packages/dis-v011-runtime；
   - 根 monorepo version 与一致性脚本常量 `ROOT_PRODUCT_VERSION`/`CONSUMER_PRODUCT_VERSION` → `'0.11.0'`；`package-lock.json` 重新生成；
   - SDK_PACKAGES 的内部边声明按 §8.1 新依赖图更新（contracts 内部边为空不变；build 增加的 ajv 边为第三方，不入 internal 边清单；根包新增 build/microkernel 依赖需脚本 consumer 段同步——脚本现在只断言 consumer 的 contracts 边，扩展断言属 T04 实现细节）。
 - **host-node 的定位（§13.5 P2-02）**：M-bump 同步 `packages/host-node` 的 version/依赖字符串**仅因一致性脚本（F08）把 SDK 家族版本机械齐平**；0.11.0 未对该包交付任何新 Host 功能，其 `./llm/*` 等导出全部是 v0.10 legacy 面。该包在 0.11.0 定位为 **LEGACY_INTERNAL_WORKSPACE_ONLY / NOT_RELEASED_AS_V011_FEATURE**：不在 §8.1 公共包矩阵、不进入 §8.5 pack/install 验收路径与发布资格声明；其 legacy 测试在 workspace 内保持绿是既有测试维持，**不扩张为 0.11.0 核心交付义务**。
-- 顺序约束：**T01 → M-bump(T04) → (T02 ∥ T03)**；M-bump 完成前 T02/T03 不得开工作位（其 npm ci 会失败）。
+- 顺序约束：**T01（仅内容 + `./v011` export 条目）→ M-bump(T04，含 contracts version bump 与 lockfile 再生) → (T02 ∥ T03)**；M-bump 完成前 T02/T03 不得开工作位（其 npm ci 会失败）。
 - DAG 准入前不执行任何 M-bump（SOURCE_WRITES=NOT_AUTHORIZED 纪律不变）。
 
 ### 8.7 PRD 映射与 AC 对应
@@ -867,7 +875,7 @@ export interface DomainAppInspection {
 
 - 四包统一 0.11.0 单版本发布（§8.1）；tarball 为发行物（§8.5），`npm publish` 不在本候选范围。
 - `verify-sdk-version-consistency.mjs` 的 PASS 是根 build 的门禁环节，发行前必须绿（M-bump 后天然绿）。
-- changelog/README（AC10 文档）必须声明：无 0.10.x 兼容、旧 export 在发行物中不可达、Node>=24。
+- changelog/README（AC10 文档）必须声明：无 0.10.x 兼容、**可执行旧 App ABI 在发行物中不可达**（contracts `.` 的 legacy 面为惰性类型/常量、随包发行，与本声明不冲突，见 §8.3 例外）、Node>=24。
 
 ### 9.3 AC 验证设计原则
 
@@ -882,13 +890,13 @@ export interface DomainAppInspection {
 
 | Task | Issue | 独占写集 | 共享/接线职责 |
 |---|---|---|---|
-| T01 Schema/Contracts | #1575 | `packages/contracts/src/v011/**`；`packages/contracts/src/v011` 的 authoring fixtures（仅 schema/TS 层）；**`packages/contracts/package.json` 的 version 字段（0.10.3→0.11.0）与 `./v011` export 条目** | 先行输出 schemaRef/Digest/FunctionOutcome 接口约定，冻结后供 T02/T03 同版本消费；交付 FunctionOutcome 严格判别联合的静态负例（`@ts-expect-error` ×4，§9.3） |
+| T01 Schema/Contracts | #1575 | `packages/contracts/src/v011/**`；`packages/contracts/src/v011` 的 authoring fixtures（仅 schema/TS 层）；**`packages/contracts/package.json` 仅允许新增 `./v011` export 条目——不做版本 bump（R5 审核 F-1 方案 (b)：version 0.10.3→0.11.0 与 lockfile 归 T04 的 M-bump）** | 先行输出 schemaRef/Digest/FunctionOutcome 接口约定，冻结后供 T02/T03 消费（M-bump 后同版本）；交付 FunctionOutcome 严格判别联合的静态负例（`@ts-expect-error` ×4，§9.3） |
 | T02 BUILD | #1576 | `tooling/build/src/v011/**` 及其 tsconfig.build 增量 | **不触碰** tooling/build/package.json（M-bump/T04 负责）；消费 T01 `contracts/v011` |
 | T03 Boot/KDP | #1577 | `packages/microkernel/src/v011/**` 及其 tsconfig.build 增量；与 T02 并行，依赖 T01 冻结 ABI | **不触碰** packages/microkernel/package.json |
-| T04 集成/公共 SDK（单 Writer） | #1578 | `packages/domain-harness/src/v011/**`（facade + App Init/invoke 接线）；**根 package.json**（§8.3 全部字段）；root `src/index.ts` 的 v011 接线；**全部 M-bump 文件**（§8.6 清单）；`scripts/distribution/verify-sdk-version-consistency.mjs`；`package-lock.json`；`.woodpecker/*`（仅允许新增 verify-v011.yaml）；build/microkernel 的 exports/files 字段（§8.2/8.3）；bare-root 导入者 ~20 文件的 specifier 机械改写（§8.3） | 唯一允许触碰共享文件的 Writer；两阶段介入（M-bump → 终接线） |
+| T04 集成/公共 SDK（单 Writer） | #1578 | `packages/domain-harness/src/v011/**`（facade + App Init/invoke 接线）；**根 package.json**（§8.3 全部字段）；root `src/index.ts` 的 v011 接线；**全部 M-bump 文件**（§8.6 清单）；`scripts/distribution/verify-sdk-version-consistency.mjs`；`package-lock.json`；`.woodpecker/*`（仅允许新增 verify-v011.yaml）；build/microkernel 的 exports/files 字段（§8.2/8.3）；bare-root 导入者 64 文件的 specifier 机械改写（§8.3，实测清单见 F14） | 唯一允许触碰共享文件的 Writer；两阶段介入（M-bump → 终接线） |
 | T05 clean consumer | #1579 | `examples/v011-basic-app/**`（新建）；pack/install 验收脚本与证据目录 | 只读验收矩阵可提前准备；**禁止** import `packages/dis-v011-runtime`；在 T04 接线后执行 §8.5 路径 |
 
-**共享文件硬规则**：`根 package.json`、`package-lock.json`、`.woodpecker/*`、`scripts/distribution/*`、各 workspace `package.json`（除 contracts 的 version+exports 两字段外）**只允许 T04 Writer 或 Integrator 触碰**；T01/T02/T03 的 PR 若含上述文件改动即拒绝合入。
+**共享文件硬规则**：`根 package.json`、`package-lock.json`、`.woodpecker/*`、`scripts/distribution/*`、各 workspace `package.json`（除 contracts 的 `./v011` export 条目新增外——R5 审核 F-1 方案 (b)：contracts 的 version 字段同样归 T04 的 M-bump）**只允许 T04 Writer 或 Integrator 触碰**；T01/T02/T03 的 PR 若含上述文件改动即拒绝合入。
 
 **并行结构**：T02 ∥ T03（同一 T01 冻结 ABI 上、写集不相交）→ T04 → T05；与 issue #1574 推荐计划一致。
 
@@ -956,8 +964,8 @@ CV-01…CV-12 逐条与本文档方案比对：可信自建闭包（CV-01）= §
 | # | 事实 | 影响 | 本候选裁决（可被审核推翻） |
 |---|---|---|---|
 | D-1 | `npm pack` **不应用** publishConfig.exports 改写（F16，npm 11.19.0 实验证据） | R4 的 pack→install 验收路径下，任何"发布时改 exports"的机制不成立 | workspace exports/files 直接即发行形态；legacy 面 fenced map（§8.3） |
-| D-2 | 根包名 legacy 导入面约 150 文件、bare 根名导入约 20 文件（F14） | 删除 legacy export 条目 = 大规模机械迁移 | legacy 子路径条目保留 + files 围栏；仅 ~20 个 bare 导入者迁移到 `./legacy`（§8.3，T04 scoped 扩展） |
-| D-3 | 一致性脚本强制四 SDK 包同版本 + 逐字 engines 字符串 + lock 镜像（F08） | contracts 升版即刻造成 workspace install 断裂 | M-bump 机制：T01→T04 机械联动→(T02∥T03)（§8.6） |
+| D-2 | 根包名 legacy 导入面约 150 文件、bare 根名导入实测 64 文件（F14，R5 审核复测一致） | 删除 legacy export 条目 = 大规模机械迁移 | legacy 子路径条目保留 + files 围栏；64 个 bare 导入者迁移到 `./legacy`（§8.3，T04 scoped 扩展） |
+| D-3 | 一致性脚本强制四 SDK 包同版本 + 逐字 engines 字符串 + lock 镜像（F08） | contracts 升版即刻造成 workspace install 断裂 | M-bump 机制：T01 合并 → T04 机械联动（含 contracts version bump + lockfile，F-1 方案 (b)）→(T02∥T03)（§8.6） |
 | D-4 | build/microkernel/host-node 包当前非 private、且被一致性脚本视为 SDK 家族 | microkernel 独立发布是对既有结构的最小增量 | §8.2 方案 B |
 | D-5 | verify.yaml 的 Node24 检查报错文案、smoke 文件集均为 v0.10 内容 | 0.11 PR 仍触发旧 smoke（旧测试在树上，保持绿） | T04 新增 verify-v011.yaml，不改 verify.yaml 既有步骤（§8.4.5） |
 | D-6 | contracts `.` 若翻转为 v011-only 将破坏数百个 V10 类型导入者 | contracts 无法采用与根包相同的围栏 | contracts `.` 保留 legacy + `./v011` 子路径（§8.3 scoped deviation，请显式确认） |
@@ -981,11 +989,23 @@ CV-01…CV-12 逐条与本文档方案比对：可信自建闭包（CV-01）= §
 | P2-02 | 交付时态/版本迁移不准确 | §14.2/§14.3 改为"R1 撰写时历史状态 / 当前实际状态"分离表述（Product Freeze 已成立：merge `22c6595b` + checkpoint issuecomment:7023306608；本文档已在 PR #1580 内）。§8.6：`host-node` 明确标记 LEGACY_INTERNAL_WORKSPACE_ONLY / NOT_RELEASED_AS_V011_FEATURE，不进入 §8.1 矩阵与 §8.5 发布资格 |
 | 附带（非审核项） | §9.1 计数勘误 | BUILD 错误码计数 22 → **28**（正文四表实数 6+7+7+8）；Boot 家族 4 → **5**（新增 RECORD_INVALID 后） |
 
+### 13.6 R2b 增量修订记录（响应 R5 独立审核 issuecomment:7023695190，P0=0/P1=2/P2=5；除本清单与 §13.5 所列修订外，正文与 R1 逐字一致）
+
+| # | 审核项 | 处置 | 修订落点 |
+|---|---|---|---|
+| F-1 | P1 · M-bump 排序洞：T01 自带 contracts version bump 会使 T01 PR 头部必然门禁红（实测 bump 不动 lockfile → `npm ci` exit 1 + `check:sdk-version-consistency` BLOCK；两 yaml 的 pull_request 触发无分支过滤） | **采用审核人方案 (b)**：contracts version bump 移出 T01 写集、归入 T04 的 M-bump（M-bump 紧随 T01 合并，仍是 T04 两阶段介入的第一阶段）；T01 仅新增 `./v011` export 条目 | §8.6 首两 bullet 与顺序约束行重写；§10 T01 行/共享文件硬规则/T04 行；§8.1 版本策略 bullet 增时序注；§13.3 D-3 同步 |
+| F-2 | P1 · "Product Freeze 仍未完成"过期陈述（R2 轮 §14.2 已改写为"已成立"，本轮补 CI 佐证引用） | 补 CI 事后佐证引用，头部与正文一致 | 头部 `PRODUCT_FREEZE=DONE` 行；§14.2 |
+| F-3 | P2 · bare 根名导入计数失真（"约 20" → 实测 **64**：node 35 / DH 17 / expo 8 / compiler 2 / root tests 2）；F05 根包 exports 漏列 `./workflow` | 数字与枚举全部修正；"tooling 侧 ~20" 改为执行期 grep 清单规则 | §1.1 F05；§1.5 F14；§8.3 两条；§10 T04 行；§13.3 D-2 |
+| F-4 | P2 · §9.1 DH_BUILD_* 计数"22" ≠ 正文实枚举 28 | **已由 R2 轮附带勘误覆盖（§13.5 末行），本轮核对无余项** | §9.1（R2 轮已改 28 = 6+7+7+8） |
+| F-5 | P2 · `KdpBootstrapResult` 与 `DomainAppInspection` 无形状 | **已由 R2 轮 P1-04 覆盖（§13.5），本轮核对无余项** | §6.1（BOOTED/FAILED 判别联合）、§7.1（`DomainAppInspection` 字段闭包） |
+| F-6 | P2 · "未注册 contentKind" 判定谓词欠句，与 `DH_BUILD_SCHEMA_INVALID` 职责重叠歧义 | 补冻结谓词 `isUnknownContentKind(k) = !CORE_CONTENT_KINDS.includes(k) && !k.startsWith('dh-ext.')`，并写明 UNKNOWN_REQUIRED（认不认识 kind）与 SCHEMA_INVALID（认识的 kind 内容合不合法）的职责边界 | §2.2 ContentKind 注释；§2.3 前两行 |
+| F-7 | P2 · §9.2 "旧 export 在发行物中不可达" 与 contracts `.` legacy 惰性类型面随包发行的事实冲突 | 措辞改为"**可执行旧 App ABI** 在发行物中不可达"，并注明 contracts 惰性类型面保留与之不冲突 | §9.2 第三条 |
+
 ---
 
 ## 14. 真相边界
 
 1. 本候选是**设计文档**：所有"BUILD 拒绝""字节一致""ERR_MODULE_NOT_FOUND"均为**设计承诺**，其真实性由 T01–T05 实现后的真实测试与 §8.5/§11 收据证明；在 L2 Freeze + 实现 + 真实验证完成前，任何评论/CI/文档引用本文档都不构成"0.11.0 可用"的证据。
-2. Product 侧状态（历史/现状分离，§13.5 P2-02）：R1 撰写时 Product Stage1 复审与 Freeze 尚未完成；**当前实际状态**：Product Freeze 已成立——PR #1565 merge `22c6595b`（2026-11-19T21:54:24Z），Owner checkpoint #1564 issuecomment:7023306608，本候选头部 `PRODUCT_FREEZE=DONE` 已锚定。Product 侧若再产生 scoped delta，本候选相应条目作废重审。
+2. Product 侧状态（历史/现状分离，§13.5 P2-02）：R1 撰写时 Product Stage1 复审与 Freeze 尚未完成；**当前实际状态**：Product Freeze 已成立——PR #1565 merge `22c6595b`（2026-11-19T21:54:24Z），Owner checkpoint #1564 issuecomment:7023306608（CI 事后佐证 issuecomment:7023821606），本候选头部 `PRODUCT_FREEZE=DONE` 已锚定。Product 侧若再产生 scoped delta，本候选相应条目作废重审。
 3. 文档交付状态（历史/现状分离）：R1 撰写于 `C:\xDev\kAiCreator\_tmp\r5\l2\` 隔离目录，当时未创建 PR、未发评论、未改仓库文件；**当前实际状态**：本文档已作为 **PR #1580**（分支 `task/dh-i1574-l2-zcode`，base `version/v0.11.0`）送独立审核，R2 修订在同一 PR 内以增量 commit 进行（§13.5）。
 4. Node API 实验结论绑定本机 npm 11.19.0；CI worker npm 版本若不同，§8.5 第 2 步的 tarball 静态断言仍成立（不依赖 publishConfig），D-1 结论在 pack 路径上对 npm ≥7 均适用（publishConfig 仅 publish 期生效的行为自 npm 引入该字段起如此）。
