@@ -163,7 +163,31 @@ lifecycle: {init: dist/package.mjs#init, dispose: dist/package.mjs#dispose}
 
 Example illustrates **definition ownership/selection**, not a mandatory literal loader implementation.
 
-## 5. Target, BUILD and exact App Lock (B01–B09)
+
+### 4.2 App selection is distinct from Package and Element Definition
+
+```yaml
+kind: DomainApp
+schemaVersion: dh.app/0.11
+id: orders.basic
+version: 1.0.0
+target: {runtime: node, module: esm}
+roots:
+  kernelPrimary: {package: kdp-basic, version: 1.0.0}
+  sdkPrimary: {package: sdk-core, version: 1.0.0}
+  businessPrimary: {package: orders-business, version: 1.0.0}
+extensions:
+  - {package: sdk-validation, version: 1.0.0}
+  - {package: orders-extension, version: 1.0.0}
+appInit: {element: orders.startup, function: init}
+ingress:
+  - {id: checkEligibility, element: orders.eligibility, function: evaluate}
+```
+
+This is the human-authored *selection intent*, **not a Lock**. The one KDP root is ultimately loaded by Boot; KDP consumes the BUILD-selected, exact dependency/implementation/target closure. App Init is a public Function belonging to the selected Business Element, not a direct unverified callback or an implicit special fourth Package layer. A minimal Basic App does not need to declare external Effects, a Main Workflow, an LLM or an Agent.
+
+
+## 5. Target, BUILD and exact App Lock (B01–B10)
 
 **B01.** Target is explicit: platform/runtime/OS/arch only where required. Portable knowledge/data is not needlessly duplicated per OS. v0.11.0 must run on **one concrete Node ESM Target** and prove a valid/invalid Target selection; supporting Windows/Browser/Android/other OS-specific variants is structurally representable but not a runtime delivery promise.
 
@@ -182,6 +206,14 @@ Example illustrates **definition ownership/selection**, not a mandatory literal 
 **B08.** BUILD creates a self-contained target-specific distribution with App Descriptor, exact Lock, Boot and pinned Package artifacts; it is independently installable/launchable without the source workspace or private Demo imports.
 
 **B09.** Verification is proportional to the selected profile: schema/graph/closure tests and a real installed architecture consumer. This PRD **does not** mandate fake proofs of semantic business truth or rerun every historical release suite.
+
+**B10. Small meaningful semantic consumption.** At least one selected, versioned **structured knowledge/rule content block must actually influence the output** of a Basic no-effect Function in a tiny deterministic fixture (positive, negative or UNKNOWN case). Merely serializing ContentBlocks and executing an unrelated hardcoded Function is **not** sufficient evidence that the Element-first content-to-execution architecture works. This does **not** require Tally/xDownload production domains or a generalized Rule Engine.
+
+
+### 5.1 Exact App Lock must be inspectable, not a parallel manifest
+
+At minimum, BUILD materializes an immutable selected record grouping `appIdentity/target`, `bootstrapKdpPin`, `selectedPackages[]` (role, exact target artifact, digest and dependency edges), `selectedElements[]` (one definition owner, contract/content digests and visibility), `selectedFunctions[]` (public contract version, selected implementation and resources), `hookBindings[]`, `appInit`, `ingress[]`, `initOrder[]`, `disposeOrder[]` and all closed `resourceDigests`. These are conceptual logical keys for L2 to encode consistently; optional features need not populate absent catalogs. Neither Boot nor KDP rederives the compilation plan, and Boot reads only its own minimal KDP bootstrap subset.
+
 
 ## 6. Boot → KDP startup and sole authority (K01–K08)
 
@@ -261,7 +293,7 @@ The following outcomes are jointly required for the **v0.11.0 architecture found
 | **AC03** Package ownership | One Package owns multiple Elements; another selected Package imports/uses an explicit public Function; duplicate Element owner, missing export and incompatible selected implementation fail BUILD |
 | **AC04** Three-layer composition | Exactly one KDP/SDK/Business Primary, selected Extension(s) in **all three layers** (can be no-op), Package interface dependency and one declared Hook contribution, one deterministic Package DAG/init plan |
 | **AC05** Boot/KDP reality | Installed Boot loads *only* pinned KDP Primary, KDP independently initializes its core and loads the exact rest from Lock; technical init order is observable; no second runtime and no dynamic Package discovery |
-| **AC06** App Init + direct ingress | Exactly one locked Business App Init Element; normal READY then direct no-effect public Function ingress (no Main Workflow); missing/duplicate/replaced Init or required binding fails BUILD |
+| **AC06** App Init + direct ingress | Exactly one locked Business App Init Element; normal READY then direct no-effect public Function ingress (no Main Workflow); **one actual selected typed rule/knowledge block materially changes the deterministic Function output (including a negative/UNKNOWN case)**; missing/duplicate/replaced Init or required binding fails BUILD |
 | **AC07** Target/Lock | One real Node ESM Target correctly selected; wrong Target/versions/resources/digest/Hook cardinality fail BUILD; generated Lock reproducible and complete |
 | **AC08** Public SDK | Clean-installed new v0.11.0 SDK consumer can build/inspect/Boot/start/call/normal-stop without private Demo imports, old v0.10.x App or monorepo source-tree assumptions |
 | **AC09** Scope honesty | Unsupported effectful/Provider/LLM/Knowledge DB/Meta profiles do not pretend to execute; no legacy-compat smoke, no in-flight stop/recovery experiment or full business demo required |
