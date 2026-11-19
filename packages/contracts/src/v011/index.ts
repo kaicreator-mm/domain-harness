@@ -20,6 +20,7 @@ export * from './boot-contracts.js';
 export * from './app-contracts.js';
 export * from './function-outcome-negatives.js';
 export * from './digest.js';
+export * from './json-schemas.js';
 export * from './error-codes.js';
 export * from './errors.js';
 export * from './validate.js';

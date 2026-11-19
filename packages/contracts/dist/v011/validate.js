@@ -422,8 +422,13 @@ function checkDomainDefinition(value, path, sink) {
             });
         }
     }
-    if ('constraints' in value && !isJsonValue(value['constraints'])) {
-        sink(`${path}.constraints`, SCHEMA_INVALID, 'constraints must be a JSON value');
+    if ('constraints' in value) {
+        // Frozen L2 §2.2 shape `readonly JsonValue[]` (see Builder RELEASE P2
+        // disposition): constraints are an ARRAY of declarative JSON values.
+        const constraints = value['constraints'];
+        if (!Array.isArray(constraints) || !constraints.every(isJsonValue)) {
+            sink(`${path}.constraints`, SCHEMA_INVALID, 'constraints must be an array of JSON values');
+        }
     }
 }
 function finalize(issues) {

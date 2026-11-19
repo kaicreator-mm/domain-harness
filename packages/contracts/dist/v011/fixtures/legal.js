@@ -146,16 +146,17 @@ export const ORDERS_DOMAIN_FIXTURE = {
     ],
 };
 /**
- * Extensibility positive (PRD E10): an unknown-to-BUILD kind that is
- * explicitly OPTIONAL is legal at the schema layer and later recorded in
- * the Lock's excludedUnknownContent — it must NOT be refused here.
+ * Extensibility positive, KNOWN-EXTENSION track: `dh-ext.acme.prompt`
+ * satisfies the frozen predicate's `dh-ext.` prefix arm, so it is a KNOWN
+ * extension kind (isUnknownContentKind === false), legal here regardless
+ * of the required flag. It is NOT the unknown-optional case.
  */
 export const EXTENSION_OPTIONAL_ELEMENT_FIXTURE = {
     kind: 'Element',
     schemaVersion: 'dh.element/0.11',
     id: 'orders.prompt-notes',
     version: '1.0.0',
-    description: 'Carries an optional dh-ext prompt block that BUILD may explicitly exclude.',
+    description: 'Carries a known dh-ext prompt block recognized through its namespace prefix.',
     content: [
         {
             id: 'prompt-note',
@@ -166,4 +167,51 @@ export const EXTENSION_OPTIONAL_ELEMENT_FIXTURE = {
         },
     ],
     functions: [],
+};
+/**
+ * Extensibility positive, TRUE UNKNOWN-OPTIONAL track (PRD E10 / L2 §2.3 /
+ * controller supplement #1575/7024893190): bare `prompt` is NOT in
+ * CORE_CONTENT_KINDS and carries no dh-ext prefix, so
+ * isUnknownContentKind('prompt') === true. Because the block is explicitly
+ * OPTIONAL, the schema layer must accept it; when BUILD selects this
+ * element with the block unselected, it records the explicit exclusion in
+ * the Lock's `excludedUnknownContent` (see the paired exclusion fixture).
+ *
+ * The value is deliberately outside the frozen `ContentKind` TS union
+ * (`CoreContentKind | dh-ext.${string}` cannot spell a bare unknown kind),
+ * so it erases through `unknown` — the same escape any author of an
+ * unknown-optional block needs against the frozen L2 §2.2 type; the JSON
+ * Schema and the validators are the machine authority for this track.
+ */
+export const UNKNOWN_OPTIONAL_ELEMENT_FIXTURE = {
+    kind: 'Element',
+    schemaVersion: 'dh.element/0.11',
+    id: 'orders.legacy-prompt-notes',
+    version: '1.0.0',
+    description: 'Carries an optional bare prompt block unknown to this BUILD profile.',
+    content: [
+        {
+            id: 'prompt-note',
+            contentKind: 'prompt',
+            schemaRef: { inline: { type: 'string' } },
+            required: false,
+            value: 'Summarize the eligibility decision for first-line support.',
+        },
+    ],
+    functions: [],
+};
+/**
+ * Lock-exclusion INPUT fixture for T02 (schema/TS layer only — T01 does
+ * not implement Lock generation): when BUILD selects
+ * UNKNOWN_OPTIONAL_ELEMENT_FIXTURE while leaving its unknown optional
+ * block unselected, the produced DomainAppLock.excludedUnknownContent must
+ * contain exactly one deterministic record for it. This fixture pins the
+ * canonical record form `<elementId>/<contentBlockId>` so T02 and the AC02
+ * evidence can consume and assert it directly.
+ */
+export const UNKNOWN_OPTIONAL_EXCLUSION_FIXTURE = {
+    elementId: 'orders.legacy-prompt-notes',
+    contentBlockId: 'prompt-note',
+    contentKind: 'prompt',
+    excludedUnknownContent: ['orders.legacy-prompt-notes/prompt-note'],
 };
