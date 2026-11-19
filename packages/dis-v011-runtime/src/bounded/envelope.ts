@@ -300,11 +300,15 @@ type RejectedMember<O> = Extract<BoundedOutcome<O>, { status: 'PROVIDER_REJECTED
 
 const DEADLINE = Symbol('BOUNDED_WALL_CLOCK_DEADLINE');
 const REASON_MAX_LENGTH = 200;
-const CONTROL_CHARACTERS = /[\x00-\x1f\x7f]/g;
+/** C0 control characters (U+0000..U+001F) plus DEL (U+007F), by code point. */
+function isControlCharacter(character: string): boolean {
+  const code = character.codePointAt(0);
+  return code === undefined || code <= 0x1f || code === 0x7f;
+}
 
 function sanitizeReason(value: unknown): string {
   const raw = value instanceof Error ? value.message : typeof value === 'string' ? value : String(value ?? '');
-  const stripped = raw.replace(CONTROL_CHARACTERS, '');
+  const stripped = Array.from(raw).filter((character) => !isControlCharacter(character)).join('');
   const truncated = stripped.length > REASON_MAX_LENGTH ? stripped.slice(0, REASON_MAX_LENGTH) : stripped;
   return truncated.length > 0 ? truncated : 'EXECUTION_FAILED';
 }
