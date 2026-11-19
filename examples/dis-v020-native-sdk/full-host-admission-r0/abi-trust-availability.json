@@ -1,0 +1,252 @@
+{
+  "schema": "dis.v0.2.full-host-admission.phase-a-source-inventory/1",
+  "recordId": "DIE_DIS3_R197_HOST_CURRENT_FUNCTION_ABI_AVAILABILITY",
+  "evidenceLevel": "SOURCE_FIRST_STRUCTURAL_FEASIBILITY_ONLY",
+  "resultingAdmission": "BLOCKED_EXTERNAL_AUTHORITY_AND_FUNCTION_ABI",
+  "noAuthorizedHostExecution": true,
+  "noSimulatedPositive": true,
+  "noConformancePromotion": true,
+  "sourcePins": {
+    "disParent": {
+      "repo": "kaicreator-mm/domain-harness",
+      "draftPr": 1497,
+      "exactHead": "01f3d5455ad706aa2a7e4ea4412307f1d6ecaaac",
+      "providerCI": {
+        "pipeline": 2626,
+        "successfulContexts": 17,
+        "totalContexts": 17
+      },
+      "fullConformanceVerified": 13,
+      "fullConformanceRequirements": 21
+    },
+    "currentSelectedAotSdk": {
+      "path": "examples/dis-v020-native-sdk/r188-current815-o2-host-boundary.test.mjs",
+      "gitBlob": "505766bb22451517685dbc5372142b239c75af65"
+    },
+    "untrustedInstallerGate": {
+      "path": "examples/dis-v020-native-sdk/o2-installed-rule-trust-preflight.mjs",
+      "gitBlob": "3ac9eb5e086f36defe5097ab33dd358c4dd8818e"
+    },
+    "previousHost": {
+      "repo": "kaicreator-mm/domain-intelligence-engineering",
+      "mergedPr": 20,
+      "exactHead": "bd01ebc73c61902e48519e1f6766d84aa5f8f899",
+      "path": "integration/formal/controlled-demo-r33/controlled_host.py",
+      "gitBlob": "0725689de2ca3eab54d7c2868aa14380ea0e285b"
+    },
+    "previousHostIpc": {
+      "repo": "kaicreator-mm/domain-intelligence-engineering",
+      "exactHead": "bd01ebc73c61902e48519e1f6766d84aa5f8f899",
+      "path": "integration/formal/controlled-demo-r33/controlled_service.py",
+      "gitBlob": "bf72aa4aad87ed58caa6d7b517e5777083b487cb"
+    }
+  },
+  "selectedFunction": {
+    "functionId": "dke.ev16.d02.vv.r188.observe",
+    "invocation": {
+      "method": "app.invoke",
+      "input": {
+        "subject": "se:SCB-CS2023-VV-R1"
+      },
+      "options": {
+        "expectedContractVersion": "1.0.0"
+      }
+    },
+    "expectedObservedOutput": {
+      "kind": "OBSERVATION",
+      "disposition": "UNKNOWN",
+      "authority": "NONE",
+      "evidenceAttested": false,
+      "executionPermitPresent": false
+    },
+    "aotCompiler": "compileDisV020Aot",
+    "sdkLoader": "loadDisV020Aot",
+    "currentSelectedInputSources": [
+      "Tally #399 original 815-node graph",
+      "Forge R143 two-leg research",
+      "Harness R155 consumer"
+    ],
+    "aiLedgerIncludedInSelectedAot": false,
+    "qualifiedOriginalSap": false,
+    "qualifiedOriginalEcp": false,
+    "originalClaimLifecycle": "PENDING",
+    "sameCallSignedHost": "NOT_RUN"
+  },
+  "referenceHost": {
+    "kind": "ENGINEERING_REFERENCE_NOT_DEPLOYED_AUTHORITY",
+    "functionId": "previewAffectedDeliverables",
+    "grantFunctionIdHardcoded": true,
+    "signedOutcomeFunctionIdHardcoded": true,
+    "sdkReceiptValidatorFunctionIdHardcoded": true,
+    "request": {
+      "method": "invoke",
+      "fields": [
+        "grant",
+        "actor",
+        "tenant",
+        "task",
+        "nonce",
+        "providerId",
+        "knowledgeRef",
+        "aotDigest",
+        "sourceRevision"
+      ]
+    },
+    "result": {
+      "signature": "Ed25519",
+      "payloadFields": [
+        "status",
+        "deliverableIds",
+        "actor",
+        "tenant",
+        "task",
+        "nonce",
+        "aotDigest",
+        "sourceRevision",
+        "functionId",
+        "grantId",
+        "providerId",
+        "knowledgeRef",
+        "claimAttested",
+        "externalBusinessEffect"
+      ],
+      "dispositions": [
+        "OBSERVED_SCOPED_CANDIDATE",
+        "DENIED",
+        "REPLAY",
+        "UNKNOWN",
+        "STALE"
+      ],
+      "claimAttested": false,
+      "externalBusinessEffect": false
+    },
+    "aotKind": "REFERENCE_NOT_DIS_AOT",
+    "referenceBusinessPredicate": "controlled-readonly-SQL-deliverables",
+    "keySupport": "DIE_CONTROLLED_HOST_KEY_FILE at Host boot; not an independently attested production key",
+    "persistedControls": [
+      "SQLite grants",
+      "SQLite consumed nonces",
+      "host pins",
+      "business revision",
+      "read-only snapshot",
+      "signed receipt"
+    ],
+    "bootstrap": {
+      "role": "operator-bootstrap-test-only",
+      "productionTrustRoot": false
+    },
+    "productionInstallerRootProven": false
+  },
+  "comparison": {
+    "selectedFunctionId": {
+      "status": "INCOMPATIBLE",
+      "current": "dke.ev16.d02.vv.r188.observe",
+      "reference": "previewAffectedDeliverables",
+      "evidence": "R50 grant, Host receipt and SDK result checks hardcode reference functionId"
+    },
+    "inputAbi": {
+      "status": "INCOMPATIBLE",
+      "current": "subject only",
+      "reference": "providerId+knowledgeRef+grant+actor+tenant+task+nonce+aotDigest+sourceRevision"
+    },
+    "outputAbi": {
+      "status": "INCOMPATIBLE",
+      "current": "OBSERVATION/UNKNOWN; authority NONE; no Effect",
+      "reference": "signed SQL deliverableIds receipt for previewAffectedDeliverables"
+    },
+    "aotProvenance": {
+      "status": "INCOMPATIBLE",
+      "current": "real selected DIS compileDisV020Aot",
+      "reference": "compile_reference_aot: REFERENCE_NOT_DIS_AOT"
+    },
+    "installedRuleBinding": {
+      "status": "NOT_ATTESTED",
+      "current": "O2 untrusted Ed25519 signed receipt always denied",
+      "reference": "R50 grants and AOT/source pins, no DIS O2 installed Rule signer custody"
+    },
+    "keyAndSignerCustody": {
+      "status": "NOT_ATTESTED",
+      "current": "no independent installed issuer proven",
+      "reference": "Host-only test signer bootstrap with productionTrustRoot false"
+    },
+    "durableReplay": {
+      "status": "REFERENCE_SCOPED_ONLY",
+      "current": "same-call Host NOT_RUN",
+      "reference": "R50 SQLite consumed nonce and signed receipt for different function"
+    }
+  },
+  "requiredExternalAuthority": [
+    {
+      "id": "original_claim_qualified_semantics",
+      "status": "NOT_ATTESTED",
+      "need": "Source Owner/review authorization, qualified Claim/typed Element/CQ/SAP; research 815 graph and AI ledger do not sign formal lifecycle"
+    },
+    {
+      "id": "eligible_ecp",
+      "status": "NOT_ATTESTED",
+      "need": "current selected Function bound to genuinely qualified original SAP/ECP and approved purpose"
+    },
+    {
+      "id": "installed_rule_issuer_registry",
+      "status": "NOT_ATTESTED",
+      "need": "independent operator-owned trusted public-key registry, not SPKI self-contained in receipt"
+    },
+    {
+      "id": "deployed_rule_bytes",
+      "status": "NOT_ATTESTED",
+      "need": "installed signed Rule digest and immutable deployed bytes bound to selected Function/AOT/SDK"
+    },
+    {
+      "id": "tenant_deployment_scope",
+      "status": "NOT_ATTESTED",
+      "need": "operator-approved tenant, deployment, rule scope and issuer mapping"
+    },
+    {
+      "id": "host_key_custody_and_attestation",
+      "status": "NOT_ATTESTED",
+      "need": "authenticated deployed Host identity, issuer key custody, canonical signature verification and signed same-call receipt"
+    },
+    {
+      "id": "revocation_nonce_freshness",
+      "status": "NOT_ATTESTED_FOR_CURRENT_FUNCTION",
+      "need": "Host-owned durable replay fence, revocation epoch, expiry, key rotation and cross-process restart contract"
+    },
+    {
+      "id": "professional_or_business_oracle",
+      "status": "NOT_ATTESTED",
+      "need": "independent semantic authority permitting eligible positive claim/admission; no synthetic signer"
+    }
+  ],
+  "futureAllowedDeliverables": {
+    "phaseA": "READ_ONLY_SOURCE_OR_DEPLOYMENT_EVIDENCE_AND_ABI_AVAILABILITY_MAP",
+    "phaseB": "ONLY_AFTER_INDEPENDENT_AUTHORITY_AND_SELECTED_FUNCTION_ABI_EXISTS",
+    "potentialSourceWriteSet": [
+      "examples/dis-v020-native-sdk/full-host-admission-r0/**",
+      ".woodpecker/dis-v020-full-host-admission-r0.yaml"
+    ],
+    "noSharedHostOrSourceModificationWithoutNewOwnerReview": true,
+    "mustProve": [
+      "same selected Function and ECP",
+      "independent issuer/tenant trust",
+      "actual installed Rule bytes",
+      "signed Host receipt in same invocation",
+      "durable replay and revocation negatives",
+      "new child and parent exact-HEAD CI",
+      "non-Writer review and distinct Integrator"
+    ],
+    "forbidden": [
+      "use a receipt-provided SPKI as trusted installer root",
+      "reuse R50 signed result from a different Function as same-call positive",
+      "rewrite reference Host result Function ID to assert compatibility",
+      "simulate a professional Oracle/Host signature",
+      "promote Full Matrix, Effect, L2, Release from this inventory"
+    ]
+  },
+  "provenanceLimits": {
+    "credentialsInspected": false,
+    "authenticatedDeploymentInspected": false,
+    "currentFunctionHostPositiveRun": false,
+    "sourceReadbackDoesNotProveAbsenceOfProvisioning": true,
+    "previousControlledHostProofRemainsValidInItsOriginalScope": true
+  }
+}
