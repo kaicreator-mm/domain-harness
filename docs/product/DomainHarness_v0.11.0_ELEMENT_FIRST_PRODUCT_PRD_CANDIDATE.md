@@ -1,92 +1,306 @@
-# DomainHarness v0.11.0 — Element-First Product/L1 PRD (Candidate)
+# DomainHarness v0.11.0 — Element-First Architecture Foundation
+## Product Requirements Document · R2 · Owner Review Candidate
 
-> **Stage 1 — NOT FROZEN.** Document owner: [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564); version implementation controller: [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563). This is a Product draft, not ABI/SDK implementation or release authorization.
->
-> Inherits frozen Product #1477 and #1484, current Cross-Version CV-01..12; imports bounded DIS v0.2.0 Element-First design from #1496 while respecting #1497 draft / #1544 separate Full qualification.
-
-
-# DomainHarness v0.11.0 — Product/L1 Element-First 原位重构候选（Stage 0/1）
+> **Status: PRODUCT/L1 REVIEW READY, OWNER APPROVAL PENDING; not Product Freeze, L2 Freeze, implementation authorization or release.**
+> **Version master:** [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563) · **Product work item:** [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) · **Product PR:** [#1565](https://github.com/kaicreator-mm/domain-harness/pull/1565).
+> **Baseline branch:** `version/v0.11.0` (initial `b1b2c182c1cb49c1b63b1efaf57ff9132d9cf4b0`); **ADS:** v4.18.0 pinned `2c395c55569fe2edf3f4135f12d3d069e526d0b7`. This document **replaces** prior #1565 R0 PRD requirements where inconsistent.
 
 ```ini
-OUTPUT_LABEL=DOMAIN_HARNESS_V011_PRODUCT_L1_R0
-PRODUCT_VERSION=0.11.0
-MASTER=#1563
-TYPE=PRODUCT_L1_VERSION_CANDIDATE
-PRODUCT_GOAL=DOMAIN_HARNESS_CANONICAL_SDK_BUILD_ELEMENT_FIRST
-INTEGRATION_MODE=VERSION_BRANCH
-CANDIDATE_MAIN_BASE=b1b2c182c1cb49c1b63b1efaf57ff9132d9cf4b0
-STANDARD_PIN=ADS_4.18.0@2c395c55569fe2edf3f4135f12d3d069e526d0b7
-SOURCE_OF_TRUTH=GITHUB_EXACT_SHA
-STAGE_0=BASELINE_RECORDED
-STAGE_1=PRD_CANDIDATE_NOT_FROZEN
-STAGE_2_L2=NOT_STARTED
-TASK_DAG=NOT_ADMITTED
-IMPLEMENTATION=NOT_AUTHORIZED_BY_THIS_CANDIDATE
+OUTPUT_LABEL=DOMAIN_HARNESS_V011_PRODUCT_L1_R2_FINAL_REVIEW_CANDIDATE
+VERSION=0.11.0
+TYPE=PRODUCT_L1_CANDIDATE_FOR_OWNER_REVIEW
+SCOPE=ELEMENT_FIRST_AND_COMPLETE_STRUCTURAL_FOUNDATION
+LEGACY_APP_ABI_COMPAT=NOT_REQUIRED
+LEGACY_FUNCTIONAL_PARITY=NOT_REQUIRED
+LEGACY_CODE_MECHANISM_REUSE=OPTIONAL_NOT_REQUIRED
+FOLLOWUP_FEATURES=REIMPLEMENT_AGAINST_0.11.x_ARCHITECTURE
+BUILD_FIRST=YES
+SINGLE_KDP_AUTHORITY=YES
+BOOT_KDP_PACKAGE_LIFECYCLE=REQUIRED
+REAL_BASIC_APP_SDK_CONSUMER=REQUIRED
+PRODUCT_FREEZE=NO
+L2=NOT_STARTED
 RELEASE=NO
 ```
 
-## 1. User outcome (Owner direction)
+## 1. Product motivation and outcome
 
-**重构的是 DomainHarness 下一版 0.11.0 本体，不是一个新的独立 DIS Runtime。** DIS 的 Element-First 设计通过 DomainHarness 的现有 SDK + BUILD + Package System + 单 KDP Primary/Kernel 实现，任意适用的领域以 Domain Definition/Element/Function/语义依赖等选定资产装配 Domain App。使用者从已有公共 BUILD/SDK 使用它，而非只能通过私有 `packages/dis-v011-runtime` 示例执行。保留现有仓库历史、受支持接口/资格和旧标签，绝不重写 v0.10.3。
+v0.10.3-style function, text, route and scattered package-first organization does not give the Domain's knowledge, rules, structured descriptions, constraints and reusable behavior stable first-class machine-consumable identities and relationships. v0.11.0 therefore establishes **Element as the organizing unit of Domain Intelligence**, with versioned content, schema, references, public Function contracts and exact selection into Packages.
 
-产品基准 #1477 已冻结 Domain Intelligence 产品方向（#1479 merge `b8135aa801eb38fcae2fa1fce3bada541178d5b9`）；#1484 确认 successor Boot→单 KDP Primary/Kernel；#1496 的 DIS 0.2.0 是最新 Element-first 设计来源，但它的 Full Conformance 仍另外由 #1499/#1544 按真实证明完成，不能冒充整套标准已冻结。架构原则 `docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md` CV-01..12 **INHERITED_UNCHANGED**。
+An SDK consumer shall be able to author a Domain and its Elements in structured form, select/build an application for a Target, start the resulting Domain App through minimal Boot and a single KDP Primary, load the selected K/S/B Packages with a precomputed dependency plan, run the one selected Business App Init and call a selected simple Function through the public SDK.
 
-## 2. 版本基本功能与实际交付
+This is an **architecture foundation release**. It is not a rewrite of every v0.10.3 business capability, a complete LLM/Agent/Harness platform, a knowledge-graph producer, or a DIS full-conformance release.
 
-P01. **唯一模型**：Domain = Elements + Semantic Relations + Constraints/Invariants + Collaboration Semantics + Build-time Element dependency DAG；Element = cohesive library（0..N public Functions）、Function = 描述/类型化 I/O、适用范围、所有权、版本、实施策略与 typed outcomes。Semantic relation 不变成 Build/Workflow DAG；Domain-owned business State 不变成 SDK 全局状态引擎。
+### 1.1 Owner decisions (binding inputs for this PRD)
 
-P02. **Canonical BUILD/AOT**：DomainHarness `tooling/build` 接收合格/声明适用范围的选定 DIS Domain Definition，选取 Target(当前真实 Node)、SDK/K/S/B/Capability/Function 实现及完整资源依赖，产出可复现锁定 App；编译/静态闭包校验在 BUILD 一次完成，不推到每次 SDK runtime 调用。不同 Domain 不依赖 `business-dis-player`、`recognizePlayer` 等通用入口特判。
+1. **No old App/SDK ABI compatibility** with v0.10.3 is required. A clean v0.11 API, manifest, Package model and boot model may be breaking.
+2. **No obligation to retain, port or reuse** v0.10.3 business functions, mechanisms or source files in the v0.11 product. Historical tags/release artifacts remain immutable; old work is optional reference material. An ability does not become a v0.11 feature until actually implemented and verified against the new contract.
+3. All later legacy/new features must be implemented **on the v0.11.x architecture**, without reopening its foundational identity/ownership/boot/package principles in each patch.
+4. Boot→KDP, uniform K/S/B Package composition, Build-time-selected Init/Hook/Target/Lock, unique Business App Init and direct Function ingress are **0.11.0 must-haves**, not 0.11.1 backlog.
+5. Domain Apps and Packages are self-built and validated against the standard: static structural invalidity belongs **to BUILD/Test**, not to runtime discovery, auto-repair, retry or elaborate concurrency/stop/recovery mechanisms.
+6. Product principles adopted independently of old implementation compatibility remain: one KDP post-bootstrap authority; Domain owns domain semantics; physical effects may not bypass explicit selected authorization; old version tags and prior Standard qualification are not retroactively changed.
 
-P03. **Canonical SDK 与 Lifecycle**：`packages/domain-harness` 使用已有 KDP Primary/Kernel 与 Package Init → 单一 Business App Init → typed selected Function ingress → live business guards/选定权限 → correct outcomes → reverse dispose。不得第二 Kernel、Effect engine、Host/scheduler 或重做 KDP。
+## 2. Model: six distinct responsibilities (not interchangeable)
 
-P04. **Selected Intelligence**：基础 App 能按确定性编译规则/合格缓存或显式 Function 实现运行；Interaction 是可选 Element，意图冲突需要澄清而不是擅自执行；确实选择的 Bounded Harness/LLM/Experience/Evolution 等按自己的合同接入，未选中不启动、无实际 Provider/Oracle 不声称 verified。旧 v0.3 决策优先级按其真正适用/获批合同传承，不发明第二 Router。
-
-P05. **KDP and Effect Authority**：Effect/Admission/Journal/CAS/Replay/UNKNOWN 仍由已有唯一 K Primary 控制，Domain-Forge 是知识生产方、Domain 业务状态由业务拥有；Agent/LLM/Experience 不铸造 Effect Permit，不能将凭据不足的业务输出升级为专业资格。
-
-P06. **General-purpose Consumer**：至少两个异构真实 Business Domain（Tally、xDownload）基于同一 canonical BUILD/SDK 接口完成 source-pinned AOT→App Init→多个 Function→typed outcomes/UNKNOWN→dispose，关键失败/不一致/未授权 effect 都可观察；不能把两个手工 Demo helper 的组合冒充通用 SDK 实现。
-
-P07. **Delivery/Compatibility**：主 SDK、BUILD、Contracts 的实际导出与已安装消费者是验收主体。历史 `packages/domain-harness` workspace `0.2.0`、`tooling/build`/Contracts `0.10.3` 与 private Demo `0.11.0-dev.2` 并存，L2 必须先确定合理 version/ABI 迁移方案；不能只改 package.json 版本号。PRD 目标产品版本为 **DomainHarness 0.11.0**，与 **DIS 0.2.0** 标准版本独立。
-
-## 3. Cross-project responsibilities / non-goals
-
-- DomainForge/外部生产组件产生可被选定的知识/智能资产；本版本实现 **DomainHarness 消费与执行**，不另造 Forge、RAG 管理 UI、Agent 开发平台、数据仓库。
-- KDP Primary = 唯一可信 state/effect execution authority；DIS 是 domain-intelligence semantic/contract design，不接管 Kernel。
-- Package 的内部 npm/Node/native helper 不自动升级为 Tool。一个 Basic App 可无 LLM/Experience/Meta/Workflow，只加载确实选中的能力。
-- 不要求替代/重写 v0.10.3 已发布 ABI，不修改其它 14 个业务项目，不把独立 #1544 Full Conformance 的剩余 8 项等同为本版本 implementation DAG。
-- 不重建 private runtime、不以刷新全部旧版本测试、形式验证论文或重复治理工作替代真实功能。
-
-## 4. Baseline/source ownership and reuse ledger
-
-| 来源 | 实际已发生事实 | v0.11 处置 |
+| Object | Responsibility and identity | Not responsible for |
 |---|---|---|
-| #1477 + #1484, CV-01..12 | 已冻结产品/单 KDP successor 等受各自权威限定的设计 | **ADOPT**，无需重冻历史 |
-| #1496 + Draft #1497 | Element-First Product 设计已形成；有界 Demo 被 Product 接受，但 Full 尚未合格 | **ADAPT_DESIGN**，明确候选/正式边界，不能无条件写 `FROZEN` |
-| #1529 dev.1 `4540f5fae282d3a62b379e8af1b39316c3ba3737` | 4/4 已完成，private D1 Element/AOT、D2 Bounded、D3 两领域样例 | **PORT_OR_REUSE** 代码及可适用测试；不转移发布资格 |
-| #1540 dev.2 `42fc57c2d2e7291ed4a7cf5578dd5a449029c864` | 3/3 完成，App Init/typed Invoke/private E2E；包级 138/138 同 SHA 验证 | **PORT_OR_REUSE**，不重派 |
-| #1556/#1562 S1 `97bb82e8929fd30b422c45de3d05a377f4c8ef27` | READY 门、in-flight drain，真实 Woodpecker verify+min-node SUCCESS；独审/合并未完成 | **CANDIDATE_REVIEW_THEN_PORT** |
-| #1557/#1560 B1 `a2446beb03c0b881577c31bf9dd89bb30b9e2fc3` | 预算耗尽防虚假成功；双 CI SUCCESS；未合并 | **CANDIDATE_REVIEW_THEN_PORT** |
-| #1558/#1561 I1 `848beb20bc96196a1d28b2d830b970488e263aec` | Deterministic Intent 澄清；双 CI SUCCESS；未合并 | **CANDIDATE_REVIEW_THEN_PORT** |
-| #1559 old I0 | 尚未实施，范围为 private Demo 拼装 | **SUPERSEDE_AS_VERSION_EXIT**；可选择只作为私有测试辅助 |
-| canonical `main@b1b2c182` | `tooling/build`、`packages/domain-harness`、`packages/contracts` 真实存在 | **NEW_VERSION_PRIMARY_IMPLEMENTATION_BASE**，以它为差异/CI/ABI 真相 |
+| **Domain Definition** | Domain identity/version, selected semantic scope, Element set, semantic relations, constraints/invariants and collaboration meaning | Executable target artifacts, runtime task scheduling |
+| **Element Definition** | One cohesive versioned semantic/service responsibility; structured content, 0..N public Functions, static dependencies, resources and provenance | A physical npm package, implicitly executing every internal item |
+| **Function Contract** | The one public callable capability contract: identity/version, typed I/O/outcomes, applicability, declared effect intent and validation | Identifying a particular source code implementation by itself |
+| **Domain Package** | Logical selected, buildable and loadable carrier of 0..N Element Definitions and their selected implementations/resources, with exports/dependsOn/hooks/lifecycle | The Domain's entire intelligence identity or an independent runtime |
+| **Domain App** | Selected Target, Package roots/composition, exact build Lock, one Business App Init and public ingress | A default Main Workflow or an independent Kernel |
+| **Boot / KDP** | Boot locates and starts pinned KDP; KDP Primary owns sole post-bootstrap Kernel Core and Package System | Boot executing business logic; a second Package manager/Kernel/Effect authority |
 
-复用三个判定：
-1. **REUSE_AS_IS**：已在 canonical 包中存在且 ABI/版本/作用域契合，直接采用，不重写/重复必要旧验收。
-2. **PORT_AND_DELTA_VALIDATE**：private 模块代码有价值但必须迁入现有 BUILD/SDK/Contracts 后按新 public consumer 和变化的 Authority seam 补最小正反例/当前 SHA CI。
-3. **REFERENCE_ONLY**：私有 Demo、旧 Scope CI、第三方签名/正式 Full 资格不具备新适用性时仅引用，不宣称已获得新的授权。
+**Graph separation is normative**: (a) K/S/B Package tree = layer/role ownership view; (b) Package DAG = typed API dependency and Hook binding edges; (c) Element dependency DAG = build-time callable/resource dependencies; (d) Domain semantic graph = meaningful relations that may legitimately cycle; (e) optional Workflow/Task graph = behavior of a Function, not the build graph. Neither BUILD nor KDP conflates these graphs.
 
-## 5. Stage 1 acceptance / gate
+## 3. Element Definition (E01–E10)
 
-Stage 1 可以被判定 Product FREEZE 仅当：
-- 独立审核本文件在 **当前 exact PR SHA** 与 #1477/#1484/#1496/CV-01..12 的约束兼容，关键 P0/P1 为零。
-- 对 v0.11 的基本业务价值、正式公共 SDK/BUILD 边界、旧版兼容与私有原型迁移作出唯一明确版本选择，不把 0.11.0 dev3 的 private package 当成正式版本。
-- 明确 Basic App 必须功能与 Optional 的 selected-scope，不以没有真实 Oracle/Host 的结果虚假晋升。
-- 以单独 GitHub Stage 1 Checkpoint 记载 reviewed SHA/Blob、Product freeze status 和 Stage2 授权；**此 Candidate、PR 通过 CI 或本 Issue 存在，不等于冻结**。
+**E01: One unified Element type; no closed class hierarchy.** `kind: Element` is a schema discriminator. No mandatory, mutually exclusive Entity/Knowledge/Rule/Workflow/Operation/Process subclasses. Optional non-exclusive `roles/tags` are descriptive/searchable; they never grant authority, choose execution engines or change Function ABI.
 
-**Stage 2** 再作主 SDK BUILD API/ABI、TypeScript Contract、KDP/Package sequence、旧代码迁移落点的 L2 并审核 Freeze；**Stage 2.4** 冻结最小 coherent Concern 的 Task DAG，物化原生 Issue Dependencies + readback；**Stage 3–5** 合法 Builder/CI/审查/合并；**Stage 6–7** 版本验证与 Release Qualification。普通推进不额外索取 Owner 评论授权，但不能代签 L2/Independent Review/Release。
+**E02: Minimum identity.** Every Element has `schemaVersion, id, version, description`, owning Domain identity, a normative content or Function boundary, and immutable/referenceable identity when selected. A Package-level source owner and provenance binding are established at BUILD; simple producer-authored Elements need not duplicate unneeded metadata in every content block.
 
-## 6. Strict currentness
+**E03: Typed content blocks.** `content[]` is a repeatable ordered-independent collection of `{id, contentKind, schemaRef, value | ref, optional provenance/applicability}`. `contentKind` is a schema-qualified, extensible **machine-verifiable content type**, not an Element type and not a Function implementation. A v0.11 implementation must handle a small standard type registry with clear extension rules; recommended core content kinds: `semantic-model`, `knowledge`, `rule`, `constraint`, `workflow-definition`, `state-model`, `structured-data`, `interaction`, `document`, `validation`. `prompt` and other specialized kinds can use the same versioned extension mechanism without SDK Kernel code changes. Text is allowed as versioned sourced content, but text-only strings cannot pretend to supply programmatically validated rules/relations.
 
-`PRODUCT_L1_PRD=AUTHORING`;`REVIEW=NOT_RUN`;`PRODUCT_L1_FREEZE=NOT_DONE`;`L2=NOT_STARTED`;`NATIVE_IMPLEMENTATION_DAG=NOT_PROVEN`;`VERSION_RELEASE=NO`.
+**E04: Cohesive contents, not one file or one Function per Element.** A cohesive Element may have multiple content kinds, resources, private code/state and several public Functions. A plain fact, record, markdown page, helper function, individual rule and UI widget is **not automatically an Element**. Split Elements by independently owned responsibility, public boundary, reuse, version and validation concerns.
 
-Related: #1563 canonical master; #1477 frozen Product; #1480 / #1484 Package/Boot; #1496 DIS Element-First; #1529/#1540/ #1555 private prototypes; #1544 Full Conformance independent lane.
+**E05: Functions.** `functions[]` may be empty for declarative/static Elements. Every public Function has stable `id` and contract version, description, input/output schemas, declared outcomes (including unknown/failure where applicable), applicability and effect intent. Implementations (Rule/Query/Code/Workflow/optional provider) are **selected per Function at BUILD**, not baked into its semantic identity. Multiple Functions within one Element can have different implementations. Public Capability descriptions project/reference the Function contract rather than duplicating a divergent second truth.
 
+**E06: Reading zero-Function Elements.** Metadata/definitions can be enumerated and inspected by BUILD/SDK tooling using declared Element refs. Their private resource bytes are not automatically callable/readable at runtime: runtime reads use selected, exported Reader/Query Functions or explicitly authorized data resources. Zero functions does not mean "not a valid Element".
+
+**E07: Relationships.** `dependencies[]` names referenced Element versions and optionally precise public Function IDs/contract versions/resources; dependency cycles or unavailable required Functions fail BUILD. `semanticRelations[]` is a separate typed, versioned relation graph that can cycle. A semantic relation never implies executable access.
+
+**E08: Resources and implementations.** Inline values and scoped local refs are semantically equivalent after normalization; BUILD validates required file existence/shape/scope, canonicalizes and seals exact bytes/target implementation pins. No runtime arbitrary path traversal, unselected package loading or online resolution. Definition digest, Function contract digest, target implementation digest and Package artifact digest are **distinct**.
+
+**E09: Validation/provenance.** Elements declare applicable schema, rules, examples/negative cases, source/provenance references when meaningful; BUILD validates *structure and selected closure*. Full domain truth/knowledge qualification belongs to appropriate domain producer/testing, not a generic Runtime claim.
+
+**E10: Extensibility.** Unknown **required** content schemas/extensions fail BUILD; unknown explicitly optional content may be excluded without granting capabilities. New content schemas/extensions are versioned and can be added without changing the root Element model. Changes to Function interface/meaning require an explicit new compatible contract version; a tag-only change cannot authorize a new operation.
+
+### 3.1 Normative logical example (field serialization to be frozen in L2)
+
+```yaml
+kind: Element
+schemaVersion: dh.element/0.11
+id: orders.eligibility
+version: 1.0.0
+domain: orders
+description:
+  summary: Order eligibility rules and read-only evaluation
+roles: [rule, knowledge]            # descriptive, not authority
+content:
+  - id: policy
+    contentKind: rule
+    schemaRef: schemas/eligibility-rules.v1.json
+    ref: data/rules.json
+  - id: explanation
+    contentKind: document
+    schemaRef: schemas/document.v1.json
+    ref: docs/eligibility.md
+functions:
+  - id: evaluate
+    contractVersion: "1"
+    inputSchemaRef: schemas/order-request.v1.json
+    outputSchemaRef: schemas/eligibility-result.v1.json
+    outcomes: [SUCCEEDED, UNKNOWN, FAILED]
+    effect: none
+dependencies:
+  - element: orders.identity
+    version: "^1.0.0"
+    functions: [normalizeOrder]
+validation:
+  ref: tests/eligibility-cases.json
+```
+
+This is a **PRD-level logical example**, not a representation already supported by the current v0.10.3 code. L2 determines exact serializable JSON/TS types and canonical constraints while preserving the decisions above.
+
+## 4. Package contents and Element ownership (P01–P11)
+
+**P01: Uniform package technical contract.** KDP/K Extension/SDK Primary/SDK Extensions/Business Primary/Business Extensions use **one Package Manifest/Loader/technical lifecycle** contract. Layer and role describe responsibility, not distinct incompatible manifest schemas. `C/Capability/Host/Tool` does **not** become a fourth compulsory K/S/B package layer.
+
+**P02: Initial composition profile.** A runnable v0.11.0 Domain App selects **exactly one** KDP Primary (self-bootstrapping), **exactly one** SDK Primary and **exactly one** Business Primary, each with 0..N optional same-layer Extension Packages. Future multiple independent business roots/sdk roots are a separate Product decision, not implicit support.
+
+**P03: Many Elements per Package.** A Package owns/exports 0..N Elements, which each have 0..N public Functions. An internal-only or code-only KDP Package may own zero Domain Elements. There is **no** one-Element-one-Package rule.
+
+**P04: Single logical definition owner.** In one selected App Lock, every resolved (`ElementId, ElementVersion, DefinitionDigest`) has one unambiguous **definition owner Package**. Cross-Package consumers use explicit exported ElementRef/FunctionRef. Packages cannot silently supply two divergent definitions for the same resolved logical Element; BUILD refuses collisions/ambiguous exports.
+
+**P05: Separate definition, implementation and target.** A logical Element's Functions can use selected implementations/resources supplied by its owner or explicitly selected provider/extension Packages, but the authoritative logical Function contract is not cloned in each provider. The BUILD Lock selects exactly one compatible implementation per selected Function/Target; alternatives may exist at authoring time. A Target variant may change physical API, not silently change the Element/Function's declared semantics.
+
+**P06: Three declaration layers.**
+- Package-local `domain-package` manifest is the authority for its `id/version/layer/role/target variants/elements[]/dependsOn/provides/contributesTo/resources/technical lifecycle`.
+- App-level `domain-app` descriptor selects `Target/KDP root/SDK root/Business root/Extensions/AppInit/ingress`; it does not repeat complete Element definitions or every transitive dependency.
+- BUILD emits a generated **exact App Lock** holding Package/Element/Function/implementation/resource identity+digest, Target, transitive closure, validated interface/Hook bindings and deterministic init/dispose plan. Runtime never uses a manually maintained global dependencies list.
+
+**P07: Package graph edges are typed.** `dependsOn` means an actual required exported API; `provides.interfaces` and `provides.hooks` are declarations; `contributesTo` binds a compatible declared Hook implementation to an owner. Layer/role placement alone is **not** an API dependency. No ambient global Hook dispatcher or dynamic registration.
+
+**P08: Hook semantics.** BUILD verifies the Hook owner's identity/version/schema and single-/multi-provider cardinality. KDP loads/binds selected implementations using the Lock; Hook Owner invokes/aggregates them according to its contract. `Package.init`/`dispose` and public Functions are not automatically Hook calls; Business Events are not implicitly Package Hooks.
+
+**P09: Selection and visibility.** Package-local internal Elements/resources can be private. Exports must explicitly expose selected public Function contracts or inspectable metadata. Importing a Package does not grant every Element's private data or any external Effect rights. BUILD validates import/export closure and cross-Package references.
+
+**P10: Author layout optional.** A suggested folder layout `domain-package.yaml + elements/ + content/ + schemas/ + implementations/ + validation/` is for usability. Semantics come from manifests and normalized refs, not directory names. A single-file inline manifest and a multi-file author layout must normalize consistently.
+
+**P11: Source vs installed artifact.** Separate package logical identity/version, schema/Element definitions, concrete target artifacts, and any optional npm distribution wrappers. The public SDK package naming/layout is independent of Element type semantics and needs one clear support policy.
+
+### 4.1 Package logical example
+
+```yaml
+kind: DomainPackage
+schemaVersion: dh.package/0.11
+id: orders-business
+version: 1.0.0
+layer: business
+role: primary
+elements:
+  - {id: orders.identity, version: 1.0.0, definitionRef: elements/identity.yaml, visibility: public}
+  - {id: orders.eligibility, version: 1.0.0, definitionRef: elements/eligibility.yaml, visibility: public}
+dependsOn:
+  - {package: sdk-core, interface: sdk.json/1}
+provides:
+  interfaces:
+    - {id: orders.eligibility.evaluate/1, element: orders.eligibility, function: evaluate}
+  hooks: []
+contributesTo: []
+lifecycle: {init: dist/package.mjs#init, dispose: dist/package.mjs#dispose}
+```
+
+Example illustrates **definition ownership/selection**, not a mandatory literal loader implementation.
+
+## 5. Target, BUILD and exact App Lock (B01–B09)
+
+**B01.** Target is explicit: platform/runtime/OS/arch only where required. Portable knowledge/data is not needlessly duplicated per OS. v0.11.0 must run on **one concrete Node ESM Target** and prove a valid/invalid Target selection; supporting Windows/Browser/Android/other OS-specific variants is structurally representable but not a runtime delivery promise.
+
+**B02.** BUILD takes Domain/Element definitions, selected App Descriptor/Package manifests, trusted resource/implementation sources and Target. No implicit imports of unselected packages or provider auto-discovery.
+
+**B03.** BUILD validates *once*: schema and unknown required extensions, identities/versions/roles, single K/S/B Primary, Element owner/export uniqueness, typed Package and Element dependencies, cycles, Hook contracts/cardinality, selected init/Function interface, ref closure/path/content digests, Function implementation binding and Target/ABI applicability.
+
+**B04.** BUILD produces a deterministic, inspectable Lock and topologically sorted technical init plan with corresponding reverse normal disposal plan. It pins **exact** KDP Primary installed artifact and all required selected Package/Element/Function/resource identities. Manifest version ranges, if accepted for authoring, are fully resolved to exact versions before deployment.
+
+**B05.** BUILD rejects every selected Function with no compatible implementation; no runtime guessing between Rule, Code, Provider and Workflow. Unimplemented advanced effectful/LLM/Tool profiles cannot masquerade as v0.11.0 executable support.
+
+**B06.** Selected Function/Element metadata must be available programmatically through a simple stable SDK/BUILD read API; merely compiling opaque text and function names is not Element-First.
+
+**B07.** Static invalidity (missing reference, duplicate owner, cycle, wrong target, invalid content kind, Hook mismatch, missing Business App Init or unresolved resource bytes) fails **at BUILD**. Runtime does not re-run the full build graph, compiler or source validation.
+
+**B08.** BUILD creates a self-contained target-specific distribution with App Descriptor, exact Lock, Boot and pinned Package artifacts; it is independently installable/launchable without the source workspace or private Demo imports.
+
+**B09.** Verification is proportional to the selected profile: schema/graph/closure tests and a real installed architecture consumer. This PRD **does not** mandate fake proofs of semantic business truth or rerun every historical release suite.
+
+## 6. Boot → KDP startup and sole authority (K01–K08)
+
+**K01. Boot is outside Package tree** and is deliberately minimal. It receives an App Descriptor location (or generated bootstrap locator) plus an installed/trusted exact KDP Primary identity and locator. It initializes only what is needed to load the selected KDP artifact.
+
+**K02.** Boot verifies minimum installed KDP Pin/binary identity against a trusted BUILD/installation record. A hash copied only from a mutable manifest is not by itself an independent install trust anchor. Under the **trusted self-built deployment profile** this is a local installed record, not a new signing/PKI product.
+
+**K03.** Boot loads exactly the pinned KDP Primary artifact and invokes **one fixed KDP entry** with descriptor/lock locations and minimal target/runtime context. Exact method name/TS signature are L2-level decisions. Boot does **not** parse Package DAG, import SDK/Business/Extensions, bind Hook, run Function, own Domain State or grant Effects.
+
+**K04.** KDP Primary must self-bootstrap its Kernel Core and Package System **without importing SDK/Business/K Extensions first**. There is one Kernel/Core authority and one Package System, not two peer runtimes or schedulers.
+
+**K05.** KDP consumes the built Descriptor/Lock and the precomputed selected Package plan. It imports selected K/SDK/Business packages and selected target artifacts, binds interfaces/Hooks and coordinates technical init **in the BUILD order**. Normal teardown uses the corresponding reverse plan. No floating versions, late provider selection, hot-swap or runtime discovery.
+
+**K06.** Kernel Core provides the sole place for runtime admission/dispatch and eventual Effect/Journal/State authority. Business semantic models and state ownership stay in their Domain Elements. Package Manager performs assembly, not business workflow evaluation. v0.11.0 Basic execution supports **no-effect** selected Functions; declaring future effect/Journal interfaces does **not** certify that complete prior Effect/CAS/Replay functionality is implemented in the new version.
+
+**K07.** Physical load/init errors that cannot be ruled out at BUILD fail startup and expose no ingress; do not try to automatically re-resolve dependencies, choose another Package, retry/self-heal or manufacture a success result. This is minimal real-world error reporting, **not** a runtime recovery engine.
+
+**K08.** The v0.11.0 implementation shall demonstrate **actual Boot → KDP Primary → selected Package technical init → Business App Init** through the new public SDK/distribution, not simply a script that bypasses Boot or passes unsealed callbacks.
+
+## 7. App Init and public Function ingress (A01–A08)
+
+**A01.** A *runnable new-style* Domain App must have **exactly one** explicitly selected, AOT-pinned **Business App Init Element** with a standard public `init(context)` Function. The Element is otherwise an ordinary Element: not a Package role, Hook, second Kernel or global Main Workflow. Static assets/non-runnable Domain definitions do not need fake init functions.
+
+**A02.** KDP owns first-stage **Package technical initialization**; second-stage **Business App Init** starts only after required packages are ready. App Init cannot be provided as an unsealed arbitrary caller callback replacing the selected Element.
+
+**A03.** Selected Init Context exposes only app/activation identities, Build/Lock Pin, selected readonly configuration and exported Function/resource handles; not arbitrary unselected Package modules, physical Host permissions or internals of KDP authority.
+
+**A04.** The standard business init result distinguishes `READY | DEGRADED | BLOCKED | FAILED`. For v0.11.0 Basic, all required static services are present before execution and the successful normal result is READY. DEGRADED can suppress only *predeclared optional* ingress; missing required service cannot become fake READY. No runtime re-planning/recovery mechanism is implied.
+
+**A05.** An App may have multiple ingress routes directly targeting any selected/exported `Element.Function`. No request must pass through App Init; no Main Workflow or universal Router is mandatory.
+
+**A06.** The basic real execution path supports a selected typed **no-effect Function**, stable input/output/outcome validation, and simple observation. Effectful Function dispatch, business policy implementation and provider execution can be implemented later against the same frozen contracts; 0.11.0 must not incorrectly allow those unimplemented modes.
+
+**A07.** Technical Package lifecycle has deterministic **normal** init/dispose sequencing. There is **no 0.11.0 requirement** to implement concurrent stop with in-flight drain/cancel, crash recovery, replay framework, remote cancellation, automatic retries, hot replacement, or a separate long-lived AppSession scheduling engine. Build/test rejects invalid self-built apps beforehand. If a real physical init fails, the result is an ordinary startup failure without new self-healing machinery.
+
+**A08.** No legacy v0.10.3 App adaptation or parity testing. Breaking manifest/ABI changes are accepted in the *new* version; every later 0.11.x feature must use this new composition and selected Function ABI. Previously released tag/binaries remain historically unchanged.
+
+## 8. Public developer experience and distribution (D01–D05)
+
+**D01.** Provide a single **documented canonical public SDK entry** to author/load/inspect/invoke a selected v0.11 Domain App, whether internally organized into monorepo packages or not. A privately published `dis-v011-runtime` Demo is not the new public product. Exact exported npm names and source-level TypeScript signatures are L2 concerns; there cannot be two competing public authorities.
+
+**D02.** Publish versioned machine-readable schemas/TS types for `DomainDefinition, ElementDefinition, ContentBlock, FunctionContract, ElementRef/FunctionRef, PackageManifest, DomainAppDescriptor, AppLock`; all are meaningful in actual BUILD, not documentation-only facades. A stable error catalog distinguishes build-time structural errors from physical startup failures and runtime Function outcomes.
+
+**D03.** A developer must be able to create an Element with sourced structured content, 0 Functions, multiple public Functions, a Package containing both and an App using cross-Package refs without editing Kernel/SDK internals.
+
+**D04.** Authoring documentation includes a minimal example and an extension/Hook example, typed content/ref guidance, Package ownership/exports and accurate no-legacy-compatibility notice. Prefer small examples, no mandatory code generator or IDE/CLI/UI product in 0.11.0.
+
+**D05.** Provide a clean-installable target build and minimal reliable CI for the new SDK/API. Historical v0.10.3 consumers are not the v0.11 acceptance bar; historical private prototypes are optional engineering references, not gate identities.
+
+## 9. Structural mapping: old content categories → new Element model
+
+This table is a **design mapping**, not a promise to migrate or retain old source/behavior.
+
+| Domain content / legacy category | 0.11.x model | When a separate Element is justified |
+|---|---|---|
+| Entity, concept, relationship, taxonomy, schema | Domain semantic graph or Element `semantic-model` content | Independent reusable domain responsibility or public interface |
+| Knowledge, Reference, facts, source text, manuals | Versioned `knowledge`/`document`/`structured-data` blocks, provenance/resources | Cohesive knowledge service or independently versioned knowledge set; can have 0 Functions |
+| Rule, validator, decision, recognizer | Typed rule/constraint/decision content; public evaluation via Function when needed | Separately owned reusable capability/contract |
+| Workflow, pattern, recipe, pipeline | `workflow-definition` content or a selected Function implementation | Stable public process responsibility, not every step |
+| Business State, state machine, events | `state-model` content, maybe distinct state-service Element | An independently managed domain-state service |
+| Interaction, Form, CLI/API/UI | Interaction/interface content + selected public ingress | Reusable interface/interaction domain service; not each widget |
+| Tool, Capability, Host adapter | Public Function/Operation/selected implementation; Effect intent explicit | Independently exposed bounded service; not each helper/OS call |
+| Hook / extension | Package `provides/contributesTo` and associated selected implementation | Not a mandatory Element type |
+| Prompt, implementation code, libraries | Content/resource or Function implementation selected at BUILD | Not by existence as a file/helper |
+| Example, counterexample, evidence, feedback, authority | `validation/provenance/constraint` blocks and referenced data | Independent evaluator/reference domain responsibility |
+
+**Ordering principle**: choose the cohesive Domain/Element boundary first → structured content and provenance → only necessary public Functions → target implementation and Package ownership. Do **not** mechanically convert `Skill/Rule/Hook/Tool/Knowledge` into a closed enum of Element subclasses.
+
+## 10. Release-scope acceptance (minimum executable, falsifiable)
+
+The following outcomes are jointly required for the **v0.11.0 architecture foundation**. Tests should cover the asserted seam once, not recreate historical exhaustive suites.
+
+| AC | Observable evidence that must exist |
+|---|---|
+| **AC01** Element structural model | One 0-Function structured/knowledge Element plus one Element with **2 public Functions** and at least 2 different typed content blocks; SDK/BUILD can inspect IDs/versions/content/relations programmatically |
+| **AC02** Typed content/ref | Inline vs file ref normalize equivalently; unknown required content schema, missing ref, invalid scope/path fail BUILD; semantic relation cycle **is allowed** while dependency cycle is not |
+| **AC03** Package ownership | One Package owns multiple Elements; another selected Package imports/uses an explicit public Function; duplicate Element owner, missing export and incompatible selected implementation fail BUILD |
+| **AC04** Three-layer composition | Exactly one KDP/SDK/Business Primary, selected Extension(s) in **all three layers** (can be no-op), Package interface dependency and one declared Hook contribution, one deterministic Package DAG/init plan |
+| **AC05** Boot/KDP reality | Installed Boot loads *only* pinned KDP Primary, KDP independently initializes its core and loads the exact rest from Lock; technical init order is observable; no second runtime and no dynamic Package discovery |
+| **AC06** App Init + direct ingress | Exactly one locked Business App Init Element; normal READY then direct no-effect public Function ingress (no Main Workflow); missing/duplicate/replaced Init or required binding fails BUILD |
+| **AC07** Target/Lock | One real Node ESM Target correctly selected; wrong Target/versions/resources/digest/Hook cardinality fail BUILD; generated Lock reproducible and complete |
+| **AC08** Public SDK | Clean-installed new v0.11.0 SDK consumer can build/inspect/Boot/start/call/normal-stop without private Demo imports, old v0.10.x App or monorepo source-tree assumptions |
+| **AC09** Scope honesty | Unsupported effectful/Provider/LLM/Knowledge DB/Meta profiles do not pretend to execute; no legacy-compat smoke, no in-flight stop/recovery experiment or full business demo required |
+| **AC10** Maintainable architecture | Versioned machine schemas/TS API, fixed authority boundaries, Package/Element/content extension example and concise Chinese/English developer guidance; no domain-specific hardcodes in canonical BUILD/KDP/SDK |
+
+**Required build negatives:** unknown required element/content extension; missing/duplicate Element owner; duplicate K/S/B Primary; cyclic Package/Element dependency; nonexistent Function export; invalid Hook target/cardinality; missing/duplicate App Init; wrong target/resource digest; unselected/unauthorized Function implementation. Runtime simply refuses wrong selected operation or actual failed startup, without a second graph compiler.
+
+**Explicitly *not* a 0.11.0 exit:** v0.10.3 feature parity, mandatory reuse/port of old modules, Tally/xDownload production-grade real business results, broad role-based knowledge service, LLM/Harness/Meta/MCP/remote Tool engines, full DIS 21/21, external Host/Effect/Journal/Replay production proof, automigration of 14 apps, concurrent stop/drain or crash self-heal.
+
+## 11. Versioning and follow-on roadmap
+
+- **v0.11.0:** ship all structural contracts, canonical BUILD/AOT, Boot→KDP, K/S/B package loading/initialization, selected App Init and minimal typed no-effect public ingress. It may be intentionally incompatible with any older App or SDK ABI.
+- **v0.11.1+:** reimplement intended Rule/Workflow/Knowledge/State/domain consumers **against** v0.11.0 Element and Package interfaces; later optional Interaction, LLM/Harness, Experience/Meta, Tool/Host/Effect and advanced Runtime mechanisms are independently scoped/verified. Old functions are requirements/reference only, not obligatory implementation imports.
+- Within **0.11.x**, preserve the new v0.11.0 *architectural invariants* and favor compatible additive Function/content extensions; do not silently change Element identity/owner, core manifest/Lock semantics, Boot/KDP authority and Package layering per patch. Any incompatible foundational change needs explicit separate version/Product decision. No guarantee of v0.10.3 parity at any particular 0.11.x patch.
+
+## 12. Architecture decisions now settled in this PRD; L2 still owns syntax and engineering
+
+**PRD decision set for Owner review:**
+- **AR-01** One Element root Schema; typed, extensible content blocks; many roles but no closed Element type hierarchy.
+- **AR-02** A cohesive Element can have zero or many public Functions and multiple content types.
+- **AR-03** One selected Element Definition owner per App Lock; cross-Package references/exports explicit.
+- **AR-04** K/S/B unified Package Schema/Loader/technical lifecycle, one Primary per layer, optional Extensions.
+- **AR-05** One App Descriptor + per-Package Manifest + BUILD-generated exact Lock; three distinct responsibilities.
+- **AR-06** Typed Package dependency/Hook graph, distinct Element dependency and semantic graphs.
+- **AR-07** Target/Implementation/Content/Resource pins resolved completely at BUILD; Runtime does not recompile.
+- **AR-08** Boot loads only exact KDP; KDP self-bootstraps and loads all other selected Packages.
+- **AR-09** Exactly one AOT-selected Business App Init Element; direct selected Function ingress; no Main Workflow.
+- **AR-10** Basic foundation supports no-effect typed Functions, not a new Agent/Effect/Recovery engine.
+- **AR-11** No old App/ABI/features/mechanisms reuse/compatibility/parity requirement; all future features use 0.11.x.
+- **AR-12** One canonical new public SDK/distribution/clean consumer; no parallel private Runtime as release substitute.
+
+**L2 remains responsible only for compatible concrete decisions:** exact JSON Schema URIs/field spelling/validation keywords, TS export names and type signatures, normalized hash/canonicalization algorithm, local repository folder layout, exact Lock serialization and bootstrap trust/installed record format, topo sort tie-break rule, hook invocation/binding ABI, concrete Node target minimum, error codes, test file paths/implementation task split and distribution packaging. L2 must not reverse AR-01…AR-12 without a Product delta.
+
+## 13. ADS review/qualification and source authority
+
+1. **Product/L1**: current #1565 docs-only candidate changes must be reviewed on the *new exact HEAD* against [#1477](https://github.com/kaicreator-mm/domain-harness/issues/1477), accepted Boot/KDP successor [#1484](https://github.com/kaicreator-mm/domain-harness/issues/1484), Package analysis [#1480](https://github.com/kaicreator-mm/domain-harness/issues/1480) and DIS Element-First **draft** [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)/[#1497](https://github.com/kaicreator-mm/domain-harness/pull/1497). Original #1565 review was REWORK on the *prior* scope; it does not approve R2.
+2. **Owner review** of this complete PRD is requested **before** Product Freeze. Any unapproved question raised by Owner is recorded as a Product delta; no circular request for independent authorization to perform ordinary implementation planning.
+3. **L2** after approved Product Stage1: lock actual contract/API/schema/Boot+KDP init/Package graph and its exact source/readback; run targeted independent review. **Do not** claim DIS v0.2 Full 21/21 or official third-party business qualifications merely because DomainHarness implements a bounded subset.
+4. **Task DAG** only after L2: few coherent Outcomes with nonoverlapping write sets, e.g. Element+Package Schema/BUILD; Boot+KDP Package lifecycle; App Init+public SDK Basic E2E/packing. Avoid forcing the 12 architecture decisions into 12 separate tasks.
+5. **Native implementation/CI/Release** have not yet happened. A PRD document, private prototype, old CI or issue comment is not proof that the new v0.11.0 product works.
+
+**Review request:** Approve or comment on **AR-01…AR-12, `1.1 boundary and AC01…AC10**. Once approved they form the single v0.11.0 Product basis for L2; no further product-scope expansion is implied by the historic F01–F24 inventory.
