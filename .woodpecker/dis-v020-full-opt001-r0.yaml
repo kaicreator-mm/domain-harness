@@ -45,6 +45,7 @@ steps:
 
   - name: opt001-live-provider
     image: bash
+    secrets: [DEEPSEEK_API_KEY]
     commands:
       - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
       - node --check examples/dis-v020-native-sdk/full-opt001-r0/opt001-live-provider.test.mjs
