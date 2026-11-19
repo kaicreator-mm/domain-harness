@@ -7,6 +7,34 @@ import type { Selection } from './types.js';
 export { bootKdp } from './boot.js';
 export { selectKnowledge, canonicalDigest, digest } from './knowledge.js';
 
+// D1 element-first contract layer (#1530) and D2 bounded execution envelope
+// (#1531), wired at I0 integration (#1529). Both stay inside this private
+// runtime workspace; no SDK contract surface changes.
+export {
+  ELEMENT_MANIFEST_SCHEMA, IMPLEMENTATION_KINDS, EFFECT_MODES,
+  parseElementManifest,
+  resolveDependencyClosure, validateSemanticRelations,
+  lockAot, resolveLockedFunction, assertFunctionBindings,
+  ElementContractError,
+} from './element/index.js';
+export type {
+  ElementManifest, ElementConsumer, ElementDefinition, ElementFunctionDecl,
+  ElementSourceDecl, SemanticRelationDecl, ImplementationKind, EffectMode,
+  DependencyClosure, AotArtifactPin, AotLock, AotLockEntry, AotImplementationCandidate,
+} from './element/index.js';
+export {
+  BOUNDED_PROVIDER_KINDS, RESERVED_UNAVAILABLE_PROVIDER_KINDS, realClock,
+  BudgetLedger, BoundedBudgetExhaustedError,
+  assertBoundedBudget, assertBoundedClock, validateProviderRegistry,
+  admitProviderKind, createBoundedEnvelope, boundedConfigError,
+} from './bounded/envelope.js';
+export type {
+  BoundedBudget, BudgetSnapshot, BoundedBudgetAxis, BoundedClock,
+  BoundedProviderDescriptor, BoundedProviderKind, BoundedProviderLabel,
+  ProviderAdmission, ProviderRejectionCode, BoundedEventFields, BoundedTraceEvent,
+  BoundedStepTicket, BoundedStepContext, BoundedPlan, BoundedOutcome, BoundedEnvelope,
+} from './bounded/envelope.js';
+
 function businessModule(selection: Selection): string {
   const policy = { packageId: 'business-dis-player@0.11.0-dev.0', packageRevision: selection.revision,
     definitionId: selection.packageId, graphSha256: selection.graphSha256,

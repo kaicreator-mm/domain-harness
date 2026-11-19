@@ -55,6 +55,24 @@ Issue: kaicreator-mm/domain-harness#1532。基准 `origin/main` = `b1b2c182`。
 node --import tsx --test "examples/dis-v011-dual-domain/test/"*.test.mjs
 ```
 
+## I0 接线（#1533）：D1/D2 公共 API 消费
+
+`test/i0-runtime.test.mjs` 在同一批真实 Pin 快照字节上，经
+`packages/dis-v011-runtime` 的**公开导出入口**（`dist/index.js`，即包
+`exports['.']`）消费 D1/D2：
+
+- D1 `parseElementManifest` / `resolveDependencyClosure` /
+  `validateSemanticRelations` / `lockAot` / `assertFunctionBindings` 锁定
+  双领域四个选定 Function（真实快照字节逐 blob 校验后入锁）；
+- D2 `createBoundedEnvelope`（`local-deterministic`）执行真实选定
+  Function——Tally rule 与 xDownload knowledge 结果与 BUILD/KDP 链一致且
+  全程 `attested:false / authority:'NONE'`；
+- 合法重封的 rule 修订（新 AOT lock）可观察地改变结果；未重封的漂移字节
+  `ELEMENT_FUNCTION_DIGEST_MISMATCH` fail-closed 零执行；
+- 未授权 external Effect（acquire）结构性拒绝零派发，`llm` 冒充
+  `PROVIDER_KIND_FORBIDDEN` 且不消耗预算；预算耗尽 mid-chain
+  `BUDGET_EXHAUSTED` 无部分成功。
+
 ## 诚实边界（务必阅读）
 
 - 快照是 **test-only fixture**，不是生产分发库；跨项目源 Pin 只是源码引用，
