@@ -1,0 +1,8 @@
+{
+  "name": "@domain-harness/dis-v011-dual-domain-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx --test test/consumer.test.mjs test/e2e.test.mjs"
+  }
+}
