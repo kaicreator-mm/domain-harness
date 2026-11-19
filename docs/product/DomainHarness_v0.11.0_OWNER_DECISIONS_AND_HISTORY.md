@@ -7,7 +7,7 @@ PRODUCT_VERSION=0.11.0
 MASTER=kaicreator-mm/domain-harness#1563
 PRODUCT=kaicreator-mm/domain-harness#1564
 PRD_PR=kaicreator-mm/domain-harness#1565
-REVIEWED_SUBJECT_PRD_BLOB=30f8f61d6cb4abef2f88b5407bdc6ec585ef8aa4
+REVIEWED_SUBJECT_PRD_BLOB=25ec66030dfafe60309eb9e6609b590c0b803bde
 PRD_PATH=docs/product/DomainHarness_v0.11.0_ELEMENT_FIRST_PRODUCT_PRD_CANDIDATE.md
 INTEGRATION_BRANCH=version/v0.11.0
 INTEGRATION_BASE=b1b2c182c1cb49c1b63b1efaf57ff9132d9cf4b0
@@ -25,7 +25,7 @@ IMPLEMENTATION_DAG=NOT_ADMITTED
 
 这是对下述 **v0.11.0 R2 PRD 的产品范围明确认可与请求落地固化**，不是让 Builder 自己伪造独立 Product Review、Release 或 Full DIS Conformance。按固定 ADS `Stage 1：`Owner 已认可的精确 PRD subject → selected 独立 Product Review → 由 Product Authority 明确形成冻结 checkpoint → L2 → Task DAG → Implementation`。本文件持久记录 **Owner scope decision**，不得把 `PRODUCT_FREEZE_CHECKPOINT=WAITING` 写成 `PASS`。
 
-**精确内容主题**：`docs/product/DomainHarness_v0.11.0_ELEMENT_FIRST_PRODUCT_PRD_CANDIDATE.md` blob `30f8f61d6cb4abef2f88b5407bdc6ec585ef8aa4`，PR [#1565](https://github.com/kaicreator-mm/domain-harness/pull/1565)。与它不一致的旧候选/聊天总结，以此最新 **Owner 接受的 R2 PRD 语义**为准；如果后续独立评审指出实质 P0/P1，需要合法修复、重新审相应新 SHA，而不是偷偷提升旧版范围。
+**精确内容主题**：`docs/product/DomainHarness_v0.11.0_ELEMENT_FIRST_PRODUCT_PRD_CANDIDATE.md` blob `25ec66030dfafe60309eb9e6609b590c0b803bde`，PR [#1565](https://github.com/kaicreator-mm/domain-harness/pull/1565)。与它不一致的旧候选/聊天总结，以此最新 **Owner 接受的 R2 PRD 语义**为准；如果后续独立评审指出实质 P0/P1，需要合法修复、重新审相应新 SHA，而不是偷偷提升旧版范围。
 
 ### 1.1 持续有效的独立项目不变量与继任解释
 
@@ -115,7 +115,7 @@ L2 遵循 **Tests → Contract → Implementation → Failure Handling → Examp
 ## 6. 下一步确定动作
 
 1. 将 PRD R2 + 本记录 + Roadmap 在 **原 #1565 docs-only Product PR** 上由单 Writer 提交；读回最终 PR HEAD、3 文件实际 Blob 与 CI。
-2. 本轮 Owner Scope Approval 写入 #1564/#1563，声明绑定 PRD Blob `30f8f61d6cb4abef2f88b5407bdc6ec585ef8aa4`。
+2. 本轮 Owner Scope Approval 写入 #1564/#1563，声明绑定 PRD Blob `25ec66030dfafe60309eb9e6609b590c0b803bde`。
 3. 原 PR #1565 在**其它独立 ChatGPT 对话**对最终 HEAD 做 selected Product/L1 审查：实读 PRD、讨论史与路线图、#1477/#1484/#1480/#1496、CV-01…12、旧 R0 P1×2 修复是否真实覆盖；结论 ACCEPT/REWORK/P0-P2；只审新增/变化风险，避免重做历史已通过内容。
 4. Review PASS 及必要 docs-only CI 成立后，建立远端 Product Freeze checkpoint 并合法受控合并到 version branch；然后迅速做范围收敛的 L2 与少量高并行 Task DAG，准备 Builder/Validator 任务；不提前动业务源码。
 <!-- /DH_V011_OWNER_CONVERSATION_CHRONICLE_R1_20261120 -->
