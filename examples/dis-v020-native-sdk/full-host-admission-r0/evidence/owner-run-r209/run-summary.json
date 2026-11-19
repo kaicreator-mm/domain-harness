@@ -1,0 +1,26 @@
+{
+  "schema": "dis.v0.2.full-host-admission.owner-run-summary/1",
+  "runId": "owner-run-r209",
+  "nodeVersion": "v24.21.0",
+  "platform": "win32",
+  "ranAtIso": "2026-11-19T11:39:43.982Z",
+  "registryPath": "admission-registry.json",
+  "registrySha256": "7ab8e886718993a9170c55b0133524751ead27ebeb8baf03fc4c08e3571df562",
+  "installedRuleSha256": "16f4b833ce2e77f06e725106c620f717a4edf95a8b0f133907d221681364b1c9",
+  "issuerSpkiSha256": "a18cdd503d3718a0ce369035b2559e11d2e1bf96f9d4d7045918f946b3cc5918",
+  "hostSpkiSha256": "ee1187462548ec44edbb4715009d9d63ddbd8b33162516e5b8c26e15c5aa1fcb",
+  "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+  "ruleDigest": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632",
+  "sdkDigest": "71ca4c1316fd6158337d87c3a7930e2354122f0306ca557f2b87f9f73d5f3d22",
+  "installedBytesDigest": "16f4b833ce2e77f06e725106c620f717a4edf95a8b0f133907d221681364b1c9",
+  "admissionStatus": "OBSERVED_SCOPED_CANDIDATE",
+  "admissionReason": "ADMITTED_OBSERVATION_ONLY",
+  "receiptSignatureBase64UrlLength": 86,
+  "receiptVerifiedByConsumer": true,
+  "honestyNotes": [
+    "SINGLE_OWNER_ECOSYSTEM",
+    "STRUCTURAL_NOT_INTERPERSONAL_INDEPENDENCE",
+    "OBSERVATION_ONLY_NO_EFFECT_NO_CLAIM_ATTESTATION",
+    "PRIVATE_KEYS_OUTSIDE_REPOSITORY"
+  ]
+}
