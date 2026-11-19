@@ -1,0 +1,14 @@
+{
+  "schema": "dis.v0.2.full-host-admission.installed-rule/1",
+  "functionId": "dke.ev16.d02.vv.r188.observe",
+  "sourceId": "r188-reader",
+  "sourceGitBlob": "234997708b5520d7f9ce5997eb7ad6ff963a5e68",
+  "ruleDigest": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632",
+  "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+  "sdkDigest": "71ca4c1316fd6158337d87c3a7930e2354122f0306ca557f2b87f9f73d5f3d22",
+  "issuerId": "owner-issuer-r209",
+  "deploymentId": "deployment:dis-v020-full-admission-r209",
+  "tenantId": "tenant:owner-admission-r209",
+  "scope": "scope:r188-observe-admission",
+  "custodyNote": "Immutable installed-rule record provisioned by the project+Host owner (Harness #1527 owner grant, single-owner ecosystem). Private keys stay outside the repository; only digests and public keys are committed."
+}
