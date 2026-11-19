@@ -271,6 +271,10 @@ export function createAppSession(config: AppSessionConfig): AppSession {
   let state: AppSessionState = 'NEW';
   const started: PhasedLifecycleStep[] = []; // steps whose init completed, in init order
   let recordedStop: AppSessionStopResult | null = null;
+  // Admission occurs synchronously in run() while READY. STOPPING closes
+  // admission immediately, then drains the already-admitted promises before
+  // disposing any Package/App resources.
+  const inFlight = new Set<Promise<unknown>>();
 
   const observe = (): Readonly<AppSessionObservation> => Object.freeze({
     state,
@@ -321,6 +325,10 @@ export function createAppSession(config: AppSessionConfig): AppSession {
     if (state !== 'READY') throw new AppSessionError('APP_SESSION_INVALID_STATE', 'stop:' + state);
     state = 'STOPPING';
     const runStop = async (): Promise<AppSessionStopResult> => {
+      // No new run() can be admitted after state becomes STOPPING. Await the
+      // captured in-flight calls (including rejected calls) before cleanup;
+      // never treat Promise.race/timeout as proof that external effects ended.
+      if (inFlight.size > 0) await Promise.allSettled([...inFlight]);
       const teardown = await disposeInReverse(started);
       if (teardown.disposeErrors.length > 0) {
         // A throwing dispose must not fake a clean stop: FAILED with the real
@@ -346,9 +354,13 @@ export function createAppSession(config: AppSessionConfig): AppSession {
   const run = <T>(fn: () => T | Promise<T>): Promise<T> => {
     if (typeof fn !== 'function') throw configurationInvalid('run.fn');
     if (state !== 'READY') throw new AppSessionError('APP_SESSION_INVALID_STATE', 'run:' + state);
-    // Call failures belong to the caller, not the session: the session stays
-    // READY and remains cleanly stoppable.
-    return Promise.resolve().then(fn);
+    // Register before returning control to the caller. A concurrent stop()
+    // must drain this exact call even if its callback has not run yet.
+    // Rejection is preserved for the caller; draining does not swallow it.
+    const pending = Promise.resolve().then(fn);
+    const tracked = pending.finally(() => { inFlight.delete(tracked); });
+    inFlight.add(tracked);
+    return tracked;
   };
 
   const session: AppSession = Object.freeze({
