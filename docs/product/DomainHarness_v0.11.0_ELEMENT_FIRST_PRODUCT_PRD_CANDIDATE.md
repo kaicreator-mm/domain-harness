@@ -23,6 +23,54 @@ L2=NOT_STARTED
 RELEASE=NO
 ```
 
+
+## 中文审核摘要（请优先审阅此节，再按需要阅读下方完整技术合同）
+
+**本 PRD 的待审核决定：** 将 v0.11.0 定义为**全新的 Element-First 架构基础版本**；旧 `v0.10.3` 的 App、SDK ABI、业务能力和底层机制**均无需兼容、保留或强制复用**。后续原有和新增业务能力全部按照 `0.11.x` 新架构实施。旧 Git tag/历史发行物不回写。本 PRD **尚未得到 Owner 审批**，也不构成 L2、Task DAG 或 Release。
+
+### A. 0.11.0 必须交付的架构
+
+**一份统一、可机器处理的 Domain/Element/Package/Domain App 结构，而不是给旧 Function 包一层 JSON。**
+
+1. **Domain/Element**：Domain 包含 Element 集、语义关系、约束与合作语义；每个 Element 对应一项内聚职责，具有 ID、版本、解释、结构化内容、资源和来源。一个 Element 可以有 0..N 个公开 Function，支持纯声明/纯知识 Element。
+2. **Element 类型**：不建立封闭的 `KnowledgeElement/RuleElement/WorkflowElement` 继承体系。所有 Element 共用一个 Schema；`roles/tags` 允许多标签分类但不授权执行；`content[].contentKind` 表示有独立 Schema、可扩展的机器类型（知识、规则、模型、数据、Workflow、State、Interaction、文档、校验等）。文本可保留为内容块，但不能伪装为已被程序理解的结构化规则。
+3. **Element 内部**：以职责组织多个内容块、公开 Function、私有实现、依赖、语义关系、资源、校验与来源。不是一文件/一规则/一函数就建一个 Element；Function 的契约和每个 Target 上的具体实现分开。
+4. **Package**：KDP/SDK/Business 三层，各有一个 Primary，可选 0..N Extension；三层统一 Manifest、装载和技术 Init/Dispose。一个 Package 可承载多个 Element；每个已选 Element 定义在 App Lock 中有唯一 owner，跨 Package 必须通过显式导出与引用，不可随意访问私有资源。Hook 属于 Package 扩展/绑定契约，不是第四层 Package，也不是必须成为 Element 的类型。
+5. **分清五种图**：三层 Package 角色结构、Package 依赖/Hook DAG、Element 静态依赖 DAG、可循环的领域语义图、可选业务 Workflow/Task 执行图，**不合并成一个大 DAG**。
+6. **BUILD/AOT**：读取完整定义，**在构建期**校验 Schema、引用、唯一 owner、依赖环、导出/Hook、函数实现、版本、Target、资源摘要、Init 等；生成精确的可审查 App Lock、装配/初始化顺序和可独立安装的 Target 产物。运行期只消费已选产物，不做二次构建、自动发现、依赖修复或版本寻优。
+7. **Boot→KDP**：Boot 在 Package Tree 外，只读取最小定位及可信安装 Pin，加载**唯一** KDP Primary 并调用一个固定启动入口。KDP 独立自举 Kernel Core+Package System，不依赖尚未加载的 SDK/Business；随后按 Lock 加载 K/SDK/Business Primary/Extensions，绑定 Hook/接口并执行已计算的技术 Init。
+8. **App Init**：所有必需 Package Init 后调用**恰好一个** BUILD/AOT 选定的 Business App Init Element.`init(context)`。App Init 不是通用 Router、Hook、Main Workflow 或第二 Kernel。成功 READY 后，各 ingress 可以直接调用被选的 Element.Function；基本版本真实执行最小**无外部 Effect** Function。`DEGRADED` 只能限制预先声明的可选入口。
+9. **Runtime 范围**：无需新建并发 Stop/in-flight drain、失败重试、自动恢复、热更新、跨进程 Replay 或自愈引擎；无法在构建期预知的真实装载错误只进行最小失败返回、不暴露业务入口。后续 Effect/Journal/LLM/Provider 等完整机制不因历史版本曾有而算作 v0.11.0 已实现功能。
+10. **公共 SDK**：只保留**一个新版本的公开使用入口**，真实机器 Schema/TypeScript Contract 可被构建、查询、选择、装载和调用；不另发独立 `dis-runtime` 冒充 DomainHarness。内部可继续采用 monorepo 模块化，但公共语义只能有一个来源。
+
+### B. 0.11.0 的十项验收（详见第 10 节 AC01–AC10）
+
+| 编号 | 最小真实验收 |
+|---|---|
+| AC01 | 一个 **0 Function** 结构化知识 Element + 一个 **2 Function** Element；通过 SDK 程序化读取结构 |
+| AC02 | Content Schema/inline/ref/来源闭包与合法语义环、非法依赖环能够区分 |
+| AC03 | 一个 Package 多 Element；另一个 Package 引用已公开 Function；拒绝重复 owner/未导出引用 |
+| AC04 | K、SDK、Business 各 1 Primary + 各层扩展和必要 Hook；生成确定的 Init plan |
+| AC05 | **真实 Boot 只启动 KDP**；KDP 自举并按 Lock 装载其余 Package |
+| AC06 | 唯一已锁定 App Init → READY → 直接 Function 调用；**被选的结构化规则/知识真实影响最小 Function 结果**，含负例/UNKNOWN |
+| AC07 | 精确 Target/Lock 正例，版本、Target、资源和 Hook 错误在 BUILD 被拒绝 |
+| AC08 | 新 SDK 从独立安装包创建/加载/调用/正常结束 Basic App，不依赖私有 Demo 或旧版 consumer |
+| AC09 | 未实现的 Effect/Provider/LLM/Meta 等能力不冒充通过；不做旧兼容与运行期恢复验证 |
+| AC10 | Schema、公共 TS 类型、扩展/Package 作者示例、中英文关键文档齐备；无业务项目硬编码 |
+
+### C. 本轮决定不做的事项
+
+不做 0.10.3 功能迁移和兼容；不做完整 Tally/xDownload 业务 E2E、知识图谱生产或数据库引擎、LLM/Harness/Meta/MCP/Agent、通用业务工作流引擎、完整外部 Effect/Journal/Replay 功能、热插拔、并发停止及异常恢复。**但这些后续能力在 `0.11.x` 必须使用本 PRD 的统一 Element/Package/Boot-KDP 架构，不能再造平行 Runtime。**
+
+### D. 本轮请确认什么、什么留给 L2
+
+**请审核第 12 节 AR-01…AR-12（架构决定）以及第 10 节 AC01…AC10（退出验收）是否足以作为 0.11.0 的最终 Product 范围。** 你认可后才会完成 Product Freeze 与实施 L2。
+
+**仅技术层面的 L2 待定**：具体 JSON Schema URI/字段拼写、TypeScript API/错误码、摘要算法、Lock 二进制或 JSON 序列化、Boot 启动函数签名、Node 最低版本与物理 Package 路径/测试写集。这些应遵守已确认 Product 语义，不是再次讨论是否采用 Element-First、是否支持旧 API、是否重复 Kernel。
+
+---
+
+
 ## 1. Product motivation and outcome
 
 v0.10.3-style function, text, route and scattered package-first organization does not give the Domain's knowledge, rules, structured descriptions, constraints and reusable behavior stable first-class machine-consumable identities and relationships. v0.11.0 therefore establishes **Element as the organizing unit of Domain Intelligence**, with versioned content, schema, references, public Function contracts and exact selection into Packages.
