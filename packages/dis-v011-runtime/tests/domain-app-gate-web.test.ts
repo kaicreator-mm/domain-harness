@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createDomainAppSession } from '../src/domain-app.ts';
+import { createDomainAppSession } from '../dist/domain-app.js';
 
 test('DomainApp never exposes its raw FunctionInvoker outside the READY gate', async () => {
   let invoked = 0;
