@@ -1,5 +1,26 @@
 # @kaicreator/domain-harness-microkernel
 
+## v0.11.0 release layout (L2 §8.2)
+
+The package root `.` is the canonical v0.11.0 Boot + KDP + Package System
+entry (`boot`, `bootstrap`; see `src/v011`). The packed tarball ships only
+`dist/v011` plus this README; the legacy v0.10.x face below stays available
+inside the workspace through the fenced `./legacy` subpath and is absent
+from the release artifact.
+
+- `./legacy` — the legacy `load` facade documented below.
+- `./legacy/host-seam` — the legacy Host bootstrap seam (documented below).
+- `./host-seam` — **retained solely because frozen L2 §8.2/workspace
+  compatibility requires it**: the legacy in-workspace consumer
+  `@kaicreator/domain-harness-host-node` (LEGACY_INTERNAL_WORKSPACE_ONLY)
+  already imports this exact subpath, and the L2 ruling for the root
+  package's old subpaths ("keep the entry, fence via the files whitelist")
+  is applied here verbatim. It is NOT a released reachable export — the
+  tarball contains no legacy dist, so installed consumers get
+  `ERR_MODULE_NOT_FOUND`. New 0.11 code must not import it.
+
+## Legacy v0.10.2 face (reference-only)
+
 The DomainHarness v0.10.2 public runtime SDK (Microkernel). It loads ONE
 already-trusted prebuilt Domain App (`V10BuiltApp` plain data produced by
 the canonical BUILD package `@kaicreator/domain-harness-build`) and exposes

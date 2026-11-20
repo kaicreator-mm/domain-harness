@@ -28,3 +28,6 @@ import {
 
 Inside this monorepo workspace the legacy v0.2–v0.10 surface remains available unchanged through the explicit `./legacy` subpath (the old root index re-exporting `public-v2`/`public-v3`/`public-v4`/`public-v7`). Legacy semantics are reference-only; no migration, parity or compatibility work is performed on it.
 在 monorepo workspace 内，legacy v0.2–v0.10 面经显式 `./legacy` 子路径原样可用（旧根 index 继续 re-export `public-v2`/`v3`/`v4`/`v7`）。legacy 语义仅作参考，不做迁移、parity 或兼容工作。
+
+The host/adapter workspaces are **LEGACY_INTERNAL_WORKSPACE_ONLY** for v0.11.0: `@kaicreator/domain-harness-node`, `@kaicreator/domain-harness-expo` and `@kaicreator/domain-harness-compiler` are private legacy consumers (0.2.x line, own versioning, not part of the frozen four-package 0.11.0 release graph). Their legacy imports of this package go through `./legacy` and keep running inside the workspace; they are not release consumers of the 0.11.0 SDK and no 0.11 feature is delivered through them.
+宿主/适配器 workspace 在 v0.11.0 中属 **LEGACY_INTERNAL_WORKSPACE_ONLY（仅 workspace 内部 legacy）**：`@kaicreator/domain-harness-node`、`-expo`、`-compiler` 是私有 legacy 消费方（0.2.x 线、独立版本、不属于冻结的四包 0.11.0 发行图）。它们对本包的 legacy 导入走 `./legacy`，仅在 workspace 内可运行；不是 0.11.0 SDK 的发行消费方，也不经它们交付任何 0.11 功能。

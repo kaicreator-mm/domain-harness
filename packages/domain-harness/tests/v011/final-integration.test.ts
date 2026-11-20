@@ -11,7 +11,10 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { boot } from '@kaicreator/domain-harness-microkernel';
+// P2-1: the canonical public entry '@kaicreator/domain-harness' is exercised
+// (root export map → real build/microkernel packages), not direct package
+// imports. The clean pack-root consumer smoke remains T05's evidence.
+import { boot } from '@kaicreator/domain-harness';
 import {
   T04BuildRefusedError,
   buildScenarioInstall,
@@ -181,6 +184,53 @@ test('T04-INT-5: unsupported effect profile is a typed BUILD refusal (DH_BUILD_E
       assert.ok(error instanceof T04BuildRefusedError, `expected T04BuildRefusedError, got ${String(error)}`);
       assert.equal(error.failure.code, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
       assert.match(error.failure.message, /0\.11\.0 implements 'none' only/);
+      return true;
+    },
+  );
+});
+
+test('T04-INT-6: a Business App Init that suppresses a REQUIRED ingress is typed-refused (never silently accepted)', { timeout: 120_000 }, async (t) => {
+  await withInstall(t, { rule: RULE_A, init: { status: 'DEGRADED_SUPPRESS_REQUIRED' } }, async (install) => {
+    const result = await boot(install.pin, install.context);
+    assert.equal(result.status, 'FAILED', JSON.stringify(result));
+    if (result.status !== 'FAILED') return;
+    // No new error family: the KDP refuses the invalid App Init result with
+    // the ordinary startup-failure code and never exposes an App handle.
+    assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
+    assert.match(result.reason, /suppressedIngress names required ingress 'evaluate'/);
+    assert.equal(
+      events().filter((event) => event['event'] === 'business-init').length,
+      1,
+      'the locked init ran once; its invalid result is what is refused',
+    );
+  });
+});
+
+test('T04-INT-7: unsupported Boot target (env.nodeMajor 22) is a typed REFUSAL before any module loads', { timeout: 120_000 }, async (t) => {
+  await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (install) => {
+    // BUILD only emits the frozen node24-esm/1 Lock; the Host-declared
+    // runtime probe must match it. A wrong major is refused by the shared
+    // context normalization (DH_BOOT_PIN_MISMATCH target family).
+    const badContext = { ...install.context, env: { nodeMajor: 22, platform: process.platform } };
+    const result = await boot(install.pin, badContext);
+    assert.equal(result.status, 'REFUSED', JSON.stringify(result));
+    if (result.status !== 'REFUSED') return;
+    assert.equal(result.code, 'DH_BOOT_PIN_MISMATCH');
+    assert.match(result.reason, /env\.nodeMajor must be 24/);
+    assert.equal(
+      events().some((event) => event['event'] === 'technical-init' || event['event'] === 'business-init'),
+      false,
+      'zero side effects: no package module was loaded or initialized',
+    );
+  });
+});
+
+test('T04-INT-8: authoring against a non-node24 Target is a typed BUILD refusal (DH_BUILD_TARGET_INVALID)', { timeout: 120_000 }, async () => {
+  await assert.rejects(
+    buildScenarioInstall({ rule: RULE_A, init: { status: 'READY' }, withUnsupportedTarget: true }),
+    (error: unknown) => {
+      assert.ok(error instanceof T04BuildRefusedError, `expected T04BuildRefusedError, got ${String(error)}`);
+      assert.equal(error.failure.code, 'DH_BUILD_TARGET_INVALID');
       return true;
     },
   );

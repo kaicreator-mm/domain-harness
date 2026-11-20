@@ -11,7 +11,7 @@ const require_ = createRequire(import.meta.url);
 const dbPath = process.argv[2];
 if (!dbPath) throw new Error('usage: consumer.mjs <sqlitePath>');
 
-const harness = await import('@kaicreator/domain-harness/legacy');
+const harness = await import('@kaicreator/domain-harness');
 const compiler = await import('@kaicreator/domain-harness-compiler');
 const { StaticPackageRegistry } = harness;
 const { compileDomainPackage } = compiler;

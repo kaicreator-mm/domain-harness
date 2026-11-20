@@ -32,8 +32,8 @@ import type {
   KdpBootstrapContext,
   ResourceRef,
 } from '@kaicreator/domain-harness-contracts/v011';
-import { buildV011App } from '@kaicreator/domain-harness-build';
-import type { V011BuildInput, V011BuildFailure } from '@kaicreator/domain-harness-build';
+import { buildV011App } from '@kaicreator/domain-harness';
+import type { V011BuildInput, V011BuildFailure } from '@kaicreator/domain-harness';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MICROKERNEL_DIR = join(HERE, '../../../microkernel');
@@ -46,10 +46,16 @@ const DESCRIPTOR_RELATIVE_PATH = 'descriptor/app.json';
 export interface T04Scenario {
   /** Selected rule content — swapped between scenarios (content-swap proof). */
   readonly rule: { readonly minOrderTotal: number; readonly regions: readonly string[] };
-  /** READY app init, or DEGRADED suppressing only the optional ingress. */
-  readonly init: { readonly status: 'READY' | 'DEGRADED' };
+  /**
+   * READY app init; DEGRADED suppressing only the optional ingress; or
+   * DEGRADED_SUPPRESS_REQUIRED — the init claims to suppress a REQUIRED
+   * ingress, which the KDP must typed-refuse (L2 §7.2).
+   */
+  readonly init: { readonly status: 'READY' | 'DEGRADED' | 'DEGRADED_SUPPRESS_REQUIRED' };
   /** Select a function declaring a non-'none' effect profile (BUILD refusal). */
   readonly withUnsupportedEffect?: boolean;
+  /** Author the descriptor against a non-node24 Target (BUILD refusal). */
+  readonly withUnsupportedTarget?: boolean;
 }
 
 export interface T04Install {
@@ -165,7 +171,9 @@ function businessEntryModuleSource(scenario: T04Scenario): string {
   const initResult =
     scenario.init.status === 'DEGRADED'
       ? { status: 'DEGRADED', suppressedIngress: ['optional-report'] }
-      : { status: 'READY' };
+      : scenario.init.status === 'DEGRADED_SUPPRESS_REQUIRED'
+        ? { status: 'DEGRADED', suppressedIngress: ['evaluate'] }
+        : { status: 'READY' };
   return `
 const events = (globalThis.__v011T04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'orders-business-entry' });
@@ -461,7 +469,9 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       schemaVersion: DH_APP_SCHEMA_VERSION,
       id: APP_ID,
       version: APP_VERSION,
-      target: TARGET_SELECTOR,
+      target: scenario.withUnsupportedTarget === true
+        ? { runtime: 'node', module: 'esm', nodeMajor: 22 }
+        : TARGET_SELECTOR,
       roots: {
         kernelPrimary: { package: 'kdp-kernel', version: '1.0.0' },
         sdkPrimary: { package: 'sdk-core', version: '1.0.0' },
