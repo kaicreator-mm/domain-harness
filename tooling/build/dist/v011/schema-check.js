@@ -10,66 +10,70 @@
  * real content validation. Cross-document semantics (closure, ownership, DAG,
  * selection, Lock) are deliberately NOT expressible here and live in the BUILD
  * pipeline — one schema authority only (L2 §2.2 boundary, T01 validate.ts).
+ *
+ * One checker instance per BUILD run: ajv's internal registry caches by
+ * schema `$id`, so a shared instance across builds could let an authoring
+ * schema carrying a colliding `$id` bleed into a later run. Fresh instance,
+ * fresh caches, zero cross-run state.
  */
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import { DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA, DOMAIN_DEFINITION_JSON_SCHEMA, DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA, ELEMENT_DEFINITION_JSON_SCHEMA, } from '@kaicreator/domain-harness-contracts/v011';
-import { canonicalJson } from '@kaicreator/domain-harness-contracts/v011';
+import { DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA, DOMAIN_DEFINITION_JSON_SCHEMA, DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA, ELEMENT_DEFINITION_JSON_SCHEMA, canonicalJson, } from '@kaicreator/domain-harness-contracts/v011';
 import { refusal, V011BuildRefusal } from './refusal.js';
-let ajvInstance;
-function getAjv() {
-    // strict:false: the frozen T01 documents are the authority for which
-    // keywords exist; ajv must not invent its own strictness failures.
-    ajvInstance ??= new Ajv2020({ strict: false, allErrors: false, validateSchema: false });
-    return ajvInstance;
-}
-/** Compile one JSON Schema (draft 2020-12); illegal schemas raise SCHEMA_INVALID. */
-export function compileContentSchema(schema, refPath) {
-    if (typeof schema !== 'boolean' && (typeof schema !== 'object' || schema === null)) {
-        throw refusal('DH_BUILD_SCHEMA_INVALID', 'schemaRef does not resolve to a JSON Schema', refPath);
+export class V011SchemaChecker {
+    ajv;
+    documentValidators = new Map();
+    contentSchemaCache = new Map();
+    constructor() {
+        // strict:false: the frozen T01 documents are the authority for which
+        // keywords exist; ajv must not invent its own strictness failures.
+        this.ajv = new Ajv2020({ strict: false, allErrors: false, validateSchema: false });
     }
-    try {
-        return getAjv().compile(schema);
+    /** Validate one authoring document against a frozen T01 machine schema. */
+    validateDocument(schemaName, value) {
+        const cached = this.documentValidators.get(schemaName);
+        const validate = cached ??
+            (() => {
+                const schema = schemaName === 'descriptor'
+                    ? DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA
+                    : schemaName === 'domain'
+                        ? DOMAIN_DEFINITION_JSON_SCHEMA
+                        : schemaName === 'manifest'
+                            ? DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA
+                            : ELEMENT_DEFINITION_JSON_SCHEMA;
+                let compiled;
+                try {
+                    compiled = this.ajv.compile(schema);
+                }
+                catch (error) {
+                    throw new V011BuildRefusal('DH_BUILD_SCHEMA_INVALID', `frozen T01 ${schemaName} schema failed to compile: ${error.message}`);
+                }
+                this.documentValidators.set(schemaName, compiled);
+                return compiled;
+            })();
+        if (!validate(value)) {
+            throw refusal('DH_BUILD_SCHEMA_INVALID', `${schemaName} document violates the frozen v011 machine schema`);
+        }
     }
-    catch (error) {
-        throw refusal('DH_BUILD_SCHEMA_INVALID', `schemaRef is not a compilable draft 2020-12 JSON Schema: ${error.message}`, refPath);
+    /** Compile one JSON Schema (draft 2020-12); illegal schemas raise SCHEMA_INVALID. */
+    compileContentSchema(schema, refPath) {
+        if (typeof schema !== 'boolean' && (typeof schema !== 'object' || schema === null)) {
+            throw refusal('DH_BUILD_SCHEMA_INVALID', 'schemaRef does not resolve to a JSON Schema', refPath);
+        }
+        try {
+            return this.ajv.compile(schema);
+        }
+        catch (error) {
+            throw refusal('DH_BUILD_SCHEMA_INVALID', `schemaRef is not a compilable draft 2020-12 JSON Schema: ${error.message}`, refPath);
+        }
     }
-}
-const documentValidators = new Map();
-/** Validate one authoring document against a frozen T01 machine schema. */
-export function validateDocument(schemaName, value) {
-    const cached = documentValidators.get(schemaName);
-    const validate = cached ??
-        (() => {
-            const schema = schemaName === 'descriptor'
-                ? DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA
-                : schemaName === 'domain'
-                    ? DOMAIN_DEFINITION_JSON_SCHEMA
-                    : schemaName === 'manifest'
-                        ? DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA
-                        : ELEMENT_DEFINITION_JSON_SCHEMA;
-            let compiled;
-            try {
-                compiled = getAjv().compile(schema);
-            }
-            catch (error) {
-                throw new V011BuildRefusal('DH_BUILD_SCHEMA_INVALID', `frozen T01 ${schemaName} schema failed to compile: ${error.message}`);
-            }
-            documentValidators.set(schemaName, compiled);
-            return compiled;
-        })();
-    if (!validate(value)) {
-        throw refusal('DH_BUILD_SCHEMA_INVALID', `${schemaName} document violates the frozen v011 machine schema`);
+    /** Compile (cached within this BUILD run) an inline content schema object. */
+    compileInlineSchema(schema, refPath) {
+        const key = canonicalJson(schema);
+        const cached = this.contentSchemaCache.get(key);
+        if (cached)
+            return cached;
+        const compiled = this.compileContentSchema(schema, refPath);
+        this.contentSchemaCache.set(key, compiled);
+        return compiled;
     }
-}
-// ---- inline/ref content schema cache (normalized by canonical JSON bytes) ----
-const contentSchemaCache = new Map();
-/** Compile (with per-BUILD-process cache) an inline content schema object. */
-export function compileInlineSchema(schema, refPath) {
-    const key = canonicalJson(schema);
-    const cached = contentSchemaCache.get(key);
-    if (cached)
-        return cached;
-    const compiled = compileContentSchema(schema, refPath);
-    contentSchemaCache.set(key, compiled);
-    return compiled;
 }

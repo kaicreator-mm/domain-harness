@@ -34,6 +34,11 @@ export interface StandardRefs {
 
 const TARGET_24: TargetSelector = { runtime: 'node', module: 'esm', nodeMajor: 24 };
 
+function requireValue(value: JsonValue | undefined, key: string): JsonValue {
+  if (value === undefined) throw new Error(`fixture: no extraElementFileValues for ${key}`);
+  return value;
+}
+
 export interface StandardCase {
   ws: Workspace;
   faq: ElementDefinition;
@@ -44,6 +49,10 @@ export interface StandardCase {
   extraElements: ElementDefinition[];
   /** `<elementId>/<contentBlockId>` -> canonical-JSON value written for a pending ref */
   extraElementFileValues: Record<string, JsonValue>;
+  /** `<elementId>/<contentBlockId>` -> RAW bytes written for a pending ref (opaque content) */
+  extraElementRawFiles: Record<string, Uint8Array>;
+  /** extra implementation bindings appended to the business node24 variant */
+  extraImplementations: DomainPackageManifest['targetVariants'][number]['implementations'];
   eligibilityVisibility: ElementVisibility;
   businessExports: DomainPackageManifest['exports'];
   sdkImports: DomainPackageManifest['imports'];
@@ -185,6 +194,8 @@ export function standardCase(): StandardCase {
     appMain,
     extraElements: [],
     extraElementFileValues: {},
+    extraElementRawFiles: {},
+    extraImplementations: [],
     eligibilityVisibility: 'public',
     businessExports: [
       { elementId: 'orders.eligibility', functionId: 'evaluate' },
@@ -240,12 +251,12 @@ export function standardCase(): StandardCase {
     for (const element of case_.extraElements) {
       for (const block of element.content) {
         if (block.ref && block.ref.digest === 'sha256:pending') {
-          const value = case_.extraElementFileValues[`${element.id}/${block.id}`];
-          if (value === undefined) {
-            throw new Error(`fixture: no extraElementFileValues for ${element.id}/${block.id}`);
-          }
-          const path = `content/${element.id.split('.')[1]}-${block.id}.json`;
-          (block as { ref?: unknown }).ref = writeCanonicalJson(businessDir, path, value);
+          const key = `${element.id}/${block.id}`;
+          const raw = case_.extraElementRawFiles[key];
+          const path = `content/${element.id.split('.')[1]}-${block.id}.bin`;
+          (block as { ref?: unknown }).ref = raw
+            ? writeRaw(businessDir, path, raw)
+            : writeCanonicalJson(businessDir, path, requireValue(case_.extraElementFileValues[key], key));
         }
       }
     }
@@ -289,6 +300,18 @@ export function standardCase(): StandardCase {
     const evaluateRef = functionRefOf(eligibility, 'evaluate');
     const initRef = functionRefOf(appMain, 'init');
 
+    const extraModules = case_.extraImplementations.map((binding, index) =>
+      writeRaw(
+        businessDir,
+        `dist/extra-${index}.mjs`,
+        new TextEncoder().encode(`export function ${binding.functionId}() {}\n`),
+      ),
+    );
+    const extraImplementations = case_.extraImplementations.map((binding, index) => ({
+      ...binding,
+      entry: { ...binding.entry, module: extraModules[index]! },
+    }));
+
     const businessManifest = manifest('orders-business', '1.0.0', {
       layer: 'business',
       role: 'primary',
@@ -312,6 +335,7 @@ export function standardCase(): StandardCase {
               contractVersion: '1',
               entry: { module: initModule, exportName: 'init' },
             },
+            ...extraImplementations,
           ],
         },
         {

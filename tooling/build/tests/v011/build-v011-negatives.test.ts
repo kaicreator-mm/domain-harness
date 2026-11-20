@@ -11,7 +11,7 @@ import {
   type V011BuildErrorCode,
 } from '@kaicreator/domain-harness-contracts/v011';
 import { buildV011App, type V011BuildResult } from '../../src/v011/index.js';
-import { functionRefOf } from './fixtures.js';
+import { functionRefOf, writeRaw } from './fixtures.js';
 import { standardCase } from './standard-case.js';
 
 function expectRefusal(result: V011BuildResult, code: V011BuildErrorCode): void {
@@ -177,14 +177,17 @@ test('DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION: two compatible bindings for on
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
+  // implementation owner may differ from definition owner (PRD P05); the
+  // second binding carries the sdk package's OWN artifact (review P2-6).
+  const sdkDir = scenario.ws.packageRoots['sdk-core']!;
+  const sdkModule = writeRaw(
+    sdkDir,
+    'dist/sdk-evaluate.mjs',
+    new TextEncoder().encode('export function evaluate() { return { decision: "SDK" }; }\n'),
+  );
   const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as {
     targetVariants: unknown[];
   };
-  const evaluateBinding = (
-    input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as {
-      targetVariants: { implementations: { entry: { module: unknown } }[] }[];
-    }
-  ).targetVariants[0]!.implementations[0]!;
   sdk.targetVariants.push({
     target: { runtime: 'node', module: 'esm', nodeMajor: 24 },
     implementations: [
@@ -192,7 +195,7 @@ test('DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION: two compatible bindings for on
         elementId: 'orders.eligibility',
         functionId: 'evaluate',
         contractVersion: '1',
-        entry: { module: evaluateBinding.entry.module, exportName: 'evaluate' },
+        entry: { module: sdkModule, exportName: 'evaluate' },
       },
     ],
   });
@@ -267,3 +270,4 @@ test('app-init function not exported by its owner is an export refusal', (t) => 
   business.exports = business.exports.filter((entry) => entry.elementId !== 'orders.app-main');
   expectRefusal(buildV011App(input), 'DH_BUILD_EXPORT_MISSING');
 });
+

@@ -24,7 +24,6 @@
  * schema authority (L2 §12 scope boundaries).
  */
 import {
-  CORE_CONTENT_KINDS,
   DH_LOCK_SCHEMA_VERSION,
   NODE24_ESM_PROFILE,
   contentDigestOf,
@@ -63,9 +62,9 @@ import type {
   V011BuildSuccess,
 } from './types.js';
 import { V011BuildRefusal, refusal } from './refusal.js';
-import { compileInlineSchema, validateDocument } from './schema-check.js';
+import { V011SchemaChecker } from './schema-check.js';
 import { V011ResourceScope, digestOfBytes } from './resources.js';
-import { kahnTopologicalOrder, satisfiesSemver } from './graph.js';
+import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
 
 // ---------------------------------------------------------------------------
 // Internal model
@@ -107,6 +106,15 @@ function isCompatibleTarget(target: TargetSelector): boolean {
   );
 }
 
+/**
+ * Package target VARIANTS must declare the exact verified floor: the sole
+ * selected Target is node24-esm/1 (L2 §8.4), so a variant without an explicit
+ * nodeMajor 24 is not selectable — never silently widened.
+ */
+function isCompatibleVariantTarget(target: TargetSelector): boolean {
+  return target.runtime === 'node' && target.module === 'esm' && target.nodeMajor === 24;
+}
+
 function toJson(value: unknown): JsonValue {
   return value as JsonValue;
 }
@@ -137,8 +145,12 @@ export function buildV011App(input: V011BuildInput): V011BuildResult {
 }
 
 function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
+  // One schema checker per BUILD run: no shared ajv registry / $id cache can
+  // leak across runs (review P2-8).
+  const schemas = new V011SchemaChecker();
+
   // ---- 1. descriptor machine-schema validation --------------------------
-  validateDocument('descriptor', input.descriptor);
+  schemas.validateDocument('descriptor', input.descriptor);
   const descriptor = input.descriptor as DomainAppDescriptor;
 
   // ---- 2. optional authoring Domains through the T01 validators ---------
@@ -152,13 +164,13 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
         issue.path,
       );
     }
-    validateDocument('domain', domain);
+    schemas.validateDocument('domain', domain);
   }
 
   // ---- 3. manifest pool machine-schema validation -----------------------
   const pool = new Map<string, DomainPackageManifest>();
   for (const [index, candidate] of input.packages.entries()) {
-    validateDocument('manifest', candidate);
+    schemas.validateDocument('manifest', candidate);
     const manifest = candidate as DomainPackageManifest;
     if (pool.has(manifest.id)) {
       throw refusal(
@@ -187,12 +199,12 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
 
   // ---- 5. roots / extensions lookup with layer+role checks --------------
   const selected = new Map<string, DomainPackageManifest>();
-  const rootSlots: readonly (keyof DomainAppDescriptor['roots'])[] = [
-    'kernelPrimary',
-    'sdkPrimary',
-    'businessPrimary',
+  const rootSlots: readonly (readonly [PackageLayer, keyof DomainAppDescriptor['roots']])[] = [
+    ['kernel', 'kernelPrimary'],
+    ['sdk', 'sdkPrimary'],
+    ['business', 'businessPrimary'],
   ];
-  for (const slot of rootSlots) {
+  for (const [layer, slot] of rootSlots) {
     const ref = descriptor.roots[slot];
     const manifest = pool.get(ref.package);
     if (!manifest || manifest.version !== ref.version) {
@@ -206,6 +218,14 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
       throw refusal(
         'DH_BUILD_LAYER_ROLE_MISMATCH',
         `roots.${slot} package '${ref.package}' declares role='${manifest.role}'; a root slot must reference a primary package`,
+        `roots.${slot}`,
+      );
+    }
+    if (manifest.layer !== layer) {
+      // the slot failed to deliver this layer's primary
+      throw refusal(
+        'DH_BUILD_PRIMARY_MISSING',
+        `roots.${slot} package '${ref.package}' declares layer='${manifest.layer}', leaving layer '${layer}' without a primary`,
         `roots.${slot}`,
       );
     }
@@ -290,6 +310,12 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
   const packagesSorted = [...selected.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
   for (const manifest of packagesSorted) {
     for (const entry of manifest.elements) {
+      if (entry.definitionRef.packageId !== manifest.id) {
+        throw refusal(
+          'DH_BUILD_SCHEMA_INVALID',
+          `'${manifest.id}' declares element '${entry.id}' with definitionRef pointing at package '${entry.definitionRef.packageId}'; an owner declares its own definition source`,
+        );
+      }
       const definitionBytes = scope.verify(entry.definitionRef);
       let parsed: unknown;
       try {
@@ -305,7 +331,7 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
         const issue = firstIssue(checked.issues);
         throw new V011BuildRefusal(issue.code as V011BuildErrorCode, issue.message, issue.path);
       }
-      validateDocument('element', parsed);
+      schemas.validateDocument('element', parsed);
       const def = parsed as ElementDefinition;
       const namespace = elementNamespace(def.id);
       if (def.id !== entry.id || def.version !== entry.version) {
@@ -433,11 +459,16 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
     }
     return { element: loaded, fn, owner: loaded.owner };
   };
-  const requireExported = (resolved: ResolvedFunction, consumer: string): void => {
-    if (resolved.owner.id !== consumer && !isExported(resolved.owner, resolved.element, resolved.fn)) {
+  const requireExported = (resolved: ResolvedFunction, consumer: string | null): void => {
+    // consumer === null marks the app-level surface (ingress / businessAppInit):
+    // the descriptor identity is external to every package, so the export
+    // check must NEVER be skipped — even if descriptor.id equals the owner
+    // package id (review P1-2).
+    if (consumer !== null && resolved.owner.id === consumer) return;
+    if (!isExported(resolved.owner, resolved.element, resolved.fn)) {
       throw refusal(
         'DH_BUILD_EXPORT_MISSING',
-        `'${consumer}' references '${resolved.element.def.id}.${resolved.fn.id}' which its owner does not export`,
+        `'${consumer ?? descriptor.id}' references '${resolved.element.def.id}.${resolved.fn.id}' which its owner does not export`,
       );
     }
   };
@@ -445,7 +476,7 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
   const ingressResolved: { entry: DomainAppDescriptor['ingress'][number]; resolved: ResolvedFunction }[] = [];
   for (const entry of descriptor.ingress) {
     const resolved = resolveFunctionRef(entry.function, `ingress.${entry.id}`);
-    requireExported(resolved, descriptor.id);
+    requireExported(resolved, null);
     ingressResolved.push({ entry, resolved });
   }
 
@@ -480,7 +511,15 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
     throw refusal('DH_BUILD_APP_INIT_DUPLICATE', 'more than one App Init candidate matched the descriptor reference');
   }
   const appInit = appInitCandidates[0]!;
-  requireExported(appInit, descriptor.id);
+  // The unique Business App Init must live on the business layer (PRD A01);
+  // a kernel/sdk-layer init candidate is a layer/role contradiction.
+  if (appInit.owner.layer !== 'business') {
+    throw refusal(
+      'DH_BUILD_LAYER_ROLE_MISMATCH',
+      `businessAppInit '${appInit.element.def.id}.${appInit.fn.id}' is owned by layer '${appInit.owner.layer}' package '${appInit.owner.id}', not the business layer`,
+    );
+  }
+  requireExported(appInit, null);
 
   // ---- 12. per-package imports --------------------------------------------
   const importedFunctions = new Map<string, ResolvedFunction>();
@@ -517,7 +556,7 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
     const candidates: { manifest: DomainPackageManifest; binding: DomainPackageManifest['targetVariants'][number]['implementations'][number] }[] = [];
     for (const manifest of packagesSorted) {
       for (const variant of manifest.targetVariants) {
-        if (!isCompatibleTarget(variant.target)) continue;
+        if (!isCompatibleVariantTarget(variant.target)) continue;
         for (const binding of variant.implementations) {
           if (
             binding.elementId === resolved.element.def.id &&
@@ -542,6 +581,12 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
       );
     }
     const { manifest: implementor, binding } = candidates[0]!;
+    if (binding.entry.module.packageId !== implementor.id) {
+      throw refusal(
+        'DH_BUILD_SCHEMA_INVALID',
+        `'${implementor.id}' binds function '${resolved.element.def.id}.${resolved.fn.id}' with an entry module from package '${binding.entry.module.packageId}'; a binding carries its own package's artifact`,
+      );
+    }
     if (implementor.id !== resolved.owner.id) {
       const ownerEntry = resolved.owner.elements.find(
         (entry) => entry.id === resolved.element.def.id && entry.version === resolved.element.def.version,
@@ -573,6 +618,12 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
       for (const manifest of packagesSorted) {
         for (const contribution of manifest.contributesTo) {
           if (contribution.ownerPackageId !== owner.id || contribution.hookId !== hook.id) continue;
+          if (contribution.entry.module.packageId !== manifest.id) {
+            throw refusal(
+              'DH_BUILD_SCHEMA_INVALID',
+              `'${manifest.id}' contributes hook '${owner.id}/${hook.id}' with an entry module from package '${contribution.entry.module.packageId}'; a contribution carries its own package's artifact`,
+            );
+          }
           scope.verify(contribution.entry.module);
           providers.push(contribution.entry);
         }
@@ -583,6 +634,7 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
           `single hook '${owner.id}/${hook.id}' received ${providers.length} provider bindings`,
         );
       }
+      providers.sort(compareEntryRef);
       hookBindings.push({
         ownerPackageId: owner.id,
         hookId: hook.id,
@@ -612,8 +664,16 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
         `package '${manifest.id}' declares only one of technicalInit / technicalDispose`,
       );
     }
-    if (manifest.technicalInit) scope.verify(manifest.technicalInit.module);
-    if (manifest.technicalDispose) scope.verify(manifest.technicalDispose.module);
+    for (const entry of [manifest.technicalInit, manifest.technicalDispose]) {
+      if (!entry) continue;
+      if (entry.module.packageId !== manifest.id) {
+        throw refusal(
+          'DH_BUILD_SCHEMA_INVALID',
+          `'${manifest.id}' declares a lifecycle entry from package '${entry.module.packageId}'; lifecycle entries carry their own package's artifact`,
+        );
+      }
+      scope.verify(entry.module);
+    }
   }
 
   // ---- 16. package DAG ------------------------------------------------------
@@ -632,13 +692,6 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
   for (const loaded of [...elements.values()].sort(compareLoadedElement)) {
     const contentDigests: ContentDigest[] = [];
     for (const block of loaded.def.content) {
-      validateBlockContent(loaded, block, scope);
-      if (block.ref) {
-        // digest already verified against real bytes inside validateBlockContent
-        contentDigests.push(block.ref.digest);
-      } else {
-        contentDigests.push(contentDigestOf(toJson(block.value)));
-      }
       if (isUnknownContentKind(block.contentKind)) {
         if (block.required) {
           // unreachable in practice: the T01 validators already refuse a
@@ -648,8 +701,12 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
             `required content block '${loaded.def.id}/${block.id}' carries unknown contentKind '${block.contentKind}'`,
           );
         }
+        // Explicitly excluded (PRD E10): no digest, no selection, no byte
+        // requirement — the block simply does not exist for this Lock.
         excludedUnknownContent.push(`${loaded.def.id}/${block.id}`);
+        continue;
       }
+      contentDigests.push(validateBlockContent(schemas, loaded, block, scope));
     }
     if (loaded.def.validation) scope.verify(loaded.def.validation.ref);
     sealedElements.push({
@@ -770,12 +827,22 @@ function toFunctionRef(resolved: ResolvedFunction): FunctionRef {
 }
 
 function compareLoadedElement(a: LoadedElement, b: LoadedElement): number {
-  return a.def.id < b.def.id ? -1 : a.def.id > b.def.id ? 1 : a.def.version < b.def.version ? -1 : 1;
+  // total strict weak order on (id, version) — equal elements compare 0.
+  if (a.def.id !== b.def.id) return a.def.id < b.def.id ? -1 : 1;
+  return compareSemver(a.def.version, b.def.version);
 }
 
 function compareResolvedFunction(a: ResolvedFunction, b: ResolvedFunction): number {
   const byElement = compareLoadedElement(a.element, b.element);
-  return byElement !== 0 ? byElement : a.fn.id < b.fn.id ? -1 : 1;
+  if (byElement !== 0) return byElement;
+  return a.fn.id < b.fn.id ? -1 : a.fn.id > b.fn.id ? 1 : 0;
+}
+
+function compareEntryRef(a: EntryRef, b: EntryRef): number {
+  // deterministic provider order: (module packageId, module path, exportName)
+  if (a.module.packageId !== b.module.packageId) return a.module.packageId < b.module.packageId ? -1 : 1;
+  if (a.module.path !== b.module.path) return a.module.path < b.module.path ? -1 : 1;
+  return a.exportName < b.exportName ? -1 : a.exportName > b.exportName ? 1 : 0;
 }
 
 function compareHookBinding(a: SealedHookBinding, b: SealedHookBinding): number {
@@ -789,38 +856,63 @@ function compareHookBinding(a: SealedHookBinding, b: SealedHookBinding): number 
 }
 
 /**
- * Validate one content block against its schemaRef (L2 §2.2/§2.3):
- * known kinds must resolve their schema (inline or package resource bytes)
- * and the content value must pass real draft 2020-12 validation; unknown
- * kinds are dispositioned by the caller (required → refused, optional →
- * recorded exclusion).
+ * Validate one KNOWN-kind content block against its schemaRef (L2 §2.2/§2.3)
+ * and return its normalized content digest:
+ *
+ * - inline value: `sha256(canonicalJson(value))`;
+ * - ref to JSON bytes: the bytes are digest-verified AND the value normalized
+ *   to `sha256(canonicalJson(parsed))`, so inline vs ref semantic equivalence
+ *   holds regardless of the file's whitespace/serialization (AC02). The raw
+ *   declared-bytes digest is still recorded in `resourceDigests` by the
+ *   verification itself;
+ * - ref to opaque (non-JSON) bytes: only `document`-like content may skip
+ *   schema validation; every other known kind with non-JSON ref bytes is
+ *   SCHEMA_INVALID (review P2-3).
  */
-function validateBlockContent(loaded: LoadedElement, block: ContentBlock, scope: V011ResourceScope): void {
-  const known =
-    (CORE_CONTENT_KINDS as readonly string[]).includes(block.contentKind) ||
-    !isUnknownContentKind(block.contentKind);
+function validateBlockContent(
+  schemas: V011SchemaChecker,
+  loaded: LoadedElement,
+  block: ContentBlock,
+  scope: V011ResourceScope,
+): ContentDigest {
   const blockPath = `${loaded.def.id}/${block.id}`;
-  let parsedRefValue: JsonValue | undefined;
-  let refIsJson = false;
-  if (block.ref) {
-    const bytes = scope.verify(block.ref);
-    try {
-      parsedRefValue = JSON.parse(Buffer.from(bytes).toString('utf8')) as JsonValue;
-      refIsJson = true;
-    } catch {
-      // Opaque byte content (e.g. a markdown document): digest-verified
-      // above, but not schema-validatable as JSON — dispositioned as bytes.
-    }
+  if (!block.ref) {
+    const value = toJson(block.value);
+    validateAgainstSchema(schemas, scope, block, value, blockPath);
+    return contentDigestOf(value);
   }
-  if (!known || (block.ref && !refIsJson)) return; // unknown kind / opaque bytes: caller disposition.
+  const bytes = scope.verify(block.ref);
+  let parsed: JsonValue;
+  try {
+    parsed = JSON.parse(Buffer.from(bytes).toString('utf8')) as JsonValue;
+  } catch {
+    if (block.contentKind !== 'document') {
+      throw refusal(
+        'DH_BUILD_SCHEMA_INVALID',
+        `content block '${blockPath}' (kind '${block.contentKind}') carries non-JSON ref bytes; only document content may be opaque`,
+        blockPath,
+      );
+    }
+    return block.ref.digest;
+  }
+  validateAgainstSchema(schemas, scope, block, parsed, blockPath);
+  return contentDigestOf(parsed);
+}
+
+function validateAgainstSchema(
+  schemas: V011SchemaChecker,
+  scope: V011ResourceScope,
+  block: ContentBlock,
+  value: JsonValue,
+  blockPath: string,
+): void {
   const validate =
     'inline' in block.schemaRef
-      ? compileInlineSchema(block.schemaRef.inline, `${blockPath}.schemaRef`)
-      : compileInlineSchema(
+      ? schemas.compileInlineSchema(block.schemaRef.inline, `${blockPath}.schemaRef`)
+      : schemas.compileInlineSchema(
           parseSchemaResource(scope, block.schemaRef, blockPath),
           `${blockPath}.schemaRef`,
         );
-  const value = block.ref ? parsedRefValue : (block.value as JsonValue);
   if (!validate(value)) {
     throw refusal(
       'DH_BUILD_SCHEMA_INVALID',
@@ -830,6 +922,7 @@ function validateBlockContent(loaded: LoadedElement, block: ContentBlock, scope:
   }
 }
 
+/** Read + digest-verify a schema resource; non-JSON schema bytes are SCHEMA_INVALID. */
 function parseSchemaResource(scope: V011ResourceScope, ref: ResourceRef, blockPath: string): JsonValue {
   const bytes = scope.verify(ref);
   try {

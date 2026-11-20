@@ -9,7 +9,7 @@
  * `<packageId>/<path>` (PRD 5.1). Missing files and digest mismatches fail
  * the BUILD with the exact frozen codes — never repaired, never re-fetched.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { refusal } from './refusal.js';
@@ -32,22 +32,21 @@ export class V011ResourceScope {
     }
     /** Read package bytes with containment enforcement; no digest bookkeeping. */
     read(packageId, path) {
-        const root = resolve(this.rootOf(packageId));
-        const target = resolve(root, path);
-        // Containment: the resolved path must stay strictly inside the package
-        // root. (T01 validators already refuse absolute/`..` wire forms; this is
-        // the byte-level defense for symlinked or adversarial on-disk layouts.)
-        if (target !== root && !target.startsWith(root + sep)) {
-            throw refusal('DH_BUILD_RESOURCE_MISSING', `resource path '${path}' escapes package root of '${packageId}'`);
-        }
-        let bytes;
+        let root;
+        let target;
         try {
-            bytes = readFileSync(target);
+            // realpath both ends: symlinked package roots or symlinked resource
+            // files cannot escape the resolved package root.
+            root = realpathSync(resolve(this.rootOf(packageId)));
+            target = realpathSync(resolve(root, path));
         }
         catch {
             throw refusal('DH_BUILD_RESOURCE_MISSING', `resource '${packageId}/${path}' does not exist or is not readable`);
         }
-        return bytes;
+        if (target !== root && !target.startsWith(root + sep)) {
+            throw refusal('DH_BUILD_RESOURCE_MISSING', `resource path '${path}' escapes package root of '${packageId}'`);
+        }
+        return readFileSync(target);
     }
     /** Read + digest-verify + record one declared resource reference. */
     verify(ref) {

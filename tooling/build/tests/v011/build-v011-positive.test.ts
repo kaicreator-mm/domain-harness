@@ -18,6 +18,7 @@ import {
   type JsonValue,
 } from '@kaicreator/domain-harness-contracts/v011';
 import { buildV011App, type V011BuildResult } from '../../src/v011/index.js';
+import { DH_ELEMENT_SCHEMA_VERSION, sha256OfBytes } from './fixtures.js';
 import { standardCase } from './standard-case.js';
 
 function expectSuccess(result: V011BuildResult): Extract<V011BuildResult, { ok: true }> {
@@ -103,7 +104,12 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
   assert.deepEqual(lock.businessAppInit, refs.initRef);
 
   // unknown optional content explicitly excluded (PRD E10 pinned record form)
+  // AND absent from selectedElements.contentDigests (review P2-4)
   assert.deepEqual(lock.excludedUnknownContent, ['orders.legacy-prompt-notes/prompt-note']);
+  assert.deepEqual(
+    lock.selectedElements.find((element) => element.ref.id === 'orders.legacy-prompt-notes')!.contentDigests,
+    [],
+  );
 
   // KDP bootstrap pin: acyclic KDP-side facts only
   assert.equal(lock.bootstrapKdpPin.kdpPackageId, '@kaicreator/domain-harness-microkernel');
@@ -185,14 +191,43 @@ test('AC02: inline value and ref-to-canonical-bytes normalize to the same conten
   };
   scenario.extraElements.push(refElement as never);
   scenario.extraElementFileValues['orders.eligibility-ref/policy-rules'] = inlineValue;
-  const { input } = scenario.finalize();
 
-  const { lock } = expectSuccess(buildV011App(input));
+  // review P2-2 counterexample: a PRETTY-PRINTED (non-canonical) JSON ref must
+  // still normalize to the inline digest, while resourceDigests keeps the
+  // raw-bytes digest.
+  const prettyBytes = new TextEncoder().encode(JSON.stringify(inlineValue, null, 2));
+  const prettyRefElement = {
+    ...structuredClone(refElement),
+    id: 'orders.eligibility-ref-pretty',
+    content: structuredClone(refElement.content),
+  };
+  prettyRefElement.content[0]!.ref = {
+    packageId: 'orders-business',
+    path: 'content/pretty-policy-rules.json',
+    digest: 'sha256:pending',
+  };
+  scenario.extraElements.push(prettyRefElement as never);
+  scenario.extraElementRawFiles['orders.eligibility-ref-pretty/policy-rules'] = prettyBytes;
+
+  const { input } = scenario.finalize();
+  const result = expectSuccess(buildV011App(input));
+  const lock = result.lock;
   const inline = lock.selectedElements.find((element) => element.ref.id === 'orders.eligibility')!;
   const byRef = lock.selectedElements.find((element) => element.ref.id === 'orders.eligibility-ref')!;
+  const byPrettyRef = lock.selectedElements.find((element) => element.ref.id === 'orders.eligibility-ref-pretty')!;
   const expected = contentDigestOf(inlineValue as JsonValue);
   assert.equal(inline.contentDigests[0], expected, 'inline block digests the canonical JSON of its value');
   assert.equal(byRef.contentDigests[0], expected, 'ref block to canonical bytes yields the identical digest');
+  assert.equal(
+    byPrettyRef.contentDigests[0],
+    expected,
+    'pretty-printed ref bytes normalize to the same digest (review P2-2)',
+  );
+  // raw actual-bytes digests remain verified in the resource closure
+  assert.equal(
+    lock.resourceDigests['orders-business/content/eligibility-ref-pretty-policy-rules.bin'],
+    sha256OfBytes(prettyBytes),
+  );
 });
 
 test('AC02: cycle-legal semantic relations pass BUILD untouched', (t) => {
@@ -213,4 +248,90 @@ test('AC02: cycle-legal semantic relations pass BUILD untouched', (t) => {
   const withDomain = { ...input, domains: [domainWithSemanticCycle] };
   const result = expectSuccess(buildV011App(withDomain));
   assert.equal(result.lock.closureDigest, expectSuccess(buildV011App(input)).lock.closureDigest);
+});
+
+test('P1-1: exported multi-Function element selects functions in total fn.id order', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const reviewFunctions = ['zebra', 'alpha', 'mid'].map((id) => ({
+    id,
+    contractVersion: '1',
+    inputSchemaRef: { inline: { type: 'object' } },
+    outputSchemaRef: { inline: { type: 'string' } },
+    outcomes: ['SUCCEEDED'] as const,
+    effects: 'none' as const,
+  }));
+  scenario.extraElements.push({
+    kind: 'Element',
+    schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+    id: 'orders.review',
+    version: '1.0.0',
+    description: 'Multi-function element with deliberately unsorted function ids.',
+    content: [],
+    functions: reviewFunctions,
+  } as never);
+  scenario.businessExports = [
+    ...scenario.businessExports,
+    { elementId: 'orders.review', functionId: 'zebra' },
+    { elementId: 'orders.review', functionId: 'alpha' },
+    { elementId: 'orders.review', functionId: 'mid' },
+  ];
+  scenario.extraImplementations = reviewFunctions.map((fn) => ({
+    elementId: 'orders.review',
+    functionId: fn.id,
+    contractVersion: '1',
+    entry: { module: { packageId: 'orders-business', path: 'x', digest: 'sha256:pending' }, exportName: fn.id },
+  }));
+  const { input } = scenario.finalize();
+  const { lock } = expectSuccess(buildV011App(input));
+  const reviewSelected = lock.selectedFunctions
+    .filter((fn) => fn.ref.element.id === 'orders.review')
+    .map((fn) => fn.ref.functionId);
+  assert.deepEqual(reviewSelected, ['alpha', 'mid', 'zebra']);
+});
+
+test('P2-8: authoring schemas sharing an $id across separate BUILD runs do not collide', (t) => {
+  // A shared ajv registry would let the first run's compiled validator shadow
+  // the second run's same-$id schema; per-build checkers make each run exact.
+  const first = standardCase();
+  t.after(first.ws.dispose);
+  first.extraElements.push({
+    kind: 'Element',
+    schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+    id: 'orders.schema-a',
+    version: '1.0.0',
+    description: 'Object-typed inline schema with a fixed $id.',
+    content: [
+      {
+        id: 'block',
+        contentKind: 'knowledge',
+        schemaRef: { inline: { $id: 'https://fixture.review/schema-dup', type: 'object' } },
+        required: true,
+        value: { a: 1 },
+      },
+    ],
+    functions: [],
+  } as never);
+  expectSuccess(buildV011App(first.finalize().input));
+
+  const second = standardCase();
+  t.after(second.ws.dispose);
+  second.extraElements.push({
+    kind: 'Element',
+    schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+    id: 'orders.schema-b',
+    version: '1.0.0',
+    description: 'String-typed inline schema reusing the same $id in a LATER run.',
+    content: [
+      {
+        id: 'block',
+        contentKind: 'knowledge',
+        schemaRef: { inline: { $id: 'https://fixture.review/schema-dup', type: 'string' } },
+        required: true,
+        value: 'not shadowed by the previous run',
+      },
+    ],
+    functions: [],
+  } as never);
+  expectSuccess(buildV011App(second.finalize().input));
 });
