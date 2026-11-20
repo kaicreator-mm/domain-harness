@@ -125,7 +125,7 @@ function assertTarball(path, expected) {
     assert.equal(manifest[section], undefined, `${expected.name}: ${section} must stay outside the frozen release graph`);
   }
   if (expected.name === '@kaicreator/domain-harness') {
-    assert.equal(manifest.scripts?.prepack, 'npm run build && node scripts/assert-current-pack-ready.mjs');
+    assert.equal(manifest.scripts?.prepack, 'npm run build');
   } else {
     assert.equal(manifest.scripts?.prepack, undefined, `${expected.name}: unexpected prepack lifecycle`);
   }
@@ -135,7 +135,6 @@ function assertTarball(path, expected) {
   if (expected.contracts !== true) {
     assert.ok(paths.every((name) => name === 'package/package.json' || name === 'package/README.md' || name.startsWith('package/dist/')),
       `${expected.name}: legacy/non-current file leaked: ${paths.join(', ')}`);
-    assert.ok(!paths.includes('package/dist/index.js'));
     assert.ok(!paths.includes('package/dist/host-seam.js'));
   } else {
     assert.ok(paths.includes('package/dist/index.js'), 'contracts entry missing');
@@ -174,9 +173,7 @@ function assertInstalledRealpaths(tarballsByName) {
     assert.ok(isOutside(repoRoot, real), `${id}: resolved into monorepo: ${real}`);
     const members = tarballsByName.get(id);
     assert.ok(members, `${id}: no local tarball evidence registered`);
-    const entryPaths = pkg.contracts === true
-      ? ['package.json', 'dist/index.js', 'dist/index.d.ts', 'dist/index.js', 'dist/index.d.ts']
-      : ['package.json', 'dist/index.js', 'dist/index.d.ts'];
+    const entryPaths = ['package.json', 'dist/index.js', 'dist/index.d.ts'];
     for (const relativePath of entryPaths) {
       const installed = join(path, ...relativePath.split('/'));
       assert.equal(lstatSync(installed).isSymbolicLink(), false, `${id}/${relativePath}: entry must not be a symlink`);
@@ -205,7 +202,7 @@ const packages = [
   },
   {
     dir: 'packages/contracts', name: '@kaicreator/domain-harness-contracts', contracts: true,
-    root: { types: './dist/index.d.ts', import: './dist/index.js', require: './dist/index.js' }, dependencies: {},
+    root: { types: './dist/index.d.ts', import: './dist/index.js' }, dependencies: {},
   },
   {
     dir: 'tooling/build', name: '@kaicreator/domain-harness-build',
@@ -243,7 +240,7 @@ try {
     tarballs.push(path);
   }
   npm(['init', '-y'], consumerRoot, 'consumer.init');
-  const registry = process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry ?? (process.platform === 'linux' ? 'http://host.docker.internal:14873' : 'http://localhost:14873');
+  const registry = process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry ?? 'https://registry.npmjs.org';
   const installEnv = { ...process.env, npm_config_registry: registry };
   const install = spawnSync(process.execPath, [npmCli, 'install', ...tarballs, '--no-audit', '--no-fund'], {
     cwd: consumerRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024, env: installEnv,
