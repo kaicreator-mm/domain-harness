@@ -239,6 +239,30 @@ test('rejects dis-v011-runtime leaving the private release boundary', () => {
   });
 });
 
+test('rejects an additional dis-v011-runtime SDK dependency edge', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'packages/dis-v011-runtime/package.json');
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    manifest.dependencies['@kaicreator/domain-harness-microkernel'] = '0.11.0';
+    writeFileSync(path, JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /no additional SDK edge/);
+  });
+});
+
+test('rejects an additional dis-v011-runtime SDK dependency edge in lock', () => {
+  withFixture(({ root, lockPackages }) => {
+    lockPackages['packages/dis-v011-runtime'].dependencies['@kaicreator/domain-harness-microkernel'] = '0.11.0';
+    writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      version: '0.11.0',
+      lockfileVersion: 3,
+      requires: true,
+      packages: lockPackages,
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /no additional SDK edge/);
+  });
+});
+
 test('rejects a dis-v011-runtime internal dependency that drifts', () => {
   withFixture(({ root }) => {
     const path = join(root, 'packages/dis-v011-runtime/package.json');

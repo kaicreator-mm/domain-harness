@@ -149,6 +149,9 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   const disRuntime = readJson(root, `${DIS_RUNTIME_DIR}/package.json`);
   assert.equal(disRuntime.private, true,
     `${DIS_RUNTIME_DIR}: must remain private:true and outside the public release graph`);
+  const disRuntimeSeen = assertInternalEdges(disRuntime, expected, DIS_RUNTIME_DIR);
+  assert.deepEqual([...disRuntimeSeen].sort(), [...DIS_RUNTIME_INTERNAL].sort(),
+    `${DIS_RUNTIME_DIR}: internal dependency graph must contain exactly build/contracts and no additional SDK edge`);
   assertExactDependencyEdges(disRuntime, DIS_RUNTIME_INTERNAL, expected, DIS_RUNTIME_DIR);
 
   const lock = readJson(root, 'package-lock.json');
@@ -195,7 +198,12 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
     assert.equal(locked[item.section]?.[CONSUMER_NAME], expected,
       `${item.dir}: lock ${item.section}.${CONSUMER_NAME} must equal ${expected}`);
   }
-  assertExactDependencyEdges(lock.packages?.[DIS_RUNTIME_DIR], DIS_RUNTIME_INTERNAL, expected, `${DIS_RUNTIME_DIR} lock`);
+  const lockedDisRuntime = lock.packages?.[DIS_RUNTIME_DIR];
+  assert.ok(lockedDisRuntime, `package-lock.json: missing workspace ${DIS_RUNTIME_DIR}`);
+  const lockedDisRuntimeSeen = assertInternalEdges(lockedDisRuntime, expected, `${DIS_RUNTIME_DIR} lock`);
+  assert.deepEqual([...lockedDisRuntimeSeen].sort(), [...DIS_RUNTIME_INTERNAL].sort(),
+    `${DIS_RUNTIME_DIR}: lock internal dependency graph must contain exactly build/contracts and no additional SDK edge`);
+  assertExactDependencyEdges(lockedDisRuntime, DIS_RUNTIME_INTERNAL, expected, `${DIS_RUNTIME_DIR} lock`);
 
   return {
     version: expected,
