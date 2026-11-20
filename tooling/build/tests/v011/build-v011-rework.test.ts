@@ -11,7 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { symlinkSync, writeFileSync } from 'node:fs';
-import { DH_ELEMENT_SCHEMA_VERSION } from '@kaicreator/domain-harness-contracts/v011';
+import { DH_ELEMENT_SCHEMA_VERSION, contentDigestOf } from '@kaicreator/domain-harness-contracts/v011';
 import { buildV011App, type V011BuildResult } from '../../src/v011/index.js';
 import { functionRefOf, sha256OfBytes, writeJson } from './fixtures.js';
 import { standardCase } from './standard-case.js';
@@ -67,6 +67,12 @@ test('P2-1: a symlinked resource escaping the package root is RESOURCE_MISSING',
   };
   businessManifest.elements.find((entry) => entry.id === 'orders.eligibility')!.definitionRef.digest =
     sha256OfBytes(defBytes);
+  // keep the descriptor ingress ref consistent with the rewritten definition
+  const appDescriptor = input.descriptor as {
+    ingress: { function: { element: { digest: string } } }[];
+  };
+  const newDefinitionDigest = contentDigestOf(JSON.parse(Buffer.from(defBytes).toString('utf8')) as never);
+  for (const entry of appDescriptor.ingress) entry.function.element.digest = newDefinitionDigest;
   expectRefusal(buildV011App(input), 'DH_BUILD_RESOURCE_MISSING');
 });
 

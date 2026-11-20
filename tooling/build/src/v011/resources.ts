@@ -57,7 +57,16 @@ export class V011ResourceScope {
         `resource path '${path}' escapes package root of '${packageId}'`,
       );
     }
-    return readFileSync(target);
+    // The realpath succeeded but the final read can still fail (directory
+    // instead of a file, unreadable entry, TOCTOU removal): same frozen code.
+    try {
+      return readFileSync(target);
+    } catch {
+      throw refusal(
+        'DH_BUILD_RESOURCE_MISSING',
+        `resource '${packageId}/${path}' does not exist or is not readable`,
+      );
+    }
   }
 
   /** Read + digest-verify + record one declared resource reference. */

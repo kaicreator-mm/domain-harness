@@ -81,7 +81,15 @@ export class V011SchemaChecker {
       throw refusal('DH_BUILD_SCHEMA_INVALID', 'schemaRef does not resolve to a JSON Schema', refPath);
     }
     try {
-      return this.ajv.compile(schema as object);
+      // Fresh registry PER COMPILED SCHEMA: one content block's inline
+      // $id/$ref can never resolve against another block's schema. Intra-block
+      // $defs/internal refs keep working; cross-block refs fail compilation
+      // here and surface as SCHEMA_INVALID (review P1). The per-build
+      // contentSchemaCache is safe to retain: same canonical schema text
+      // compiles to an isolated, semantically identical validator.
+      return new Ajv2020({ strict: false, allErrors: false, validateSchema: false }).compile(
+        schema as object,
+      );
     } catch (error) {
       throw refusal(
         'DH_BUILD_SCHEMA_INVALID',
