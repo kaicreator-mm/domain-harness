@@ -20,7 +20,7 @@ import {
 } from '@kaicreator/domain-harness';
 ```
 
-选定实现、受信安装记录、Boot/KDP 校验阶梯、唯一 Business App Init、ingress 调用、inspect 与 dispose 均来自四个真实 npm tarball，并在仓库外的新目录中执行。旧可执行 App API 不属于本示例。
+四个真实 npm tarball 提供 SDK、contracts、BUILD 与 KDP；业务 Domain Package 由 consumer 本地 authored 并复制到外部 installRoot。选定实现、受信安装记录、Boot/KDP 校验阶梯、唯一 Business App Init、ingress 调用、inspect 与 dispose 均在该仓库外新目录中执行。旧可执行 App API 不属于本示例。
 
 ## 执行完整验收路径
 

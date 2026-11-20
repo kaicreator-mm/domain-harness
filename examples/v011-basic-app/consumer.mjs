@@ -351,7 +351,10 @@ async function runPositive(label, rule) {
     assert.equal(first.lock.selectedPackages.filter((pkg) => pkg.role === 'extension').length, 3);
     assert.equal(first.lock.hookBindings.length, 1);
     assert.equal(first.lock.selectedElements.some((element) => element.ref.id === 'basic.knowledge'), true);
-    assert.equal(first.lock.excludedUnknownContent.length > 0, true);
+    assert.equal(first.lock.excludedUnknownContent.includes('basic.knowledge/optional-unknown'), true);
+    const knowledgeLock = first.lock.selectedElements.find((element) => element.ref.id === 'basic.knowledge');
+    assert.equal(knowledgeLock.contentDigests.length, 1, 'only the required knowledge block may be selected');
+    assert.equal(knowledgeLock.contentDigests.includes(contentDigestOf({ note: 'unknown optional content is explicitly excluded' })), false);
     await evidence(`${label}.build-determinism`, { status: 'PASS', closureDigest: first.lock.closureDigest, hookBindings: 1, primary: 3, extension: 3 });
 
     const install = await materialize(label, prepared, first);
@@ -389,7 +392,9 @@ async function runPositive(label, rule) {
     assert.equal(inspection.target.profile, 'node24-esm/1');
     assert.deepEqual(await app.dispose(), { status: 'DISPOSED' });
     const disposed = runtimeEvents.filter((event) => event.event === 'technical-dispose').map((event) => event.package);
+    assert.deepEqual(install.lock.technicalDisposeOrder, [...install.lock.technicalInitOrder].reverse());
     assert.deepEqual(disposed, install.lock.technicalDisposeOrder);
+    assert.deepEqual(disposed, [...technical].reverse(), 'runtime disposal must be the exact reverse of technical init');
     const afterDispose = await app.invoke('submit', { total: 100, region: 'EU' });
     assert.equal(afterDispose.kind, 'FAILED');
     assert.equal(afterDispose.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
@@ -398,6 +403,13 @@ async function runPositive(label, rule) {
   } finally {
     await rm(prepared.root, { recursive: true, force: true });
   }
+}
+
+async function cloneInstall(source) {
+  const installRoot = await mkdtemp(join(consumerRoot, 'negative-install-'));
+  installRoots.add(installRoot);
+  await cp(source.installRoot, installRoot, { recursive: true });
+  return { ...source, installRoot, context: { ...source.context, installRoot } };
 }
 
 async function main() {
@@ -421,57 +433,61 @@ async function main() {
   await expectBuildRefusal('unsupported-effect', { unsupportedEffect: true }, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
   await expectBuildRefusal('unsupported-target', { unsupportedTarget: true }, 'DH_BUILD_TARGET_INVALID');
 
-  const originalLock = await readFile(a.install.context.lockPath ? join(a.install.installRoot, 'dh-lock/app.lock.json') : '');
+  // Every negative uses a NEW installRoot: module URLs cannot be hidden by the
+  // earlier positive boot's ESM cache, so any accidental package import is visible.
+  const tamperInstall = await cloneInstall(a.install);
+  const originalLock = await readFile(join(tamperInstall.installRoot, 'dh-lock/app.lock.json'));
   const tampered = new Uint8Array(originalLock);
   tampered[20] ^= 1;
   assert.doesNotThrow(() => JSON.parse(Buffer.from(tampered).toString('utf8')), 'tamper must preserve JSON syntax so digest verification is exercised');
-  await writeFile(join(a.install.installRoot, 'dh-lock/app.lock.json'), tampered);
+  await writeFile(join(tamperInstall.installRoot, 'dh-lock/app.lock.json'), tampered);
   let before = globalThis.__v011T05Events.length;
-  let refused = await boot(a.install.pin, a.install.context);
+  let refused = await boot(tamperInstall.pin, tamperInstall.context);
   assert.equal(refused.status, 'REFUSED');
   assert.equal(refused.code, 'DH_BOOT_PIN_MISMATCH');
   assert.equal(globalThis.__v011T05Events.length, before, 'tampered Lock must not load packages');
-  await evidence('negative.lock-byte-tamper', { status: 'PASS', code: refused.code });
-  await writeFile(join(a.install.installRoot, 'dh-lock/app.lock.json'), originalLock);
+  await evidence('negative.lock-byte-tamper', { status: 'PASS', code: refused.code, freshInstall: true });
 
-  const recordPath = join(a.install.installRoot, 'dh-install/installed-record.json');
-  const hiddenPath = join(a.install.installRoot, 'dh-install/installed-record.hidden.json');
+  const missingInstall = await cloneInstall(a.install);
+  const recordPath = join(missingInstall.installRoot, 'dh-install/installed-record.json');
+  const hiddenPath = join(missingInstall.installRoot, 'dh-install/installed-record.hidden.json');
   await rename(recordPath, hiddenPath);
   before = globalThis.__v011T05Events.length;
-  refused = await boot(a.install.pin, a.install.context);
+  refused = await boot(missingInstall.pin, missingInstall.context);
   assert.equal(refused.status, 'REFUSED');
   assert.equal(refused.code, 'DH_BOOT_RECORD_MISSING');
   assert.equal(globalThis.__v011T05Events.length, before, 'missing record must not load packages');
-  await evidence('negative.missing-installed-record', { status: 'PASS', code: refused.code });
-  await rename(hiddenPath, recordPath);
+  await evidence('negative.missing-installed-record', { status: 'PASS', code: refused.code, freshInstall: true });
 
-  const originalRecord = await readFile(recordPath, 'utf8');
-  await writeFile(recordPath, JSON.stringify({ ...JSON.parse(originalRecord), lockDigest: `sha256:${'0'.repeat(64)}` }));
+  const invalidInstall = await cloneInstall(a.install);
+  const invalidRecordPath = join(invalidInstall.installRoot, 'dh-install/installed-record.json');
+  const originalRecord = await readFile(invalidRecordPath, 'utf8');
+  await writeFile(invalidRecordPath, JSON.stringify({ ...JSON.parse(originalRecord), lockDigest: `sha256:${'0'.repeat(64)}` }));
   before = globalThis.__v011T05Events.length;
-  refused = await boot(a.install.pin, a.install.context);
+  refused = await boot(invalidInstall.pin, invalidInstall.context);
   assert.equal(refused.status, 'REFUSED');
   assert.equal(refused.code, 'DH_BOOT_RECORD_INVALID');
   assert.equal(globalThis.__v011T05Events.length, before, 'invalid record digest must not load packages');
-  await evidence('negative.record-digest-invalid', { status: 'PASS', code: refused.code });
-  await writeFile(recordPath, originalRecord);
+  await evidence('negative.record-digest-invalid', { status: 'PASS', code: refused.code, freshInstall: true });
 
-  const kdpEntry = join(a.install.installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel', 'dist', 'v011', 'index.js');
+  const kdpTamperInstall = await cloneInstall(a.install);
+  const kdpEntry = join(kdpTamperInstall.installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel', 'dist', 'v011', 'index.js');
   const originalKdp = await readFile(kdpEntry);
   await writeFile(kdpEntry, `${originalKdp.toString('utf8')}\n// post-install KDP tamper\n`);
   before = globalThis.__v011T05Events.length;
-  refused = await boot(a.install.pin, a.install.context);
+  refused = await boot(kdpTamperInstall.pin, kdpTamperInstall.context);
   assert.equal(refused.status, 'REFUSED');
   assert.equal(refused.code, 'DH_BOOT_PIN_MISMATCH');
   assert.equal(globalThis.__v011T05Events.length, before, 'KDP byte tamper must not load packages');
-  await evidence('negative.kdp-artifact-tamper', { status: 'PASS', code: refused.code });
-  await writeFile(kdpEntry, originalKdp);
+  await evidence('negative.kdp-artifact-tamper', { status: 'PASS', code: refused.code, freshInstall: true });
 
+  const forgedInstall = await cloneInstall(a.install);
   before = globalThis.__v011T05Events.length;
-  refused = await boot({ ...a.install.pin, lockDigest: `sha256:${'0'.repeat(64)}` }, a.install.context);
+  refused = await boot({ ...forgedInstall.pin, lockDigest: `sha256:${'0'.repeat(64)}` }, forgedInstall.context);
   assert.equal(refused.status, 'REFUSED');
   assert.equal(refused.code, 'DH_BOOT_PIN_MISMATCH');
   assert.equal(globalThis.__v011T05Events.length, before, 'forged pin must not load packages');
-  await evidence('negative.forged-pin', { status: 'PASS', code: refused.code });
+  await evidence('negative.forged-pin', { status: 'PASS', code: refused.code, freshInstall: true });
 
   const upstream = (task, tests) => ({
     source: 'UPSTREAM_REUSED_NOT_RERUN_IN_T05', task,

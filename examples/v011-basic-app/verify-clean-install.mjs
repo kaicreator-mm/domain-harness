@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, readdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
-import { basename, isAbsolute, join, relative, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
+const require = createRequire(import.meta.url);
+const npmManifest = require.resolve('npm/package.json', {
+  paths: [dirname(process.execPath), resolve(dirname(process.execPath), '../lib/node_modules')],
+});
+const npmCli = process.env.npm_execpath ?? join(dirname(npmManifest), 'bin/npm-cli.js');
 const workRoot = mkdtempSync(join(tmpdir(), 'dh-v011-t05-clean-'));
 const packDir = join(workRoot, 'packs');
 const consumerRoot = join(workRoot, 'consumer');
@@ -29,7 +35,7 @@ function isOutside(parent, candidate) {
 function run(command, args, cwd, label, timeout = 600_000) {
   const result = spawnSync(command, args, {
     cwd, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024,
-    env: process.env, shell: process.platform === 'win32' && (command === 'npm' || command === 'npm.cmd'),
+    env: process.env,
   });
   writeFileSync(join(evidenceDir, `${label}.stdout.log`), result.stdout ?? '');
   writeFileSync(join(evidenceDir, `${label}.stderr.log`), result.stderr ?? '');
@@ -40,17 +46,33 @@ function run(command, args, cwd, label, timeout = 600_000) {
   return result.stdout;
 }
 function npm(args, cwd, label, timeout) {
-  return run(process.platform === 'win32' ? 'npm.cmd' : 'npm', args, cwd, label, timeout);
+  return run(process.execPath, [npmCli, ...args], cwd, label, timeout);
 }
 function parsePackJson(stdout) {
   const start = stdout.search(/^\[/mu);
   assert.ok(start >= 0, `npm pack emitted no JSON array: ${stdout}`);
   return JSON.parse(stdout.slice(start));
 }
+function parsePaxPath(content) {
+  const text = content.toString('utf8');
+  let cursor = 0;
+  while (cursor < text.length) {
+    const space = text.indexOf(' ', cursor);
+    assert.ok(space > cursor, 'invalid PAX record length');
+    const length = Number.parseInt(text.slice(cursor, space), 10);
+    assert.ok(Number.isSafeInteger(length) && length > 0 && cursor + length <= text.length, 'invalid PAX record size');
+    const record = text.slice(space + 1, cursor + length);
+    cursor += length;
+    if (record.startsWith('path=')) return record.slice(5).replace(/\n$/u, '');
+  }
+  return undefined;
+}
 function tarMembers(path) {
   const data = gunzipSync(readFileSync(path));
   const members = new Map();
   let longName;
+  let paxPath;
+  let globalPaxPath;
   for (let offset = 0; offset + 512 <= data.length;) {
     const header = data.subarray(offset, offset + 512);
     if (header.every((value) => value === 0)) break;
@@ -66,12 +88,20 @@ function tarMembers(path) {
     const content = data.subarray(contentStart, contentStart + size);
     const type = String.fromCharCode(header[156]);
     offset = contentStart + Math.ceil(size / 512) * 512;
-    if (type === 'x' || type === 'g') continue; // PAX metadata: no file member is emitted.
+    if (type === 'x') {
+      paxPath = parsePaxPath(content) ?? paxPath;
+      continue;
+    }
+    if (type === 'g') {
+      globalPaxPath = parsePaxPath(content) ?? globalPaxPath;
+      continue;
+    }
     if (type === 'L') {
       longName = content.toString('utf8').split('\0')[0];
       continue;
     }
-    const name = longName ?? shortName;
+    const name = paxPath ?? globalPaxPath ?? longName ?? shortName;
+    paxPath = undefined;
     longName = undefined;
     assert.ok(name.startsWith('package/'), `${path}: member escapes package prefix: ${name}`);
     assert.ok(!name.split('/').includes('..') && !isAbsolute(name), `${path}: traversal member: ${name}`);
@@ -194,6 +224,8 @@ try {
   assert.equal(dirty.trim(), '', `source checkout must be clean at ${head}`);
   record('source', { head, repoOutsideRoot: workRoot, clean: true });
   npm(['run', 'build'], repoRoot, 'source.build');
+  const dirtyAfterBuild = run('git', ['status', '--porcelain', '--untracked-files=no'], repoRoot, 'source.clean-after-build');
+  assert.equal(dirtyAfterBuild.trim(), '', `build must not change tracked source at ${head}`);
   const tarballs = [];
   const tarballMembers = new Map();
   for (const pkg of packages) {
@@ -208,9 +240,9 @@ try {
   npm(['init', '-y'], consumerRoot, 'consumer.init');
   const registry = process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry ?? (process.platform === 'linux' ? 'http://host.docker.internal:14873' : 'http://localhost:14873');
   const installEnv = { ...process.env, npm_config_registry: registry };
-  const install = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', [
-    'install', ...tarballs, '--no-audit', '--no-fund',
-  ], { cwd: consumerRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024, env: installEnv, shell: process.platform === 'win32' });
+  const install = spawnSync(process.execPath, [npmCli, 'install', ...tarballs, '--no-audit', '--no-fund'], {
+    cwd: consumerRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024, env: installEnv,
+  });
   writeFileSync(join(evidenceDir, 'consumer.install.stdout.log'), install.stdout ?? '');
   writeFileSync(join(evidenceDir, 'consumer.install.stderr.log'), install.stderr ?? '');
   record('consumer.install', { exit: install.status, signal: install.signal, registry });
