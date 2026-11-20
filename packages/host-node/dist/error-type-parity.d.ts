@@ -6,7 +6,7 @@
  * dependency between the two owners.
  */
 import type { V10CodedFailure } from '@kaicreator/domain-harness-contracts';
-import type { V10MultiBQueryError } from '@kaicreator/domain-harness-microkernel';
+import type { V10MultiBQueryError } from '@kaicreator/domain-harness-microkernel/legacy';
 import type { V10MemoryError } from './scoped-memory.js';
 type RequireTrue<T extends true> = T;
 export type _V10MemoryErrorContract = RequireTrue<V10MemoryError extends V10CodedFailure ? true : false>;

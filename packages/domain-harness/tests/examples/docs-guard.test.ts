@@ -147,7 +147,7 @@ test('docs-guard: examples consume the published package name, never internal sr
   // support.ts is the shared import surface; every example draws from it or
   // imports the package directly.
   const support = await readExample('support.ts');
-  assert.ok(support.includes("from '@kaicreator/domain-harness'"));
+  assert.ok(support.includes("from '@kaicreator/domain-harness/legacy'"));
 });
 
 test('docs-guard: the boot example consumes a compiled Domain Package at startup', async () => {

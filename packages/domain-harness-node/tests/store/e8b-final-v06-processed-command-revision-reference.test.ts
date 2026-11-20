@@ -46,7 +46,7 @@ import {
   type DurableProcessDataSnapshot,
   type ProcessCommandRuntimeStore,
   type ProcessedCommandTurnCommit,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type {
   WorkflowAddress,
   WorkflowInstanceSnapshot,

@@ -33,7 +33,7 @@ import {
   createDomainRuntimeV3,
   type DomainRuntimeV3,
 } from '@kaicreator/domain-harness/v3';
-import { DOMAIN_HARNESS_VERSION } from '@kaicreator/domain-harness';
+import { DOMAIN_HARNESS_VERSION } from '@kaicreator/domain-harness/legacy';
 import { createDomainRuntime, StaticPackageRegistry } from '@kaicreator/domain-harness/v2';
 // T012R extension: the repaired candidate's new declared subpath
 // ./v7/execution (T012-D1 bounded repair) — full value + type surface must

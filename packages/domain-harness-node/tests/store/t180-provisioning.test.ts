@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   type ProvisionAndOpenWorkflowInstanceRequest,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import { RuntimeInstanceProvisioningCoordinator } from '../../../domain-harness/src/runtime/instance-provisioning-coordinator.js';
 import type { WorkflowAddress } from '@kaicreator/domain-harness/v2';
 import { NodeSqliteRuntimeStore } from '../../src/store/node-sqlite-runtime-store.js';

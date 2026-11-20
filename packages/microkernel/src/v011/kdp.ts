@@ -163,6 +163,13 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
   if (profile !== NODE24_ESM_PROFILE) {
     return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock target profile '${profile}' is not the frozen '${NODE24_ESM_PROFILE}'`);
   }
+  const minimumNodeMajor = lock.target.nodeMajor ?? 24;
+  if (safeContext.env.nodeMajor < minimumNodeMajor) {
+    return failed(
+      'DH_RUNTIME_UNSUPPORTED_PROFILE',
+      `Host nodeMajor ${safeContext.env.nodeMajor} is below the Lock target floor ${minimumNodeMajor} for '${NODE24_ESM_PROFILE}'`,
+    );
+  }
 
   const configResult = await readDescriptorConfig(safeContext, lock);
   if (!configResult.ok) return configResult.result;

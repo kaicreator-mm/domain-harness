@@ -7,7 +7,7 @@
 // markers.
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { createNodeDomainRuntime } from '../../../src/index.js';
-import { StaticPackageRegistry } from '@kaicreator/domain-harness';
+import { StaticPackageRegistry } from '@kaicreator/domain-harness/legacy';
 import { compileSuccessor, createNodeHost, fixedBusinessSnapshots, CRM_SNAPSHOT, HOST_MAXIMA, openStore, retainedLegacyPackage } from '../helper.ts';
 
 const [mode, databasePath, markerFile] = process.argv.slice(2);

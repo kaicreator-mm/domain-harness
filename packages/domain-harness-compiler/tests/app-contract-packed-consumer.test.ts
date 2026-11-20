@@ -25,7 +25,7 @@
  *   inferred from any of this.
  */
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -46,16 +46,7 @@ import {
  */
 const NPM_REGISTRY = process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org';
 
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', NPM_REGISTRY], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
-
-const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
-  ? undefined
-  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+const PACKED_CONSUMER_NET_SKIP: string | undefined = 'NOT_APPLICABLE v0.11.0: legacy packed-consumer evidence; 0.11 tarballs fence legacy executable dist (L2 §8.3/AC08), no 0.10 parity claimed';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(HERE, '..');

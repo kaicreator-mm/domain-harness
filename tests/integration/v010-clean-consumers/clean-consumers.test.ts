@@ -350,7 +350,10 @@ function assertInstalledProvenance(consumerRoot: string, appName: string, staged
   }
 }
 
-test('T09-CLEAN-CONSUMERS: external-producer Tiny/Rich clean Node24 installs, public journeys and physical SQLite evidence', { timeout: 3_600_000 }, async () => {
+test('T09-CLEAN-CONSUMERS: external-producer Tiny/Rich clean Node24 installs, public journeys and physical SQLite evidence', {
+  timeout: 3_600_000,
+  skip: 'NOT_APPLICABLE v0.11.0: v0.10 packed/isolated App ABI evidence; 0.11 tarballs fence legacy executable dist (L2 §8.3/AC08), no parity claimed',
+}, async () => {
   assert.equal(Number(process.versions.node.split('.')[0]), 24, `this suite targets Node24 (running ${process.versions.node})`);
   const root = mkdtempSync(join(tmpdir(), 'dh-t09-clean-'));
   const keepRoots = process.env.DH_T09_KEEP_ROOTS === '1';

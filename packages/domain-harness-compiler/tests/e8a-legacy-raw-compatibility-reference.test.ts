@@ -59,7 +59,7 @@
  * keys, UTF-8), not a reproduction of the manifest digest.
  */
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -69,22 +69,18 @@ import { fileURLToPath } from 'node:url';
 import { assertNewWorkspacePackagesInstalled, stagePackedWorkspaces, verifiedLocalWorkspaceTarballs } from './packed-fixture-stage.js';
 
 
-/**
- * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
- * this file's packed-consumer journeys npm-install dependencies from the
- * registry; workers without egress must SKIP explicitly rather than hang
- * an install to the step timeout. Zero behavior change when reachable.
- */
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
-
-const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
-  ? undefined
-  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+/** NOT_APPLICABLE is version-scoped and never depends on network reachability. */
+// v0.11.0 T04 disposition (L2 §8.3 fence / §12.1): NOT_APPLICABLE for v0.11.0 —
+// kept verbatim as legacy packed-consumer evidence (do not delete; do not
+// rewrite as v011 tests). The 0.11.0 release tarballs of
+// @kaicreator/domain-harness / -build / -microkernel intentionally exclude
+// the legacy dist (files whitelist; old executable App ABI unreachable —
+// AC08), so this clean-install consumer journey can no longer reach the
+// legacy ABI it verifies from the packed artifacts. No 0.10.x parity is
+// claimed or performed; workspace-only legacy tests continue to run via
+// './legacy'.
+const NOT_APPLICABLE_V0110_LEGACY_PACKED = 'NOT_APPLICABLE v0.11.0: legacy packed-consumer evidence — the 0.11.0 release tarballs intentionally exclude the legacy dist (L2 §8.3 files fence / AC08); kept verbatim, no 0.10.x parity claimed';
+const PACKED_CONSUMER_NET_SKIP: string | undefined = NOT_APPLICABLE_V0110_LEGACY_PACKED;
 
 import {
   admitComponent,

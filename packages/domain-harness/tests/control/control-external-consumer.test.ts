@@ -25,6 +25,16 @@ import {
  * the npm registry. Workers without registry egress must SKIP explicitly
  * rather than hang an npm install to the step timeout.
  */
+// v0.11.0 T04 disposition (L2 §8.3 fence / §12.1): NOT_APPLICABLE for v0.11.0 —
+// kept verbatim as legacy packed-consumer evidence (do not delete; do not
+// rewrite as v011 tests). The 0.11.0 release tarballs of
+// @kaicreator/domain-harness / -build / -microkernel intentionally exclude
+// the legacy dist (files whitelist; old executable App ABI unreachable —
+// AC08), so this clean-install consumer journey can no longer reach the
+// legacy ABI it verifies from the packed artifacts. No 0.10.x parity is
+// claimed or performed; workspace-only legacy tests continue to run via
+// './legacy'. (npmRegistryReachable is retained as historical evidence of
+// the original network gate.)
 function npmRegistryReachable(): boolean {
   const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
     encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
@@ -281,7 +291,8 @@ await runtime.dispose();
 console.log('consumer-ok');
 `;
 
-test('#313 packed package delivers the public control surface to a clean consumer', async (t) => {
+// NOT_APPLICABLE v0.11.0 (L2 §8.3 fence): legacy packed-consumer evidence; see disposition below.
+test.skip('#313 packed package delivers the public control surface to a clean consumer', async (t) => {
   if (!npmRegistryReachable()) {
     t.skip('PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment');
     return;

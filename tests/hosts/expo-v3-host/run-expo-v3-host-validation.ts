@@ -64,7 +64,7 @@ import {
   type PromotedArtifactBody,
   type ResolvedDecision,
   type ToolEffectSemantics,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   STANDARD_CAPABILITIES,
   type JsonObject,

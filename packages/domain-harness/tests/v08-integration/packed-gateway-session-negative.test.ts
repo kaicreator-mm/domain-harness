@@ -39,12 +39,7 @@ import {
  * native build) from the npm registry. Workers without registry egress
  * SKIP explicitly rather than hang the install to the step timeout.
  */
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
+const NOT_APPLICABLE_V0110_LEGACY_PACKED = 'NOT_APPLICABLE v0.11.0: legacy packed/isolated App ABI evidence; 0.11 tarballs fence legacy executable dist (L2 §8.3/AC08), no parity claimed';
 
 const packageRoot = fileURLToPath(new URL('../..', import.meta.url));
 const nodePackageRoot = fileURLToPath(new URL('../../../domain-harness-node', import.meta.url));
@@ -72,12 +67,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('#1013 R2: packed consumer deep-import of the ops seam is refused enforceably (session capability)', { timeout: 300_000 }, async (t) => {
-  if (!npmRegistryReachable()) {
-    t.skip('PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment');
-    return;
-  }
-
+test('#1013 R2: packed consumer deep-import of the ops seam is refused enforceably (session capability)', { timeout: 300_000, skip: NOT_APPLICABLE_V0110_LEGACY_PACKED }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-gateway-session-'));
   const packs = join(root, 'packs');
   const consumer = join(root, 'consumer');

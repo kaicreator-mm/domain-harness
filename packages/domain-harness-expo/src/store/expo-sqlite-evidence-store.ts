@@ -1,8 +1,8 @@
-import { RuntimeEvidenceIntegrationError } from '@kaicreator/domain-harness';
+import { RuntimeEvidenceIntegrationError } from '@kaicreator/domain-harness/legacy';
 import type {
   RuntimeEvidencePort,
   RuntimeEvidenceRecord,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type { JsonValue } from '@kaicreator/domain-harness/v2';
 import type { ExclusiveTransactionQueue } from './exclusive-transaction.js';
 import type { ExpoSqliteExecutorLike } from './expo-sqlite-types.js';

@@ -28,7 +28,7 @@ import {
   recoverGovernanceExecutionAuthority,
   type DomainActivationBinding,
   type GovernanceBaselineBody,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   VolatileActivationAuthority,
   VolatileDurableExecutionStore,

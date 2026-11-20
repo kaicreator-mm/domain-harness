@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { resolve as resolvePath, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createNodeDomainRuntime } from '../../src/index.js';
-import { StaticPackageRegistry } from '@kaicreator/domain-harness';
+import { StaticPackageRegistry } from '@kaicreator/domain-harness/legacy';
 import type { DomainRuntime } from '@kaicreator/domain-harness/v2';
 import {
   CRM_SNAPSHOT,

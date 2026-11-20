@@ -1,4 +1,4 @@
-import type { VolatileSemanticCacheRetentionPolicy } from '@kaicreator/domain-harness';
+import type { VolatileSemanticCacheRetentionPolicy } from '@kaicreator/domain-harness/legacy';
 import { ExclusiveTransactionQueue } from './exclusive-transaction.js';
 import { ExpoSqliteRuntimeEvidenceStore } from './expo-sqlite-evidence-store.js';
 import {

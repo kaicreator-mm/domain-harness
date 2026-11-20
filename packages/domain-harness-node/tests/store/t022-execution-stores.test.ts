@@ -9,7 +9,7 @@ import {
   HARNESS_OPERATION_IDENTITY_VERSION,
   SEMANTIC_CACHE_ENTRY_FORMAT_VERSION,
   SEMANTIC_CACHE_IDENTITY_VERSION,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type {
   AdmissionEffectJournalRecord,
   CompiledArtifactIdentity,
@@ -17,7 +17,7 @@ import type {
   HarnessJournalOutcome,
   SemanticCacheEntry,
   SemanticCacheKey,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type { JsonValue } from '@kaicreator/domain-harness/v2';
 import {
   NodeSqliteAdmissionEffectJournal,

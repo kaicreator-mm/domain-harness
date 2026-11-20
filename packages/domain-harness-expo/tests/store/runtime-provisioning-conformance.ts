@@ -14,8 +14,8 @@ import type {
   RuntimeObservationPage,
   RuntimeObservationReadRequest,
   RuntimeObservationRecord,
-} from '@kaicreator/domain-harness';
-import { RUNTIME_OBSERVATION_INITIAL_EPOCH_ID } from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
+import { RUNTIME_OBSERVATION_INITIAL_EPOCH_ID } from '@kaicreator/domain-harness/legacy';
 
 /**
  * Issue #180 / I-OPEN shared atomic provisioning ensure/open conformance

@@ -82,8 +82,8 @@ export function inventoryCounterPath(dir: string): string {
 
 export function createNodeHost(options: {
   readonly counterPath?: string;
-  readonly expression?: import('@kaicreator/domain-harness').RuntimeHostBindings['expression'];
-} = {}): import('@kaicreator/domain-harness').RuntimeHostBindings {
+  readonly expression?: import('@kaicreator/domain-harness/legacy').RuntimeHostBindings['expression'];
+} = {}): import('@kaicreator/domain-harness/legacy').RuntimeHostBindings {
   return {
     capabilities: [SX_CRYPTO, SX_MODULE, SX_INVENTORY],
     sha256,

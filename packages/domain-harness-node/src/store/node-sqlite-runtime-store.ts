@@ -37,7 +37,7 @@ import {
   type RuntimeObservationReadRequest,
   type RuntimeObservationRecord,
   type RuntimeObservationStore,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type {
   BindGovernanceExecutionPinResult,
   CommandOutcomeSnapshot,
@@ -59,13 +59,13 @@ import type {
   RegisterExternalWorkRequest,
   RuntimeInstanceProvisioningStore,
   RuntimeStoreProcessCommandExtension,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   provisioningInstanceIdentityMatchesRequest,
   provisioningRecordMatchesRequest,
   requireAcceptedMessageIdentityCompatible,
-} from '@kaicreator/domain-harness';
-import type { RuntimeObservationInstanceProvisioningStore } from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
+import type { RuntimeObservationInstanceProvisioningStore } from '@kaicreator/domain-harness/legacy';
 
 const DEFAULT_BUSY_TIMEOUT_MS = 5_000;
 const TERMINAL_LIFECYCLES = new Set<WorkflowLifecycle>([

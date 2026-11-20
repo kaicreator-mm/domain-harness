@@ -32,7 +32,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -57,12 +57,7 @@ import { INTEG_ISSUER, INTEG_ISSUER_SECRET } from './helpers.js';
  * clean consumer installs better-sqlite3 from the npm registry; workers
  * without registry egress SKIP explicitly rather than hang.
  */
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
+const NOT_APPLICABLE_V0110_LEGACY_PACKED = 'NOT_APPLICABLE v0.11.0: legacy packed/isolated App ABI evidence; 0.11 tarballs fence legacy executable dist (L2 §8.3/AC08), no parity claimed';
 
 function run(command: string, args: readonly string[], cwd: string): string {
   return execFileSync(command, [...args], {
@@ -156,12 +151,7 @@ async function sealOriginalApp(kind: 'approval' | 'engineering'): Promise<{
   };
 }
 
-test('T-F E2E: both REAL #1012 Apps on one REAL SQLite via the npm-packed authenticated Host — lineage denies cross-source, restart keeps lineage, replay refused', { timeout: 420_000 }, async (t) => {
-  if (!npmRegistryReachable()) {
-    t.skip('PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment');
-    return;
-  }
-
+test('T-F E2E: both REAL #1012 Apps on one REAL SQLite via the npm-packed authenticated Host — lineage denies cross-source, restart keeps lineage, replay refused', { timeout: 420_000, skip: NOT_APPLICABLE_V0110_LEGACY_PACKED }, async () => {
   // ---- One canonical D3 policy: the integration fixture IS the examples
   // bytes (this E2E seals the examples directly; the pin catches drift). ----
   const [examplesEngineering, fixtureEngineering] = await Promise.all([

@@ -159,7 +159,7 @@ const toolPlaneNames = {
   queryUxTool: ['.', '/v2', '/v3', '/v4', '/v7', '/workflow'],
 };
 const namespaces = {
-  '.': await import('@kaicreator/domain-harness'),
+  '.': await import('@kaicreator/domain-harness/legacy'),
   '/v2': V7 && (await import('@kaicreator/domain-harness/v2')),
   '/v3': V3,
   '/v4': await import('@kaicreator/domain-harness/v4'),

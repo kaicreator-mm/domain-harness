@@ -23,10 +23,10 @@ const NOW = (): number => Date.UTC(2026, 9, 25, 12, 0, 0);
 
 // Root tests compile as CJS under tsx; the two package-specifier imports
 // are awaited lazily so the real ESM export maps are exercised.
-type BuildModule = typeof import('@kaicreator/domain-harness-build');
-type MicrokernelModule = typeof import('@kaicreator/domain-harness-microkernel');
-const buildModule: Promise<BuildModule> = import('@kaicreator/domain-harness-build');
-const microkernelModule: Promise<MicrokernelModule> = import('@kaicreator/domain-harness-microkernel');
+type BuildModule = typeof import('@kaicreator/domain-harness-build/legacy');
+type MicrokernelModule = typeof import('@kaicreator/domain-harness-microkernel/legacy');
+const buildModule: Promise<BuildModule> = import('@kaicreator/domain-harness-build/legacy');
+const microkernelModule: Promise<MicrokernelModule> = import('@kaicreator/domain-harness-microkernel/legacy');
 
 test('T04-FACADE-P1: external BUILD output activates and physically sends/queries through the public facade', { timeout: 120_000 }, async () => {
   // (1) The external producer: the canonical BUILD package, package specifier.

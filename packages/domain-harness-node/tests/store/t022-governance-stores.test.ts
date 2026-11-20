@@ -10,7 +10,7 @@ import type {
   GovernanceBaselineRetentionReference,
   GovernancePackageCdiBinding,
   PromotionActivationAuditRecord,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   NodeSqliteAuthorityAuditStore,
   NodeSqliteDomainActivationAuthority,

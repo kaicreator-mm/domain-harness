@@ -6,7 +6,7 @@ import test from 'node:test';
 import {
   GovernanceBaselineRegistry,
   type DomainActivationBinding,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   makeRequest,
   sha256,

@@ -21,7 +21,7 @@ import {
   type RuntimeObservationReadRequest,
   type RuntimeObservationRecord,
   type RuntimeObservationStore,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type {
   BindGovernanceExecutionPinResult,
   CommandOutcomeSnapshot,
@@ -44,13 +44,13 @@ import type {
   RuntimeInstanceProvisioningStore,
   RuntimeObservationInstanceProvisioningStore,
   RuntimeStoreProcessCommandExtension,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   assertProcessedCommandTurnRevisionProgression,
   provisioningInstanceIdentityMatchesRequest,
   provisioningRecordMatchesRequest,
   requireAcceptedMessageIdentityCompatible,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type { JsonValue as CanonicalJsonValue } from '@kaicreator/domain-harness/v2';
 import { canonicalText, decodeJson, encodeJson } from './authority-shared.js';
 import type {

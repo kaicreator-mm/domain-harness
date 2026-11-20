@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import type { DomainActivationBinding } from '@kaicreator/domain-harness';
+import type { DomainActivationBinding } from '@kaicreator/domain-harness/legacy';
 import { openHostFixture } from './host-fixture.js';
 
 function tempDir(): string {

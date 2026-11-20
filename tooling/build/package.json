@@ -1,18 +1,22 @@
 {
   "name": "@kaicreator/domain-harness-build",
   "version": "0.11.0",
-  "description": "DomainHarness BUILD tooling",
+  "description": "DomainHarness BUILD tooling (v0.11.0 canonical BUILD; legacy buildV10App via ./legacy)",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/v011/index.js",
+  "types": "./dist/v011/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/v011/index.d.ts",
+      "import": "./dist/v011/index.js"
+    },
+    "./legacy": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
   "files": [
-    "dist",
+    "dist/v011",
     "README.md"
   ],
   "engines": {

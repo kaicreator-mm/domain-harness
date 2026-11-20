@@ -9,7 +9,7 @@
  * featureExport and capability identities).
  */
 import assert from 'node:assert/strict';
-import { projectSelectedComponents } from '@kaicreator/domain-harness-build';
+import { projectSelectedComponents } from '@kaicreator/domain-harness-build/legacy';
 
 assert.equal(Number(process.versions.node.split('.')[0]), 24, 'Node24 is the selected physical authoring lane');
 const feature = Object.freeze({

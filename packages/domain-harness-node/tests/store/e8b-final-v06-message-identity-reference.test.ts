@@ -40,7 +40,7 @@ import {
   RUNTIME_OBSERVATION_INITIAL_EPOCH_ID,
   type RuntimeObservationIntent,
   type RuntimeObservationRecord,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   AcceptedMessageIdentityCollisionError,
   type DomainMessage,

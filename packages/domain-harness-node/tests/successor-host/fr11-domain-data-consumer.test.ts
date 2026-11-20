@@ -18,7 +18,7 @@ import test from 'node:test';
 import { createHash } from 'node:crypto';
 
 import { createNodeDomainRuntime } from '../../src/index.js';
-import { StaticPackageRegistry } from '@kaicreator/domain-harness';
+import { StaticPackageRegistry } from '@kaicreator/domain-harness/legacy';
 import { canonicalJsonStringify } from '@kaicreator/domain-harness/v2';
 import { computeCompiledPackageId } from '../../../../packages/domain-harness/src/package/validation.js';
 import type { NodeSqliteRuntimeStore } from '../../src/store/node-sqlite-runtime-store.js';

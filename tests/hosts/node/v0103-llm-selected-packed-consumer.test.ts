@@ -280,7 +280,18 @@ try {
 } finally { server.closeAllConnections(); server.close(); }
 `;
 
-test('clean packed Node consumer loads only selected public Host entries', { timeout: 120_000 }, async () => {
+// v0.11.0 T04 disposition (L2 §8.3 fence / §12.1): NOT_APPLICABLE for v0.11.0 —
+// kept verbatim as legacy packed-consumer evidence (do not delete; do not
+// rewrite as v011 tests). The 0.11.0 release tarballs of
+// @kaicreator/domain-harness / -build / -microkernel intentionally exclude
+// the legacy dist (files whitelist; old executable App ABI unreachable —
+// AC08), so this clean-install consumer journey can no longer reach the
+// legacy ABI it verifies from the packed artifacts. No 0.10.x parity is
+// claimed or performed; workspace-only legacy tests continue to run via
+// './legacy'. (npmRegistryReachable is retained as historical evidence of
+// the original network gate.)
+// NOT_APPLICABLE v0.11.0 (L2 §8.3 fence): legacy packed-consumer evidence; see disposition below.
+test.skip('clean packed Node consumer loads only selected public Host entries', { timeout: 120_000 }, async () => {
   assert.ok(Number(process.versions.node.split('.')[0]) >= 24);
   const dir = await mkdtemp(join(tmpdir(), 'dh-v0103-r-consumer-'));
   try {

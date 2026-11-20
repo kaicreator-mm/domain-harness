@@ -75,7 +75,9 @@ function rootSegment(relativePath: string): string {
   return withinPackage.split('/')[0]!.replace(/\.(js|d\.ts|js\.map|d\.ts\.map)$/, '');
 }
 
-test('P2-01: staged core/compiler/node tarballs are content-equivalent to clean live npm packs, with the live-only divergence pinned to documented legacy orphans', async () => {
+test('P2-01: staged core/compiler/node tarballs are content-equivalent to clean live npm packs, with the live-only divergence pinned to documented legacy orphans', {
+  skip: 'NOT_APPLICABLE v0.11.0: v0.10 staged/live legacy tarball equivalence; 0.11 deliberately fences legacy executable dist (L2 §8.3/AC08)',
+}, async () => {
   const staged = await stagePackedWorkspaces({ includeNodePackage: true });
   assert.notEqual(staged.nodeTarball, undefined, 'the node-inclusive stage must produce a node tarball');
   // #1337 (T07a2): the new-workspace bridge stages (package.json skeleton +
@@ -147,7 +149,9 @@ test('P2-01: staged core/compiler/node tarballs are content-equivalent to clean 
   }
 }, 600_000);
 
-test('P2-01: two independent staging processes produce byte-identical (exact-SHA) tarballs', async () => {
+test('P2-01: two independent staging processes produce byte-identical (exact-SHA) tarballs', {
+  skip: 'NOT_APPLICABLE v0.11.0: v0.10 staged legacy tarball reproducibility; root now intentionally rebuilds canonical v011 at prepack',
+}, async () => {
   // #1337 (T07a2): the new-workspace bridge tarballs are included — the
   // bridge install list is pinned by SHA256, so cross-process byte-identity
   // of the staged new-workspace tarballs is part of the same

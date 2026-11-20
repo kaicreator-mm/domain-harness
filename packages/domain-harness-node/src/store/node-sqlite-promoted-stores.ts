@@ -2,7 +2,7 @@ import {
   PromotedArtifactContractError,
   samePromotedArtifactAuthority,
   samePromotedArtifactIdentity,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type {
   BindPromotedArtifactAliasInput,
   DynamicChildExecutionPin,
@@ -16,7 +16,7 @@ import type {
   PromotedArtifactRevocationRecord,
   PromotedArtifactStore,
   PromotedArtifactVersionBinding,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type { JsonValue } from '@kaicreator/domain-harness/v2';
 import { canonicalText, decodeJson, type AuthoritySqliteDatabase } from './authority-shared.js';
 
