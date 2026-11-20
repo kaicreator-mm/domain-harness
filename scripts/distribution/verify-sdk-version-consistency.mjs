@@ -175,8 +175,8 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
     assert.equal(manifest.name, item.name, `${item.dir}: package name`);
     assert.equal(manifest.version, expected,
       `${item.dir}: source manifest version must equal ${expected}`);
-    assert.equal(manifest.engines?.node, '>=24.0.0',
-      `${item.dir}: Node engine must remain >=24.0.0`);
+    assert.equal(manifest.engines?.node, '>=22.12.0',
+      `${item.dir}: Node engine must remain >=22.12.0`);
     assert.notEqual(manifest.private, true,
       `${item.dir}: public SDK package cannot be private`);
     const seen = assertInternalEdges(manifest, expected, item.dir);
@@ -190,7 +190,7 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   assert.equal(consumer.name, CONSUMER_NAME, 'DomainHarness consumer package name');
   assert.equal(consumer.version, CONSUMER_PRODUCT_VERSION,
     `${CONSUMER_DIR}: product version must remain 0.11.0`);
-  assert.equal(consumer.engines?.node, '>=24.0.0',
+  assert.equal(consumer.engines?.node, '>=22.12.0',
     `${CONSUMER_DIR}: canonical public SDK must declare the verified Node target floor`);
   // T04 final wiring (L2 §8.3 / AC08): the consumer IS the canonical public
   // SDK entry and must be publishable — private:true would exclude it from
@@ -247,7 +247,7 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
     assert.ok(locked, `package-lock.json: missing workspace ${item.dir}`);
     assert.equal(locked.name, item.name, `${item.dir}: lock package name`);
     assert.equal(locked.version, expected, `${item.dir}: lock package version`);
-    assert.equal(locked.engines?.node, '>=24.0.0', `${item.dir}: lock Node engine`);
+    assert.equal(locked.engines?.node, '>=22.12.0', `${item.dir}: lock Node engine`);
     const lockedSeen = assertInternalEdges(locked, expected, `${item.dir} lock`);
     assert.deepEqual([...lockedSeen].sort(), [...item.internal].sort(),
       `${item.dir}: lock internal dependency graph changed`);
@@ -263,7 +263,7 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
     `${CONSUMER_DIR}: lock product version must remain 0.11.0`);
   assert.equal(lockedConsumer.version, consumer.version,
     `${CONSUMER_DIR}: lock package version`);
-  assert.equal(lockedConsumer.engines?.node, '>=24.0.0',
+  assert.equal(lockedConsumer.engines?.node, '>=22.12.0',
     `${CONSUMER_DIR}: lock must retain the verified Node target floor`);
   const lockedConsumerSeen = assertInternalEdges(lockedConsumer, expected, `${CONSUMER_DIR} lock`);
   assert.deepEqual([...lockedConsumerSeen].sort(), [...CONSUMER_INTERNAL].sort(),

@@ -52,7 +52,7 @@ steps:
     commands:
       - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
       - node --version && npm --version && git --version
-      - node -e 'if (Number(process.versions.node.split(".")[0]) < 24) { console.error("v0.11.x requires Node >=24 for this selected target"); process.exit(1); }'
+      - node -e 'if (Number(process.versions.node.split(".")[0]) < 22) { console.error("v0.11.x requires Node >=22 for this selected target"); process.exit(1); }'
       # Install exactly once. All following commands reuse this workspace.
       - npm ci --no-audit --no-fund
       # Includes coherent SDK version/dependency graph and committed-dist.

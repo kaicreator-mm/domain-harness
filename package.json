@@ -7,7 +7,7 @@
     "tooling/*"
   ],
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "build": "npm run check:sdk-version-consistency && npm run build --workspaces --if-present && node scripts/check-committed-dist.mjs",

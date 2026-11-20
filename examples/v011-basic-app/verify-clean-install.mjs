@@ -117,7 +117,7 @@ function assertTarball(path, expected) {
   assert.equal(manifest.name, expected.name);
   assert.equal(manifest.version, '0.11.0');
   assert.notEqual(manifest.private, true);
-  assert.equal(manifest.engines?.node, '>=24.0.0');
+  assert.equal(manifest.engines?.node, '>=22.12.0');
   assert.deepEqual(manifest.exports?.['.'], expected.root);
   assert.deepEqual(manifest.dependencies ?? {}, expected.dependencies);
   for (const section of ['optionalDependencies', 'peerDependencies', 'peerDependenciesMeta', 'bundledDependencies', 'bundleDependencies']) {
