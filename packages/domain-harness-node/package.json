@@ -1,6 +1,6 @@
 {
   "name": "@kaicreator/domain-harness-node",
-  "version": "0.11.0",
+  "version": "0.2.0",
   "description": "Node host bindings for DomainHarness",
   "type": "module",
   "main": "./dist/index.js",

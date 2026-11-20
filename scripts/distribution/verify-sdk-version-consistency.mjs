@@ -41,6 +41,17 @@ const CONSUMER_INTERNAL = Object.freeze([
   '@kaicreator/domain-harness-contracts',
   '@kaicreator/domain-harness-microkernel',
 ]);
+// v0.11.0 M-bump root-name edge consumers (L2 §8.6): these non-release
+// workspaces keep their own version (0.2.0 / 0.11.0-dev.0) but must consume
+// the canonical root package at the exact release version in the given
+// section — an unsatisfied edge makes npm resolve the root package name
+// against a registry and breaks workspace install.
+export const ROOT_EDGE_PACKAGES = Object.freeze([
+  { dir: 'packages/domain-harness-node', section: 'dependencies' },
+  { dir: 'packages/domain-harness-expo', section: 'dependencies' },
+  { dir: 'packages/domain-harness-compiler', section: 'peerDependencies' },
+  { dir: 'packages/dis-v011-runtime', section: 'dependencies' },
+]);
 const ROOT_PRODUCT_VERSION = '0.11.0';
 const CONSUMER_PRODUCT_VERSION = '0.11.0';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -101,9 +112,20 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   assert.equal(consumer.name, CONSUMER_NAME, 'DomainHarness consumer package name');
   assert.equal(consumer.version, CONSUMER_PRODUCT_VERSION,
     `${CONSUMER_DIR}: product version must remain 0.11.0`);
+  // M-bump phase rule (L2 §8.3): the consumer stays private until the T04
+  // final wiring removes private:true; package-lock.json workspace records
+  // do not carry the private flag, so this is asserted on the source only.
+  assert.equal(consumer.private, true,
+    `${CONSUMER_DIR}: must remain private:true during the M-bump phase (T04 final wiring may change it)`);
   const consumerSeen = assertInternalEdges(consumer, expected, CONSUMER_DIR);
   assert.deepEqual([...consumerSeen].sort(), [...CONSUMER_INTERNAL].sort(),
     `${CONSUMER_DIR}: internal dependency graph must describe the frozen 0.11.0 graph (contracts/build/microkernel)`);
+
+  for (const item of ROOT_EDGE_PACKAGES) {
+    const manifest = readJson(root, `${item.dir}/package.json`);
+    assert.equal(manifest[item.section]?.[CONSUMER_NAME], expected,
+      `${item.dir}: ${item.section}.${CONSUMER_NAME} must equal ${expected}`);
+  }
 
   const lock = readJson(root, 'package-lock.json');
   assert.equal(lock.version, ROOT_PRODUCT_VERSION,
@@ -139,6 +161,13 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   const lockedConsumerSeen = assertInternalEdges(lockedConsumer, expected, `${CONSUMER_DIR} lock`);
   assert.deepEqual([...lockedConsumerSeen].sort(), [...CONSUMER_INTERNAL].sort(),
     `${CONSUMER_DIR}: lock internal dependency graph must describe the frozen 0.11.0 graph`);
+
+  for (const item of ROOT_EDGE_PACKAGES) {
+    const locked = lock.packages?.[item.dir];
+    assert.ok(locked, `package-lock.json: missing workspace ${item.dir}`);
+    assert.equal(locked[item.section]?.[CONSUMER_NAME], expected,
+      `${item.dir}: lock ${item.section}.${CONSUMER_NAME} must equal ${expected}`);
+  }
 
   return {
     version: expected,

@@ -7,12 +7,14 @@ import test from 'node:test';
 import { redactAbsoluteCommandArgs } from '../../scripts/distribution/pack-sdk-from-tag.mjs';
 
 import {
+  ROOT_EDGE_PACKAGES,
   SDK_PACKAGES,
   verifySdkVersionConsistency,
 } from '../../scripts/distribution/verify-sdk-version-consistency.mjs';
 
 const VERSION = '0.11.0';
 const CONSUMER_DIR = 'packages/domain-harness';
+const CONSUMER_NAME = '@kaicreator/domain-harness';
 const CONTRACTS = '@kaicreator/domain-harness-contracts';
 const BUILD = '@kaicreator/domain-harness-build';
 const MICROKERNEL = '@kaicreator/domain-harness-microkernel';
@@ -45,13 +47,28 @@ function fixture() {
   }
 
   const consumer = {
-    name: '@kaicreator/domain-harness',
+    name: CONSUMER_NAME,
     version: '0.11.0',
+    private: true,
     dependencies: { [BUILD]: VERSION, [CONTRACTS]: VERSION, [MICROKERNEL]: VERSION },
   };
   mkdirSync(join(root, CONSUMER_DIR), { recursive: true });
   writeFileSync(join(root, CONSUMER_DIR, 'package.json'), JSON.stringify(consumer, null, 2) + '\n');
   lockPackages[CONSUMER_DIR] = globalThis.structuredClone(consumer);
+
+  // Non-release workspaces keep their own version but must carry the exact
+  // root-name edge (dependencies for node/expo/dis, peerDependencies for the
+  // retired compiler).
+  for (const item of ROOT_EDGE_PACKAGES) {
+    const manifest = {
+      name: `fixture-${item.dir}`,
+      version: '0.2.0',
+      [item.section]: { [CONSUMER_NAME]: VERSION },
+    };
+    mkdirSync(join(root, item.dir), { recursive: true });
+    writeFileSync(join(root, item.dir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
+    lockPackages[item.dir] = globalThis.structuredClone(manifest);
+  }
   writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
     name: 'domain-harness-monorepo',
     version: '0.11.0',
@@ -105,6 +122,26 @@ test('rejects a consumer that drifts from the frozen contracts/build/microkernel
     delete consumer.dependencies[MICROKERNEL];
     writeFileSync(path, JSON.stringify(consumer));
     assert.throws(() => verifySdkVersionConsistency(root, VERSION), /frozen 0\.11\.0 graph/);
+  });
+});
+
+test('rejects a root-name edge that drifts from the release version', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'packages/domain-harness-node/package.json');
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    manifest.dependencies[CONSUMER_NAME] = '0.2.0';
+    writeFileSync(path, JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 0\.11\.0/);
+  });
+});
+
+test('rejects a consumer that leaves private during the M-bump phase', () => {
+  withFixture(({ root }) => {
+    const path = join(root, CONSUMER_DIR, 'package.json');
+    const consumer = JSON.parse(readFileSync(path, 'utf8'));
+    consumer.private = false;
+    writeFileSync(path, JSON.stringify(consumer));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must remain private:true/);
   });
 });
 
