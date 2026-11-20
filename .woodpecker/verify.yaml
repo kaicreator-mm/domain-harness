@@ -15,8 +15,6 @@ when:
         - 'tsconfig.base.json'
         - 'eslint.config.mjs'
       on_empty: true
-  - event: push
-    branch: 'refactor/v0110-clean-source-quality'
   - event: manual
     branch: 'version/v0.11.*'
 labels:
