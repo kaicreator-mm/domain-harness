@@ -94,6 +94,92 @@ Emit task evidence / feedback (candidate, not automatic promotion)
 
 **0.11.1 的新增任务控制不是另建通用 Agent Runtime**：作为既有 Domain App / KDP 的受控编排层，限定只运行选定 Workflow/Function；不把未来工具、LLM、持久恢复一起纳入初版。每个阶段都可以演示一条从 Public SDK 到真实 Outcome 的完整纵向切片。
 
+
+## 2A. 双层反馈层级与多级进化模型（0.11.7–0.11.11 的设计权威）
+
+依据 [#1398](https://github.com/kaicreator-mm/domain-harness/issues/1398)、[原 v0.3 PRD ``8/11–13](https://github.com/kaicreator-mm/domain-harness/blob/main/docs/product/DomainHarness_v0.3_PRD_FROZEN.md)、[#1477](https://github.com/kaicreator-mm/domain-harness/issues/1477)、[#1478](https://github.com/kaicreator-mm/domain-harness/issues/1478) 和 [DIS #1487](https://github.com/kaicreator-mm/domain-harness/issues/1487)。**两层是反馈责任与时间跨度，而非两个拥有状态/Effect 权威的 Kernel。**
+
+```text
+ Layer A: CURRENT TASK / BUSINESS LOOP（当前任务快速闭环）
+ Goal → Context → select strategy → KDP admission/act → observe → verify
+   ↑ next/ask/stop/unknown                              │
+   └─────────────────────────────────────────────────────┘
+       Strategy: Compiled DI > Exact Semantic Reuse >
+                 Promoted Workflow > Bounded LLM (默认历史优先序)
+                  │
+                  └── authorized redacted RunEvidenceRef / DecisionEvidence
+                                                        ↓
+ Layer B: CROSS-TASK META / EVOLUTION LOOP（跨任务慢反馈）
+ Aggregate/Evaluate → Candidate → Shadow/Independent Qualification
+                         → Explicit Promotion → Forge Compile
+                         → next BUILD selects new Package/Lock
+                                         │
+                            FUTURE App activated on new exact pin
+                       (running App remains pinned to old identity)
+```
+
+### 2A.1 反馈层级：两个时间尺度、七个可检验等级
+
+| 层 | 级别 | 反馈责任 | 对应 0.11.x |
+|---|---|---|---|
+| Task | A0 Step Observation | 实时确认 Function/Tool/Host 结果；不因 Tool 返回成功文字就声称目标已完成 | 0.11.1–0.11.6 逐步落实 |
+| Task | A1 Task Correction | 检查未满足目标、补充数据、选择下一步、重试或 STOP；严格受预算/权限/Pin 限定 | 0.11.1–0.11.6 逐步落实 |
+| Task→Task | A2 Qualified Exact Reuse | 对已证实的**纯语义决策**按精确语义/作用域/版本/有效性复用；绝不重放 Effect | **0.11.7** |
+| Meta input | B0 Evidence Evaluation | 受控导出任务证据，按完整 trajectory/Goal/Outcome/反馈与真实 Oracle 评价 | **0.11.8** |
+| Meta | B1 Reflection/Candidate | 跨任务发现重复模式、知识/流程/交互缺口，形成可证伪版本化候选 | **0.11.9** |
+| Meta | B2 Qualification | 独立 baseline/held-out/反例验证和 Shadow 对照；Validation 不等于 Promotion | **0.11.10** |
+| Meta→New Task | B3 Governed Adoption | 人或明确授权主体批准，Forge 编译，未来 BUILD/Lock 精确选择；旧实例不变 | **0.11.11** |
+
+**两条相互正交的“多级”轴，不能偷换成 L0/L1/L2/L3：**
+
+- **运行时策略优先级**（v0.3 冻结）：`COMPILED_RULE → EXACT_SEMANTIC_RESULT → PROMOTED_WORKFLOW → BOUNDED_LLM`。不存在“Promoted Workflow 天然优先于 Exact Semantic Reuse”的历史依据；在领域需要时允许有版本化的显式策略例外。
+- **知识资格成熟度**（DIS #1487）：`OBSERVED → CANDIDATE → VALIDATED → PROMOTED → SELECTED → ACTIVATED/EXECUTED`。每一步有独立的角色、确切摘要、证据及授权，且可能 `REJECTED/WITHDRAWN/EXPIRED/SUPERSEDED`；禁止 Agent/LLM/Simulator 因一次评分好就擅自晋升。
+- **渐进确定性化**只是设计方向：未知案例第一次经有界 LLM 解题，后续同等条件可使用合格精确结果，重复解题模式经独立验证可固化为 Workflow，最终可能成为编译 Rule。不同成熟度不能凭次数自动晋升。
+
+### 2A.2 五种不同身份，禁止做成万能 Memory
+
+| 结构 | 负责什么 | 不是什么 |
+|---|---|---|
+| `TaskContext/WorkingMemory` | 当前 Goal、已确认事实、未决问题和临时 Observation | 不是跨任务共享的权威知识 |
+| `KDP State/EffectJournal` | 实际状态、已提交/未知 Effect、必要回放和审计 | 不是任意可重复执行的语义缓存 |
+| `ExperienceRecord` | 带 Domain/Package/Run/Outcome/来源/有效性约束的历史片段 | 历史发生 ≠ 一般性领域规则正确 |
+| `ExactSemanticResultRef` | 经过允许和资格检查、可在精确相同语义前置条件下复用的**纯决策** | 向量相似度命中≠精确语义命中；不得缓存权限或外部 Effect |
+| `Candidate/Promoted DI` | 来自经验的提案，与经授权晋升并被 Package BUILD 选定的领域智能 | Candidate≠Promoted≠Selected≠Runtime Activated |
+
+`ExactSemanticResultRef` 的最小检查：canonical semantic input、Domain/Package/Rule/Workflow/Policy/Target revision、tenant/actor scope、来源/适用性/currentness、Result provenance、验证凭证和过期/撤销状态。不能严格证明等价时 MISS/UNKNOWN；跨租户或版本 drift 必须拒绝。不要复制原 Host payload、敏感 prompt、token/PII 到 Memory。Experience 可用于上下文提示，但不能凭“曾经成功”越过实时权限与业务 Guard。
+
+### 2A.3 两层之间采用最小证据契约，不复制 Forge/Simulator
+
+- **Task 层输出**：尽早在 0.11.1–0.11.6 的正常 TaskRun/Outcome 中保留必要结构化事件；0.11.8 才实现受控的 `RunEvidenceRef/DecisionEvidence` 导出、评价和跨任务聚合；避免事后重造所有任务日志。
+- **Meta 处理**：是可选择的领域分析 Function / 独立离线工作负载，对红线内的脱敏证据工作；不成为常驻的自治 Agent Server、第二 State Machine authority 或独立 Effect Host。
+- **Candidate**：至少有 `candidateId/revision/digest`、baseline、来源证据引用、目标 Domain/Package 版本、预期增益、负例和 UNKNOWN 适用边界。候选可覆盖 Rule、Workflow、Knowledge、Interaction 或 Prompt/Context policy，但不允许自动执行。
+- **Validator / Domain-Simulator**：负责真实独立验证和 baseline 对照；`ValidationReceipt` 必须绑定 exact candidate/dependency/profile/runner/result/held-out cases。LLM Judge 只是非权威评估辅助，不能代签正式 Oracle。Shadow 路径不得执行真实业务 Effect。
+- **Promotion**：由明确授权主体单独产生 `PromotionDecision`；Forge 产出经批准的未来资产，BUILD/Lock 显式选中，现有活跃实例仍 Pin 旧身份。未授权、被撤销、过期或候选字节变化必须阻止提升。
+- **可插拔后端**：允许复用 task-meta 或现有 telemetry 的真实 schema，仅在 Consumer 证明缺失时新增 adapter；不强制向量 DB、中央实验平台、训练引擎或全局异步定时任务。
+
+### 2A.4 成熟 Agent/Harness 实现的可复用经验（仅借鉴机制）
+
+| 参考 | 已公开的工程做法 | 对 DomainHarness 的具体启示 |
+|---|---|---|
+| [Google ADK](https://github.com/google/adk-docs/blob/main/docs/sessions/index.md) | 区分 Session、Session State、跨 Session Memory 及可替换 MemoryService | 明确 Task Context、跨任务 Experience、KDP 真实 State 是三种生命周期，不强制一个存储后端 |
+| [LangGraph Memory](https://langchain-ai.github.io/langgraph/concepts/memory/) | thread-scoped short-term vs cross-thread long-term；semantic/episodic/procedural 不同记忆形态 | 设计 Domain/tenant namespace、来源和范围；经验不能自动变为规则或指令 |
+| [OpenAI Agents SDK Tracing](https://openai.github.io/openai-agents-python/tracing/) | 跟踪 model/tool/handoff/guardrail spans，支持观测出口与敏感数据控制 | 做可复现的 Goal→Step→Observation→Outcome 轨迹；输出到 Meta 前明确最小数据、脱敏和授权 |
+| [LangSmith Evals](https://docs.langchain.com/langsmith/evaluation-types) | 生产 trace 的在线监测，与离线数据集/回归对照、人工及模型评价分离 | 将反馈与资格验证拆到 0.11.8 和 0.11.10，不让线上观察自动成为验证 PASS |
+| [DSPy Optimizers](https://github.com/stanfordnlp/dspy/blob/main/docs/docs/learn/optimization/optimizers.md) | 利用 trace、metric 和数据集构造、评估 prompt/示例等优化候选 | Meta 提出 Prompt/Workflow 候选需有精确输入和指标；不在 Harness 内实现通用训练/优化器 |
+| [Letta Sleep-time](https://www.letta.com/blog/sleep-time-compute/) | 将反思/记忆整理与主 Agent 的实时交互分离成独立工作负载 | 可以让跨任务 Meta 与当前任务解耦；**不能**让离线 Agent 自行改变 pinned Package 或取得 KDP 权威 |
+
+### 2A.5 可贯通的独立验收情景
+
+1. **首次未知任务**：编译知识未覆盖时，已实现的 bounded LLM 仅提出 proposal，所有 Function/Effect 仍经 KDP 审核与 Host readback。留下 Task Evidence，而不自动形成规则。
+2. **0.11.7 精确复用**：再次遇到完全匹配的纯语义决策可使用有资格的 Exact Cache；版本变化、适用范围变化、过期或跨租户必须 MISS，**不能复放 Effect**。
+3. **0.11.8 反馈评价**：从多次成功、失败、UNKNOWN 中提取脱敏 trajectory/Outcome；报告某一类重复失败或重复昂贵 LLM 调用，并区分客观验证与主观评价。
+4. **0.11.9 候选生成**：从明确的多次 Evidence 构建一个不可变的 Rule/Workflow Candidate，记录预期收益与反例，内容变化改变 digest，不能直接进入生产。
+5. **0.11.10 独立验证**：真实有权的 Validator/Simulator 用 baseline + held-out cases/负例/版本/策略范围对照；仅通过确切范围时返回 `VALIDATED`，无原始 Oracle 时保留 `NOT_RUN/BLOCKED`。
+6. **0.11.11 未来激活**：被正式批准的精确候选经 Forge 编译后由新 BUILD/Lock 选择，旧运行实例依旧 pinned；禁止靠 LLM 或本地自评跳过批准。再次遇到类似任务，编译 Rule 或已晋升 Workflow 可优先解决，而无需重复 LLM。
+
+**按阶段分别验收，绝不在 0.11.7 一次交付所有六步。** 旧 0.10.3 实现与外部框架只能提供方案参考，不能为 0.11.x 当前 SHA 的功能盖章。最终所有 0.11.n 仍属于 **同一个 `version/v0.11.x` 列车**；根据 #1563 顶部最新 Owner 决议，当前仅允许推进 0.11.0 单一真实 Demo 的必要验收，**不启动 0.11.1+ 开发**。
+
+
 ## 3. 几个必须稳定的架构约束
 
 ### 3.1 把机制分清，而不是强行同质化
