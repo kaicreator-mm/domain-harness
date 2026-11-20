@@ -37,6 +37,11 @@ const registryForeignFiles = new Set([
   'packages/contracts/src/identity.ts',
   'packages/contracts/src/qualified-canonical.ts',
 ]);
+// v011 T01 (#1575): the standalone 0.11 contracts under src/v011 carry their
+// own frozen 40-code catalog (DH_BUILD_*/DH_BOOT_*/DH_RUNTIME_*) and are NOT
+// part of the v0.10 typed-refusal registry; the whole directory stays
+// registry-foreign so the v010 catalog cannot silently widen.
+const registryForeignDirectories = ['packages/contracts/src/v011'];
 for (const owner of [
   'packages/contracts/src', 'packages/microkernel/src',
   'packages/host-node/src', 'tooling/build/src',
@@ -45,7 +50,13 @@ for (const owner of [
     for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a,b)=>a.name.localeCompare(b.name,'en'))) {
       const full=join(directory,entry.name);
       if (entry.isDirectory()) await collect(full);
-      else if (entry.name.endsWith('.ts') && !registryForeignFiles.has(relative(root, full).replaceAll('\\', '/'))) sourceFiles.push(full);
+      else if (entry.name.endsWith('.ts')) {
+        const relativePath = relative(root, full).replaceAll('\\', '/');
+        if (!registryForeignFiles.has(relativePath)
+          && !registryForeignDirectories.some((d) => relativePath.startsWith(d + '/'))) {
+          sourceFiles.push(full);
+        }
+      }
     }
   }
   await collect(join(root,owner));
