@@ -145,6 +145,34 @@ test('rejects a consumer that leaves private during the M-bump phase', () => {
   });
 });
 
+test('rejects a lock consumer graph that drifts while source stays valid', () => {
+  withFixture(({ root, lockPackages }) => {
+    delete lockPackages[CONSUMER_DIR].dependencies[MICROKERNEL];
+    writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      version: '0.11.0',
+      lockfileVersion: 3,
+      requires: true,
+      packages: lockPackages,
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /frozen 0\.11\.0 graph/);
+  });
+});
+
+test('rejects a lock root-name edge that drifts while source stays valid', () => {
+  withFixture(({ root, lockPackages }) => {
+    lockPackages['packages/domain-harness-node'].dependencies[CONSUMER_NAME] = '0.2.0';
+    writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      version: '0.11.0',
+      lockfileVersion: 3,
+      requires: true,
+      packages: lockPackages,
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 0\.11\.0/);
+  });
+});
+
 test('rejects a lockfile that disagrees with the source workspace manifest', () => {
   withFixture(({ root, lockPackages }) => {
     lockPackages['packages/host-node'].version = '0.11.0-rc.0';
