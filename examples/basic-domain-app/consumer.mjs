@@ -602,7 +602,7 @@ async function main() {
   await evidence('negative.record-digest-invalid', { status: 'PASS', code: refused.code, freshInstall: true });
 
   const kdpTamperInstall = await cloneInstall(a.install);
-  const kdpEntry = join(kdpTamperInstall.installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel', 'dist', 'current', 'index.js');
+  const kdpEntry = join(kdpTamperInstall.installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel', 'dist', 'index.js');
   const originalKdp = await readFile(kdpEntry);
   await writeFile(kdpEntry, `${originalKdp.toString('utf8')}\n// post-install KDP tamper\n`);
   before = globalThis.__domainHarnessT05Events.length;

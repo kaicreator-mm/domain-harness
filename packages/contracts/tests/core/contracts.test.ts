@@ -14,8 +14,6 @@ import {
   DOMAIN_DEFINITION_JSON_SCHEMA,
   ELEMENT_DEFINITION_JSON_SCHEMA,
   CONTENT_BLOCK_JSON_SCHEMA,
-  FUNCTION_CONTRACT_JSON_SCHEMA,
-  ELEMENT_REF_JSON_SCHEMA,
   FUNCTION_REF_JSON_SCHEMA,
   DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA,
   DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA,
@@ -56,7 +54,7 @@ import {
   OUTCOME_NEGATIVE_UNKNOWN_MISSING_REASON,
 } from './function-outcome-negatives.js';
 import type { FunctionOutcome, JsonValue } from '@kaicreator/domain-harness-contracts';
-import Ajv2020 from 'ajv/dist/2020.js';
+import { Ajv2020 } from 'ajv/dist/2020.js';
 
 
 test('当前领域错误应继承原生 Error，保留稳定名称、错误码及 cause', () => {

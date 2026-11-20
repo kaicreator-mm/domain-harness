@@ -339,7 +339,7 @@ export async function buildFixtureInstall(
       exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
     }),
   );
-  await cp(MICROKERNEL_DIST, join(kdpPackageDir, 'dist', 'current'), { recursive: true });
+  await cp(MICROKERNEL_DIST, join(kdpPackageDir, 'dist'), { recursive: true });
 
   const contractsPackageDir = join(installRoot, 'node_modules', '@kaicreator/domain-harness-contracts');
   await mkdir(contractsPackageDir, { recursive: true });
@@ -352,7 +352,7 @@ export async function buildFixtureInstall(
       exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
     }),
   );
-  await cp(CONTRACTS_DIST, join(contractsPackageDir, 'dist', 'current'), { recursive: true });
+  await cp(CONTRACTS_DIST, join(contractsPackageDir, 'dist'), { recursive: true });
 
   const kernelPath = await write(`node_modules/${FIXTURE_KERNEL}/dist/index.mjs`, kernelModuleSource(scenario));
   const sdkPath = await write(`node_modules/${FIXTURE_SDK}/dist/index.mjs`, sdkModuleSource(scenario));
@@ -415,7 +415,7 @@ export async function buildFixtureInstall(
   const descriptorBytes = Buffer.from(JSON.stringify(descriptor), 'utf8');
   await write(DESCRIPTOR_RELATIVE_PATH, descriptorBytes.toString('utf8'));
 
-  const kdpEntryDigest = await fileBytesDigest(join(kdpPackageDir, 'dist', 'current', 'index.js'));
+  const kdpEntryDigest = await fileBytesDigest(join(kdpPackageDir, 'dist', 'index.js'));
   const artifactRef = (packageId: string, artifactPath: string): { packageId: string; path: string; digest: ContentDigest } => ({
     packageId,
     path: artifactPath,
@@ -565,7 +565,7 @@ export async function buildFixtureInstall(
 
   const recordPath = join(installRoot, 'dh-install', 'installed-record.json');
   const lockPath = join(installRoot, ...LOCK_RELATIVE_PATH.split('/'));
-  const kdpEntryPath = join(kdpPackageDir, 'dist', 'current', 'index.js');
+  const kdpEntryPath = join(kdpPackageDir, 'dist', 'index.js');
 
   return {
     installRoot,
