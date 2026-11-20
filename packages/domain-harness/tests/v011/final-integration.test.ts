@@ -206,21 +206,21 @@ test('T04-INT-6: a Business App Init that suppresses a REQUIRED ingress is typed
   });
 });
 
-test('T04-INT-7: unsupported Boot target (env.nodeMajor 22) is a typed REFUSAL before any module loads', { timeout: 120_000 }, async (t) => {
+test('T04-INT-7: unsupported Boot target (env.nodeMajor 22) is a typed failure before selected packages load', { timeout: 120_000 }, async (t) => {
   await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (install) => {
-    // BUILD only emits the frozen node24-esm/1 Lock; the Host-declared
-    // runtime probe must match it. A wrong major is refused by the shared
-    // context normalization (DH_BOOT_PIN_MISMATCH target family).
+    // BUILD emits the frozen node24-esm/1 Lock. The KDP compares the Host's
+    // declared runtime probe with that Target's applicability floor before
+    // loading any selected package; Boot passes through the typed failure.
     const badContext = { ...install.context, env: { nodeMajor: 22, platform: process.platform } };
     const result = await boot(install.pin, badContext);
-    assert.equal(result.status, 'REFUSED', JSON.stringify(result));
-    if (result.status !== 'REFUSED') return;
-    assert.equal(result.code, 'DH_BOOT_PIN_MISMATCH');
-    assert.match(result.reason, /env\.nodeMajor must be 24/);
+    assert.equal(result.status, 'FAILED', JSON.stringify(result));
+    if (result.status !== 'FAILED') return;
+    assert.equal(result.code, 'DH_RUNTIME_UNSUPPORTED_PROFILE');
+    assert.match(result.reason, /below the Lock target floor 24/);
     assert.equal(
-      events().some((event) => event['event'] === 'technical-init' || event['event'] === 'business-init'),
+      events().some((event) => event['event'] === 'module-evaluated' || event['event'] === 'technical-init' || event['event'] === 'business-init'),
       false,
-      'zero side effects: no package module was loaded or initialized',
+      'zero selected-package side effects: no package module was loaded or initialized',
     );
   });
 });

@@ -27,7 +27,7 @@
  * - legacy spot check from the same tarball: root and `./v2` stay unchanged.
  */
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -43,12 +43,7 @@ import {
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 
-/**
- * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
- * this file's packed-consumer journeys npm-install dependencies from the
- * registry; workers without egress must SKIP explicitly rather than hang
- * an install to the step timeout. Zero behavior change when reachable.
- */
+/** NOT_APPLICABLE is version-scoped and never depends on network reachability. */
 // v0.11.0 T04 disposition (L2 §8.3 fence / §12.1): NOT_APPLICABLE for v0.11.0 —
 // kept verbatim as legacy packed-consumer evidence (do not delete; do not
 // rewrite as v011 tests). The 0.11.0 release tarballs of
@@ -57,19 +52,9 @@ const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 // AC08), so this clean-install consumer journey can no longer reach the
 // legacy ABI it verifies from the packed artifacts. No 0.10.x parity is
 // claimed or performed; workspace-only legacy tests continue to run via
-// './legacy'. (npmRegistryReachable is retained as historical evidence of
-// the original network gate.)
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
-
+// './legacy'.
 const NOT_APPLICABLE_V0110_LEGACY_PACKED = 'NOT_APPLICABLE v0.11.0: legacy packed-consumer evidence — the 0.11.0 release tarballs intentionally exclude the legacy dist (L2 §8.3 files fence / AC08); kept verbatim, no 0.10.x parity claimed';
-const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
-  ? NOT_APPLICABLE_V0110_LEGACY_PACKED
-  : NOT_APPLICABLE_V0110_LEGACY_PACKED;
+const PACKED_CONSUMER_NET_SKIP: string | undefined = NOT_APPLICABLE_V0110_LEGACY_PACKED;
 
 function run(command: string, args: readonly string[], cwd: string): string {
   return execFileSync(command, [...args], {

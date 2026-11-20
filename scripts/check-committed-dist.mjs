@@ -19,12 +19,18 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const neverCommittedDist = new Set([
   '@kaicreator/domain-harness-node',
   '@kaicreator/domain-harness-expo',
-  // v0.11.0 T04 final wiring: the root SDK ships via npm pack with a
-  // `prepack: npm run build` guarantee (dist/v011 is rebuilt at pack time,
-  // so the packed artifact always matches the committed sources). Its dist
-  // tree stays UNTRACKED (generated), so the present/tracked/fresh guard
-  // cannot apply; the pack-time rebuild is the freshness enforcement.
-  '@kaicreator/domain-harness',
+]);
+
+// The canonical root SDK also keeps dist untracked, but it is NOT exempt from
+// shipped-artifact verification. Every ordinary workspace build executes its
+// pack readiness assertion after compiling all workspaces, and every npm pack
+// must rebuild then run the same assertion through this exact prepack script.
+// The other public packages retain the tracked/present/fresh guard below.
+const packTimeBuiltDist = new Map([
+  ['@kaicreator/domain-harness', {
+    prepack: 'npm run build && node scripts/assert-v011-pack-ready.mjs',
+    assertion: 'scripts/assert-v011-pack-ready.mjs',
+  }],
 ]);
 
 async function discoverShipped() {
@@ -47,6 +53,17 @@ async function discoverShipped() {
         continue;
       }
       if (manifest.private === true) continue;
+      const packTime = packTimeBuiltDist.get(manifest.name);
+      if (packTime !== undefined) {
+        if (manifest.scripts?.prepack !== packTime.prepack) {
+          throw new Error(`check-committed-dist: ${manifest.name} prepack must be exactly '${packTime.prepack}'`);
+        }
+        execFileSync(process.execPath, [packTime.assertion], {
+          cwd: `${root}/${parent}/${dir}`,
+          stdio: 'inherit',
+        });
+        continue;
+      }
       // Legacy host packages that never shipped a committed dist (their dist/
       // is gitignored). They stay unguarded until a later task marks them
       // private (T07b/T08), at which point this entry becomes redundant.

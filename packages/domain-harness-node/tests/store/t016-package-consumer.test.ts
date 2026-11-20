@@ -45,7 +45,9 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('T-016 package consumer: packed core/node/expo expose the public v0.2 API to a clean TypeScript consumer', async () => {
+test('T-016 package consumer: packed core/node/expo expose the public v0.2 API to a clean TypeScript consumer', {
+  skip: 'NOT_APPLICABLE v0.11.0: v0.2 packed/isolated App ABI evidence; 0.11 tarballs fence legacy executable dist (L2 §8.3/AC08), no parity claimed',
+}, async () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-t016-consumer-'));
   const packDirectory = join(root, 'packs');
   const consumerDirectory = join(root, 'consumer');

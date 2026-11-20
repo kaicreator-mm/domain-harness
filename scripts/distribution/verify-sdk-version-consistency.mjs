@@ -54,6 +54,12 @@ export const ROOT_EDGE_PACKAGES = Object.freeze([
 ]);
 const ROOT_PRODUCT_VERSION = '0.11.0';
 const CONSUMER_PRODUCT_VERSION = '0.11.0';
+const ROOT_SDK_PREPACK = 'npm run build && node scripts/assert-v011-pack-ready.mjs';
+const PRIVATE_LEGACY_WORKSPACES = new Set([
+  'packages/domain-harness-node',
+  'packages/domain-harness-expo',
+  'packages/domain-harness-compiler',
+]);
 const DIS_RUNTIME_DIR = 'packages/dis-v011-runtime';
 const DIS_RUNTIME_INTERNAL = Object.freeze([
   '@kaicreator/domain-harness-build',
@@ -184,6 +190,8 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   assert.equal(consumer.name, CONSUMER_NAME, 'DomainHarness consumer package name');
   assert.equal(consumer.version, CONSUMER_PRODUCT_VERSION,
     `${CONSUMER_DIR}: product version must remain 0.11.0`);
+  assert.equal(consumer.engines?.node, '>=24.0.0',
+    `${CONSUMER_DIR}: canonical public SDK must declare the verified Node target floor`);
   // T04 final wiring (L2 §8.3 / AC08): the consumer IS the canonical public
   // SDK entry and must be publishable — private:true would exclude it from
   // the release graph (M-bump phase rule ended at T04 final wiring).
@@ -197,6 +205,8 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   // SDK ships only dist/v011; `./legacy` and the old subpath entries stay in
   // the fenced exports map for workspace compatibility.
   assertV011OnlyPackShape(consumer, ['./legacy'], CONSUMER_DIR);
+  assert.equal(consumer.scripts?.prepack, ROOT_SDK_PREPACK,
+    `${CONSUMER_DIR}: prepack must freshly build and assert the untracked canonical dist`);
   assertV011OnlyPackShape(readJson(root, 'tooling/build/package.json'), ['./legacy'], 'tooling/build');
   assertV011OnlyPackShape(manifests[1].manifest, ['./legacy', './legacy/host-seam'], 'packages/microkernel');
   assertContractsReleaseShape(manifests[0].manifest, 'packages/contracts');
@@ -205,6 +215,10 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
 
   for (const item of ROOT_EDGE_PACKAGES) {
     const manifest = readJson(root, `${item.dir}/package.json`);
+    if (PRIVATE_LEGACY_WORKSPACES.has(item.dir)) {
+      assert.equal(manifest.private, true,
+        `${item.dir}: legacy root/legacy imports are workspace-only; this package must not enter a public release graph`);
+    }
     assert.equal(manifest[item.section]?.[CONSUMER_NAME], expected,
       `${item.dir}: ${item.section}.${CONSUMER_NAME} must equal ${expected}`);
   }
@@ -249,6 +263,8 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
     `${CONSUMER_DIR}: lock product version must remain 0.11.0`);
   assert.equal(lockedConsumer.version, consumer.version,
     `${CONSUMER_DIR}: lock package version`);
+  assert.equal(lockedConsumer.engines?.node, '>=24.0.0',
+    `${CONSUMER_DIR}: lock must retain the verified Node target floor`);
   const lockedConsumerSeen = assertInternalEdges(lockedConsumer, expected, `${CONSUMER_DIR} lock`);
   assert.deepEqual([...lockedConsumerSeen].sort(), [...CONSUMER_INTERNAL].sort(),
     `${CONSUMER_DIR}: lock internal dependency graph must describe the frozen 0.11.0 graph`);

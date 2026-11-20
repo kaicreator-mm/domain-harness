@@ -391,20 +391,6 @@ export function normalizeBootstrapContext(context: unknown): TrustResult<Normali
     const env = isRecord(envRaw) && typeof envRaw['nodeMajor'] === 'number' && typeof envRaw['platform'] === 'string'
       ? { nodeMajor: envRaw['nodeMajor'], platform: envRaw['platform'] }
       : { nodeMajor: 0, platform: 'unknown' };
-    // T04 rework P2-3: the single verified Target is 'node24-esm/1' (L2 §8.4);
-    // the Host-declared runtime probe env.nodeMajor must equal 24. A wrong
-    // major is a target-family refusal (DH_BOOT_PIN_MISMATCH) — no new error
-    // family — and Boot/KDP share this one normalization, so neither path
-    // can start on an unverified Node major.
-    if (env.nodeMajor !== 24) {
-      return {
-        ok: false,
-        failure: trustFailure(
-          'DH_BOOT_PIN_MISMATCH',
-          `bootstrap context env.nodeMajor must be 24 for the frozen 'node24-esm/1' target; got ${env.nodeMajor}`,
-        ),
-      };
-    }
     return {
       ok: true,
       value: { installRoot, descriptorPath, lockPath, hostPorts, env },

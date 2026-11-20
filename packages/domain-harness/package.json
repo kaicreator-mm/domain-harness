@@ -3,6 +3,9 @@
   "version": "0.11.0",
   "description": "DomainHarness v0.11.0 Element-First public SDK (canonical entry; legacy ABI not shipped)",
   "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "main": "./dist/v011/index.js",
   "types": "./dist/v011/index.d.ts",
   "exports": {
@@ -74,7 +77,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs",
-    "prepack": "npm run build",
+    "prepack": "npm run build && node scripts/assert-v011-pack-ready.mjs",
     "build:legacy-test": "tsc -p tsconfig.legacy-test.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && npm run build:legacy-test && node --import tsx --test \"tests/**/*.test.ts\" && tsc -p tsconfig.test.json --noEmit"

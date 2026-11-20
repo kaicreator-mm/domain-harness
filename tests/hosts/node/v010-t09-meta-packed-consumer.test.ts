@@ -10,7 +10,7 @@
  * a deep `dist/...` import is refused with ERR_PACKAGE_PATH_NOT_EXPORTED.
  */
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
@@ -31,19 +31,9 @@ import {
 // AC08), so this clean-install consumer journey can no longer reach the
 // legacy ABI it verifies from the packed artifacts. No 0.10.x parity is
 // claimed or performed; workspace-only legacy tests continue to run via
-// './legacy'. (npmRegistryReachable is retained as historical evidence of
-// the original network gate.)
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
-
+// './legacy'.
 const NOT_APPLICABLE_V0110_LEGACY_PACKED = 'NOT_APPLICABLE v0.11.0: legacy packed-consumer evidence — the 0.11.0 release tarballs intentionally exclude the legacy dist (L2 §8.3 files fence / AC08); kept verbatim, no 0.10.x parity claimed';
-const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
-  ? NOT_APPLICABLE_V0110_LEGACY_PACKED
-  : NOT_APPLICABLE_V0110_LEGACY_PACKED;
+const PACKED_CONSUMER_NET_SKIP: string | undefined = NOT_APPLICABLE_V0110_LEGACY_PACKED;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');

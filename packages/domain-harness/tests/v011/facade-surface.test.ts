@@ -9,7 +9,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as facade from '../../src/v011/index.js';
+import * as facade from '@kaicreator/domain-harness';
 
 test('T04-FACADE-1: the canonical entry runtime export set is exactly the union of the real contracts/BUILD/Boot/KDP exports', async () => {
   const contracts = await import('@kaicreator/domain-harness-contracts/v011');

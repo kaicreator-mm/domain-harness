@@ -5,7 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { V10_SFEATURE_ABI, V10_TARGET_PROFILE, sha256Hex } from '@kaicreator/domain-harness-contracts';
-import { buildV10App } from '@kaicreator/domain-harness-build/legacy';
+import { buildV10App } from '@kaicreator/domain-harness-build';
 import { activateV10App } from '@kaicreator/domain-harness-microkernel/host-seam';
 import {
   metaFeedbackEvidencePrefix,
