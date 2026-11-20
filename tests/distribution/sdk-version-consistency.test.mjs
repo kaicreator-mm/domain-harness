@@ -38,7 +38,10 @@ function fixture() {
       type: 'module',
       engines: { node: '>=24.0.0' },
       files: ['dist'],
-      dependencies,
+      dependencies: {
+        ...dependencies,
+        ...(item.dir === 'tooling/build' ? { ajv: '8.17.1' } : {}),
+      },
     };
     manifests.set(item.dir, manifest);
     mkdirSync(join(root, item.dir), { recursive: true });
@@ -63,6 +66,7 @@ function fixture() {
     const manifest = {
       name: `fixture-${item.dir}`,
       version: '0.2.0',
+      ...(item.dir === 'packages/dis-v011-runtime' ? { private: true } : {}),
       [item.section]: {
         [CONSUMER_NAME]: VERSION,
         ...(item.dir === 'packages/dis-v011-runtime'
@@ -178,6 +182,29 @@ test('rejects a lock root-name edge that drifts while source stays valid', () =>
   });
 });
 
+test('rejects a BUILD Ajv version that is not exact 8.17.1', () => {
+  withFixture(({ root, manifests }) => {
+    const manifest = manifests.get('tooling/build');
+    manifest.dependencies.ajv = '^8.17.1';
+    writeFileSync(join(root, 'tooling/build/package.json'), JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 8\.17\.1/);
+  });
+});
+
+test('rejects a lock BUILD Ajv version that is not exact 8.17.1', () => {
+  withFixture(({ root, lockPackages }) => {
+    lockPackages['tooling/build'].dependencies.ajv = '^8.17.1';
+    writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      version: '0.11.0',
+      lockfileVersion: 3,
+      requires: true,
+      packages: lockPackages,
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 8\.17\.1/);
+  });
+});
+
 test('rejects an extra third-party consumer production dependency', () => {
   withFixture(({ root }) => {
     const path = join(root, CONSUMER_DIR, 'package.json');
@@ -199,6 +226,40 @@ test('rejects an extra third-party lock consumer production dependency', () => {
       packages: lockPackages,
     }));
     assert.throws(() => verifySdkVersionConsistency(root, VERSION), /no third-party runtime dependency/);
+  });
+});
+
+test('rejects dis-v011-runtime leaving the private release boundary', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'packages/dis-v011-runtime/package.json');
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    manifest.private = false;
+    writeFileSync(path, JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must remain private:true/);
+  });
+});
+
+test('rejects an additional dis-v011-runtime SDK dependency edge', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'packages/dis-v011-runtime/package.json');
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    manifest.dependencies['@kaicreator/domain-harness-microkernel'] = '0.11.0';
+    writeFileSync(path, JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /no additional SDK edge/);
+  });
+});
+
+test('rejects an additional dis-v011-runtime SDK dependency edge in lock', () => {
+  withFixture(({ root, lockPackages }) => {
+    lockPackages['packages/dis-v011-runtime'].dependencies['@kaicreator/domain-harness-microkernel'] = '0.11.0';
+    writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      version: '0.11.0',
+      lockfileVersion: 3,
+      requires: true,
+      packages: lockPackages,
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /no additional SDK edge/);
   });
 });
 
