@@ -102,6 +102,8 @@ export interface FixtureInstall {
   writeLockBytes(bytes: Buffer): Promise<void>;
   readKdpEntryBytes(): Promise<Buffer>;
   writeKdpEntryBytes(bytes: Buffer): Promise<void>;
+  /** replace the installed KDP package manifest (exports-conditions tests). */
+  writeKdpManifest(manifest: unknown): Promise<void>;
   /** overwrite an installed package file (post-install tamper negatives). */
   writePackageFile(packageId: string, path: string, bytes: Buffer): Promise<void>;
   cleanup(): Promise<void>;
@@ -631,6 +633,9 @@ export async function buildFixtureInstall(
     readKdpEntryBytes: () => readFile(kdpEntryPath),
     writeKdpEntryBytes: async (bytes) => {
       await writeFile(kdpEntryPath, bytes);
+    },
+    writeKdpManifest: async (manifest) => {
+      await writeFile(join(kdpPackageDir, 'package.json'), JSON.stringify(manifest));
     },
     writePackageFile: async (packageId, path, bytes) => {
       const absolute = join(installRoot, 'node_modules', ...packageId.split('/'), ...path.split('/'));

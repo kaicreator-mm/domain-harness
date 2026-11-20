@@ -153,22 +153,36 @@ export class PackageSystem {
             throw error;
         }
     }
-    /** Strict reverse teardown per the Lock's `technicalDisposeOrder`. */
+    /**
+     * Strict reverse teardown per the Lock's `technicalDisposeOrder`.
+     * Best-effort across ALL packages: every entry is attempted even after
+     * failures, and the aggregated error is reported at the end (so one bad
+     * package cannot abort the remaining teardown).
+     */
     async runTechnicalDispose() {
+        const failures = [];
         for (const packageId of this.lock.technicalDisposeOrder) {
-            const pkg = this.packageById(packageId);
-            if (pkg === undefined) {
-                throw new KdpLoadError(`technicalDisposeOrder references unselected package '${packageId}'`);
-            }
-            const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
-            const technicalDispose = mod['technicalDispose'];
-            if (technicalDispose !== undefined) {
-                if (typeof technicalDispose !== 'function') {
-                    throw new KdpLoadError(`package '${packageId}' export 'technicalDispose' is not a function`);
+            try {
+                const pkg = this.packageById(packageId);
+                if (pkg === undefined) {
+                    throw new KdpLoadError(`technicalDisposeOrder references unselected package '${packageId}'`);
                 }
-                const context = { packageId, hostPorts: this.hostPorts };
-                await technicalDispose(context);
+                const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
+                const technicalDispose = mod['technicalDispose'];
+                if (technicalDispose !== undefined) {
+                    if (typeof technicalDispose !== 'function') {
+                        throw new KdpLoadError(`package '${packageId}' export 'technicalDispose' is not a function`);
+                    }
+                    const context = { packageId, hostPorts: this.hostPorts };
+                    await technicalDispose(context);
+                }
             }
+            catch (error) {
+                failures.push(`${packageId}: ${error.message}`);
+            }
+        }
+        if (failures.length > 0) {
+            throw new KdpLoadError(`technical dispose failed for ${failures.length} package(s): ${failures.join('; ')}`);
         }
     }
     /** Seal hook bindings: import every provider module, freeze the table. No invocation channel. */

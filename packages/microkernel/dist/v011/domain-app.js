@@ -176,10 +176,17 @@ export function createDomainApp(deps) {
     function dispose() {
         if (disposeFlight === null) {
             disposeFlight = (async () => {
-                // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
-                await packages.runTechnicalDispose();
-                disposed = true;
-                return { status: 'DISPOSED' };
+                try {
+                    // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
+                    await packages.runTechnicalDispose();
+                    return { status: 'DISPOSED' };
+                }
+                finally {
+                    // The app is consumed by a dispose attempt regardless of outcome:
+                    // after a failed teardown later invoke is refused, and repeat
+                    // dispose keeps returning the latched rejection.
+                    disposed = true;
+                }
             })();
         }
         return disposeFlight;

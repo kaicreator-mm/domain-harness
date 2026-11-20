@@ -46,7 +46,12 @@ export declare class PackageSystem {
      * init failure) before the original error propagates.
      */
     runTechnicalInit(): Promise<void>;
-    /** Strict reverse teardown per the Lock's `technicalDisposeOrder`. */
+    /**
+     * Strict reverse teardown per the Lock's `technicalDisposeOrder`.
+     * Best-effort across ALL packages: every entry is attempted even after
+     * failures, and the aggregated error is reported at the end (so one bad
+     * package cannot abort the remaining teardown).
+     */
     runTechnicalDispose(): Promise<void>;
     /** Seal hook bindings: import every provider module, freeze the table. No invocation channel. */
     sealHooks(): Promise<ReadonlyMap<string, readonly unknown[]>>;

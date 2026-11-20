@@ -11,6 +11,16 @@
 import type { JsonValue } from '@kaicreator/domain-harness-contracts/v011';
 
 export function validateJsonSubset(instance: unknown, schema: unknown): boolean {
+  // Non-JSON instances fail outright: undefined is not a JSON value, and
+  // neither are functions, symbols or bigints (even against boolean true).
+  if (
+    instance === undefined ||
+    typeof instance === 'function' ||
+    typeof instance === 'symbol' ||
+    typeof instance === 'bigint'
+  ) {
+    return false;
+  }
   // Non-finite numbers are not JSON data — refuse them outright.
   if (typeof instance === 'number' && !Number.isFinite(instance)) return false;
   if (typeof schema === 'boolean') return schema;

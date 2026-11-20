@@ -27,7 +27,7 @@ import type {
   KdpPrimary,
   V011BootErrorCode,
 } from '@kaicreator/domain-harness-contracts/v011';
-import { isRecord, readTrustedRecord, verifyContextPaths, verifyInstallTrust } from './verify.js';
+import { isRecord, normalizeBootstrapContext, readTrustedRecord, verifyContextPaths, verifyInstallTrust } from './verify.js';
 
 function refused(code: V011BootErrorCode, reason: string): BootResult {
   return { status: 'REFUSED', code, reason };
@@ -37,28 +37,40 @@ function refused(code: V011BootErrorCode, reason: string): BootResult {
 // (b) pin vs record
 // ---------------------------------------------------------------------------
 
+/**
+ * Snapshot the untrusted pin ONCE: every field is read exactly one time
+ * inside the guard and copied into a plain object, so a Proxy pin with
+ * throwing/lazy getters has no second read to escape through. Any access
+ * failure is an ordinary malformed-pin refusal.
+ */
 function readPin(pin: unknown): { pin: BootstrapPin; problems: string[] } {
   const problems: string[] = [];
-  // The pin is arbitrary caller input — it may be a Proxy with throwing
-  // traps. Any access failure is an ordinary malformed-pin refusal.
-  // (isRecord itself only uses intrinsic typeof checks — trap-safe.)
-  const p: Record<string, unknown> = isRecord(pin) ? pin : {};
+  // isRecord itself only uses intrinsic typeof checks — trap-safe.
+  const source: Record<string, unknown> = isRecord(pin) ? pin : {};
+  const snapshot: Record<string, unknown> = {};
   try {
-    if (p['schemaVersion'] !== DH_PIN_SCHEMA_VERSION) {
+    snapshot['schemaVersion'] = source['schemaVersion'];
+    snapshot['target'] = source['target'];
+    snapshot['kdpPackageId'] = source['kdpPackageId'];
+    snapshot['kdpPrimaryEntry'] = source['kdpPrimaryEntry'];
+    snapshot['kdpPrimaryDigest'] = source['kdpPrimaryDigest'];
+    snapshot['lockDigest'] = source['lockDigest'];
+    snapshot['lockPath'] = source['lockPath'];
+    if (snapshot['schemaVersion'] !== DH_PIN_SCHEMA_VERSION) {
       problems.push(`pin schemaVersion must be '${DH_PIN_SCHEMA_VERSION}'`);
     }
-    if (!isRecord(p['target'])) problems.push('pin target must be an object');
-    if (typeof p['kdpPackageId'] !== 'string' || p['kdpPackageId'].length === 0) {
+    if (!isRecord(snapshot['target'])) problems.push('pin target must be an object');
+    if (typeof snapshot['kdpPackageId'] !== 'string' || snapshot['kdpPackageId'].length === 0) {
       problems.push('pin kdpPackageId is not a well-formed package id');
     }
-    if (p['kdpPrimaryEntry'] !== 'bootstrap') problems.push(`pin kdpPrimaryEntry must be 'bootstrap'`);
-    if (!isContentDigest(p['kdpPrimaryDigest'])) problems.push('pin kdpPrimaryDigest must be sha256:<64 lowercase hex>');
-    if (!isContentDigest(p['lockDigest'])) problems.push('pin lockDigest must be sha256:<64 lowercase hex>');
-    if (typeof p['lockPath'] !== 'string' || p['lockPath'].length === 0) problems.push('pin lockPath must be a non-empty string');
+    if (snapshot['kdpPrimaryEntry'] !== 'bootstrap') problems.push(`pin kdpPrimaryEntry must be 'bootstrap'`);
+    if (!isContentDigest(snapshot['kdpPrimaryDigest'])) problems.push('pin kdpPrimaryDigest must be sha256:<64 lowercase hex>');
+    if (!isContentDigest(snapshot['lockDigest'])) problems.push('pin lockDigest must be sha256:<64 lowercase hex>');
+    if (typeof snapshot['lockPath'] !== 'string' || snapshot['lockPath'].length === 0) problems.push('pin lockPath must be a non-empty string');
   } catch (error) {
     problems.push(`pin could not be read: ${(error as Error).message}`);
   }
-  return { pin: p as unknown as BootstrapPin, problems };
+  return { pin: snapshot as unknown as BootstrapPin, problems };
 }
 
 function checkPinAgainstRecord(pin: BootstrapPin, record: InstalledRecord): string | null {
@@ -92,31 +104,36 @@ function checkPinAgainstRecord(pin: BootstrapPin, record: InstalledRecord): stri
  * Never parses Package DAGs, never preloads SDK/Business/Extensions.
  */
 export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Promise<BootResult> {
-  // A missing/garbage context is a typed REFUSED, never a TypeError.
-  if (!isRecord(context)) {
-    return refused('DH_BOOT_RECORD_MISSING', 'boot context is missing or not an object; no trusted install can be addressed');
-  }
+  // Normalize the invocation context ONCE: every field is read exactly one
+  // time into a plain snapshot, so a hostile context Proxy cannot fire
+  // later. A missing/garbage context is a typed REFUSED, never a TypeError.
+  const normalized = normalizeBootstrapContext(context);
+  if (!normalized.ok) return refused(normalized.failure.code, normalized.failure.reason);
+  const safeContext = normalized.value;
+
   // (a) trusted installed record — the only trust anchor (shared helper;
   // a missing/non-string installRoot is typed DH_BOOT_RECORD_MISSING).
-  const recordResult = await readTrustedRecord(context.installRoot);
+  const recordResult = await readTrustedRecord(safeContext.installRoot);
   if (!recordResult.ok) return refused(recordResult.failure.code, recordResult.failure.reason);
   const { value: record } = recordResult;
 
-  // (b) pin cross-check against the record; lock/descriptor path binding.
+  // (b) pin cross-check against the record (plain snapshot, single read);
+  // lock/descriptor path binding.
   const { pin: checkedPin, problems } = readPin(pin);
   if (problems.length > 0) {
     return refused('DH_BOOT_PIN_MISMATCH', `pin is malformed: ${problems.join('; ')}`);
   }
   const pinMismatch = checkPinAgainstRecord(checkedPin, record);
   if (pinMismatch !== null) return refused('DH_BOOT_PIN_MISMATCH', pinMismatch);
-  const pathFailure = verifyContextPaths(context, record);
+  const pathFailure = verifyContextPaths(safeContext, record);
   if (pathFailure !== null) return refused(pathFailure.code, pathFailure.reason);
 
   // (c) record vs actual bytes: Lock closure digest + KDP entry artifact.
-  const trust = await verifyInstallTrust(context);
+  const trust = await verifyInstallTrust(safeContext);
   if (!trust.ok) return refused(trust.failure.code, trust.failure.reason);
 
-  // (d) load and start the pinned KDP Primary only.
+  // (d) load and start the pinned KDP Primary only. The normalized context
+  // is handed over — KDP re-normalizes it (plain reads) as its first step.
   let kdpModule: Record<string, unknown>;
   try {
     kdpModule = (await import(pathToFileURL(trust.value.entryPath).href)) as Record<string, unknown>;
@@ -128,5 +145,5 @@ export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Pro
     return refused('DH_BOOT_KDP_ENTRY_INVALID', `pinned KDP entry has no named export 'bootstrap'`);
   }
   // Transparent pass-through: KDP reports BOOTED or ordinary FAILED itself.
-  return await (bootstrap as KdpPrimary['bootstrap'])(context);
+  return await (bootstrap as KdpPrimary['bootstrap'])(safeContext);
 }

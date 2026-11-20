@@ -1,4 +1,4 @@
-import type { DomainAppLock, InstalledRecord, KdpBootstrapContext, V011BootErrorCode } from '@kaicreator/domain-harness-contracts/v011';
+import type { DomainAppLock, HostPortBinding, InstalledRecord, KdpBootstrapContext, V011BootErrorCode } from '@kaicreator/domain-harness-contracts/v011';
 export interface TrustFailure {
     readonly code: V011BootErrorCode;
     readonly reason: string;
@@ -31,18 +31,47 @@ export declare function readTrustedRecord(installRoot: unknown): Promise<TrustRe
 export declare function verifyContextPaths(context: KdpBootstrapContext, record: InstalledRecord): TrustFailure | null;
 /** Read the Lock file and verify its sealed closure digest against the record. */
 export declare function verifyLockAgainstRecord(installRoot: string, record: InstalledRecord): Promise<TrustResult<DomainAppLock>>;
-/** Locate the KDP entry artifact via node_modules-normal package resolution under installRoot. */
-export declare function resolveKdpEntryPath(installRoot: string, kdpPackageId: string): Promise<string | null>;
+/**
+ * Locate the KDP entry artifact via node_modules-normal package resolution
+ * under installRoot. Returns { ok, entryPath } or a typed entry-invalid
+ * failure when the manifest/exports shape cannot be resolved (a resolved
+ * but unreadable/mismatched entry stays a PIN_MISMATCH-class failure).
+ */
+export declare function resolveKdpEntryPath(installRoot: string, kdpPackageId: string): Promise<TrustResult<string>>;
 /** Verify the actual KDP entry artifact bytes against the record digest. */
 export declare function verifyKdpEntryBytes(installRoot: string, record: InstalledRecord): Promise<TrustResult<string>>;
 /**
- * The full pre-load trust ladder for one installRoot + context: record,
- * context path binding, Lock bytes, KDP entry bytes. Both Boot and the
- * directly-exported KDP Primary consume THIS — there is no second trust
- * path.
+ * Plain, once-extracted snapshot of the invocation context. Every field is
+ * read exactly ONCE at entry (inside a guard), so a caller-supplied Proxy
+ * with throwing/lazy getters can never fire later in the pipeline — there
+ * are no second reads to escape the typed REFUSED/FAILED mapping.
  */
-export declare function verifyInstallTrust(context: KdpBootstrapContext): Promise<TrustResult<{
+export interface NormalizedBootstrapContext {
+    readonly installRoot: string;
+    readonly descriptorPath: string;
+    readonly lockPath: string;
+    readonly hostPorts: readonly HostPortBinding[];
+    readonly env: {
+        readonly nodeMajor: number;
+        readonly platform: string;
+    };
+}
+/**
+ * Normalize an arbitrary invocation context at entry. Missing/garbage
+ * values map to typed failures (never a TypeError); each well-formed field
+ * is copied into a plain snapshot so downstream code never touches the
+ * original (possibly hostile) object again.
+ */
+export declare function normalizeBootstrapContext(context: unknown): TrustResult<NormalizedBootstrapContext>;
+/**
+ * The full pre-load trust ladder for one installRoot + context: normalized
+ * context, record, context path binding, Lock bytes, KDP entry bytes. Both
+ * Boot and the directly-exported KDP Primary consume THIS — there is no
+ * second trust path.
+ */
+export declare function verifyInstallTrust(context: unknown): Promise<TrustResult<{
     record: InstalledRecord;
     lock: DomainAppLock;
     entryPath: string;
+    context: NormalizedBootstrapContext;
 }>>;

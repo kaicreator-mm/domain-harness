@@ -24,6 +24,7 @@ import {
 } from '@kaicreator/domain-harness-contracts/v011';
 import type {
   DomainAppLock,
+  HostPortBinding,
   InstalledRecord,
   JsonValue,
   KdpBootstrapContext,
@@ -212,6 +213,26 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock closureDigest does not equal the installed record lockDigest') };
   }
   const lock = parsed as unknown as DomainAppLock;
+  // Structural shape checks on the fields the runtime dereferences: a
+  // digest-consistent but malformed Lock must be a typed mismatch, never a
+  // TypeError downstream.
+  if (!isRecord(lock.target) || typeof lock.target['profile'] !== 'string') {
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock target is malformed (expected an object with a profile string)') };
+  }
+  if (
+    !isRecord(lock.bootstrapKdpPin) ||
+    typeof lock.bootstrapKdpPin['kdpPackageId'] !== 'string' ||
+    lock.bootstrapKdpPin['kdpPrimaryEntry'] !== 'bootstrap' ||
+    typeof lock.bootstrapKdpPin['kdpPrimaryDigest'] !== 'string'
+  ) {
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock bootstrapKdpPin is malformed (expected kdpPackageId/kdpPrimaryEntry/kdpPrimaryDigest)') };
+  }
+  if (
+    !isRecord(lock.appIdentity) ||
+    typeof lock.appIdentity['descriptorDigest'] !== 'string'
+  ) {
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock appIdentity is malformed (expected a descriptorDigest string)') };
+  }
   if (
     lock.bootstrapKdpPin.kdpPackageId !== record.kdpPackageId ||
     lock.bootstrapKdpPin.kdpPrimaryEntry !== record.kdpPrimaryEntry ||
@@ -222,39 +243,88 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
   return { ok: true, value: lock };
 }
 
-/** Locate the KDP entry artifact via node_modules-normal package resolution under installRoot. */
-export async function resolveKdpEntryPath(installRoot: string, kdpPackageId: string): Promise<string | null> {
+/**
+ * Resolve a conditional-exports value for the runtime conditions
+ * ['node', 'import'], falling back to 'default'. Nested condition objects
+ * are supported ('node' -> { import: ... }); a string resolves directly.
+ * Returns null when no condition path yields a string — the caller turns
+ * that into a typed entry-invalid failure, never a silently wrong import.
+ */
+function resolveConditionalExports(value: unknown): string | null {
+  if (typeof value === 'string') return value;
+  if (isRecord(value)) {
+    for (const condition of ['node', 'import', 'default'] as const) {
+      if (hasOwn(value, condition)) {
+        const resolved = resolveConditionalExports(value[condition]);
+        if (resolved !== null) return resolved;
+      }
+    }
+  }
+  return null;
+}
+
+function hasOwn(value: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+/**
+ * Locate the KDP entry artifact via node_modules-normal package resolution
+ * under installRoot. Returns { ok, entryPath } or a typed entry-invalid
+ * failure when the manifest/exports shape cannot be resolved (a resolved
+ * but unreadable/mismatched entry stays a PIN_MISMATCH-class failure).
+ */
+export async function resolveKdpEntryPath(
+  installRoot: string,
+  kdpPackageId: string,
+): Promise<TrustResult<string>> {
+  const invalid = (reason: string): TrustResult<string> => ({
+    ok: false,
+    failure: trustFailure('DH_BOOT_KDP_ENTRY_INVALID', reason),
+  });
   const manifestPath = resolvePackageFile(installRoot, kdpPackageId, 'package.json');
-  if (manifestPath === null) return null;
+  if (manifestPath === null) {
+    return invalid(`KDP package '${kdpPackageId}' manifest cannot be addressed under installRoot`);
+  }
   let manifest: unknown;
   try {
     manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
   } catch {
-    return null;
+    return invalid(`KDP package '${kdpPackageId}' manifest is not readable parseable JSON`);
   }
-  if (!isRecord(manifest)) return null;
-  let entry: unknown = manifest['main'];
-  const exportsField = manifest['exports'];
-  if (isRecord(exportsField)) {
-    const dot = exportsField['.'];
-    if (isRecord(dot)) {
-      entry = dot['import'] ?? dot['default'] ?? entry;
-    } else if (typeof dot === 'string') {
-      entry = dot;
+  if (!isRecord(manifest)) {
+    return invalid(`KDP package '${kdpPackageId}' manifest is not a JSON object`);
+  }
+  let dot: unknown;
+  if (hasOwn(manifest, 'exports')) {
+    const exportsField = manifest['exports'];
+    if (typeof exportsField === 'string') {
+      dot = exportsField;
+    } else if (isRecord(exportsField) && hasOwn(exportsField, '.')) {
+      dot = exportsField['.'];
+    } else {
+      return invalid(`KDP package '${kdpPackageId}' exports map has no '.' entry`);
     }
-  } else if (typeof exportsField === 'string') {
-    entry = exportsField;
+  } else {
+    dot = manifest['main'];
   }
-  if (typeof entry !== 'string' || !entry.startsWith('./')) return null;
-  return resolvePackageFile(installRoot, kdpPackageId, entry.slice(2));
+  const entry = resolveConditionalExports(dot);
+  if (entry === null || !entry.startsWith('./')) {
+    return invalid(
+      `KDP package '${kdpPackageId}' entry cannot be resolved from node/import/default conditions (got ${JSON.stringify(entry)})`,
+    );
+  }
+  const resolved = resolvePackageFile(installRoot, kdpPackageId, entry.slice(2));
+  if (resolved === null) {
+    return invalid(`KDP package '${kdpPackageId}' entry '${entry}' is not an in-package relative path`);
+  }
+  return { ok: true, value: resolved };
 }
 
 /** Verify the actual KDP entry artifact bytes against the record digest. */
 export async function verifyKdpEntryBytes(installRoot: string, record: InstalledRecord): Promise<TrustResult<string>> {
-  const entryPath = await resolveKdpEntryPath(installRoot, record.kdpPackageId);
-  if (entryPath === null) {
-    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', `KDP package '${record.kdpPackageId}' entry cannot be resolved under installRoot`) };
-  }
+  const entryResult = await resolveKdpEntryPath(installRoot, record.kdpPackageId);
+  if (!entryResult.ok) return entryResult;
+  const entryPath = entryResult.value;
   let bytes: Buffer;
   try {
     bytes = await readFile(entryPath);
@@ -268,30 +338,98 @@ export async function verifyKdpEntryBytes(installRoot: string, record: Installed
 }
 
 /**
- * The full pre-load trust ladder for one installRoot + context: record,
- * context path binding, Lock bytes, KDP entry bytes. Both Boot and the
- * directly-exported KDP Primary consume THIS — there is no second trust
- * path.
+ * Plain, once-extracted snapshot of the invocation context. Every field is
+ * read exactly ONCE at entry (inside a guard), so a caller-supplied Proxy
+ * with throwing/lazy getters can never fire later in the pipeline — there
+ * are no second reads to escape the typed REFUSED/FAILED mapping.
  */
-export async function verifyInstallTrust(
-  context: KdpBootstrapContext,
-): Promise<TrustResult<{ record: InstalledRecord; lock: DomainAppLock; entryPath: string }>> {
-  // A missing/garbage context is an ordinary typed failure, never a
-  // TypeError: without a usable context there is no trusted install.
+export interface NormalizedBootstrapContext {
+  readonly installRoot: string;
+  readonly descriptorPath: string;
+  readonly lockPath: string;
+  readonly hostPorts: readonly HostPortBinding[];
+  readonly env: { readonly nodeMajor: number; readonly platform: string };
+}
+
+/**
+ * Normalize an arbitrary invocation context at entry. Missing/garbage
+ * values map to typed failures (never a TypeError); each well-formed field
+ * is copied into a plain snapshot so downstream code never touches the
+ * original (possibly hostile) object again.
+ */
+export function normalizeBootstrapContext(context: unknown): TrustResult<NormalizedBootstrapContext> {
   if (!isRecord(context)) {
     return {
       ok: false,
       failure: trustFailure('DH_BOOT_RECORD_MISSING', 'bootstrap context is missing or not an object'),
     };
   }
-  const recordResult = await readTrustedRecord(context.installRoot);
+  try {
+    const installRoot = context['installRoot'];
+    if (typeof installRoot !== 'string' || installRoot.length === 0) {
+      return {
+        ok: false,
+        failure: trustFailure('DH_BOOT_RECORD_MISSING', 'installRoot is missing or not a string; no trusted install can be addressed'),
+      };
+    }
+    const lockPath = context['lockPath'];
+    const descriptorPath = context['descriptorPath'];
+    if (typeof lockPath !== 'string' || lockPath.length === 0) {
+      return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'context.lockPath is missing or not a string') };
+    }
+    if (typeof descriptorPath !== 'string' || descriptorPath.length === 0) {
+      return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'context.descriptorPath is missing or not a string') };
+    }
+    const hostPortsRaw = context['hostPorts'];
+    const hostPorts: readonly HostPortBinding[] = Array.isArray(hostPortsRaw)
+      ? hostPortsRaw.filter(
+          (entry): entry is HostPortBinding =>
+            isRecord(entry) && typeof entry['name'] === 'string' && typeof entry['port'] === 'number',
+        )
+      : [];
+    const envRaw = context['env'];
+    const env = isRecord(envRaw) && typeof envRaw['nodeMajor'] === 'number' && typeof envRaw['platform'] === 'string'
+      ? { nodeMajor: envRaw['nodeMajor'], platform: envRaw['platform'] }
+      : { nodeMajor: 0, platform: 'unknown' };
+    return {
+      ok: true,
+      value: { installRoot, descriptorPath, lockPath, hostPorts, env },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      failure: trustFailure('DH_BOOT_RECORD_MISSING', `bootstrap context could not be read: ${(error as Error).message}`),
+    };
+  }
+}
+
+/**
+ * The full pre-load trust ladder for one installRoot + context: normalized
+ * context, record, context path binding, Lock bytes, KDP entry bytes. Both
+ * Boot and the directly-exported KDP Primary consume THIS — there is no
+ * second trust path.
+ */
+export async function verifyInstallTrust(
+  context: unknown,
+): Promise<TrustResult<{ record: InstalledRecord; lock: DomainAppLock; entryPath: string; context: NormalizedBootstrapContext }>> {
+  const normalized = normalizeBootstrapContext(context);
+  if (!normalized.ok) return normalized;
+  const recordResult = await readTrustedRecord(normalized.value.installRoot);
   if (!recordResult.ok) return recordResult;
-  const pathFailure = verifyContextPaths(context, recordResult.value);
+  const pathFailure = verifyContextPaths(normalized.value, recordResult.value);
   if (pathFailure !== null) return { ok: false, failure: pathFailure };
-  const installRoot = context.installRoot;
+  const installRoot = normalized.value.installRoot;
   const lockResult = await verifyLockAgainstRecord(installRoot, recordResult.value);
   if (!lockResult.ok) return lockResult;
   const entryResult = await verifyKdpEntryBytes(installRoot, recordResult.value);
   if (!entryResult.ok) return entryResult;
-  return { ok: true, value: { record: recordResult.value, lock: lockResult.value, entryPath: entryResult.value } };
+  return {
+    ok: true,
+    value: {
+      record: recordResult.value,
+      lock: lockResult.value,
+      entryPath: entryResult.value,
+      context: normalized.value,
+    },
+  };
 }

@@ -383,6 +383,64 @@ test('dispose is single-flight: concurrent and repeated calls never rerun techni
     (event) => event['event'] === 'technical-dispose' && event['package'] === 'fixture-kernel',
   );
   assert.equal(kernelDisposes.length, 1, 'failing technicalDispose ran exactly once');
+
+  // A failed dispose consumes the app: later invoke is refused, and repeat
+  // dispose keeps returning the latched rejection (not a DISPOSED result).
+  const invokeOutcome = await result.app.invoke('evaluate', { total: 1, region: 'EU' });
+  assert.equal(invokeOutcome.kind, 'FAILED');
+  assert.equal(
+    invokeOutcome.kind === 'FAILED' && invokeOutcome.failure.code,
+    'DH_RUNTIME_INGRESS_NOT_CALLABLE',
+  );
+  const third = await result.app.dispose().then(
+    () => null,
+    (error: unknown) => (error as Error).message,
+  );
+  assert.equal(third, first, 'repeat dispose after failure returns the same rejection');
+});
+
+test('technical dispose is best-effort across all packages with an aggregate error', async (t) => {
+  const fixture = await buildFixtureInstall({
+    init: { status: 'READY' },
+    functions: {},
+    kernelDisposeThrow: true,
+  });
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'BOOTED');
+  if (result.status !== 'BOOTED') return;
+  const message = await result.app.dispose().then(
+    () => null,
+    (error: unknown) => (error as Error).message,
+  );
+  assert.match(String(message), /technical dispose failed for 1 package\(s\)/);
+  assert.match(String(message), /fixture-kernel/);
+  // Every package was attempted despite the kernel failure — the reverse
+  // teardown never aborts early.
+  const disposes = events().filter((event) => event['event'] === 'technical-dispose');
+  assert.deepEqual(
+    disposes.map((event) => event['package']),
+    DISPOSE_ORDER,
+  );
+});
+
+test('DEGRADED with duplicate suppressedIngress ids is refused', async (t) => {
+  await withScenario(
+    t,
+    {
+      init: { status: 'DEGRADED', suppressed: ['optional-report', 'optional-report'] },
+      functions: {},
+    },
+    async (_fixture, result) => {
+      assert.equal(result.status, 'FAILED', JSON.stringify(result));
+      if (result.status === 'FAILED') {
+        assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
+        assert.match(result.reason, /duplicate/);
+      }
+    },
+  );
 });
 
 test('technicalInit failure: already-initialized packages are torn down in strict reverse order', async (t) => {

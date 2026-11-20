@@ -283,3 +283,107 @@ function deepFreeze(value: unknown): void {
   }
   Object.freeze(value);
 }
+
+test('KDP manifest exports conditions: nested node/import resolve, unresolvable shapes are typed entry-invalid', async (t) => {
+  await withFixture(t, async (fixture) => {
+    // Positive: nested condition object ('node' -> { import: ... }).
+    await fixture.writeKdpManifest({
+      name: '@kaicreator/domain-harness-microkernel',
+      version: '0.11.0',
+      type: 'module',
+      exports: { '.': { node: { import: './dist/v011/index.js' } } },
+    });
+    const nested = await boot(fixture.pin, fixture.context);
+    assert.equal(nested.status, 'BOOTED', JSON.stringify(nested));
+    if (nested.status === 'BOOTED') await nested.app.dispose();
+
+    // Positive: import/default ordering with a non-matching condition first.
+    await fixture.writeKdpManifest({
+      name: '@kaicreator/domain-harness-microkernel',
+      version: '0.11.0',
+      type: 'module',
+      exports: { '.': { browser: './dist/nowhere.js', import: './dist/v011/index.js' } },
+    });
+    const ordered = await boot(fixture.pin, fixture.context);
+    assert.equal(ordered.status, 'BOOTED', JSON.stringify(ordered));
+    if (ordered.status === 'BOOTED') await ordered.app.dispose();
+
+    // Negative: no node/import/default condition path -> typed entry-invalid.
+    await fixture.writeKdpManifest({
+      name: '@kaicreator/domain-harness-microkernel',
+      version: '0.11.0',
+      type: 'module',
+      exports: { '.': { browser: './dist/nowhere.js' } },
+    });
+    const unresolved = await boot(fixture.pin, fixture.context);
+    assertRefused(unresolved, 'DH_BOOT_KDP_ENTRY_INVALID');
+    if (unresolved.status === 'REFUSED') {
+      assert.match(unresolved.reason, /node\/import\/default/);
+    }
+    // (No sideEffectFree here: the two positive boots above intentionally
+    // produced observable lifecycle events in the same fixture.)
+  });
+});
+
+test('digest-consistent Lock with malformed target/bootstrapKdpPin is a typed mismatch, not a TypeError', async (t) => {
+  await withFixture(t, async (fixture) => {
+    // Simulate a trusted installer writing a digest-consistent but
+    // malformed Lock: self-reseal the Lock, then re-pin record + pin.
+    const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
+    delete lock['bootstrapKdpPin'];
+    delete lock['closureDigest'];
+    lock['closureDigest'] = digestOf(lock);
+
+    const record = await fixture.readRecord();
+    record['lockDigest'] = lock['closureDigest'];
+    const recordBase = { ...record };
+    delete recordBase['recordDigest'];
+    record['recordDigest'] = digestOf(recordBase);
+    await fixture.writeRecord(record);
+    await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
+    const pin = {
+      ...fixture.pin,
+      lockDigest: lock['closureDigest'] as ContentDigest,
+    };
+
+    const result = await boot(pin, fixture.context);
+    assertRefused(result, 'DH_BOOT_PIN_MISMATCH');
+    if (result.status === 'REFUSED') {
+      assert.match(result.reason, /bootstrapKdpPin is malformed/);
+    }
+    sideEffectFree();
+  });
+});
+
+test('pin and context are normalized once: second-read throwing Proxies cannot escape typed results', async (t) => {
+  await withFixture(t, async (fixture) => {
+    // A pin Proxy that serves each field exactly once and throws on any
+    // second read: single-read snapshotting must boot cleanly.
+    const reads = new Map<string, number>();
+    const oneShotPin = new Proxy(structuredClone(fixture.pin), {
+      get(target, key) {
+        const count = (reads.get(String(key)) ?? 0) + 1;
+        reads.set(String(key), count);
+        if (count > 1) throw new Error('second pin read');
+        return Reflect.get(target, key);
+      },
+    });
+    const pinResult = await boot(oneShotPin as unknown as typeof fixture.pin, fixture.context);
+    assert.equal(pinResult.status, 'BOOTED', JSON.stringify(pinResult));
+    if (pinResult.status === 'BOOTED') await pinResult.app.dispose();
+
+    // A context Proxy with the same second-read trap: same expectation.
+    const contextReads = new Map<string, number>();
+    const oneShotContext = new Proxy(structuredClone(fixture.context), {
+      get(target, key) {
+        const count = (contextReads.get(String(key)) ?? 0) + 1;
+        contextReads.set(String(key), count);
+        if (count > 1) throw new Error('second context read');
+        return Reflect.get(target, key);
+      },
+    });
+    const contextResult = await boot(fixture.pin, oneShotContext as unknown as typeof fixture.context);
+    assert.equal(contextResult.status, 'BOOTED', JSON.stringify(contextResult));
+    if (contextResult.status === 'BOOTED') await contextResult.app.dispose();
+  });
+});

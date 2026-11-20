@@ -89,3 +89,16 @@ test('non-object schemas fail closed; non-finite numbers and tuple-form items ar
     true,
   );
 });
+
+test('undefined and other non-JSON instances fail — undefined is not JSON', () => {
+  assert.equal(validateJsonSubset(undefined, true), false, 'undefined against boolean true');
+  assert.equal(validateJsonSubset(undefined, { type: 'object' }), false);
+  assert.equal(validateJsonSubset(undefined, {}), false);
+  assert.equal(validateJsonSubset(() => 1, true), false, 'function is not JSON');
+  assert.equal(validateJsonSubset(Symbol('s'), true), false, 'symbol is not JSON');
+  assert.equal(validateJsonSubset(10n, true), false, 'bigint is not JSON');
+  // JSON values still pass.
+  assert.equal(validateJsonSubset(null, true), true);
+  assert.equal(validateJsonSubset('x', true), true);
+  assert.equal(validateJsonSubset(0, true), true);
+});

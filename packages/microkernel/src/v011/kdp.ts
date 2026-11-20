@@ -124,6 +124,9 @@ function validateInitResult(
   }
   const ids = new Set(ingress.map((entry) => entry.id));
   const optionalIds = new Set(ingress.filter((entry) => entry.optional).map((entry) => entry.id));
+  if (new Set(suppressed).size !== suppressed.length) {
+    return 'suppressedIngress contains duplicate ingress ids';
+  }
   for (const id of suppressed) {
     if (!ids.has(id)) return `suppressedIngress names unknown ingress '${id}'`;
     if (!optionalIds.has(id)) {
@@ -149,20 +152,23 @@ function validateInitResult(
 export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
   // 1. FULL shared install-trust ladder — the direct export must not bypass
   // Boot's trust anchor (self-signed Locks / forged KDP artifacts fail here).
+  // The context is normalized ONCE here (plain snapshot); the rest of the
+  // pipeline only ever touches the snapshot.
   const trust = await verifyInstallTrust(context);
   if (!trust.ok) return failed(trust.failure.code, trust.failure.reason);
   const { lock } = trust.value;
+  const safeContext = trust.value.context;
 
   const profile: string = lock.target.profile;
   if (profile !== NODE24_ESM_PROFILE) {
     return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock target profile '${profile}' is not the frozen '${NODE24_ESM_PROFILE}'`);
   }
 
-  const configResult = await readDescriptorConfig(context, lock);
+  const configResult = await readDescriptorConfig(safeContext, lock);
   if (!configResult.ok) return configResult.result;
   const config = configResult.config;
 
-  const packages = new PackageSystem(context.installRoot, lock, context.hostPorts ?? []);
+  const packages = new PackageSystem(safeContext.installRoot, lock, safeContext.hostPorts);
 
   // 3. Technical package load + init in the Lock's exact order.
   try {

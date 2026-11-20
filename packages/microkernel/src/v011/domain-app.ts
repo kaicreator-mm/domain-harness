@@ -239,10 +239,16 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
   function dispose(): Promise<{ readonly status: 'DISPOSED' }> {
     if (disposeFlight === null) {
       disposeFlight = (async () => {
-        // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
-        await packages.runTechnicalDispose();
-        disposed = true;
-        return { status: 'DISPOSED' } as const;
+        try {
+          // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
+          await packages.runTechnicalDispose();
+          return { status: 'DISPOSED' } as const;
+        } finally {
+          // The app is consumed by a dispose attempt regardless of outcome:
+          // after a failed teardown later invoke is refused, and repeat
+          // dispose keeps returning the latched rejection.
+          disposed = true;
+        }
       })();
     }
     return disposeFlight;
