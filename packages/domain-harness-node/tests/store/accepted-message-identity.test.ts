@@ -5,7 +5,7 @@ import {
   RUNTIME_OBSERVATION_INITIAL_EPOCH_ID,
   type RuntimeObservationIntent,
   type RuntimeObservationRecord,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type { DomainMessage, WorkflowAddress } from '@kaicreator/domain-harness/v2';
 import { AcceptedMessageIdentityCollisionError } from '@kaicreator/domain-harness/v2';
 import { NodeSqliteRuntimeStore } from '../../src/store/node-sqlite-runtime-store.js';

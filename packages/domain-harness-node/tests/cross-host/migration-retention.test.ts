@@ -25,7 +25,7 @@ import {
   type PromotedArtifactBody,
   type SemanticCacheEntry,
   type SemanticCacheKey,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import { makeBaseline, sha256 } from '../../../domain-harness/tests/admission/helpers.js';
 import { bootablePackage } from '../v3-host/host-fixture.js';
 import { openAuthorityTestDatabase } from '../store/authority-test-helpers.js';

@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { V10_SFEATURE_ABI, V10_TARGET_PROFILE, sha256Hex } from '@kaicreator/domain-harness-contracts';
-import { buildV10App } from '@kaicreator/domain-harness-build';
+import { buildV10App } from '@kaicreator/domain-harness-build/legacy';
 import { activateV10App } from '@kaicreator/domain-harness-microkernel/host-seam';
 import {
   metaFeedbackClaimKey,

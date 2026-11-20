@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import type { RuntimeEvidenceRecord } from '@kaicreator/domain-harness';
+import type { RuntimeEvidenceRecord } from '@kaicreator/domain-harness/legacy';
 import { NodeSqliteRuntimeEvidenceStore } from '../../src/store/node-sqlite-evidence-store.js';
 import { openAuthorityTestDatabase } from './authority-test-helpers.js';
 

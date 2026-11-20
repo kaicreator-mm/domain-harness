@@ -75,7 +75,7 @@ import {
   isRuntimeImplementationRef,
   verifyDacReferenceIdentity,
   refuteExternalBusinessSoRIdentity,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 assert.equal(DAC_REFERENCE_BASELINE.baselineCommit, '9c3ef91b8b40d893e4fe2b0370200e765816ec2b');
 assert.equal(DAC_REFERENCE_ROLES.length, 8);

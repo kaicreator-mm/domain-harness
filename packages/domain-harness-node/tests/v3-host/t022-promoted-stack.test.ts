@@ -16,7 +16,7 @@ import {
   type DecisionResolverPorts,
   type PromotedArtifactBody,
   type PromotedArtifactProducerInvalidationPort,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   authority,
   invokingContext,

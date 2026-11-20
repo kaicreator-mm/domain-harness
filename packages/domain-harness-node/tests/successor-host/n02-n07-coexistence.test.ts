@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createNodeDomainRuntime } from '../../src/index.js';
-import { StaticPackageRegistry } from '@kaicreator/domain-harness';
+import { StaticPackageRegistry } from '@kaicreator/domain-harness/legacy';
 import {
   CRM_SNAPSHOT,
   HOST_MAXIMA,

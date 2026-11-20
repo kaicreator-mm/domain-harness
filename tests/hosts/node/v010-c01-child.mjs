@@ -18,7 +18,7 @@ globalThis.__c01NotifyStorePath = `${jobStorePath}.notify-unused`;
 
 const [{ V10_TARGET_PROFILE, sha256Hex }, { buildV10App }, { activateV10App }] = await Promise.all([
   import('@kaicreator/domain-harness-contracts'),
-  import('@kaicreator/domain-harness-build'),
+  import('@kaicreator/domain-harness-build/legacy'),
   import('../../../packages/microkernel/src/internal/activation.js'),
 ]);
 

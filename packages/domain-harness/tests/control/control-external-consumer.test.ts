@@ -69,7 +69,7 @@ import {
   createDomainRuntime,
   StaticPackageRegistry,
   RUNTIME_CONTROL_CONTRACT_VERSION,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 const manifest = {
   formatVersion: '0.2',

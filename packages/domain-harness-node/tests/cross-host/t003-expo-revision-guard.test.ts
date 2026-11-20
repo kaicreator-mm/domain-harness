@@ -9,7 +9,7 @@ import {
   type CommandOutcomeSnapshot,
   type DurableProcessDataSnapshot,
   type ProcessedCommandTurnCommit,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type {
   MessageAcceptedAck,
   MessageDispositionSnapshot,

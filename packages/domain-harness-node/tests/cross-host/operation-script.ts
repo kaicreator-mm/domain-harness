@@ -21,7 +21,7 @@ import {
   type PromotedArtifactBody,
   type WorkflowAddress,
   type WorkflowInstanceSnapshot,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import { mkdirSync } from 'node:fs';
 import {
   ScriptedEffectTools,

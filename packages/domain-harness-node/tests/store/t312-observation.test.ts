@@ -20,7 +20,7 @@ import {
   type DomainIntelligencePackageIdentity,
   type RuntimeObservationStreamRef,
   type RuntimeObservationStore,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import { NodeSqliteRuntimeStore } from '../../src/store/node-sqlite-runtime-store.js';
 import { makeTestStore, type TestStore } from './test-helpers.js';
 

@@ -1,14 +1,22 @@
 {
   "name": "@kaicreator/domain-harness-microkernel",
   "version": "0.11.0",
-  "description": "DomainHarness Microkernel public SDK",
+  "description": "DomainHarness v0.11.0 Microkernel (Boot + KDP + Package System; legacy load facade via ./legacy)",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/v011/index.js",
+  "types": "./dist/v011/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/v011/index.d.ts",
+      "import": "./dist/v011/index.js"
+    },
+    "./legacy": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./legacy/host-seam": {
+      "types": "./dist/host-seam.d.ts",
+      "import": "./dist/host-seam.js"
     },
     "./host-seam": {
       "types": "./dist/host-seam.d.ts",
@@ -16,7 +24,7 @@
     }
   },
   "files": [
-    "dist",
+    "dist/v011",
     "README.md"
   ],
   "engines": {

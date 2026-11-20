@@ -2,7 +2,7 @@ import {
   GovernanceContractError,
   PromotionActivationAuthorityError,
   governanceBaselineKey,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type {
   DomainActivationAuthority,
   DomainActivationBinding,
@@ -14,7 +14,7 @@ import type {
   GovernancePackageCdiBinding,
   PromotionActivationAuditRecord,
   PromotionActivationAuditStore,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type { JsonValue as CanonicalJsonValue } from '@kaicreator/domain-harness/v2';
 import type { ExclusiveTransactionQueue } from './exclusive-transaction.js';
 import type { ExpoSqliteBindParams, ExpoSqliteExecutorLike } from './expo-sqlite-types.js';

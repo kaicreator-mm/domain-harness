@@ -1,50 +1,30 @@
 # @kaicreator/domain-harness
 
-Portable DomainHarness v0.2 Runtime Core and Contract SDK.
+DomainHarness v0.11.0 Element-First public SDK — the ONE canonical public entry (L2 §8.3).
 
-The package root is the portable v0.2 public surface. It does not require Node built-ins, `better-sqlite3`, filesystem discovery, Worker Threads, or Raw Domain Package compilation at application startup.
-
-## Installation (exact git pin)
-
-The package is consumed by pinning an exact repository revision — there is no npm release. The built `dist/` tree is committed to the repository, so a git install delivers a usable package without lifecycle scripts:
-
-```sh
-pnpm add "github:kaicreator-mm/domain-harness#<exact-sha>&path:packages/domain-harness"
-```
-
-- Pin `<exact-sha>` to the full commit SHA you validated against; record it as your dependency fact.
-- The subdirectory (`&path:`) form is required because this package lives in a monorepo; pnpm supports it (npm does not resolve git subdirectory dependencies).
-- Use the same exact SHA for `@kaicreator/domain-harness-compiler` (its runtime peer dependency is satisfied by this package) and for the host packages if you consume them.
+The package root `.` is the v0.11.0 canonical SDK: a pure composition of the real frozen contracts (`@kaicreator/domain-harness-contracts/v011`), the canonical BUILD (`buildV011App` from `@kaicreator/domain-harness-build`) and the Boot/KDP/DomainApp runtime (`boot` / `bootstrap` from `@kaicreator/domain-harness-microkernel`). It adds no second Runtime, Kernel, BUILD, App Init, Router, workflow or Function dispatcher.
 
 ```ts
 import {
-  createDomainRuntime,
-  StaticPackageRegistry,
-  type DomainRuntime,
-  type RuntimeHostBindings,
-  type RuntimeStore,
-  type TargetCompiledDomainPackage,
+  buildV011App,   // canonical BUILD → the exact Lock
+  boot,           // minimal Boot (pin/record/bytes verification ladder)
+  contentDigestOf,
+  type DomainAppDescriptor,
+  type DomainAppLock,
+  type FunctionOutcome,
 } from '@kaicreator/domain-harness';
 ```
 
-`@kaicreator/domain-harness/v2` remains an alias for the same v0.2 portable surface for consumers that adopted the explicit subpath during development.
+## Release facts / 发行事实
 
-## Host bindings
+- Version 0.11.0 ships **only `dist/v011`**: the packed tarball contains the canonical v011 entry plus this README. The legacy v0.2–v0.10 executable App ABI is **not shipped** — old subpath entries (e.g. `./legacy`, `./v2`, `./v7`) stay in the exports map for workspace compatibility but resolve to files that are absent from the tarball (`ERR_MODULE_NOT_FOUND` fence).
+- 本包 0.11.0 的发行物只包含 `dist/v011` 与本文档：legacy 可执行 App ABI 不进入 tarball。exports map 中的旧子路径（如 `./legacy`、`./v2`、`./v7`）仅为 workspace 兼容保留，在发行物中不可达（行为围栏）。
+- **No 0.10.x compatibility** is provided or claimed; there is no parity verification with the old App ABI. / 不提供、也不宣称任何 0.10.x 兼容，不做旧 ABI parity 验证。
+- Requires Node.js >= 24 (single verified target `node24-esm/1`). / 需要 Node.js >= 24（唯一已验证目标 `node24-esm/1`）。
+- Runtime dependencies are exactly `@kaicreator/domain-harness-contracts`, `@kaicreator/domain-harness-build` and `@kaicreator/domain-harness-microkernel`, all at the same 0.11.0 version — zero third-party runtime dependencies (legacy third-party packages stay workspace devDependencies only).
+- `@kaicreator/domain-harness-contracts` carries a scoped exception: its `.` remains the legacy **inert** type/constant face; `./v011` is the canonical 0.11 contracts entry.
 
-The portable core owns runtime mechanics and contracts. Host-specific implementations live outside this package:
+## Legacy workspace surface / Workspace 内的 legacy 面
 
-- `@kaicreator/domain-harness-node` — Node RuntimeStore and Node host bindings;
-- `@kaicreator/domain-harness-expo` — Expo/Hermes RuntimeStore and host bindings;
-- `@kaicreator/domain-harness-compiler` — build-time Raw Domain Package compilation.
-
-Application startup supplies an already Target Compiled Domain Package plus RuntimeStore/host bindings/resources. The v0.2 runtime does not rediscover or compile a Raw Domain Package.
-
-## v0.1 compatibility
-
-v0.1 is a frozen release baseline with a Node-bound embedded runtime API (`createDomainHarness`, filesystem loader, SQLite journal, Script/Expression host execution). That API is intentionally **not re-exported from the v0.2 package root**, because doing so would make the v0.2 Runtime Core transitively depend on Node-only infrastructure and violate the v0.2 portability contract.
-
-Applications that still require the v0.1 API must remain pinned to the v0.1 release/baseline while migrating to the v0.2 Runtime/host-package model.
-
-## Public boundary
-
-Public callers depend on portable Runtime contracts, Workflow Address / Domain Message semantics, Query/Subscription/Projection, package pinning, recovery and host-binding interfaces. SQLite rows, host driver types, compiler internals, private workflow-engine representation and Raw Package loader internals are not public v0.2 SDK contracts.
+Inside this monorepo workspace the legacy v0.2–v0.10 surface remains available unchanged through the explicit `./legacy` subpath (the old root index re-exporting `public-v2`/`public-v3`/`public-v4`/`public-v7`). Legacy semantics are reference-only; no migration, parity or compatibility work is performed on it.
+在 monorepo workspace 内，legacy v0.2–v0.10 面经显式 `./legacy` 子路径原样可用（旧根 index 继续 re-export `public-v2`/`v3`/`v4`/`v7`）。legacy 语义仅作参考，不做迁移、parity 或兼容工作。

@@ -268,7 +268,7 @@ assert.notEqual(
 
 // --- legacy entries unchanged on the same tarball --------------------------
 
-const root = await import('@kaicreator/domain-harness');
+const root = await import('@kaicreator/domain-harness/legacy');
 assert.equal(root.DOMAIN_HARNESS_VERSION, '0.2.0');
 const v2 = await import('@kaicreator/domain-harness/v2');
 assert.equal(v2.COMPILED_ARTIFACT_KINDS.length, 8);

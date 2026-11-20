@@ -256,7 +256,7 @@ const toolPlaneNames = [
   'queryUxTool',
 ];
 const otherNamespaces = {
-  '.': await import('@kaicreator/domain-harness'),
+  '.': await import('@kaicreator/domain-harness/legacy'),
   '/v2': await import('@kaicreator/domain-harness/v2'),
   '/v3': V3,
   '/v4': await import('@kaicreator/domain-harness/v4'),

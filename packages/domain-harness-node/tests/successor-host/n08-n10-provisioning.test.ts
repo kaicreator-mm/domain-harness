@@ -12,7 +12,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileSuccessor, freshDbPath, openStore, rawSql, createNodeHost, fixedBusinessSnapshots, CRM_SNAPSHOT, HOST_MAXIMA, retainedLegacyPackage } from './helper.ts';
 import { createNodeDomainRuntime } from '../../src/index.js';
-import { StaticPackageRegistry } from '@kaicreator/domain-harness';
+import { StaticPackageRegistry } from '@kaicreator/domain-harness/legacy';
 import { assertHealthyWorkerReports, spawnReportedChild, withSpawnOnlyRetry, type ChildResult } from './worker-oracle.ts';
 
 const CHILD = resolve(join(fileURLToPath(import.meta.url), '..', 'fixtures', 'child.ts'));

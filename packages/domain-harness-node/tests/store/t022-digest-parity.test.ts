@@ -7,7 +7,7 @@ import {
   computeGovernanceBaselineIdentity,
   computeGovernanceExecutionBindingDigest,
   type Sha256Port,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 /**
  * T-022 V2 — canonical digest parity on the real Node host.

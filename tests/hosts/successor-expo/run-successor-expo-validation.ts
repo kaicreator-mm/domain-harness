@@ -56,7 +56,7 @@ import {
   type JsonValue,
   type RuntimeHostBindings,
   type TargetCompiledDomainPackage,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 // Non-public activation validators are imported from the vendored dist by
 // relative path (the public barrel deliberately does not re-export them;
 // the vendored dist is byte-identical to the merged TESTED_HEAD build).

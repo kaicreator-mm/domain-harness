@@ -27,7 +27,7 @@ import {
   type DomainHardInvariantPredicate,
   type DomainWorkflowDefinition,
   type JsonValue,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   VolatileActivationAuthority,
   VolatileDurableExecutionStore,

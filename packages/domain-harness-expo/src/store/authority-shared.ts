@@ -1,4 +1,4 @@
-import { canonicalJsonStringify } from '@kaicreator/domain-harness';
+import { canonicalJsonStringify } from '@kaicreator/domain-harness/legacy';
 import type { JsonValue } from '@kaicreator/domain-harness/v2';
 
 /**

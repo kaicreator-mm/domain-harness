@@ -8,7 +8,7 @@
  * packages — importing this module in a Tiny install must succeed with no
  * Host-node, SQLite, BUILD or Compiler package present.
  */
-import { load as loadPublic } from '@kaicreator/domain-harness-microkernel';
+import { load as loadPublic } from '@kaicreator/domain-harness-microkernel/legacy';
 
 export { loadPublic as load };
 export { PlainFileDocStore } from './plain-store.mjs';

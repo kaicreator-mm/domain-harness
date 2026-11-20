@@ -197,7 +197,7 @@ import {
   createDomainRuntime,
   DOMAIN_HARNESS_VERSION,
   StaticPackageRegistry,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 // Successor /v7 import fixture (additive surface stays reachable and separate).
 import {
@@ -407,7 +407,7 @@ if (typeof m.PUBLIC_COMPILER_OUTPUT_PROFILE !== 'object' || m.PUBLIC_COMPILER_OU
 if (m.DOMAIN_HARNESS_COMPILER_PACKAGE !== '@kaicreator/domain-harness-compiler') throw new Error('unexpected package identity: ' + m.DOMAIN_HARNESS_COMPILER_PACKAGE);
 if (m.COMPILER_PUBLIC_API_VERSION !== 'compiler-public-api.v1') throw new Error('unexpected compiler public API compatibility level: ' + m.COMPILER_PUBLIC_API_VERSION);
 for (const key of ['admitComponent','computeDefinitionGraphDigest','validateToolComponent','mapRawV07AuthoringToComponentGraph','RAW_V07_TOOL_KIND']) { if (key in m) throw new Error('compiler root must not expose successor/internal authority: ' + key); }
-const core = await import('@kaicreator/domain-harness');
+const core = await import('@kaicreator/domain-harness/legacy');
 if (core.DOMAIN_HARNESS_VERSION !== '0.2.0') throw new Error('legacy core root version changed: ' + core.DOMAIN_HARNESS_VERSION);
 if (typeof core.createDomainRuntime !== 'function' || typeof core.StaticPackageRegistry !== 'function') throw new Error('legacy core root commitments missing');
 const v7 = await import('@kaicreator/domain-harness/v7');

@@ -9,7 +9,7 @@ import {
   prepareProcessedCommandTurn,
   type DomainActivationBinding,
   type Sha256Port,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type { WorkflowAddress, WorkflowInstanceSnapshot } from '@kaicreator/domain-harness/v2';
 import { NodeSqliteRuntimeStore } from '../../src/store/node-sqlite-runtime-store.js';
 

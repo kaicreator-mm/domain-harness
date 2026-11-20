@@ -19,6 +19,12 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const neverCommittedDist = new Set([
   '@kaicreator/domain-harness-node',
   '@kaicreator/domain-harness-expo',
+  // v0.11.0 T04 final wiring (L2 §8.3): the root SDK package becomes
+  // publishable (private removed) but its dist stays UNCOMMITTED — the L2
+  // ruling explicitly keeps the root build chain's "dist 不入库" semantics;
+  // only the pack `files` whitelist changed. Guarding it here would demand a
+  // tracked dist tree the frozen architecture does not want.
+  '@kaicreator/domain-harness',
 ]);
 
 async function discoverShipped() {

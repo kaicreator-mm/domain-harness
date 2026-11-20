@@ -1314,7 +1314,7 @@ import {
   createDomainRuntime,
   DOMAIN_HARNESS_VERSION,
   StaticPackageRegistry,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 void bundleScriptTool;
 void BusinessSourceCompileError;
@@ -1348,7 +1348,7 @@ void StaticPackageRegistry;
 const compiler = await import('@kaicreator/domain-harness-compiler');
 if (typeof compiler.compileDomainPackage !== 'function') throw new Error('legacy compiler root build API missing');
 if (compiler.COMPILER_PUBLIC_API_VERSION !== 'compiler-public-api.v1') throw new Error('compiler public API compatibility level changed');
-const core = await import('@kaicreator/domain-harness');
+const core = await import('@kaicreator/domain-harness/legacy');
 if (core.DOMAIN_HARNESS_VERSION !== '0.2.0') throw new Error('legacy core root version changed');
 if (typeof core.createDomainRuntime !== 'function' || typeof core.StaticPackageRegistry !== 'function') throw new Error('legacy core root commitments missing');
 `,

@@ -29,7 +29,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { V10_TARGET_PROFILE, sha256Hex } from '@kaicreator/domain-harness-contracts';
-import { buildV10App } from '@kaicreator/domain-harness-build';
+import { buildV10App } from '@kaicreator/domain-harness-build/legacy';
 import { v10BuildPackageClosureDigest } from '@kaicreator/domain-harness-host-node';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

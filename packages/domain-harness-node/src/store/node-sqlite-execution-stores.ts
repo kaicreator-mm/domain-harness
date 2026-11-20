@@ -5,7 +5,7 @@ import {
   SemanticCacheContractError,
   canonicalJsonStringify,
   isContentDigest,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type {
   AdmissionDurableEffectJournal,
   AdmissionEffectJournalRecord,
@@ -25,7 +25,7 @@ import type {
   SemanticCacheQuarantineRecord,
   SemanticCacheRead,
   VolatileSemanticCacheRetentionPolicy,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type { JsonValue } from '@kaicreator/domain-harness/v2';
 import { canonicalText, decodeJson, type AuthoritySqliteDatabase } from './authority-shared.js';
 

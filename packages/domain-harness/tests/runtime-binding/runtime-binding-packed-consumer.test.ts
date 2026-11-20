@@ -80,7 +80,7 @@ import {
   activateRuntimeBinding,
   isRuntimeBindingEvidence,
   RuntimeBindingError,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 const baseline = { ...DAC_REFERENCE_BASELINE };
 const sha256 = { digestUtf8: async (v) => 'consumer-sha256:' + v };

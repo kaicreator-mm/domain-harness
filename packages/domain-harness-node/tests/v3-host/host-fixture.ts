@@ -2,11 +2,11 @@ import type {
   AdmissionDurableEffectJournal,
   CreateDomainRuntimeV3AuthorityOptions,
   GovernanceBaselineBody,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   StaticPackageRegistry,
   createDomainRuntimeV3,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import type { TargetCompiledDomainPackage } from '@kaicreator/domain-harness/v2';
 import { computeCompiledPackageId } from '../../../domain-harness/src/package/index.js';
 import {

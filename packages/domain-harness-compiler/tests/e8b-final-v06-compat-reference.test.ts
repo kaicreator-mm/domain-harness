@@ -579,7 +579,7 @@ test('E8b one-runtime-effect-authority: caller-constructed assembly JSON is reje
         '--input-type=module',
         '--eval',
         `
-const { AssemblyExecutionActivator, GovernanceExecutionBindingError } = await import('@kaicreator/domain-harness');
+const { AssemblyExecutionActivator, GovernanceExecutionBindingError } = await import('@kaicreator/domain-harness/legacy');
 const { createHash } = await import('node:crypto');
 const sha256 = { async digestUtf8(value) { return createHash('sha256').update(value, 'utf8').digest('hex'); } };
 

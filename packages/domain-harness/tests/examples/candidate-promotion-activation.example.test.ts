@@ -37,7 +37,7 @@ import {
   type GovernanceBaselineIdentity,
   type JsonValue,
   type PromotedArtifactIdentity,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import { exampleSha256 } from './support.js';
 
 const DOMAIN_ID = 'orders';

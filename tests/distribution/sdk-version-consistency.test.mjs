@@ -18,6 +18,14 @@ const CONSUMER_NAME = '@kaicreator/domain-harness';
 const CONTRACTS = '@kaicreator/domain-harness-contracts';
 const BUILD = '@kaicreator/domain-harness-build';
 const MICROKERNEL = '@kaicreator/domain-harness-microkernel';
+const V011_ENTRY = Object.freeze({
+  types: './dist/v011/index.d.ts',
+  import: './dist/v011/index.js',
+});
+const LEGACY_ENTRY = Object.freeze({
+  types: './dist/index.d.ts',
+  import: './dist/index.js',
+});
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'dh-sdk-version-consistency-'));
@@ -32,16 +40,31 @@ function fixture() {
   }, null, 2) + '\n');
   for (const item of SDK_PACKAGES) {
     const dependencies = Object.fromEntries(item.internal.map((name) => [name, VERSION]));
+    const isContracts = item.dir === 'packages/contracts';
     const manifest = {
       name: item.name,
       version: VERSION,
       type: 'module',
       engines: { node: '>=24.0.0' },
-      files: ['dist'],
-      dependencies: {
-        ...dependencies,
-        ...(item.dir === 'tooling/build' ? { ajv: '8.17.1' } : {}),
-      },
+      // T04 final release shape (L2 §8.3): executable SDK packages ship only
+      // dist/v011; contracts keep the full dist (inert legacy types).
+      files: isContracts ? ['dist', 'README.md'] : ['dist/v011', 'README.md'],
+      exports: isContracts
+        ? { '.': LEGACY_ENTRY, './v011': V011_ENTRY }
+        : {
+            '.': V011_ENTRY,
+            './legacy': LEGACY_ENTRY,
+            ...(item.dir === 'packages/microkernel'
+              ? {
+                  './legacy/host-seam': {
+                    types: './dist/host-seam.d.ts',
+                    import: './dist/host-seam.js',
+                  },
+                }
+              : {}),
+          },
+      ...(Object.keys(dependencies).length > 0 ? { dependencies } : {}),
+      ...(item.dir === 'tooling/build' ? { dependencies: { ...dependencies, ajv: '8.17.1' } } : {}),
     };
     manifests.set(item.dir, manifest);
     mkdirSync(join(root, item.dir), { recursive: true });
@@ -52,7 +75,10 @@ function fixture() {
   const consumer = {
     name: CONSUMER_NAME,
     version: '0.11.0',
-    private: true,
+    type: 'module',
+    engines: { node: '>=24.0.0' },
+    files: ['dist/v011', 'README.md'],
+    exports: { '.': V011_ENTRY, './legacy': LEGACY_ENTRY },
     dependencies: { [BUILD]: VERSION, [CONTRACTS]: VERSION, [MICROKERNEL]: VERSION },
   };
   mkdirSync(join(root, CONSUMER_DIR), { recursive: true });
@@ -144,13 +170,73 @@ test('rejects a root-name edge that drifts from the release version', () => {
   });
 });
 
-test('rejects a consumer that leaves private during the M-bump phase', () => {
+test('rejects a canonical consumer that returns to private (T04 final wiring)', () => {
   withFixture(({ root }) => {
     const path = join(root, CONSUMER_DIR, 'package.json');
     const consumer = JSON.parse(readFileSync(path, 'utf8'));
-    consumer.private = false;
+    consumer.private = true;
     writeFileSync(path, JSON.stringify(consumer));
-    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must remain private:true/);
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must be publishable/);
+  });
+});
+
+test('rejects a release package whose files whitelist ships the legacy dist', () => {
+  withFixture(({ root }) => {
+    const path = join(root, CONSUMER_DIR, 'package.json');
+    const consumer = JSON.parse(readFileSync(path, 'utf8'));
+    consumer.files = ['dist', 'README.md'];
+    writeFileSync(path, JSON.stringify(consumer));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /legacy dist fenced/);
+  });
+});
+
+test('rejects a release package whose exports root is not the v011 canonical entry', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'tooling/build/package.json');
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    manifest.exports['.'] = LEGACY_ENTRY;
+    writeFileSync(path, JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /canonical v011 entry/);
+  });
+});
+
+test('rejects a release package that drops the fenced legacy subpath', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'packages/microkernel/package.json');
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    delete manifest.exports['./legacy'];
+    writeFileSync(path, JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /workspace compatibility/);
+  });
+});
+
+test('rejects peer/optional/bundled metadata leaking into the release graph', () => {
+  withFixture(({ root }) => {
+    const path = join(root, CONSUMER_DIR, 'package.json');
+    const consumer = JSON.parse(readFileSync(path, 'utf8'));
+    consumer.peerDependencies = { 'some-driver': '^1.0.0' };
+    writeFileSync(path, JSON.stringify(consumer));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must be absent from the frozen release graph/);
+  });
+});
+
+test('rejects a microkernel third-party runtime dependency', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'packages/microkernel/package.json');
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    manifest.dependencies['left-pad'] = '1.0.0';
+    writeFileSync(path, JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /no third-party runtime dependency/);
+  });
+});
+
+test('rejects contracts gaining a dependency (zero-dependency rule)', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'packages/contracts/package.json');
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    manifest.dependencies = { 'left-pad': '1.0.0' };
+    writeFileSync(path, JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /zero-dependency/);
   });
 });
 

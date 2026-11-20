@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { PromotedArtifactContractError } from '@kaicreator/domain-harness';
+import { PromotedArtifactContractError } from '@kaicreator/domain-harness/legacy';
 import type {
   DynamicChildExecutionPin,
   PromotedArtifactAuthorityBinding,
@@ -13,7 +13,7 @@ import type {
   PromotedArtifactRetentionReference,
   PromotedArtifactRevocationRecord,
   PromotedArtifactVersionBinding,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 import {
   NodeSqliteDynamicChildPinStore,
   NodeSqlitePromotedArtifactStore,

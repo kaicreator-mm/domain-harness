@@ -200,7 +200,7 @@ assert.equal(typeof digest, 'string');
 assert.ok(digest.length > 0);
 
 // Root entry: additive and identity-stable.
-const root = await import('@kaicreator/domain-harness');
+const root = await import('@kaicreator/domain-harness/legacy');
 assert.equal(root.DOMAIN_HARNESS_VERSION, '0.2.0');
 assert.equal(typeof root.createDomainRuntime, 'function');
 assert.equal(typeof root.validateComponentEnvelope, 'function');

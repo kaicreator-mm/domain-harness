@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { realpathSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { load } from '@kaicreator/domain-harness-microkernel';
+import { load } from '@kaicreator/domain-harness-microkernel/legacy';
 import { V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
 
 const consumerRoot = realpathSync(dirname(fileURLToPath(import.meta.url)));
@@ -17,7 +17,7 @@ assert.equal(process.versions.node.split('.')[0], '24', 'real Node24 process req
 assert.equal(typeof load, 'function');
 assert.equal(V10_TARGET_PROFILE, 'node24-esm/1');
 
-for (const name of ['@kaicreator/domain-harness-contracts', '@kaicreator/domain-harness-microkernel']) {
+for (const name of ['@kaicreator/domain-harness-contracts', '@kaicreator/domain-harness-microkernel/legacy']) {
   const entry = realpathSync(fileURLToPath(import.meta.resolve(name)));
   assert.ok(entry.startsWith(join(consumerRoot, 'node_modules') + sep), name + ' escaped isolated install root: ' + entry);
 }

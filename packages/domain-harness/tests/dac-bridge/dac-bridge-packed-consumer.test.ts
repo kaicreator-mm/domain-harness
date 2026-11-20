@@ -76,7 +76,7 @@ import {
   isCommandRef,
   isOutcomeRef,
   isDomainCommandCorrelation,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 assert.equal(DAC_REFERENCE_BASELINE_COMMIT(), '9c3ef91b8b40d893e4fe2b0370200e765816ec2b');
 assert.equal(DAC_BRIDGE_ROLES.length, 7);

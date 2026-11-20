@@ -21,7 +21,7 @@ import { readFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { V10_TARGET_PROFILE, sha256Hex, assertLlmGenerateRequestV1, assertLlmGenerateResultV1 } from '@kaicreator/domain-harness-contracts';
-import { buildV10App } from '@kaicreator/domain-harness-build';
+import { buildV10App } from '@kaicreator/domain-harness-build/legacy';
 import { activateV10App } from '@kaicreator/domain-harness-microkernel/host-seam';
 import { activateGovernedV10Build, v10BuildPackageClosureDigest, v10BuildActivationDecisionDigest } from '@kaicreator/domain-harness-host-node';
 import { parse } from 'acorn';
@@ -286,7 +286,7 @@ test('clean packed Node consumer loads only selected public Host entries', { tim
   try {
     const pack = execFileSync(process.execPath, [npm, 'pack', '--json', '--pack-destination', dir,
       '--workspace', '@kaicreator/domain-harness-contracts', '--workspace', '@kaicreator/domain-harness-microkernel',
-      '--workspace', '@kaicreator/domain-harness-host-node', '--workspace', '@kaicreator/domain-harness-build'], { cwd: root, encoding: 'utf8' });
+      '--workspace', '@kaicreator/domain-harness-host-node', '--workspace', '@kaicreator/domain-harness-build/legacy'], { cwd: root, encoding: 'utf8' });
     const tarballs = (JSON.parse(pack) as { filename: string }[]).map(p => join(dir, p.filename));
     assert.equal(tarballs.length, 4);
     await writeFile(join(dir, 'package.json'), JSON.stringify({ private: true, type: 'module' }));

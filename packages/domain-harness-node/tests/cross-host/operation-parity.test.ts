@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { canonicalJsonStringify, type JsonValue } from '@kaicreator/domain-harness';
+import { canonicalJsonStringify, type JsonValue } from '@kaicreator/domain-harness/legacy';
 import { PARITY_NOW_MS, runOperationScript } from './operation-script.js';
 
 /** Tables excluded from byte comparison (host ledger mechanisms; see schema-parity). */

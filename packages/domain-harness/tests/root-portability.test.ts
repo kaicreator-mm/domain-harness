@@ -117,7 +117,7 @@ for (const key of esmKeys) {
     run(process.execPath, ['contracts-dual-loader.mjs'], consumer);
 
     writeFileSync(join(consumer, 'index.mjs'), `
-import * as sdk from '@kaicreator/domain-harness';
+import * as sdk from '@kaicreator/domain-harness/legacy';
 
 if (sdk.DOMAIN_HARNESS_VERSION !== '0.2.0') {
   throw new Error('unexpected root SDK version');

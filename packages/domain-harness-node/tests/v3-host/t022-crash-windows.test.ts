@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { CentralAdmissionError } from '@kaicreator/domain-harness';
+import { CentralAdmissionError } from '@kaicreator/domain-harness/legacy';
 import { makeRequest } from '../../../domain-harness/tests/admission/helpers.js';
 import { openHostFixture, pinInstance } from './host-fixture.js';
 

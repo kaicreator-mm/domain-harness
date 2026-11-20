@@ -15,6 +15,9 @@
   // T012-D1 (#930): src/public-v7/execution.ts anchors the additive
   // ./v7/execution subpath declaration entry (bounded repair; the owner
   // leaf modules it re-exports are pulled in as its import closure).
+  // v0.11.0 T04 (#1578): src/v011/index.ts anchors the canonical 0.11.0
+  // public SDK entry (package root `.` per L2 §8.3) — a pure re-export
+  // composition of contracts/v011 + build v011 + microkernel v011.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
@@ -33,6 +36,7 @@
     "src/public-v8/dac.ts",
     "src/host-v8/index.ts",
     "src/workflow/index.ts",
-    "src/workflow/internal/xstate-adapter.ts"
+    "src/workflow/internal/xstate-adapter.ts",
+    "src/v011/index.ts"
   ]
 }

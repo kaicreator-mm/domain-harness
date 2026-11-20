@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import type { VolatileSemanticCacheRetentionPolicy } from '@kaicreator/domain-harness';
+import type { VolatileSemanticCacheRetentionPolicy } from '@kaicreator/domain-harness/legacy';
 import { applyNodeSqliteMigrations } from './migrations.js';
 import { NodeSqliteRuntimeEvidenceStore } from './node-sqlite-evidence-store.js';
 import {

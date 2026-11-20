@@ -76,7 +76,7 @@ import {
   createDomainRuntime,
   StaticPackageRegistry,
   canonicalJsonStringify,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 const manifest = {
   formatVersion: '0.2',

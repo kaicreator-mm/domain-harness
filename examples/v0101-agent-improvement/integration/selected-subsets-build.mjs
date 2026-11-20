@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { sha256Hex, V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
-import { buildV10App } from '@kaicreator/domain-harness-build';
+import { buildV10App } from '@kaicreator/domain-harness-build/legacy';
 import { activateV10App } from '@kaicreator/domain-harness-microkernel/host-seam';
 import { definitionV2 } from '../../v010-clean-consumer/apps/rich/app-definition.mjs';
 import { invokeAgentImprovementFeature } from '@kaicreator/domain-harness-host-node';

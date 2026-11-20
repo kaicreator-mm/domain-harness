@@ -50,10 +50,10 @@ const TARGET_KEYS = ['deployedAppId', 'tenantId', 'appId', 'businessPackageId', 
 // Root tests compile as CJS under tsx; the package-specifier runtime import
 // is awaited lazily so the real ESM export map is exercised (dist rebuilt
 // by the workspace build before this suite runs).
-type BuildModule = typeof import('@kaicreator/domain-harness-build');
-type MicrokernelModule = typeof import('@kaicreator/domain-harness-microkernel');
-const buildModule: Promise<BuildModule> = import('@kaicreator/domain-harness-build');
-const microkernelModule: Promise<MicrokernelModule> = import('@kaicreator/domain-harness-microkernel');
+type BuildModule = typeof import('@kaicreator/domain-harness-build/legacy');
+type MicrokernelModule = typeof import('@kaicreator/domain-harness-microkernel/legacy');
+const buildModule: Promise<BuildModule> = import('@kaicreator/domain-harness-build/legacy');
+const microkernelModule: Promise<MicrokernelModule> = import('@kaicreator/domain-harness-microkernel/legacy');
 
 const intentOf = (instanceKey: string, messageId: string): V10PublicIntent => ({
   intentType: 'submitQuoteDecisionDynamic',
@@ -139,7 +139,7 @@ async function refusalOf(run: () => Promise<unknown>): Promise<{ name: string; c
 async function loadApp(
   app: V10BuiltApp,
   queryAuthority: V10QueryAuthority,
-): Promise<import('@kaicreator/domain-harness-microkernel').DomainApp> {
+): Promise<import('@kaicreator/domain-harness-microkernel/legacy').DomainApp> {
   const { load } = await microkernelModule;
   return await load(app, {
     store: new PlainCasDocStore(),

@@ -44,7 +44,7 @@ import {
   type TerminalizeInstanceRequest,
   type WorkflowAddress,
   type WorkflowInstanceSnapshot,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 /** Real SHA-256 port for examples (consumers inject their platform's hash). */
 export const exampleSha256: Sha256Port = {

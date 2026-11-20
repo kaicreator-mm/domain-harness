@@ -23,7 +23,7 @@ import {
   VolatileRuntimeEvidenceStore,
   type AdmissionEffectJournalRecord,
   type RuntimeEvidenceGovernanceBaselineRef,
-} from '@kaicreator/domain-harness';
+} from '@kaicreator/domain-harness/legacy';
 
 const governanceBaseline: RuntimeEvidenceGovernanceBaselineRef = {
   domainId: 'orders',

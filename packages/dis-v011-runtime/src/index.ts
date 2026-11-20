@@ -1,4 +1,4 @@
-import { buildV10App } from '@kaicreator/domain-harness-build';
+import { buildV10App } from '@kaicreator/domain-harness-build/legacy';
 import { V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
 import { assertVerifiedSelection, canonicalDigest, digest } from './knowledge.js';
 import { registerBuild } from './provider-bindings.js';
