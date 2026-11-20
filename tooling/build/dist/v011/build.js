@@ -372,6 +372,7 @@ function runBuild(input) {
     }
     const sealedFunctions = [];
     for (const resolved of [...selectedFunctions.values()].sort(compareResolvedFunction)) {
+        validateSelectedFunctionSchemas(schemas, scope, selected, resolved);
         if (resolved.fn.effects !== 'none') {
             throw refusal('DH_BUILD_EFFECT_PROFILE_UNSUPPORTED', `selected function '${resolved.element.def.id}.${resolved.fn.id}' declares effects '${resolved.fn.effects}'; 0.11.0 implements 'none' only`);
         }
@@ -572,6 +573,27 @@ function runBuild(input) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+/**
+ * Resolve and compile every selected Function input/output schema at BUILD.
+ * Only the runtime-supported profile may cross into the exact Lock; private,
+ * unselected Functions never reach this admission point. Resource schemas use
+ * the same digest-verified bytes as other selected-closure resources.
+ */
+function validateSelectedFunctionSchemas(schemas, scope, selectedPackages, resolved) {
+    const functionPath = `${resolved.element.def.id}.${resolved.fn.id}`;
+    for (const channel of ['inputSchemaRef', 'outputSchemaRef']) {
+        const ref = resolved.fn[channel];
+        const refPath = `${functionPath}.${channel}`;
+        if (!('inline' in ref) && !selectedPackages.has(ref.packageId)) {
+            throw refusal('DH_BUILD_SCHEMA_INVALID', `runtime Function schema resource '${ref.packageId}/${ref.path}' is not in the selected package closure`, refPath);
+        }
+        const inline = 'inline' in ref;
+        const schema = inline
+            ? ref.inline
+            : parseSchemaResource(scope, ref, refPath, `runtime Function '${functionPath}.${channel}'`);
+        schemas.compileFunctionSchema(schema, `${refPath}${inline ? '.inline' : ''}`);
+    }
+}
 function isExported(owner, element, fn) {
     const entry = owner.elements.find((candidate) => candidate.id === element.def.id && candidate.version === element.def.version);
     if (!entry || entry.visibility !== 'public')
@@ -676,12 +698,12 @@ function validateAgainstSchema(schemas, scope, block, value, blockPath) {
     }
 }
 /** Read + digest-verify a schema resource; non-JSON schema bytes are SCHEMA_INVALID. */
-function parseSchemaResource(scope, ref, blockPath) {
+function parseSchemaResource(scope, ref, refPath, subject = `content block '${refPath}'`) {
     const bytes = scope.verify(ref);
     try {
         return JSON.parse(Buffer.from(bytes).toString('utf8'));
     }
     catch {
-        throw refusal('DH_BUILD_SCHEMA_INVALID', `schema resource '${ref.packageId}/${ref.path}' for content block '${blockPath}' is not JSON`, blockPath);
+        throw refusal('DH_BUILD_SCHEMA_INVALID', `schema resource '${ref.packageId}/${ref.path}' for ${subject} is not JSON`, refPath);
     }
 }

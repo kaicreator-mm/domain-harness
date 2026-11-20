@@ -52,6 +52,58 @@ test('input schema mismatch is refused before the implementation runs', async (t
   await app.dispose();
 });
 
+test('nested non-JSON input is refused before the selected implementation runs', async (t) => {
+  const app = await bootApp(t, {
+    init: { status: 'READY' },
+    // If the guard runs after the implementation, every nested counterexample
+    // below would instead surface DH_KDP_PACKAGE_LOAD_FAILED from this throw.
+    functions: { evaluate: { behavior: 'throw' } },
+  });
+  const cases: readonly [string, unknown][] = [
+    ['nested undefined', { total: 100, region: 'EU', metadata: [{ value: undefined }] }],
+    ['nested function', { total: 100, region: 'EU', metadata: { callback: () => undefined } }],
+    ['nested Symbol', { total: 100, region: 'EU', metadata: [{ token: Symbol('not-json') }] }],
+    ['nested bigint', { total: 100, region: 'EU', metadata: { count: 10n } }],
+    ['nested non-finite number', { total: 100, region: 'EU', metadata: [{ value: Number.NaN }] }],
+    [
+      'nested throwing Proxy',
+      {
+        total: 100,
+        region: 'EU',
+        metadata: new Proxy({ value: true }, { get() { throw new Error('evil nested getter'); } }),
+      },
+    ],
+    ['root Date', new Date(0)],
+    ['root Map', new Map([['total', 100]])],
+  ];
+  for (const [name, input] of cases) {
+    const outcome = await app.invoke('evaluate', input);
+    assert.equal(outcome.kind, 'FAILED', name);
+    assert.equal(
+      outcome.kind === 'FAILED' && outcome.failure.code,
+      'DH_RUNTIME_INPUT_SCHEMA_MISMATCH',
+      name,
+    );
+  }
+  await app.dispose();
+});
+
+test('valid nested JSON objects and arrays preserve the existing invocation behavior', async (t) => {
+  const app = await bootApp(t, {
+    init: { status: 'READY' },
+    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
+  });
+  const outcome = await app.invoke('evaluate', {
+    total: 100,
+    region: 'EU',
+    metadata: {
+      history: [null, true, 1, 'text', { nested: ['array', { object: 2 }] }],
+    },
+  });
+  assert.deepEqual(outcome, { kind: 'SUCCEEDED', value: { decision: 'POS' } });
+  await app.dispose();
+});
+
 test('SUCCEEDED values are validated against the output schema; mismatch is reported as FAILED', async (t) => {
   const app = await bootApp(t, {
     init: { status: 'READY' },
