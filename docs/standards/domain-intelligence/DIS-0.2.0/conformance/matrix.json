@@ -71,7 +71,10 @@
     "r97-o2-native-no-trust-ci",
     "r100-o2-cohort-bridge-r99-repair-ci",
     "r101-o2-canonical-lineage-native-ci",
-    "r102-o2-unicode-lineage-native-ci"
+    "r102-o2-unicode-lineage-native-ci",
+    "r211-opt001-real-live-multi-context-ci",
+    "r211-opt003-full-activation-ci",
+    "r211-opt004-server-promotion-ci"
   ],
   "requirements": [
     {
@@ -1831,6 +1834,10 @@
         {
           "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
           "case": "O1 R94 provider-disabled and zero-budget paths preserve real SDK observation without model calls"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/full-opt001-r0/opt001-live-provider.test.mjs",
+          "case": "OPT001 live: real DeepSeek bounded advisory through the real AOT harness"
         }
       ],
       "negative": [
@@ -1845,12 +1852,17 @@
         {
           "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
           "case": "O1 R96 rejects FAILED/UNKNOWN or source-mismatched native observations before Provider fallback"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/full-opt001-r0/opt001-live-provider.test.mjs",
+          "case": "OPT001 live: absent credential env is an explicit NO_CREDENTIAL rejection"
         }
       ],
       "receiptIds": [
-        "r96-o1-source-observation-ci"
+        "r96-o1-source-observation-ci",
+        "r211-opt001-real-live-multi-context-ci"
       ],
-      "note": "R94 native selected xDownload Knowledge Function is invoked through actual canonical DIS v0.2 AOT→SDK/KDP before a bounded fixture-only provider fallback. R95 exact HEAD ed25934d2fb5d24a4e6a767441b129172e426a97 passed Woodpecker #2450/1-3 3/3; R96 exact HEAD d4f0b8bb57090a994794f7c15a3eaa062627dd38 passed #2451/1-3 3/3. R96 additionally requires typed OBSERVED, contract v1.0.0 and the exact original xdownload-business source ID/Git Blob before provider fallback; FAILED/UNKNOWN/unpinned observations fail closed. Provider remains fixture-only, NOT AOT-locked and not a real LLM; no independent business Oracle, full Harness provider contract, tool loop or end-to-end timeout/termination proof. Therefore PARTIAL, not VERIFIED."
+      "note": "R94 native selected xDownload Knowledge Function is invoked through actual canonical DIS v0.2 AOT→SDK/KDP before a bounded fixture-only provider fallback. R95 exact HEAD ed25934d2fb5d24a4e6a767441b129172e426a97 passed Woodpecker #2450/1-3 3/3; R96 exact HEAD d4f0b8bb57090a994794f7c15a3eaa062627dd38 passed #2451/1-3 3/3. R96 additionally requires typed OBSERVED, contract v1.0.0 and the exact original xdownload-business source ID/Git Blob before provider fallback; FAILED/UNKNOWN/unpinned observations fail closed. Provider remains fixture-only, NOT AOT-locked and not a real LLM; no independent business Oracle, full Harness provider contract, tool loop or end-to-end timeout/termination proof. Therefore PARTIAL, not VERIFIED. R211 (#1547, PR #1569): real AOT-selected bounded DeepSeek provider; live positive + invalid-credential/timeout/cancel/hot-swap/hostile-output negatives; real live evidence executed on three independent local contexts (Writer Windows, Integrator LAN-Linux node:24 container, independent reviewer) at exact HEAD; CI-context live blocked by the Woodpecker 3.20.1 local-backend secret-delivery finding (4 probes recorded); model outputs are data only, authority NONE. Stays PARTIAL until a same-HEAD CI-context live run exists."
     },
     {
       "id": "DIS020-OPT-002",
@@ -1953,37 +1965,83 @@
       "id": "DIS020-OPT-003",
       "title": "Local data-only Evolution Slot activation, task pin, rollback, revoke",
       "profile": "optional-profile",
-      "state": "NOT_RUN",
+      "state": "VERIFIED",
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "9"
       },
-      "implementation": [],
-      "positive": [],
-      "negative": [],
-      "receiptIds": [],
-      "note": "R2 E07,N02,N09,N13,N14 not executed in selected SDK."
+      "implementation": [
+        "examples/dis-v020-native-sdk/full-opt003-r0/evolution-slot.mjs",
+        "examples/dis-v020-native-sdk/full-opt003-r0/evolution-slot.test.mjs",
+        "examples/dis-v020-native-sdk/full-opt003-r0/full-opt003-native.test.mjs",
+        ".woodpecker/dis-v020-full-opt003-r0.yaml"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/full-opt003-r0/full-opt003-native.test.mjs",
+          "case": "OPT003 native full lifecycle: load -> atomic activate+pin -> data-driven execute -> revoke -> rollback -> restart invalidation"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/full-opt003-r0/evolution-slot.test.mjs",
+          "case": "OPT003 data-driven behavior change: unactivated task is denied, rule miss denies allow"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/full-opt003-r0/full-opt003-native.test.mjs",
+          "case": "OPT003 native negatives: forged code zero-execution, wrong-task pin, cancel race, stale epoch, AOT-outside slot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/full-opt003-r0/evolution-slot.test.mjs",
+          "case": "OPT003 forged code is rejected as inert data with zero execution evidence"
+        }
+      ],
+      "receiptIds": [
+        "r211-opt003-full-activation-ci"
+      ],
+      "note": "R211 (#1549, PR #1571): full local data-only Evolution Slot activation lifecycle on the real selected xDownload AOT -> public SDK; atomic task pin, revoke/rollback, restart invalidation; forged-code/data-only fail-closed negatives with zero execution evidence; independent non-Writer review ACCEPT_SCOPED; integrated parent 24/24 re-run. Scope stays local/in-process, authority NONE."
     },
     {
       "id": "DIS020-OPT-004",
       "title": "Server Promotion and new AOT lifecycle, privacy/scope governance",
       "profile": "optional-profile",
-      "state": "NOT_RUN",
+      "state": "PARTIAL",
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "9"
       },
-      "implementation": [],
-      "positive": [],
-      "negative": [],
-      "receiptIds": [],
-      "note": "R2 E08-E10,N08,N11,N15 not executed."
+      "implementation": [
+        "examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.mjs",
+        "examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.test.mjs",
+        ".woodpecker/dis-v020-full-opt004-r0.yaml",
+        "examples/dis-v020-native-sdk/full-r211-integration/opt004-opt003-activation-seam.test.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.test.mjs",
+          "case": "O4 positive chain: nominate -> validate -> authorized promotion -> new AOT package version -> future activation not performed"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.test.mjs",
+          "case": "O4 negative: forged promoter signature is rejected and flagged FORGERY; validator key reuse is flagged"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.test.mjs",
+          "case": "O4 negative: replay of the same authorized promotion nonce is rejected"
+        }
+      ],
+      "receiptIds": [
+        "r211-opt004-server-promotion-ci"
+      ],
+      "note": "R211 (#1550, PR #1566): consent->candidate->independent validation receipt->pinned-promoter authorized promotion->new AOT manifest version chain->READY_NOT_ACTIVATED; tenant/scope isolation, nonce anti-replay, zero implicit Effect; O4->O3 activation seam reconciled end-to-end by the Integrator (PR #1582). PARTIAL: no real Server/Domain/Forge authority and no Product-approved server promotion policy; no Effect/Experience/Release."
     },
     {
       "id": "DIS020-GOV-001",
       "title": "Independent exact-SHA review and Product/L1 L2 Freeze",
       "profile": "governance",
-      "state": "NOT_RUN",
+      "state": "PARTIAL",
       "spec": {
         "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
         "section": "10"
@@ -1992,7 +2050,7 @@
       "positive": [],
       "negative": [],
       "receiptIds": [],
-      "note": "Version delivery governance separate from Demo CI; PR remains Draft."
+      "note": "R211 (#1551): fresh independent non-Writer exact-SHA review of the fully integrated Draft parent executed and published at https://github.com/kaicreator-mm/domain-harness/pull/1497#issuecomment-7028719817 (REVIEW_COMPLETED_SCOPED, HEAD 862aa44f, validator 28/28 + lane re-runs + integrity probes); the Product/L1 L2-Freeze/applicability decision is explicitly NOT made this round - remaining owner decision explicitly pending. No auto L2/Release from CI green."
     }
   ]
 }

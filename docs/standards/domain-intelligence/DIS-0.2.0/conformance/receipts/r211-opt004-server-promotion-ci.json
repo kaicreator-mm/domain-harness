@@ -1,0 +1,51 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r211-opt004-server-promotion-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "OPT004_SERVER_PROMOTION_LIFECYCLE_ENGINEERING_EVIDENCE_PARTIAL_NO_FORMAL_PROMOTION_AUTHORITY",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "6503ce283be97b067ff76b03ee3efbe2ebc06f3c",
+    "tree": "5ff9aae2bbaf7123f0e4101aa9e1fa50b493b2a5"
+  },
+  "native": {
+    "lifecycleModule": {
+      "path": "examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.mjs"
+    },
+    "tests": {
+      "path": "examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.test.mjs"
+    },
+    "integrationYaml": {
+      "path": ".woodpecker/dis-v020-full-opt004-r0.yaml"
+    },
+    "localRun": "8/8 EXIT=0 (Writer); independent reviewer re-execution 8/8 EXIT=0, 23/23 adversarial probes PASS"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2647/6"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2647/19"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2647/18"
+    }
+  ],
+  "review": {
+    "pullRequest": "kaicreator-mm/domain-harness#1566",
+    "verdict": "ACCEPT_SCOPED",
+    "url": "https://github.com/kaicreator-mm/domain-harness/pull/1566#issuecomment-7019131808"
+  },
+  "activationSeam": {
+    "pullRequest": "kaicreator-mm/domain-harness#1582",
+    "scope": "Integrator-owned O4 promotion manifest -> O3 stable activation ABI end-to-end reconciliation (#1551 DAG final integration)"
+  },
+  "honestScope": "In-process server semantics; authenticated = genuinely executed pinned Ed25519 verification. No real Server/Domain/Forge authority, no Product-approved promotion policy, no Effect/Experience/Release; ROW REMAINS PARTIAL pending formal server Product/owner promotion authority."
+}
