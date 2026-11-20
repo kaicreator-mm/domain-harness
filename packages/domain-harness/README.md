@@ -26,9 +26,9 @@ import {
 
 ## Diagnostics / 日志与故障定位
 
-The core SDK returns **structured and stable** `BootResult` / `FunctionOutcome` status and error codes, rather than writing to `console` or a global log transport. The calling Host is responsible for logging events; this avoids leaking business inputs, rules, local paths or secrets by default.
+The core SDK returns typed `BootResult` / `FunctionOutcome` status and error codes rather than writing to `console` or a global logger. The Host owns its own structured event logging. **Never log `reason`, `failure.message`, `unknownReason.message`, or an exception object by default**: those are untrusted diagnostic strings, not redacted fields, and can contain business inputs, local paths or secrets. Use only a trusted, explicitly redacted/allowlisted diagnostic sink when raw details are genuinely needed.
 
-核心 SDK 不依赖全局日志框架或自动打印业务数据。Host 可按下述方式记录结构化结果；`code` 用于机器判断，`reason` 用于人工诊断，`lockDigest` 与 `activationId` 可由授权 Host 作为关联字段管理。不要默认记录原始输入、规则内容或凭据。
+核心 SDK 不依赖全局日志框架或自动打印业务数据。Host 应默认只记录可信的 `event/status/code` 和由 Host 自己生成的关联 ID。**`reason` 是不可信的诊断文本**，可能含有来自业务 App Init、插件或 cleanup 异常的原始错误消息。不可默认记录到生产日志；仅在授权的故障诊断通道中，经过显式字段白名单和敏感数据清理后使用。不要默认记录原始输入、规则、文件路径或凭据。
 
 ```js
 const result = await boot(pin, context);
@@ -37,12 +37,14 @@ if (result.status !== 'BOOTED') {
     event: 'domain-harness.boot',
     status: result.status,
     code: result.code,
-    reason: result.reason,
+    // No result.reason: untrusted exception messages can contain secrets.
   });
 }
 ```
 
-For an invoked Function, log `kind` and the selected `failure.code` or `unknownReason.code` on non-success; never treat UNKNOWN as FAILED or log the `value` payload by default. T05's external clean-install acceptance records machine-readable NDJSON events, but those are **test evidence**, not a production logging backend. A failed App Init runs reverse technical cleanup and appends any cleanup failure to its typed startup reason.
+**Concrete negative case:** if a selected business App Init throws `new Error('token=example-secret')`, the KDP `result.reason` may include that literal string (including appended cleanup exceptions). The safe Host example above logs only the status/code, so the secret does not reach the default log. Do **not** treat a diagnostic reason as sanitized simply because the outer result is typed.
+
+For an invoked Function, log `kind` and the selected `failure.code` or `unknownReason.code` on non-success; never treat UNKNOWN as FAILED or log the `value` or reason/message payloads by default. A Host-generated correlation ID is safe for tracing; `lockDigest` and `activationId` should be handled under the Host's explicit exposure policy. T05's external clean-install acceptance NDJSON is **test evidence**, not a production logging backend. A failed App Init runs reverse technical cleanup and can append cleanup errors verbatim to its untrusted startup `reason`.
 
 ## Legacy workspace surface / Workspace 内的 legacy 面
 
