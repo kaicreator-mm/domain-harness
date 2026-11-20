@@ -54,8 +54,14 @@ export function validateJsonSubset(instance: unknown, schema: unknown): boolean 
   }
 
   if (typeof instance === 'string') {
-    if (typeof s['minLength'] === 'number' && instance.length < s['minLength']) return false;
-    if (typeof s['maxLength'] === 'number' && instance.length > s['maxLength']) return false;
+    // JSON Schema 2020-12 measures Unicode code points, not UTF-16 code
+    // units. A supplementary character (e.g. 😀) counts as one character.
+    if (typeof s['minLength'] === 'number' || typeof s['maxLength'] === 'number') {
+      let codePointLength = 0;
+      for (const _character of instance) codePointLength += 1;
+      if (typeof s['minLength'] === 'number' && codePointLength < s['minLength']) return false;
+      if (typeof s['maxLength'] === 'number' && codePointLength > s['maxLength']) return false;
+    }
     if (typeof s['pattern'] === 'string') {
       try {
         if (!new RegExp(s['pattern'], 'u').test(instance)) return false;
