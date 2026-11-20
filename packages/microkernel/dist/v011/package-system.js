@@ -86,6 +86,34 @@ export class PackageSystem {
         }
         return bytes;
     }
+    /**
+     * Verify EVERY selected executable entry before the first selected ESM import.
+     * Node ESM may import another selected Function module transitively before
+     * loadEntry() observes it. This preflight prevents execution of tampered
+     * selected Package, Function and Hook modules. The trusted installer still
+     * owns the on-disk installRoot and any nonselected ESM sidecars.
+     */
+    async verifySelectedArtifacts() {
+        const selected = new Map();
+        const collect = (ref) => {
+            const key = `${ref.packageId}/${ref.path}`;
+            const previous = selected.get(key);
+            if (previous !== undefined && previous.digest !== ref.digest) {
+                throw new KdpLoadError(`inconsistent executable digests for '${key}'`, 'DH_BOOT_PIN_MISMATCH');
+            }
+            selected.set(key, ref);
+        };
+        for (const pkg of this.lock.selectedPackages)
+            collect(pkg.artifact);
+        for (const fn of this.lock.selectedFunctions)
+            collect(fn.implementation.module);
+        for (const hook of this.lock.hookBindings)
+            for (const provider of hook.providers)
+                collect(provider.module);
+        for (const [key, ref] of selected) {
+            await this.readVerifiedBytes(ref.packageId, ref.path, ref.digest, `selected executable '${key}'`);
+        }
+    }
     /** Load a package artifact module addressed by its sealed ResourceRef. */
     async loadArtifactModule(ref, what) {
         const absolute = resolvePackageFile(this.installRoot, ref.packageId, ref.path);
@@ -123,9 +151,10 @@ export class PackageSystem {
                 }
                 const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
                 const technicalInit = mod['technicalInit'];
-                if (technicalInit !== undefined) {
+                // No implicit init: the exact BUILD Lock must have declared this pair.
+                if (pkg.technicalLifecycle) {
                     if (typeof technicalInit !== 'function') {
-                        throw new KdpLoadError(`package '${packageId}' export 'technicalInit' is not a function`);
+                        throw new KdpLoadError(`package '${packageId}' declared technicalInit but its artifact has no callable named export`);
                     }
                     const context = { packageId, hostPorts: this.hostPorts };
                     await technicalInit(context);
@@ -140,6 +169,10 @@ export class PackageSystem {
                     if (pkg === undefined)
                         continue;
                     const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
+                    // Roll back only a lifecycle explicitly admitted by the sealed Lock.
+                    // A non-lifecycle package may coincidentally export this name.
+                    if (!pkg.technicalLifecycle)
+                        continue;
                     const technicalDispose = mod['technicalDispose'];
                     if (typeof technicalDispose === 'function') {
                         const context = { packageId, hostPorts: this.hostPorts };
@@ -169,9 +202,9 @@ export class PackageSystem {
                 }
                 const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
                 const technicalDispose = mod['technicalDispose'];
-                if (technicalDispose !== undefined) {
+                if (pkg.technicalLifecycle) {
                     if (typeof technicalDispose !== 'function') {
-                        throw new KdpLoadError(`package '${packageId}' export 'technicalDispose' is not a function`);
+                        throw new KdpLoadError(`package '${packageId}' declared technicalDispose but its artifact has no callable named export`);
                     }
                     const context = { packageId, hostPorts: this.hostPorts };
                     await technicalDispose(context);

@@ -1,2 +1,2 @@
 export const ELEMENT_VISIBILITIES = ['public', 'private'];
-export const NODE24_ESM_PROFILE = 'node24-esm/1';
+export const NODE22_ESM_PROFILE = 'node22-esm/1';

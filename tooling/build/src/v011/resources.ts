@@ -12,7 +12,7 @@
 import { readFileSync, realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import type { ContentDigest, ResourceRef } from '@kaicreator/domain-harness-contracts/v011';
+import { isRelativeResourcePath, type ContentDigest, type ResourceRef } from '@kaicreator/domain-harness-contracts/v011';
 import { refusal } from './refusal.js';
 
 export function digestOfBytes(bytes: Uint8Array): ContentDigest {
@@ -38,6 +38,10 @@ export class V011ResourceScope {
 
   /** Read package bytes with containment enforcement; no digest bookkeeping. */
   read(packageId: string, path: string): Uint8Array {
+    // BUILD must use the same canonical POSIX paths that Boot/KDP accepts.
+    if (!isRelativeResourcePath(path)) {
+      throw refusal('DH_BUILD_RESOURCE_MISSING', `resource '${packageId}/${String(path)}' is not a canonical relative POSIX path`);
+    }
     let root: string;
     let target: string;
     try {

@@ -4,6 +4,8 @@
 
 DomainHarness 是一套面向 **Domain App / Domain Package** 的 JS/TS 运行 SDK。外部可信 BUILD 阶段封闭选定 K/S/B/C Domain Packages；运行时 Microkernel 装载预构建 App，提供 `send / query / subscribe / stop`；可选 Node Host 提供 CAS/SQLite 等物理能力。业务状态与外部 Effect 权威由 **K Primary** 拥有，而不是 Microkernel 或 Host。
 
+> **v0.11.0 开发分支**：Element-First Canonical SDK 当前处于版本分支候选阶段；最低 Node.js 为 **22.12.0**，标准 Target 为 `node22-esm/1`。请参见 [v0.11.0 公共 SDK 使用与诊断](packages/domain-harness/README.md) 和 [真实四包安装示例](examples/v011-basic-app/README.zh-CN.md)。下方 v0.10.x 文档与 Tag 事实仅针对旧正式版本，不代表 v0.11.0 已发布。
+
 ## 用户从这里开始
 
 | 想做什么 | 中文说明 |

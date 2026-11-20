@@ -225,11 +225,11 @@ export const UNKNOWN_OPTIONAL_EXCLUSION_FIXTURE = {
 const APP_TARGET_SELECTOR = {
     runtime: 'node',
     module: 'esm',
-    nodeMajor: 24,
+    nodeMajor: 22,
 };
 const APP_TARGET = {
     ...APP_TARGET_SELECTOR,
-    profile: 'node24-esm/1',
+    profile: 'node22-esm/1',
 };
 const EVALUATE_FUNCTION_REF = {
     element: {
@@ -297,6 +297,7 @@ export const DOMAIN_APP_LOCK_FIXTURE = {
             version: '1.0.0',
             layer: 'kernel',
             role: 'primary',
+            technicalLifecycle: false,
             artifact: {
                 packageId: 'kdp-basic',
                 path: 'dist/kdp-basic.mjs',
@@ -309,6 +310,7 @@ export const DOMAIN_APP_LOCK_FIXTURE = {
             version: '1.0.0',
             layer: 'sdk',
             role: 'primary',
+            technicalLifecycle: false,
             artifact: {
                 packageId: 'sdk-core',
                 path: 'dist/sdk-core.mjs',
@@ -321,6 +323,7 @@ export const DOMAIN_APP_LOCK_FIXTURE = {
             version: '1.0.0',
             layer: 'business',
             role: 'primary',
+            technicalLifecycle: false,
             artifact: ORDERS_BUSINESS_ARTIFACT,
             dependsOn: ['sdk-core'],
         },

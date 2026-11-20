@@ -119,3 +119,8 @@ L2 遵循 **Tests → Contract → Implementation → Failure Handling → Examp
 3. 原 PR #1565 在**其它独立 ChatGPT 对话**对最终 HEAD 做 selected Product/L1 审查：实读 PRD、讨论史与路线图、#1477/#1484/#1480/#1496、CV-01…12、旧 R0 P1×2 修复是否真实覆盖；结论 ACCEPT/REWORK/P0-P2；只审新增/变化风险，避免重做历史已通过内容。
 4. Review PASS 及必要 docs-only CI 成立后，建立远端 Product Freeze checkpoint 并合法受控合并到 version branch；然后迅速做范围收敛的 L2 与少量高并行 Task DAG，准备 Builder/Validator 任务；不提前动业务源码。
 <!-- /DH_V011_OWNER_CONVERSATION_CHRONICLE_R1_20261120 -->
+
+
+## R27（2026-11-21）最低运行时及代码质量决议
+
+当前用户明确要求：检查日志/注释、Node 最低依赖降至 22、修复 v0.11.0 R26 评审发现。最低基线选择 Node.js >=22.12.0（ESLint 10 和 JSON/ESM 稳定特性），锁定 Target 改为 `node22-esm/1`；Node24 Host 仍可运行。候选修改须经受影响测试、现有单 Woodpecker、Node22 真实环境验证和精确 SHA 受控合并。历史 Node24-only L2 结论自本增量生效起由本决议取代，不追溯修改先前已审核证据；当前不自动授予 Release Qualification 或发布。日志继续使用 BootResult/FunctionOutcome 结构化失败代码，由 Host 自主输出，业务敏感数据默认不采集。

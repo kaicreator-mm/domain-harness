@@ -1,6 +1,8 @@
 # DomainHarness v0.11.0 — Element-First Architecture Foundation
 ## Product Requirements Document · R2 · Owner Review Candidate
 
+> **R27 新增 Owner 执行变更（2026-11-21）**：本轮明确降低 v0.11.0 的 Node 最低支持版本到 Node.js **22.12.0**，同步 canonical Target `node22-esm/1`，兼容运行于 Node 24 及更高版本。旧正文中 `node24-esm/1` 与 `>=24` 文字仅为历史 R2 裁决，已由本条覆盖；须在 R27 最终 Exact-HEAD 审核/CI 成功后视为已实现，不倒填历史冻结资格。
+
 > **Status: OWNER SCOPE ACCEPTED on 2026-11-20; selected independent Product Review and remote version-branch Product Freeze checkpoint PENDING. Not L2 Freeze, implementation authorization or release.**
 > **Version master:** [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563) · **Product work item:** [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) · **Product PR:** [#1565](https://github.com/kaicreator-mm/domain-harness/pull/1565).
 > **Baseline branch:** `version/v0.11.0` (initial `b1b2c182c1cb49c1b63b1efaf57ff9132d9cf4b0`); **ADS:** v4.18.0 pinned `2c395c55569fe2edf3f4135f12d3d069e526d0b7`. This document **replaces** prior #1565 R0 PRD requirements where inconsistent.

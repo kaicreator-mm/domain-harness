@@ -177,7 +177,7 @@ async function authoring(label, rule, options = {}) {
   for (const id of Object.keys(dirs)) artifactRefs[id] = await artifactRef(id, 'dist/index.mjs');
   const rulesEntryRef = await artifactRef('rules-package', 'dist/rules.mjs');
   const businessEntryRef = await artifactRef('app-business', 'dist/app.mjs');
-  const target = { runtime: 'node', module: 'esm', nodeMajor: 24 };
+  const target = { runtime: 'node', module: 'esm', nodeMajor: 22 };
   const variant = (implementations) => [{ target, implementations }];
   const implementation = (elementId, functionId, module, exportName, resources) => ({
     elementId, functionId, contractVersion: '1', entry: { module, exportName }, ...(resources === undefined ? {} : { resources }),
@@ -241,7 +241,7 @@ async function authoring(label, rule, options = {}) {
 
   const descriptor = {
     kind: 'DomainApp', schemaVersion: DH_APP_SCHEMA_VERSION, id: `basic.clean.${label}`, version: '1.0.0',
-    target: options.unsupportedTarget === true ? { runtime: 'node', module: 'esm', nodeMajor: 22 } : target,
+    target: options.unsupportedTarget === true ? { runtime: 'node', module: 'esm', nodeMajor: 20 } : target,
     roots: {
       kernelPrimary: { package: 'kernel-primary', version: '1.0.0' },
       sdkPrimary: { package: 'sdk-primary', version: '1.0.0' },
@@ -299,7 +299,7 @@ async function materialize(label, prepared, built) {
   };
   const context = {
     installRoot, descriptorPath: 'descriptor/app.json', lockPath: record.lockPath,
-    hostPorts: [], env: { nodeMajor: 24, platform: process.platform },
+    hostPorts: [], env: { nodeMajor: 22, platform: process.platform },
   };
   return { installRoot, pin, context, lock, lockBytes };
 }
@@ -389,7 +389,7 @@ async function runPositive(label, rule) {
 
     const inspection = await app.inspect();
     assert.equal(inspection.appIdentity.lockDigest, install.lock.closureDigest);
-    assert.equal(inspection.target.profile, 'node24-esm/1');
+    assert.equal(inspection.target.profile, 'node22-esm/1');
     assert.deepEqual(await app.dispose(), { status: 'DISPOSED' });
     const disposed = runtimeEvents.filter((event) => event.event === 'technical-dispose').map((event) => event.package);
     assert.deepEqual(install.lock.technicalDisposeOrder, [...install.lock.technicalInitOrder].reverse());

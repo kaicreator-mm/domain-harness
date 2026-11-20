@@ -48,7 +48,7 @@ function fixture() {
       name: item.name,
       version: VERSION,
       type: 'module',
-      engines: { node: '>=24.0.0' },
+      engines: { node: '>=22.12.0' },
       // T04 final release shape (L2 §8.3): executable SDK packages ship only
       // dist/v011; contracts keep the full dist (inert legacy types).
       files: isContracts ? ['dist', 'README.md'] : ['dist/v011', 'README.md'],
@@ -79,7 +79,7 @@ function fixture() {
     name: CONSUMER_NAME,
     version: '0.11.0',
     type: 'module',
-    engines: { node: '>=24.0.0' },
+    engines: { node: '>=22.12.0' },
     files: ['dist/v011', 'README.md'],
     exports: { '.': V011_ENTRY, './legacy': LEGACY_ENTRY },
     scripts: { prepack: 'npm run build && node scripts/assert-v011-pack-ready.mjs' },

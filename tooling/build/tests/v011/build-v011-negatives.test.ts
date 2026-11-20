@@ -113,6 +113,33 @@ refusalCase('DH_BUILD_IMPLEMENTATION_MISSING', (s) => {
 // L203 — lifecycle / dependency negatives reachable through standardCase
 // ---------------------------------------------------------------------------
 
+test('R27: BUILD rejects artifact paths Runtime would reject', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  // Keep the path witness independent from the lifecycle/artifact agreement guard.
+  for (const path of ['./dist/business.mjs', 'dist/../dist/business.mjs']) {
+    expectRefusal(buildV011App({
+      ...input, packageArtifacts: { ...input.packageArtifacts, 'orders-business': path },
+    }), 'DH_BUILD_RESOURCE_MISSING');
+  }
+  expectRefusal(buildV011App({
+    ...input, kdpArtifact: { ...input.kdpArtifact, path: `./${input.kdpArtifact.path}` },
+  }), 'DH_BUILD_RESOURCE_MISSING');
+});
+
+test('R27: lifecycle EntryRef must match pinned package artifact and named export', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const packages = input.packages.map((raw) => {
+    const manifest = raw as import('@kaicreator/domain-harness-contracts/v011').DomainPackageManifest;
+    if (manifest.id !== 'sdk-core') return manifest;
+    return { ...manifest, technicalInit: { ...manifest.technicalInit!, exportName: 'init' } };
+  });
+  expectRefusal(buildV011App({ ...input, packages }), 'DH_BUILD_SCHEMA_INVALID');
+});
+
 refusalCase('DH_BUILD_LIFECYCLE_HALF', (s) => {
   s.sdkLifecycle = 'init-only';
 });
@@ -144,7 +171,7 @@ refusalCase('DH_BUILD_HOOK_CARDINALITY', (s) => {
 // ---------------------------------------------------------------------------
 
 refusalCase('DH_BUILD_TARGET_INVALID', (s) => {
-  s.descriptorTarget = { runtime: 'node', module: 'esm', nodeMajor: 22 };
+  s.descriptorTarget = { runtime: 'node', module: 'esm', nodeMajor: 20 };
 });
 
 refusalCase('DH_BUILD_RESOURCE_MISSING', (s) => {
@@ -189,7 +216,7 @@ test('DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION: two compatible bindings for on
     targetVariants: unknown[];
   };
   sdk.targetVariants.push({
-    target: { runtime: 'node', module: 'esm', nodeMajor: 24 },
+    target: { runtime: 'node', module: 'esm', nodeMajor: 22 },
     implementations: [
       {
         elementId: 'orders.eligibility',

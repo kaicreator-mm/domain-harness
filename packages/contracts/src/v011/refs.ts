@@ -55,13 +55,13 @@ export interface TargetSelector {
   /** 0.11.0 sole implemented runtime target (PRD B01). */
   readonly runtime: 'node';
   readonly module: 'esm';
-  /** Declared applicability floor; aligned with the L2 §8.4 ruling (24). */
+  /** Declared applicability floor; aligned with the L2 §8.4 ruling (22; R27). */
   readonly nodeMajor?: number;
 }
 
 /** Exact Target constant entering the Lock (L2 §5.2/§8.4). */
-export type ResolvedTargetProfile = 'node24-esm/1';
-export const NODE24_ESM_PROFILE: ResolvedTargetProfile = 'node24-esm/1';
+export type ResolvedTargetProfile = 'node22-esm/1';
+export const NODE22_ESM_PROFILE: ResolvedTargetProfile = 'node22-esm/1';
 
 export interface ResolvedTarget extends TargetSelector {
   readonly profile: ResolvedTargetProfile;

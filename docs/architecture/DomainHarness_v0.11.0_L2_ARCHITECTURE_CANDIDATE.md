@@ -1,4 +1,6 @@
 # DomainHarness v0.11.0 — L2 Architecture Candidate（R2，R6 审后单轮修订，送独立 delta 审核）
+> **R27 实施增量决议（2026-11-21）**：将先前冻结的 Node24 target floor 调整为 Node.js >=22.12.0、Target `node22-esm/1`（Node24 Host 仍可执行 Node22 Lock）；该 Owner 当前指令覆盖历史 §8.4 中 node24-only 叙述，但不变更其它 L1/L2 设计。新增 R26 P1 启动失败清理、Manifest 生命周期与实际执行一致、Lock-selected ESM 预检、路径同构、稀疏 JSON 和 dispose 新入口保护；回读候选 PR 的精准 SHA/CI 后才提升相应代码资格。日志由 Host 使用现有 BootResult/FunctionOutcome 结构化字段记录，无全局 console transport。
+
 
 > 本文档把 #1574 的 R4 接口方案评论（issuecomment 7022648334，§2 L201–L208 候选）扩写为源码校准后的正式 L2 架构候选。
 > **状态：CANDIDATE_NOT_FROZEN。** 本文档不签 L2 Freeze、不授权源码写入、不物化 Native Task DAG；所有结论以本头部所锚定的 PRD 精确 blob 与 PR HEAD 为唯一产品语义权威。

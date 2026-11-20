@@ -24,7 +24,7 @@ import {
 
 ## 执行完整验收路径
 
-在 Node.js 24 检出中运行：
+在 Node.js 22.12+ 检出中运行：
 
 ```bash
 node examples/v011-basic-app/verify-clean-install.mjs

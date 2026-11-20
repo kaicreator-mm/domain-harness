@@ -6,21 +6,16 @@ function failedOutcome(code, message) {
 function unknownOutcome(code, message) {
     return { kind: 'UNKNOWN', unknownReason: { code, message } };
 }
-function isReasonObject(value) {
-    return (typeof value === 'object' &&
-        value !== null &&
-        typeof value['code'] === 'string' &&
-        typeof value['message'] === 'string');
+function snapshotReason(value) {
+    if (typeof value !== 'object' || value === null)
+        return null;
+    // Snapshot each field exactly once: later getter/proxy changes cannot alter
+    // the already-validated diagnostic returned across FunctionOutcome.
+    const record = value;
+    const code = record['code'];
+    const message = record['message'];
+    return typeof code === 'string' && typeof message === 'string' ? { code, message } : null;
 }
-/**
- * Normalize a raw implementation return value into the strict
- * FunctionOutcome union. Garbage never propagates: a well-formed outcome
- * kind the contract did not declare is normalized to UNKNOWN (honest
- * doubt), while a malformed implementation result is a runtime
- * enforcement failure reported as FAILED (never re-checked against the
- * declared outcome set — it is the runtime's own refusal, not an
- * implementation outcome).
- */
 /**
  * Normalize a raw implementation return value into the strict
  * FunctionOutcome union. This function must NEVER throw: hostile or buggy
@@ -43,17 +38,23 @@ export function normalizeOutcome(raw, declaredOutcomes) {
                 }
                 return { kind: 'SUCCEEDED', value };
             }
-            if (kind === 'UNKNOWN' && hasOwn(outcome, 'unknownReason') && isReasonObject(outcome['unknownReason'])) {
-                if (!declaredOutcomes.includes('UNKNOWN')) {
-                    return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'UNKNOWN'`);
+            if (kind === 'UNKNOWN' && hasOwn(outcome, 'unknownReason')) {
+                const reason = snapshotReason(outcome['unknownReason']);
+                if (reason !== null) {
+                    if (!declaredOutcomes.includes('UNKNOWN')) {
+                        return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'UNKNOWN'`);
+                    }
+                    return { kind: 'UNKNOWN', unknownReason: reason };
                 }
-                return { kind: 'UNKNOWN', unknownReason: outcome['unknownReason'] };
             }
-            if (kind === 'FAILED' && hasOwn(outcome, 'failure') && isReasonObject(outcome['failure'])) {
-                if (!declaredOutcomes.includes('FAILED')) {
-                    return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'FAILED'`);
+            if (kind === 'FAILED' && hasOwn(outcome, 'failure')) {
+                const reason = snapshotReason(outcome['failure']);
+                if (reason !== null) {
+                    if (!declaredOutcomes.includes('FAILED')) {
+                        return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'FAILED'`);
+                    }
+                    return { kind: 'FAILED', failure: reason };
                 }
-                return { kind: 'FAILED', failure: outcome['failure'] };
             }
             if (typeof kind === 'string' && (kind === 'SUCCEEDED' || kind === 'UNKNOWN' || kind === 'FAILED')) {
                 return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `implementation returned outcome kind '${kind}' missing its strict union payload`);
@@ -177,6 +178,8 @@ export function createDomainApp(deps) {
     }
     function dispose() {
         if (disposeFlight === null) {
+            // Close ingress synchronously before the first asynchronous teardown.
+            disposed = true;
             disposeFlight = (async () => {
                 try {
                     // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).

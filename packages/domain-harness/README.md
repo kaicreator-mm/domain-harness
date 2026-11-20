@@ -20,9 +20,33 @@ import {
 - Version 0.11.0 ships **only `dist/v011`**: the packed tarball contains the canonical v011 entry plus this README. The legacy v0.2–v0.10 executable App ABI is **not shipped** — old subpath entries (e.g. `./legacy`, `./v2`, `./v7`) stay in the exports map for workspace compatibility but resolve to files that are absent from the tarball (`ERR_MODULE_NOT_FOUND` fence).
 - 本包 0.11.0 的发行物只包含 `dist/v011` 与本文档：legacy 可执行 App ABI 不进入 tarball。exports map 中的旧子路径（如 `./legacy`、`./v2`、`./v7`）仅为 workspace 兼容保留，在发行物中不可达（行为围栏）。
 - **No 0.10.x compatibility** is provided or claimed; there is no parity verification with the old App ABI. / 不提供、也不宣称任何 0.10.x 兼容，不做旧 ABI parity 验证。
-- Requires Node.js >= 24 (single verified target `node24-esm/1`). / 需要 Node.js >= 24（唯一已验证目标 `node24-esm/1`）。
+- Requires Node.js >= 22.12 (canonical target `node22-esm/1`, also runnable on newer Node majors). / 需要 Node.js >= 22.12（标准目标 `node22-esm/1`，较新的 Node 大版本也可运行）。
 - Runtime dependencies are exactly `@kaicreator/domain-harness-contracts`, `@kaicreator/domain-harness-build` and `@kaicreator/domain-harness-microkernel`, all at the same 0.11.0 version — zero third-party runtime dependencies (legacy third-party packages stay workspace devDependencies only).
 - `@kaicreator/domain-harness-contracts` carries a scoped exception: its `.` remains the legacy **inert** type/constant face; `./v011` is the canonical 0.11 contracts entry.
+
+## Diagnostics / 日志与故障定位
+
+The core SDK returns typed `BootResult` / `FunctionOutcome` values; it does not write business data to a global logger. **A typed error does not imply sanitized content.** `result.reason`, `result.code`, `failure.code`, `unknownReason.code`, their messages, and exception objects can carry untrusted text from selected implementation code, including secrets, customer data and local paths. Do not log any of these fields verbatim by default.
+
+核心 SDK 返回结构化状态，不自动输出业务数据。**类型检查不等于日志内容已经脱敏。** Boot 的 `reason/code`、Function 的 `failure.code/unknownReason.code`、消息及异常对象都可能包含业务实现提供的不可信文本。Host 默认只记录有限状态字段及自己生成的关联 ID；不要直接记录原始错误码、原因、业务输入、规则、路径或凭据。
+
+```js
+// Host-owned, opaque correlation ID: never derived from user input or exception text.
+const correlationId = crypto.randomUUID();
+const result = await boot(pin, context);
+if (result.status !== 'BOOTED') {
+  hostLogger.warn({
+    event: 'domain-harness.boot',
+    status: result.status,
+    correlationId,
+    // Deliberately NO result.code or result.reason.
+  });
+}
+```
+
+**Negative examples:** a business App Init can throw `new Error('token=example-secret')`, which may flow into `result.reason`. A selected technical initializer can throw `Object.assign(new Error('startup failure'), { code: 'token=example-secret' })`, which may flow into `result.code`. A Function may return `{ kind: 'FAILED', failure: { code: 'token=example-secret', message: '...' } }`. None of these untrusted strings appears in the default log above.
+
+For Function outcomes, the Host may log the finite `kind` discriminator without serializing `value`, `failure`, `unknownReason` or any raw code/message. Preserve UNKNOWN as distinct from FAILED. If operators need a diagnostic category, map **explicitly known literal codes** through a Host-owned allowlist to **fixed, safe Host labels**; do not simply accept a `DH_` prefix, regex match, or arbitrary implementation-supplied code as proof of safety. Detailed diagnostics require an authorized, explicitly redacted/allowlisted sink. `lockDigest` and `activationId` are subject to the Host's own exposure policy. T05 acceptance NDJSON is test evidence, **not** a production logging backend. A failed App Init may append raw cleanup exception text to `reason`; never implicitly promote that text into log-safe metadata.
 
 ## Legacy workspace surface / Workspace 内的 legacy 面
 

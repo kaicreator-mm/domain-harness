@@ -23,7 +23,7 @@
  */
 import { CORE_CONTENT_KINDS } from './element-contracts.js';
 import { DH_APP_SCHEMA_VERSION, DH_DOMAIN_SCHEMA_VERSION, DH_ELEMENT_SCHEMA_VERSION, DH_LOCK_SCHEMA_VERSION, DH_PACKAGE_SCHEMA_VERSION, } from './schema-versions.js';
-import { NODE24_ESM_PROFILE } from './refs.js';
+import { NODE22_ESM_PROFILE } from './refs.js';
 export const V011_JSON_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema';
 export const V011_SCHEMA_BASE_ID = 'https://kaicreator.dev/schemas/domain-harness/v011';
 // ---- Shared pattern vocabulary (mirrors validate.ts) ----
@@ -485,7 +485,7 @@ const RESOLVED_TARGET_DEF = {
         runtime: { const: 'node' },
         module: { const: 'esm' },
         nodeMajor: { type: 'integer', minimum: 0 },
-        profile: { const: NODE24_ESM_PROFILE },
+        profile: { const: NODE22_ESM_PROFILE },
     },
 };
 const PACKAGE_REF_DEF = {
@@ -598,13 +598,14 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA = defsEnvelope('app-lock.json', {
             items: {
                 type: 'object',
                 additionalProperties: false,
-                required: ['packageId', 'version', 'layer', 'role', 'artifact', 'dependsOn'],
+                required: ['packageId', 'version', 'layer', 'role', 'artifact', 'technicalLifecycle', 'dependsOn'],
                 properties: {
                     packageId: { type: 'string', minLength: 1 },
                     version: { type: 'string', pattern: SEMVER_PATTERN },
                     layer: { enum: ['kernel', 'sdk', 'business'] },
                     role: { enum: ['primary', 'extension'] },
                     artifact: { $ref: '#/$defs/resourceRef' },
+                    technicalLifecycle: { type: 'boolean' },
                     dependsOn: { type: 'array', items: { type: 'string', minLength: 1 } },
                 },
             },

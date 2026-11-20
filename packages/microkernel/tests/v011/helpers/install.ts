@@ -42,8 +42,8 @@ export const KDP_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
 export const TARGET: ResolvedTarget = {
   runtime: 'node',
   module: 'esm',
-  nodeMajor: 24,
-  profile: 'node24-esm/1',
+  nodeMajor: 22,
+  profile: 'node22-esm/1',
 };
 export const LOCK_RELATIVE_PATH = 'dh-lock/app.lock.json';
 export const DESCRIPTOR_RELATIVE_PATH = 'descriptor/app.json';
@@ -442,7 +442,7 @@ export async function buildFixtureInstall(
     schemaVersion: 'dh.app/0.11',
     id: APP_ID,
     version: APP_VERSION,
-    target: { runtime: 'node', module: 'esm', nodeMajor: 24 },
+    target: { runtime: 'node', module: 'esm', nodeMajor: 22 },
     roots: {
       kernelPrimary: { package: FIXTURE_KERNEL, version: '1.0.0' },
       sdkPrimary: { package: FIXTURE_SDK, version: '1.0.0' },
@@ -504,10 +504,10 @@ export async function buildFixtureInstall(
       kdpPrimaryDigest: kdpEntryDigest,
     },
     selectedPackages: [
-      { packageId: FIXTURE_KERNEL, version: '1.0.0', layer: 'kernel', role: 'primary', artifact: kernelArtifact, dependsOn: [] },
-      { packageId: FIXTURE_SDK, version: '1.0.0', layer: 'sdk', role: 'primary', artifact: sdkArtifact, dependsOn: [FIXTURE_KERNEL] },
-      { packageId: FIXTURE_BUSINESS, version: '1.0.0', layer: 'business', role: 'primary', artifact: businessArtifact, dependsOn: [FIXTURE_SDK] },
-      { packageId: FIXTURE_EXT, version: '1.0.0', layer: 'business', role: 'extension', artifact: extArtifact, dependsOn: [FIXTURE_BUSINESS] },
+      { packageId: FIXTURE_KERNEL, version: '1.0.0', technicalLifecycle: true, layer: 'kernel', role: 'primary', artifact: kernelArtifact, dependsOn: [] },
+      { packageId: FIXTURE_SDK, version: '1.0.0', technicalLifecycle: true, layer: 'sdk', role: 'primary', artifact: sdkArtifact, dependsOn: [FIXTURE_KERNEL] },
+      { packageId: FIXTURE_BUSINESS, version: '1.0.0', technicalLifecycle: true, layer: 'business', role: 'primary', artifact: businessArtifact, dependsOn: [FIXTURE_SDK] },
+      { packageId: FIXTURE_EXT, version: '1.0.0', technicalLifecycle: true, layer: 'business', role: 'extension', artifact: extArtifact, dependsOn: [FIXTURE_BUSINESS] },
     ],
     selectedElements: [
       {
@@ -606,7 +606,7 @@ export async function buildFixtureInstall(
     descriptorPath: DESCRIPTOR_RELATIVE_PATH,
     lockPath: LOCK_RELATIVE_PATH,
     hostPorts: [{ name: 'fixture-channel', port: 0 }],
-    env: { nodeMajor: 24, platform: process.platform },
+    env: { nodeMajor: 22, platform: process.platform },
   };
 
   const recordPath = join(installRoot, 'dh-install', 'installed-record.json');

@@ -10,6 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { BootResult, DomainApp } from '@kaicreator/domain-harness-contracts/v011';
+import { normalizeOutcome } from '../../src/v011/domain-app.js';
 import {
   boot,
   buildFixtureInstall,
@@ -177,8 +178,8 @@ test('inspect projects Lock facts only (B06), including DEGRADED suppression', a
   assert.deepEqual(inspection.target, {
     runtime: 'node',
     module: 'esm',
-    nodeMajor: 24,
-    profile: 'node24-esm/1',
+    nodeMajor: 22,
+    profile: 'node22-esm/1',
   });
   assert.deepEqual(
     inspection.packages.map((pkg) => [pkg.packageId, pkg.layer, pkg.role]),
@@ -212,6 +213,17 @@ test('inspect projects Lock facts only (B06), including DEGRADED suppression', a
   const degradedInspection = await degraded.inspect();
   assert.deepEqual(degradedInspection.suppressedIngress, ['optional-report']);
   await degraded.dispose();
+});
+
+test('R27: FunctionOutcome reason diagnostics are stable snapshots, not live getters', () => {
+  let reads = 0;
+  const raw = { kind: 'UNKNOWN', unknownReason: {
+    get code() { reads += 1; return reads === 1 ? 'REGION_UNKNOWN' : 'LATER'; },
+    get message() { reads += 1; return reads === 2 ? 'region not selected' : 'LATER'; },
+  } };
+  const normalized = normalizeOutcome(raw, ['UNKNOWN']);
+  assert.deepEqual(normalized, { kind: 'UNKNOWN', unknownReason: { code: 'REGION_UNKNOWN', message: 'region not selected' } });
+  assert.equal(reads, 2);
 });
 
 test('invoke never rejects on Proxy/getter outcomes: typed FAILED instead', async (t) => {
@@ -264,6 +276,18 @@ test('invoke never rejects on hostile Proxy input: typed input mismatch instead'
   assert.equal(outcome.kind, 'FAILED');
   assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH');
   await app.dispose();
+});
+
+test('R27: disposal immediately closes ingress before asynchronous technical teardown', async (t) => {
+  const app = await bootApp(t, {
+    init: { status: 'READY' },
+    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
+  });
+  const teardown = app.dispose();
+  const during = await app.invoke('evaluate', { total: 100, region: 'EU' });
+  assert.equal(during.kind, 'FAILED');
+  if (during.kind === 'FAILED') assert.equal(during.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
+  await teardown;
 });
 
 test('invoke after dispose is refused; disposed apps stay disposed', async (t) => {

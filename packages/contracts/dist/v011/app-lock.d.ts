@@ -25,6 +25,8 @@ export interface SelectedPackage {
     readonly role: PackageRole;
     /** Exact Target artifact + digest. */
     readonly artifact: ResourceRef;
+    /** True iff authoring declared a paired, digest-sealed technical lifecycle. */
+    readonly technicalLifecycle: boolean;
     /** Resolved package-id dependency edges. */
     readonly dependsOn: readonly string[];
 }
@@ -75,7 +77,7 @@ export interface DomainAppLock {
         readonly version: SemVer;
         readonly descriptorDigest: ContentDigest;
     };
-    /** Exact 'node24-esm/1'. */
+    /** Exact 'node22-esm/1'. */
     readonly target: ResolvedTarget;
     readonly bootstrapKdpPin: BootstrapKdpRef;
     readonly selectedPackages: readonly SelectedPackage[];

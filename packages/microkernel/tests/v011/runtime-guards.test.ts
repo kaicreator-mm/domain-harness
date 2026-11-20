@@ -47,6 +47,19 @@ test('Draft 2020-12 minLength/maxLength count Unicode code points, not UTF-16 un
   assert.equal(validateJsonSubset('ab', { type: 'string', minLength: 2, maxLength: 2 }), true);
 });
 
+test('R27: sparse arrays cannot pass the plain JSON guard or boolean true schema', () => {
+  const oneHole = new Array(1);
+  const nestedList = new Array(3);
+  nestedList[0] = 1;
+  nestedList[2] = 3;
+  const nested = { list: nestedList };
+  assert.equal(isPlainJsonValue(oneHole), false);
+  assert.equal(isPlainJsonValue(nested), false);
+  assert.equal(validateJsonSubset(oneHole, true), false);
+  assert.equal(validateJsonSubset(oneHole, { type: 'array', minItems: 1 }), false);
+  assert.equal(validateJsonSubset([null], true), true);
+});
+
 test('isPlainJsonValue accepts only plain JSON data', () => {
   // Primitives and plain structures pass.
   assert.equal(isPlainJsonValue(null), true);

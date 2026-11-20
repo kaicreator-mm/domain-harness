@@ -103,6 +103,17 @@ test('T01: frozen unknown-kind predicate decides recognition only (L2 §2.2)', (
   assert.equal(CORE_CONTENT_KINDS.length, 10);
 });
 
+test('R27: canonical JSON refuses sparse arrays before hashing', () => {
+  const sparse = new Array(1);
+  assert.throws(() => canonicalJson(sparse), /sparse array/);
+  assert.throws(() => contentDigestOf(sparse as unknown as import('../../src/v011/base.js').JsonValue), /sparse array/);
+  const nestedSparse = new Array(2);
+  nestedSparse[1] = 7;
+  assert.throws(() => canonicalJson({ nested: nestedSparse }), /sparse array/);
+  assert.equal(canonicalJson([]), '[]');
+  assert.equal(canonicalJson([null, 7]), '[null,7]');
+});
+
 test('T01: canonical digest is deterministic, order-insensitive and byte-sensitive (L2 §5.3)', () => {
   assert.equal(canonicalJson({ b: 2, a: [1, { z: 1, y: 2 }] }), '{"a":[1,{"y":2,"z":1}],"b":2}');
   const digestA = contentDigestOf({ kind: 'x', payload: { b: 2, a: 1 } });

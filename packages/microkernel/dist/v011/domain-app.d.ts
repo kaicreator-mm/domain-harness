@@ -25,15 +25,6 @@ export interface DomainAppDeps {
 }
 /**
  * Normalize a raw implementation return value into the strict
- * FunctionOutcome union. Garbage never propagates: a well-formed outcome
- * kind the contract did not declare is normalized to UNKNOWN (honest
- * doubt), while a malformed implementation result is a runtime
- * enforcement failure reported as FAILED (never re-checked against the
- * declared outcome set — it is the runtime's own refusal, not an
- * implementation outcome).
- */
-/**
- * Normalize a raw implementation return value into the strict
  * FunctionOutcome union. This function must NEVER throw: hostile or buggy
  * implementations may return Proxies with throwing traps, so every access
  * is guarded and mapped to a typed FAILED outcome. Kind/payload presence

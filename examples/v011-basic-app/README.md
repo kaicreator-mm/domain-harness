@@ -24,7 +24,7 @@ The four actual npm tarballs supply the SDK, contracts, BUILD and KDP. Business 
 
 ## Run the complete acceptance path
 
-From a Node.js 24 checkout:
+From a Node.js 22.12+ checkout:
 
 ```bash
 node examples/v011-basic-app/verify-clean-install.mjs

@@ -39,7 +39,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const MICROKERNEL_DIR = join(HERE, '../../../microkernel');
 const CONTRACTS_DIR = join(HERE, '../../../contracts');
 const KDP_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
-const TARGET_SELECTOR = { runtime: 'node', module: 'esm', nodeMajor: 24 } as const;
+const TARGET_SELECTOR = { runtime: 'node', module: 'esm', nodeMajor: 22 } as const;
 const LOCK_RELATIVE_PATH = 'dh-lock/app.lock.json';
 const DESCRIPTOR_RELATIVE_PATH = 'descriptor/app.json';
 
@@ -54,7 +54,7 @@ export interface T04Scenario {
   readonly init: { readonly status: 'READY' | 'DEGRADED' | 'DEGRADED_SUPPRESS_REQUIRED' };
   /** Select a function declaring a non-'none' effect profile (BUILD refusal). */
   readonly withUnsupportedEffect?: boolean;
-  /** Author the descriptor against a non-node24 Target (BUILD refusal). */
+  /** Author the descriptor against a non-node22 Target (BUILD refusal). */
   readonly withUnsupportedTarget?: boolean;
 }
 
@@ -470,7 +470,7 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       id: APP_ID,
       version: APP_VERSION,
       target: scenario.withUnsupportedTarget === true
-        ? { runtime: 'node', module: 'esm', nodeMajor: 22 }
+        ? { runtime: 'node', module: 'esm', nodeMajor: 20 }
         : TARGET_SELECTOR,
       roots: {
         kernelPrimary: { package: 'kdp-kernel', version: '1.0.0' },
@@ -586,7 +586,7 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       descriptorPath: DESCRIPTOR_RELATIVE_PATH,
       lockPath: LOCK_RELATIVE_PATH,
       hostPorts: [{ name: 'fixture-channel', port: 0 }],
-      env: { nodeMajor: 24, platform: process.platform },
+      env: { nodeMajor: 22, platform: process.platform },
     };
 
     return {
