@@ -1,22 +1,10 @@
 import { PackageSystem, KdpLoadError } from './package-system.js';
-import { validateJsonSubset } from './schema-subset.js';
+import { isPlainJsonValue, validateJsonSubset } from './schema-subset.js';
 function failedOutcome(code, message) {
     return { kind: 'FAILED', failure: { code, message } };
 }
 function unknownOutcome(code, message) {
     return { kind: 'UNKNOWN', unknownReason: { code, message } };
-}
-function isJsonValue(value) {
-    if (value === null || typeof value === 'string' || typeof value === 'boolean')
-        return true;
-    if (typeof value === 'number')
-        return Number.isFinite(value);
-    if (Array.isArray(value))
-        return value.every(isJsonValue);
-    if (typeof value === 'object' && value !== null) {
-        return Object.values(value).every(isJsonValue);
-    }
-    return false;
 }
 function isReasonObject(value) {
     return (typeof value === 'object' &&
@@ -39,7 +27,7 @@ export function normalizeOutcome(raw, declaredOutcomes) {
         const kind = outcome['kind'];
         if (kind === 'SUCCEEDED' && 'value' in outcome) {
             const value = outcome['value'];
-            if (!isJsonValue(value)) {
+            if (!isPlainJsonValue(value)) {
                 return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-JSON SUCCEEDED value');
             }
             if (!declaredOutcomes.includes('SUCCEEDED')) {
@@ -73,6 +61,11 @@ export function createDomainApp(deps) {
     const status = deps.initialStatus;
     const suppressed = new Set(deps.suppressedIngress);
     let disposed = false;
+    // Single-flight dispose: concurrent and repeated calls share ONE teardown
+    // attempt — success resolves every caller with the same result, failure
+    // rejects every caller with the same rejection, and technicalDispose is
+    // never rerun.
+    let disposeFlight = null;
     const ingressById = new Map(lock.ingress.map((entry) => [entry.id, entry]));
     async function invoke(ingressId, input) {
         if (disposed) {
@@ -149,13 +142,16 @@ export function createDomainApp(deps) {
             suppressedIngress: status === 'DEGRADED' ? [...suppressed].sort() : [],
         };
     }
-    async function dispose() {
-        if (disposed)
-            return { status: 'DISPOSED' };
-        // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
-        await packages.runTechnicalDispose();
-        disposed = true;
-        return { status: 'DISPOSED' };
+    function dispose() {
+        if (disposeFlight === null) {
+            disposeFlight = (async () => {
+                // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
+                await packages.runTechnicalDispose();
+                disposed = true;
+                return { status: 'DISPOSED' };
+            })();
+        }
+        return disposeFlight;
     }
     return {
         get status() {

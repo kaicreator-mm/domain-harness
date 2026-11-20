@@ -31,13 +31,20 @@ import type {
   SelectedPackage,
 } from '@kaicreator/domain-harness-contracts/v011';
 import { resolvePackageFile, splitResourceKey } from './paths.js';
+import { bytesContentDigest } from './verify.js';
 
-/** Ordinary startup failure carrier (PRD K07): no retry, no recovery. */
+/**
+ * Startup failure carrier (PRD K07): no retry, no recovery. `code` is
+ * DH_KDP_PACKAGE_LOAD_FAILED for ordinary physical load failures and
+ * DH_BOOT_PIN_MISMATCH when actual bytes do not match the sealed Lock /
+ * ResourceRef digests (post-install tamper inside the trust root).
+ */
 export class KdpLoadError extends Error {
-  readonly code = 'DH_KDP_PACKAGE_LOAD_FAILED' as const;
-  constructor(reason: string) {
+  readonly code: string;
+  constructor(reason: string, code = 'DH_KDP_PACKAGE_LOAD_FAILED') {
     super(reason);
     this.name = 'KdpLoadError';
+    this.code = code;
   }
 }
 
@@ -79,12 +86,42 @@ export class PackageSystem {
     return cached;
   }
 
+  /**
+   * Read a package file's actual bytes and verify them against the sealed
+   * digest before use. `expected` comes from the trusted Lock surface (a
+   * ResourceRef digest or the `resourceDigests` closure entry); a mismatch
+   * means post-install tampering inside the trust root and is refused with
+   * DH_BOOT_PIN_MISMATCH.
+   */
+  private async readVerifiedBytes(packageId: string, path: string, expected: string, what: string): Promise<Buffer> {
+    const absolute = resolvePackageFile(this.installRoot, packageId, path);
+    if (absolute === null) {
+      throw new KdpLoadError(`${what} path '${packageId}/${path}' is not an in-package relative path`);
+    }
+    let bytes: Buffer;
+    try {
+      bytes = await readFile(absolute);
+    } catch {
+      throw new KdpLoadError(`${what} '${packageId}/${path}' is not readable`);
+    }
+    if (bytesContentDigest(bytes) !== expected) {
+      throw new KdpLoadError(
+        `${what} bytes at '${packageId}/${path}' do not match the sealed digest (post-install tamper refused)`,
+        'DH_BOOT_PIN_MISMATCH',
+      );
+    }
+    return bytes;
+  }
+
   /** Load a package artifact module addressed by its sealed ResourceRef. */
   async loadArtifactModule(ref: ResourceRef, what: string): Promise<ModuleExports> {
     const absolute = resolvePackageFile(this.installRoot, ref.packageId, ref.path);
     if (absolute === null) {
       throw new KdpLoadError(`${what} artifact path '${ref.packageId}/${ref.path}' is not an in-package relative path`);
     }
+    // Hash the ACTUAL artifact bytes against the sealed ref.digest BEFORE
+    // import — never execute bytes the Lock did not pin.
+    await this.readVerifiedBytes(ref.packageId, ref.path, ref.digest, `${what} artifact`);
     return this.importModule(absolute, what);
   }
 
@@ -245,16 +282,23 @@ export class PackageSystem {
     const packageId = ref['packageId'];
     const path = ref['path'];
     if (typeof packageId !== 'string' || typeof path !== 'string') return null;
-    const absolute = resolvePackageFile(this.installRoot, packageId, path);
-    if (absolute === null) return null;
+    // A schema resource outside the sealed closure is unavailable; one
+    // INSIDE the closure must match its pinned digest byte-for-byte.
+    const closureDigest = this.lock.resourceDigests[`${packageId}/${path}`];
+    if (closureDigest === undefined) return null;
+    const bytes = await this.readVerifiedBytes(packageId, path, closureDigest, 'schema resource');
     try {
-      return JSON.parse(await readFile(absolute, 'utf8')) as unknown;
+      return JSON.parse(bytes.toString('utf8')) as unknown;
     } catch {
       return null;
     }
   }
 
-  /** Readonly resource handle for one sealed closure resource (`<packageId>/<path>` key). */
+  /**
+   * Readonly resource handle for one sealed closure resource. read()
+   * verifies the actual bytes against the Lock `resourceDigests` entry for
+   * its `<packageId>/<path>` key before returning them.
+   */
   resourceHandle(key: string): ReadonlyResourceHandle {
     const split = splitResourceKey(key);
     const packageId = split?.packageId ?? '';
@@ -267,9 +311,11 @@ export class PackageSystem {
     return {
       ref,
       read: async (): Promise<Uint8Array> => {
-        const absolute = resolvePackageFile(this.installRoot, packageId, path);
-        if (absolute === null) throw new KdpLoadError(`resource '${key}' is not an in-package relative path`);
-        return readFile(absolute);
+        const expected = this.lock.resourceDigests[key];
+        if (expected === undefined) {
+          throw new KdpLoadError(`resource '${key}' is not part of the sealed closure`);
+        }
+        return this.readVerifiedBytes(packageId, path, expected, `resource '${key}'`);
       },
     };
   }

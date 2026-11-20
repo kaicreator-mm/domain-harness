@@ -17,12 +17,11 @@ import type {
   DomainAppInspection,
   DomainAppLock,
   FunctionOutcome,
-  JsonValue,
   SealedIngress,
   SelectedFunction,
 } from '@kaicreator/domain-harness-contracts/v011';
 import { PackageSystem, KdpLoadError } from './package-system.js';
-import { validateJsonSubset } from './schema-subset.js';
+import { isPlainJsonValue, validateJsonSubset } from './schema-subset.js';
 
 export interface DomainAppDeps {
   readonly lock: DomainAppLock;
@@ -39,16 +38,6 @@ function failedOutcome(code: string, message: string): FunctionOutcome {
 
 function unknownOutcome(code: string, message: string): FunctionOutcome {
   return { kind: 'UNKNOWN', unknownReason: { code, message } };
-}
-
-function isJsonValue(value: unknown): value is JsonValue {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
-  if (Array.isArray(value)) return value.every(isJsonValue);
-  if (typeof value === 'object' && value !== null) {
-    return Object.values(value).every(isJsonValue);
-  }
-  return false;
 }
 
 function isReasonObject(value: unknown): value is { code: string; message: string } {
@@ -75,7 +64,7 @@ export function normalizeOutcome(raw: unknown, declaredOutcomes: readonly string
     const kind = outcome['kind'];
     if (kind === 'SUCCEEDED' && 'value' in outcome) {
       const value = outcome['value'];
-      if (!isJsonValue(value)) {
+      if (!isPlainJsonValue(value)) {
         return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-JSON SUCCEEDED value');
       }
       if (!declaredOutcomes.includes('SUCCEEDED')) {
@@ -116,6 +105,11 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
   const status = deps.initialStatus;
   const suppressed = new Set(deps.suppressedIngress);
   let disposed = false;
+  // Single-flight dispose: concurrent and repeated calls share ONE teardown
+  // attempt — success resolves every caller with the same result, failure
+  // rejects every caller with the same rejection, and technicalDispose is
+  // never rerun.
+  let disposeFlight: Promise<{ readonly status: 'DISPOSED' }> | null = null;
 
   const ingressById = new Map<string, SealedIngress>(lock.ingress.map((entry) => [entry.id, entry]));
 
@@ -208,12 +202,16 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     };
   }
 
-  async function dispose(): Promise<{ readonly status: 'DISPOSED' }> {
-    if (disposed) return { status: 'DISPOSED' };
-    // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
-    await packages.runTechnicalDispose();
-    disposed = true;
-    return { status: 'DISPOSED' };
+  function dispose(): Promise<{ readonly status: 'DISPOSED' }> {
+    if (disposeFlight === null) {
+      disposeFlight = (async () => {
+        // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
+        await packages.runTechnicalDispose();
+        disposed = true;
+        return { status: 'DISPOSED' } as const;
+      })();
+    }
+    return disposeFlight;
   }
 
   return {

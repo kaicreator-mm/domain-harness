@@ -82,6 +82,7 @@ test('KDP boots core + package system: init order, hook sealing, business init, 
       '@fixture/sdk/dist/index.mjs',
       'fixture-business/dist/index.mjs',
       'fixture-business/elements/orders.eligibility.json',
+      'fixture-business/schemas/optional-report-input.schema.json',
       'fixture-business/content/rules.json',
       'fixture-ext/dist/index.mjs',
       'fixture-ext/dist/hook.mjs',
@@ -149,6 +150,21 @@ test('DEGRADED: only predeclared optional ingress is suppressed; required suppre
       assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
     }
   });
+
+  // Honesty guard: DEGRADED with an EMPTY or OMITTED suppressedIngress list
+  // is a masquerade — nothing is actually degraded — and is refused.
+  for (const init of [
+    { status: 'DEGRADED' as const },
+    { status: 'DEGRADED' as const, suppressed: [] as string[] },
+  ]) {
+    await withScenario(t, { init, functions: {} }, async (_fixture, result) => {
+      assert.equal(result.status, 'FAILED', JSON.stringify(result));
+      if (result.status === 'FAILED') {
+        assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
+        assert.match(result.reason, /masquerade/);
+      }
+    });
+  }
 });
 
 test('BLOCKED: app handle boots with BLOCKED status and no ingress is callable', async (t) => {
@@ -253,4 +269,118 @@ test('resource key convention: rightmost-slash split handles scoped package ids 
   const outcome = await result.app.invoke('evaluate', { total: 10, region: 'EU' });
   assert.equal(outcome.kind, 'SUCCEEDED');
   await result.app.dispose();
+});
+
+test('artifact byte tamper: selected package artifact is hashed before import and refused', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  // Post-install tamper INSIDE the trust root: swap a selected package
+  // artifact for different bytes. The Lock closure still verifies, so only
+  // the runtime artifact digest check can catch this.
+  await fixture.writePackageFile(
+    'fixture-kernel',
+    'dist/index.mjs',
+    Buffer.from('export const tampered = true;\n', 'utf8'),
+  );
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'FAILED', JSON.stringify(result));
+  if (result.status === 'FAILED') {
+    assert.equal(result.code, 'DH_BOOT_PIN_MISMATCH');
+    assert.match(result.reason, /sealed digest/);
+  }
+  assert.equal(
+    events().some((event) => event['event'] === 'business-init'),
+    false,
+    'tampered artifact must produce zero ingress',
+  );
+});
+
+test('closure resource read: verified bytes on the happy path, digest mismatch on tamper', async (t) => {
+  // Positive: the init-context resource handle returns verified bytes.
+  await withScenario(
+    t,
+    { init: { status: 'READY' }, functions: {}, readResource: 'fixture-business/content/rules.json' },
+    async (_fixture, result) => {
+      assert.equal(result.status, 'BOOTED', JSON.stringify(result));
+      if (result.status !== 'BOOTED') return;
+      const read = events().find((event) => event['event'] === 'resource-read');
+      assert.ok(read !== undefined, 'resource-read event expected');
+      assert.equal(read['key'], 'fixture-business/content/rules.json');
+      assert.equal(typeof read['bytes'], 'number');
+      await result.app.dispose();
+    },
+  );
+
+  // Negative: tamper the resource bytes after install; the read itself
+  // refuses with a digest mismatch and the boot fails with zero ingress.
+  const fixture = await buildFixtureInstall({
+    init: { status: 'READY' },
+    functions: {},
+    readResource: 'fixture-business/content/rules.json',
+  });
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  await fixture.writePackageFile(
+    'fixture-business',
+    'content/rules.json',
+    Buffer.from(JSON.stringify({ minOrderTotal: 1, regions: ['XX'] }), 'utf8'),
+  );
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'FAILED', JSON.stringify(result));
+  if (result.status === 'FAILED') {
+    assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
+    assert.match(result.reason, /digest/);
+  }
+});
+
+test('dispose is single-flight: concurrent and repeated calls never rerun technicalDispose', async (t) => {
+  // Success: every concurrent caller gets the same DISPOSED result and the
+  // teardown runs exactly once per package.
+  await withScenario(t, { init: { status: 'READY' }, functions: {} }, async (_fixture, result) => {
+    assert.equal(result.status, 'BOOTED');
+    if (result.status !== 'BOOTED') return;
+    const [a, b, c] = await Promise.all([
+      result.app.dispose(),
+      result.app.dispose(),
+      result.app.dispose(),
+    ]);
+    assert.deepEqual(a, { status: 'DISPOSED' });
+    assert.deepEqual(b, { status: 'DISPOSED' });
+    assert.deepEqual(c, { status: 'DISPOSED' });
+    const disposes = events().filter((event) => event['event'] === 'technical-dispose');
+    assert.equal(disposes.length, DISPOSE_ORDER.length, 'technicalDispose ran exactly once per package');
+  });
+
+  // Failure: the same rejection is shared by every caller and the failing
+  // technicalDispose is never rerun.
+  const fixture = await buildFixtureInstall({
+    init: { status: 'READY' },
+    functions: {},
+    kernelDisposeThrow: true,
+  });
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'BOOTED');
+  if (result.status !== 'BOOTED') return;
+  const first = await result.app.dispose().then(
+    () => null,
+    (error: unknown) => (error as Error).message,
+  );
+  const countAfterFirst = events().length;
+  const second = await result.app.dispose().then(
+    () => null,
+    (error: unknown) => (error as Error).message,
+  );
+  assert.match(String(first), /fixture kernel technicalDispose threw/);
+  assert.equal(first, second, 'repeated dispose returns the same rejection');
+  assert.equal(events().length, countAfterFirst, 'no teardown reruns after the first attempt');
+  const kernelDisposes = events().filter(
+    (event) => event['event'] === 'technical-dispose' && event['package'] === 'fixture-kernel',
+  );
+  assert.equal(kernelDisposes.length, 1, 'failing technicalDispose ran exactly once');
 });

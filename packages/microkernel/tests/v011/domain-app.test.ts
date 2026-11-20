@@ -15,7 +15,6 @@ import {
   buildFixtureInstall,
   type FixtureScenario,
 } from './helpers/install.js';
-
 async function bootApp(t: import('node:test').TestContext, scenario: FixtureScenario): Promise<DomainApp> {
   const fixture = await buildFixtureInstall(scenario);
   t.after(async () => {
@@ -172,4 +171,40 @@ test('invoke after dispose is refused; disposed apps stay disposed', async (t) =
   const outcome = await app.invoke('evaluate', { total: 1, region: 'EU' });
   assert.equal(outcome.kind, 'FAILED');
   assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
+});
+
+test('resource-referenced input schema: verified read passes, tampered schema is refused', async (t) => {
+  // Positive: optional-report's inputSchemaRef is a SchemaRef RESOURCE
+  // inside the sealed closure; the runtime verifies its bytes and validates.
+  const healthy = await bootApp(t, {
+    init: { status: 'READY' },
+    functions: { optionalReport: { behavior: 'succeed', value: 'report-ok' } },
+  });
+  const ok = await healthy.invoke('optional-report', { anything: true });
+  assert.deepEqual(ok, { kind: 'SUCCEEDED', value: 'report-ok' });
+  await healthy.dispose();
+
+  // Negative: post-install tamper of the schema resource bytes. The
+  // runtime digest check refuses to use it; invoke reports UNKNOWN with
+  // the tamper reason — never validating against attacker bytes.
+  const fixture = await buildFixtureInstall({
+    init: { status: 'READY' },
+    functions: { optionalReport: { behavior: 'succeed', value: 'report-ok' } },
+  });
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  await fixture.writePackageFile(
+    'fixture-business',
+    'schemas/optional-report-input.schema.json',
+    Buffer.from(JSON.stringify({ type: 'object', additionalProperties: false }), 'utf8'),
+  );
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'BOOTED', JSON.stringify(result));
+  if (result.status !== 'BOOTED') return;
+  const outcome = await result.app.invoke('optional-report', { anything: true });
+  assert.equal(outcome.kind, 'UNKNOWN');
+  assert.equal(outcome.kind === 'UNKNOWN' && outcome.unknownReason.code, 'DH_RUNTIME_UNSUPPORTED_PROFILE');
+  assert.match(outcome.kind === 'UNKNOWN' ? outcome.unknownReason.message : '', /digest/);
+  await result.app.dispose();
 });

@@ -8,6 +8,8 @@
  * `$ref` resolution is not implemented in 0.11.0 — schemas for runtime
  * validation must be self-contained. Boolean schemas are supported.
  */
+import type { JsonValue } from '@kaicreator/domain-harness-contracts/v011';
+
 export function validateJsonSubset(instance: unknown, schema: unknown): boolean {
   if (typeof schema === 'boolean') return schema;
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return true;
@@ -87,9 +89,13 @@ export function validateJsonSubset(instance: unknown, schema: unknown): boolean 
       }
     }
     const additional = s['additionalProperties'];
-    if (additional === false && isPlainObject(properties)) {
+    if (additional === false) {
+      // additionalProperties:false refuses ANY undeclared key — including
+      // when no `properties` keyword is present at all (then every key is
+      // additional, so only {} is accepted).
       for (const key of Object.keys(objectInstance)) {
-        if (!(key in properties)) return false;
+        const declared = isPlainObject(properties) && key in properties;
+        if (!declared) return false;
       }
     } else if (isPlainObject(additional)) {
       for (const key of Object.keys(objectInstance)) {
@@ -133,13 +139,34 @@ function matchesType(instance: unknown, type: unknown): boolean {
       case 'object':
         return typeof instance === 'object' && instance !== null && !Array.isArray(instance);
       default:
-        return true;
+        // An unknown `type` literal matches NOTHING — never fall through to
+        // "matches everything" (a malformed schema must fail closed).
+        return false;
     }
   });
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Strict plain-JSON value guard: only null, booleans, finite numbers,
+ * strings, plain arrays and plain objects (Object.prototype or a null
+ * prototype, the two shapes JSON.parse can produce). Date, Map, Set,
+ * class instances and primitive wrappers are refused — they are not JSON
+ * values and must never cross the FunctionOutcome boundary.
+ */
+export function isPlainJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(isPlainJsonValue);
+  if (isPlainObject(value)) {
+    const prototype: unknown = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return false;
+    return Object.values(value).every(isPlainJsonValue);
+  }
+  return false;
 }
 
 /** Order-insensitive JSON equality (objects compare by key set recursively). */

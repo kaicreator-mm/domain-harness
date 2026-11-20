@@ -221,6 +221,20 @@ test('path substitution: traversal/absolute/out-of-root lock paths are REFUSED',
   });
 });
 
+test('missing or non-string installRoot is a typed REFUSED, never a TypeError', async (t) => {
+  await withFixture(t, async (fixture) => {
+    for (const badRoot of [undefined, null, 42, '']) {
+      const context = { ...fixture.context, installRoot: badRoot } as unknown as typeof fixture.context;
+      const result = await boot(fixture.pin, context);
+      assertRefused(result, 'DH_BOOT_RECORD_MISSING');
+      if (result.status === 'REFUSED') {
+        assert.match(result.reason, /installRoot/);
+      }
+    }
+    sideEffectFree();
+  });
+});
+
 function deepFreeze(value: unknown): void {
   if (typeof value !== 'object' || value === null) return;
   for (const key of Object.keys(value)) {

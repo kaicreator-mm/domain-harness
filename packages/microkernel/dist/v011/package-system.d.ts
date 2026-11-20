@@ -1,8 +1,13 @@
 import type { DomainAppLock, ElementDefinition, EntryRef, HostPortBinding, ReadonlyResourceHandle, ResourceRef, SelectedFunction, SelectedPackage } from '@kaicreator/domain-harness-contracts/v011';
-/** Ordinary startup failure carrier (PRD K07): no retry, no recovery. */
+/**
+ * Startup failure carrier (PRD K07): no retry, no recovery. `code` is
+ * DH_KDP_PACKAGE_LOAD_FAILED for ordinary physical load failures and
+ * DH_BOOT_PIN_MISMATCH when actual bytes do not match the sealed Lock /
+ * ResourceRef digests (post-install tamper inside the trust root).
+ */
 export declare class KdpLoadError extends Error {
-    readonly code: "DH_KDP_PACKAGE_LOAD_FAILED";
-    constructor(reason: string);
+    readonly code: string;
+    constructor(reason: string, code?: string);
 }
 export interface TechnicalLifecycleContext {
     readonly packageId: string;
@@ -21,6 +26,14 @@ export declare class PackageSystem {
     constructor(installRoot: string, lock: DomainAppLock, hostPorts: readonly HostPortBinding[]);
     packageById(packageId: string): SelectedPackage | undefined;
     private importModule;
+    /**
+     * Read a package file's actual bytes and verify them against the sealed
+     * digest before use. `expected` comes from the trusted Lock surface (a
+     * ResourceRef digest or the `resourceDigests` closure entry); a mismatch
+     * means post-install tampering inside the trust root and is refused with
+     * DH_BOOT_PIN_MISMATCH.
+     */
+    private readVerifiedBytes;
     /** Load a package artifact module addressed by its sealed ResourceRef. */
     loadArtifactModule(ref: ResourceRef, what: string): Promise<ModuleExports>;
     /** Resolve an EntryRef to its named export; refuses default/anonymous and missing exports. */
@@ -59,7 +72,11 @@ export declare class PackageSystem {
         output: unknown;
     } | null>;
     private resolveSchemaRef;
-    /** Readonly resource handle for one sealed closure resource (`<packageId>/<path>` key). */
+    /**
+     * Readonly resource handle for one sealed closure resource. read()
+     * verifies the actual bytes against the Lock `resourceDigests` entry for
+     * its `<packageId>/<path>` key before returning them.
+     */
     resourceHandle(key: string): ReadonlyResourceHandle;
 }
 export {};

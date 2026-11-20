@@ -69,6 +69,10 @@ export interface FixtureInit {
 export interface FixtureScenario {
   readonly init: FixtureInit;
   readonly functions: Readonly<Record<string, FunctionBehavior>>;
+  /** When set, businessAppInit reads this init-context resource key. */
+  readonly readResource?: string;
+  /** When true, the fixture kernel's technicalDispose throws (single-flight negative). */
+  readonly kernelDisposeThrow?: boolean;
 }
 
 export const DEFAULT_SCENARIO: FixtureScenario = {
@@ -94,6 +98,8 @@ export interface FixtureInstall {
   writeLockBytes(bytes: Buffer): Promise<void>;
   readKdpEntryBytes(): Promise<Buffer>;
   writeKdpEntryBytes(bytes: Buffer): Promise<void>;
+  /** overwrite an installed package file (post-install tamper negatives). */
+  writePackageFile(packageId: string, path: string, bytes: Buffer): Promise<void>;
   cleanup(): Promise<void>;
 }
 
@@ -154,7 +160,7 @@ function behave(name) {
 `;
 }
 
-function kernelModuleSource(): string {
+function kernelModuleSource(scenario: FixtureScenario): string {
   return `
 const events = (globalThis.__v011Events ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_KERNEL}' });
@@ -163,6 +169,9 @@ export async function technicalInit(ctx) {
 }
 export async function technicalDispose(ctx) {
   events.push({ event: 'technical-dispose', package: '${FIXTURE_KERNEL}' });
+  if (${JSON.stringify(scenario.kernelDisposeThrow ?? false)}) {
+    throw new Error('fixture kernel technicalDispose threw');
+  }
 }
 `;
 }
@@ -184,7 +193,7 @@ function businessModuleSource(scenario: FixtureScenario): string {
   return `
 const events = (globalThis.__v011Events ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_BUSINESS}' });
-const SCENARIO = ${JSON.stringify({ init: scenario.init, functions: scenario.functions })};
+const SCENARIO = ${JSON.stringify({ init: scenario.init, functions: scenario.functions, readResource: scenario.readResource ?? null })};
 ${behaviorDispatch()}
 export async function technicalInit(ctx) {
   events.push({ event: 'technical-init', package: '${FIXTURE_BUSINESS}' });
@@ -203,6 +212,12 @@ export async function businessAppInit(initCtx) {
     ingress: [...initCtx.functions.keys()],
     resourceKeys: [...initCtx.resources.keys()],
   });
+  if (SCENARIO.readResource) {
+    // Un-guarded on purpose: a tampered closure resource must fail the init.
+    const handle = initCtx.resources.get(SCENARIO.readResource);
+    const bytes = await handle.read();
+    events.push({ event: 'resource-read', package: '${FIXTURE_BUSINESS}', key: SCENARIO.readResource, bytes: bytes.length });
+  }
   const init = SCENARIO.init;
   if (init.throw) throw new Error('fixture business init threw');
   const result = { status: init.status };
@@ -248,7 +263,11 @@ export function telemetryHook() {
 const APP_ID = 'fixture.orders-app';
 const APP_VERSION = '1.0.0';
 
-function elementDefinition(): ElementDefinition {
+/** Resource-referenced input schema for `optionalReport` (schema-tamper tests). */
+export const OPTIONAL_REPORT_SCHEMA_PATH = 'schemas/optional-report-input.schema.json';
+const OPTIONAL_REPORT_SCHEMA_TEXT = JSON.stringify({ type: 'object' });
+
+function elementDefinition(optionalReportSchemaDigest: ContentDigest): ElementDefinition {
   return {
     kind: 'Element',
     schemaVersion: 'dh.element/0.11',
@@ -288,7 +307,13 @@ function elementDefinition(): ElementDefinition {
       {
         id: 'optionalReport',
         contractVersion: '1',
-        inputSchemaRef: { inline: { type: 'object' } },
+        // Resource-referenced schema: exercises the runtime SchemaRef
+        // resource-read digest verification on the happy path and under tamper.
+        inputSchemaRef: {
+          packageId: FIXTURE_BUSINESS,
+          path: OPTIONAL_REPORT_SCHEMA_PATH,
+          digest: optionalReportSchemaDigest,
+        },
         outputSchemaRef: { inline: { type: 'string' } },
         outcomes: ['SUCCEEDED', 'UNKNOWN'],
         effects: 'none',
@@ -351,7 +376,7 @@ export async function buildFixtureInstall(
   await cp(CONTRACTS_DIST, join(contractsPackageDir, 'dist', 'v011'), { recursive: true });
 
   // 2. Fixture K/S/B/Extension packages — real ESM modules on disk.
-  const kernelPath = await write(`node_modules/${FIXTURE_KERNEL}/dist/index.mjs`, kernelModuleSource());
+  const kernelPath = await write(`node_modules/${FIXTURE_KERNEL}/dist/index.mjs`, kernelModuleSource(scenario));
   const sdkPath = await write(`node_modules/${FIXTURE_SDK}/dist/index.mjs`, sdkModuleSource());
   const businessPath = await write(`node_modules/${FIXTURE_BUSINESS}/dist/index.mjs`, businessModuleSource(scenario));
   const extPath = await write(`node_modules/${FIXTURE_EXT}/dist/index.mjs`, extensionModuleSource());
@@ -361,11 +386,15 @@ export async function buildFixtureInstall(
     JSON.stringify({ minOrderTotal: 50, regions: ['EU'] }),
   );
 
-  const definition = elementDefinition();
+  const definition = elementDefinition(bytesDigest(Buffer.from(OPTIONAL_REPORT_SCHEMA_TEXT, 'utf8')));
   const definitionText = JSON.stringify(definition);
   await write(
     `node_modules/${FIXTURE_BUSINESS}/elements/orders.eligibility.json`,
     definitionText,
+  );
+  await write(
+    `node_modules/${FIXTURE_BUSINESS}/${OPTIONAL_REPORT_SCHEMA_PATH}`,
+    OPTIONAL_REPORT_SCHEMA_TEXT,
   );
   const definitionDigest = digestOf(JSON.parse(definitionText));
 
@@ -431,6 +460,7 @@ export async function buildFixtureInstall(
     [`${FIXTURE_SDK}/dist/index.mjs`]: sdkArtifact.digest,
     [`${FIXTURE_BUSINESS}/dist/index.mjs`]: businessArtifact.digest,
     [`${FIXTURE_BUSINESS}/elements/orders.eligibility.json`]: bytesDigest(Buffer.from(definitionText, 'utf8')),
+    [`${FIXTURE_BUSINESS}/${OPTIONAL_REPORT_SCHEMA_PATH}`]: bytesDigest(Buffer.from(OPTIONAL_REPORT_SCHEMA_TEXT, 'utf8')),
     [`${FIXTURE_BUSINESS}/content/rules.json`]: await fileBytesDigest(
       join(installRoot, 'node_modules', FIXTURE_BUSINESS, 'content', 'rules.json'),
     ),
@@ -582,6 +612,11 @@ export async function buildFixtureInstall(
     readKdpEntryBytes: () => readFile(kdpEntryPath),
     writeKdpEntryBytes: async (bytes) => {
       await writeFile(kdpEntryPath, bytes);
+    },
+    writePackageFile: async (packageId, path, bytes) => {
+      const absolute = join(installRoot, 'node_modules', ...packageId.split('/'), ...path.split('/'));
+      await mkdir(dirname(absolute), { recursive: true });
+      await writeFile(absolute, bytes);
     },
     cleanup: async () => {
       const { rm } = await import('node:fs/promises');

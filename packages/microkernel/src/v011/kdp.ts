@@ -4,8 +4,12 @@
  *
  * KDP self-boots the Kernel Core + this Package System WITHOUT first
  * importing any SDK / Business / K Extension module, then:
- *   1. reads the exact Lock (re-verifying the closure digest it already
- *      passed at Boot — defense in depth for direct callers);
+ *   1. re-runs the FULL shared install-trust ladder (record, context path
+ *      binding, Lock closure digest, KDP entry bytes) — the directly
+ *      exported `bootstrap` must NOT bypass Boot's trust anchor, so
+ *      self-signed Locks and forged KDP artifacts fail here even when the
+ *      entry is invoked without Boot (same `verify.ts` helpers, no second
+ *      trust path);
  *   2. verifies the Descriptor bytes against the Lock-pinned
  *      descriptorDigest and takes the selected read-only config (PRD A03);
  *   3. loads the selected packages in the Lock's `technicalInitOrder` and
@@ -22,10 +26,7 @@
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
-import {
-  NODE24_ESM_PROFILE,
-  contentDigestOf,
-} from '@kaicreator/domain-harness-contracts/v011';
+import { NODE24_ESM_PROFILE } from '@kaicreator/domain-harness-contracts/v011';
 import type {
   AppInitContext,
   AppStatus,
@@ -40,6 +41,8 @@ import type {
   SealedIngress,
 } from '@kaicreator/domain-harness-contracts/v011';
 import { resolveInRoot } from './paths.js';
+import { verifyInstallTrust } from './verify.js';
+import { isPlainJsonValue } from './schema-subset.js';
 import { PackageSystem, KdpLoadError } from './package-system.js';
 import { createDomainApp } from './domain-app.js';
 
@@ -53,46 +56,6 @@ function failed(code: string, reason: string): KdpBootstrapResult {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isJsonValue(value: unknown): value is JsonValue {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
-  if (Array.isArray(value)) return value.every(isJsonValue);
-  if (isRecord(value)) return Object.values(value).every(isJsonValue);
-  return false;
-}
-
-async function readVerifiedLock(context: KdpBootstrapContext): Promise<DomainAppLock | KdpBootstrapResult> {
-  const lockPath = resolveInRoot(context.installRoot, context.lockPath);
-  if (lockPath === null) {
-    return failed('DH_BOOT_PIN_MISMATCH', `context.lockPath '${context.lockPath}' is not an in-root relative path`);
-  }
-  let bytes: Buffer;
-  try {
-    bytes = await readFile(lockPath);
-  } catch {
-    return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock file '${context.lockPath}' is not readable`);
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(bytes.toString('utf8'));
-  } catch {
-    return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock file '${context.lockPath}' is not parseable JSON`);
-  }
-  if (!isRecord(parsed) || typeof parsed['closureDigest'] !== 'string') {
-    return failed('DH_KDP_PACKAGE_LOAD_FAILED', 'Lock file has no closureDigest field');
-  }
-  const { closureDigest, ...preimage } = parsed;
-  if (contentDigestOf(preimage as JsonValue) !== closureDigest) {
-    return failed('DH_BOOT_PIN_MISMATCH', 'Lock closureDigest recomputation failed at KDP');
-  }
-  const lock = parsed as unknown as DomainAppLock;
-  const profile: string = lock.target.profile;
-  if (profile !== NODE24_ESM_PROFILE) {
-    return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock target profile '${profile}' is not the frozen '${NODE24_ESM_PROFILE}'`);
-  }
-  return lock;
 }
 
 type DescriptorConfigResult =
@@ -134,8 +97,8 @@ async function readDescriptorConfig(
   }
   const descriptor = parsed as unknown as DomainAppDescriptor;
   const config = descriptor.config ?? {};
-  if (!isRecord(config) || !Object.values(config).every(isJsonValue)) {
-    return fail('Descriptor config is not a JSON object');
+  if (!isRecord(config) || !Object.values(config).every(isPlainJsonValue)) {
+    return fail('Descriptor config is not a plain JSON object');
   }
   return { ok: true, config };
 }
@@ -167,8 +130,8 @@ function validateInitResult(
       return `suppressedIngress names required ingress '${id}'; DEGRADED may suppress only predeclared optional ingress`;
     }
   }
-  if ('detail' in result && result['detail'] !== undefined && !isJsonValue(result['detail'])) {
-    return 'detail must be a JSON value';
+  if ('detail' in result && result['detail'] !== undefined && !isPlainJsonValue(result['detail'])) {
+    return 'detail must be a plain JSON value';
   }
   if (status === 'READY' && suppressed.length > 0) {
     return 'READY cannot carry suppressedIngress; a required service is missing (refuse to masquerade as READY, PRD A04)';
@@ -176,13 +139,24 @@ function validateInitResult(
   if (status === 'BLOCKED' && suppressed.length > 0) {
     return 'BLOCKED cannot carry suppressedIngress';
   }
+  if (status === 'DEGRADED' && suppressed.length === 0) {
+    return 'DEGRADED must suppress at least one predeclared optional ingress; empty or omitted suppressedIngress is a masquerade, not degradation';
+  }
   return { status: status as AppStatus, suppressed };
 }
 
 /** The one pinned KDP Primary entry (frozen named export `bootstrap`). */
 export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
-  const lock = await readVerifiedLock(context);
-  if ('status' in lock) return lock;
+  // 1. FULL shared install-trust ladder — the direct export must not bypass
+  // Boot's trust anchor (self-signed Locks / forged KDP artifacts fail here).
+  const trust = await verifyInstallTrust(context);
+  if (!trust.ok) return failed(trust.failure.code, trust.failure.reason);
+  const { lock } = trust.value;
+
+  const profile: string = lock.target.profile;
+  if (profile !== NODE24_ESM_PROFILE) {
+    return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock target profile '${profile}' is not the frozen '${NODE24_ESM_PROFILE}'`);
+  }
 
   const configResult = await readDescriptorConfig(context, lock);
   if (!configResult.ok) return configResult.result;
