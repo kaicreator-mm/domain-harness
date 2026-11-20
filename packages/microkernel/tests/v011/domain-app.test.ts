@@ -214,6 +214,17 @@ test('inspect projects Lock facts only (B06), including DEGRADED suppression', a
   await degraded.dispose();
 });
 
+test('R27: FunctionOutcome reason diagnostics are stable snapshots, not live getters', () => {
+  let reads = 0;
+  const raw = { kind: 'UNKNOWN', unknownReason: {
+    get code() { reads += 1; return reads === 1 ? 'REGION_UNKNOWN' : 'LATER'; },
+    get message() { reads += 1; return reads === 2 ? 'region not selected' : 'LATER'; },
+  } };
+  const normalized = normalizeOutcome(raw, ['UNKNOWN']);
+  assert.deepEqual(normalized, { kind: 'UNKNOWN', unknownReason: { code: 'REGION_UNKNOWN', message: 'region not selected' } });
+  assert.equal(reads, 2);
+});
+
 test('invoke never rejects on Proxy/getter outcomes: typed FAILED instead', async (t) => {
   // A Proxy AS the implementation outcome: even reading `kind` throws.
   const evilOutcome = await bootApp(t, {

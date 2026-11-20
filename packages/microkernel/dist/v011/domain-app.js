@@ -6,11 +6,15 @@ function failedOutcome(code, message) {
 function unknownOutcome(code, message) {
     return { kind: 'UNKNOWN', unknownReason: { code, message } };
 }
-function isReasonObject(value) {
-    return (typeof value === 'object' &&
-        value !== null &&
-        typeof value['code'] === 'string' &&
-        typeof value['message'] === 'string');
+function snapshotReason(value) {
+    if (typeof value !== 'object' || value === null)
+        return null;
+    // Snapshot each field exactly once: later getter/proxy changes cannot alter
+    // the already-validated diagnostic returned across FunctionOutcome.
+    const record = value;
+    const code = record['code'];
+    const message = record['message'];
+    return typeof code === 'string' && typeof message === 'string' ? { code, message } : null;
 }
 /**
  * Normalize a raw implementation return value into the strict
@@ -43,16 +47,24 @@ export function normalizeOutcome(raw, declaredOutcomes) {
                 }
                 return { kind: 'SUCCEEDED', value };
             }
-            if (kind === 'UNKNOWN' && hasOwn(outcome, 'unknownReason') && isReasonObject(outcome['unknownReason'])) {
-                if (!declaredOutcomes.includes('UNKNOWN')) {
-                    return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'UNKNOWN'`);
+            if (kind === 'UNKNOWN' && hasOwn(outcome, 'unknownReason')) {
+                const reason = snapshotReason(outcome['unknownReason']);
+                if (reason !== null) {
+                    if (!declaredOutcomes.includes('UNKNOWN')) {
+                        return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'UNKNOWN'`);
+                    }
+                    return { kind: 'UNKNOWN', unknownReason: reason };
                 }
-                return { kind: 'UNKNOWN', unknownReason: outcome['unknownReason'] };
             }
-            if (kind === 'FAILED' && hasOwn(outcome, 'failure') && isReasonObject(outcome['failure'])) {
-                if (!declaredOutcomes.includes('FAILED')) {
-                    return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'FAILED'`);
+            if (kind === 'FAILED' && hasOwn(outcome, 'failure')) {
+                const reason = snapshotReason(outcome['failure']);
+                if (reason !== null) {
+                    if (!declaredOutcomes.includes('FAILED')) {
+                        return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'FAILED'`);
+                    }
+                    return { kind: 'FAILED', failure: reason };
                 }
+            }
                 return { kind: 'FAILED', failure: outcome['failure'] };
             }
             if (typeof kind === 'string' && (kind === 'SUCCEEDED' || kind === 'UNKNOWN' || kind === 'FAILED')) {
