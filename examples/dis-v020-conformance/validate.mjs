@@ -168,6 +168,21 @@ const verifiedWitnesses=new Map(Object.entries({
       "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
       "case": "native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule"
     }
+  },
+  // R211: OPT-003 local data-only Evolution Slot full activation lifecycle.
+  // Anchored to the reviewed PR #1571 native tests and the exact-SHA
+  // 3/3 canonical-context receipt (pipeline 2669) plus integrated-parent
+  // 24/24 re-run (pipeline 2681). Scope stays local/in-process, authority NONE.
+  "DIS020-OPT-003": {
+    "receiptId": "r211-opt003-full-activation-ci",
+    "positive": {
+      "path": "examples/dis-v020-native-sdk/full-opt003-r0/full-opt003-native.test.mjs",
+      "case": "OPT003 native full lifecycle: load -> atomic activate+pin -> data-driven execute -> revoke -> rollback -> restart invalidation"
+    },
+    "negative": {
+      "path": "examples/dis-v020-native-sdk/full-opt003-r0/full-opt003-native.test.mjs",
+      "case": "OPT003 native negatives: forged code zero-execution, wrong-task pin, cancel race, stale epoch, AOT-outside slot"
+    }
   }
 }));
 const sha=/^[a-f0-9]{40}$/;

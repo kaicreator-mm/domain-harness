@@ -39,32 +39,44 @@ test('B13 R59 all B01-B12 genuine 26 native source rounds have consistent 3-cont
  },(()=>{
   const coreStates=audit.coreVerified+audit.corePartial;
   assert.equal(coreStates,16);
-  return {coreVerified:audit.coreVerified,corePartial:audit.corePartial,optionalNotRun:2,governanceNotRun:1};
+  // R211 (#1544): OPT-003 VERIFIED + OPT-004 PARTIAL + GOV-001 PARTIAL leave
+  // no Optional/Governance requirement in NOT_RUN.
+  return {coreVerified:audit.coreVerified,corePartial:audit.corePartial,optionalNotRun:0,governanceNotRun:0};
  })());
- // R98: O1 and O2 have partial native evidence, neither is optional VERIFIED.
- // Witness the full roster to avoid silent optional state/pin drift.
+ // R98: O1 and O2 have partial native evidence; R211 promoted O3 (receipt
+ // r211-opt003-full-activation-ci, reviewed PR #1571) and landed O4 as
+ // PARTIAL (no promotion authority). Witness the full roster to avoid
+ // silent optional state/pin drift.
  const {matrix:liveMatrix}=await basePromise;
  assert.deepEqual(liveMatrix.requirements.filter(x=>x.profile==='optional-profile')
   .map(x=>[x.id,x.state]),[['DIS020-OPT-001','PARTIAL'],['DIS020-OPT-002','PARTIAL'],
-  ['DIS020-OPT-003','NOT_RUN'],['DIS020-OPT-004','NOT_RUN']]);
+  ['DIS020-OPT-003','VERIFIED'],['DIS020-OPT-004','PARTIAL']]);
 });
 test('B13 R59 forged optional-state promotion and stale NOT_RUN demotion cannot satisfy exact ledger counters',async()=>{
  const audit=await auditFullDisLedger({stopBefore:'B13'});
  const exact={coreVerified:audit.coreVerified,corePartial:audit.corePartial,
-  optionalNotRun:audit.optionalNotRun,governanceNotRun:audit.governanceNotRun};
- const tally=m=>{const t={coreVerified:0,corePartial:0,optionalNotRun:0,governanceNotRun:0};
+  optionalNotRun:audit.optionalNotRun,governanceNotRun:audit.governanceNotRun,
+  optionalVerified:audit.optionalVerified??0,optionalPartial:audit.optionalPartial??0};
+ const tally=m=>{const t={coreVerified:0,corePartial:0,optionalNotRun:0,
+  governanceNotRun:0,optionalVerified:0,optionalPartial:0};
   for(const r of m.requirements){
    if(r.profile==='core'&&r.state==='VERIFIED')t.coreVerified++;
    else if(r.profile==='core'&&r.state==='PARTIAL')t.corePartial++;
    else if(r.profile==='optional-profile'&&r.state==='NOT_RUN')t.optionalNotRun++;
+   else if(r.profile==='optional-profile'&&r.state==='VERIFIED')t.optionalVerified++;
+   else if(r.profile==='optional-profile'&&r.state==='PARTIAL')t.optionalPartial++;
    else if(r.profile==='governance'&&r.state==='NOT_RUN')t.governanceNotRun++;
   }return t};
  const {matrix}=await basePromise;
  assert.deepEqual(tally(matrix),exact);
- // Falsely marking unrun O3 as partially executed changes exact live counters.
- const promoted=clone(matrix);
- promoted.requirements.find(x=>x.id==='DIS020-OPT-003').state='PARTIAL';
- assert.notDeepEqual(tally(promoted),exact);
+ // Falsely demoting the genuinely verified O3 (R211) changes exact live counters.
+ const demotedO3=clone(matrix);
+ demotedO3.requirements.find(x=>x.id==='DIS020-OPT-003').state='NOT_RUN';
+ assert.notDeepEqual(tally(demotedO3),exact);
+ // Falsely promoting O4 without a promotion authority changes live counters.
+ const promotedO4=clone(matrix);
+ promotedO4.requirements.find(x=>x.id==='DIS020-OPT-004').state='VERIFIED';
+ assert.notDeepEqual(tally(promotedO4),exact);
  // Demoting actual O1 partial evidence to NOT_RUN reintroduces stale counting;
  // the original #2448/1 failure was an earlier, different 4-unrun snapshot.
  const demoted=clone(matrix);

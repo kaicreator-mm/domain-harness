@@ -1,0 +1,54 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r211-opt003-full-activation-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "OPT003_LOCAL_DATA_ONLY_EVOLUTION_SLOT_FULL_ACTIVATION_LIFECYCLE_NATIVE_AND_NEGATIVES",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "d3bfb2529051d258b80beb45842ffd88ef04cd68",
+    "tree": "77f509913c03298c9d2995d934584e0be94f2ed5"
+  },
+  "native": {
+    "slotModule": {
+      "path": "examples/dis-v020-native-sdk/full-opt003-r0/evolution-slot.mjs"
+    },
+    "structuralTests": {
+      "path": "examples/dis-v020-native-sdk/full-opt003-r0/evolution-slot.test.mjs"
+    },
+    "nativeTests": {
+      "path": "examples/dis-v020-native-sdk/full-opt003-r0/full-opt003-native.test.mjs"
+    },
+    "integrationYaml": {
+      "path": ".woodpecker/dis-v020-full-opt003-r0.yaml"
+    },
+    "localRun": "evolution-slot.test.mjs 13/13 EXIT=0 + full-opt003-native.test.mjs 2/2 EXIT=0 (Writer, Windows node v24.21.0); independent reviewer re-execution identical counts (see review)"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2669/6"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2669/18"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2669/19"
+    }
+  ],
+  "review": {
+    "pullRequest": "kaicreator-mm/domain-harness#1571",
+    "verdict": "ACCEPT_SCOPED",
+    "url": "https://github.com/kaicreator-mm/domain-harness/pull/1571#issuecomment-7024411825"
+  },
+  "parentIntegration": {
+    "head": "b080bc7cf33de543b8ea0faa0effa8bfa2372937",
+    "pipeline": "https://ci.kaicreator.com/repos/18/pipeline/2681",
+    "result": "24/24 PR-context workflows SUCCESS including dis-v020-full-opt003-r0"
+  }
+}

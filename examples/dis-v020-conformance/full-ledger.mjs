@@ -150,7 +150,11 @@ export async function auditFullDisLedger({stopBefore='B13'}={}){
   currentBlobMismatch:rows.filter(x=>!x.sourceMatchesCurrent).map(x=>x.id),
   coreVerified:core.filter(x=>x.state==='VERIFIED').length,
   corePartial:core.filter(x=>x.state==='PARTIAL').length,
+  optionalVerified:optional.filter(x=>x.state==='VERIFIED').length,
+  optionalPartial:optional.filter(x=>x.state==='PARTIAL').length,
   optionalNotRun:optional.filter(x=>x.state==='NOT_RUN').length,
+  governanceVerified:gov.filter(x=>x.state==='VERIFIED').length,
+  governancePartial:gov.filter(x=>x.state==='PARTIAL').length,
   governanceNotRun:gov.filter(x=>x.state==='NOT_RUN').length,
   versionFreezeEligible:false,independentSemanticSAP:'NOT_CLAIMED',
   rows});

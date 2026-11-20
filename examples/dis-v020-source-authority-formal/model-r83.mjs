@@ -90,7 +90,12 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
  // R93: the baseline tracks the Product-accepted scoped CORE-008 admission
  // (linux/x64/Node Demo Target, witnessed by r86-c3-fresh-exact-sha-review-ci);
  // CORE-002/005/016 remain unresolved and must not be promoted by this update.
- // R97 tracks bounded native O1 and O2 PARTIAL; O3/O4 remain NOT_RUN.
+ // R97 tracks bounded native O1 and O2 PARTIAL.
+ // R211 (#1544): O3 promotes VERIFIED on the full local data-only Evolution
+ // Slot activation lifecycle (reviewed PR #1571, receipt
+ // r211-opt003-full-activation-ci); O4 lands its in-process server promotion
+ // lifecycle as PARTIAL (no real promotion authority); GOV-001 moves to
+ // PARTIAL (independent review executed, Product/L1 decision pending owner).
  const required=new Map();
  const expectedProfile=new Map();
  const partial=new Set(['002','005','016']);
@@ -100,14 +105,16 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
   required.set(id,partial.has(suffix)?'PARTIAL':'VERIFIED');
   expectedProfile.set(id,'core');
  }
- // O1 fixture Provider and O2 native fail-closed LearningObservation are
- // PARTIAL. Neither has trusted Experience/Provider issuance; O3/O4 remain NOT_RUN.
+ // O1 (real multi-context live evidence, CI-context live blocked by the
+ // secret-delivery finding) and O2 (external business Validator) stay
+ // PARTIAL; O3 is VERIFIED; O4 PARTIAL without a promotion authority.
+ const optExpected=['PARTIAL','PARTIAL','VERIFIED','PARTIAL'];
  for(let n=1;n<=4;n++){
   const id='DIS020-OPT-'+String(n).padStart(3,'0');
-  required.set(id,n<=2?'PARTIAL':'NOT_RUN');
+  required.set(id,optExpected[n-1]);
   expectedProfile.set(id,'optional-profile');
  }
- required.set('DIS020-GOV-001','NOT_RUN');
+ required.set('DIS020-GOV-001','PARTIAL');
  expectedProfile.set('DIS020-GOV-001','governance');
  // The requirement ID owns its profile. Aggregate counts alone can hide a
  // same-state CORE↔OPT swap (e.g. CORE-002 PARTIAL ↔ OPT-001 PARTIAL).
@@ -117,10 +124,13 @@ export function validateOriginalEvidence(producer,receipt,manifest,matrix,pins){
    fail('MATRIX_REQUIREMENT_STATE_OR_PROFILE_DRIFT');
  const counts={};
  for(const x of req){const k=x.profile+':'+x.state;counts[k]=(counts[k]||0)+1}
+ // R211 (#1544): Optional 1 VERIFIED (OPT-003) / 3 PARTIAL / 0 NOT_RUN;
+ // Governance 1 PARTIAL (review done, Product/L1 decision pending owner).
  for(const [k,v] of Object.entries({'core:VERIFIED':13,'core:PARTIAL':3,
-     'optional-profile:PARTIAL':2,'optional-profile:NOT_RUN':2,
-     'governance:NOT_RUN':1}))
-    if(counts[k]!==v)fail('CORE_SCOPE_DRIFT_'+k);
+     'optional-profile:VERIFIED':1,'optional-profile:PARTIAL':3,
+     'optional-profile:NOT_RUN':0,
+     'governance:PARTIAL':1}))
+    if((counts[k]||0)!==v)fail('CORE_SCOPE_DRIFT_'+k);
  return {sourceRows:r.rows,sourceTiers:{...r.counts},nativeSourceHead:ORIGINAL.nativeHead,
    coreVerified:13,corePartial:3,independentSap:0,effects:0};
 }

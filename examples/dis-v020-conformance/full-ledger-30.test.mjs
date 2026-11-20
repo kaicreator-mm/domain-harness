@@ -43,8 +43,13 @@ test('R63 every B01-B16 source-qualified round (30/30) has unique historical Git
  assert.equal(a.coreVerified,actualCore.filter(x=>x.state==='VERIFIED').length);
  assert.equal(a.corePartial,actualCore.filter(x=>x.state==='PARTIAL').length);
  assert.equal(a.coreVerified+a.corePartial,16);
- assert.equal(a.optionalNotRun,2);
- assert.equal(a.governanceNotRun,1);
+ // R211 (#1544): OPT-003 VERIFIED, OPT-004 PARTIAL, GOV-001 PARTIAL —
+ // no Optional/Governance requirement remains NOT_RUN.
+ assert.equal(a.optionalNotRun,0);
+ assert.equal(a.governanceNotRun,0);
+ assert.equal(a.optionalVerified,1);
+ assert.equal(a.optionalPartial,3);
+ assert.equal(a.governancePartial,1);
  assert.equal(a.independentSemanticSAP,'NOT_CLAIMED');
  assert.equal(a.versionFreezeEligible,false);
 });

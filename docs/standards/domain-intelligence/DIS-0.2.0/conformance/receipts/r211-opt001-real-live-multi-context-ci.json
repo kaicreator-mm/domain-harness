@@ -1,0 +1,71 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r211-opt001-real-live-multi-context-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "OPT001_REAL_AOT_SELECTED_PROVIDER_LIVE_EVIDENCE_MULTI_CONTEXT_LOCAL_CI_STRUCTURAL_CONTRACT_GREEN",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "1654bdff0e35d12561c5a77b2fa445cc9b8871e3",
+    "tree": "287167d7161fdf1c67662449abb045a1b91c2900"
+  },
+  "native": {
+    "providerModule": {
+      "path": "examples/dis-v020-native-sdk/full-opt001-r0/opt001-aot-bounded-provider.mjs"
+    },
+    "liveTests": {
+      "path": "examples/dis-v020-native-sdk/full-opt001-r0/opt001-live-provider.test.mjs"
+    },
+    "contractTests": {
+      "path": "examples/dis-v020-native-sdk/full-opt001-r0/opt001-bounded-contract.test.mjs"
+    },
+    "integrationYaml": {
+      "path": ".woodpecker/dis-v020-full-opt001-r0.yaml"
+    }
+  },
+  "liveEvidence": {
+    "writerWindows": "opt001-live-provider.test.mjs 5/5 EXIT=0, real api.deepseek.com calls (node v24.21.0)",
+    "integratorLanLinux": "5/5 EXIT=0 rc=0 in node:24 container on CC-LAN200 (192.168.100.200), npm ci+build rc=0, run finished 2026-11-20T01:15:56Z; contract suite rc=0 in same container",
+    "independentReviewer": "see review verdict comment for the third-context re-execution counts",
+    "credentialHandling": "DEEPSEEK_API_KEY consumed from process.env only; never committed; transient key file on the LAN host shredded after the run and the accidental xtrace echo scrubbed from the log"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2682/6"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2682/19"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2682/18"
+    }
+  ],
+  "ciLiveContextBlocked": {
+    "finding": "Woodpecker 3.20.1 does not deliver repo secrets to local-backend steps",
+    "probes": [
+      "pipeline 2649 (pull_request, secret events include pull_request, no filter) -> live step env missing",
+      "pipeline 2655 (pull_request, repo trusted=true, step declares secrets:[DEEPSEEK_API_KEY]) -> still missing",
+      "pipeline 2676 (manual, after secret value re-store) -> still missing",
+      "pipeline 2679 (manual, secret images filter [bash]) -> still missing"
+    ],
+    "responsibleParty": "CI host operator (server/agent-side secret delivery for backend=local)",
+    "unlock": "fix secret injection then rerun the manual event at the same HEAD; the live step keeps its fail-loud no-credential gate by design"
+  },
+  "review": {
+    "pullRequest": "kaicreator-mm/domain-harness#1569",
+    "verdict": "ACCEPT_SCOPED",
+    "url": "https://github.com/kaicreator-mm/domain-harness/pull/1569#issuecomment-7028170125",
+    "writerReceipts": [
+      "https://github.com/kaicreator-mm/domain-harness/issues/1547#issuecomment-7020185284",
+      "https://github.com/kaicreator-mm/domain-harness/issues/1547#issuecomment-7024050710",
+      "https://github.com/kaicreator-mm/domain-harness/issues/1547#issuecomment-7027948858"
+    ]
+  },
+  "honestScope": "Model outputs are consumed as DATA only; authority NONE, no semantic PASS, no Effect/permission/state facts. ROW REMAINS PARTIAL: real live evidence is local multi-context; a same-HEAD CI-context live run is blocked by the infrastructure finding above."
+}

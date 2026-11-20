@@ -19,7 +19,9 @@ test('B04-02 R42 exact historical source ledger and 21 requirement DAG leave 7 s
  assert.equal(r.remaining.length,r.partialCore);
  assert.equal(r.optionalNotRun,matrix.requirements.filter(x=>
   x.profile==='optional-profile'&&x.state==='NOT_RUN').length);
- assert.equal(r.optionalNotRun,2);assert.equal(r.governanceNotRun,1);
+ // R211 (#1544): OPT-003 VERIFIED, OPT-004 PARTIAL, GOV-001 PARTIAL —
+ // no Optional/Governance requirement remains NOT_RUN.
+ assert.equal(r.optionalNotRun,0);assert.equal(r.governanceNotRun,0);
  assert.equal(r.formalFreezeEligible,false);
  assert.equal(r.sourceReview.locatorRepair,'OPEN');
  assert.equal(r.sourceReview.sap,'UNQUALIFIED');

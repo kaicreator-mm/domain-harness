@@ -32,10 +32,12 @@ test('R67 all 34 original B01-B20 scoped rounds retain independent named 3-conte
  assert.ok(r.rows.every(x=>x.ci==='STORED_EXACT_SOURCE_CI_3_OF_3_SUCCESS'));
  assert.ok(r.rows.every(x=>x.semanticSAP==='NOT_INFERRED'));
  const live=(await json('matrix.json')).requirements;
+ // R211 (#1544): OPT-003 VERIFIED, OPT-004 PARTIAL, GOV-001 PARTIAL —
+ // live counters have no Optional/Governance NOT_RUN left.
  assert.deepEqual([r.coreVerified,r.corePartial,r.optionalNotRun,r.governanceNotRun],[
   live.filter(x=>x.profile==='core'&&x.state==='VERIFIED').length,
   live.filter(x=>x.profile==='core'&&x.state==='PARTIAL').length,
-  2,1
+  0,0
  ]);
  assert.equal(r.versionFreezeEligible,false);assert.equal(r.independentSemanticSAP,'NOT_CLAIMED');
 });
