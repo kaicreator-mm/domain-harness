@@ -26,25 +26,27 @@ import {
 
 ## Diagnostics / 日志与故障定位
 
-The core SDK returns typed `BootResult` / `FunctionOutcome` status and error codes rather than writing to `console` or a global logger. The Host owns its own structured event logging. **Never log `reason`, `failure.message`, `unknownReason.message`, or an exception object by default**: those are untrusted diagnostic strings, not redacted fields, and can contain business inputs, local paths or secrets. Use only a trusted, explicitly redacted/allowlisted diagnostic sink when raw details are genuinely needed.
+The core SDK returns typed `BootResult` / `FunctionOutcome` values; it does not write business data to a global logger. **A typed error does not imply sanitized content.** `result.reason`, `result.code`, `failure.code`, `unknownReason.code`, their messages, and exception objects can carry untrusted text from selected implementation code, including secrets, customer data and local paths. Do not log any of these fields verbatim by default.
 
-核心 SDK 不依赖全局日志框架或自动打印业务数据。Host 应默认只记录可信的 `event/status/code` 和由 Host 自己生成的关联 ID。**`reason` 是不可信的诊断文本**，可能含有来自业务 App Init、插件或 cleanup 异常的原始错误消息。不可默认记录到生产日志；仅在授权的故障诊断通道中，经过显式字段白名单和敏感数据清理后使用。不要默认记录原始输入、规则、文件路径或凭据。
+核心 SDK 返回结构化状态，不自动输出业务数据。**类型检查不等于日志内容已经脱敏。** Boot 的 `reason/code`、Function 的 `failure.code/unknownReason.code`、消息及异常对象都可能包含业务实现提供的不可信文本。Host 默认只记录有限状态字段及自己生成的关联 ID；不要直接记录原始错误码、原因、业务输入、规则、路径或凭据。
 
 ```js
+// Host-owned, opaque correlation ID: never derived from user input or exception text.
+const correlationId = crypto.randomUUID();
 const result = await boot(pin, context);
 if (result.status !== 'BOOTED') {
   hostLogger.warn({
     event: 'domain-harness.boot',
     status: result.status,
-    code: result.code,
-    // No result.reason: untrusted exception messages can contain secrets.
+    correlationId,
+    // Deliberately NO result.code or result.reason.
   });
 }
 ```
 
-**Concrete negative case:** if a selected business App Init throws `new Error('token=example-secret')`, the KDP `result.reason` may include that literal string (including appended cleanup exceptions). The safe Host example above logs only the status/code, so the secret does not reach the default log. Do **not** treat a diagnostic reason as sanitized simply because the outer result is typed.
+**Negative examples:** a business App Init can throw `new Error('token=example-secret')`, which may flow into `result.reason`. A selected technical initializer can throw `Object.assign(new Error('startup failure'), { code: 'token=example-secret' })`, which may flow into `result.code`. A Function may return `{ kind: 'FAILED', failure: { code: 'token=example-secret', message: '...' } }`. None of these untrusted strings appears in the default log above.
 
-For an invoked Function, log `kind` and the selected `failure.code` or `unknownReason.code` on non-success; never treat UNKNOWN as FAILED or log the `value` or reason/message payloads by default. A Host-generated correlation ID is safe for tracing; `lockDigest` and `activationId` should be handled under the Host's explicit exposure policy. T05's external clean-install acceptance NDJSON is **test evidence**, not a production logging backend. A failed App Init runs reverse technical cleanup and can append cleanup errors verbatim to its untrusted startup `reason`.
+For Function outcomes, the Host may log the finite `kind` discriminator without serializing `value`, `failure`, `unknownReason` or any raw code/message. Preserve UNKNOWN as distinct from FAILED. If operators need a diagnostic category, map **explicitly known literal codes** through a Host-owned allowlist to **fixed, safe Host labels**; do not simply accept a `DH_` prefix, regex match, or arbitrary implementation-supplied code as proof of safety. Detailed diagnostics require an authorized, explicitly redacted/allowlisted sink. `lockDigest` and `activationId` are subject to the Host's own exposure policy. T05 acceptance NDJSON is test evidence, **not** a production logging backend. A failed App Init may append raw cleanup exception text to `reason`; never implicitly promote that text into log-safe metadata.
 
 ## Legacy workspace surface / Workspace 内的 legacy 面
 
