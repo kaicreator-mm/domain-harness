@@ -1,9 +1,9 @@
-# DomainHarness 0.11.x — 领域 Harness / Agent 渐进式能力路线图（R4 候选）
+# DomainHarness 0.11.x — 领域 Harness / Agent 渐进式能力路线图（R5 候选）
 
-<!-- DH_V011X_DOMAIN_BOUNDED_AGENT_PROGRESSIVE_R4_20261121 -->
+<!-- DH_V011X_DOMAIN_BOUNDED_AGENT_PROGRESSIVE_R5_20261121 -->
 
 ```ini
-OUTPUT_LABEL=DH_V011X_R4_DOMAIN_HARNESS_AGENT_VERTICAL_SLICES
+OUTPUT_LABEL=DH_V011X_R5_DOMAIN_HARNESS_AGENT_VERTICAL_SLICES
 MASTER=kaicreator-mm/domain-harness#1563
 PRODUCT_0110=kaicreator-mm/domain-harness#1564
 REFERENCE_HARNESS_ANALYSIS=kaicreator-mm/domain-harness#1477,#1478
@@ -12,21 +12,23 @@ STATUS=PRODUCT_ROADMAP_DELTA_PROPOSED_NOT_FROZEN
 STAGE_0=0.11.0_INTERNAL_ACCEPTED_UNCHANGED
 DEVELOPMENT_TRAIN=version/v0.11.x
 EXTERNAL_RELEASE=ONLY_AFTER_FULL_TRAIN_ACCEPTANCE
-STAGE_1_TO_7=PLANNED_NOT_IMPLEMENTED
+STAGE_1_TO_10=PLANNED_NOT_IMPLEMENTED
+STAGE_7_TO_10=EXPERIENCE_FEEDBACK_META_EVOLUTION_SPLIT
+OPTIONAL_AFTER=0.11.11_PLUS_ONLY_WITH_EXPLICIT_SCOPE
 OLD_VERSION_ABI_OR_PARITY=NOT_REQUIRED
 NODE_BASELINE=>=22.12.0
 ```
 
 ## 0. 不变的版本列车与可信基线
 
-**0.11.x 是一条开发列车；0.11.0…0.11.7 是内部可独立验收的增量阶段，不是分别向外发布的 SemVer Patch。**
+**0.11.x 是一条开发列车；0.11.0…0.11.10 是内部可独立验收的增量阶段，不是分别向外发布的 SemVer Patch。**
 
 - `main` 继续承载已发布版本；**所有阶段验收合格后**才产生最终 main PR、正式 Tag/GitHub Release 和必要的发布资格。禁止为每个阶段单独执行完整 Release Qualification；npm 发布默认不执行。
 - `version/v0.11.0` 为已验收 Stage-0 快照，HEAD `525f4f59ad40e7cb516a37421a24c6584ec36ae3`，T01–T05/AC01–AC10 有既有范围限定证据；不回写 Stage-0 PRD、L2 或旧独立审核结论。
 - **`version/v0.11.x` 是唯一开发集成分支**。后续阶段从其最新已验收 HEAD 取基线，使用隔离 Task 分支/必要 PR，差量审核与集成后形成阶段快照；不将阶段候选虚报为已实现。
 - 没有保留 0.10.3 App/SDK ABI、代码迁移或功能全等义务；其机制仅作为设计输入。Node 基准按已确认的 `>=22.12.0`，不能因旧项目用 Node24 而抬高最低版本。
 
-本 R4 改动 **只涉及后续 Product Roadmap 的结构/阶段范围**，不变更现有 Stage-0 架构、源码或发布政策。后续阶段仍按 ADS Product/L1 delta → 必要 L2 delta → Native Task DAG → implementation → focused validation → 独立审核 → 单分支集成。
+本 R5 改动 **只涉及后续 Product Roadmap 的结构/阶段范围**，不变更现有 Stage-0 架构、源码或发布政策。后续阶段仍按 ADS Product/L1 delta → 必要 L2 delta → Native Task DAG → implementation → focused validation → 独立审核 → 单分支集成。
 
 ## 1. 产品中心：Domain-bounded Harness，而不是功能模块合集
 
@@ -81,8 +83,13 @@ Emit task evidence / feedback (candidate, not automatic promotion)
 | **0.11.4 — Authorized Action Loop** | **可对外行动的领域 Agent**：不仅能回答，还可在许可范围操作真实业务 | selected Tool/Operation Function、KDP capability/permit、Host/Effect、业务 State/CAS、Outcome/Journal、最小幂等和 readback、验证结果的 Observe→Verify→Advance | 经 0.11.2 决策和 0.11.3 确认，完成一项真实 Host 操作并核对业务状态；无权限/不一致/超时或结果 UNKNOWN 不得标 COMPLETE |
 | **0.11.5 — Bounded Reasoning Agent** | **能解决未编译路径的领域问题**：确定性优先，必要时模型提出可验证步骤 | Provider-neutral LLM adapter（可接 OpenAI-compatible/Anthropic 等）、selected model profile、Context/token/step budget、typed proposal/observation、bounded model→tool→model iteration、结果/工具入参验证 | 同一类 Goal：已知规则不调用 LLM；规则无法覆盖时调用真实选定 Provider 形成 proposal，经 KDP 审核的 Tool/Function 执行和 outcome verify；越界 Tool/预算/无效输出被拒绝 |
 | **0.11.6 — Durable & Recoverable Agent** | **可长期运行的任务**：可暂停、恢复、观察和控制多阶段任务而不破坏已执行 Effect | durable TaskRun checkpoint、恢复/幂等、cancel/timeout/retry policy、必要的业务事件/选定 Tool adapter（MCP/IPC 等仅按消费需求）、可观察的失败分类与日志 | 在真实 Effect 之后中断并恢复，历史 Effect 不重复提交；用户取消、暂挂/恢复、工具结果乱序及未知结果均保守终止或重审 |
-| **0.11.7 — Experience & Evolution Loop** | **能把执行经验变成未来领域能力的受控进化**：学习不等于擅自改变正在运行的任务 | Memory/Experience/Feedback、qualified reuse、execution evidence→candidate→shadow/independent validation→explicit approval→Forge/Package next BUILD；Domain-scoped Meta insights | 当前任务积累可追溯反馈，下一任务可在资格允许时复用；错误/未经授权候选不可 promote，已运行实例继续 pinned 原版本；经批准仅在后续 BUILD 选新 Package 生效 |
-| **0.11.8+ / future minor** | **按真实使用需求进一步拓展** | cross-platform target、复杂跨 Agent coordination、remote streaming、复杂补偿、领域自举、完整 DIS Conformance | 必须独立冻结真实 Consumer/Oracle/范围；默认不阻止核心 0.11.x 列车退出 |
+| **0.11.7 — Memory & Experience Reuse** | **具经验复用能力的领域 Agent**：任务完成后可检索历史经验，但经验不自动成为领域事实 | Domain-scoped Task Memory、Experience Record、必要检索/适用性过滤、来源与版本、qualified reference/reuse；区分 working context、durable task journal 与跨任务经验 | 首次任务留下可查证经验；第二次相似任务能引用适用经验辅助已选策略，过期/跨域/矛盾经验不直接决定业务结果；不生成改进候选、不晋升知识 |
+| **0.11.8 — Feedback & Evaluation** | **可评价策略效果的领域 Agent**：依据目标、真实结果和反馈识别可改进之处 | 任务 Goal/Outcome/Evidence 评估、用户/Host 反馈、结果与策略关联、结构化失败/不确定性分类、最小跨任务指标 | 对成功、失败、UNKNOWN 与用户纠正各给出有根据的评价；能发现同一策略的重复失败并报告差距，不将未经验证的评价当作事实或自动修改流程 |
+| **0.11.9 — Meta Analysis & Candidate Discovery** | **能提出可证伪改进建议的领域 Agent**：把评价转化为候选，而不是直接改变在线行为 | Domain-scoped Meta 分析、重复缺口聚合、Candidate 类型/证据链/预期增益/反例、候选版本与状态；候选为非权威数据 | 基于多次真实任务 Evidence + Feedback 生成一个限定作用域、含证据与反例的 Rule/Workflow/Knowledge 改进候选；证据不足标 UNKNOWN，当前运行实例和选定 Package 不变 |
+| **0.11.10 — Qualified Evolution & Forge Handoff** | **可受控更新未来领域能力的系统**：候选验证与批准后，在下一次 BUILD 中选定新版本 | Candidate/Evidence 标准交接、Domain-Forge/外部独立 Validator/Oracle 资格回读、批准/拒绝结果、Package 版本与 BUILD/Lock 重选；Harness 只做消费与选择 | 用一个真实候选演示：不合格/拒绝不能激活；合格且获批准的候选经 Forge 输出新 Package，新的 App BUILD 明确选用，新旧运行实例分别保持各自 pinned 版本；不在 Harness 内重建 Forge 平台 |
+| **0.11.11+（可选）** | **仅按真实消费者需求扩展同一 0.11.x 路线** | 跨平台目标、复杂跨 Agent 协调、远端流式工具、完整 DIS Conformance、深层自举等 | 必须单独明确实际需求、独立范围和验收标准；默认不阻止 0.11.0–0.11.10 的核心路线完成 |
+
+**0.11.7–0.11.10 是同一经验演化链条的四个独立退出点，而不是四套 Memory/Meta/Forge Runtime**。先复用经验，再评价结果，再提出候选，最后由外部权威验证、批准和选入下一 BUILD。没有真实 Candidate/Validator/Forge 权限时，0.11.10 只能如实停在未满足验收，不能以模拟回执宣布正式合格。
 
 **0.11.1 的新增任务控制不是另建通用 Agent Runtime**：作为既有 Domain App / KDP 的受控编排层，限定只运行选定 Workflow/Function；不把未来工具、LLM、持久恢复一起纳入初版。每个阶段都可以演示一条从 Public SDK 到真实 Outcome 的完整纵向切片。
 
@@ -124,7 +131,7 @@ Emit task evidence / feedback (candidate, not automatic promotion)
 
 ## 5. 当前实施建议和来源交叉索引
 
-**当前下一步仅聚焦 0.11.1：DomainTask + Workflow/TaskState + minimal deterministic loop。** 先冻结最小 Agent Task/Step/Outcome 契约及与现有 KDP/Function 的归属，再交付一条完整的 no-Effect 可运行任务。不要同时启动 0.11.4 Tool Effect、0.11.5 LLM、0.11.7 Meta，也不要为了画完整 Agent 架构而无限拆 Task DAG。
+**当前实际交付优先级以主 Issue #1563 顶部最新 Owner 决议为准：先完成 0.11.0 单一真实 Demo 的直接需求验收，暂停 0.11.1 实施。** 后续恢复阶段开发时，第一候选才是 0.11.1 DomainTask + Workflow/TaskState + minimal deterministic loop。 先冻结最小 Agent Task/Step/Outcome 契约及与现有 KDP/Function 的归属，再交付一条完整的 no-Effect 可运行任务。不要同时启动 0.11.4 Tool Effect、0.11.5 LLM、0.11.7–0.11.10 Experience/Meta，也不要为了画完整 Agent 架构而无限拆 Task DAG。
 
 来源：
 - [#1477](https://github.com/kaicreator-mm/domain-harness/issues/1477)：Domain Intelligence 是价值核心；DomainHarness 是受限运行时，编译优先、策略顺序、Forge/Harness 边界及一套 Kernel 权威。
@@ -134,4 +141,4 @@ Emit task evidence / feedback (candidate, not automatic promotion)
 - [#1468](https://github.com/kaicreator-mm/domain-harness/issues/1468)、[#1489](https://github.com/kaicreator-mm/domain-harness/issues/1489)：Tool/Event 和多 Operation 的需求输入；只有真实消费必要时才纳入。
 - [#1567](https://github.com/kaicreator-mm/domain-harness/issues/1567)：历史能力证据及限制，不是必须原样迁移的全部清单。
 
-<!-- /DH_V011X_DOMAIN_BOUNDED_AGENT_PROGRESSIVE_R4_20261121 -->
+<!-- /DH_V011X_DOMAIN_BOUNDED_AGENT_PROGRESSIVE_R5_20261121 -->
