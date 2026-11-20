@@ -31,6 +31,7 @@ export interface TechnicalLifecycleContext {
 
 type ModuleExports = Record<string, unknown>;
 
+/** 唯一 Package 装配器负责预检已选代码字节、固定顺序初始化、函数句柄及逆序清理，不重新推导构建图。 */
 export class PackageSystem {
   private readonly moduleCache = new Map<string, Promise<ModuleExports>>();
   private readonly definitionCache = new Map<string, ElementDefinition | null>();

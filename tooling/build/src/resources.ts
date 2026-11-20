@@ -9,6 +9,7 @@ export function digestOfBytes(bytes: Uint8Array): ContentDigest {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
+/** BUILD 在此封存文件系统资源：相对路径、真实路径约束和字节摘要缺一不可。 */
 export class ResourceScope {
   private readonly roots: Readonly<Record<string, string>>;
   readonly closureDigests = new Map<string, ContentDigest>();

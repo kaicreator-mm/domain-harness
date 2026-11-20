@@ -93,6 +93,7 @@ function firstIssue(issues: readonly ValidationIssue[]): ValidationIssue {
 }
 
 
+/** 构建入口只处理已声明的域定义与资源闭包。错误返回稳定拒绝码，不修复输入，也不在运行期重新选择实现。 */
 export function buildApp(input: BuildInput): BuildResult {
   try {
     return { ok: true, ...runBuild(input) };
@@ -109,6 +110,7 @@ export function buildApp(input: BuildInput): BuildResult {
   }
 }
 
+/** 依次建立包闭包、Element 所有权和依赖图，校验资源内容后生成确定性 Lock；所有步骤必须先于启动执行。 */
 function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   const schemas = new SchemaChecker();
 
@@ -718,6 +720,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
 }
 
 
+/** 只验证被选定函数的输入输出 Schema，禁止通过未选中 Schema 扩大运行时授权边界。 */
 function validateSelectedFunctionSchemas(
   schemas: SchemaChecker,
   scope: ResourceScope,
@@ -806,6 +809,7 @@ function compareHookBinding(a: SealedHookBinding, b: SealedHookBinding): number 
         : 1;
 }
 
+/** 内容块的内联值与外部资源在解析后应产生同一语义摘要，同时保留原始文件字节校验。 */
 function validateBlockContent(
   schemas: SchemaChecker,
   loaded: LoadedElement,

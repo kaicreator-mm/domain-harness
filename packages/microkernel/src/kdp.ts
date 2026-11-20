@@ -81,6 +81,7 @@ async function readDescriptorConfig(
 
 const APP_STATUSES: readonly AppStatus[] = ['READY', 'DEGRADED', 'BLOCKED', 'FAILED'];
 
+/** App Init 返回的 READY、DEGRADED 等状态必须与已声明的可选入口一致，不允许静默压制必需入口。 */
 function validateInitResult(
   result: unknown,
   ingress: readonly SealedIngress[],
@@ -124,6 +125,7 @@ function validateInitResult(
   return { status: status as AppStatus, suppressed };
 }
 
+/** KDP 复验可信安装后按 Lock 完成技术初始化、Hook、业务初始化；任一步失败必须撤销已完成的初始化。 */
 export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
   const trust = await verifyInstallTrust(context);
   if (!trust.ok) return failed(trust.failure.code, trust.failure.reason);

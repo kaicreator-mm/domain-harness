@@ -16,6 +16,7 @@ function refused(code: BootErrorCode, reason: string): BootResult {
 }
 
 
+/** 将外部 Pin 一次性读取为普通快照，避免 Proxy 或 Getter 在同一次启动中改变校验依据。 */
 function readPin(pin: unknown): { pin: BootstrapPin; problems: string[] } {
   const problems: string[] = [];
   const source: Record<string, unknown> = isRecord(pin) ? pin : {};
@@ -66,6 +67,7 @@ function checkPinAgainstRecord(pin: BootstrapPin, record: InstalledRecord): stri
 }
 
 
+/** Boot 先完成安装记录、Lock 和 KDP 字节核验；仅在全部通过后加载唯一选定的 KDP 入口。 */
 export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Promise<BootResult> {
   const normalized = normalizeBootstrapContext(context);
   if (!normalized.ok) return refused(normalized.failure.code, normalized.failure.reason);
