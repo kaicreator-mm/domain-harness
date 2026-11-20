@@ -75,13 +75,15 @@ function hasOwn(value, key) {
     return Object.prototype.hasOwnProperty.call(value, key);
 }
 /**
- * Schema validation that cannot reject: a throwing Proxy/getter on the
- * instance is a validation failure for the caller, mapped to a typed
- * FAILED outcome by the invoke pipeline.
+ * Plain-JSON + Schema validation that cannot reject: the recursive JSON guard
+ * runs before the subset evaluator so unconstrained schema branches cannot
+ * smuggle nested undefined/functions/Symbols/bigints or other non-JSON data
+ * to the selected implementation. Throwing Proxies/getters are validation
+ * failures for the caller, mapped to a typed FAILED outcome by invoke.
  */
 function safeValidateJsonSubset(instance, schema) {
     try {
-        return validateJsonSubset(instance, schema);
+        return isPlainJsonValue(instance) && validateJsonSubset(instance, schema);
     }
     catch {
         return false;
