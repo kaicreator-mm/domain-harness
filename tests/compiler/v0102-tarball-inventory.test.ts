@@ -45,7 +45,7 @@ test('T07b selected workspace engines and export identities are the Node24-only 
   for (const selected of SELECTED) {
     const manifest = readManifest(selected.dir);
     assert.equal(manifest.name, selected.name);
-    assert.equal(manifest.version, '0.10.3');
+    assert.equal(manifest.version, '0.11.0');
     assert.notEqual(manifest.private, true, selected.name + ' must remain distributable');
     assert.equal(manifest.engines?.node, '>=24.0.0');
     assert.equal(manifest.main, './dist/index.js');
@@ -54,8 +54,9 @@ test('T07b selected workspace engines and export identities are the Node24-only 
       selected.name === '@kaicreator/domain-harness-microkernel' ? ['.', './host-seam'] :
         selected.name === '@kaicreator/domain-harness-host-node' ? ['.', './llm/anthropic', './llm/openai'] :
           // v011 T01 (#1575): the canonical 0.11 contracts enter through this
-          // subpath only; the package root stays the legacy v0.10.x face and
-          // the version bump stays deferred to the T04 M-bump (L2 §8.6).
+          // subpath only; the package root stays the legacy v0.10.x face. The
+          // version bump is applied by the T04 M-bump (L2 §8.6) — selected
+          // SDK family manifests are uniformly 0.11.0 from here on.
           selected.name === '@kaicreator/domain-harness-contracts' ? ['.', './v011'] : ['.']);
     assert.ok(manifest.files?.includes('dist'), 'selected runtime/build must ship dist');
   }

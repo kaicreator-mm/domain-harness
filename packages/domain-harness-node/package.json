@@ -19,7 +19,7 @@
     "test": "npm run build && node --import tsx --test tests/store/*.test.ts tests/v3-host/*.test.ts tests/cross-host/*.test.ts tests/successor-host/*.test.ts"
   },
   "dependencies": {
-    "@kaicreator/domain-harness": "0.2.0",
+    "@kaicreator/domain-harness": "0.11.0",
     "better-sqlite3": "^12.0.0"
   },
   "private": true

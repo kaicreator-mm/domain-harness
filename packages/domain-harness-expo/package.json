@@ -16,7 +16,7 @@
     "test": "npm run typecheck"
   },
   "dependencies": {
-    "@kaicreator/domain-harness": "0.2.0"
+    "@kaicreator/domain-harness": "0.11.0"
   },
   "private": true
 }

@@ -33,8 +33,32 @@ export const SDK_PACKAGES = Object.freeze([
 const INTERNAL_PREFIX = '@kaicreator/domain-harness-';
 const CONSUMER_DIR = 'packages/domain-harness';
 const CONSUMER_NAME = '@kaicreator/domain-harness';
-const ROOT_PRODUCT_VERSION = '0.2.0';
-const CONSUMER_PRODUCT_VERSION = '0.2.0';
+// Frozen v0.11.0 consumer graph (L2 §8.1/§8.6): the canonical public SDK
+// depends on exactly these three internal packages, each at the release
+// version; third-party packages are not internal edges.
+const CONSUMER_INTERNAL = Object.freeze([
+  '@kaicreator/domain-harness-build',
+  '@kaicreator/domain-harness-contracts',
+  '@kaicreator/domain-harness-microkernel',
+]);
+// v0.11.0 M-bump root-name edge consumers (L2 §8.6): these non-release
+// workspaces keep their own version (0.2.0 / 0.11.0-dev.0) but must consume
+// the canonical root package at the exact release version in the given
+// section — an unsatisfied edge makes npm resolve the root package name
+// against a registry and breaks workspace install.
+export const ROOT_EDGE_PACKAGES = Object.freeze([
+  { dir: 'packages/domain-harness-node', section: 'dependencies' },
+  { dir: 'packages/domain-harness-expo', section: 'dependencies' },
+  { dir: 'packages/domain-harness-compiler', section: 'peerDependencies' },
+  { dir: 'packages/dis-v011-runtime', section: 'dependencies' },
+]);
+const ROOT_PRODUCT_VERSION = '0.11.0';
+const CONSUMER_PRODUCT_VERSION = '0.11.0';
+const DIS_RUNTIME_DIR = 'packages/dis-v011-runtime';
+const DIS_RUNTIME_INTERNAL = Object.freeze([
+  '@kaicreator/domain-harness-build',
+  '@kaicreator/domain-harness-contracts',
+]);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 function readJson(root, relativePath) {
@@ -61,10 +85,22 @@ function assertInternalEdges(manifest, expected, label) {
   return seen;
 }
 
+function assertExactDependencyEdges(manifest, names, expected, label) {
+  for (const name of names) {
+    assert.equal(manifest.dependencies?.[name], expected,
+      `${label}: dependencies.${name} must equal ${expected}`);
+  }
+}
+
+function assertExactConsumerRuntimeGraph(manifest, expectedNames, label) {
+  assert.deepEqual(Object.keys(manifest.dependencies || {}).sort(), [...expectedNames].sort(),
+    `${label}: production dependencies must contain exactly the frozen graph and no third-party runtime dependency`);
+}
+
 export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   const rootManifest = readJson(root, 'package.json');
   assert.equal(rootManifest.version, ROOT_PRODUCT_VERSION,
-    'root monorepo product version must remain 0.2.0');
+    'root monorepo product version must remain 0.11.0');
 
   const manifests = SDK_PACKAGES.map((item) => ({
     ...item,
@@ -92,13 +128,27 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   const consumer = readJson(root, `${CONSUMER_DIR}/package.json`);
   assert.equal(consumer.name, CONSUMER_NAME, 'DomainHarness consumer package name');
   assert.equal(consumer.version, CONSUMER_PRODUCT_VERSION,
-    `${CONSUMER_DIR}: product version must remain 0.2.0`);
-  assert.equal(consumer.dependencies?.['@kaicreator/domain-harness-contracts'], expected,
-    `${CONSUMER_DIR}: contracts dependency must equal ${expected}`);
+    `${CONSUMER_DIR}: product version must remain 0.11.0`);
+  // M-bump phase rule (L2 §8.3): the consumer stays private until the T04
+  // final wiring removes private:true; package-lock.json workspace records
+  // do not carry the private flag, so this is asserted on the source only.
+  assert.equal(consumer.private, true,
+    `${CONSUMER_DIR}: must remain private:true during the M-bump phase (T04 final wiring may change it)`);
+  const consumerSeen = assertInternalEdges(consumer, expected, CONSUMER_DIR);
+  assert.deepEqual([...consumerSeen].sort(), [...CONSUMER_INTERNAL].sort(),
+    `${CONSUMER_DIR}: internal dependency graph must describe the frozen 0.11.0 graph (contracts/build/microkernel)`);
+  assertExactConsumerRuntimeGraph(consumer, CONSUMER_INTERNAL, CONSUMER_DIR);
+
+  for (const item of ROOT_EDGE_PACKAGES) {
+    const manifest = readJson(root, `${item.dir}/package.json`);
+    assert.equal(manifest[item.section]?.[CONSUMER_NAME], expected,
+      `${item.dir}: ${item.section}.${CONSUMER_NAME} must equal ${expected}`);
+  }
+  assertExactDependencyEdges(readJson(root, `${DIS_RUNTIME_DIR}/package.json`), DIS_RUNTIME_INTERNAL, expected, DIS_RUNTIME_DIR);
 
   const lock = readJson(root, 'package-lock.json');
   assert.equal(lock.version, ROOT_PRODUCT_VERSION,
-    'package-lock.json root product version must remain 0.2.0');
+    'package-lock.json root product version must remain 0.11.0');
   assert.equal(lock.name, rootManifest.name,
     'package-lock.json root name must match package.json');
   const lockedRoot = lock.packages?.[''];
@@ -124,14 +174,21 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   assert.equal(lockedConsumer.name, consumer.name,
     `${CONSUMER_DIR}: lock package name must match package.json`);
   assert.equal(lockedConsumer.version, CONSUMER_PRODUCT_VERSION,
-    `${CONSUMER_DIR}: lock product version must remain 0.2.0`);
+    `${CONSUMER_DIR}: lock product version must remain 0.11.0`);
   assert.equal(lockedConsumer.version, consumer.version,
     `${CONSUMER_DIR}: lock package version`);
-  assert.equal(
-    lockedConsumer.dependencies?.['@kaicreator/domain-harness-contracts'],
-    expected,
-    `${CONSUMER_DIR}: lock contracts dependency must equal ${expected}`,
-  );
+  const lockedConsumerSeen = assertInternalEdges(lockedConsumer, expected, `${CONSUMER_DIR} lock`);
+  assert.deepEqual([...lockedConsumerSeen].sort(), [...CONSUMER_INTERNAL].sort(),
+    `${CONSUMER_DIR}: lock internal dependency graph must describe the frozen 0.11.0 graph`);
+  assertExactConsumerRuntimeGraph(lockedConsumer, CONSUMER_INTERNAL, `${CONSUMER_DIR} lock`);
+
+  for (const item of ROOT_EDGE_PACKAGES) {
+    const locked = lock.packages?.[item.dir];
+    assert.ok(locked, `package-lock.json: missing workspace ${item.dir}`);
+    assert.equal(locked[item.section]?.[CONSUMER_NAME], expected,
+      `${item.dir}: lock ${item.section}.${CONSUMER_NAME} must equal ${expected}`);
+  }
+  assertExactDependencyEdges(lock.packages?.[DIS_RUNTIME_DIR], DIS_RUNTIME_INTERNAL, expected, `${DIS_RUNTIME_DIR} lock`);
 
   return {
     version: expected,
