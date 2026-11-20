@@ -80,16 +80,55 @@ test('R92 C3 accepted linux/x64/node Target is the sole newly promoted Core whil
  for(const id of ['002','005','016'])
   assert.equal(matrix.requirements.find(x=>x.id==='DIS020-CORE-'+id).state,'PARTIAL');
  // R97 O1 + O2 native readiness remain PARTIAL; no trusted O2 Experience issuer.
+ // R211: O1 gains real-live multi-context evidence receipt but stays PARTIAL
+ // (CI-context live blocked by the 3.20.1 local-backend secret-delivery finding);
+ // O3 promotes VERIFIED; O4 server lifecycle engineering lands as PARTIAL;
+ // GOV-001 records the executed independent review with the Product/L1
+ // decision still explicitly pending.
  assert.equal(matrix.requirements.find(x=>x.id==='DIS020-OPT-001').state,'PARTIAL');
+ const o1=matrix.requirements.find(x=>x.id==='DIS020-OPT-001');
+ assert.ok(o1.receiptIds.includes('r211-opt001-real-live-multi-context-ci'));
  const o2=matrix.requirements.find(x=>x.id==='DIS020-OPT-002');
  assert.equal(o2.state,'PARTIAL');
  assert.ok(o2.receiptIds.includes('r97-o2-native-no-trust-ci'));
  assert.ok(o2.positive.some(e=>e.case.includes('only LearningObservation')));
  assert.ok(o2.negative.some(e=>e.case.includes('cannot mint Experience')));
- assert.equal(result.tallies['optional-profile:PARTIAL'],2);
- assert.equal(result.tallies['optional-profile:NOT_RUN'],2);
- for(const id of ['003','004'])
-  assert.equal(matrix.requirements.find(x=>x.id==='DIS020-OPT-'+id).state,'NOT_RUN');
+ assert.equal(matrix.requirements.find(x=>x.id==='DIS020-OPT-003').state,'VERIFIED');
+ assert.ok(matrix.requirements.find(x=>x.id==='DIS020-OPT-003').receiptIds.includes('r211-opt003-full-activation-ci'));
+ assert.equal(matrix.requirements.find(x=>x.id==='DIS020-OPT-004').state,'PARTIAL');
+ assert.equal(result.tallies['optional-profile:VERIFIED'],1);
+ assert.equal(result.tallies['optional-profile:PARTIAL'],3);
+ assert.equal(result.tallies['optional-profile:NOT_RUN']??0,0);
+ assert.equal(matrix.requirements.find(x=>x.id==='DIS020-GOV-001').state,'PARTIAL');
+});
+test('R211 OPT-003 promotion and honest PARTIAL bookkeeping anchor to real receipts and probes',async()=>{
+ const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async id=>[
+  id,JSON.parse(await readFile(new URL('receipts/'+id+'.json',base),'utf8'))
+ ])));
+ // OPT-003 VERIFIED witness receipt: exact historical 3/3 canonical contexts.
+ const o3=matrix.requirements.find(r=>r.id==='DIS020-OPT-003');
+ assert.equal(o3.state,'VERIFIED');
+ const r3=receipts['r211-opt003-full-activation-ci'];
+ assert.equal(r3.status,'SUCCESS');
+ assert.equal(r3.source.head,'d3bfb2529051d258b80beb45842ffd88ef04cd68');
+ assert.deepEqual(r3.ci.map(x=>x.state),['SUCCESS','SUCCESS','SUCCESS']);
+ assert.ok(r3.parentIntegration.head.length===40);
+ // OPT-001: live multi-context evidence receipt but state stays PARTIAL with
+ // the CI secret-delivery blocker recorded, not silently waived.
+ const o1=matrix.requirements.find(r=>r.id==='DIS020-OPT-001');
+ assert.equal(o1.state,'PARTIAL');
+ const r1=receipts['r211-opt001-real-live-multi-context-ci'];
+ assert.equal(r1.ciLiveContextBlocked.probes.length,4);
+ assert.ok(o1.negative.some(e=>e.case.includes('NO_CREDENTIAL')));
+ // OPT-004: engineering receipt, PARTIAL until a real promotion authority exists.
+ const o4=matrix.requirements.find(r=>r.id==='DIS020-OPT-004');
+ assert.equal(o4.state,'PARTIAL');
+ assert.ok(receipts['r211-opt004-server-promotion-ci'].activationSeam.pullRequest.includes('#1582')||receipts['r211-opt004-server-promotion-ci'].activationSeam.pullRequest.endsWith('1582'));
+ // GOV-001 PARTIAL only records the executed review; the Product/L1 decision
+ // stays explicitly pending in the note.
+ const gov=matrix.requirements.find(r=>r.id==='DIS020-GOV-001');
+ assert.equal(gov.state,'PARTIAL');
+ assert.ok(gov.note.includes('NOT made this round'));
 });
 test('R93 C3 VERIFIED cannot borrow generic R9.5 evidence or drop R86 selected-Host closure proof',async()=>{
  const receipts=Object.fromEntries(await Promise.all(matrix.receipts.map(async id=>[

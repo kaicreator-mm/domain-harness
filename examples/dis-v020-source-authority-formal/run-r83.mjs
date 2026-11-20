@@ -22,7 +22,11 @@ const EXPECTED_CODE_BLOBS={
  // R94 PARTIAL native fixture-only provider with no semantic qualification).
  // R95/R97: bind each requirement ID to its exact Core/Optional/Governance profile;
  // add Optional demotion and same-state Core/Optional profile-swap negatives.
- model:'574ca91705e3b6bafd6486e619406a099ea02558',
+ // R211 (#1544): model updated for O3 VERIFIED (receipt
+ // r211-opt003-full-activation-ci, reviewed PR #1571), O4 PARTIAL (no
+ // promotion authority) and GOV-001 PARTIAL (independent review executed,
+ // Product/L1 decision pending owner).
+ model:'b57cd3ccfd2b6663ddf5f8089691be9de5b18ae8',
  tests:'173174a8d635e8738f0c434365512ad506b6c560'
 };
 const blob=s=>{

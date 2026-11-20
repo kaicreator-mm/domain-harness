@@ -29,7 +29,7 @@
 | **D05 — Harness/LLM 可选能力** | OPT-001：真实 AOT-selected Provider、预算、工具调用、UNKNOWN | 接入真实选中 Provider，有限预算/取消；正常返回、不可用降级、无模型确定性回退 | 伪造 Provider/工具输出、预算超额、模型幻觉冒充事实、未选择的 Model 调用 | R94 native selected xDownload AOT→SDK/KDP + fixture Provider；R95 implementation HEAD `ed25934d` 的 #2450/1–3 3/3 SUCCESS，R96 implementation HEAD `d4f0b8bb` 的 #2451/1–3 3/3 SUCCESS；后续 R96 evidence/docs-sync HEAD `1920a7f0` 的 #2452/1–3 也独立 3/3 SUCCESS；OPT-001 **PARTIAL** | Provider 仍非 AOT-bound/非真实 LLM；继续补真实 Provider ABI、预算/终止证明和独立业务 Oracle，禁止提前 VERIFIED |
 | **D06 — Experience 与独立校验** | OPT-002：Experience provenance、源 Cohort、独立 Oracle/holdout、可重用性 | 对真实 Function/Domain 结果生成观察→可信校验→Experience；新的 holdout 检查与精确版本复用 | 同一来源重复计数为独立证据、Cache 命中伪验证、模拟 Oracle 自证、跨版本/隐私混淆 | R2 设计和 fixture 自演示；**native optional profile NOT_RUN** | 复用 D01 的 typed evidence；不依赖 D05 即可先验证确定性经验，选中模型路径再复核 D05 |
 | **D07 — Evolution / Meta 晋升** | OPT-003/004：数据规则 Slot、Task pin、撤销/回滚、Server Meta/Forge 晋升及新 AOT | 被明确选择的 bounded rule data 在适用 SDK 中验证/激活/撤销；Meta 产新候选→独立校验→新 AOT | 未获授权热更新、任意 native code 注入、跨 Task 激活、过期受众/无效撤销、Server 自行晋升或泄漏 | R2 模拟晋升和设计；**native optional profiles NOT_RUN** | D06 真实 Evidence 与 D04 AOT/Target 先成立；若选择 LLM 生成候选还需 D05，不能自动生产自演进 |
-| **D08 — 版本闭环与独立审核** | CORE-016 + GOV-001；全部适用 MUST/启用 Profile 的证据闭环 | 每个适用 requirement 与可执行 source/test/negative/实际匹配的 CI receipt 一一对照；独立 Exact-SHA review、Product/L1/L2 decision | 未运行、缺日志、混合 context FAIL、借旧 SHA、无 Owner Freeze、自评替代独审 | CORE-016 PARTIAL、GOV-001 NOT_RUN | D00–D07 的**适用**条件满足后，执行现有独立门禁；最终才决定 Freeze / merge / release |
+| **D08 — 版本闭环与独立审核** | CORE-016 + GOV-001；全部适用 MUST/启用 Profile 的证据闭环 | 每个适用 requirement 与可执行 source/test/negative/实际匹配的 CI receipt 一一对照；独立 Exact-SHA review、Product/L1/L2 decision | 未运行、缺日志、混合 context FAIL、借旧 SHA、无 Owner Freeze、自评替代独审 | CORE-016 PARTIAL、GOV-001 PARTIAL（R211：独立评审已执行，Product/L1 决策待 Owner） | D00–D07 的**适用**条件满足后，执行现有独立门禁；最终才决定 Freeze / merge / release |
 
 ## 3. 证据依赖图（不是 Frozen Task DAG）
 
@@ -73,6 +73,8 @@ D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式�
 - **下一最小可改变决策的步骤**：查 Woodpecker 2232/1 第一失败命令/日志，修复有证据的根因，在原写集复测并把新 SHA 的独立 context 结果写进新的 receipt。不能只因随后 docs-only HEAD 获得其他 green context 就借 R11 integration PASS。
 - **停止/复盘**：每项 Demo 结论包含 `Question | input source+exact pin | execution+environment | positive/negative/UNKNOWN | result | what NOT proven | next smallest evidence | inherited scope/invalidated receipts`。无必要时一个 Markdown 就够；不追求每项单独 Issue 或机器 Schema。
 - **通用经验写回 [ADS #1361](https://github.com/kaicreator-mm/ai-development-standard/issues/1361)**：版本 Conformance 可借用 ADS #1362 的证据组织技术，但不得混淆 Stage 1/2 权威；历史成功的 exact SHA、领域来源 Pin、独立语义判定、Effect 权限与本轮 CI 必须分别表达；研究依赖图不等于 Frozen Task DAG。Issue 开销与时间/成本只有实际测量才声称节省。
+
+**R211 更新（2026-11-20，#1544）**：六 lane 并行交付后机器矩阵 14/21 VERIFIED（OPT-003 VERIFIED；OPT-004/GOV-001 PARTIAL；0 NOT_RUN）——以 matrix.json 为唯一状态权威，本索引为研究叙事。原文如下。
 
 **R13 验证器反例修复**：旧 `validate.test.mjs` 要求 `core:NOT_RUN > 0`，与真实 Matrix 9 VERIFIED / 7 PARTIAL / 0 NOT_RUN 矛盾；现在以完整 16 Core 数和剩余未验证数核对，并新增“BLOCKED 收据不能为 VERIFIED 背书”的负例。此源级问题不等于确认 Woodpecker 的第一失败步骤；只认后续 exact-SHA CI。
 

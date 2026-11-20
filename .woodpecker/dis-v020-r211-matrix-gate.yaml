@@ -1,0 +1,51 @@
+# DIS 0.2.0 R211 matrix/auditor gate — one checkout, one focused CI result.
+# Modeled on .woodpecker/v011.yaml (single consolidated workflow; trusted
+# local backend with plugin-git partial+sparse clone). Runs ONLY the
+# fail-closed conformance auditor chain that consumes the checked-in
+# Matrix/receipts/ledger evidence. No build needed: the only workspace
+# import (contracts/dis-v020) resolves to its source .mjs; npm ci exists
+# just to materialize workspace links. Tiny footprint, finish-fast.
+# Never mints qualification, Effect, Experience, L2 or Release.
+when:
+  - event: pull_request
+  - event: manual
+
+labels:
+  backend: local
+
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      partial: true
+      depth: 1
+      tags: false
+      lfs: false
+      recursive: false
+      sparse:
+        - examples/dis-v020-conformance
+        - examples/dis-v020-source-authority-formal
+        - examples/dis-v020-native-sdk
+        - docs/standards/domain-intelligence
+        - packages
+        - tooling
+        - scripts
+
+steps:
+  - name: r211-matrix-auditors
+    image: bash
+    commands:
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+      - node --version
+      - node -e "if(Number(process.versions.node.split('.')[0])<24)process.exit(1)"
+      - npm_config_better_sqlite3_binary_host_mirror=https://registry.npmmirror.com/-/binary/better-sqlite3 npm ci --no-audit --no-fund
+      # The fail-closed auditor chain over the checked-in 21-row Matrix,
+      # receipts, B01-B20 ledger and closure DAG. Each auditor previously
+      # rejected the stale 13/21 snapshot; all are aligned to the honest
+      # R211 state (14/21 VERIFIED, 7 PARTIAL, 0 NOT_RUN) in this commit.
+      - node --test examples/dis-v020-conformance/validate.test.mjs
+      - node examples/dis-v020-source-authority-formal/run-r83.mjs
+      - node --test examples/dis-v020-conformance/full-ledger.test.mjs
+      - node --test examples/dis-v020-conformance/full-ledger-30.test.mjs
+      - node --test examples/dis-v020-conformance/full-ledger-34.test.mjs
+      - node --test examples/dis-v020-conformance/closure-audit.test.mjs
