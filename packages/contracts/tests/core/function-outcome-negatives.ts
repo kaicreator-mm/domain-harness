@@ -1,5 +1,5 @@
 /** 当前领域契约：单一结构定义与严格的数据验证。 */
-import type { FunctionOutcome } from './app-contracts.js';
+import type { FunctionOutcome } from '../../src/app-contracts.js';
 
 const succeededMissingValue = { kind: 'SUCCEEDED' } as const;
 // @ts-expect-error 此处必须触发静态类型错误

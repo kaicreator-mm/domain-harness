@@ -1,13 +1,13 @@
 /** 当前领域契约：单一结构定义与严格的数据验证。 */
-import type { SemVer } from '../base.js';
+import type { SemVer } from '../../src/base.js';
 import type {
   DomainDefinition,
   ElementDefinition,
-} from '../element-contracts.js';
-import type { DomainAppDescriptor } from '../app-descriptor.js';
-import type { DomainAppLock } from '../app-lock.js';
-import type { FunctionRef, ResolvedTarget } from '../refs.js';
-import { contentDigestOf } from '../digest.js';
+} from '../../src/element-contracts.js';
+import type { DomainAppDescriptor } from '../../src/app-descriptor.js';
+import type { DomainAppLock } from '../../src/app-lock.js';
+import type { FunctionRef, ResolvedTarget } from '../../src/refs.js';
+import { contentDigestOf } from '../../src/digest.js';
 
 const RESOURCE_DIGESTS = {
   rules: contentDigestOf({ fixture: 'orders/rules', revision: 1 }),
