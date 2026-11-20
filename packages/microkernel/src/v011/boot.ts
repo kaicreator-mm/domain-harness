@@ -39,23 +39,38 @@ function refused(code: V011BootErrorCode, reason: string): BootResult {
 
 function readPin(pin: unknown): { pin: BootstrapPin; problems: string[] } {
   const problems: string[] = [];
+  // The pin is arbitrary caller input — it may be a Proxy with throwing
+  // traps. Any access failure is an ordinary malformed-pin refusal.
+  // (isRecord itself only uses intrinsic typeof checks — trap-safe.)
   const p: Record<string, unknown> = isRecord(pin) ? pin : {};
-  if (p['schemaVersion'] !== DH_PIN_SCHEMA_VERSION) {
-    problems.push(`pin schemaVersion must be '${DH_PIN_SCHEMA_VERSION}'`);
+  try {
+    if (p['schemaVersion'] !== DH_PIN_SCHEMA_VERSION) {
+      problems.push(`pin schemaVersion must be '${DH_PIN_SCHEMA_VERSION}'`);
+    }
+    if (!isRecord(p['target'])) problems.push('pin target must be an object');
+    if (typeof p['kdpPackageId'] !== 'string' || p['kdpPackageId'].length === 0) {
+      problems.push('pin kdpPackageId is not a well-formed package id');
+    }
+    if (p['kdpPrimaryEntry'] !== 'bootstrap') problems.push(`pin kdpPrimaryEntry must be 'bootstrap'`);
+    if (!isContentDigest(p['kdpPrimaryDigest'])) problems.push('pin kdpPrimaryDigest must be sha256:<64 lowercase hex>');
+    if (!isContentDigest(p['lockDigest'])) problems.push('pin lockDigest must be sha256:<64 lowercase hex>');
+    if (typeof p['lockPath'] !== 'string' || p['lockPath'].length === 0) problems.push('pin lockPath must be a non-empty string');
+  } catch (error) {
+    problems.push(`pin could not be read: ${(error as Error).message}`);
   }
-  if (!isRecord(p['target'])) problems.push('pin target must be an object');
-  if (typeof p['kdpPackageId'] !== 'string' || p['kdpPackageId'].length === 0) {
-    problems.push('pin kdpPackageId is not a well-formed package id');
-  }
-  if (p['kdpPrimaryEntry'] !== 'bootstrap') problems.push(`pin kdpPrimaryEntry must be 'bootstrap'`);
-  if (!isContentDigest(p['kdpPrimaryDigest'])) problems.push('pin kdpPrimaryDigest must be sha256:<64 lowercase hex>');
-  if (!isContentDigest(p['lockDigest'])) problems.push('pin lockDigest must be sha256:<64 lowercase hex>');
-  if (typeof p['lockPath'] !== 'string' || p['lockPath'].length === 0) problems.push('pin lockPath must be a non-empty string');
   return { pin: p as unknown as BootstrapPin, problems };
 }
 
 function checkPinAgainstRecord(pin: BootstrapPin, record: InstalledRecord): string | null {
-  if (canonicalJson(pin.target) !== canonicalJson(record.target)) {
+  // The pin target is caller input — cyclic or non-plain values must map to
+  // a typed mismatch, never throw out of boot.
+  let pinTargetJson: string;
+  try {
+    pinTargetJson = canonicalJson(pin.target);
+  } catch (error) {
+    return `pin target is not plain serializable data: ${(error as Error).message}`;
+  }
+  if (pinTargetJson !== canonicalJson(record.target)) {
     return 'pin target does not equal the installed record target';
   }
   if (pin.kdpPackageId !== record.kdpPackageId) return 'pin kdpPackageId does not equal the installed record';
@@ -77,6 +92,10 @@ function checkPinAgainstRecord(pin: BootstrapPin, record: InstalledRecord): stri
  * Never parses Package DAGs, never preloads SDK/Business/Extensions.
  */
 export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Promise<BootResult> {
+  // A missing/garbage context is a typed REFUSED, never a TypeError.
+  if (!isRecord(context)) {
+    return refused('DH_BOOT_RECORD_MISSING', 'boot context is missing or not an object; no trusted install can be addressed');
+  }
   // (a) trusted installed record — the only trust anchor (shared helper;
   // a missing/non-string installRoot is typed DH_BOOT_RECORD_MISSING).
   const recordResult = await readTrustedRecord(context.installRoot);

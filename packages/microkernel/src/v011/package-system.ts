@@ -138,22 +138,45 @@ export class PackageSystem {
   /**
    * Technical init in the Lock's exact `technicalInitOrder`; module
    * evaluation plus the optional named `technicalInit` export per package.
+   * On failure the packages already initialized are torn down in strict
+   * REVERSE order (best-effort: cleanup errors never mask the original
+   * init failure) before the original error propagates.
    */
   async runTechnicalInit(): Promise<void> {
-    for (const packageId of this.lock.technicalInitOrder) {
-      const pkg = this.packageById(packageId);
-      if (pkg === undefined) {
-        throw new KdpLoadError(`technicalInitOrder references unselected package '${packageId}'`);
-      }
-      const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
-      const technicalInit = mod['technicalInit'];
-      if (technicalInit !== undefined) {
-        if (typeof technicalInit !== 'function') {
-          throw new KdpLoadError(`package '${packageId}' export 'technicalInit' is not a function`);
+    const initialized: string[] = [];
+    try {
+      for (const packageId of this.lock.technicalInitOrder) {
+        const pkg = this.packageById(packageId);
+        if (pkg === undefined) {
+          throw new KdpLoadError(`technicalInitOrder references unselected package '${packageId}'`);
         }
-        const context: TechnicalLifecycleContext = { packageId, hostPorts: this.hostPorts };
-        await (technicalInit as (ctx: TechnicalLifecycleContext) => unknown)(context);
+        const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
+        const technicalInit = mod['technicalInit'];
+        if (technicalInit !== undefined) {
+          if (typeof technicalInit !== 'function') {
+            throw new KdpLoadError(`package '${packageId}' export 'technicalInit' is not a function`);
+          }
+          const context: TechnicalLifecycleContext = { packageId, hostPorts: this.hostPorts };
+          await (technicalInit as (ctx: TechnicalLifecycleContext) => unknown)(context);
+        }
+        initialized.push(packageId);
       }
+    } catch (error) {
+      for (const packageId of [...initialized].reverse()) {
+        try {
+          const pkg = this.packageById(packageId);
+          if (pkg === undefined) continue;
+          const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
+          const technicalDispose = mod['technicalDispose'];
+          if (typeof technicalDispose === 'function') {
+            const context: TechnicalLifecycleContext = { packageId, hostPorts: this.hostPorts };
+            await (technicalDispose as (ctx: TechnicalLifecycleContext) => unknown)(context);
+          }
+        } catch {
+          // Best-effort cleanup: the original init failure takes precedence.
+        }
+      }
+      throw error;
     }
   }
 
@@ -161,7 +184,9 @@ export class PackageSystem {
   async runTechnicalDispose(): Promise<void> {
     for (const packageId of this.lock.technicalDisposeOrder) {
       const pkg = this.packageById(packageId);
-      if (pkg === undefined) continue;
+      if (pkg === undefined) {
+        throw new KdpLoadError(`technicalDisposeOrder references unselected package '${packageId}'`);
+      }
       const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
       const technicalDispose = mod['technicalDispose'];
       if (technicalDispose !== undefined) {

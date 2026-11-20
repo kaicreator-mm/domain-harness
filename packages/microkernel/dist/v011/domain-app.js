@@ -21,40 +21,71 @@ function isReasonObject(value) {
  * declared outcome set — it is the runtime's own refusal, not an
  * implementation outcome).
  */
+/**
+ * Normalize a raw implementation return value into the strict
+ * FunctionOutcome union. This function must NEVER throw: hostile or buggy
+ * implementations may return Proxies with throwing traps, so every access
+ * is guarded and mapped to a typed FAILED outcome. Kind/payload presence
+ * uses plain own-property checks only (no prototype chain, no `in`).
+ */
 export function normalizeOutcome(raw, declaredOutcomes) {
-    if (typeof raw === 'object' && raw !== null) {
-        const outcome = raw;
-        const kind = outcome['kind'];
-        if (kind === 'SUCCEEDED' && 'value' in outcome) {
-            const value = outcome['value'];
-            if (!isPlainJsonValue(value)) {
-                return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-JSON SUCCEEDED value');
+    try {
+        if (typeof raw === 'object' && raw !== null) {
+            const outcome = raw;
+            const kind = outcome['kind'];
+            if (kind === 'SUCCEEDED' && hasOwn(outcome, 'value')) {
+                const value = outcome['value'];
+                if (!isPlainJsonValue(value)) {
+                    return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-JSON SUCCEEDED value');
+                }
+                if (!declaredOutcomes.includes('SUCCEEDED')) {
+                    return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'SUCCEEDED'`);
+                }
+                return { kind: 'SUCCEEDED', value };
             }
-            if (!declaredOutcomes.includes('SUCCEEDED')) {
-                return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'SUCCEEDED'`);
+            if (kind === 'UNKNOWN' && hasOwn(outcome, 'unknownReason') && isReasonObject(outcome['unknownReason'])) {
+                if (!declaredOutcomes.includes('UNKNOWN')) {
+                    return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'UNKNOWN'`);
+                }
+                return { kind: 'UNKNOWN', unknownReason: outcome['unknownReason'] };
             }
-            return { kind: 'SUCCEEDED', value };
-        }
-        if (kind === 'UNKNOWN' && isReasonObject(outcome['unknownReason'])) {
-            if (!declaredOutcomes.includes('UNKNOWN')) {
-                return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'UNKNOWN'`);
+            if (kind === 'FAILED' && hasOwn(outcome, 'failure') && isReasonObject(outcome['failure'])) {
+                if (!declaredOutcomes.includes('FAILED')) {
+                    return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'FAILED'`);
+                }
+                return { kind: 'FAILED', failure: outcome['failure'] };
             }
-            return { kind: 'UNKNOWN', unknownReason: outcome['unknownReason'] };
-        }
-        if (kind === 'FAILED' && isReasonObject(outcome['failure'])) {
-            if (!declaredOutcomes.includes('FAILED')) {
-                return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'FAILED'`);
+            if (typeof kind === 'string' && (kind === 'SUCCEEDED' || kind === 'UNKNOWN' || kind === 'FAILED')) {
+                return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `implementation returned outcome kind '${kind}' missing its strict union payload`);
             }
-            return { kind: 'FAILED', failure: outcome['failure'] };
+            if (typeof kind === 'string' && !declaredOutcomes.includes(kind)) {
+                return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `implementation returned outcome kind '${kind}' that the contract did not declare`);
+            }
         }
-        if (typeof kind === 'string' && (kind === 'SUCCEEDED' || kind === 'UNKNOWN' || kind === 'FAILED')) {
-            return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `implementation returned outcome kind '${kind}' missing its strict union payload`);
-        }
-        if (typeof kind === 'string' && !declaredOutcomes.includes(kind)) {
-            return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `implementation returned outcome kind '${kind}' that the contract did not declare`);
-        }
+        return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-FunctionOutcome value');
     }
-    return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-FunctionOutcome value');
+    catch (error) {
+        // A Proxy/getter on the implementation's return value threw while being
+        // inspected — an ordinary typed FAILED outcome, never a rejected invoke.
+        return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `implementation returned a value whose inspection threw: ${error.message}`);
+    }
+}
+/** Own-property check that does not walk the prototype chain. */
+function hasOwn(value, key) {
+    return Object.prototype.hasOwnProperty.call(value, key);
+}
+/**
+ * Schema validation that cannot reject: a throwing Proxy/getter on the
+ * instance is a validation failure for the caller, mapped to a typed
+ * FAILED outcome by the invoke pipeline.
+ */
+function safeValidateJsonSubset(instance, schema) {
+    try {
+        return validateJsonSubset(instance, schema);
+    }
+    catch {
+        return false;
+    }
 }
 export function createDomainApp(deps) {
     const { lock, packages } = deps;
@@ -98,7 +129,7 @@ export function createDomainApp(deps) {
         if (schemas === null) {
             return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `input/output schema resources for function '${selected.ref.functionId}' are unavailable in this install`);
         }
-        if (!validateJsonSubset(input, schemas.input)) {
+        if (!safeValidateJsonSubset(input, schemas.input)) {
             return failedOutcome('DH_RUNTIME_INPUT_SCHEMA_MISMATCH', `input for ingress '${ingressId}' failed inputSchemaRef`);
         }
         let raw;
@@ -109,7 +140,7 @@ export function createDomainApp(deps) {
             return failedOutcome('DH_KDP_PACKAGE_LOAD_FAILED', `implementation for ingress '${ingressId}' threw: ${error.message}`);
         }
         const outcome = normalizeOutcome(raw, selected.outcomes);
-        if (outcome.kind === 'SUCCEEDED' && !validateJsonSubset(outcome.value, schemas.output)) {
+        if (outcome.kind === 'SUCCEEDED' && !safeValidateJsonSubset(outcome.value, schemas.output)) {
             return failedOutcome('DH_RUNTIME_OUTPUT_SCHEMA_MISMATCH', `SUCCEEDED value for ingress '${ingressId}' failed outputSchemaRef (reported as FAILED, never passed through)`);
         }
         return outcome;

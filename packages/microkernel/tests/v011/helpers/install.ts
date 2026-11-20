@@ -58,7 +58,9 @@ export type FunctionBehavior =
   | { readonly behavior: 'unknown' }
   | { readonly behavior: 'failed' }
   | { readonly behavior: 'throw' }
-  | { readonly behavior: 'garbage' };
+  | { readonly behavior: 'garbage' }
+  | { readonly behavior: 'proxy-outcome' }
+  | { readonly behavior: 'proxy-value' };
 
 export interface FixtureInit {
   readonly status: 'READY' | 'DEGRADED' | 'BLOCKED' | 'FAILED';
@@ -73,6 +75,8 @@ export interface FixtureScenario {
   readonly readResource?: string;
   /** When true, the fixture kernel's technicalDispose throws (single-flight negative). */
   readonly kernelDisposeThrow?: boolean;
+  /** When true, the fixture SDK's technicalInit throws (init-cleanup negative). */
+  readonly sdkInitThrow?: boolean;
 }
 
 export const DEFAULT_SCENARIO: FixtureScenario = {
@@ -153,6 +157,18 @@ function behave(name) {
       throw new Error('fixture function threw');
     case 'garbage':
       return 42;
+    case 'proxy-outcome': {
+      const outcome = {};
+      Object.defineProperty(outcome, 'kind', {
+        get() { throw new Error('evil outcome getter'); },
+      });
+      return outcome;
+    }
+    case 'proxy-value':
+      return {
+        kind: 'SUCCEEDED',
+        value: new Proxy({ decision: 'POS' }, { get() { throw new Error('evil value getter'); } }),
+      };
     default:
       throw new Error('unknown fixture behavior ' + b.behavior);
   }
@@ -176,12 +192,15 @@ export async function technicalDispose(ctx) {
 `;
 }
 
-function sdkModuleSource(): string {
+function sdkModuleSource(scenario: FixtureScenario): string {
   return `
 const events = (globalThis.__v011Events ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_SDK}' });
 export async function technicalInit(ctx) {
   events.push({ event: 'technical-init', package: '${FIXTURE_SDK}' });
+  if (${JSON.stringify(scenario.sdkInitThrow ?? false)}) {
+    throw new Error('fixture sdk technicalInit threw');
+  }
 }
 export async function technicalDispose(ctx) {
   events.push({ event: 'technical-dispose', package: '${FIXTURE_SDK}' });
@@ -377,7 +396,7 @@ export async function buildFixtureInstall(
 
   // 2. Fixture K/S/B/Extension packages — real ESM modules on disk.
   const kernelPath = await write(`node_modules/${FIXTURE_KERNEL}/dist/index.mjs`, kernelModuleSource(scenario));
-  const sdkPath = await write(`node_modules/${FIXTURE_SDK}/dist/index.mjs`, sdkModuleSource());
+  const sdkPath = await write(`node_modules/${FIXTURE_SDK}/dist/index.mjs`, sdkModuleSource(scenario));
   const businessPath = await write(`node_modules/${FIXTURE_BUSINESS}/dist/index.mjs`, businessModuleSource(scenario));
   const extPath = await write(`node_modules/${FIXTURE_EXT}/dist/index.mjs`, extensionModuleSource());
   const hookPath = await write(`node_modules/${FIXTURE_EXT}/dist/hook.mjs`, hookProviderModuleSource());

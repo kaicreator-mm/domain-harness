@@ -32,6 +32,13 @@ export interface DomainAppDeps {
  * declared outcome set — it is the runtime's own refusal, not an
  * implementation outcome).
  */
+/**
+ * Normalize a raw implementation return value into the strict
+ * FunctionOutcome union. This function must NEVER throw: hostile or buggy
+ * implementations may return Proxies with throwing traps, so every access
+ * is guarded and mapped to a typed FAILED outcome. Kind/payload presence
+ * uses plain own-property checks only (no prototype chain, no `in`).
+ */
 export declare function normalizeOutcome(raw: unknown, declaredOutcomes: readonly string[]): FunctionOutcome;
 export declare function createDomainApp(deps: DomainAppDeps): DomainApp;
 export { KdpLoadError };

@@ -384,3 +384,53 @@ test('dispose is single-flight: concurrent and repeated calls never rerun techni
   );
   assert.equal(kernelDisposes.length, 1, 'failing technicalDispose ran exactly once');
 });
+
+test('technicalInit failure: already-initialized packages are torn down in strict reverse order', async (t) => {
+  const fixture = await buildFixtureInstall({
+    init: { status: 'READY' },
+    functions: {},
+    sdkInitThrow: true,
+  });
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'FAILED', JSON.stringify(result));
+  if (result.status === 'FAILED') {
+    assert.equal(result.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
+    assert.match(result.reason, /fixture sdk technicalInit threw/);
+  }
+
+  // Init order: kernel initialized, sdk's technicalInit threw. Best-effort
+  // cleanup must dispose ONLY the already-initialized kernel, in reverse.
+  const inits = events()
+    .filter((event) => event['event'] === 'technical-init')
+    .map((event) => event['package']);
+  assert.deepEqual(inits, ['fixture-kernel', '@fixture/sdk']);
+  const disposes = events()
+    .filter((event) => event['event'] === 'technical-dispose')
+    .map((event) => event['package']);
+  assert.deepEqual(disposes, ['fixture-kernel'], 'reverse best-effort cleanup of initialized packages only');
+  assert.equal(
+    events().some((event) => event['event'] === 'business-init'),
+    false,
+    'zero ingress when technical init fails',
+  );
+});
+
+test('runTechnicalDispose refuses unselected packages instead of silently continuing', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  const { PackageSystem } = await import('../../src/v011/package-system.js');
+  const tamperedLock = {
+    ...fixture.lock,
+    technicalDisposeOrder: ['fixture-ghost'],
+  };
+  const packages = new PackageSystem(fixture.installRoot, tamperedLock, []);
+  await assert.rejects(
+    packages.runTechnicalDispose(),
+    /technicalDisposeOrder references unselected package 'fixture-ghost'/,
+  );
+});

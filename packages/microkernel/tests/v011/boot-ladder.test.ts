@@ -235,6 +235,47 @@ test('missing or non-string installRoot is a typed REFUSED, never a TypeError', 
   });
 });
 
+test('null/garbage boot context is a typed REFUSED, never a TypeError', async (t) => {
+  await withFixture(t, async (fixture) => {
+    for (const badContext of [null, undefined, 'nope', 42]) {
+      const result = await boot(fixture.pin, badContext as unknown as typeof fixture.context);
+      assertRefused(result, 'DH_BOOT_RECORD_MISSING');
+    }
+    sideEffectFree();
+  });
+});
+
+test('cyclic or throwing pin values are typed REFUSED, never a TypeError', async (t) => {
+  await withFixture(t, async (fixture) => {
+    // Cyclic pin.target: canonicalJson would throw on the cycle.
+    const cyclicTarget: Record<string, unknown> = { runtime: 'node' };
+    cyclicTarget['self'] = cyclicTarget;
+    const cyclicPin = { ...fixture.pin, target: cyclicTarget } as unknown as typeof fixture.pin;
+    const cyclicResult = await boot(cyclicPin, fixture.context);
+    assertRefused(cyclicResult, 'DH_BOOT_PIN_MISMATCH');
+    if (cyclicResult.status === 'REFUSED') {
+      assert.match(cyclicResult.reason, /not plain serializable/);
+    }
+    sideEffectFree();
+
+    // Throwing-Proxy pin: reading any pin field throws.
+    const evilPin = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('evil pin getter');
+        },
+      },
+    );
+    const proxyResult = await boot(evilPin as unknown as typeof fixture.pin, fixture.context);
+    assertRefused(proxyResult, 'DH_BOOT_PIN_MISMATCH');
+    if (proxyResult.status === 'REFUSED') {
+      assert.match(proxyResult.reason, /could not be read/);
+    }
+    sideEffectFree();
+  });
+});
+
 function deepFreeze(value: unknown): void {
   if (typeof value !== 'object' || value === null) return;
   for (const key of Object.keys(value)) {

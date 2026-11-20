@@ -52,3 +52,40 @@ test('isPlainJsonValue accepts only plain JSON data', () => {
   assert.equal(isPlainJsonValue({ d: new Date(0) }), false, 'nested non-plain values are refused');
   assert.equal(isPlainJsonValue([new Map()]), false);
 });
+
+test('required/properties use own properties only — inherited keys do not satisfy them', () => {
+  const schema = { type: 'object', required: ['a'], properties: { b: { type: 'number' } } };
+  const inherited = Object.create({ a: 'inherited' });
+  assert.equal(validateJsonSubset(inherited, schema), false, 'inherited `a` must not satisfy required');
+
+  const ownAndInherited = Object.assign(Object.create({ b: 'inherited-string' }), { a: 1, b: 5 });
+  assert.equal(validateJsonSubset(ownAndInherited, schema), true, 'own `b` validates; inherited is ignored');
+
+  const badOwnB = Object.assign(Object.create({}), { a: 1, b: 'not-a-number' });
+  assert.equal(validateJsonSubset(badOwnB, schema), false, 'own `b` failing its subschema is refused');
+});
+
+test('non-object schemas fail closed; non-finite numbers and tuple-form items are refused', () => {
+  // Only boolean schemas and plain schema objects are meaningful.
+  assert.equal(validateJsonSubset(1, true), true);
+  assert.equal(validateJsonSubset(1, false), false);
+  assert.equal(validateJsonSubset(1, 'not-a-schema'), false);
+  assert.equal(validateJsonSubset(1, 42), false);
+  assert.equal(validateJsonSubset(1, null), false);
+  assert.equal(validateJsonSubset(1, ['type', 'number']), false);
+  assert.equal(validateJsonSubset(1, { type: 'number' }), true);
+
+  // Non-finite number instances are not JSON data.
+  assert.equal(validateJsonSubset(Number.POSITIVE_INFINITY, { type: 'number' }), false);
+  assert.equal(validateJsonSubset(Number.NaN, true), false, 'even against boolean true');
+
+  // Array-form `items` is the pre-2020-12 tuple form; this subset requires
+  // prefixItems and must reject rather than silently accept.
+  assert.equal(validateJsonSubset([1, 2], { items: [{ type: 'number' }] }), false);
+  assert.equal(validateJsonSubset([1, 'x'], { items: { type: 'number' } }), false);
+  assert.equal(validateJsonSubset([1, 2], { items: { type: 'number' } }), true);
+  assert.equal(
+    validateJsonSubset([1, 'x'], { prefixItems: [{ type: 'number' }, { type: 'string' }] }),
+    true,
+  );
+});

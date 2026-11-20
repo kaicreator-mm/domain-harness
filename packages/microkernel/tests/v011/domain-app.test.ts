@@ -162,6 +162,58 @@ test('inspect projects Lock facts only (B06), including DEGRADED suppression', a
   await degraded.dispose();
 });
 
+test('invoke never rejects on Proxy/getter outcomes: typed FAILED instead', async (t) => {
+  // A Proxy AS the implementation outcome: even reading `kind` throws.
+  const evilOutcome = await bootApp(t, {
+    init: { status: 'READY' },
+    functions: { evaluate: { behavior: 'proxy-outcome' } },
+  });
+  const outcomeResult = await evilOutcome.invoke('evaluate', { total: 1, region: 'EU' });
+  assert.equal(outcomeResult.kind, 'FAILED');
+  assert.equal(
+    outcomeResult.kind === 'FAILED' && outcomeResult.failure.code,
+    'DH_RUNTIME_UNSUPPORTED_PROFILE',
+  );
+  assert.match(
+    outcomeResult.kind === 'FAILED' ? outcomeResult.failure.message : '',
+    /inspection threw/,
+  );
+  await evilOutcome.dispose();
+
+  // A SUCCEEDED value whose own inspection throws during normalization.
+  const evilValue = await bootApp(t, {
+    init: { status: 'READY' },
+    functions: { evaluate: { behavior: 'proxy-value' } },
+  });
+  const valueResult = await evilValue.invoke('evaluate', { total: 1, region: 'EU' });
+  assert.equal(valueResult.kind, 'FAILED');
+  assert.equal(
+    valueResult.kind === 'FAILED' && valueResult.failure.code,
+    'DH_RUNTIME_UNSUPPORTED_PROFILE',
+  );
+  await evilValue.dispose();
+});
+
+test('invoke never rejects on hostile Proxy input: typed input mismatch instead', async (t) => {
+  const app = await bootApp(t, {
+    init: { status: 'READY' },
+    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
+  });
+  const hostileInput = new Proxy(
+    { total: 100, region: 'EU' },
+    {
+      get(target, key) {
+        if (key === 'total') throw new Error('evil input getter');
+        return Reflect.get(target, key);
+      },
+    },
+  );
+  const outcome = await app.invoke('evaluate', hostileInput);
+  assert.equal(outcome.kind, 'FAILED');
+  assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH');
+  await app.dispose();
+});
+
 test('invoke after dispose is refused; disposed apps stay disposed', async (t) => {
   const app = await bootApp(t, {
     init: { status: 'READY' },

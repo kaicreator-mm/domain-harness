@@ -41,6 +41,9 @@ export declare class PackageSystem {
     /**
      * Technical init in the Lock's exact `technicalInitOrder`; module
      * evaluation plus the optional named `technicalInit` export per package.
+     * On failure the packages already initialized are torn down in strict
+     * REVERSE order (best-effort: cleanup errors never mask the original
+     * init failure) before the original error propagates.
      */
     runTechnicalInit(): Promise<void>;
     /** Strict reverse teardown per the Lock's `technicalDisposeOrder`. */

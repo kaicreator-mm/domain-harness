@@ -1,8 +1,13 @@
 export function validateJsonSubset(instance, schema) {
+    // Non-finite numbers are not JSON data — refuse them outright.
+    if (typeof instance === 'number' && !Number.isFinite(instance))
+        return false;
     if (typeof schema === 'boolean')
         return schema;
+    // Fail closed: anything that is not a boolean or a plain schema object
+    // (string/number/array/null schema) matches NOTHING.
     if (typeof schema !== 'object' || schema === null || Array.isArray(schema))
-        return true;
+        return false;
     const s = schema;
     if ('const' in s && !deepJsonEqual(instance, s['const']))
         return false;
@@ -52,8 +57,15 @@ export function validateJsonSubset(instance, schema) {
         if (typeof s['maxItems'] === 'number' && instance.length > s['maxItems'])
             return false;
         const items = s['items'];
-        if (items !== undefined && !instance.every((item) => validateJsonSubset(item, items)))
-            return false;
+        if (items !== undefined) {
+            // Draft 2020-12 `items` is a single schema. The old array (tuple)
+            // form is `prefixItems`; an array-form `items` is a malformed schema
+            // for this target and is rejected rather than silently accepted.
+            if (Array.isArray(items))
+                return false;
+            if (!instance.every((item) => validateJsonSubset(item, items)))
+                return false;
+        }
         const prefixItems = s['prefixItems'];
         if (Array.isArray(prefixItems)) {
             for (let index = 0; index < prefixItems.length && index < instance.length; index += 1) {
@@ -78,14 +90,15 @@ export function validateJsonSubset(instance, schema) {
         const required = s['required'];
         if (Array.isArray(required)) {
             for (const key of required) {
-                if (typeof key === 'string' && !(key in objectInstance))
+                // Own properties only — inherited members do not satisfy `required`.
+                if (typeof key === 'string' && !hasOwn(objectInstance, key))
                     return false;
             }
         }
         const properties = s['properties'];
         if (isPlainObject(properties)) {
             for (const [key, subschema] of Object.entries(properties)) {
-                if (key in objectInstance && !validateJsonSubset(objectInstance[key], subschema))
+                if (hasOwn(objectInstance, key) && !validateJsonSubset(objectInstance[key], subschema))
                     return false;
             }
         }
@@ -95,14 +108,14 @@ export function validateJsonSubset(instance, schema) {
             // when no `properties` keyword is present at all (then every key is
             // additional, so only {} is accepted).
             for (const key of Object.keys(objectInstance)) {
-                const declared = isPlainObject(properties) && key in properties;
+                const declared = isPlainObject(properties) && hasOwn(properties, key);
                 if (!declared)
                     return false;
             }
         }
         else if (isPlainObject(additional)) {
             for (const key of Object.keys(objectInstance)) {
-                const declared = isPlainObject(properties) && key in properties;
+                const declared = isPlainObject(properties) && hasOwn(properties, key);
                 if (!declared && !validateJsonSubset(objectInstance[key], additional))
                     return false;
             }
@@ -155,6 +168,10 @@ function matchesType(instance, type) {
 function isPlainObject(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+/** Own-property check that does not walk the prototype chain. */
+function hasOwn(value, key) {
+    return Object.prototype.hasOwnProperty.call(value, key);
+}
 /**
  * Strict plain-JSON value guard: only null, booleans, finite numbers,
  * strings, plain arrays and plain objects (Object.prototype or a null
@@ -193,7 +210,7 @@ export function deepJsonEqual(a, b) {
         const keysA = Object.keys(a);
         const keysB = Object.keys(b);
         return (keysA.length === keysB.length &&
-            keysA.every((key) => key in b && deepJsonEqual(a[key], b[key])));
+            keysA.every((key) => hasOwn(b, key) && deepJsonEqual(a[key], b[key])));
     }
     return false;
 }

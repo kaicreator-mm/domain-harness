@@ -249,6 +249,14 @@ export async function verifyKdpEntryBytes(installRoot, record) {
  * path.
  */
 export async function verifyInstallTrust(context) {
+    // A missing/garbage context is an ordinary typed failure, never a
+    // TypeError: without a usable context there is no trusted install.
+    if (!isRecord(context)) {
+        return {
+            ok: false,
+            failure: trustFailure('DH_BOOT_RECORD_MISSING', 'bootstrap context is missing or not an object'),
+        };
+    }
     const recordResult = await readTrustedRecord(context.installRoot);
     if (!recordResult.ok)
         return recordResult;

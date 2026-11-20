@@ -96,3 +96,13 @@ test('direct bootstrap with a removed installed record is FAILED (record is the 
     }
   });
 });
+
+test('direct bootstrap with a null/garbage context is typed FAILED, never a TypeError', async () => {
+  for (const badContext of [null, undefined, 42]) {
+    const result = await bootstrap(badContext as unknown as Parameters<typeof bootstrap>[0]);
+    assert.equal(result.status, 'FAILED', JSON.stringify(result));
+    if (result.status === 'FAILED') {
+      assert.equal(result.code, 'DH_BOOT_RECORD_MISSING');
+    }
+  }
+});
