@@ -57,7 +57,9 @@ steps:
       - npm ci --no-audit --no-fund
       # Includes coherent SDK version/dependency graph and committed-dist.
       - npm run build
-      - npm run lint
+      # Code-only lint: the historical npm run lint also checks docs/current.
+      # Do not fetch docs/ into this source-only v0.11.x checkout.
+      - node scripts/lint.mjs --code-only && ./node_modules/.bin/eslint .
       - npm run typecheck
       # The new contracts/BUILD/KDP paths, not v0.10.x-only smoke tests.
       - node --import tsx --test packages/contracts/tests/v011/*.test.ts tooling/build/tests/v011/*.test.ts packages/microkernel/tests/v011/*.test.ts
