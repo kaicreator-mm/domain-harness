@@ -27,11 +27,18 @@ import { NODE24_ESM_PROFILE } from './refs.js';
 export const V011_JSON_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema';
 export const V011_SCHEMA_BASE_ID = 'https://kaicreator.dev/schemas/domain-harness/v011';
 // ---- Shared pattern vocabulary (mirrors validate.ts) ----
-const IDENTIFIER_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._-]*$';
+/** First char alphanumeric, then [A-Za-z0-9._-]; may end in '_' but never in '.' or '-' (validate.ts isIdentifier parity). */
+const IDENTIFIER_PATTERN = '^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9_])?$';
 const SEMVER_PATTERN = '^[0-9]+\\.[0-9]+\\.[0-9]+$';
 const CONTENT_DIGEST_PATTERN = '^sha256:[0-9a-f]{64}$';
-/** Package-root relative POSIX path: no leading '/', no drive letter (':' outside charset), no backslash, no '.'/'..' segments. */
-const RESOURCE_PATH_PATTERN = '^(?!.*(^|/)\\.{1,2}($|/))[A-Za-z0-9][A-Za-z0-9._\\-/]*$';
+/**
+ * Package-root relative POSIX path: no leading '/', no drive letter (':'
+ * outside charset), no backslash, no empty segment ('//' or trailing '/'),
+ * no '.'/'..' segments. A leading '_'/'-'/'.' (non-dot-segment) head char
+ * stays legal — the handwritten rule only bans '/', '\\' and 'X:' at the
+ * head (validate.ts isRelativeResourcePath parity).
+ */
+const RESOURCE_PATH_PATTERN = '^(?!.*//)(?!.*(/)$)(?!.*(^|/)\\.{1,2}($|/))[A-Za-z0-9._-][A-Za-z0-9._\\-/]*$';
 // ---- Shared $defs bodies (composed into every self-contained document) ----
 const RESOURCE_REF_DEF = {
     type: 'object',
@@ -109,7 +116,9 @@ const CONTENT_BLOCK_DEF = {
                     contentKind: {
                         anyOf: [
                             { enum: [...CORE_CONTENT_KINDS] },
-                            { type: 'string', pattern: '^dh-ext.' },
+                            // Literal dot escaped (review P2-1): the frozen predicate is
+                            // startsWith('dh-ext.') — 'dh-ext_foo' must NOT pass.
+                            { type: 'string', pattern: '^dh-ext\\.' },
                         ],
                     },
                 },
@@ -285,8 +294,10 @@ export const ELEMENT_REF_JSON_SCHEMA = defsEnvelope('element-ref.json', {
     },
 }, {});
 export const FUNCTION_REF_JSON_SCHEMA = defsEnvelope('function-ref.json', {
-    type: 'object',
-    additionalProperties: false,
+    // Pure 2020-12 $ref envelope (review P1): root-level sibling keywords
+    // such as additionalProperties would evaluate against an empty root
+    // property set and reject every legal FunctionRef; the referenced
+    // $def owns all constraints (same rationale as element.json).
     $ref: '#/$defs/functionRef',
 }, {
     elementRef: ELEMENT_REF_DEF,
@@ -350,11 +361,10 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA = defsEnvelope('package-manifes
             items: {
                 type: 'object',
                 additionalProperties: false,
-                anyOf: [
-                    { properties: { elementId: { type: 'string' } }, required: ['elementId'] },
-                    { properties: { functionId: { type: 'string' } }, required: ['functionId'] },
-                    { properties: { interfaceId: { type: 'string' } }, required: ['interfaceId'] },
-                ],
+                // Aligned to the frozen L2 §4.1 TS type ExportEntry where ALL
+                // three keys are optional (review P2-2 disposition: the schema
+                // must not be stricter than the frozen ABI — `{}` is legal; a
+                // narrowing would need a scoped Product amendment instead).
                 properties: {
                     elementId: { type: 'string', minLength: 1 },
                     functionId: { type: 'string', minLength: 1 },

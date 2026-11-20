@@ -55,6 +55,7 @@ import {
   canonicalJson,
   contentDigestOf,
   isContentDigest,
+  isRelativeResourcePath,
   isUnknownContentKind,
   sha256Hex,
   validateDomainDefinition,
@@ -362,3 +363,179 @@ test('T01: JSON Schema rejects the schema-expressible negatives the same way the
     }
   }
 });
+
+// ---- Review-repair adversarial section (#1575/7027597735: P1, P2-1, P2-2, P2-3) ----
+// Each repaired case gets an explicit positive AND negative here, so the
+// "schema compiled but never positively validated" blind spot that let
+// function-ref.json reject every legal FunctionRef cannot recur. The JSON
+// Schema verdict must agree with the handwritten validator on every case.
+
+/** The review's minimal legal FunctionRef (P1 counterexample, now a positive). */
+const LEGAL_FUNCTION_REF = {
+  element: {
+    namespace: 'orders',
+    id: 'orders.eligibility',
+    version: '1.0.0',
+    digest: `sha256:${'a'.repeat(64)}`,
+  },
+  functionId: 'evaluate',
+  contractVersion: '1',
+} as const;
+
+test('T01 repair P1: function-ref.json root is a pure $ref envelope and accepts a legal FunctionRef', () => {
+  // Root carries no sibling type/additionalProperties (they would evaluate
+  // against an empty root property set under 2020-12 and reject everything).
+  assert.deepEqual(
+    Object.keys(FUNCTION_REF_JSON_SCHEMA).sort(),
+    ['$defs', '$id', '$ref', '$schema'].sort(),
+    'function-ref.json root must be a pure $ref envelope',
+  );
+  const validate = ajv.compile(FUNCTION_REF_JSON_SCHEMA as never);
+  assert.equal(validate(structuredClone(LEGAL_FUNCTION_REF)), true, 'legal FunctionRef passes the ROOT document');
+});
+
+test('T01 repair P1: function-ref.json root refuses meaningful negatives', () => {
+  const validate = ajv.compile(FUNCTION_REF_JSON_SCHEMA as never);
+  const negatives: Array<[string, unknown]> = [
+    ['missing functionId', { element: LEGAL_FUNCTION_REF.element, contractVersion: '1' }],
+    ['missing contractVersion', { element: LEGAL_FUNCTION_REF.element, functionId: 'evaluate' }],
+    ['unknown extra root property', { ...LEGAL_FUNCTION_REF, bogus: 1 }],
+    ['bad element digest', { ...LEGAL_FUNCTION_REF, element: { ...LEGAL_FUNCTION_REF.element, digest: 'deadbeef' } }],
+    [
+      'element missing namespace',
+      { ...LEGAL_FUNCTION_REF, element: { id: 'x', version: '1.0.0', digest: `sha256:${'a'.repeat(64)}` } },
+    ],
+    ['non-object root', 'evaluate'],
+    ['null root', null],
+  ];
+  for (const [name, value] of negatives) {
+    assert.equal(validate(structuredClone(value) as never), false, `root must refuse: ${name}`);
+  }
+});
+
+test('T01 repair P2-1: required dh-ext_foo is refused by BOTH the schema and the handwritten validator', () => {
+  const contentValidate = ajv.compile(CONTENT_BLOCK_JSON_SCHEMA as never);
+  const base = { id: 'prompt-block', schemaRef: { inline: { type: 'string' } }, value: 'x' };
+  // The frozen predicate is a LITERAL startsWith('dh-ext.') — the underscore
+  // form must not slip through the required-track kind gate.
+  assert.equal(isUnknownContentKind('dh-ext_foo'), true, "predicate: 'dh-ext_foo' is unknown");
+  const sneaky = { ...base, contentKind: 'dh-ext_foo', required: true };
+  assert.equal(contentValidate(structuredClone(sneaky) as never), false, 'schema refuses required dh-ext_foo');
+  // Handwritten parity: the element-level validator reports the exact frozen code.
+  // ('dh-ext_foo' is deliberately not a ContentKind at the TS layer — the
+  // adversarial input arrives as untyped data, hence the cast.)
+  const element = structuredClone(KNOWLEDGE_ELEMENT_FIXTURE);
+  (element as { content: unknown }).content = [sneaky as never];
+  const result = validateElementDefinition(element);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.ok(
+      result.issues.some((issue) => issue.code === 'DH_BUILD_SCHEMA_UNKNOWN_REQUIRED'),
+      'handwritten validator reports DH_BUILD_SCHEMA_UNKNOWN_REQUIRED for dh-ext_foo',
+    );
+  }
+  // The literal-prefix form stays legal on the required track.
+  const known = { ...base, contentKind: 'dh-ext.acme.prompt', required: true };
+  assert.equal(isUnknownContentKind('dh-ext.acme.prompt'), false);
+  assert.equal(contentValidate(structuredClone(known) as never), true, 'dh-ext.* stays legal when required');
+});
+
+test('T01 repair P2-2: ExportEntry accepts {} and every optional-key combination the frozen TS type allows', () => {
+  const manifestValidate = ajv.compile(DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA as never);
+  const base = {
+    kind: 'DomainPackage',
+    schemaVersion: DH_PACKAGE_SCHEMA_VERSION,
+    id: 'orders.kdp',
+    version: '1.0.0',
+    layer: 'kernel',
+    role: 'primary',
+    elements: [],
+    dependsOn: [],
+    imports: [],
+    contributesTo: [],
+    targetVariants: [],
+  };
+  const legalExports: unknown[] = [
+    {},
+    { elementId: 'orders.faq' },
+    { functionId: 'evaluate' },
+    { interfaceId: 'orders.search' },
+    { elementId: 'orders.faq', functionId: 'evaluate' },
+    { elementId: 'orders.faq', functionId: 'evaluate', interfaceId: 'orders.search' },
+    { functionId: 'evaluate', interfaceId: 'orders.search' },
+  ];
+  for (const entry of legalExports) {
+    const manifest = { ...structuredClone(base), exports: [entry] };
+    assert.equal(
+      manifestValidate(manifest as never),
+      true,
+      `ExportEntry ${JSON.stringify(entry)} is legal (frozen type: all three keys optional)`,
+    );
+  }
+  const illegalExports: Array<[string, unknown]> = [
+    ['empty-string elementId', { elementId: '' }],
+    ['unknown fourth key', { elementId: 'orders.faq', bogus: 1 }],
+    ['non-string functionId', { functionId: 42 }],
+  ];
+  for (const [name, entry] of illegalExports) {
+    const manifest = { ...structuredClone(base), exports: [entry] };
+    assert.equal(manifestValidate(manifest as never), false, `schema must refuse ExportEntry: ${name}`);
+  }
+});
+
+test('T01 repair P2-3: identifier pattern matches the handwritten validator on corner cases', () => {
+  const elementValidate = ajv.compile(ELEMENT_DEFINITION_JSON_SCHEMA as never);
+  // [candidate, expected verdict for BOTH layers]
+  const cases: Array<[string, boolean]> = [
+    ['orders.faq', true],
+    ['orders.faq.', false], // trailing '.' refused by both
+    ['orders-faq-', false], // trailing '-' refused by both
+    ['orders_faq_', true], // trailing '_' stays legal (handwritten parity)
+    ['a', true],
+    ['-lead', false], // first char must be alphanumeric in both layers
+    ['_lead', false],
+    ['', false],
+  ];
+  for (const [id, expected] of cases) {
+    const element = structuredClone(KNOWLEDGE_ELEMENT_FIXTURE);
+    (element as { id: string }).id = id;
+    assert.equal(
+      elementValidate(structuredClone(element) as never),
+      expected,
+      `schema verdict for id '${id}'`,
+    );
+    assert.equal(validateElementDefinition(element).ok, expected, `handwritten verdict for id '${id}'`);
+  }
+});
+
+test('T01 repair P2-3: resource path pattern matches the handwritten validator on corner cases', () => {
+  const elementValidate = ajv.compile(ELEMENT_DEFINITION_JSON_SCHEMA as never);
+  const digest = `sha256:${'a'.repeat(64)}`;
+  // [candidate path, expected verdict for BOTH layers]
+  const cases: Array<[string, boolean]> = [
+    ['content/faq.json', true],
+    ['a//b', false], // empty segment
+    ['a/', false], // trailing '/'
+    ['/a', false], // leading '/'
+    ['../a', false], // dot-dot segment
+    ['./a', false], // dot segment
+    ['a/./b', false],
+    ['a/../b', false],
+    ['-lead/x.js', true], // leading '-' legal in both layers
+    ['_lead/x.js', true],
+    ['', false],
+  ];
+  for (const [path, expected] of cases) {
+    assert.equal(isRelativeResourcePath(path), expected, `handwritten path verdict for '${path}'`);
+    const element = structuredClone(KNOWLEDGE_ELEMENT_FIXTURE);
+    const block = element.content[0] as unknown as { ref: unknown };
+    block.ref = { packageId: 'orders-business', path, digest };
+    assert.equal(
+      elementValidate(structuredClone(element) as never),
+      expected,
+      `schema path verdict for '${path}'`,
+    );
+    assert.equal(validateElementDefinition(element).ok, expected, `handwritten element verdict for '${path}'`);
+  }
+});
+
