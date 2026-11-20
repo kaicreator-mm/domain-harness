@@ -1,4 +1,6 @@
 import type { DomainDefinition, ElementDefinition } from '../element-contracts.js';
+import type { DomainAppDescriptor } from '../app-descriptor.js';
+import type { DomainAppLock } from '../app-lock.js';
 /**
  * AC01 positive form one: a 0-Function structured knowledge Element.
  * `functions: []` is a first-class legal form (PRD AR-02/AC01), not a
@@ -55,3 +57,7 @@ export declare const UNKNOWN_OPTIONAL_EXCLUSION_FIXTURE: {
     readonly contentKind: "prompt";
     readonly excludedUnknownContent: readonly ["orders.legacy-prompt-notes/prompt-note"];
 };
+/** Legal selection-intent descriptor (NOT a Lock), coherent with ORDERS_DOMAIN_FIXTURE. */
+export declare const DOMAIN_APP_DESCRIPTOR_FIXTURE: DomainAppDescriptor;
+/** Legal exact-Lock fixture covering every DomainAppLock conceptual key. */
+export declare const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock;

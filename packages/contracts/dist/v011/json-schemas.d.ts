@@ -11,6 +11,8 @@ export declare const FUNCTION_CONTRACT_JSON_SCHEMA: JsonObject;
 export declare const ELEMENT_REF_JSON_SCHEMA: JsonObject;
 export declare const FUNCTION_REF_JSON_SCHEMA: JsonObject;
 export declare const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject;
+export declare const DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA: JsonObject;
+export declare const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject;
 /**
  * Machine-readable registry of every v011 JSON Schema document, keyed by
  * the `$id` file stem. Frozen order; consumers may compile each document

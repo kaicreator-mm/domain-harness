@@ -215,3 +215,168 @@ export const UNKNOWN_OPTIONAL_EXCLUSION_FIXTURE = {
     contentKind: 'prompt',
     excludedUnknownContent: ['orders.legacy-prompt-notes/prompt-note'],
 };
+// ---- D02 completion fixtures: legal Descriptor + exact Lock ----
+// (controller pre-review #1575/7025451554). These are schema/TS-layer
+// authoring fixtures: the Lock's closureDigest here is a valid-form wire
+// value only — recomputing the predecessor image is BUILD/Boot authority
+// (L2 §5.3), deliberately not simulated in T01.
+// Descriptor carries the authoring TargetSelector (no profile); the exact
+// profile appears only in the sealed Lock's ResolvedTarget (L2 §5.1/§5.2).
+const APP_TARGET_SELECTOR = {
+    runtime: 'node',
+    module: 'esm',
+    nodeMajor: 24,
+};
+const APP_TARGET = {
+    ...APP_TARGET_SELECTOR,
+    profile: 'node24-esm/1',
+};
+const EVALUATE_FUNCTION_REF = {
+    element: {
+        namespace: 'orders',
+        id: 'orders.eligibility',
+        version: ELIGIBILITY_ELEMENT_VERSION,
+        digest: contentDigestOf({ fixture: 'orders/eligibility-definition', revision: 1 }),
+    },
+    functionId: 'evaluate',
+    contractVersion: '1',
+};
+const ORDERS_BUSINESS_ARTIFACT = {
+    packageId: 'orders-business',
+    path: 'dist/orders-business.mjs',
+    digest: contentDigestOf({ fixture: 'orders-business/artifact', revision: 1 }),
+};
+/** Legal selection-intent descriptor (NOT a Lock), coherent with ORDERS_DOMAIN_FIXTURE. */
+export const DOMAIN_APP_DESCRIPTOR_FIXTURE = {
+    kind: 'DomainApp',
+    schemaVersion: 'dh.app/0.11',
+    id: 'orders.basic',
+    version: '1.0.0',
+    target: APP_TARGET_SELECTOR,
+    roots: {
+        kernelPrimary: { package: 'kdp-basic', version: '1.0.0' },
+        sdkPrimary: { package: 'sdk-core', version: '1.0.0' },
+        businessPrimary: { package: 'orders-business', version: '1.0.0' },
+    },
+    extensions: [],
+    businessAppInit: {
+        element: {
+            namespace: 'orders',
+            id: 'orders.app-main',
+            version: '1.0.0',
+            digest: contentDigestOf({ fixture: 'orders/app-main-definition', revision: 1 }),
+        },
+        functionId: 'init',
+        contractVersion: '1',
+    },
+    ingress: [
+        { id: 'evaluate', function: EVALUATE_FUNCTION_REF, optional: false },
+    ],
+    config: {
+        regionDefault: 'EU',
+    },
+};
+/** Legal exact-Lock fixture covering every DomainAppLock conceptual key. */
+export const DOMAIN_APP_LOCK_FIXTURE = {
+    kind: 'DomainAppLock',
+    schemaVersion: 'dh.lock/0.11',
+    appIdentity: {
+        id: 'orders.basic',
+        version: '1.0.0',
+        descriptorDigest: contentDigestOf({ fixture: 'orders/basic-descriptor', revision: 1 }),
+    },
+    target: APP_TARGET,
+    bootstrapKdpPin: {
+        kdpPackageId: '@kaicreator/domain-harness-microkernel',
+        kdpPrimaryEntry: 'bootstrap',
+        kdpPrimaryDigest: contentDigestOf({ fixture: 'kdp/bootstrap-entry', revision: 1 }),
+    },
+    selectedPackages: [
+        {
+            packageId: 'kdp-basic',
+            version: '1.0.0',
+            layer: 'kernel',
+            role: 'primary',
+            artifact: {
+                packageId: 'kdp-basic',
+                path: 'dist/kdp-basic.mjs',
+                digest: contentDigestOf({ fixture: 'kdp-basic/artifact', revision: 1 }),
+            },
+            dependsOn: [],
+        },
+        {
+            packageId: 'sdk-core',
+            version: '1.0.0',
+            layer: 'sdk',
+            role: 'primary',
+            artifact: {
+                packageId: 'sdk-core',
+                path: 'dist/sdk-core.mjs',
+                digest: contentDigestOf({ fixture: 'sdk-core/artifact', revision: 1 }),
+            },
+            dependsOn: ['kdp-basic'],
+        },
+        {
+            packageId: 'orders-business',
+            version: '1.0.0',
+            layer: 'business',
+            role: 'primary',
+            artifact: ORDERS_BUSINESS_ARTIFACT,
+            dependsOn: ['sdk-core'],
+        },
+    ],
+    selectedElements: [
+        {
+            ref: EVALUATE_FUNCTION_REF.element,
+            ownerPackageId: 'orders-business',
+            visibility: 'public',
+            contentDigests: [contentDigestOf({ fixture: 'orders/rules', revision: 1 })],
+            contractDigests: [
+                contentDigestOf({ fixture: 'orders/eligibility-contract-evaluate', revision: 1 }),
+            ],
+        },
+        {
+            ref: {
+                namespace: 'orders',
+                id: 'orders.legacy-prompt-notes',
+                version: '1.0.0',
+                digest: contentDigestOf({ fixture: 'orders/legacy-prompt-notes-definition', revision: 1 }),
+            },
+            ownerPackageId: 'orders-business',
+            visibility: 'private',
+            contentDigests: [contentDigestOf({ fixture: 'orders/legacy-prompt', revision: 1 })],
+            contractDigests: [],
+        },
+    ],
+    selectedFunctions: [
+        {
+            ref: EVALUATE_FUNCTION_REF,
+            outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'],
+            effects: 'none',
+            implementation: {
+                module: ORDERS_BUSINESS_ARTIFACT,
+                exportName: 'evaluate',
+            },
+            resources: [
+                {
+                    packageId: 'orders-business',
+                    path: 'content/rules.json',
+                    digest: contentDigestOf({ fixture: 'orders/rules', revision: 1 }),
+                },
+            ],
+        },
+    ],
+    hookBindings: [],
+    technicalInitOrder: ['kdp-basic', 'sdk-core', 'orders-business'],
+    technicalDisposeOrder: ['orders-business', 'sdk-core', 'kdp-basic'],
+    businessAppInit: DOMAIN_APP_DESCRIPTOR_FIXTURE.businessAppInit,
+    ingress: [
+        { id: 'evaluate', function: EVALUATE_FUNCTION_REF, optional: false },
+    ],
+    resourceDigests: {
+        'orders-business/content/rules.json': contentDigestOf({ fixture: 'orders/rules', revision: 1 }),
+        'orders-business/content/faq.json': contentDigestOf({ fixture: 'orders/faq', revision: 1 }),
+    },
+    excludedUnknownContent: [...UNKNOWN_OPTIONAL_EXCLUSION_FIXTURE.excludedUnknownContent],
+    closureDigest: contentDigestOf({ fixture: 'orders/basic-lock-closure', revision: 1 }),
+};

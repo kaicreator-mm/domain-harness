@@ -1,7 +1,7 @@
 export interface V011IllegalFixture {
     readonly name: string;
     readonly expectedCode: string;
-    readonly target: 'element' | 'domain';
+    readonly target: 'element' | 'domain' | 'descriptor' | 'lock';
     /** Intentionally invalid value (erased to unknown). */
     readonly value: unknown;
 }

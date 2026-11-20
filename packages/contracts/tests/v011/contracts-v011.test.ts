@@ -30,6 +30,8 @@ import {
   ELEMENT_REF_JSON_SCHEMA,
   FUNCTION_REF_JSON_SCHEMA,
   DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA,
+  DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA,
+  DOMAIN_APP_LOCK_JSON_SCHEMA,
   V011_JSON_SCHEMAS,
   V011_JSON_SCHEMA_DIALECT,
   V011_SCHEMA_BASE_ID,
@@ -40,6 +42,8 @@ import {
   EXTENSION_OPTIONAL_ELEMENT_FIXTURE,
   UNKNOWN_OPTIONAL_ELEMENT_FIXTURE,
   UNKNOWN_OPTIONAL_EXCLUSION_FIXTURE,
+  DOMAIN_APP_DESCRIPTOR_FIXTURE,
+  DOMAIN_APP_LOCK_FIXTURE,
   OUTCOME_NEGATIVE_FAILED_MISSING_FAILURE,
   OUTCOME_NEGATIVE_SUCCEEDED_MISSING_VALUE,
   OUTCOME_NEGATIVE_SUCCEEDED_WITH_FAILURE,
@@ -159,7 +163,7 @@ test('T01: P2 disposition — domain constraints are the frozen readonly JsonVal
 });
 
 test('T01: every illegal fixture is refused with exactly its bound catalog code', () => {
-  assert.ok(ILLEGAL_FIXTURES.length >= 15, 'negative set is non-trivial');
+  assert.ok(ILLEGAL_FIXTURES.length >= 25, 'negative set is non-trivial');
   const seen = new Set<string>();
   for (const fixture of ILLEGAL_FIXTURES) {
     const result =
@@ -255,6 +259,7 @@ const SCHEMA_EXPRESSIBLE_NEGATIVES = new Set([
 ]);
 
 test('T01: every exported JSON Schema document carries $schema/$id and compiles under 2020-12', () => {
+  // D02 full set (controller #1575/7025451554): descriptor + app-lock included.
   const expectedDocs = [
     'domain',
     'element',
@@ -263,6 +268,8 @@ test('T01: every exported JSON Schema document carries $schema/$id and compiles 
     'element-ref',
     'function-ref',
     'package-manifest',
+    'app-descriptor',
+    'app-lock',
   ];
   assert.deepEqual(Object.keys(V011_JSON_SCHEMAS).sort(), [...expectedDocs].sort());
   const registry: Record<string, object> = {
@@ -273,6 +280,8 @@ test('T01: every exported JSON Schema document carries $schema/$id and compiles 
     'element-ref': ELEMENT_REF_JSON_SCHEMA as Record<string, object>,
     'function-ref': FUNCTION_REF_JSON_SCHEMA as Record<string, object>,
     'package-manifest': DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA as Record<string, object>,
+    'app-descriptor': DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA as Record<string, object>,
+    'app-lock': DOMAIN_APP_LOCK_JSON_SCHEMA as Record<string, object>,
   };
   for (const [name, doc] of Object.entries(registry)) {
     assert.equal(doc.$schema, V011_JSON_SCHEMA_DIALECT, `${name} dialect`);
@@ -297,6 +306,16 @@ test('T01: legal fixtures pass BOTH the handwritten validator and the JSON Schem
   assert.equal(domainValidate(structuredClone(ORDERS_DOMAIN_FIXTURE)), true);
 });
 
+test('T01: legal descriptor and Lock pass their JSON Schemas (D02 completion)', () => {
+  const descriptorValidate = ajv.compile(DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA as never);
+  const lockValidate = ajv.compile(DOMAIN_APP_LOCK_JSON_SCHEMA as never);
+  assert.equal(descriptorValidate(structuredClone(DOMAIN_APP_DESCRIPTOR_FIXTURE)), true);
+  assert.equal(lockValidate(structuredClone(DOMAIN_APP_LOCK_FIXTURE)), true);
+  // The Lock fixture records the unknown-optional exclusion exactly as the
+  // paired fixture pins it (coherence across D02 fixture set).
+  assert.deepEqual(DOMAIN_APP_LOCK_FIXTURE.excludedUnknownContent, ['orders.legacy-prompt-notes/prompt-note']);
+});
+
 test('T01: unknown optional content passes the JSON Schema required-track gate by design', () => {
   const contentValidate = ajv.compile(CONTENT_BLOCK_JSON_SCHEMA as never);
   const unknownRequired = {
@@ -311,11 +330,21 @@ test('T01: unknown optional content passes the JSON Schema required-track gate b
 });
 
 test('T01: JSON Schema rejects the schema-expressible negatives the same way the validator does', () => {
-  const elementValidate = ajv.compile(ELEMENT_DEFINITION_JSON_SCHEMA as never);
-  const domainValidate = ajv.compile(DOMAIN_DEFINITION_JSON_SCHEMA as never);
+  const schemaValidators: Record<string, ReturnType<typeof ajv.compile>> = {
+    'element': ajv.compile(ELEMENT_DEFINITION_JSON_SCHEMA as never),
+    'domain': ajv.compile(DOMAIN_DEFINITION_JSON_SCHEMA as never),
+    'descriptor': ajv.compile(DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA as never),
+    'lock': ajv.compile(DOMAIN_APP_LOCK_JSON_SCHEMA as never),
+  };
   for (const fixture of ILLEGAL_FIXTURES) {
-    const validate = fixture.target === 'element' ? elementValidate : domainValidate;
+    const validate = schemaValidators[fixture.target]!;
     const schemaAccepts = validate(structuredClone(fixture.value) as never) === true;
+    if (fixture.target === 'descriptor' || fixture.target === 'lock') {
+      // Descriptor/Lock negatives have no handwritten T01 validator — the
+      // JSON Schema is the schema-layer authority for these documents.
+      assert.equal(schemaAccepts, false, `schema must refuse ${fixture.name}`);
+      continue;
+    }
     if (SCHEMA_EXPRESSIBLE_NEGATIVES.has(fixture.name)) {
       assert.equal(schemaAccepts, false, `schema must refuse ${fixture.name}`);
     } else {

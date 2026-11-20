@@ -9,7 +9,7 @@
  * are intentionally OUTSIDE the legal type surface, so keeping them typed
  * would be self-defeating.
  */
-import { ELIGIBILITY_ELEMENT_FIXTURE, KNOWLEDGE_ELEMENT_FIXTURE, ORDERS_DOMAIN_FIXTURE, } from './legal.js';
+import { DOMAIN_APP_DESCRIPTOR_FIXTURE, DOMAIN_APP_LOCK_FIXTURE, ELIGIBILITY_ELEMENT_FIXTURE, KNOWLEDGE_ELEMENT_FIXTURE, ORDERS_DOMAIN_FIXTURE, } from './legal.js';
 const ALL_ZERO_DIGEST = `sha256:${'0'.repeat(64)}`;
 function cloneLegal(value) {
     return structuredClone(value);
@@ -192,6 +192,108 @@ export const ILLEGAL_FIXTURES = [
         value: (() => {
             const draft = cloneLegal(ORDERS_DOMAIN_FIXTURE);
             draft['elements'] = [];
+            return draft;
+        })(),
+    },
+    // ---- Descriptor negatives (D02 completion, #1575/7025451554) ----
+    {
+        name: 'descriptor-discriminant-wrong',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'descriptor',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_DESCRIPTOR_FIXTURE);
+            draft['kind'] = 'DomainApp2';
+            return draft;
+        })(),
+    },
+    {
+        name: 'descriptor-schema-version-stale',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'descriptor',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_DESCRIPTOR_FIXTURE);
+            draft['schemaVersion'] = 'dh.app/0.10';
+            return draft;
+        })(),
+    },
+    {
+        name: 'descriptor-roots-missing',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'descriptor',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_DESCRIPTOR_FIXTURE);
+            delete draft['roots'];
+            return draft;
+        })(),
+    },
+    {
+        name: 'descriptor-business-app-init-missing',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'descriptor',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_DESCRIPTOR_FIXTURE);
+            delete draft['businessAppInit'];
+            return draft;
+        })(),
+    },
+    {
+        name: 'descriptor-target-wrong-runtime',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'descriptor',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_DESCRIPTOR_FIXTURE);
+            asRecord(draft['target'])['runtime'] = 'browser';
+            return draft;
+        })(),
+    },
+    // ---- Lock negatives ----
+    {
+        name: 'lock-discriminant-wrong',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'lock',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_LOCK_FIXTURE);
+            draft['kind'] = 'LockV2';
+            return draft;
+        })(),
+    },
+    {
+        name: 'lock-schema-version-stale',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'lock',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_LOCK_FIXTURE);
+            draft['schemaVersion'] = 'dh.lock/0.10';
+            return draft;
+        })(),
+    },
+    {
+        name: 'lock-closure-digest-format-invalid',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'lock',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_LOCK_FIXTURE);
+            draft['closureDigest'] = 'deadbeef';
+            return draft;
+        })(),
+    },
+    {
+        name: 'lock-kdp-entry-wrong',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'lock',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_LOCK_FIXTURE);
+            asRecord(draft['bootstrapKdpPin'])['kdpPrimaryEntry'] = 'init';
+            return draft;
+        })(),
+    },
+    {
+        name: 'lock-target-profile-wrong',
+        expectedCode: 'DH_BUILD_SCHEMA_INVALID',
+        target: 'lock',
+        value: (() => {
+            const draft = cloneLegal(DOMAIN_APP_LOCK_FIXTURE);
+            asRecord(draft['target'])['profile'] = 'node20-esm/1';
             return draft;
         })(),
     },

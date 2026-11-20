@@ -23,10 +23,13 @@
  */
 import { CORE_CONTENT_KINDS } from './element-contracts.js';
 import {
+  DH_APP_SCHEMA_VERSION,
   DH_DOMAIN_SCHEMA_VERSION,
   DH_ELEMENT_SCHEMA_VERSION,
+  DH_LOCK_SCHEMA_VERSION,
   DH_PACKAGE_SCHEMA_VERSION,
 } from './schema-versions.js';
+import { NODE24_ESM_PROFILE } from './refs.js';
 import type { JsonValue } from './base.js';
 
 type JsonObject = { readonly [k: string]: JsonValue };
@@ -508,6 +511,251 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
   },
 );
 
+// ---- D02 completion: Domain App Descriptor and exact App Lock ----
+// (controller pre-review #1575/7025451554: PRD D02 names these two in the
+// versioned machine-schema set; closureDigest recompute, owner/DAG
+// resolution and resource byte checks stay BUILD/Boot (T02/T03) — the
+// schemas freeze only the per-document structural rules.)
+
+const TARGET_SELECTOR_DEF: JsonObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['runtime', 'module'],
+  properties: {
+    runtime: { const: 'node' },
+    module: { const: 'esm' },
+    nodeMajor: { type: 'integer', minimum: 0 },
+  },
+};
+
+const RESOLVED_TARGET_DEF: JsonObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['runtime', 'module', 'profile'],
+  properties: {
+    runtime: { const: 'node' },
+    module: { const: 'esm' },
+    nodeMajor: { type: 'integer', minimum: 0 },
+    profile: { const: NODE24_ESM_PROFILE },
+  },
+};
+
+const PACKAGE_REF_DEF: JsonObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['package', 'version'],
+  properties: {
+    package: { type: 'string', minLength: 1 },
+    version: { type: 'string', pattern: SEMVER_PATTERN },
+  },
+};
+
+const INGRESS_ENTRY_DEF: JsonObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id', 'function'],
+  properties: {
+    id: { type: 'string', minLength: 1 },
+    function: { $ref: '#/$defs/functionRef' },
+    optional: { type: 'boolean' },
+  },
+};
+
+export const DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA: JsonObject = defsEnvelope(
+  'app-descriptor.json',
+  {
+    type: 'object',
+    additionalProperties: false,
+    required: ['kind', 'schemaVersion', 'id', 'version', 'target', 'roots', 'extensions', 'businessAppInit', 'ingress'],
+    properties: {
+      kind: { const: 'DomainApp' },
+      schemaVersion: { const: DH_APP_SCHEMA_VERSION },
+      id: { type: 'string', pattern: IDENTIFIER_PATTERN },
+      version: { type: 'string', pattern: SEMVER_PATTERN },
+      target: TARGET_SELECTOR_DEF,
+      roots: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['kernelPrimary', 'sdkPrimary', 'businessPrimary'],
+        properties: {
+          kernelPrimary: { $ref: '#/$defs/packageRef' },
+          sdkPrimary: { $ref: '#/$defs/packageRef' },
+          businessPrimary: { $ref: '#/$defs/packageRef' },
+        },
+      },
+      extensions: { type: 'array', items: { $ref: '#/$defs/packageRef' } },
+      businessAppInit: { $ref: '#/$defs/functionRef' },
+      ingress: { type: 'array', items: { $ref: '#/$defs/ingressEntry' } },
+      config: { type: 'object', additionalProperties: {} },
+    },
+  },
+  {
+    elementRef: ELEMENT_REF_DEF,
+    functionRef: FUNCTION_REF_DEF,
+    packageRef: PACKAGE_REF_DEF,
+    targetSelector: TARGET_SELECTOR_DEF,
+    ingressEntry: INGRESS_ENTRY_DEF,
+  },
+);
+
+const ENTRY_REF_DEF: JsonObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['module', 'exportName'],
+  properties: {
+    module: { $ref: '#/$defs/resourceRef' },
+    exportName: { type: 'string', minLength: 1 },
+  },
+};
+
+export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
+  'app-lock.json',
+  {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'kind',
+      'schemaVersion',
+      'appIdentity',
+      'target',
+      'bootstrapKdpPin',
+      'selectedPackages',
+      'selectedElements',
+      'selectedFunctions',
+      'hookBindings',
+      'technicalInitOrder',
+      'technicalDisposeOrder',
+      'businessAppInit',
+      'ingress',
+      'resourceDigests',
+      'excludedUnknownContent',
+      'closureDigest',
+    ],
+    properties: {
+      kind: { const: 'DomainAppLock' },
+      schemaVersion: { const: DH_LOCK_SCHEMA_VERSION },
+      appIdentity: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'version', 'descriptorDigest'],
+        properties: {
+          id: { type: 'string', minLength: 1 },
+          version: { type: 'string', pattern: SEMVER_PATTERN },
+          descriptorDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+        },
+      },
+      target: { $ref: '#/$defs/resolvedTarget' },
+      bootstrapKdpPin: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['kdpPackageId', 'kdpPrimaryEntry', 'kdpPrimaryDigest'],
+        properties: {
+          kdpPackageId: { type: 'string', minLength: 1 },
+          kdpPrimaryEntry: { const: 'bootstrap' },
+          kdpPrimaryDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+        },
+      },
+      selectedPackages: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['packageId', 'version', 'layer', 'role', 'artifact', 'dependsOn'],
+          properties: {
+            packageId: { type: 'string', minLength: 1 },
+            version: { type: 'string', pattern: SEMVER_PATTERN },
+            layer: { enum: ['kernel', 'sdk', 'business'] },
+            role: { enum: ['primary', 'extension'] },
+            artifact: { $ref: '#/$defs/resourceRef' },
+            dependsOn: { type: 'array', items: { type: 'string', minLength: 1 } },
+          },
+        },
+      },
+      selectedElements: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['ref', 'ownerPackageId', 'visibility', 'contentDigests', 'contractDigests'],
+          properties: {
+            ref: { $ref: '#/$defs/elementRef' },
+            ownerPackageId: { type: 'string', minLength: 1 },
+            visibility: { enum: ['public', 'private'] },
+            contentDigests: { type: 'array', items: { type: 'string', pattern: CONTENT_DIGEST_PATTERN } },
+            contractDigests: { type: 'array', items: { type: 'string', pattern: CONTENT_DIGEST_PATTERN } },
+          },
+        },
+      },
+      selectedFunctions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['ref', 'outcomes', 'effects', 'implementation', 'resources'],
+          properties: {
+            ref: { $ref: '#/$defs/functionRef' },
+            outcomes: {
+              type: 'array',
+              minItems: 1,
+              items: { enum: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] },
+              contains: { const: 'SUCCEEDED' },
+            },
+            effects: { enum: ['none', 'external', 'state'] },
+            implementation: { $ref: '#/$defs/entryRef' },
+            resources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
+          },
+        },
+      },
+      hookBindings: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['ownerPackageId', 'hookId', 'cardinality', 'providers'],
+          properties: {
+            ownerPackageId: { type: 'string', minLength: 1 },
+            hookId: { type: 'string', minLength: 1 },
+            cardinality: { enum: ['single', 'multi'] },
+            providers: { type: 'array', items: { $ref: '#/$defs/entryRef' } },
+          },
+        },
+      },
+      technicalInitOrder: { type: 'array', items: { type: 'string', minLength: 1 } },
+      technicalDisposeOrder: { type: 'array', items: { type: 'string', minLength: 1 } },
+      businessAppInit: { $ref: '#/$defs/functionRef' },
+      ingress: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'function', 'optional'],
+          properties: {
+            id: { type: 'string', minLength: 1 },
+            function: { $ref: '#/$defs/functionRef' },
+            optional: { type: 'boolean' },
+          },
+        },
+      },
+      resourceDigests: {
+        type: 'object',
+        propertyNames: { type: 'string', minLength: 1 },
+        additionalProperties: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+      },
+      excludedUnknownContent: { type: 'array', items: { type: 'string', minLength: 1 } },
+      // Wire-form check only: recomputing the predecessor image is Boot/T02
+      // authority (L2 §5.3) and is deliberately NOT schema semantics.
+      closureDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+    },
+  },
+  {
+    resourceRef: RESOURCE_REF_DEF,
+    elementRef: ELEMENT_REF_DEF,
+    functionRef: FUNCTION_REF_DEF,
+    entryRef: ENTRY_REF_DEF,
+    resolvedTarget: RESOLVED_TARGET_DEF,
+  },
+);
+
 /**
  * Machine-readable registry of every v011 JSON Schema document, keyed by
  * the `$id` file stem. Frozen order; consumers may compile each document
@@ -521,4 +769,6 @@ export const V011_JSON_SCHEMAS: Readonly<Record<string, JsonObject>> = Object.fr
   'element-ref': ELEMENT_REF_JSON_SCHEMA,
   'function-ref': FUNCTION_REF_JSON_SCHEMA,
   'package-manifest': DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA,
+  'app-descriptor': DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA,
+  'app-lock': DOMAIN_APP_LOCK_JSON_SCHEMA,
 });
