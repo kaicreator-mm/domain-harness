@@ -144,7 +144,10 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
     assert.equal(manifest[item.section]?.[CONSUMER_NAME], expected,
       `${item.dir}: ${item.section}.${CONSUMER_NAME} must equal ${expected}`);
   }
-  assertExactDependencyEdges(readJson(root, `${DIS_RUNTIME_DIR}/package.json`), DIS_RUNTIME_INTERNAL, expected, DIS_RUNTIME_DIR);
+  const disRuntime = readJson(root, `${DIS_RUNTIME_DIR}/package.json`);
+  assert.equal(disRuntime.private, true,
+    `${DIS_RUNTIME_DIR}: must remain private:true and outside the public release graph`);
+  assertExactDependencyEdges(disRuntime, DIS_RUNTIME_INTERNAL, expected, DIS_RUNTIME_DIR);
 
   const lock = readJson(root, 'package-lock.json');
   assert.equal(lock.version, ROOT_PRODUCT_VERSION,

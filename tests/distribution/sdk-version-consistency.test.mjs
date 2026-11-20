@@ -63,6 +63,7 @@ function fixture() {
     const manifest = {
       name: `fixture-${item.dir}`,
       version: '0.2.0',
+      ...(item.dir === 'packages/dis-v011-runtime' ? { private: true } : {}),
       [item.section]: {
         [CONSUMER_NAME]: VERSION,
         ...(item.dir === 'packages/dis-v011-runtime'
@@ -199,6 +200,16 @@ test('rejects an extra third-party lock consumer production dependency', () => {
       packages: lockPackages,
     }));
     assert.throws(() => verifySdkVersionConsistency(root, VERSION), /no third-party runtime dependency/);
+  });
+});
+
+test('rejects dis-v011-runtime leaving the private release boundary', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'packages/dis-v011-runtime/package.json');
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    manifest.private = false;
+    writeFileSync(path, JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must remain private:true/);
   });
 });
 
