@@ -60,6 +60,9 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     ['kdp-kernel'],
   );
 
+  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'sdk-core')?.technicalLifecycle, true);
+  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'orders-business')?.technicalLifecycle, false);
+
   // elements: 0-Function knowledge element + multi-Function element coexist
   assert.deepEqual(
     lock.selectedElements.map((element) => element.ref.id),

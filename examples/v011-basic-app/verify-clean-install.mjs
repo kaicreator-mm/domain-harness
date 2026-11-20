@@ -223,7 +223,13 @@ try {
   const dirty = run('git', ['status', '--porcelain', '--untracked-files=no'], repoRoot, 'source.clean');
   assert.equal(dirty.trim(), '', `source checkout must be clean at ${head}`);
   record('source', { head, repoOutsideRoot: workRoot, clean: true });
-  npm(['run', 'build'], repoRoot, 'source.build');
+  // The single Woodpecker lane already built and verified this exact HEAD.
+  // Standalone invocations still build normally; no second workspace BUILD in CI.
+  if (process.env.DH_T05_ALREADY_BUILT === '1') {
+    record('source.build', { status: 'REUSED_PRECEDING_CI_BUILD' });
+  } else {
+    npm(['run', 'build'], repoRoot, 'source.build');
+  }
   const dirtyAfterBuild = run('git', ['status', '--porcelain', '--untracked-files=no'], repoRoot, 'source.clean-after-build');
   assert.equal(dirtyAfterBuild.trim(), '', `build must not change tracked source at ${head}`);
   const tarballs = [];

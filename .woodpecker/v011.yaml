@@ -52,7 +52,7 @@ steps:
     commands:
       - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
       - node --version && npm --version && git --version
-      - node -e 'if (Number(process.versions.node.split(".")[0]) < 22) { console.error("v0.11.x requires Node >=22 for this selected target"); process.exit(1); }'
+      - node -e 'const [major,minor]=process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 12)) { console.error("v0.11.x requires Node >=22.12.0"); process.exit(1); }'
       # Install exactly once. All following commands reuse this workspace.
       - npm ci --no-audit --no-fund
       # Includes coherent SDK version/dependency graph and committed-dist.
@@ -69,4 +69,4 @@ steps:
       - node --test tests/distribution/sdk-version-consistency.test.mjs
       # T05 is a REQUIRED real pack + fresh external install, not a pack dry-run.
       # The driver creates its own external root and executes the canonical consumer.
-      - DH_T05_NPM_REGISTRY=http://host.docker.internal:14873 node examples/v011-basic-app/verify-clean-install.mjs
+      - DH_T05_ALREADY_BUILT=1 DH_T05_NPM_REGISTRY=http://host.docker.internal:14873 node examples/v011-basic-app/verify-clean-install.mjs

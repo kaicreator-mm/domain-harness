@@ -163,6 +163,11 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
   if (profile !== NODE22_ESM_PROFILE) {
     return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock target profile '${profile}' is not the frozen '${NODE22_ESM_PROFILE}'`);
   }
+  // The Host-declared environment cannot downgrade the actual Node process.
+  const [actualNodeMajor, actualNodeMinor] = process.versions.node.split('.').map(Number);
+  if (actualNodeMajor < 22 || (actualNodeMajor === 22 && actualNodeMinor < 12)) {
+    return failed('DH_RUNTIME_UNSUPPORTED_PROFILE', `actual Node.js ${process.versions.node} is below the supported 22.12 runtime floor`);
+  }
   const minimumNodeMajor = lock.target.nodeMajor ?? 22;
   if (safeContext.env.nodeMajor < minimumNodeMajor) {
     return failed(
