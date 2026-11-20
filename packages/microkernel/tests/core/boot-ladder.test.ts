@@ -114,6 +114,27 @@ test('invalid record: wrong kind / wrong schemaVersion / broken recordDigest are
   });
 });
 
+// JSON.parse 可接受指数溢出的数字，但可信摘要必须受控拒绝，禁止异常逃逸。
+test('non-canonical installed record number is REFUSED with zero package side effects', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const source = JSON.stringify(await fixture.readRecord());
+    assert.ok(source.includes('"recordDigest":'));
+    await fixture.writeRecordText(source.replace('"recordDigest":', '"unexpected":1e999,"recordDigest":'));
+    assertRefused(await boot(fixture.pin, fixture.context), 'DH_BOOT_RECORD_INVALID');
+    sideEffectFree();
+  });
+});
+
+test('non-canonical Lock number is REFUSED with zero package side effects', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const source = (await fixture.readLockBytes()).toString('utf8');
+    assert.ok(source.includes('"closureDigest":'));
+    await fixture.writeLockBytes(Buffer.from(source.replace('"closureDigest":', '"unexpected":1e999,"closureDigest":'), 'utf8'));
+    assertRefused(await boot(fixture.pin, fixture.context), 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+});
+
 test('one-byte Lock tamper: closure digest recomputation refuses with DH_BOOT_PIN_MISMATCH', async (t) => {
   await withFixture(t, async (fixture) => {
     const bytes = await fixture.readLockBytes();
