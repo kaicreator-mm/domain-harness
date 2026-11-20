@@ -1,0 +1,64 @@
+# DomainHarness v0.11.x — one checkout, one workspace, one focused CI result.
+# Replaces the v0.10.x verify/verify-min-node workflows; no legacy CI lane.
+# Woodpecker 3.x / trusted local backend, with plugin-git sparse + partial clone.
+when:
+  - event: pull_request
+    branch: 'version/v0.11.*'
+    path:
+      include:
+        - '.woodpecker/**'
+        - 'packages/**'
+        - 'tooling/**'
+        - 'scripts/**'
+        - 'tests/**'
+        - 'examples/v011-basic-app/**'
+        - 'package.json'
+        - 'package-lock.json'
+        - 'tsconfig.base.json'
+        - 'eslint.config.mjs'
+      on_empty: true
+  # Manual verification of an exact v0.11.x branch/ref. This is NOT a
+  # release qualification; T05 owns packed fresh-consumer acceptance.
+  - event: manual
+    branch: 'version/v0.11.*'
+
+labels:
+  backend: local
+
+# A workflow has one cloned workspace shared by all steps. Explicitly
+# configure its SINGLE plugin-git checkout. The blobless shallow fetch
+# and cone sparse checkout avoid pulling materialized docs/agent history.
+# Root-level files are retained by Git cone semantics for npm workspaces.
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      partial: true
+      depth: 1
+      tags: false
+      lfs: false
+      recursive: false
+      sparse:
+        - packages
+        - tooling
+        - scripts
+        - tests
+        # T05 adds this only when the actual v011 consumer exists.
+        - examples/v011-basic-app
+
+steps:
+  - name: v011-verify
+    image: bash
+    commands:
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+      - node --version && npm --version && git --version
+      - node -e 'if (Number(process.versions.node.split(".")[0]) < 24) { console.error("v0.11.x requires Node >=24 for this selected target"); process.exit(1); }'
+      # Install exactly once. All following commands reuse this workspace.
+      - npm ci --no-audit --no-fund
+      # Includes coherent SDK version/dependency graph and committed-dist.
+      - npm run build
+      - npm run lint
+      - npm run typecheck
+      # The new contracts/BUILD/KDP paths, not v0.10.x-only smoke tests.
+      - node --import tsx --test packages/contracts/tests/v011/*.test.ts tooling/build/tests/v011/*.test.ts packages/microkernel/tests/v011/*.test.ts
+      - node --test tests/distribution/sdk-version-consistency.test.mjs
