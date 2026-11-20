@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { BootResult } from '@kaicreator/domain-harness-contracts/v011';
+import { splitResourceKey } from '../../src/v011/paths.js';
 import {
   boot,
   buildFixtureInstall,
@@ -36,7 +37,7 @@ async function withScenario(
   await run(fixture, result);
 }
 
-const INIT_ORDER = ['fixture-kernel', 'fixture-sdk', 'fixture-business', 'fixture-ext'];
+const INIT_ORDER = ['fixture-kernel', '@fixture/sdk', 'fixture-business', 'fixture-ext'];
 const DISPOSE_ORDER = [...INIT_ORDER].reverse();
 
 test('KDP boots core + package system: init order, hook sealing, business init, READY', async (t) => {
@@ -77,13 +78,13 @@ test('KDP boots core + package system: init order, hook sealing, business init, 
     assert.deepEqual(businessInit['config'], { region: 'EU', featureFlag: true });
     assert.deepEqual(businessInit['ingress'], ['evaluate', 'optional-report']);
     assert.deepEqual(businessInit['resourceKeys'], [
-      'fixture-kernel:dist/index.mjs',
-      'fixture-sdk:dist/index.mjs',
-      'fixture-business:dist/index.mjs',
-      'fixture-business:elements/orders.eligibility.json',
-      'fixture-business:content/rules.json',
-      'fixture-ext:dist/index.mjs',
-      'fixture-ext:dist/hook.mjs',
+      'fixture-kernel/dist/index.mjs',
+      '@fixture/sdk/dist/index.mjs',
+      'fixture-business/dist/index.mjs',
+      'fixture-business/elements/orders.eligibility.json',
+      'fixture-business/content/rules.json',
+      'fixture-ext/dist/index.mjs',
+      'fixture-ext/dist/hook.mjs',
     ]);
     assert.deepEqual(
       events().filter((event) => event['event'] === 'business-init'),
@@ -198,7 +199,7 @@ test('package physical load failure: DH_KDP_PACKAGE_LOAD_FAILED, zero ingress, n
   });
   // Remove a selected package artifact after installation (post-install
   // corruption inside the trusted root).
-  await rm(join(fixture.installRoot, 'node_modules', 'fixture-sdk', 'dist'), { recursive: true, force: true });
+  await rm(join(fixture.installRoot, 'node_modules', '@fixture/sdk', 'dist'), { recursive: true, force: true });
   const result = await boot(fixture.pin, fixture.context);
   assert.equal(result.status, 'FAILED', JSON.stringify(result));
   if (result.status === 'FAILED') {
@@ -209,4 +210,47 @@ test('package physical load failure: DH_KDP_PACKAGE_LOAD_FAILED, zero ingress, n
     false,
     'zero ingress and no business init on physical load failure',
   );
+});
+
+test('resource key convention: rightmost-slash split handles scoped package ids end to end', async (t) => {
+  // Unit: the frozen T02/T01 `<packageId>/<path>` key form resolves its
+  // boundary by scanning from the rightmost '/' for the first well-formed
+  // package id — scoped ids keep their scope segment and multi-segment
+  // resource paths (per the frozen T01 fixture) stay intact.
+  assert.deepEqual(splitResourceKey('@fixture/sdk/dist/index.mjs'), {
+    packageId: '@fixture/sdk',
+    path: 'dist/index.mjs',
+  });
+  assert.deepEqual(splitResourceKey('orders-business/content/rules.json'), {
+    packageId: 'orders-business',
+    path: 'content/rules.json',
+  });
+  assert.deepEqual(splitResourceKey('fixture-business/elements/orders.eligibility.json'), {
+    packageId: 'fixture-business',
+    path: 'elements/orders.eligibility.json',
+  });
+  assert.equal(splitResourceKey('noslash'), null);
+  assert.equal(splitResourceKey('/onlypath'), null);
+  assert.equal(splitResourceKey('../evil/x.json'), null, 'traversal package ids are refused');
+
+  // End to end: the default fixture install carries a SCOPED SDK primary
+  // ('@fixture/sdk'); boot, schema lookup across the mixed-key closure and
+  // ingress invocation all still work.
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'BOOTED', JSON.stringify(result));
+  if (result.status !== 'BOOTED') return;
+  const scopedKeySeen = events().some(
+    (event) =>
+      event['event'] === 'business-init' &&
+      Array.isArray(event['resourceKeys']) &&
+      (event['resourceKeys'] as string[]).includes('@fixture/sdk/dist/index.mjs'),
+  );
+  assert.ok(scopedKeySeen, 'scoped package resource key must reach the init context');
+  const outcome = await result.app.invoke('evaluate', { total: 10, region: 'EU' });
+  assert.equal(outcome.kind, 'SUCCEEDED');
+  await result.app.dispose();
 });

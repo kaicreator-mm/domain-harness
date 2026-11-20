@@ -133,7 +133,7 @@ test('inspect projects Lock facts only (B06), including DEGRADED suppression', a
     inspection.packages.map((pkg) => [pkg.packageId, pkg.layer, pkg.role]),
     [
       ['fixture-kernel', 'kernel', 'primary'],
-      ['fixture-sdk', 'sdk', 'primary'],
+      ['@fixture/sdk', 'sdk', 'primary'],
       ['fixture-business', 'business', 'primary'],
       ['fixture-ext', 'business', 'extension'],
     ],

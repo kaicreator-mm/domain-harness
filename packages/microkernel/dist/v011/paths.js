@@ -10,10 +10,13 @@
  * to `<installRoot>/dh-install/installed-record.json` and the pin only
  * cross-checks against the record.
  *
- * Runtime resource convention (T03): installed packages live under
+ * Runtime resource convention (T03, aligned with T02 `V011ResourceScope`
+ * and the frozen T01 fixture keys): installed packages live under
  * `<installRoot>/node_modules/<packageId>/`; Lock `resourceDigests` keys
- * are `<packageId>:<path>` so the runtime can address every sealed
- * resource without re-deriving paths.
+ * are `<packageId>/<path>` so the runtime can address every sealed
+ * resource without re-deriving paths. The boundary is resolved by
+ * `splitResourceKey` — see its doc for the exact rightmost-well-formed
+ * rule that handles scoped package ids and multi-segment paths.
  */
 import * as nodePath from 'node:path';
 /** The frozen installed-record location relative to installRoot (L2 §6.2a). */
@@ -22,6 +25,32 @@ export const INSTALLED_RECORD_RELATIVE_PATH = 'dh-install/installed-record.json'
 const PACKAGE_ID_PATTERN = /^(@[A-Za-z0-9][A-Za-z0-9._-]*\/)?[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 export function isWellFormedPackageId(value) {
     return typeof value === 'string' && PACKAGE_ID_PATTERN.test(value);
+}
+/**
+ * Split a Lock `resourceDigests` key of the frozen T02/T01 form
+ * `<packageId>/<path>` (see contracts/v011 fixtures, e.g.
+ * 'orders-business/content/rules.json').
+ *
+ * The split scans `/` boundaries from the RIGHTMOST position leftwards and
+ * takes the first boundary whose left side is a well-formed package id
+ * with a non-empty right side. This is deterministic because a package id
+ * carries at most one scope segment (`@scope/name`): any boundary further
+ * right would fold path segments into the id and is therefore ill-formed.
+ * It handles scoped package ids ('@fixture/sdk/dist/index.mjs' ->
+ * '@fixture/sdk' + 'dist/index.mjs') and multi-segment resource paths
+ * ('orders-business/content/rules.json' -> 'orders-business' +
+ * 'content/rules.json'). Returns null when no boundary qualifies.
+ */
+export function splitResourceKey(key) {
+    let separator = key.length;
+    while ((separator = key.lastIndexOf('/', separator - 1)) > 0) {
+        const packageId = key.slice(0, separator);
+        const path = key.slice(separator + 1);
+        if (path.length > 0 && isWellFormedPackageId(packageId)) {
+            return { packageId, path };
+        }
+    }
+    return null;
 }
 /**
  * Resolve a root-relative POSIX path and guarantee the result stays

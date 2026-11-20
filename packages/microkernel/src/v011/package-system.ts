@@ -30,7 +30,7 @@ import type {
   SelectedFunction,
   SelectedPackage,
 } from '@kaicreator/domain-harness-contracts/v011';
-import { resolvePackageFile } from './paths.js';
+import { resolvePackageFile, splitResourceKey } from './paths.js';
 
 /** Ordinary startup failure carrier (PRD K07): no retry, no recovery. */
 export class KdpLoadError extends Error {
@@ -175,20 +175,20 @@ export class PackageSystem {
    * Content-addressed Element definition lookup: the Lock pins each
    * definition by `definitionDigest` (canonical JSON digest), and the
    * definition document is part of the sealed resource closure. The
-   * runtime scans the closure for the resource whose parsed canonical
-   * digest equals the pinned ElementRef digest. Negative results are
-   * cached; failure means invoke-time schema validation is unavailable.
+   * runtime scans the closure (T02 `V011ResourceScope` keys of the frozen
+   * `<packageId>/<path>` form, rightmost-`/`) for the resource whose
+   * parsed canonical digest equals the pinned ElementRef digest. Negative
+   * results are cached; failure means invoke-time schema validation is
+   * unavailable.
    */
   async findElementDefinition(definitionDigest: string): Promise<ElementDefinition | null> {
     const cached = this.definitionCache.get(definitionDigest);
     if (cached !== undefined) return cached;
     let found: ElementDefinition | null = null;
     for (const [key] of Object.entries(this.lock.resourceDigests)) {
-      const separator = key.indexOf(':');
-      if (separator <= 0) continue;
-      const packageId = key.slice(0, separator);
-      const path = key.slice(separator + 1);
-      const absolute = resolvePackageFile(this.installRoot, packageId, path);
+      const split = splitResourceKey(key);
+      if (split === null) continue;
+      const absolute = resolvePackageFile(this.installRoot, split.packageId, split.path);
       if (absolute === null) continue;
       let parsed: unknown;
       try {
@@ -254,11 +254,11 @@ export class PackageSystem {
     }
   }
 
-  /** Readonly resource handle for one sealed closure resource (`<pkg>:<path>` key). */
+  /** Readonly resource handle for one sealed closure resource (`<packageId>/<path>` key). */
   resourceHandle(key: string): ReadonlyResourceHandle {
-    const separator = key.indexOf(':');
-    const packageId = separator > 0 ? key.slice(0, separator) : '';
-    const path = separator > 0 ? key.slice(separator + 1) : '';
+    const split = splitResourceKey(key);
+    const packageId = split?.packageId ?? '';
+    const path = split?.path ?? '';
     const ref: ResourceRef = {
       packageId,
       path,

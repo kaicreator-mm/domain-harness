@@ -42,9 +42,11 @@ export declare class PackageSystem {
      * Content-addressed Element definition lookup: the Lock pins each
      * definition by `definitionDigest` (canonical JSON digest), and the
      * definition document is part of the sealed resource closure. The
-     * runtime scans the closure for the resource whose parsed canonical
-     * digest equals the pinned ElementRef digest. Negative results are
-     * cached; failure means invoke-time schema validation is unavailable.
+     * runtime scans the closure (T02 `V011ResourceScope` keys of the frozen
+     * `<packageId>/<path>` form, rightmost-`/`) for the resource whose
+     * parsed canonical digest equals the pinned ElementRef digest. Negative
+     * results are cached; failure means invoke-time schema validation is
+     * unavailable.
      */
     findElementDefinition(definitionDigest: string): Promise<ElementDefinition | null>;
     /**
@@ -57,7 +59,7 @@ export declare class PackageSystem {
         output: unknown;
     } | null>;
     private resolveSchemaRef;
-    /** Readonly resource handle for one sealed closure resource (`<pkg>:<path>` key). */
+    /** Readonly resource handle for one sealed closure resource (`<packageId>/<path>` key). */
     resourceHandle(key: string): ReadonlyResourceHandle;
 }
 export {};

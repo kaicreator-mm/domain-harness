@@ -49,7 +49,7 @@ export const LOCK_RELATIVE_PATH = 'dh-lock/app.lock.json';
 export const DESCRIPTOR_RELATIVE_PATH = 'descriptor/app.json';
 
 const FIXTURE_KERNEL = 'fixture-kernel';
-const FIXTURE_SDK = 'fixture-sdk';
+const FIXTURE_SDK = '@fixture/sdk';
 const FIXTURE_BUSINESS = 'fixture-business';
 const FIXTURE_EXT = 'fixture-ext';
 
@@ -427,15 +427,15 @@ export async function buildFixtureInstall(
   const hookDigest = await fileBytesDigest(hookPath);
 
   const resourceDigests: Record<string, ContentDigest> = {
-    [`${FIXTURE_KERNEL}:dist/index.mjs`]: kernelArtifact.digest,
-    [`${FIXTURE_SDK}:dist/index.mjs`]: sdkArtifact.digest,
-    [`${FIXTURE_BUSINESS}:dist/index.mjs`]: businessArtifact.digest,
-    [`${FIXTURE_BUSINESS}:elements/orders.eligibility.json`]: bytesDigest(Buffer.from(definitionText, 'utf8')),
-    [`${FIXTURE_BUSINESS}:content/rules.json`]: await fileBytesDigest(
+    [`${FIXTURE_KERNEL}/dist/index.mjs`]: kernelArtifact.digest,
+    [`${FIXTURE_SDK}/dist/index.mjs`]: sdkArtifact.digest,
+    [`${FIXTURE_BUSINESS}/dist/index.mjs`]: businessArtifact.digest,
+    [`${FIXTURE_BUSINESS}/elements/orders.eligibility.json`]: bytesDigest(Buffer.from(definitionText, 'utf8')),
+    [`${FIXTURE_BUSINESS}/content/rules.json`]: await fileBytesDigest(
       join(installRoot, 'node_modules', FIXTURE_BUSINESS, 'content', 'rules.json'),
     ),
-    [`${FIXTURE_EXT}:dist/index.mjs`]: extArtifact.digest,
-    [`${FIXTURE_EXT}:dist/hook.mjs`]: hookDigest,
+    [`${FIXTURE_EXT}/dist/index.mjs`]: extArtifact.digest,
+    [`${FIXTURE_EXT}/dist/hook.mjs`]: hookDigest,
   };
 
   const lockBase = {
