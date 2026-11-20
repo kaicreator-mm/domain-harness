@@ -69,7 +69,7 @@ export function evaluate(input) {
 export function optionalReport() { return { kind: 'SUCCEEDED', value: 'optional-report-ok' }; }
 `;
 }
-function businessModule(withUnsupportedEffect, initThrows = false) {
+function businessModule(withUnsupportedEffect, initThrows = false, initDegraded = false) {
   return `
 import { evaluate, initializeRule } from 'rules-package/rules';
 const events = (globalThis.__v011T05Events ??= []);
@@ -81,7 +81,7 @@ export async function businessAppInit(ctx) {
   const rule = JSON.parse(Buffer.from(await handle.read()).toString('utf8'));
   initializeRule(rule);
   events.push({ event: 'business-init', package: 'app-business', minOrderTotal: rule.minOrderTotal });
-  return { status: 'READY' };
+  return ${initDegraded ? "{ status: 'DEGRADED', suppressedIngress: ['optional-report'] }" : "{ status: 'READY' }"};
 }
 export function submit(input) { return evaluate(input); }
 ${withUnsupportedEffect ? "export function dangerous() { return { kind: 'SUCCEEDED', value: 'must-not-run' }; }" : ''}
@@ -114,7 +114,7 @@ async function authoring(label, rule, options = {}) {
     artifacts[id] = await write(dirs[id], 'dist/index.mjs', lifecycleModule(id));
   }
   const rulesEntry = await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule());
-  const businessEntry = await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true));
+  const businessEntry = await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
   await write(dirs['rules-package'], 'package.json', JSON.stringify({
     name: 'rules-package', version: '1.0.0', type: 'module', exports: { './rules': './dist/rules.mjs' },
   }));
@@ -154,6 +154,24 @@ async function authoring(label, rule, options = {}) {
       { element: 'basic.knowledge', version: '1.0.0' },
     ],
   };
+  // Deliberately malformed *authoring* variants are written and digested
+  // through the same real Package files. BUILD then sees their true bytes,
+  // not mutated in-memory objects with stale DefinitionRefs.
+  if (options.unknownRequired === true) knowledge.content.push({
+    id: 'unknown-required', contentKind: 'not-selected-content-kind',
+    schemaRef: { inline: { type: 'object' } }, required: true, value: {},
+  });
+  if (options.elementCycle === true) {
+    knowledge.dependencies = [{ element: 'basic.app', version: '1.0.0' }];
+  }
+  if (options.inlineRule === true) {
+    rules.content[0].value = structuredClone(rule);
+    delete rules.content[0].ref;
+  }
+  if (options.missingRuleRef === true) {
+    rules.content[0].ref = { ...ruleRef, path: 'content/no-such-rule.json' };
+  }
+
   const definitions = { 'basic.knowledge': knowledge, 'basic.rules': rules, 'basic.app': app };
   const definitionRefs = {};
   for (const [id, definition] of Object.entries(definitions)) {
@@ -317,7 +335,23 @@ async function expectBuildRefusal(label, options, code) {
   }
 }
 
-async function runPositive(label, rule) {
+// One and the same external application authoring path is used for all
+// BUILD refusals. Each negative is an independent, fresh valid baseline
+// with precisely one mutation before BUILD (no stale shared state).
+async function expectBuildMutationRefusal(label, mutate, code, options = {}) {
+  const prepared = await authoring('negative-' + label, { minOrderTotal: 50, regions: ['EU', 'US'] }, options);
+  try {
+    mutate(prepared);
+    const result = await buildV011App(prepared.input);
+    assert.equal(result.ok, false, label + ': BUILD incorrectly accepted the negative');
+    assert.equal(result.code, code, label + ': wrong typed refusal: ' + JSON.stringify(result));
+    await evidence('negative.build.' + label, { status: 'PASS', code });
+  } finally {
+    await rm(prepared.root, { recursive: true, force: true });
+  }
+}
+
+async function runPositive(label, rule, expectedAtHundred) {
   const prepared = await authoring(label, rule);
   try {
     const domain = {
@@ -377,7 +411,7 @@ async function runPositive(label, rule) {
     const pos = await app.invoke('submit', { total: 100, region: 'US' });
     const neg = await app.invoke('submit', { total: 10, region: 'US' });
     const unknownOutcome = await app.invoke('submit', { total: 100, region: 'APAC' });
-    assert.deepEqual(pos, { kind: 'SUCCEEDED', value: { decision: 100 >= rule.minOrderTotal ? 'POS' : 'NEG', via: 'rules-package/evaluate' } });
+    assert.deepEqual(pos, { kind: 'SUCCEEDED', value: { decision: expectedAtHundred, via: 'rules-package/evaluate' } });
     assert.deepEqual(neg, { kind: 'SUCCEEDED', value: { decision: 'NEG', via: 'rules-package/evaluate' } });
     assert.equal(unknownOutcome.kind, 'UNKNOWN');
     assert.equal(unknownOutcome.unknownReason.code, 'REGION_UNKNOWN');
@@ -386,6 +420,16 @@ async function runPositive(label, rule) {
       assert.equal(excluded.kind, 'UNKNOWN');
       assert.equal(excluded.unknownReason.code, 'REGION_UNKNOWN');
     }
+    const invalidInput = await app.invoke('submit', { total: 'not-a-number', region: 'US' });
+    assert.equal(invalidInput.kind, 'FAILED', 'invalid input must not enter the domain implementation');
+    assert.equal(invalidInput.failure.code, 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH');
+    const unselectedIngress = await app.invoke('not-in-lock', { total: 100, region: 'US' });
+    assert.equal(unselectedIngress.kind, 'FAILED');
+    assert.equal(unselectedIngress.failure.code, 'DH_RUNTIME_INGRESS_UNKNOWN');
+    await evidence(`${label}.negative-ingress`, {
+      status: 'PASS', invalidInputCode: invalidInput.failure.code,
+      unselectedIngressCode: unselectedIngress.failure.code,
+    });
     await evidence(`${label}.cross-package-pos-neg-unknown`, { status: 'PASS', pos: pos.value, neg: neg.value, unknown: unknownOutcome.unknownReason });
 
     const inspection = await app.inspect();
@@ -425,14 +469,69 @@ async function main() {
   assert.equal(typeof contracts.contentDigestOf, 'function');
   await evidence('positive.contracts-v011-import', { status: 'PASS' });
 
-  const a = await runPositive('rule-a', { minOrderTotal: 50, regions: ['EU', 'US'] });
-  const b = await runPositive('rule-b', { minOrderTotal: 500, regions: ['US'] });
+  const a = await runPositive('rule-a', { minOrderTotal: 50, regions: ['EU', 'US'] }, 'POS');
+  const b = await runPositive('rule-b', { minOrderTotal: 500, regions: ['US'] }, 'NEG');
   assert.notDeepEqual(a.install.lockBytes, b.install.lockBytes);
   assert.notEqual(a.install.lock.closureDigest, b.install.lock.closureDigest);
   await evidence('content-exchange.lock-and-output', { status: 'PASS', a: a.install.lock.closureDigest, b: b.install.lock.closureDigest, observed: 'A POS vs B NEG for total=100; B EU UNKNOWN' });
 
   await expectBuildRefusal('unsupported-effect', { unsupportedEffect: true }, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
   await expectBuildRefusal('unsupported-target', { unsupportedTarget: true }, 'DH_BUILD_TARGET_INVALID');
+
+  // Requirement-derived BUILD negative matrix, all through the actual
+  // four-packed public SDK rather than imported private validator calls.
+  const pkg = (prepared, id) => {
+    const found = prepared.input.packages.find((candidate) => candidate.id === id);
+    assert.ok(found, 'fixture must contain Package ' + id);
+    return found;
+  };
+  await expectBuildMutationRefusal('unknown-required-content', () => {}, 'DH_BUILD_SCHEMA_UNKNOWN_REQUIRED', { unknownRequired: true });
+  await expectBuildMutationRefusal('missing-content-reference', () => {}, 'DH_BUILD_RESOURCE_MISSING', { missingRuleRef: true });
+  await expectBuildMutationRefusal('element-dependency-cycle', () => {}, 'DH_BUILD_ELEMENT_CYCLE', { elementCycle: true });
+  await expectBuildMutationRefusal('missing-public-export', (p) => {
+    pkg(p, 'app-business').exports = [{ interfaceId: 'business.api' }];
+  }, 'DH_BUILD_EXPORT_MISSING');
+  await expectBuildMutationRefusal('missing-selected-implementation', (p) => {
+    const business = pkg(p, 'app-business');
+    business.targetVariants[0].implementations =
+      business.targetVariants[0].implementations.filter((binding) => binding.functionId !== 'submit');
+  }, 'DH_BUILD_IMPLEMENTATION_MISSING');
+  await expectBuildMutationRefusal('duplicate-sdk-primary', (p) => {
+    pkg(p, 'sdk-extension').role = 'primary';
+  }, 'DH_BUILD_PRIMARY_DUPLICATE');
+  await expectBuildMutationRefusal('missing-kernel-primary', (p) => {
+    pkg(p, 'kernel-primary').layer = 'sdk';
+  }, 'DH_BUILD_PRIMARY_MISSING');
+  await expectBuildMutationRefusal('package-dependency-cycle', (p) => {
+    pkg(p, 'kernel-primary').dependsOn = [{ package: 'sdk-primary', version: '1.0.0', interface: 'sdk.api' }];
+  }, 'DH_BUILD_PACKAGE_CYCLE');
+  await expectBuildMutationRefusal('hook-not-declared', (p) => {
+    pkg(p, 'kernel-extension').contributesTo[0].hookId = 'not-an-audit-hook';
+  }, 'DH_BUILD_HOOK_TARGET_INVALID');
+  await expectBuildMutationRefusal('missing-selected-app-init', (p) => {
+    p.input.descriptor.businessAppInit.functionId = 'nonexistent-init';
+  }, 'DH_BUILD_APP_INIT_MISSING');
+  await expectBuildMutationRefusal('bad-resource-digest', (p) => {
+    pkg(p, 'app-business').targetVariants[0].implementations[0].resources[0].digest = `sha256:${'0'.repeat(64)}`;
+  }, 'DH_BUILD_RESOURCE_DIGEST_MISMATCH');
+  await expectBuildMutationRefusal('noncanonical-artifact-path', (p) => {
+    p.input.packageArtifacts['kernel-primary'] = './dist/index.mjs';
+  }, 'DH_BUILD_RESOURCE_MISSING');
+
+  // Inline and ResourceRef rule content must produce identical selected
+  // semantic content digest even when authoring representations differ.
+  const inlinePrepared = await authoring('inline-rule', { minOrderTotal: 50, regions: ['EU', 'US'] }, { inlineRule: true });
+  try {
+    const built = await buildV011App(inlinePrepared.input);
+    assert.equal(built.ok, true, JSON.stringify(built));
+    const aRule = a.install.lock.selectedElements.find((el) => el.ref.id === 'basic.rules');
+    const inlineRule = built.lock.selectedElements.find((el) => el.ref.id === 'basic.rules');
+    assert.ok(aRule && inlineRule);
+    assert.deepEqual(inlineRule.contentDigests, aRule.contentDigests, 'inline vs ref content semantics changed');
+    await evidence('positive.inline-rule-ref-equivalence', { status: 'PASS', digest: inlineRule.contentDigests[0] });
+  } finally {
+    await rm(inlinePrepared.root, { recursive: true, force: true });
+  }
 
   // An App Init exception must not strand a half-initialized Package graph.
   // This is a real installed consumer, not a mock of KDP's cleanup function.
@@ -457,6 +556,30 @@ async function main() {
     await evidence('negative.app-init-failure-rollback', { status: 'PASS', code: failedInit.code, initialized: initialized.length, disposed: disposed.length, exposedApp: false });
   } finally {
     await rm(failedInitPrepared.root, { recursive: true, force: true });
+  }
+
+  // A degraded App can suppress ONLY the explicitly optional ingress.
+  const degradedPrepared = await authoring('degraded-optional-ingress', { minOrderTotal: 50, regions: ['EU', 'US'] }, { initDegraded: true });
+  try {
+    const built = await buildV011App(degradedPrepared.input);
+    assert.equal(built.ok, true, JSON.stringify(built));
+    const install = await materialize('degraded-optional-ingress', degradedPrepared, built);
+    globalThis.__v011T05Events = [];
+    const booted = await boot(install.pin, install.context);
+    assert.equal(booted.status, 'BOOTED', JSON.stringify(booted));
+    if (booted.status !== 'BOOTED') throw new Error('degraded fixture failed Boot');
+    assert.equal(booted.app.status, 'DEGRADED');
+    const inspection = await booted.app.inspect();
+    assert.deepEqual(inspection.suppressedIngress, ['optional-report']);
+    const stillCallable = await booted.app.invoke('submit', { total: 100, region: 'US' });
+    assert.deepEqual(stillCallable, { kind: 'SUCCEEDED', value: { decision: 'POS', via: 'rules-package/evaluate' } });
+    const suppressed = await booted.app.invoke('optional-report', {});
+    assert.equal(suppressed.kind, 'FAILED');
+    assert.equal(suppressed.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
+    await booted.app.dispose();
+    await evidence('positive.degraded-optional-ingress', { status: 'PASS', suppressed: inspection.suppressedIngress, requiredCallable: true });
+  } finally {
+    await rm(degradedPrepared.root, { recursive: true, force: true });
   }
 
   // Every negative uses a NEW installRoot: module URLs cannot be hidden by the
