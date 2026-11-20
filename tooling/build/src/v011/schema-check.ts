@@ -30,6 +30,123 @@ import { refusal, V011BuildRefusal } from './refusal.js';
 
 export type V011DocumentSchemaName = 'descriptor' | 'domain' | 'manifest' | 'element';
 
+/**
+ * The closed schema profile executed by T03's minimal runtime validator.
+ *
+ * This is deliberately NOT the ContentBlock profile: content is validated only
+ * by BUILD/Ajv and may use the complete Draft 2020-12 vocabulary. Function
+ * input/output contracts cross the runtime seam, so unknown/custom keywords
+ * and standard assertion/applicator keywords with no T03 implementation are
+ * refused instead of becoming silent no-ops. Annotation keywords whose values
+ * do not affect instance validation remain legal.
+ */
+const RUNTIME_FUNCTION_SCHEMA_KEYWORDS: ReadonlySet<string> = new Set([
+  '$schema',
+  '$id',
+  '$comment',
+  '$defs',
+  'title',
+  'description',
+  'default',
+  'examples',
+  'deprecated',
+  'readOnly',
+  'writeOnly',
+  'const',
+  'enum',
+  'type',
+  'minimum',
+  'maximum',
+  'exclusiveMinimum',
+  'exclusiveMaximum',
+  'multipleOf',
+  'minLength',
+  'maxLength',
+  'pattern',
+  'minItems',
+  'maxItems',
+  'items',
+  'prefixItems',
+  'uniqueItems',
+  'required',
+  'properties',
+  'additionalProperties',
+  'minProperties',
+  'maxProperties',
+  'allOf',
+  'anyOf',
+  'oneOf',
+  'not',
+]);
+
+function isSchemaObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOwn(value: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+/** Recursively admit only schema trees T03 can execute without dropping constraints. */
+function assertRuntimeFunctionSchemaProfile(schema: unknown, path: string): void {
+  if (typeof schema === 'boolean') return;
+  if (!isSchemaObject(schema)) {
+    throw refusal(
+      'DH_BUILD_SCHEMA_INVALID',
+      'runtime Function schema must be a boolean or a Draft 2020-12 schema object',
+      path,
+    );
+  }
+
+  for (const key of Object.keys(schema).sort()) {
+    if (!RUNTIME_FUNCTION_SCHEMA_KEYWORDS.has(key)) {
+      throw refusal(
+        'DH_BUILD_SCHEMA_INVALID',
+        `runtime Function schema keyword '${key}' is outside the supported subset`,
+        `${path}.${key}`,
+      );
+    }
+  }
+
+  // T03 applies `items` to every array entry before applying `prefixItems`.
+  // Draft 2020-12 applies it only AFTER the prefix, so the combination is not
+  // runtime-equivalent (except the assertion-free items:true no-op).
+  if (hasOwn(schema, 'prefixItems') && hasOwn(schema, 'items') && schema['items'] !== true) {
+    throw refusal(
+      'DH_BUILD_SCHEMA_INVALID',
+      'runtime Function schema does not support prefixItems together with items (except items:true)',
+      `${path}.items`,
+    );
+  }
+
+  const visitMap = (keyword: '$defs' | 'properties'): void => {
+    const map = schema[keyword];
+    if (!isSchemaObject(map)) return; // Ajv below reports the malformed keyword shape.
+    for (const [key, subschema] of Object.entries(map)) {
+      assertRuntimeFunctionSchemaProfile(subschema, `${path}.${keyword}[${JSON.stringify(key)}]`);
+    }
+  };
+  visitMap('$defs');
+  visitMap('properties');
+
+  if (hasOwn(schema, 'additionalProperties')) {
+    assertRuntimeFunctionSchemaProfile(schema['additionalProperties'], `${path}.additionalProperties`);
+  }
+  if (hasOwn(schema, 'items')) {
+    assertRuntimeFunctionSchemaProfile(schema['items'], `${path}.items`);
+  }
+  for (const keyword of ['prefixItems', 'allOf', 'anyOf', 'oneOf'] as const) {
+    const schemas = schema[keyword];
+    if (!Array.isArray(schemas)) continue; // Ajv below reports the malformed keyword shape.
+    for (const [index, subschema] of schemas.entries()) {
+      assertRuntimeFunctionSchemaProfile(subschema, `${path}.${keyword}[${index}]`);
+    }
+  }
+  if (hasOwn(schema, 'not')) {
+    assertRuntimeFunctionSchemaProfile(schema['not'], `${path}.not`);
+  }
+}
+
 export class V011SchemaChecker {
   private readonly ajv: InstanceType<typeof Ajv2020>;
   private readonly documentValidators = new Map<V011DocumentSchemaName, ValidateFunction>();
@@ -94,6 +211,30 @@ export class V011SchemaChecker {
       throw refusal(
         'DH_BUILD_SCHEMA_INVALID',
         `schemaRef is not a compilable draft 2020-12 JSON Schema: ${(error as Error).message}`,
+        refPath,
+      );
+    }
+  }
+
+  /**
+   * Compile one selected Function input/output schema for BUILD admission.
+   * The returned validator is not shipped or reused as a second runtime
+   * engine: Ajv proves Draft 2020-12 schema validity here, while the recursive
+   * profile above proves every assertion is implemented by T03 at runtime.
+   */
+  compileFunctionSchema(schema: unknown, refPath: string): ValidateFunction {
+    assertRuntimeFunctionSchemaProfile(schema, refPath);
+    try {
+      // As with ContentBlocks, isolate each schema's $id registry. Unlike the
+      // BUILD-only content path, validate the schema itself against the
+      // 2020-12 meta-schema so malformed supported keywords fail at BUILD.
+      return new Ajv2020({ strict: false, allErrors: false, validateSchema: true }).compile(
+        schema as object,
+      );
+    } catch (error) {
+      throw refusal(
+        'DH_BUILD_SCHEMA_INVALID',
+        `runtime Function schema is not a compilable draft 2020-12 JSON Schema: ${(error as Error).message}`,
         refPath,
       );
     }
