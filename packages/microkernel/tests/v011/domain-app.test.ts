@@ -266,6 +266,18 @@ test('invoke never rejects on hostile Proxy input: typed input mismatch instead'
   await app.dispose();
 });
 
+test('R27: disposal immediately closes ingress before asynchronous technical teardown', async (t) => {
+  const app = await bootApp(t, {
+    init: { status: 'READY' },
+    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
+  });
+  const teardown = app.dispose();
+  const during = await app.invoke('evaluate', { total: 100, region: 'EU' });
+  assert.equal(during.kind, 'FAILED');
+  if (during.kind === 'FAILED') assert.equal(during.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
+  await teardown;
+});
+
 test('invoke after dispose is refused; disposed apps stay disposed', async (t) => {
   const app = await bootApp(t, {
     init: { status: 'READY' },

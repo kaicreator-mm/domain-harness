@@ -113,6 +113,32 @@ refusalCase('DH_BUILD_IMPLEMENTATION_MISSING', (s) => {
 // L203 — lifecycle / dependency negatives reachable through standardCase
 // ---------------------------------------------------------------------------
 
+test('R27: BUILD rejects artifact paths Runtime would reject', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  for (const path of ['./dist/sdk.mjs', 'dist/../dist/sdk.mjs']) {
+    expectRefusal(buildV011App({
+      ...input, packageArtifacts: { ...input.packageArtifacts, 'sdk-core': path },
+    }), 'DH_BUILD_RESOURCE_MISSING');
+  }
+  expectRefusal(buildV011App({
+    ...input, kdpArtifact: { ...input.kdpArtifact, path: `./${input.kdpArtifact.path}` },
+  }), 'DH_BUILD_RESOURCE_MISSING');
+});
+
+test('R27: lifecycle EntryRef must match pinned package artifact and named export', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const packages = input.packages.map((raw) => {
+    const manifest = raw as import('@kaicreator/domain-harness-contracts/v011').DomainPackageManifest;
+    if (manifest.id !== 'sdk-core') return manifest;
+    return { ...manifest, technicalInit: { ...manifest.technicalInit!, exportName: 'init' } };
+  });
+  expectRefusal(buildV011App({ ...input, packages }), 'DH_BUILD_SCHEMA_INVALID');
+});
+
 refusalCase('DH_BUILD_LIFECYCLE_HALF', (s) => {
   s.sdkLifecycle = 'init-only';
 });

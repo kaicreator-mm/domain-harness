@@ -443,6 +443,30 @@ test('DEGRADED with duplicate suppressedIngress ids is refused', async (t) => {
   );
 });
 
+test('R27: post-initialization Business App Init failure rolls back every technical package', async (t) => {
+  for (const init of [{ status: 'FAILED' as const }, { status: 'READY' as const, throw: true }]) {
+    const fixture = await buildFixtureInstall({ init, functions: {} });
+    t.after(async () => fixture.cleanup());
+    const result = await boot(fixture.pin, fixture.context);
+    assert.equal(result.status, 'FAILED', JSON.stringify(result));
+    const inits = events().filter((e) => e['event'] === 'technical-init').map((e) => e['package']);
+    const disposes = events().filter((e) => e['event'] === 'technical-dispose').map((e) => e['package']);
+    assert.deepEqual(inits, INIT_ORDER);
+    assert.deepEqual(disposes, DISPOSE_ORDER, 'all previously initialized packages must be disposed');
+  }
+});
+
+test('R27: a tampered selected Hook module is refused before any selected package executes', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  await fixture.writePackageFile('fixture-ext', 'dist/hook.mjs', Buffer.from('export function telemetryHook() { return "tampered"; }\n'));
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'FAILED', JSON.stringify(result));
+  if (result.status === 'FAILED') assert.equal(result.code, 'DH_BOOT_PIN_MISMATCH');
+  assert.equal(events().some((e) => e['event'] === 'technical-init'), false,
+    'selected module integrity must be checked before first technical init');
+});
+
 test('technicalInit failure: already-initialized packages are torn down in strict reverse order', async (t) => {
   const fixture = await buildFixtureInstall({
     init: { status: 'READY' },
