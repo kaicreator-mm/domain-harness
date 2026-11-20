@@ -54,6 +54,11 @@ export const ROOT_EDGE_PACKAGES = Object.freeze([
 ]);
 const ROOT_PRODUCT_VERSION = '0.11.0';
 const CONSUMER_PRODUCT_VERSION = '0.11.0';
+const DIS_RUNTIME_DIR = 'packages/dis-v011-runtime';
+const DIS_RUNTIME_INTERNAL = Object.freeze([
+  '@kaicreator/domain-harness-build',
+  '@kaicreator/domain-harness-contracts',
+]);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 function readJson(root, relativePath) {
@@ -78,6 +83,18 @@ function assertInternalEdges(manifest, expected, label) {
     }
   }
   return seen;
+}
+
+function assertExactDependencyEdges(manifest, names, expected, label) {
+  for (const name of names) {
+    assert.equal(manifest.dependencies?.[name], expected,
+      `${label}: dependencies.${name} must equal ${expected}`);
+  }
+}
+
+function assertExactConsumerRuntimeGraph(manifest, expectedNames, label) {
+  assert.deepEqual(Object.keys(manifest.dependencies || {}).sort(), [...expectedNames].sort(),
+    `${label}: production dependencies must contain exactly the frozen graph and no third-party runtime dependency`);
 }
 
 export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
@@ -120,12 +137,14 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   const consumerSeen = assertInternalEdges(consumer, expected, CONSUMER_DIR);
   assert.deepEqual([...consumerSeen].sort(), [...CONSUMER_INTERNAL].sort(),
     `${CONSUMER_DIR}: internal dependency graph must describe the frozen 0.11.0 graph (contracts/build/microkernel)`);
+  assertExactConsumerRuntimeGraph(consumer, CONSUMER_INTERNAL, CONSUMER_DIR);
 
   for (const item of ROOT_EDGE_PACKAGES) {
     const manifest = readJson(root, `${item.dir}/package.json`);
     assert.equal(manifest[item.section]?.[CONSUMER_NAME], expected,
       `${item.dir}: ${item.section}.${CONSUMER_NAME} must equal ${expected}`);
   }
+  assertExactDependencyEdges(readJson(root, `${DIS_RUNTIME_DIR}/package.json`), DIS_RUNTIME_INTERNAL, expected, DIS_RUNTIME_DIR);
 
   const lock = readJson(root, 'package-lock.json');
   assert.equal(lock.version, ROOT_PRODUCT_VERSION,
@@ -161,6 +180,7 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   const lockedConsumerSeen = assertInternalEdges(lockedConsumer, expected, `${CONSUMER_DIR} lock`);
   assert.deepEqual([...lockedConsumerSeen].sort(), [...CONSUMER_INTERNAL].sort(),
     `${CONSUMER_DIR}: lock internal dependency graph must describe the frozen 0.11.0 graph`);
+  assertExactConsumerRuntimeGraph(lockedConsumer, CONSUMER_INTERNAL, `${CONSUMER_DIR} lock`);
 
   for (const item of ROOT_EDGE_PACKAGES) {
     const locked = lock.packages?.[item.dir];
@@ -168,6 +188,7 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
     assert.equal(locked[item.section]?.[CONSUMER_NAME], expected,
       `${item.dir}: lock ${item.section}.${CONSUMER_NAME} must equal ${expected}`);
   }
+  assertExactDependencyEdges(lock.packages?.[DIS_RUNTIME_DIR], DIS_RUNTIME_INTERNAL, expected, `${DIS_RUNTIME_DIR} lock`);
 
   return {
     version: expected,
