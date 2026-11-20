@@ -69,4 +69,4 @@ steps:
       - node --test tests/distribution/sdk-version-consistency.test.mjs
       # T05 is a REQUIRED real pack + fresh external install, not a pack dry-run.
       # The driver creates its own external root and executes the canonical consumer.
-      - node examples/v011-basic-app/verify-clean-install.mjs
+      - DH_T05_NPM_REGISTRY=http://host.docker.internal:14873 node examples/v011-basic-app/verify-clean-install.mjs

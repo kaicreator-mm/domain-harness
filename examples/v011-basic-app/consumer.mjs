@@ -22,6 +22,7 @@ const eventsPath = join(evidenceDir, 'consumer-events.ndjson');
 await mkdir(evidenceDir, { recursive: true });
 await writeFile(eventsPath, '');
 const events = [];
+const installRoots = new Set();
 async function evidence(step, detail = {}) {
   const event = { step, ...detail };
   events.push(event);
@@ -273,6 +274,7 @@ async function authoring(label, rule, options = {}) {
 
 async function materialize(label, prepared, built) {
   const installRoot = await mkdtemp(join(consumerRoot, `install-${label}-`));
+  installRoots.add(installRoot);
   for (const id of Object.keys(prepared.dirs)) await cp(prepared.dirs[id], join(installRoot, 'node_modules', id), { recursive: true });
   for (const id of ['@kaicreator/domain-harness-microkernel', '@kaicreator/domain-harness-contracts']) {
     await cp(join(consumerRoot, 'node_modules', ...id.split('/')), join(installRoot, 'node_modules', ...id.split('/')), { recursive: true });
@@ -281,6 +283,9 @@ async function materialize(label, prepared, built) {
   const lockBytes = built.lockBytes;
   await write(installRoot, 'dh-lock/app.lock.json', lockBytes);
   const lock = built.lock;
+  // L2 §6.2.4 / §8.5.3: THIS acceptance script is the ONE trusted installer.
+  // It writes installRoot and the record. A caller that can rewrite installRoot
+  // is outside the v0.11.0 threat model; no PKI or second trust service exists.
   const recordBase = {
     kind: 'DomainAppInstallRecord', schemaVersion: 'dh.install/0.11', appId: lock.appIdentity.id, appVersion: lock.appIdentity.version,
     target: lock.target, lockPath: 'dh-lock/app.lock.json', lockDigest: lock.closureDigest,
@@ -359,6 +364,9 @@ async function runPositive(label, rule) {
     const runtimeEvents = globalThis.__v011T05Events;
     const technical = runtimeEvents.filter((event) => event.event === 'technical-init').map((event) => event.package);
     assert.deepEqual(technical, install.lock.technicalInitOrder);
+    const businessInitIndex = runtimeEvents.findIndex((event) => event.event === 'business-init');
+    const lastTechnicalIndex = runtimeEvents.map((event) => event.event).lastIndexOf('technical-init');
+    assert.ok(lastTechnicalIndex >= 0 && businessInitIndex > lastTechnicalIndex, 'the one Business App Init must run after every technical init');
     assert.equal(runtimeEvents.filter((event) => event.event === 'business-init').length, 1);
     await evidence(`${label}.boot-kdp-app-init`, { status: 'PASS', technicalInitOrder: technical, businessInitCount: 1 });
 
@@ -416,6 +424,7 @@ async function main() {
   const originalLock = await readFile(a.install.context.lockPath ? join(a.install.installRoot, 'dh-lock/app.lock.json') : '');
   const tampered = new Uint8Array(originalLock);
   tampered[20] ^= 1;
+  assert.doesNotThrow(() => JSON.parse(Buffer.from(tampered).toString('utf8')), 'tamper must preserve JSON syntax so digest verification is exercised');
   await writeFile(join(a.install.installRoot, 'dh-lock/app.lock.json'), tampered);
   let before = globalThis.__v011T05Events.length;
   let refused = await boot(a.install.pin, a.install.context);
@@ -428,31 +437,85 @@ async function main() {
   const recordPath = join(a.install.installRoot, 'dh-install/installed-record.json');
   const hiddenPath = join(a.install.installRoot, 'dh-install/installed-record.hidden.json');
   await rename(recordPath, hiddenPath);
+  before = globalThis.__v011T05Events.length;
   refused = await boot(a.install.pin, a.install.context);
   assert.equal(refused.status, 'REFUSED');
   assert.equal(refused.code, 'DH_BOOT_RECORD_MISSING');
+  assert.equal(globalThis.__v011T05Events.length, before, 'missing record must not load packages');
   await evidence('negative.missing-installed-record', { status: 'PASS', code: refused.code });
   await rename(hiddenPath, recordPath);
 
+  const originalRecord = await readFile(recordPath, 'utf8');
+  await writeFile(recordPath, JSON.stringify({ ...JSON.parse(originalRecord), lockDigest: `sha256:${'0'.repeat(64)}` }));
+  before = globalThis.__v011T05Events.length;
+  refused = await boot(a.install.pin, a.install.context);
+  assert.equal(refused.status, 'REFUSED');
+  assert.equal(refused.code, 'DH_BOOT_RECORD_INVALID');
+  assert.equal(globalThis.__v011T05Events.length, before, 'invalid record digest must not load packages');
+  await evidence('negative.record-digest-invalid', { status: 'PASS', code: refused.code });
+  await writeFile(recordPath, originalRecord);
+
+  const kdpEntry = join(a.install.installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel', 'dist', 'v011', 'index.js');
+  const originalKdp = await readFile(kdpEntry);
+  await writeFile(kdpEntry, `${originalKdp.toString('utf8')}\n// post-install KDP tamper\n`);
+  before = globalThis.__v011T05Events.length;
+  refused = await boot(a.install.pin, a.install.context);
+  assert.equal(refused.status, 'REFUSED');
+  assert.equal(refused.code, 'DH_BOOT_PIN_MISMATCH');
+  assert.equal(globalThis.__v011T05Events.length, before, 'KDP byte tamper must not load packages');
+  await evidence('negative.kdp-artifact-tamper', { status: 'PASS', code: refused.code });
+  await writeFile(kdpEntry, originalKdp);
+
+  before = globalThis.__v011T05Events.length;
   refused = await boot({ ...a.install.pin, lockDigest: `sha256:${'0'.repeat(64)}` }, a.install.context);
   assert.equal(refused.status, 'REFUSED');
   assert.equal(refused.code, 'DH_BOOT_PIN_MISMATCH');
+  assert.equal(globalThis.__v011T05Events.length, before, 'forged pin must not load packages');
   await evidence('negative.forged-pin', { status: 'PASS', code: refused.code });
 
-  for (const install of [a.install, b.install]) {
-    await rm(install.installRoot, { recursive: true, force: true });
-  }
+  const upstream = (task, tests) => ({
+    source: 'UPSTREAM_REUSED_NOT_RERUN_IN_T05', task,
+    reviewedHead: 'd1f686558061df268c18f9643c6be1043cd81a06',
+    integratedHead: '08f99c79b3b32b0541622e14393f3a044fbf7915',
+    tree: 'ca6b8eb20838cda40c1125c3ee817af16c6155d3',
+    ci: 'Woodpecker pipeline 2732 (SUCCESS)', tests,
+  });
   const ac = {
-    AC01: 'PASS: E2E Domain/Element structure, 0/2 Function Elements, duplicate/discriminator negatives',
-    AC02: 'PASS: typed content/ref digest + semantic cycle + unknown required/optional; remaining cross-resource negatives reused from T01/T02',
-    AC03: 'PASS: real app-business -> rules-package ESM public Function call; ownership negatives reused from T02',
-    AC04: 'PASS: 3 Primary + 3 Extension + one sealed Hook + deterministic init/dispose; cardinality negatives reused from T02',
-    AC05: 'PASS: real trusted Boot/KDP/init + record/pin/tamper refusals with zero package load',
-    AC06: 'PASS: one App Init + direct cross-package POS/NEG/UNKNOWN + same-code content exchange; required suppression reused from T04',
-    AC07: 'PASS: exact repeated Lock bytes + one-byte tamper refusal; remaining Target/digest negatives reused from T02',
-    AC08: 'PASS: actual four-tarball external install (driver) + legacy import fences + contracts/v011',
-    AC09: 'PASS: unsupported effect/target typed BUILD refusals; no unimplemented success path',
-    AC10: 'PASS: bilingual v011-only author docs + canonical-source business-word scan (driver)',
+    AC01: { status: 'PASS_E2E', e2e: ['Domain/Element structure, 0/2 Function Elements, duplicate/discriminator negatives'], upstream: [] },
+    AC02: {
+      status: 'PASS_E2E_WITH_UPSTREAM',
+      e2e: ['typed content/ref digest', 'legal semantic cycle', 'unknown required refusal', 'unknown optional exclusion'],
+      upstream: [upstream('T01+T02', 'packages/contracts/tests/v011/*.test.ts; tooling/build/tests/v011/*.test.ts (remaining cross-resource negatives)')],
+    },
+    AC03: {
+      status: 'PASS_E2E_WITH_UPSTREAM',
+      e2e: ['real app-business -> rules-package ESM public Function call'],
+      upstream: [upstream('T02', 'tooling/build/tests/v011/*.test.ts (ownership/export/implementation negatives)')],
+    },
+    AC04: {
+      status: 'PASS_E2E_WITH_UPSTREAM',
+      e2e: ['3 Primary + 3 Extension', 'one sealed Hook', 'deterministic technical init/dispose order'],
+      upstream: [upstream('T02', 'tooling/build/tests/v011/*.test.ts (Primary/Hook cardinality negatives)')],
+    },
+    AC05: {
+      status: 'PASS_E2E',
+      e2e: ['trusted installer -> Boot/KDP/init order', 'Lock byte tamper', 'missing/invalid record', 'KDP artifact tamper', 'forged pin', 'zero package load on every refusal'],
+      scope: 'The acceptance script is the trusted installer per L2 §6.2.4/§8.5.3; caller-writable installRoot forgery and PKI are outside the frozen threat model.',
+      upstream: [],
+    },
+    AC06: {
+      status: 'PASS_E2E_WITH_UPSTREAM',
+      e2e: ['one App Init after all technical init', 'direct cross-package POS/NEG/UNKNOWN', 'same-code content exchange'],
+      upstream: [upstream('T04', 'packages/domain-harness/tests/v011/final-integration.test.ts (required-ingress suppression and DEGRADED negatives)')],
+    },
+    AC07: {
+      status: 'PASS_E2E_WITH_UPSTREAM',
+      e2e: ['exact repeated Lock bytes', 'JSON-preserving one-byte Lock tamper refusal'],
+      upstream: [upstream('T02', 'tooling/build/tests/v011/*.test.ts (remaining Target/version/resource digest negatives)')],
+    },
+    AC08: { status: 'PASS_E2E', e2e: ['actual four-tarball external install + per-entry realpath and byte equality', 'legacy import fences', 'contracts/v011'], upstream: [] },
+    AC09: { status: 'PASS_E2E', e2e: ['unsupported effect and target typed BUILD refusals', 'no unimplemented success path'], upstream: [] },
+    AC10: { status: 'PASS_E2E', e2e: ['bilingual v011-only author docs', 'executable canonical-source business-word scan (driver)'], upstream: [] },
   };
   const result = { status: 'PASS', ac, events: events.length, sdkEntry };
   await writeFile(join(evidenceDir, 'consumer-result.json'), `${JSON.stringify(result, null, 2)}\n`);
@@ -467,4 +530,8 @@ try {
   await writeFile(join(evidenceDir, 'consumer-result.json'), `${JSON.stringify(result, null, 2)}\n`);
   console.error(result.error);
   process.exitCode = 1;
+} finally {
+  for (const root of installRoots) {
+    await rm(root, { recursive: true, force: true });
+  }
 }
