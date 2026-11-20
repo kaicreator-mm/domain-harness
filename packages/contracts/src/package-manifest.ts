@@ -9,6 +9,7 @@ import type {
 } from './refs.js';
 import type { DH_PACKAGE_SCHEMA_VERSION } from './schema-versions.js';
 
+/** 三层职责是固定的，Capability 或 Hook 不构成第四个 Package 层。 */
 export type PackageLayer = 'kernel' | 'sdk' | 'business';
 
 export type PackageRole = 'primary' | 'extension';
@@ -32,6 +33,7 @@ export interface ExportEntry {
   readonly interfaceId?: string;
 }
 
+/** Hook 声明归属与可接受实现数量，BUILD 负责静态校验和封存。 */
 export interface HookDeclaration {
   readonly id: string;
   readonly interfaceSchemaRef: SchemaRef;
@@ -49,6 +51,7 @@ export interface HookBinding {
   readonly entry: EntryRef;
 }
 
+/** Package 清单统一承载 Element 归属、显式导入导出、Target 实现和配对技术生命周期。 */
 export interface DomainPackageManifest {
   readonly kind: 'DomainPackage';
   readonly schemaVersion: typeof DH_PACKAGE_SCHEMA_VERSION;

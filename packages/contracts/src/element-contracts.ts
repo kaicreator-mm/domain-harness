@@ -21,6 +21,7 @@ export const CORE_CONTENT_KINDS = [
 
 export type CoreContentKind = (typeof CORE_CONTENT_KINDS)[number];
 
+/** 内容类型是可扩展标识；未知必填类型由 BUILD 拒绝，可选未知类型必须被显式排除。 */
 export type ContentKind = CoreContentKind | `dh-ext.${string}`;
 
 export function isUnknownContentKind(kind: string): boolean {
@@ -28,6 +29,7 @@ export function isUnknownContentKind(kind: string): boolean {
 }
 
 
+/** Schema 文件的绝对身份由所属 Package、相对路径和内容摘要共同确定。 */
 export interface SchemaResourceRef {
   readonly packageId: string;
   readonly path: string;
@@ -52,6 +54,7 @@ export interface ProvenanceRef {
   readonly refs?: readonly ResourceRef[];
 }
 
+/** 内容块必须在内联值与资源引用中二选一，且每个块都有独立 Schema 和适用条件。 */
 export interface ContentBlock {
   readonly id: string;
   readonly contentKind: ContentKind;
@@ -68,6 +71,7 @@ export type FunctionOutcomeKind = 'SUCCEEDED' | 'UNKNOWN' | 'FAILED';
 
 export type EffectIntent = 'none' | 'external' | 'state';
 
+/** Function 只声明语义、输入输出和 Effect 意图；具体实现由 BUILD 按 Target 选定。 */
 export interface FunctionContract {
   readonly id: string;
   readonly contractVersion: string;
@@ -86,6 +90,7 @@ export interface ElementDependency {
   readonly functions?: readonly string[];
 }
 
+/** Element 表达一项内聚领域职责，允许零个或多个公开 Function，不建立封闭的子类型层级。 */
 export interface ElementDefinition {
   readonly kind: 'Element';
   readonly schemaVersion: typeof DH_ELEMENT_SCHEMA_VERSION;
@@ -107,6 +112,7 @@ export interface SemanticEdge {
   readonly version?: string;
 }
 
+/** Domain 的语义关系可以成环；真正影响构建顺序的依赖关系必须无环。 */
 export interface DomainDefinition {
   readonly kind: 'Domain';
   readonly schemaVersion: typeof DH_DOMAIN_SCHEMA_VERSION;

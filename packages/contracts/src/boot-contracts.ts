@@ -7,6 +7,7 @@ import type {
 } from './schema-versions.js';
 import type { DomainApp } from './app-contracts.js';
 
+/** 可信安装器写入的实际安装记录；Pin 与 Lock 必须绑定此记录及选定 KDP 的字节摘要。 */
 export interface InstalledRecord {
   readonly kind: 'DomainAppInstallRecord';
   readonly schemaVersion: typeof DH_INSTALL_RECORD_SCHEMA_VERSION;
@@ -21,6 +22,7 @@ export interface InstalledRecord {
   readonly recordDigest: ContentDigest;
 }
 
+/** Boot 仅依此最小定位信息寻找唯一 KDP Primary，不进行运行时版本寻优。 */
 export interface BootstrapPin {
   readonly schemaVersion: typeof DH_PIN_SCHEMA_VERSION;
   readonly target: ResolvedTarget;
@@ -36,6 +38,7 @@ export interface HostPortBinding {
   readonly port: number;
 }
 
+/** Host 提供运行环境与已安装根路径；该上下文不应包含未授权 Effect 权限。 */
 export interface KdpBootstrapContext {
   readonly installRoot: string;
   readonly descriptorPath: string;
@@ -52,6 +55,7 @@ export interface KdpPrimary {
   bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult>;
 }
 
+/** 启动前拒绝返回 REFUSED；选定 KDP 执行后的失败由 KDP 报告 FAILED。 */
 export type BootResult =
   | { readonly status: 'REFUSED'; readonly code: string; readonly reason: string }
   | KdpBootstrapResult;

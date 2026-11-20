@@ -24,6 +24,7 @@ export interface ReadonlyResourceHandle {
   read(): Promise<Uint8Array>;
 }
 
+/** App Init 只能访问被选中的只读资源与函数句柄，不授予 Host 或任意包的执行权限。 */
 export interface AppInitContext {
   readonly appId: string;
   readonly activationId: string;
@@ -39,11 +40,13 @@ export interface AppInitResult {
   readonly detail?: JsonValue;
 }
 
+/** 成功、未知与失败互斥，调用方不能把缺失依据的 UNKNOWN 当成 SUCCEEDED。 */
 export type FunctionOutcome =
   | { readonly kind: 'SUCCEEDED'; readonly value: JsonValue }
   | { readonly kind: 'UNKNOWN'; readonly unknownReason: { readonly code: string; readonly message: string } }
   | { readonly kind: 'FAILED'; readonly failure: { readonly code: string; readonly message: string } };
 
+/** 启动完成后只允许调用 Lock 中声明的 ingress，释放后必须拒绝再次调用。 */
 export interface DomainApp {
   readonly status: AppStatus;
   invoke(ingressId: string, input: unknown): Promise<FunctionOutcome>;
