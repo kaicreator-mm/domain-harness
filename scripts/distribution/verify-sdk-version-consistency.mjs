@@ -125,6 +125,8 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
       `${item.dir}: internal dependency graph changed`);
   }
 
+  assertExactDependencyEdges(readJson(root, 'tooling/build/package.json'), ['ajv'], '8.17.1', 'tooling/build');
+
   const consumer = readJson(root, `${CONSUMER_DIR}/package.json`);
   assert.equal(consumer.name, CONSUMER_NAME, 'DomainHarness consumer package name');
   assert.equal(consumer.version, CONSUMER_PRODUCT_VERSION,
@@ -171,6 +173,8 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
     assert.deepEqual([...lockedSeen].sort(), [...item.internal].sort(),
       `${item.dir}: lock internal dependency graph changed`);
   }
+
+  assertExactDependencyEdges(lock.packages?.['tooling/build'], ['ajv'], '8.17.1', 'tooling/build lock');
 
   const lockedConsumer = lock.packages?.[CONSUMER_DIR];
   assert.ok(lockedConsumer, `package-lock.json: missing workspace ${CONSUMER_DIR}`);

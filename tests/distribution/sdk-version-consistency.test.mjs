@@ -38,7 +38,10 @@ function fixture() {
       type: 'module',
       engines: { node: '>=24.0.0' },
       files: ['dist'],
-      dependencies,
+      dependencies: {
+        ...dependencies,
+        ...(item.dir === 'tooling/build' ? { ajv: '8.17.1' } : {}),
+      },
     };
     manifests.set(item.dir, manifest);
     mkdirSync(join(root, item.dir), { recursive: true });
@@ -176,6 +179,29 @@ test('rejects a lock root-name edge that drifts while source stays valid', () =>
       packages: lockPackages,
     }));
     assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 0\.11\.0/);
+  });
+});
+
+test('rejects a BUILD Ajv version that is not exact 8.17.1', () => {
+  withFixture(({ root, manifests }) => {
+    const manifest = manifests.get('tooling/build');
+    manifest.dependencies.ajv = '^8.17.1';
+    writeFileSync(join(root, 'tooling/build/package.json'), JSON.stringify(manifest));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 8\.17\.1/);
+  });
+});
+
+test('rejects a lock BUILD Ajv version that is not exact 8.17.1', () => {
+  withFixture(({ root, lockPackages }) => {
+    lockPackages['tooling/build'].dependencies.ajv = '^8.17.1';
+    writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      version: '0.11.0',
+      lockfileVersion: 3,
+      requires: true,
+      packages: lockPackages,
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 8\.17\.1/);
   });
 });
 
