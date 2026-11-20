@@ -530,6 +530,13 @@ test('T01 repair P2-3: resource path pattern matches the handwritten validator o
     ['c:x', false], // /^[A-Za-z]:/ drive prefix refused
     ['C:/x/y', false],
     ['a\\b', false], // backslash refused anywhere
+    ['.hidden/x.js', true], // non-dot-segment heads starting with '.' are legal
+    ['.a', true],
+    ['a\n/b\\c', false], // backslash after a line terminator still refused ([\s\S]* lookahead)
+    ['a\n/../b', false], // dot-segment after a line terminator still refused
+    ['a\u2028/b\\c', false], // U+2028 variant
+    ['a\u2029/../b', false], // U+2029 variant
+    ['a/.\n', true], // '.\n' is an ordinary legal segment, not the '.' segment
     ['', false],
   ];
   for (const [path, expected] of cases) {

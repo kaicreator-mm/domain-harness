@@ -36,9 +36,13 @@ const CONTENT_DIGEST_PATTERN = '^sha256:[0-9a-f]{64}$';
  * parity, expressed segment-wise: non-empty; no backslash anywhere; no
  * /^[A-Za-z]:/ drive prefix; every '/'-separated segment non-empty and not
  * '.' or '..'. Anything else is legal, including ':' after the first char
- * ('res:x'), '@', '+' and other non-separator POSIX characters.
+ * ('res:x'), '@', '+' and other non-separator POSIX characters. The
+ * negative lookaheads use [\s\S]* (not '.') so they also see past line
+ * terminators — a backslash or a dot-segment after a '\n'/U+2028/U+2029
+ * must still be refused, while newlines inside an ordinary segment stay
+ * legal (the acceptance side [^/]+ does not ban them).
  */
-const RESOURCE_PATH_PATTERN = '^(?!.*\\\\)(?![A-Za-z]:)(?!.*(^|/)\\.{1,2}($|/))[^/]+(?:/[^/]+)*$';
+const RESOURCE_PATH_PATTERN = '^(?![\\s\\S]*\\\\)(?![A-Za-z]:)(?![\\s\\S]*(^|/)\\.{1,2}($|/))[^/]+(?:/[^/]+)*$';
 // ---- Shared $defs bodies (composed into every self-contained document) ----
 const RESOURCE_REF_DEF = {
     type: 'object',
