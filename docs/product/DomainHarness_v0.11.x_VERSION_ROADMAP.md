@@ -1,105 +1,137 @@
-# DomainHarness 0.11.x — 单一版本列车、分阶段交付与依赖关系（R2）
-<!-- DH_V011X_ELEMENT_FIRST_RELEASE_ROADMAP_R2_OWNER_TRAIN_20261121 -->
+# DomainHarness 0.11.x — 领域 Harness / Agent 渐进式能力路线图（R4 候选）
+
+<!-- DH_V011X_DOMAIN_BOUNDED_AGENT_PROGRESSIVE_R4_20261121 -->
 
 ```ini
-OUTPUT_LABEL=DOMAIN_HARNESS_V011X_SINGLE_TRAIN_ROADMAP_R2
+OUTPUT_LABEL=DH_V011X_R4_DOMAIN_HARNESS_AGENT_VERTICAL_SLICES
 MASTER=kaicreator-mm/domain-harness#1563
 PRODUCT_0110=kaicreator-mm/domain-harness#1564
-PRIMARY_PRODUCT_PR=kaicreator-mm/domain-harness#1565
+REFERENCE_HARNESS_ANALYSIS=kaicreator-mm/domain-harness#1477,#1478
 FEATURE_INVENTORY=kaicreator-mm/domain-harness#1567
-STATUS=OWNER_CONFIRMED_RELEASE_BOUNDARY_FUTURE_STAGE_SCOPE_CANDIDATE
-VERSION_0110=STAGE_0_INTEGRATED_ACCEPTED_NOT_RELEASED
-VERSION_011X=SINGLE_DEVELOPMENT_TRAIN_ONLY_FINAL_MAIN_AND_RELEASE
-LEGACY_PARITY_PORT_ABI=NOT_REQUIRED
-APPROVAL_FUTURE_PATCH_SCOPE=NOT_AUTOMATIC
-PINNED_ADS=4.18.0@2c395c55569fe2edf3f4135f12d3d069e526d0b7
+STATUS=PRODUCT_ROADMAP_DELTA_PROPOSED_NOT_FROZEN
+STAGE_0=0.11.0_INTERNAL_ACCEPTED_UNCHANGED
+DEVELOPMENT_TRAIN=version/v0.11.x
+EXTERNAL_RELEASE=ONLY_AFTER_FULL_TRAIN_ACCEPTANCE
+STAGE_1_TO_7=PLANNED_NOT_IMPLEMENTED
+OLD_VERSION_ABI_OR_PARITY=NOT_REQUIRED
+NODE_BASELINE=>=22.12.0
 ```
 
-## 0. 一条 0.11.x 版本列车的分支与发布边界（Owner 决议：2026-11-21）
+## 0. 不变的版本列车与可信基线
 
-**正式决议：0.11.x 是一个完整功能版本拆成多个内部实施阶段，不是多个独立对外发行的小版本。** 以前针对 `0.11.0` 单独合并 `main` 和发布的方案已被撤回；[main PR #1596](https://github.com/kaicreator-mm/domain-harness/pull/1596) 关闭且未合并，历史验收仍有效。
+**0.11.x 是一条开发列车；0.11.0…0.11.7 是内部可独立验收的增量阶段，不是分别向外发布的 SemVer Patch。**
 
-| Git 对象 | 角色 | 允许事项 | 禁止事项 |
-|---|---|---|---|
-| `main` | 当前正式发行线 | 继续承载已正式发布的版本；仅在 0.11.x 完整验收后接受一次主线集成 | 把 `0.11.0` 或任一未完成阶段提前合入 |
-| `version/v0.11.0` | Stage-0 已验收源码快照 | 保留 Element/Package/BUILD/Boot/KDP/AppInit/SDK 及 AC01–AC10 证据 | 误当正式 Tag/对外 Release；继续作为所有阶段的集成目标 |
-| **`version/v0.11.x`** | **0.11.x 唯一正式开发集成分支** | 从 Stage-0 精确提交 `525f4f59ad40e7cb516a37421a24c6584ec36ae3` 建立；继续合入 0.11.1、0.11.2…所有已审阶段 | 每一阶段单独发起 `main` PR / GitHub Release / npm publish |
-| `task/...`（必要时 `version/v0.11.n`） | 阶段实现/隔离分支 | 从当前 `version/v0.11.x` HEAD 派生，增量审核后受控合入同一列车 | 旁路共用 Lock/KDP，或将局部阶段视为全列车 Release Authority |
+- `main` 继续承载已发布版本；**所有阶段验收合格后**才产生最终 main PR、正式 Tag/GitHub Release 和必要的发布资格。禁止为每个阶段单独执行完整 Release Qualification；npm 发布默认不执行。
+- `version/v0.11.0` 为已验收 Stage-0 快照，HEAD `525f4f59ad40e7cb516a37421a24c6584ec36ae3`，T01–T05/AC01–AC10 有既有范围限定证据；不回写 Stage-0 PRD、L2 或旧独立审核结论。
+- **`version/v0.11.x` 是唯一开发集成分支**。后续阶段从其最新已验收 HEAD 取基线，使用隔离 Task 分支/必要 PR，差量审核与集成后形成阶段快照；不将阶段候选虚报为已实现。
+- 没有保留 0.10.3 App/SDK ABI、代码迁移或功能全等义务；其机制仅作为设计输入。Node 基准按已确认的 `>=22.12.0`，不能因旧项目用 Node24 而抬高最低版本。
 
-**阶段与最终退出门：**
-1. **Stage-0 = 0.11.0：COMPLETE / INTERNAL_ACCEPTED**。复用 [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)、T01–T05、真实 Node >=22.12.0 与四 tarball 外部消费者 AC01–AC10 的有限验证和独立审核；不重跑相同代码的已通过测试。
-2. **Stage-1…Stage-7 = 0.11.1…0.11.7：PLANNED**。每阶段最小 Product/L2 delta、必要 Task DAG、实际功能及受影响测试、独立差量审核、单分支集成；可以调整优先级，但不可无证据标 COMPLETE。
-3. **0.11.8+：OPTIONAL BACKLOG**。跨平台/大型自举/完整 Conformance 等仅按真实需求另立范围，默认**不阻止**完成核心 0.11.0…0.11.7 列车；如 Owner 把具体事项纳入本列车，须在最终验收前明确调整并冻结退出范围，避免“0.11.x 永远做不完”。
-4. **只在明确的完整列车退出门**，综合前面阶段的可复用证据、增量跨模块集成与真实对外四包验证，确认无必需功能缺口及 P0/P1，再对 `main` 开一个最终 PR、按受保护分支规则集成、创建一次正式版本 Tag/GitHub Release。Tag 取当时确认的最终正式版本号，**不预先承诺** `v0.11.0`；npm 发布默认不执行，须单独选定。
-5. 开发阶段可生成内部 npm pack / 安装试验产物作验收，但这些**不是**正式 GitHub Release 或 npm Registry 发布。未获整个列车最终资格时，Stage Accepted != Released。
+本 R4 改动 **只涉及后续 Product Roadmap 的结构/阶段范围**，不变更现有 Stage-0 架构、源码或发布政策。后续阶段仍按 ADS Product/L1 delta → 必要 L2 delta → Native Task DAG → implementation → focused validation → 独立审核 → 单分支集成。
 
-## 1. 规划依据、有效性和划分规则
+## 1. 产品中心：Domain-bounded Harness，而不是功能模块合集
 
-0.11.0 已完成并经审核、CI 验证，作为 **0.11.x 内部 Stage-0 架构基线**，不是独立对外 Release。本文件定义后续阶段的大致能力与依赖优先级，不自动冻结 0.11.1…0.11.7 的 Product/L2 或派发 Native Task DAG。各阶段按实际需求执行 Product delta → 必要 L2 delta → Task DAG → 定向测试/独立审核 → **合入同一个 `version/v0.11.x` 集成分支**；阶段完成不触发 `main` 合并、正式 Tag、GitHub Release 或 npm 发布。尚未实现的能力必须标 `NOT_IMPLEMENTED`。
+**产品定义**：Domain-Harness 在当前选定且 pinned 的 Domain Package/Intelligence 之内，理解一个有边界的用户目标，选择可适用的领域知识和已验证解题策略，必要时进行有界模型推理，通过 KDP 授权执行声明的 Function/Tool/Effect，观察并验证结果，产出可追溯的 Outcome 与反馈。
 
-**原则**：
-1. **全部使用 0.11.x 新架构**，不用承诺旧 0.10.3 App/SDK API、已实现功能和机制继续保留或迁移。旧码只可参考，不是依赖，禁止以旧版曾经 CI PASS 为新版合格证明。
-2. 先让 Domain App 具备对真实问题有用的最小确定性知识、规则、读写能力；之后再补可选 Interaction、LLM、Harness、Memory/Meta、Tool 等，不因热门模型功能打断结构版本。
-3. 每版一个主要能力 Concern；共享公共契约变化按实际代码影响合并，避免每个小版本同时开数十个模块重做。
-4. `Rule/Knowledge/Workflow/State/Tool/Experience` 均须作为新统一 Element 的内容、Function 或 Package binding 组织；**不得**创建独立“Rule SDK、Knowledge Runtime、Agent Runtime、Workflow Kernel”与 KDP 并列。
-5. 0.11.0…0.11.n 是**尚未正式发布的同一版本列车的内部里程碑**，不以 Patch 编号向外承诺各阶段之间的公开 SemVer 兼容性；共享契约变化需明确增量 Product/L2 决议并同步全部受影响模块及测试。Element identity/Package owner/Lock/Boot-KDP 的重大重构需评估是否超出本列车范围；正式公开兼容政策只在最终 Release 时冻结。
-6. 每版必须以当前事实确认 KDP/Host/Effect 的真实可用性；Build 完整性≠真实业务 Oracle、历史 Mock≠真实 Host 授权，不能把在 0.11.0 未实现的 Effect/Journal/Recovery 宣称已完成。
+- **Domain-Forge**：设计时的领域发现、获取、综合、验证和编译；产生可信候选 Domain Intelligence/Packages。Harness 不变成第二个知识生产/审核平台。
+- **Domain Package**：具版本和适用范围的领域语义、规则、状态机、Workflow、Tool 合同和验证标准的交付载体；Package 完整不等于领域智能完整。
+- **Domain-Harness**：当前任务运行时的选定上下文、策略选择、执行、观测、评价、必要追问、恢复和经验反馈。不是通用 Agent Framework，也不是 LLM API wrapper。
+- **KDP/Kernel**：单一受信任执行权威，所有真实 State/Capability/Effect/Host admission 归它管。Harness 的 Coordinator、Workflow、Agent、Meta 不产生第二个 Kernel、并行 Effect Owner 或权限绕行。
+- **LLM**：可选的受限解决策略，不是每个 Agent task 必须调用的入口；没有被选择的 Function/Tool 永远不因模型建议获得执行权。
 
-## 2. 建议的版本/功能范围表
-
-| 内部阶段（非单独发布） | 核心用户价值 / 阶段 Outcome | 新架构中的主对象与实现边界 | 关键证明、依赖与非目标 | 来源 |
-|---|---|---|---|---|
-| **0.11.0** | **Element-First + Boot/KDP/多层 Package 架构基础**；可创建、选择、封存、装配、启动、检查和调用一个基础 Domain App | Domain/Element（0..N Function+typed content）/Package K-S-B Primary+Extensions/Build Lock/单 App Init/无 Effect Function，最小已选知识/规则影响输出 | AC01–AC10；无旧 App ABI、无全业务迁移、无 LLM/Meta/真实 Effect 框架 | #1563/#1564/#1565, #1480/#1484/#1496 |
-| **0.11.1** | **确定性 Domain Intelligence MVP**：真正可复用的领域事实/规则/校验/识别/决策，实现有用的 Read-only Domain App | `Knowledge/Rule/Decision/Validator/Recognizer` content & Function/typed outcome/Applicability/UNKNOWN，多个 Element 的真实协调；跨领域两个不同简单消费者做独立验证 | 依赖 0.11.0 的内容/资源/Function/BUILD。证明规则参与真实领域决定与结构化 UNKNOWN；不做复杂知识 DB、自动学习、LLM | #1477/#1485/#1496, #1567 F05/F06/F07/F10/F17 |
-| **0.11.2** | **可用的 Domain State 与受控 Effect**，支持真正端到端业务命令：可信授权→调用 Host/Capability→可检查结果；先实用再扩展 | 新 KDP Kernel 的 bounded Admission/Effect/Outcome/State primitives、业务 State Element、选定 Host/Capability/Tool Operation contract、最小持久化；公共 Function 的 effect declaration | 必须真实校验 live user/State/Effect 权限，区分提交/UNKNOWN/拒绝，先完成一个真实、可证伪受控外部操作，不重搬旧 v10 Runtime；Crash/replay 长尾范围按需求独立裁定 | #1477 CV-06/11, #1480/#1304, #1567 F14/F17/F19 |
-| **0.11.3** | **Knowledge Reader/Query 与领域资源访问**：检索结构化知识、版本、来源、适用范围及可选索引；与 Rule 联动 | `Knowledge/StructuredData` Element、Reader/Query Function、Source/Schema/Snapshot/Provenance、包内静态资源 + 需要时可选 SQLite/索引 | 不建通用图数据库平台、不替 Domain-Forge 生产知识、不因 SQLite CAS 存在误称已是 Knowledge DB；支持离线 Basic | #1476/#1477/#1496, #1567 F08/F13 |
-| **0.11.4** | **Interaction 与 Guided Journey**：动态 Form/CLI/Chat 共同使用的 Domain Intent 澄清、确定性分支和直达 Function | `Interaction` Element、UI-neutral `StepSpec/StepOutcome`、Intent→已选 Function/Operation、可选 context assembly、离线 Guided Journey | 未确认用户意图不等于可执行授权；无专门 UI 引擎/Agent；仅在真实多入口需求出现时增量 Hook/Events | #1395/#1489/#1478, #1567 F09/F15/F23 |
-| **0.11.5** | **可选 LLM Provider + Bounded Harness**：确定性不能解决的问题才消耗模型，使用已选知识/规则/Functions 的闭环 | `LLM/Harness/Context` Elements，selected Provider profile、预算、typed intermediate result/UNKNOWN、KDP permit boundary，必要的单/多轮最小推理 | 模型输出不授予 Effect，不允许未选 Function 动态插入，真实 provider 调用与成本凭证独立于 Basic；不做通用 Agent 平台 | #1478/#1396/#1496, #1567 F07/F11/F23 |
-| **0.11.6** | **复杂业务 Workflow、Business Events 和可扩展 Tool/Package 互操作**：实际跨 Element/Package 过程组装 | `Workflow` content/Function、业务事件订阅/过滤、声明式 Tool Operation/可选 Remote/IPC Adapter、selected Hook Provider 组合 | Workflow 不是唯一业务入口，也不是 KDP 调度器；不同 Tool effect 仍经单 KDP 真实授权；远端 Streaming/Cancel 只有用例出现才单独选入 | #1468/#1361/#1489, #1567 F14/F15/F24 |
-| **0.11.7** | **Experience/Memory/Feedback/Meta 正规选定实现**：已发生的事实可用于优化候选，但不擅自晋升真实业务能力 | `Memory/Evidence/Feedback/Experience/Meta` Elements；Domain scoped nonauthoritative snapshots；候选→Shadow→独立资格→下一 BUILD/Package | 知识与候选资格不来自未经证实的模型 PASS；真实 Promotion 与 Oracle 权威独立；不强制让 Basic App 部署 Meta | #1398/#1487/#1477, #1567 F12/F18/F19 |
-| **0.11.8+ 或未来 Minor** | **按真实需求解决跨平台、复杂 Agent/远端 Tool、深层智能自举、更多消费者/形式化 Conformance** | 多 Target SDK/Package 实现、设备 Host/特殊 Runtime、remote stream/cancel、Full DIS/Forge 联动、DH-DI 自举及大规模消费者 | 必须具体商业目标/验证责任成立后再立项；影响基础 ABI/架构时升新 Minor，不把补丁号当破坏性改造通道 | #1477/#1478/#1544, #1567 F18/F19/F20/F21/F22/F24 |
-
-**版本时间顺序可调整**，特别是状态/Effect 与 Knowledge Access 可因首个真实 Consumer 的需求对调，但**0.11.0 的结构基础不能推迟**。若当前 0.11.0 Basic 包含两个互相独立的简单 Domain fixture，仅证明架构泛化，不等于 0.11.1 完整领域智能 MVP。每阶段只对实际声明的能力和可证伪边界负责；阶段内部接受不代表整个 0.11.x 可对外发布。
-
-## 3. 依赖与计划并行度
+### 领域任务最小闭环（贯穿后续全部阶段）
 
 ```text
-0.11.0 Element + Package + Build Lock + Boot/KDP + AppInit + typed no-effect Function
-     │
-     ├─→ 0.11.1 Domain rules/decisions/recognizers
-     ├─→ 0.11.2 State + authorized Effect (business runtime correctness)
-     ├─→ 0.11.3 Knowledge Reader/Query & provenance ─┐
-     ├─→ 0.11.4 Interaction/Guided Journey ────────────┤
-     └─→ 0.11.5 LLM/Harness ───────────────────────────┘
-                           │
-           ┌───────────────┴─────────────────┐
-           ↓                                 ↓
-      0.11.6 Workflow/Tool/Event         0.11.7 Memory/Experience/Meta
-           └───────────────┬─────────────────┘
-                           ↓
-                    0.11.8+/new minor
+Domain Task + selected Domain/Package/Lock + Goal/Constraints
+      ↓
+Recognize Goal / Intent / Applicability
+      ↓
+Assemble bounded Context (facts / knowledge / state / observations)
+      ↓
+Resolve strategy in priority order:
+  1. selected deterministic domain intelligence
+  2. qualified exact semantic result reuse (when available)
+  3. selected promoted reusable procedure / subworkflow (when available)
+  4. bounded LLM reasoning fallback (only when needed and enabled)
+      ↓
+Propose Step / Function / Tool / State transition
+      ↓
+KDP Admission + declared Capability + current State guard
+      ↓
+Execute selected Function / approved Effect → Observe result
+      ↓
+Validate against goal, invariants, evidence and outcome contract
+      ├─ Satisfied → COMPLETE
+      ├─ Missing information → ASK / WAIT
+      ├─ Resolvable uncertainty → next bounded step
+      └─ Invalid/unauthorized/budget exceeded → UNKNOWN / BLOCKED / FAILED
+      ↓
+Emit task evidence / feedback (candidate, not automatic promotion)
 ```
 
-此图是**能力依赖/建议顺序**，不是原生 GitHub Task DAG；可执行的 Native Task DAG 只属于当前已冻结的阶段。所有阶段从同一个 `version/v0.11.x` 最新已接受 HEAD 开始，Task PR 合回该分支；仅在写集冲突或隔离需要时使用临时阶段/功能分支，不创建多个并行发布分支。0.11.0 的已通过证据继续复用，不允许未批准的共享契约漂移。
+这一闭环不要求首版全部能力可用：每个阶段引入一个新策略或执行边界并证明它真实工作。Workflow 是可以选择的求解结构/流程定义，State Machine 是任务及领域状态约束；二者都不是第二执行核心。直接 Function ingress 对简单 App 始终合法。
 
-## 4. 各阶段统一验收门（不是对外发布门）
+## 2. 按 Harness / Agent 成熟度递进的内部阶段
 
-1. **源真相**：当前阶段的 Product Goal、选定 Element/Package/Function、运行环境与不做事项进入 GitHub；绑定适用的 ADS 规范版本。
-2. **可执行而非标签**：真实 public SDK/BUILD、实际 selected Element 参与用户业务、Positive/Negative/UNKNOWN、Role Scope/真实 Effect（如涉及）有证据。
-3. **只执行必要验证**：只对 changed seams/行为跑 Test/CI/其它要求的真实 Host；不得迁入整套旧 CI 测试、旧业务功能验证历史，旧源码实际不受当前 Code Scope 保护。
-4. **长期架构稳定**：后续 Feature 添加到既有 Element/Package/Lock、函数兼容扩展；不创建重复 Root Runtime、重复 Package Manager、面向某一个业务的 Core 特判。
-5. **资质不混淆**：每个 0.11.x 的新功能是否真的进入当前新版由当前 SHA 的源/CI/消费者证明；Full DIS 21 项/第三方知识权利/真实 Host 授权/Oracle 单独评价。
-6. **阶段号不是发布号**：若能力合并/拆分可减少复杂度，按 Product delta 调整阶段编号；阶段验收后仅推进下一个阶段，不重复为每一阶段建立 main PR、正式 Tag、Release Qualification 和发行包。最终 Release 的版本号在完整列车退出门由 Owner 确认。
+| 阶段 | Harness / Agent 成熟度（用户获得什么能力） | 新增核心能力及结构 | 本阶段最小可证伪业务验收 |
+|---|---|---|---|
+| **0.11.0 — 已接受** | **可装配的 Domain App**：为 Agent/Harness 提供受信的静态执行基础 | Element、0..N Function、typed content、K/S/B Package、BUILD/AOT/Lock、Boot→KDP→App Init、public SDK；直接调用无外部 Effect Function | clean packed consumer 构建、启动并调用 selected knowledge/rule 实际影响输出；复用 AC01–AC10 |
+| **0.11.1 — Task & Control Loop** | **确定性任务型 Harness**：能接一个 Goal，选择已声明步骤，逐步运行直到满足退出条件 | `DomainTask/Goal/TaskRun`、selected `Procedure/Workflow`、`Step`、`TaskStateMachine`、Guard/transition/step outcome、bounded coordinator/runner、基础 Observation/Validation；全部归属 Element/Package/KDP 既有执行通路 | 使用 public SDK 输入一个领域目标，运行**无外部 Effect、无 LLM** 的 2–3 个真实 selected Function 步骤，完成/拒绝/缺信息退出；不存在无限循环/非法转换或第二入口 Kernel |
+| **0.11.2 — Domain-aware Resolver** | **使用编译领域智能解决任务**：不靠硬编码流程分支，能选择知识和适用策略并说明决策依据 | Goal/Intent recognition、Context assembly、typed Knowledge/Rule/Recognizer/Validator/Decision、版本/适用范围/来源最小 Reader、确定性策略选择与可用的合格语义复用；复用 0.11.1 task loop | 同一 Goal 有不同事实/规则版本时，选对知识和策略并完成业务判断；证据不足、跨域、冲突、不适用输出 UNKNOWN/ASK，不任意猜测 |
+| **0.11.3 — Guided Goal Resolution** | **可交互的领域 Agent**：信息不足时有结构地追问、补充 Task context 并继续 | UI-neutral `Interaction/StepSpec/StepOutcome`、动态问题/Form schema、Intent clarification、用户授权/确认的领域模型、Workflow pause/continue；Bounded Knowledge Query 按用例增强 | 用户只提供不完整目标，Harness 追问关键事实、恢复原 TaskRun，再完成经确认的确定性步骤；错误/拒绝输入无法越过 Guard |
+| **0.11.4 — Authorized Action Loop** | **可对外行动的领域 Agent**：不仅能回答，还可在许可范围操作真实业务 | selected Tool/Operation Function、KDP capability/permit、Host/Effect、业务 State/CAS、Outcome/Journal、最小幂等和 readback、验证结果的 Observe→Verify→Advance | 经 0.11.2 决策和 0.11.3 确认，完成一项真实 Host 操作并核对业务状态；无权限/不一致/超时或结果 UNKNOWN 不得标 COMPLETE |
+| **0.11.5 — Bounded Reasoning Agent** | **能解决未编译路径的领域问题**：确定性优先，必要时模型提出可验证步骤 | Provider-neutral LLM adapter（可接 OpenAI-compatible/Anthropic 等）、selected model profile、Context/token/step budget、typed proposal/observation、bounded model→tool→model iteration、结果/工具入参验证 | 同一类 Goal：已知规则不调用 LLM；规则无法覆盖时调用真实选定 Provider 形成 proposal，经 KDP 审核的 Tool/Function 执行和 outcome verify；越界 Tool/预算/无效输出被拒绝 |
+| **0.11.6 — Durable & Recoverable Agent** | **可长期运行的任务**：可暂停、恢复、观察和控制多阶段任务而不破坏已执行 Effect | durable TaskRun checkpoint、恢复/幂等、cancel/timeout/retry policy、必要的业务事件/选定 Tool adapter（MCP/IPC 等仅按消费需求）、可观察的失败分类与日志 | 在真实 Effect 之后中断并恢复，历史 Effect 不重复提交；用户取消、暂挂/恢复、工具结果乱序及未知结果均保守终止或重审 |
+| **0.11.7 — Experience & Evolution Loop** | **能把执行经验变成未来领域能力的受控进化**：学习不等于擅自改变正在运行的任务 | Memory/Experience/Feedback、qualified reuse、execution evidence→candidate→shadow/independent validation→explicit approval→Forge/Package next BUILD；Domain-scoped Meta insights | 当前任务积累可追溯反馈，下一任务可在资格允许时复用；错误/未经授权候选不可 promote，已运行实例继续 pinned 原版本；经批准仅在后续 BUILD 选新 Package 生效 |
+| **0.11.8+ / future minor** | **按真实使用需求进一步拓展** | cross-platform target、复杂跨 Agent coordination、remote streaming、复杂补偿、领域自举、完整 DIS Conformance | 必须独立冻结真实 Consumer/Oracle/范围；默认不阻止核心 0.11.x 列车退出 |
 
-## 5. 近期推荐的实际优先序
+**0.11.1 的新增任务控制不是另建通用 Agent Runtime**：作为既有 Domain App / KDP 的受控编排层，限定只运行选定 Workflow/Function；不把未来工具、LLM、持久恢复一起纳入初版。每个阶段都可以演示一条从 Public SDK 到真实 Outcome 的完整纵向切片。
 
-**0.11.0 Stage-0 架构基线已经完成并进入 `version/v0.11.x`，不再做 standalone Release。** 下一阶段优先 **0.11.1 确定性领域智能**（使 Element-first 能解决实际领域问题），再依真实 Consumer 需求推进 **0.11.2 State 与受控 Effect**，随后 Knowledge Reader、Interaction、LLM、Workflow、Memory 等。每个阶段有最小可执行的退出结果和已审核集成 HEAD；不把尚未实现的后续阶段虚报为完成。
+## 3. 几个必须稳定的架构约束
 
-## 6. 版本外研究与经验索引（只复用语义，不强制迁移实现）
+### 3.1 把机制分清，而不是强行同质化
 
-- [#1567 F01–F24](https://github.com/kaicreator-mm/domain-harness/issues/1567)：完整待处理能力来源/旧版本候选/源状态。用于确定未来需求，不生成代码保留义务。
-- [#1480](https://github.com/kaicreator-mm/domain-harness/issues/1480)：统一 Package/Target/Boot 的已有分析，其中某些字段尚待 v0.11 L2 定稿。
-- [#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496) / [#1497 Draft](https://github.com/kaicreator-mm/domain-harness/pull/1497)：Element/Function/App Init 与 optional Harness 的标准候选；完整 DIS Conformance 必须独立裁定。
-- [#1477](https://github.com/kaicreator-mm/domain-harness/issues/1477) / [#1478](https://github.com/kaicreator-mm/domain-harness/issues/1478)：Domain Intelligence 与未来 Harness 产品目标的方向来源。
-- [#1468](https://github.com/kaicreator-mm/domain-harness/issues/1468)、[#1476](https://github.com/kaicreator-mm/domain-harness/issues/1476)、[#1489](https://github.com/kaicreator-mm/domain-harness/issues/1489)：Events/Tool、Knowledge、Operation Selector 的真正消费证据与边界。
-<!-- /DH_V011X_ELEMENT_FIRST_RELEASE_ROADMAP_R1_20261120 -->
+| 概念 | 所有权 / 作用 | 不做什么 |
+|---|---|---|
+| `Element / Package` | 定义并封存领域语义、Function/Workflow/StateMachine/Tool Contract | 不成为执行器 |
+| `DomainTask / Goal` | 本次运行的目标、输入事实、限制、完成标准和状态 | 不拥有全局业务授权 |
+| `Workflow / Procedure` | 选定的可复用解决步骤和条件分支；可由 deterministic 选择或有界 proposal 指定 | 不成为唯一 ingress 或另一 Kernel |
+| `Task State Machine` | 任务生命周期和进度条件，如 CREATED/ACTIVE/WAITING/COMPLETED/BLOCKED | 不替代领域对象状态及 KDP State/CAS |
+| `Domain State Machine` | 业务实体状态、事件、Guard 与不变量 | 不拥有真实持久化或 Effect |
+| `Harness Coordinator` | 在预算内选策略、推进单一 TaskRun、组装观察、决定 Ask/Next/Stop | 不发明第二授权 authority |
+| `KDP/Host` | 选定 Function 和受控 Effect/状态的执行许可与可信结果 | 不掌握某具体领域的硬编码知识 |
+| `Resolver / Provider` | 编译规则、合格复用、流程与 LLM 候选的组合 | LLM 输出不是许可凭证 |
+| `Experience/Meta` | 累积证据、候选发现、未来版本改进 | 不热变更 pinned Package |
+
+### 3.2 领域优先；通用 Agent 功能并不天然属于 DomainHarness
+
+- **编译优先**：已知领域问题由已选知识/规则/过程直接解决，避免每次 Runtime 重新调用模型求解。
+- **精确选定**：Domain/Package/Element/Function/Tool/Provider 都有可检查的版本、作用域、能力和权限；Agent 不在运行时随意选未安装插件。
+- **可问、可停、可证伪**：UNKNOWN/ASK/BLOCKED 是合法 Outcome。任务完成需要验收标准，不用“模型说成功”代替真实效果。
+- **最少状态**：TaskRun working context、领域业务 State、durable Effect journal、长期 Memory 是四种不同信息，逐阶段才加入必需持久化，不能都塞进一个万能 `state`。
+- **不吸收 Forge**：领域知识生产、独立业务 Oracle、Promotion 批准仍由拥有权威的系统/主体提供。
+- **选择性互操作**：MCP/Agent-to-Agent/复杂 handoff 只有具体 Consumer 场景才进入 Product/L2。拒绝“因为 Agent 平台流行就造第二套通用框架”。
+
+## 4. 独立阶段验收的统一形状
+
+每个阶段只提交一份足够复现的阶段收据，不为每个补丁号执行完整对外发布流程：
+
+1. **实际 public SDK 到业务结果**：`npm pack → fresh consumer → BUILD/Lock → Boot/KDP → TaskRun/Function/Tool → Outcome`。Stage-0 已验证的静态链路只重用证据，变更 seam 才重测。
+2. **主场景**：一个有用且必须依赖本阶段能力的跨 Element / Function 业务流程；实现声明/日志、必要注释、明确失败原因；新增核心能力不得只以 isolated mock/文档声称。
+3. **关键反例**：至少一个应拒绝/停止场景和 UNKNOWN 场景。涉真实 Effect 必须验证权限和 readback；涉 LLM 必须显示选择性触发、预算和非法 proposal 拒绝；涉 Memory 必须证明资格边界。
+4. **版本进度证据**：Product delta、需要时 L2 delta、原生 Task Issue/PR/Exact HEAD、必要源码检查和测试、增量独立 Review、单集成分支快照；只审核改动范围，复用已经通过的未变证据。
+5. **不虚报阶段/发布**：Stage ACCEPTED ≠ full 0.11.x RELEASE；Model success ≠ Host effect success；old v0.10.3 success ≠ v0.11.x success；工程收据 ≠ 真实领域 Oracle/Full Conformance。
+6. **出列车前的最终验收**：所有当前冻结的核心阶段通过，已验证阶段证据复用，再进行真正跨模块最终消费者 E2E、必要发布审查及一次受控 `main` 合并/Tag/Release。
+
+## 5. 当前实施建议和来源交叉索引
+
+**当前下一步仅聚焦 0.11.1：DomainTask + Workflow/TaskState + minimal deterministic loop。** 先冻结最小 Agent Task/Step/Outcome 契约及与现有 KDP/Function 的归属，再交付一条完整的 no-Effect 可运行任务。不要同时启动 0.11.4 Tool Effect、0.11.5 LLM、0.11.7 Meta，也不要为了画完整 Agent 架构而无限拆 Task DAG。
+
+来源：
+- [#1477](https://github.com/kaicreator-mm/domain-harness/issues/1477)：Domain Intelligence 是价值核心；DomainHarness 是受限运行时，编译优先、策略顺序、Forge/Harness 边界及一套 Kernel 权威。
+- [#1478](https://github.com/kaicreator-mm/domain-harness/issues/1478)：目标理解、Context、规划/Tool、Outcome/Evaluation、恢复和反馈等 Harness 运行时能力候选。
+- [#1480](https://github.com/kaicreator-mm/domain-harness/issues/1480)、[#1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)：Package/KDP/Function/selected Element 与本版本新架构输入；不替代新的 L2 合同。
+- [#1476](https://github.com/kaicreator-mm/domain-harness/issues/1476)：原 v0.10.4 Knowledge Reader/Query 仅 Intake，属于后续新架构能力，不假装已实施。
+- [#1468](https://github.com/kaicreator-mm/domain-harness/issues/1468)、[#1489](https://github.com/kaicreator-mm/domain-harness/issues/1489)：Tool/Event 和多 Operation 的需求输入；只有真实消费必要时才纳入。
+- [#1567](https://github.com/kaicreator-mm/domain-harness/issues/1567)：历史能力证据及限制，不是必须原样迁移的全部清单。
+
+<!-- /DH_V011X_DOMAIN_BOUNDED_AGENT_PROGRESSIVE_R4_20261121 -->
