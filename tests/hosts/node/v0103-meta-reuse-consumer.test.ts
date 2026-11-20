@@ -107,7 +107,10 @@ try {
 } finally { env.activation.dispose(); }
 `;
 
-test('v0.10.3 M: clean public Host consumer retains proposal-only authority through future BUILD pin', { timeout: 180_000 }, () => {
+test('v0.10.3 M: clean public Host consumer retains proposal-only authority through future BUILD pin', {
+  timeout: 180_000,
+  skip: 'NOT_APPLICABLE v0.11.0: v0.10 clean public Host/App ABI evidence; 0.11 tarballs fence legacy executable dist (L2 §8.3/AC08), no parity claimed',
+}, () => {
   assert.equal(Number(process.versions.node.split('.')[0]), 24);
   const root = mkdtempSync(join(tmpdir(), 'dh-v0103-meta-reuse-'));
   try {

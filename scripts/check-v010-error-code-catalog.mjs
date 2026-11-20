@@ -37,11 +37,14 @@ const registryForeignFiles = new Set([
   'packages/contracts/src/identity.ts',
   'packages/contracts/src/qualified-canonical.ts',
 ]);
-// v011 T01 (#1575): the standalone 0.11 contracts under src/v011 carry their
-// own frozen 40-code catalog (DH_BUILD_*/DH_BOOT_*/DH_RUNTIME_*) and are NOT
-// part of the v0.10 typed-refusal registry; the whole directory stays
-// registry-foreign so the v010 catalog cannot silently widen.
-const registryForeignDirectories = ['packages/contracts/src/v011'];
+// v011 contracts/BUILD/runtime sources carry their own frozen DH_* catalog
+// and are NOT part of the v0.10 typed-refusal registry; every standalone v011
+// directory stays registry-foreign so the v010 catalog cannot silently widen.
+const registryForeignDirectories = [
+  'packages/contracts/src/v011',
+  'packages/microkernel/src/v011',
+  'tooling/build/src/v011',
+];
 for (const owner of [
   'packages/contracts/src', 'packages/microkernel/src',
   'packages/host-node/src', 'tooling/build/src',
