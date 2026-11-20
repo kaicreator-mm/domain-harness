@@ -63,4 +63,7 @@ steps:
       - npm run typecheck
       # The new contracts/BUILD/KDP paths, not v0.10.x-only smoke tests.
       - node --import tsx --test packages/contracts/tests/v011/*.test.ts tooling/build/tests/v011/*.test.ts packages/microkernel/tests/v011/*.test.ts
+      # T04 public SDK tests materialize with its single-Writer implementation.
+      # Run them in this SAME installed workspace; no second checkout or CI lane.
+      - if test -d packages/domain-harness/tests/v011; then node --import tsx --test packages/domain-harness/tests/v011/*.test.ts; fi
       - node --test tests/distribution/sdk-version-consistency.test.mjs
