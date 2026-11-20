@@ -29,6 +29,24 @@ test('unknown schema type matches nothing (fail closed)', () => {
   assert.equal(validateJsonSubset(true, { type: 'string' }), false);
 });
 
+test('Draft 2020-12 minLength/maxLength count Unicode code points, not UTF-16 units', () => {
+  // One astral character is one Unicode code point, despite two JS code units.
+  assert.equal('😀'.length, 2);
+  assert.equal(validateJsonSubset('😀', { type: 'string', minLength: 2 }), false);
+  assert.equal(validateJsonSubset('😀', { type: 'string', maxLength: 1 }), true);
+  assert.equal(validateJsonSubset('😀😀', { type: 'string', minLength: 2 }), true);
+  assert.equal(validateJsonSubset('😀😀', { type: 'string', maxLength: 1 }), false);
+  assert.equal(validateJsonSubset('A😀', { type: 'string', maxLength: 2 }), true);
+  // Combining accents are two code points (not one grapheme cluster).
+  assert.equal(validateJsonSubset('e\\u0301', { type: 'string', minLength: 2 }), true);
+  assert.equal(validateJsonSubset('e\\u0301', { type: 'string', maxLength: 1 }), false);
+  // Nested selected Function input schemas use exactly the same validator.
+  assert.equal(validateJsonSubset({ label: '😀' }, {
+    type: 'object', properties: { label: { type: 'string', minLength: 2 } },
+  }), false);
+  assert.equal(validateJsonSubset('ab', { type: 'string', minLength: 2, maxLength: 2 }), true);
+});
+
 test('isPlainJsonValue accepts only plain JSON data', () => {
   // Primitives and plain structures pass.
   assert.equal(isPlainJsonValue(null), true);
