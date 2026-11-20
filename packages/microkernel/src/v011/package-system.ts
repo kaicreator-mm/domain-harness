@@ -1,0 +1,276 @@
+/**
+ * DomainHarness v0.11.0 T03 (#1577) — KDP Package System internals.
+ *
+ * Started by the KDP Primary AFTER self-boot of the Kernel Core; loads
+ * ONLY what the sealed Lock selects, in the Lock's own
+ * `technicalInitOrder` — never re-BUILDs, never repairs, never resolves
+ * alternatives at runtime (PRD K05/B07). Physical load failures are
+ * ordinary startup failures (DH_KDP_PACKAGE_LOAD_FAILED, PRD K07): no
+ * retry, no recovery engine.
+ *
+ * Runtime lifecycle convention (T03): a selected package artifact module
+ * may export named `technicalInit` / `technicalDispose` functions. The
+ * frozen Lock has no per-package init EntryRef field, so this named-export
+ * convention is the minimal 0.11.0 runtime contract; BUILD still enforces
+ * the manifest pairing rule (DH_BUILD_LIFECYCLE_HALF) for authoring
+ * hygiene. Hook bindings are SEALED at bootstrap: provider modules are
+ * imported and their named exports frozen into an immutable table; 0.11.0
+ * exposes no hook invocation channel beyond that.
+ */
+import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import { contentDigestOf, canonicalJson } from '@kaicreator/domain-harness-contracts/v011';
+import type {
+  DomainAppLock,
+  ElementDefinition,
+  EntryRef,
+  HostPortBinding,
+  ReadonlyResourceHandle,
+  ResourceRef,
+  SelectedFunction,
+  SelectedPackage,
+} from '@kaicreator/domain-harness-contracts/v011';
+import { resolvePackageFile } from './paths.js';
+
+/** Ordinary startup failure carrier (PRD K07): no retry, no recovery. */
+export class KdpLoadError extends Error {
+  readonly code = 'DH_KDP_PACKAGE_LOAD_FAILED' as const;
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'KdpLoadError';
+  }
+}
+
+export interface TechnicalLifecycleContext {
+  readonly packageId: string;
+  /** Fixture channels only (L2 §6.2.3) — never Effect authority. */
+  readonly hostPorts: readonly HostPortBinding[];
+}
+
+type ModuleExports = Record<string, unknown>;
+
+export class PackageSystem {
+  private readonly moduleCache = new Map<string, Promise<ModuleExports>>();
+  private readonly definitionCache = new Map<string, ElementDefinition | null>();
+  private readonly schemaCache = new Map<string, { input: unknown; output: unknown } | null>();
+  private sealedHookTable: ReadonlyMap<string, readonly unknown[]> | null = null;
+
+  constructor(
+    private readonly installRoot: string,
+    readonly lock: DomainAppLock,
+    private readonly hostPorts: readonly HostPortBinding[],
+  ) {}
+
+  packageById(packageId: string): SelectedPackage | undefined {
+    return this.lock.selectedPackages.find((pkg) => pkg.packageId === packageId);
+  }
+
+  private async importModule(absolutePath: string, what: string): Promise<ModuleExports> {
+    let cached = this.moduleCache.get(absolutePath);
+    if (cached === undefined) {
+      cached = import(pathToFileURL(absolutePath).href).then(
+        (mod) => mod as ModuleExports,
+        (error: unknown) => {
+          throw new KdpLoadError(`${what} failed to import: ${(error as Error).message}`);
+        },
+      );
+      this.moduleCache.set(absolutePath, cached);
+    }
+    return cached;
+  }
+
+  /** Load a package artifact module addressed by its sealed ResourceRef. */
+  async loadArtifactModule(ref: ResourceRef, what: string): Promise<ModuleExports> {
+    const absolute = resolvePackageFile(this.installRoot, ref.packageId, ref.path);
+    if (absolute === null) {
+      throw new KdpLoadError(`${what} artifact path '${ref.packageId}/${ref.path}' is not an in-package relative path`);
+    }
+    return this.importModule(absolute, what);
+  }
+
+  /** Resolve an EntryRef to its named export; refuses default/anonymous and missing exports. */
+  async loadEntry(entry: EntryRef, what: string): Promise<unknown> {
+    const mod = await this.loadArtifactModule(entry.module, what);
+    const exported = mod[entry.exportName];
+    if (exported === undefined) {
+      throw new KdpLoadError(`${what} has no named export '${entry.exportName}'`);
+    }
+    return exported;
+  }
+
+  /**
+   * Technical init in the Lock's exact `technicalInitOrder`; module
+   * evaluation plus the optional named `technicalInit` export per package.
+   */
+  async runTechnicalInit(): Promise<void> {
+    for (const packageId of this.lock.technicalInitOrder) {
+      const pkg = this.packageById(packageId);
+      if (pkg === undefined) {
+        throw new KdpLoadError(`technicalInitOrder references unselected package '${packageId}'`);
+      }
+      const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
+      const technicalInit = mod['technicalInit'];
+      if (technicalInit !== undefined) {
+        if (typeof technicalInit !== 'function') {
+          throw new KdpLoadError(`package '${packageId}' export 'technicalInit' is not a function`);
+        }
+        const context: TechnicalLifecycleContext = { packageId, hostPorts: this.hostPorts };
+        await (technicalInit as (ctx: TechnicalLifecycleContext) => unknown)(context);
+      }
+    }
+  }
+
+  /** Strict reverse teardown per the Lock's `technicalDisposeOrder`. */
+  async runTechnicalDispose(): Promise<void> {
+    for (const packageId of this.lock.technicalDisposeOrder) {
+      const pkg = this.packageById(packageId);
+      if (pkg === undefined) continue;
+      const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
+      const technicalDispose = mod['technicalDispose'];
+      if (technicalDispose !== undefined) {
+        if (typeof technicalDispose !== 'function') {
+          throw new KdpLoadError(`package '${packageId}' export 'technicalDispose' is not a function`);
+        }
+        const context: TechnicalLifecycleContext = { packageId, hostPorts: this.hostPorts };
+        await (technicalDispose as (ctx: TechnicalLifecycleContext) => unknown)(context);
+      }
+    }
+  }
+
+  /** Seal hook bindings: import every provider module, freeze the table. No invocation channel. */
+  async sealHooks(): Promise<ReadonlyMap<string, readonly unknown[]>> {
+    const table = new Map<string, readonly unknown[]>();
+    for (const binding of this.lock.hookBindings) {
+      const providers: unknown[] = [];
+      for (const provider of binding.providers) {
+        const exported = await this.loadEntry(
+          provider,
+          `hook '${binding.hookId}' provider in package '${provider.module.packageId}'`,
+        );
+        if (typeof exported !== 'function') {
+          throw new KdpLoadError(
+            `hook '${binding.hookId}' provider export '${provider.exportName}' is not a function`,
+          );
+        }
+        providers.push(exported);
+      }
+      table.set(`${binding.ownerPackageId}#${binding.hookId}`, Object.freeze(providers));
+    }
+    this.sealedHookTable = Object.freeze(table);
+    return this.sealedHookTable;
+  }
+
+  /** The sealed hook table (available after `sealHooks`). */
+  get hooks(): ReadonlyMap<string, readonly unknown[]> {
+    return this.sealedHookTable ?? new Map<string, readonly unknown[]>();
+  }
+
+  /** Find the selected implementation entry for a FunctionRef (exact canonical equality). */
+  functionByRef(ref: SelectedFunction['ref']): SelectedFunction | undefined {
+    const wanted = canonicalJson(ref);
+    return this.lock.selectedFunctions.find((fn) => canonicalJson(fn.ref) === wanted);
+  }
+
+  /**
+   * Content-addressed Element definition lookup: the Lock pins each
+   * definition by `definitionDigest` (canonical JSON digest), and the
+   * definition document is part of the sealed resource closure. The
+   * runtime scans the closure for the resource whose parsed canonical
+   * digest equals the pinned ElementRef digest. Negative results are
+   * cached; failure means invoke-time schema validation is unavailable.
+   */
+  async findElementDefinition(definitionDigest: string): Promise<ElementDefinition | null> {
+    const cached = this.definitionCache.get(definitionDigest);
+    if (cached !== undefined) return cached;
+    let found: ElementDefinition | null = null;
+    for (const [key] of Object.entries(this.lock.resourceDigests)) {
+      const separator = key.indexOf(':');
+      if (separator <= 0) continue;
+      const packageId = key.slice(0, separator);
+      const path = key.slice(separator + 1);
+      const absolute = resolvePackageFile(this.installRoot, packageId, path);
+      if (absolute === null) continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await readFile(absolute, 'utf8'));
+      } catch {
+        continue;
+      }
+      try {
+        if (contentDigestOf(parsed as Parameters<typeof contentDigestOf>[0]) === definitionDigest) {
+          found = parsed as ElementDefinition;
+          break;
+        }
+      } catch {
+        continue; // non-plain data cannot be a definition digest match
+      }
+    }
+    this.definitionCache.set(definitionDigest, found);
+    return found;
+  }
+
+  /**
+   * Resolve the input/output schema documents for a selected function
+   * from its owner Element definition (inline SchemaRef or in-closure
+   * resource SchemaRef). null = schemas unavailable for this install.
+   */
+  async functionSchemas(fn: SelectedFunction): Promise<{ input: unknown; output: unknown } | null> {
+    const key = canonicalJson(fn.ref);
+    const cached = this.schemaCache.get(key);
+    if (cached !== undefined) return cached;
+    let resolved: { input: unknown; output: unknown } | null = null;
+    const element = this.lock.selectedElements.find(
+      (candidate) => canonicalJson(candidate.ref) === canonicalJson(fn.ref.element),
+    );
+    if (element !== undefined) {
+      const definition = await this.findElementDefinition(element.ref.digest);
+      const contract = definition?.functions.find(
+        (candidate) =>
+          candidate.id === fn.ref.functionId && candidate.contractVersion === fn.ref.contractVersion,
+      );
+      if (definition !== null && contract !== undefined) {
+        const input = await this.resolveSchemaRef(contract.inputSchemaRef);
+        const output = await this.resolveSchemaRef(contract.outputSchemaRef);
+        if (input !== null && output !== null) resolved = { input, output };
+      }
+    }
+    this.schemaCache.set(key, resolved);
+    return resolved;
+  }
+
+  private async resolveSchemaRef(schemaRef: unknown): Promise<unknown> {
+    if (typeof schemaRef !== 'object' || schemaRef === null) return null;
+    const ref = schemaRef as Record<string, unknown>;
+    if ('inline' in ref) return ref['inline'];
+    const packageId = ref['packageId'];
+    const path = ref['path'];
+    if (typeof packageId !== 'string' || typeof path !== 'string') return null;
+    const absolute = resolvePackageFile(this.installRoot, packageId, path);
+    if (absolute === null) return null;
+    try {
+      return JSON.parse(await readFile(absolute, 'utf8')) as unknown;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Readonly resource handle for one sealed closure resource (`<pkg>:<path>` key). */
+  resourceHandle(key: string): ReadonlyResourceHandle {
+    const separator = key.indexOf(':');
+    const packageId = separator > 0 ? key.slice(0, separator) : '';
+    const path = separator > 0 ? key.slice(separator + 1) : '';
+    const ref: ResourceRef = {
+      packageId,
+      path,
+      digest: this.lock.resourceDigests[key] ?? 'sha256:0',
+    };
+    return {
+      ref,
+      read: async (): Promise<Uint8Array> => {
+        const absolute = resolvePackageFile(this.installRoot, packageId, path);
+        if (absolute === null) throw new KdpLoadError(`resource '${key}' is not an in-package relative path`);
+        return readFile(absolute);
+      },
+    };
+  }
+}

@@ -1,0 +1,229 @@
+/**
+ * DomainHarness v0.11.0 T03 (#1577) — DomainApp runtime (L2 §7).
+ *
+ * The App handle exposes exactly three operations: `invoke` (the ONLY
+ * runtime entry, direct to the locked Function — no caller replacement,
+ * no second Router/Kernel, PRD A05), `inspect` (B06 read-only projection
+ * of Lock facts, no private internals) and `dispose` (strict reverse-order
+ * teardown, PRD A07 — no concurrent stop/drain engine). FunctionOutcome is
+ * the strict three-state discriminated union; the runtime validates input
+ * before the call and the SUCCEEDED value after the call (L2 §7.2.4), and
+ * never lets an undeclared outcome kind or a malformed implementation
+ * result masquerade as SUCCEEDED (PRD A06/AC09).
+ */
+import type {
+  AppStatus,
+  DomainApp,
+  DomainAppInspection,
+  DomainAppLock,
+  FunctionOutcome,
+  JsonValue,
+  SealedIngress,
+  SelectedFunction,
+} from '@kaicreator/domain-harness-contracts/v011';
+import { PackageSystem, KdpLoadError } from './package-system.js';
+import { validateJsonSubset } from './schema-subset.js';
+
+export interface DomainAppDeps {
+  readonly lock: DomainAppLock;
+  readonly packages: PackageSystem;
+  /** ingress id → selected function + resolved implementation export. */
+  readonly ingressImpls: ReadonlyMap<string, SelectedFunction & { impl: (input: unknown) => unknown }>;
+  readonly suppressedIngress: readonly string[];
+  readonly initialStatus: AppStatus;
+}
+
+function failedOutcome(code: string, message: string): FunctionOutcome {
+  return { kind: 'FAILED', failure: { code, message } };
+}
+
+function unknownOutcome(code: string, message: string): FunctionOutcome {
+  return { kind: 'UNKNOWN', unknownReason: { code, message } };
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  if (typeof value === 'object' && value !== null) {
+    return Object.values(value).every(isJsonValue);
+  }
+  return false;
+}
+
+function isReasonObject(value: unknown): value is { code: string; message: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as Record<string, unknown>)['code'] === 'string' &&
+    typeof (value as Record<string, unknown>)['message'] === 'string'
+  );
+}
+
+/**
+ * Normalize a raw implementation return value into the strict
+ * FunctionOutcome union. Garbage never propagates: a well-formed outcome
+ * kind the contract did not declare is normalized to UNKNOWN (honest
+ * doubt), while a malformed implementation result is a runtime
+ * enforcement failure reported as FAILED (never re-checked against the
+ * declared outcome set — it is the runtime's own refusal, not an
+ * implementation outcome).
+ */
+export function normalizeOutcome(raw: unknown, declaredOutcomes: readonly string[]): FunctionOutcome {
+  if (typeof raw === 'object' && raw !== null) {
+    const outcome = raw as Record<string, unknown>;
+    const kind = outcome['kind'];
+    if (kind === 'SUCCEEDED' && 'value' in outcome) {
+      const value = outcome['value'];
+      if (!isJsonValue(value)) {
+        return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-JSON SUCCEEDED value');
+      }
+      if (!declaredOutcomes.includes('SUCCEEDED')) {
+        return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'SUCCEEDED'`);
+      }
+      return { kind: 'SUCCEEDED', value };
+    }
+    if (kind === 'UNKNOWN' && isReasonObject(outcome['unknownReason'])) {
+      if (!declaredOutcomes.includes('UNKNOWN')) {
+        return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'UNKNOWN'`);
+      }
+      return { kind: 'UNKNOWN', unknownReason: outcome['unknownReason'] };
+    }
+    if (kind === 'FAILED' && isReasonObject(outcome['failure'])) {
+      if (!declaredOutcomes.includes('FAILED')) {
+        return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', `contract did not declare outcome kind 'FAILED'`);
+      }
+      return { kind: 'FAILED', failure: outcome['failure'] };
+    }
+    if (typeof kind === 'string' && (kind === 'SUCCEEDED' || kind === 'UNKNOWN' || kind === 'FAILED')) {
+      return unknownOutcome(
+        'DH_RUNTIME_UNSUPPORTED_PROFILE',
+        `implementation returned outcome kind '${kind}' missing its strict union payload`,
+      );
+    }
+    if (typeof kind === 'string' && !declaredOutcomes.includes(kind)) {
+      return unknownOutcome(
+        'DH_RUNTIME_UNSUPPORTED_PROFILE',
+        `implementation returned outcome kind '${kind}' that the contract did not declare`,
+      );
+    }
+  }
+  return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-FunctionOutcome value');
+}
+
+export function createDomainApp(deps: DomainAppDeps): DomainApp {
+  const { lock, packages } = deps;
+  const status = deps.initialStatus;
+  const suppressed = new Set(deps.suppressedIngress);
+  let disposed = false;
+
+  const ingressById = new Map<string, SealedIngress>(lock.ingress.map((entry) => [entry.id, entry]));
+
+  async function invoke(ingressId: string, input: unknown): Promise<FunctionOutcome> {
+    if (disposed) {
+      return failedOutcome('DH_RUNTIME_INGRESS_NOT_CALLABLE', 'app is disposed');
+    }
+    if (status !== 'READY' && status !== 'DEGRADED') {
+      return failedOutcome('DH_RUNTIME_INGRESS_NOT_CALLABLE', `app status is ${status}; no ingress is callable`);
+    }
+    const entry = ingressById.get(ingressId);
+    if (entry === undefined) {
+      return failedOutcome('DH_RUNTIME_INGRESS_UNKNOWN', `ingress '${ingressId}' does not exist`);
+    }
+    if (status === 'DEGRADED' && suppressed.has(ingressId)) {
+      return failedOutcome(
+        'DH_RUNTIME_INGRESS_NOT_CALLABLE',
+        `ingress '${ingressId}' is suppressed by the DEGRADED app status`,
+      );
+    }
+    const selected = deps.ingressImpls.get(ingressId);
+    if (selected === undefined) {
+      return failedOutcome('DH_RUNTIME_INGRESS_UNKNOWN', `ingress '${ingressId}' has no selected implementation`);
+    }
+    if (selected.effects !== 'none') {
+      return failedOutcome(
+        'DH_RUNTIME_UNSUPPORTED_PROFILE',
+        `function '${selected.ref.functionId}' declares effects '${selected.effects}'; 0.11.0 implements none`,
+      );
+    }
+
+    let schemas: { input: unknown; output: unknown } | null;
+    try {
+      schemas = await packages.functionSchemas(selected);
+    } catch (error) {
+      return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', (error as Error).message);
+    }
+    if (schemas === null) {
+      return unknownOutcome(
+        'DH_RUNTIME_UNSUPPORTED_PROFILE',
+        `input/output schema resources for function '${selected.ref.functionId}' are unavailable in this install`,
+      );
+    }
+    if (!validateJsonSubset(input, schemas.input)) {
+      return failedOutcome('DH_RUNTIME_INPUT_SCHEMA_MISMATCH', `input for ingress '${ingressId}' failed inputSchemaRef`);
+    }
+
+    let raw: unknown;
+    try {
+      raw = await selected.impl(input);
+    } catch (error) {
+      return failedOutcome('DH_KDP_PACKAGE_LOAD_FAILED', `implementation for ingress '${ingressId}' threw: ${(error as Error).message}`);
+    }
+    const outcome = normalizeOutcome(raw, selected.outcomes);
+    if (outcome.kind === 'SUCCEEDED' && !validateJsonSubset(outcome.value, schemas.output)) {
+      return failedOutcome(
+        'DH_RUNTIME_OUTPUT_SCHEMA_MISMATCH',
+        `SUCCEEDED value for ingress '${ingressId}' failed outputSchemaRef (reported as FAILED, never passed through)`,
+      );
+    }
+    return outcome;
+  }
+
+  async function inspect(): Promise<DomainAppInspection> {
+    return {
+      appIdentity: {
+        id: lock.appIdentity.id,
+        version: lock.appIdentity.version,
+        lockDigest: lock.closureDigest,
+      },
+      target: lock.target,
+      packages: lock.selectedPackages.map((pkg) => ({
+        packageId: pkg.packageId,
+        version: pkg.version,
+        layer: pkg.layer,
+        role: pkg.role,
+      })),
+      elements: lock.selectedElements.map((element) => ({
+        ref: element.ref,
+        ownerPackageId: element.ownerPackageId,
+        visibility: element.visibility,
+      })),
+      functions: lock.selectedFunctions.map((fn) => ({
+        ref: fn.ref,
+        outcomes: fn.outcomes,
+        effects: fn.effects,
+      })),
+      ingress: lock.ingress.map((entry) => ({ id: entry.id, optional: entry.optional })),
+      suppressedIngress: status === 'DEGRADED' ? [...suppressed].sort() : [],
+    };
+  }
+
+  async function dispose(): Promise<{ readonly status: 'DISPOSED' }> {
+    if (disposed) return { status: 'DISPOSED' };
+    // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
+    await packages.runTechnicalDispose();
+    disposed = true;
+    return { status: 'DISPOSED' };
+  }
+
+  return {
+    get status(): AppStatus {
+      return status;
+    },
+    invoke,
+    inspect,
+    dispose,
+  };
+}
+
+export { KdpLoadError };

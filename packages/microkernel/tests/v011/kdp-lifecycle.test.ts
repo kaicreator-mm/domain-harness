@@ -1,0 +1,212 @@
+/**
+ * DomainHarness v0.11.0 T03 (#1577) — KDP bootstrap / Package System
+ * lifecycle tests (L2 §6.2.2, AC04/AC05 positive half).
+ *
+ * Observable behavior comes from real fixture package modules writing
+ * events during module evaluation, technical init/dispose and the one
+ * businessAppInit (see helpers/install.ts). Assertions cover: load and
+ * init order equals the Lock's technicalInitOrder, hook provider sealing,
+ * exactly-locked businessAppInit with the PRD A03 init context, strict
+ * reverse dispose, and ordinary-FAILED startup with zero ingress and no
+ * recovery on physical load/init failure (PRD K07).
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { BootResult } from '@kaicreator/domain-harness-contracts/v011';
+import {
+  boot,
+  buildFixtureInstall,
+  events,
+  type FixtureInstall,
+  type FixtureScenario,
+} from './helpers/install.js';
+
+async function withScenario(
+  t: import('node:test').TestContext,
+  scenario: FixtureScenario,
+  run: (fixture: FixtureInstall, result: BootResult) => Promise<void>,
+): Promise<void> {
+  const fixture = await buildFixtureInstall(scenario);
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  const result = await boot(fixture.pin, fixture.context);
+  await run(fixture, result);
+}
+
+const INIT_ORDER = ['fixture-kernel', 'fixture-sdk', 'fixture-business', 'fixture-ext'];
+const DISPOSE_ORDER = [...INIT_ORDER].reverse();
+
+test('KDP boots core + package system: init order, hook sealing, business init, READY', async (t) => {
+  await withScenario(t, {
+    init: { status: 'READY' },
+    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
+  }, async (_fixture, result) => {
+    assert.equal(result.status, 'BOOTED', JSON.stringify(result));
+    if (result.status !== 'BOOTED') return;
+    assert.equal(result.app.status, 'READY');
+
+    // Package modules evaluated + technical init in the Lock's exact order.
+    const evaluated = events()
+      .filter((event) => event['event'] === 'module-evaluated')
+      .map((event) => event['package']);
+    const inits = events()
+      .filter((event) => event['event'] === 'technical-init')
+      .map((event) => event['package']);
+    assert.deepEqual(evaluated.slice(0, INIT_ORDER.length), INIT_ORDER);
+    assert.deepEqual(inits, INIT_ORDER);
+
+    // Hook provider module imported during sealing (after technical init,
+    // before business init) and never invoked (no channel).
+    const hookEvalIndex = events().findIndex(
+      (event) => event['event'] === 'module-evaluated' && event['package'] === 'fixture-ext:hook',
+    );
+    const businessInitIndex = events().findIndex((event) => event['event'] === 'business-init');
+    assert.ok(hookEvalIndex > 0, 'hook provider module must be loaded by sealHooks');
+    assert.ok(businessInitIndex > hookEvalIndex, 'hooks sealed before businessAppInit runs');
+    assert.equal(events().some((event) => event['event'] === 'hook-provider-invoked'), false);
+
+    // The one businessAppInit observed the PRD A03 init context.
+    const businessInit = events().find((event) => event['event'] === 'business-init');
+    assert.ok(businessInit !== undefined);
+    assert.equal(businessInit['appId'], 'fixture.orders-app');
+    assert.equal(businessInit['hasActivationId'], true);
+    assert.equal(typeof businessInit['lockDigest'], 'string');
+    assert.deepEqual(businessInit['config'], { region: 'EU', featureFlag: true });
+    assert.deepEqual(businessInit['ingress'], ['evaluate', 'optional-report']);
+    assert.deepEqual(businessInit['resourceKeys'], [
+      'fixture-kernel:dist/index.mjs',
+      'fixture-sdk:dist/index.mjs',
+      'fixture-business:dist/index.mjs',
+      'fixture-business:elements/orders.eligibility.json',
+      'fixture-business:content/rules.json',
+      'fixture-ext:dist/index.mjs',
+      'fixture-ext:dist/hook.mjs',
+    ]);
+    assert.deepEqual(
+      events().filter((event) => event['event'] === 'business-init'),
+      [businessInit],
+      'exactly one businessAppInit executed',
+    );
+  });
+});
+
+test('dispose runs technicalDispose in the strict reverse disposeOrder', async (t) => {
+  await withScenario(t, {
+    init: { status: 'READY' },
+    functions: {},
+  }, async (_fixture, result) => {
+    assert.equal(result.status, 'BOOTED');
+    if (result.status !== 'BOOTED') return;
+    await result.app.dispose();
+    const disposes = events()
+      .filter((event) => event['event'] === 'technical-dispose')
+      .map((event) => event['package']);
+    assert.deepEqual(disposes, DISPOSE_ORDER);
+    // Idempotent second dispose adds no further events.
+    const count = events().length;
+    await result.app.dispose();
+    assert.equal(events().length, count);
+  });
+});
+
+test('DEGRADED: only predeclared optional ingress is suppressed; required suppression is refused', async (t) => {
+  await withScenario(t, {
+    init: { status: 'DEGRADED', suppressed: ['optional-report'] },
+    functions: {
+      evaluate: { behavior: 'succeed', value: { decision: 'POS' } },
+      optionalReport: { behavior: 'succeed', value: 'report-ok' },
+    },
+  }, async (_fixture, result) => {
+    assert.equal(result.status, 'BOOTED');
+    if (result.status !== 'BOOTED') return;
+    assert.equal(result.app.status, 'DEGRADED');
+
+    const ok = await result.app.invoke('evaluate', { total: 100, region: 'EU' });
+    assert.equal(ok.kind, 'SUCCEEDED');
+
+    const suppressed = await result.app.invoke('optional-report', {});
+    assert.equal(suppressed.kind, 'FAILED');
+    assert.equal(suppressed.kind === 'FAILED' && suppressed.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
+
+    const inspection = await result.app.inspect();
+    assert.deepEqual(inspection.suppressedIngress, ['optional-report']);
+    await result.app.dispose();
+  });
+
+  // Honesty guard: DEGRADED may not swallow a required ingress (PRD A04).
+  // The init itself did execute (its event is observable) but its dishonest
+  // result is refused: FAILED, no app handle, no ingress.
+  await withScenario(t, {
+    init: { status: 'DEGRADED', suppressed: ['evaluate'] },
+    functions: {},
+  }, async (_fixture, result) => {
+    assert.equal(result.status, 'FAILED', JSON.stringify(result));
+    if (result.status === 'FAILED') {
+      assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
+    }
+  });
+});
+
+test('BLOCKED: app handle boots with BLOCKED status and no ingress is callable', async (t) => {
+  await withScenario(t, {
+    init: { status: 'BLOCKED' },
+    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
+  }, async (_fixture, result) => {
+    assert.equal(result.status, 'BOOTED');
+    if (result.status !== 'BOOTED') return;
+    assert.equal(result.app.status, 'BLOCKED');
+    const outcome = await result.app.invoke('evaluate', { total: 1, region: 'EU' });
+    assert.equal(outcome.kind, 'FAILED');
+    assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
+    const inspection = await result.app.inspect();
+    assert.deepEqual(inspection.suppressedIngress, []);
+    await result.app.dispose();
+  });
+});
+
+test('business init FAILED / throwing / malformed result: ordinary FAILED, zero ingress, no recovery', async (t) => {
+  for (const scenario of [
+    { init: { status: 'FAILED' as const }, functions: {} },
+    { init: { status: 'READY' as const, throw: true }, functions: {} },
+  ]) {
+    await withScenario(t, scenario, async (_fixture, result) => {
+      assert.equal(result.status, 'FAILED', JSON.stringify(result));
+      if (result.status === 'FAILED') {
+        assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
+        assert.ok(result.reason.length > 0);
+      }
+    });
+  }
+
+  // READY while suppressing an ingress is a masquerade attempt -> refused.
+  await withScenario(t, {
+    init: { status: 'READY', suppressed: ['optional-report'] },
+    functions: {},
+  }, async (_fixture, result) => {
+    assert.equal(result.status, 'FAILED');
+    if (result.status === 'FAILED') assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
+  });
+});
+
+test('package physical load failure: DH_KDP_PACKAGE_LOAD_FAILED, zero ingress, no retry', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => {
+    await fixture.cleanup();
+  });
+  // Remove a selected package artifact after installation (post-install
+  // corruption inside the trusted root).
+  await rm(join(fixture.installRoot, 'node_modules', 'fixture-sdk', 'dist'), { recursive: true, force: true });
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'FAILED', JSON.stringify(result));
+  if (result.status === 'FAILED') {
+    assert.equal(result.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
+  }
+  assert.equal(
+    events().some((event) => event['event'] === 'business-init'),
+    false,
+    'zero ingress and no business init on physical load failure',
+  );
+});
