@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   DH_ELEMENT_SCHEMA_VERSION,
   type BuildErrorCode,
+  type DomainAppDescriptor,
 } from '@kaicreator/domain-harness-contracts';
 import { buildApp, type BuildResult } from '../../src/index.js';
 import { functionRefOf, writeRaw } from './fixtures.js';
@@ -48,11 +49,11 @@ refusalCase('DH_BUILD_SCHEMA_UNKNOWN_REQUIRED', (s) => {
 });
 
 refusalCase('DH_BUILD_CONTENT_XOR', (s) => {
-  (s.faq.content[0] as Record<string, unknown>).value = { entries: [] };
+  s.faq.content[0]!.value = { entries: [] };
 });
 
 refusalCase('DH_BUILD_SCHEMA_INVALID', (s) => {
-  (s.eligibility.content[0] as { value?: unknown }).value = { minOrderTotal: 'fifty', regions: ['EU'] };
+  s.eligibility.content[0]!.value = { minOrderTotal: 'fifty', regions: ['EU'] };
 });
 
 refusalCase('DH_BUILD_REF_UNRESOLVED', (s) => {
@@ -125,8 +126,8 @@ test('RV-3: duplicate ingress ID pointing to distinct Functions is refused befor
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input, refs } = scenario.finalize();
-  const descriptor = {
-    ...input.descriptor,
+  const descriptor: DomainAppDescriptor = {
+    ...(input.descriptor as DomainAppDescriptor),
     ingress: [
       { id: 'same', function: refs.evaluateRef },
       { id: 'same', function: refs.initRef },

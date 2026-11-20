@@ -27,6 +27,15 @@ export interface StandardRefs {
   initRef: FunctionRef;
 }
 
+/** 测试夹具需要构造合法或非法变体；只展开合同对象，在递归 JsonValue 边界停止。 */
+type Mutable<T> = [JsonValue] extends [T]
+  ? T
+  : T extends readonly (infer U)[]
+    ? Mutable<U>[]
+    : T extends object
+      ? { -readonly [K in keyof T]: Mutable<T[K]> }
+      : T;
+
 const TARGET_22: TargetSelector = { runtime: 'node', module: 'esm', nodeMajor: 22 };
 
 function requireValue(value: JsonValue | undefined, key: string): JsonValue {
@@ -36,10 +45,10 @@ function requireValue(value: JsonValue | undefined, key: string): JsonValue {
 
 export interface StandardCase {
   ws: Workspace;
-  faq: ElementDefinition;
-  eligibility: ElementDefinition;
-  legacyPrompt: ElementDefinition;
-  appMain: ElementDefinition;
+  faq: Mutable<ElementDefinition>;
+  eligibility: Mutable<ElementDefinition>;
+  legacyPrompt: Mutable<ElementDefinition>;
+  appMain: Mutable<ElementDefinition>;
   extraElements: ElementDefinition[];
   extraElementFileValues: Record<string, JsonValue>;
   extraElementRawFiles: Record<string, Uint8Array>;
@@ -60,7 +69,7 @@ export interface StandardCase {
 export function standardCase(): StandardCase {
   const ws = makeWorkspace();
 
-  const faq: ElementDefinition = {
+  const faq: Mutable<ElementDefinition> = {
     kind: 'Element',
     schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
     id: 'orders.faq',
@@ -78,7 +87,7 @@ export function standardCase(): StandardCase {
     functions: [],
   };
 
-  const eligibility: ElementDefinition = {
+  const eligibility: Mutable<ElementDefinition> = {
     kind: 'Element',
     schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
     id: 'orders.eligibility',
@@ -140,7 +149,7 @@ export function standardCase(): StandardCase {
     dependencies: [{ element: 'orders.faq', version: '^1.0.0' }],
   };
 
-  const legacyPrompt: ElementDefinition = {
+  const legacyPrompt: Mutable<ElementDefinition> = {
     kind: 'Element',
     schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
     id: 'orders.legacy-prompt-notes',
@@ -158,7 +167,7 @@ export function standardCase(): StandardCase {
     functions: [],
   };
 
-  const appMain: ElementDefinition = {
+  const appMain: Mutable<ElementDefinition> = {
     kind: 'Element',
     schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
     id: 'orders.app-main',
@@ -249,7 +258,7 @@ export function standardCase(): StandardCase {
       }
     }
     const allBusiness = [faq, eligibility, legacyPrompt, appMain, ...case_.extraElements];
-    const entries: DomainPackageManifest['elements'] = [];
+    const entries: DomainPackageManifest['elements'][number][] = [];
     for (const [index, element] of allBusiness.entries()) {
       const fileName = `definitions/${element.id.split('.')[1]}-${element.version}-${index}.json`;
       const definitionRef = writeJson(businessDir, fileName, element as unknown as JsonValue);
