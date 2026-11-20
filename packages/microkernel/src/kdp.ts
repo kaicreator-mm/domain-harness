@@ -182,8 +182,15 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     }
     const initFn = initExport as (context: AppInitContext) => unknown;
 
+    // App Init 只获得其选定实现明确声明的资源，不暴露其余包产物与整个 Lock 闭包。
     const resources = new Map<string, ReadonlyResourceHandle>(
-      Object.keys(lock.resourceDigests).map((key) => [key, packages.resourceHandle(key)]),
+      initSelected.resources.map((ref) => {
+        const key = `${ref.packageId}/${ref.path}`;
+        if (lock.resourceDigests[key] !== ref.digest) {
+          throw new KdpLoadError(`App Init resource '${key}' is not sealed with the declared digest`, 'DH_BOOT_PIN_MISMATCH');
+        }
+        return [key, packages.resourceHandle(key)] as const;
+      }),
     );
     let appRef: { invoke(ingressId: string, input: unknown): Promise<FunctionOutcome> } | null = null;
     const functionHandles = new Map<string, ReadonlyFunctionHandle>();

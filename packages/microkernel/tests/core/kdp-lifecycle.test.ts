@@ -63,15 +63,8 @@ test('KDP boots core + package system: init order, hook sealing, business init, 
     assert.deepEqual(businessInit['config'], { region: 'EU', featureFlag: true });
     assert.deepEqual(businessInit['ingress'], ['evaluate', 'optional-report']);
     assert.deepEqual(businessInit['resourceKeys'], [
-      'fixture-kernel/dist/index.mjs',
-      '@fixture/sdk/dist/index.mjs',
-      'fixture-business/dist/index.mjs',
-      'fixture-business/elements/orders.eligibility.json',
-      'fixture-business/schemas/optional-report-input.schema.json',
       'fixture-business/content/rules.json',
-      'fixture-ext/dist/index.mjs',
-      'fixture-ext/dist/hook.mjs',
-    ]);
+    ], 'App Init 只能获得选定 Function 声明的资源，不得读取任何可执行产物');
     assert.deepEqual(
       events().filter((event) => event['event'] === 'business-init'),
       [businessInit],
@@ -232,9 +225,10 @@ test('resource key convention: rightmost-slash split handles scoped package ids 
     (event) =>
       event['event'] === 'business-init' &&
       Array.isArray(event['resourceKeys']) &&
-      (event['resourceKeys'] as string[]).includes('@fixture/sdk/dist/index.mjs'),
+      (event['resourceKeys'] as string[]).includes('fixture-business/content/rules.json') &&
+      !(event['resourceKeys'] as string[]).includes('@fixture/sdk/dist/index.mjs'),
   );
-  assert.ok(scopedKeySeen, 'scoped package resource key must reach the init context');
+  assert.ok(scopedKeySeen, 'only declared scoped resource reaches App Init, not other package artifacts');
   const outcome = await result.app.invoke('evaluate', { total: 10, region: 'EU' });
   assert.equal(outcome.kind, 'SUCCEEDED');
   await result.app.dispose();

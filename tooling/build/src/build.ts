@@ -423,7 +423,16 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   };
 
   const ingressResolved: { entry: DomainAppDescriptor['ingress'][number]; resolved: ResolvedFunction }[] = [];
-  for (const entry of descriptor.ingress) {
+  const seenIngressIds = new Set<string>();
+  for (const [index, entry] of descriptor.ingress.entries()) {
+    if (seenIngressIds.has(entry.id)) {
+      throw refusal(
+        'DH_BUILD_SCHEMA_INVALID',
+        `duplicate ingress id '${entry.id}' would overwrite an already declared public entry`,
+        `ingress[${index}].id`,
+      );
+    }
+    seenIngressIds.add(entry.id);
     const resolved = resolveFunctionRef(entry.function, `ingress.${entry.id}`);
     requireExported(resolved, null);
     ingressResolved.push({ entry, resolved });
@@ -555,6 +564,27 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   for (const owner of packagesSorted) {
     const declared = owner.provides?.hooks ?? [];
     for (const hook of declared) {
+      // Hook 接口是 BUILD 阶段的公开合同，必须与 Function Schema 一样先解析并验证。
+      const schemaPath = `provides.${owner.id}.hooks.${hook.id}.interfaceSchemaRef`;
+      try {
+        const ref = hook.interfaceSchemaRef;
+        if ('inline' in ref) {
+          schemas.compileContentSchema(ref.inline, schemaPath);
+        } else {
+          if (!selected.has(ref.packageId)) {
+            throw refusal('DH_BUILD_HOOK_TARGET_INVALID',
+              `hook '${owner.id}/${hook.id}' schema references unselected package '${ref.packageId}'`, schemaPath);
+          }
+          const schema = parseSchemaResource(scope, ref, schemaPath, `hook '${owner.id}/${hook.id}'`);
+          schemas.compileContentSchema(schema, schemaPath);
+        }
+      } catch (error) {
+        if (error instanceof BuildRefusal) {
+          throw refusal('DH_BUILD_HOOK_TARGET_INVALID',
+            `hook '${owner.id}/${hook.id}' schema is invalid: ${error.message}`, schemaPath);
+        }
+        throw error;
+      }
       const providers: EntryRef[] = [];
       for (const manifest of packagesSorted) {
         for (const contribution of manifest.contributesTo) {

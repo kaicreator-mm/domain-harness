@@ -97,6 +97,46 @@ refusalCase('DH_BUILD_IMPLEMENTATION_MISSING', (s) => {
 });
 
 
+// Hook 接口必须在 BUILD 解析，非法 Schema 不得被封存成可用 Hook。
+test('RV-1: BUILD refuses malformed inline Hook interface schema', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as unknown as {
+    provides: { hooks: { interfaceSchemaRef: unknown }[] };
+  };
+  sdk.provides.hooks[0]!.interfaceSchemaRef = { inline: 42 };
+  expectRefusal(buildApp(input), 'DH_BUILD_HOOK_TARGET_INVALID');
+});
+
+test('RV-1: BUILD refuses Hook schema resource with incorrect digest', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as unknown as {
+    provides: { hooks: { interfaceSchemaRef: unknown }[] };
+  };
+  const file = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'schemas/hook.schema.json', new TextEncoder().encode('{"type":"object"}'));
+  sdk.provides.hooks[0]!.interfaceSchemaRef = { ...file, digest: `sha256:${'0'.repeat(64)}` };
+  expectRefusal(buildApp(input), 'DH_BUILD_HOOK_TARGET_INVALID');
+});
+
+test('RV-3: duplicate ingress ID pointing to distinct Functions is refused before Lock creation', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input, refs } = scenario.finalize();
+  const descriptor = {
+    ...input.descriptor,
+    ingress: [
+      { id: 'same', function: refs.evaluateRef },
+      { id: 'same', function: refs.initRef },
+    ],
+  };
+  const result = buildApp({ ...input, descriptor });
+  expectRefusal(result, 'DH_BUILD_SCHEMA_INVALID');
+  if (!result.ok) assert.match(result.path ?? '', /^ingress\[1\]\.id$/);
+});
+
 test('R27: BUILD rejects artifact paths Runtime would reject', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);

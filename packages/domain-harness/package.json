@@ -21,7 +21,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:typecheck": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "@kaicreator/domain-harness-build": "0.11.0",

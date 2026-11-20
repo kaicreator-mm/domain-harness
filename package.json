@@ -15,7 +15,7 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "node scripts/check-source-quality.mjs && eslint .",
-    "test": "npm run test:typecheck --workspace @kaicreator/domain-harness-contracts && node --import tsx --test packages/contracts/tests/core/*.test.ts tooling/build/tests/core/*.test.ts packages/microkernel/tests/core/*.test.ts packages/domain-harness/tests/core/*.test.ts",
+    "test": "npm run test:typecheck --workspaces && node --import tsx --test packages/contracts/tests/core/*.test.ts tooling/build/tests/core/*.test.ts packages/microkernel/tests/core/*.test.ts packages/domain-harness/tests/core/*.test.ts",
     "test:demo": "node examples/basic-domain-app/verify-clean-install.mjs",
     "verify": "npm run build && npm run typecheck && npm run lint && npm test && npm run test:demo"
   },

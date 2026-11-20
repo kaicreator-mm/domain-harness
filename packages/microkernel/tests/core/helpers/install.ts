@@ -497,7 +497,11 @@ export async function buildFixtureInstall(
         outcomes: ['SUCCEEDED'],
         effects: 'none',
         implementation: { module: businessArtifact, exportName: 'businessAppInit' },
-        resources: [],
+        resources: [{
+          packageId: FIXTURE_BUSINESS,
+          path: 'content/rules.json',
+          digest: resourceDigests[`${FIXTURE_BUSINESS}/content/rules.json`]!,
+        }],
       },
     ],
     hookBindings: [
