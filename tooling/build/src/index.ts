@@ -1,22 +1,11 @@
-/** DomainHarness v0.10.2 BUILD-only public entry; no Microkernel or Host authority. */
-export { buildV10App } from './build.js';
+/** 构建期职责：校验并封存选定的依赖、资源和函数，保证生成确定性 Lock。 */
+export { buildApp } from './build.js';
 export type {
-  V10ModuleInput,
-  V10RouteRowInput,
-  BuildV10AppOptions,
-  V10SealedModule,
-  V10BuiltApp,
-} from '@kaicreator/domain-harness-contracts';
-
-/** A8b: producer-only Component declarations mapped onto sealed BUILD inputs. */
-export { projectSelectedComponents } from './component-view.js';
-export type {
-  ComponentClass,
-  SemanticKind,
-  ToolPlacement,
-  SemanticComponent,
-  HookComponent,
-  ToolComponent,
-  ComponentDeclaration,
-  ComponentProjection,
-} from './component-view.js';
+  BuildInput,
+  BuildResult,
+  BuildSuccess,
+  BuildFailure,
+  KdpArtifactInput,
+} from './types.js';
+export { BuildRefusal } from './refusal.js';
+export { digestOfBytes } from './resources.js';

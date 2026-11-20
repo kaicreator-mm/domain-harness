@@ -1,0 +1,48 @@
+# 单一 sparse checkout、单一 npm ci、单一共享工作区。
+when:
+  - event: pull_request
+    branch: 'version/v0.11.*'
+    path:
+      include:
+        - '.woodpecker/**'
+        - 'packages/**'
+        - 'tooling/**'
+        - 'scripts/**'
+        - 'examples/basic-domain-app/**'
+        - '.agents/**'
+        - 'package.json'
+        - 'package-lock.json'
+        - 'tsconfig.base.json'
+        - 'eslint.config.mjs'
+      on_empty: true
+  - event: manual
+    branch: 'version/v0.11.*'
+labels:
+  backend: local
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      partial: true
+      depth: 1
+      tags: false
+      lfs: false
+      recursive: false
+      sparse:
+        - packages
+        - tooling
+        - scripts
+        - examples/basic-domain-app
+        - .agents
+steps:
+  - name: verify
+    image: bash
+    commands:
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+      - node -e 'const [major,minor]=process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 12)) process.exit(1)'
+      - npm ci --no-audit --no-fund
+      - npm run build
+      - npm run typecheck
+      - npm run lint
+      - npm test
+      - DH_T05_ALREADY_BUILT=1 DH_T05_NPM_REGISTRY=http://host.docker.internal:14873 npm run test:demo

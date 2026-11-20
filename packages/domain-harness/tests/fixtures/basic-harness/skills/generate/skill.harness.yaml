@@ -1,5 +1,0 @@
-output:
-  schema: output.schema.json
-resources:
-  - refs/example.md
-profile: high-quality-generation

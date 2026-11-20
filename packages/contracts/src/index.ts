@@ -1,13 +1,18 @@
-/** v0.10.2 canonical ABI/digest and typed error identity. */
+/** 当前领域契约：单一结构定义与严格的数据验证。 */
+export * from './schema-versions.js';
+export type * from './base.js';
+export * from './element-contracts.js';
+export * from './refs.js';
+export * from './package-manifest.js';
+export * from './app-descriptor.js';
+export * from './app-lock.js';
+export * from './boot-contracts.js';
+export * from './app-contracts.js';
+export * from './function-outcome-negatives.js';
 export * from './digest.js';
-export * from './known-error-codes.js';
+export * from './json-schemas.js';
+export * from './error-codes.js';
 export * from './errors.js';
-export * from './guards.js';
-export * from './identity.js';
-export * from './json.js';
-export * from './qualified-canonical.js';
-export type * from './build-types.js';
-export type * from './activation-types.js';
-export type * from './import-types.js';
-export * from './llm-generate-v1.js';
-export * from './llm-generate-v1-guards.js';
+export * from './validate.js';
+export * from './fixtures/legal.js';
+export * from './fixtures/illegal.js';

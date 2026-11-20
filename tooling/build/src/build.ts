@@ -1,589 +1,878 @@
-/** v0.10.2 T05: canonical BUILD-only source migration. No runtime or Host imports. */
-/**
- * DomainHarness v0.10 T00 (#1166) — closed-world Node24 BUILD composition.
- * ========================================================================
- *
- * `buildV10App` pins, for ONE Domain App, exactly one Node24 target profile
- * and one compatible SDK + Kernel/Standard/Business/Capability graph with
- * its ordinary npm/native import allowances, under accepted Product A01
- * (A01-PC05). It is the once-only static owner of every composition fact:
- *
- *  - closed roles: exactly one K Primary, exactly one S Primary, >=1
- *    Business; capability packages are covered by exactly one sealed
- *    capability binding (handler map) — "two primaries" is a BUILD
- *    failure (A01-PC08);
- *  - advisory identity: K extension providerId/hook pairs and S feature
- *    keys are unique (duplicate/conflicting provider or feature refuses);
- *  - authority reservation: the kernel-authority namespaces (`kernel:`,
- *    `cas:`, `admission:`, `journal:`, `effect:`) may be PROVIDED only by
- *    the K Primary — a forged extension hook or any non-K package claiming
- *    commit/journal/admission authority refuses at BUILD, never at a
- *    runtime source inspection (frozen PC-08 "forged extension hook");
- *  - dependency closure: declared dependencies resolve inside the selected
- *    closure (missing refuses) and the graph is acyclic (cycle refuses);
- *    required features (`requires`) are provided by the selected closure
- *    only, so a hidden mandatory advanced dependency cannot slip in;
- *  - profile/ABI: the target profile is exactly the selected Node24 ESM
- *    profile and every entry's ABI is its role's selected row (wrong
- *    runtime/ABI refuses);
- *  - byte pinning: sha256(moduleSource) == moduleSha256 for every sealed
- *    module (byte substitution refuses);
- *  - ordinary imports: every module's import edges are sealed by its
- *    `externalImports` allowance (`import-policy.ts`); undeclared,
- *    computed dynamic, require/eval/code-string, file/data and
- *    cross-package edges refuse — the sealed graph is the whole graph,
- *    with no discovery edge (no second engine, no dynamic install);
- *  - routes: the intent→operation table is admitted against the sealed
- *    graph's OWN business intents and capability handler maps (no
- *    caller-supplied intent authority).
- *
- * Determinism is a product property: no clock, no randomness, no locale —
- * the same input builds the byte-identical plain-data output and digest.
- * The output (`dh.v10.build/1`) carries the sealed load order and mints NO
- * approval/authority of any kind; the trusted activation counterpart
- * (`activation.ts`) consumes it as plain data without re-deriving or
- * re-attesting any of these static facts (A01: the SDK is not a second
- * Package checker).
- *
- * BUILD never evaluates module source (purely static analysis) and performs
- * no I/O.
- */
-import { isObjectRecord } from '@kaicreator/domain-harness-contracts';
-import { canonicalSnapshot } from '@kaicreator/domain-harness-contracts';
+/** 构建期职责：校验并封存选定的依赖、资源和函数，保证生成确定性 Lock。 */
 import {
-  V10_BUILD_FORMAT,
-  V10_BUNDLER_REVISION,
-  V10_HOST_ABI,
-  V10_IMPORT_POLICY_REVISION,
-  V10_RUNTIME_ABI,
-  V10_SELECTED_ROLE_ABI,
-  V10_TARGET_PROFILE,
-  sha256Canonical,
-  sha256Hex,
-  type V10ModuleRole,
+  DH_LOCK_SCHEMA_VERSION,
+  NODE22_ESM_PROFILE,
+  contentDigestOf,
+  isUnknownContentKind,
+  validateDomainDefinition,
+  validateElementDefinition,
+  type ContentBlock,
+  type ContentDigest,
+  type DomainAppDescriptor,
+  type DomainAppLock,
+  type DomainPackageManifest,
+  type EffectIntent,
+  type ElementDefinition,
+  type ElementRef,
+  type EntryRef,
+  type FunctionContract,
+  type FunctionRef,
+  type JsonValue,
+  type PackageLayer,
+  type ResolvedTarget,
+  type ResourceRef,
+  type SealedHookBinding,
+  type SealedIngress,
+  type SelectedElement,
+  type SelectedFunction,
+  type SelectedPackage,
+  type SemVer,
+  type TargetSelector,
+  type BuildErrorCode,
+  type ValidationIssue,
 } from '@kaicreator/domain-harness-contracts';
-import { assertSealedImportClosure, type V10ExternalImports } from './import-policy.js';
-import { V10BuildError } from '@kaicreator/domain-harness-contracts';
-import { resolveV10SelectedClosure } from './selected-closure.js';
+import { canonicalJson } from '@kaicreator/domain-harness-contracts';
+import type {
+  BuildInput,
+  BuildResult,
+  BuildSuccess,
+} from './types.js';
+import { BuildRefusal, refusal } from './refusal.js';
+import { SchemaChecker } from './schema-check.js';
+import { ResourceScope, digestOfBytes } from './resources.js';
+import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
 
 
-import type { BuildV10AppOptions, V10SealedModule, V10BuiltApp } from '@kaicreator/domain-harness-contracts';
-export type { V10ModuleInput, V10RouteRowInput, BuildV10AppOptions, V10SealedModule, V10BuiltApp } from '@kaicreator/domain-harness-contracts';
+interface LoadedElement {
+  readonly def: ElementDefinition;
+  readonly namespace: string;
+  readonly key: string;
+  readonly definitionDigest: ContentDigest;
+  readonly owner: DomainPackageManifest;
+  readonly visibility: 'public' | 'private';
+}
 
-const HEX64 = /^[0-9a-f]{64}$/;
-const PACKAGE_ID_RE = /^[A-Za-z][A-Za-z0-9._:@-]{0,127}$/;
-/** Feature/hook key grammar: `name/version` or `namespace:name/version` (e.g. `advisory-alpha-observation/v1`, `standard:validation/1`). */
-const FEATURE_KEY_RE = /^[a-z][a-z0-9._:-]{0,127}\/[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
-const INTENT_KEY_RE = /^intent:[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
-const AUTHORITY_NAMESPACES = ['kernel:', 'cas:', 'admission:', 'journal:', 'effect:'] as const;
-const ROUTE_FIELDS = new Set(['intentId', 'operationId', 'capabilityId', 'handlerId']);
-const MODULE_FIELDS = new Set([
-  'packageId', 'role', 'abiVersion', 'moduleSource', 'moduleSha256', 'endpoint',
-  'dependencies', 'externalImports', 'provides', 'requires', 'optional',
-  'providerId', 'hookExport', 'featureExport', 'capabilityId', 'handlers', 'externalEffect',
-]);
-const HANDLER_FIELDS = new Set(['operationId', 'handler']);
-const EXTERNAL_IMPORT_FIELDS = new Set(['node', 'npm', 'native']);
-const MAX_ITEMS = 256;
-const MAX_STRING = 512;
-/** Sealed module bytes bound (chars): real selected payload modules are tens of KB. */
-const MAX_MODULE_CHARS = 8_388_608;
+interface ResolvedFunction {
+  readonly element: LoadedElement;
+  readonly fn: FunctionContract;
+  readonly owner: DomainPackageManifest;
+}
 
-function fail(code: string, message: string): never {
-  throw new V10BuildError(code, message);
+const PACKAGE_LAYERS: readonly PackageLayer[] = ['kernel', 'sdk', 'business'];
+
+function elementNamespace(id: string): string {
+  const dot = id.indexOf('.');
+  if (dot <= 0) {
+    throw refusal(
+      'DH_BUILD_SCHEMA_INVALID',
+      `element id '${id}' is not domain-qualified (expected '<domain>.<name>')`,
+    );
+  }
+  return id.slice(0, dot);
+}
+
+function isCompatibleTarget(target: TargetSelector): boolean {
+  return (
+    target.runtime === 'node' &&
+    target.module === 'esm' &&
+    (target.nodeMajor === undefined || target.nodeMajor === 22)
+  );
+}
+
+function isCompatibleVariantTarget(target: TargetSelector): boolean {
+  return target.runtime === 'node' && target.module === 'esm' && target.nodeMajor === 22;
+}
+
+function toJson(value: unknown): JsonValue {
+  return value as JsonValue;
+}
+
+function firstIssue(issues: readonly ValidationIssue[]): ValidationIssue {
+  const issue = issues[0]!;
+  return issue;
 }
 
 
-function boundedString(value: unknown, label: string): string {
-  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_STRING) {
-    fail('BUILD_INPUT_INVALID', `${label} must be a non-empty string of at most ${String(MAX_STRING)} characters`);
-  }
-  return value;
-}
-
-function stringList(value: unknown, label: string, maxItems: number): string[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > maxItems) {
-    fail('BUILD_INPUT_INVALID', `${label} must be an array of at most ${String(maxItems)} strings`);
-  }
-  const out: string[] = [];
-  for (const item of value) {
-    out.push(boundedString(item, `${label} entry`));
-  }
-  if (new Set(out).size !== out.length) {
-    fail('BUILD_INPUT_INVALID', `${label} carries duplicate entries`);
-  }
-  return out;
-}
-
-function strictFields(value: Record<string, unknown>, allowed: Set<string>, label: string): void {
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) {
-      fail('BUILD_GRAPH_INVALID', `${label} carries unknown field '${key}'; the v0.10 BUILD boundary refuses unknown fields and aliases instead of ignoring them`);
-    }
-  }
-}
-
-/** Canonical-snapshot hostile input first (accessor traps refused unread). */
-function snapshotOrThrow(value: unknown, label: string): Record<string, unknown> {
-  let snapshot: unknown;
+export function buildApp(input: BuildInput): BuildResult {
   try {
-    snapshot = canonicalSnapshot(value);
+    return { ok: true, ...runBuild(input) };
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    fail('BUILD_INPUT_INVALID', `${label} is not strict canonical plain data: ${detail}`);
+    if (error instanceof BuildRefusal) {
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+        ...(error.refPath !== undefined ? { path: error.refPath } : {}),
+      };
+    }
+    throw error;
   }
-  if (!isObjectRecord(snapshot)) {
-    fail('BUILD_INPUT_INVALID', `${label} must be a record`);
-  }
-  return snapshot;
 }
 
-function parseExternalImports(raw: unknown, packageId: string): V10ExternalImports {
-  if (raw === undefined) {
-    return Object.freeze({ node: Object.freeze([]), npm: Object.freeze([]), native: Object.freeze([]) });
+function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
+  const schemas = new SchemaChecker();
+
+  schemas.validateDocument('descriptor', input.descriptor);
+  const descriptor = input.descriptor as DomainAppDescriptor;
+
+  for (const [index, domain] of (input.domains ?? []).entries()) {
+    const result = validateDomainDefinition(domain);
+    if (!result.ok) {
+      const issue = firstIssue(result.issues);
+      throw new BuildRefusal(
+        issue.code as BuildErrorCode,
+        `domains[${index}]: ${issue.message}`,
+        issue.path,
+      );
+    }
+    schemas.validateDocument('domain', domain);
   }
-  if (!isObjectRecord(raw)) {
-    fail('BUILD_INPUT_INVALID', `module ${packageId} externalImports must be a record`);
+
+  const pool = new Map<string, DomainPackageManifest>();
+  for (const [index, candidate] of input.packages.entries()) {
+    schemas.validateDocument('manifest', candidate);
+    const manifest = candidate as DomainPackageManifest;
+    if (pool.has(manifest.id)) {
+      throw refusal(
+        'DH_BUILD_SCHEMA_INVALID',
+        `duplicate manifest id '${manifest.id}' in the package pool`,
+        `packages[${index}].id`,
+      );
+    }
+    pool.set(manifest.id, manifest);
   }
-  strictFields(raw, EXTERNAL_IMPORT_FIELDS, `module ${packageId} externalImports`);
-  for (const kind of ['node', 'npm', 'native'] as const) {
-    for (const specifier of raw[kind] === undefined ? [] : Array.isArray(raw[kind]) ? raw[kind] : fail('BUILD_INPUT_INVALID', `module ${packageId} externalImports.${kind} must be an array`)) {
-      if (typeof specifier !== 'string' || specifier.length === 0 || specifier.length > MAX_STRING) {
-        fail('BUILD_INPUT_INVALID', `module ${packageId} externalImports.${kind} entries must be non-empty bounded strings`);
+
+  if (!isCompatibleTarget(descriptor.target)) {
+    throw refusal(
+      'DH_BUILD_TARGET_INVALID',
+      `descriptor target ${JSON.stringify(descriptor.target)} is not the unique supported node22-esm/1 family`,
+      'target',
+    );
+  }
+  const target: ResolvedTarget = {
+    runtime: 'node',
+    module: 'esm',
+    ...(descriptor.target.nodeMajor !== undefined ? { nodeMajor: descriptor.target.nodeMajor } : {}),
+    profile: NODE22_ESM_PROFILE,
+  };
+
+  const selected = new Map<string, DomainPackageManifest>();
+  const rootSlots: readonly (readonly [PackageLayer, keyof DomainAppDescriptor['roots']])[] = [
+    ['kernel', 'kernelPrimary'],
+    ['sdk', 'sdkPrimary'],
+    ['business', 'businessPrimary'],
+  ];
+  for (const [layer, slot] of rootSlots) {
+    const ref = descriptor.roots[slot];
+    const manifest = pool.get(ref.package);
+    if (!manifest || manifest.version !== ref.version) {
+      throw refusal(
+        'DH_BUILD_REF_UNRESOLVED',
+        `descriptor roots.${slot} references '${ref.package}@${ref.version}' which is not in the package pool`,
+        `roots.${slot}`,
+      );
+    }
+    if (manifest.role !== 'primary') {
+      throw refusal(
+        'DH_BUILD_LAYER_ROLE_MISMATCH',
+        `roots.${slot} package '${ref.package}' declares role='${manifest.role}'; a root slot must reference a primary package`,
+        `roots.${slot}`,
+      );
+    }
+    if (manifest.layer !== layer) {
+      throw refusal(
+        'DH_BUILD_PRIMARY_MISSING',
+        `roots.${slot} package '${ref.package}' declares layer='${manifest.layer}', leaving layer '${layer}' without a primary`,
+        `roots.${slot}`,
+      );
+    }
+    selected.set(manifest.id, manifest);
+  }
+  for (const [index, ref] of descriptor.extensions.entries()) {
+    const manifest = pool.get(ref.package);
+    if (!manifest || manifest.version !== ref.version) {
+      throw refusal(
+        'DH_BUILD_REF_UNRESOLVED',
+        `descriptor extensions[${index}] references '${ref.package}@${ref.version}' which is not in the package pool`,
+        `extensions[${index}]`,
+      );
+    }
+    selected.set(manifest.id, manifest);
+  }
+
+  const queue = [...selected.keys()].sort();
+  const dependsOnEdges = new Map<string, readonly string[]>();
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    const manifest = selected.get(id)!;
+    const edges: string[] = [];
+    for (const dep of manifest.dependsOn) {
+      const targetManifest = pool.get(dep.package);
+      if (!targetManifest || !satisfiesSemver(targetManifest.version, dep.version)) {
+        throw refusal(
+          'DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `'${id}' depends on '${dep.package}@${dep.version}' which is not selected and cannot be resolved`,
+          'dependsOn',
+        );
+      }
+      const exportedInterfaces = new Set(
+        targetManifest.exports
+          .map((entry) => entry.interfaceId)
+          .filter((value): value is string => value !== undefined),
+      );
+      if (!exportedInterfaces.has(dep.interface)) {
+        throw refusal(
+          'DH_BUILD_EXPORT_MISSING',
+          `'${id}' depends on interface '${dep.interface}' which '${dep.package}' does not export`,
+          'dependsOn',
+        );
+      }
+      edges.push(dep.package);
+      if (!selected.has(dep.package)) {
+        selected.set(dep.package, targetManifest);
+        queue.push(dep.package);
+        queue.sort();
       }
     }
+    dependsOnEdges.set(id, edges);
   }
-  return Object.freeze({
-    node: Object.freeze(stringList(raw.node, `module ${packageId} externalImports.node`, MAX_ITEMS)),
-    npm: Object.freeze(stringList(raw.npm, `module ${packageId} externalImports.npm`, MAX_ITEMS)),
-    native: Object.freeze(stringList(raw.native, `module ${packageId} externalImports.native`, MAX_ITEMS)),
-  });
-}
 
-interface ParsedModule {
-  readonly packageId: string;
-  readonly role: V10ModuleRole;
-  readonly abiVersion: string;
-  readonly moduleSource: string | null;
-  readonly moduleSha256: string | null;
-  readonly endpoint: string;
-  readonly dependencies: readonly string[];
-  readonly externalImports: V10ExternalImports;
-  readonly provides: readonly string[];
-  readonly requires: readonly string[];
-  readonly optional: boolean;
-  readonly providerId: string | null;
-  readonly hookExport: string | null;
-  readonly featureExport: string | null;
-  readonly capabilityId: string | null;
-  readonly handlers: readonly { operationId: string; handler: string }[] | null;
-  readonly externalEffect: boolean;
-}
+  const primaries = new Map<PackageLayer, string[]>();
+  for (const manifest of selected.values()) {
+    if (manifest.role === 'primary') {
+      const list = primaries.get(manifest.layer) ?? [];
+      list.push(manifest.id);
+      primaries.set(manifest.layer, list);
+    }
+  }
+  for (const layer of PACKAGE_LAYERS) {
+    const list = (primaries.get(layer) ?? []).sort();
+    if (list.length === 0) {
+      throw refusal('DH_BUILD_PRIMARY_MISSING', `no primary package selected for layer '${layer}'`);
+    }
+    if (list.length > 1) {
+      throw refusal(
+        'DH_BUILD_PRIMARY_DUPLICATE',
+        `layer '${layer}' has ${list.length} primary packages: ${list.join(', ')}`,
+      );
+    }
+  }
 
-function parseHandlers(raw: unknown, packageId: string): { operationId: string; handler: string }[] {
-  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_ITEMS) {
-    fail('BUILD_GRAPH_INVALID', `capability ${packageId} must carry a non-empty bounded operation→handler map`);
-  }
-  const operations = new Set<string>();
-  const handlers: { operationId: string; handler: string }[] = [];
-  for (const handlerRaw of raw) {
-    if (!isObjectRecord(handlerRaw)) {
-      fail('BUILD_GRAPH_INVALID', `capability ${packageId} handler entry must be a record`);
-    }
-    strictFields(handlerRaw, HANDLER_FIELDS, `capability ${packageId} handler`);
-    const operationId = boundedString(handlerRaw.operationId, `capability ${packageId} handler operationId`);
-    const handler = boundedString(handlerRaw.handler, `capability ${packageId} handler handler`);
-    if (operations.has(operationId)) {
-      fail('BUILD_GRAPH_INVALID', `capability ${packageId} binds operation ${operationId} more than once`);
-    }
-    operations.add(operationId);
-    handlers.push({ operationId, handler });
-  }
-  return handlers;
-}
-
-function parseModules(rawModules: readonly unknown[]): ParsedModule[] {
-  if (rawModules.length === 0 || rawModules.length > MAX_ITEMS) {
-    fail('BUILD_GRAPH_INVALID', `the composition must select a non-empty bounded module array (1..${String(MAX_ITEMS)})`);
-  }
-  const parsed: ParsedModule[] = [];
-  const seenIds = new Set<string>();
-  for (const raw of rawModules) {
-    if (!isObjectRecord(raw)) {
-      fail('BUILD_GRAPH_INVALID', 'each composition module must be a record');
-    }
-    strictFields(raw, MODULE_FIELDS, 'composition module');
-    const packageId = boundedString(raw.packageId, 'module packageId');
-    if (!PACKAGE_ID_RE.test(packageId)) {
-      fail('BUILD_INPUT_INVALID', `module packageId ${packageId} is not a bounded package identity`);
-    }
-    if (seenIds.has(packageId)) {
-      fail('BUILD_GRAPH_INVALID', `duplicate module identity ${packageId}`);
-    }
-    seenIds.add(packageId);
-    const role = raw.role;
-    if (typeof role !== 'string' || !(role in V10_SELECTED_ROLE_ABI)) {
-      fail('BUILD_GRAPH_INVALID', `module ${packageId} carries unknown role ${String(role)}`);
-    }
-    const abiVersion = boundedString(raw.abiVersion, `module ${packageId} abiVersion`);
-    const optional = raw.optional === undefined ? false : raw.optional;
-    if (typeof optional !== 'boolean') {
-      fail('BUILD_INPUT_INVALID', `module ${packageId} optional must be a boolean`);
-    }
-    const moduleSource = raw.moduleSource === undefined ? null : ((): string => {
-      if (typeof raw.moduleSource !== 'string' || raw.moduleSource.length === 0 || raw.moduleSource.length > MAX_MODULE_CHARS) {
-        fail('BUILD_INPUT_INVALID', `module ${packageId} moduleSource must be a non-empty string of at most ${String(MAX_MODULE_CHARS)} characters`);
+  const scope = new ResourceScope(input.packageRoots);
+  const elements = new Map<string, LoadedElement>();
+  const byLogicalId = new Map<string, Map<SemVer, LoadedElement>>();
+  const packagesSorted = [...selected.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+  for (const manifest of packagesSorted) {
+    for (const entry of manifest.elements) {
+      if (entry.definitionRef.packageId !== manifest.id) {
+        throw refusal(
+          'DH_BUILD_SCHEMA_INVALID',
+          `'${manifest.id}' declares element '${entry.id}' with definitionRef pointing at package '${entry.definitionRef.packageId}'; an owner declares its own definition source`,
+        );
       }
-      return raw.moduleSource;
-    })();
-    const moduleSha256 = raw.moduleSha256 === undefined ? null : (typeof raw.moduleSha256 === 'string' && HEX64.test(raw.moduleSha256) ? raw.moduleSha256 : fail('BUILD_GRAPH_INVALID', `module ${packageId} moduleSha256 must be a lowercase hex sha-256 digest`));
-    if (optional === false && moduleSource === null) {
-      fail('BUILD_GRAPH_INVALID', `module ${packageId} is not optional and must carry sealed module bytes`);
-    }
-    if ((moduleSource === null) !== (moduleSha256 === null)) {
-      fail('BUILD_GRAPH_INVALID', `module ${packageId} must carry both sealed bytes and digest, or neither`);
-    }
-    parsed.push({
-      packageId,
-      role: role as V10ModuleRole,
-      abiVersion,
-      moduleSource,
-      moduleSha256,
-      endpoint: boundedString(raw.endpoint, `module ${packageId} endpoint`),
-      dependencies: Object.freeze(stringList(raw.dependencies, `module ${packageId} dependencies`, MAX_ITEMS)),
-      externalImports: parseExternalImports(raw.externalImports, packageId),
-      provides: Object.freeze(stringList(raw.provides, `module ${packageId} provides`, MAX_ITEMS)),
-      requires: Object.freeze(stringList(raw.requires, `module ${packageId} requires`, MAX_ITEMS)),
-      optional,
-      providerId: raw.providerId === undefined ? null : boundedString(raw.providerId, `module ${packageId} providerId`),
-      hookExport: raw.hookExport === undefined ? null : boundedString(raw.hookExport, `module ${packageId} hookExport`),
-      featureExport: raw.featureExport === undefined ? null : boundedString(raw.featureExport, `module ${packageId} featureExport`),
-      capabilityId: raw.capabilityId === undefined ? null : boundedString(raw.capabilityId, `module ${packageId} capabilityId`),
-      handlers: raw.handlers === undefined ? null : parseHandlers(raw.handlers, packageId),
-      externalEffect: raw.externalEffect === undefined ? false : (typeof raw.externalEffect === 'boolean' ? raw.externalEffect : fail('BUILD_INPUT_INVALID', `module ${packageId} externalEffect must be a boolean`)),
-    });
-  }
-  return parsed;
-}
-
-function checkAuthorityReservation(module: ParsedModule, kernelPrimary: ParsedModule | undefined): void {
-  const isKernelPrimary = module.role === 'kernel-primary';
-  for (const key of module.provides) {
-    const squat = AUTHORITY_NAMESPACES.find((namespace) => key.startsWith(namespace));
-    if (squat !== undefined && !isKernelPrimary) {
-      fail('V10_AUTHORITY_FORGERY', `module ${module.packageId} (${module.role}) provides authority key '${key}'; the ${squat}* authority namespace is reserved to the one selected Kernel Primary`);
-    }
-  }
-  if (isKernelPrimary && kernelPrimary !== undefined && kernelPrimary.packageId !== module.packageId) {
-    fail('V10_ROLE_CARDINALITY', `two kernel-primary modules are selected (${kernelPrimary.packageId}, ${module.packageId}); a Domain App composes exactly one K Primary`);
-  }
-  if (module.handlers !== null && module.role !== 'capability') {
-    fail('V10_AUTHORITY_FORGERY', `module ${module.packageId} (${module.role}) declares capability handlers; operation handler maps belong to capability packages only`);
-  }
-  if (module.externalEffect && module.role !== 'capability') {
-    fail('V10_AUTHORITY_FORGERY', `module ${module.packageId} (${module.role}) declares externalEffect; the external Effect Operation gate is sealed to capability packages only`);
-  }
-}
-
-/**
- * Compose one closed-world Node24 Domain App. Purely static and
- * deterministic: zero module evaluation, zero I/O, no clock/randomness.
- */
-export function buildV10App(options: BuildV10AppOptions): V10BuiltApp {
-  if (typeof options !== 'object' || options === null) {
-    fail('BUILD_INPUT_INVALID', 'buildV10App requires an options record');
-  }
-  const snap = snapshotOrThrow(options, 'build options');
-  const appId = boundedString(snap.appId, 'appId');
-  const audience = boundedString(snap.audience, 'audience');
-  const buildId = boundedString(snap.buildId ?? 'v010-build', 'buildId');
-  if (snap.targetProfile !== V10_TARGET_PROFILE) {
-    fail('V10_TARGET_UNSUPPORTED', `target profile ${String(snap.targetProfile)} is not the selected Node24 ESM profile ${V10_TARGET_PROFILE}; a composition pins exactly one target runtime`);
-  }
-  const hardBudgetRaw = snap.hardBudget ?? { maxStepsPerTurn: 8, maxWorkUnitsPerTurn: 64 };
-  if (!isObjectRecord(hardBudgetRaw)) {
-    fail('BUILD_INPUT_INVALID', 'hardBudget must be a record');
-  }
-  const stepsRaw: unknown = hardBudgetRaw.maxStepsPerTurn;
-  const workRaw: unknown = hardBudgetRaw.maxWorkUnitsPerTurn;
-  for (const [label, value] of [['maxStepsPerTurn', stepsRaw], ['maxWorkUnitsPerTurn', workRaw]] as const) {
-    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > 1_000_000_000) {
-      fail('BUILD_INPUT_INVALID', `hardBudget.${label} must be a bounded positive integer`);
-    }
-  }
-  const hardBudget: { maxStepsPerTurn: number; maxWorkUnitsPerTurn: number } = Object.freeze({
-    maxStepsPerTurn: stepsRaw as number,
-    maxWorkUnitsPerTurn: workRaw as number,
-  });
-  if (!Array.isArray(snap.modules) || !Array.isArray(snap.routes)) {
-    fail('BUILD_INPUT_INVALID', 'buildV10App requires modules and routes arrays');
-  }
-  const modules = parseModules(snap.modules as readonly unknown[]);
-  if (modules.some((module) => module.role === 'kernel-primary' && module.moduleSource === null)) {
-    fail('BUILD_GRAPH_INVALID', 'the selected Kernel Primary must carry sealed bytes');
-  }
-
-  // ---- Closed roles + advisory identity + authority reservation ----
-  let kernelPrimary: ParsedModule | undefined;
-  let standardPrimary: ParsedModule | undefined;
-  const business: ParsedModule[] = [];
-  const capabilities: ParsedModule[] = [];
-  const extensions: ParsedModule[] = [];
-  const features: ParsedModule[] = [];
-  const byProvider = new Map<string, ParsedModule>();
-  const byHook = new Map<string, ParsedModule>();
-  const byFeature = new Map<string, ParsedModule>();
-  const byIntent = new Map<string, ParsedModule>();
-  const byCapabilityId = new Map<string, { module: ParsedModule; handlers: { operationId: string; handler: string }[] }>();
-
-  for (const module of modules) {
-    checkAuthorityReservation(module, kernelPrimary);
-    if (module.role === 'kernel-primary') kernelPrimary = module;
-    else if (module.role === 'standard-primary') {
-      if (standardPrimary !== undefined) {
-        fail('V10_ROLE_CARDINALITY', `two standard-primary modules are selected (${standardPrimary.packageId}, ${module.packageId}); a Domain App composes exactly one S Primary`);
+      const definitionBytes = scope.verify(entry.definitionRef);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(Buffer.from(definitionBytes).toString('utf8'));
+      } catch {
+        throw refusal(
+          'DH_BUILD_SCHEMA_INVALID',
+          `element definition '${entry.definitionRef.packageId}/${entry.definitionRef.path}' is not JSON`,
+        );
       }
-      standardPrimary = module;
-    } else if (module.role === 'business') business.push(module);
-    else if (module.role === 'capability') capabilities.push(module);
-    else if (module.role === 'kernel-extension') extensions.push(module);
-    else if (module.role === 'standard-feature') features.push(module);
+      const checked = validateElementDefinition(parsed);
+      if (!checked.ok) {
+        const issue = firstIssue(checked.issues);
+        throw new BuildRefusal(issue.code as BuildErrorCode, issue.message, issue.path);
+      }
+      schemas.validateDocument('element', parsed);
+      const def = parsed as ElementDefinition;
+      const namespace = elementNamespace(def.id);
+      if (def.id !== entry.id || def.version !== entry.version) {
+        throw refusal(
+          'DH_BUILD_VERSION_CONFLICT',
+          `manifest entry '${entry.id}@${entry.version}' resolves to definition '${def.id}@${def.version}'`,
+        );
+      }
+      const key = `${namespace}|${def.id}|${def.version}`;
+      if (elements.has(key)) {
+        throw refusal(
+          'DH_BUILD_ELEMENT_DUPLICATE_OWNER',
+          `element '${def.id}@${def.version}' is declared by more than one selected package`,
+        );
+      }
+      const loaded: LoadedElement = {
+        def,
+        namespace,
+        key,
+        definitionDigest: contentDigestOf(toJson(def)),
+        owner: manifest,
+        visibility: entry.visibility,
+      };
+      elements.set(key, loaded);
+      const versions = byLogicalId.get(def.id) ?? new Map<SemVer, LoadedElement>();
+      versions.set(def.version, loaded);
+      byLogicalId.set(def.id, versions);
+    }
   }
-  if (kernelPrimary === undefined) {
-    fail('V10_ROLE_CARDINALITY', 'the composition selects no Kernel Primary; a Domain App composes exactly one K Primary');
-  }
-  if (standardPrimary === undefined) {
-    fail('V10_ROLE_CARDINALITY', 'the composition selects no Standard Primary; a Domain App composes exactly one S Primary');
-  }
-  if (business.length === 0) {
-    fail('V10_ROLE_CARDINALITY', 'the composition selects no Business package; a Domain App composes at least one B');
+  for (const [id, versions] of byLogicalId) {
+    if (versions.size > 1) {
+      throw refusal(
+        'DH_BUILD_VERSION_CONFLICT',
+        `element '${id}' is required at multiple versions: ${[...versions.keys()].sort().join(', ')}`,
+      );
+    }
   }
 
-  // Per-role selected ABI rows (A01-PC08 wrong version refuses at BUILD).
-  for (const module of modules) {
-    const selected = V10_SELECTED_ROLE_ABI[module.role];
-    if (module.abiVersion !== selected) {
-      fail('V10_ABI_UNSUPPORTED', `module ${module.packageId} (${module.role}) declares ABI ${module.abiVersion}; the selected Node24 profile pins ${selected} for this role`);
-    }
-  }
-
-  // Advisory identity: K extension provider/hook pairs stay injective and
-  // never squat a kernel/standard namespace; S feature keys likewise.
-  for (const module of [...extensions, ...features]) {
-    if (module.role === 'kernel-extension' && module.providerId === null) {
-      fail('BUILD_GRAPH_INVALID', `kernel-extension ${module.packageId} declares no provider identity`);
-    }
-    if (module.role === 'kernel-extension' && (module.hookExport === null || module.provides.length !== 1)) {
-      fail('BUILD_GRAPH_INVALID', `kernel-extension ${module.packageId} must declare exactly one advisory hook (hookExport + one provides key)`);
-    }
-    if (module.role === 'standard-feature' && (module.featureExport === null || module.provides.length !== 1)) {
-      fail('BUILD_GRAPH_INVALID', `standard-feature ${module.packageId} must declare exactly one feature key (featureExport + one provides key)`);
-    }
-    const key = module.provides[0] as string;
-    if (!FEATURE_KEY_RE.test(key)) {
-      fail('BUILD_GRAPH_INVALID', `module ${module.packageId} provides malformed feature/hook key '${key}'`);
-    }
-    if (module.role === 'standard-feature' && !key.startsWith('standard:')) {
-      fail('BUILD_GRAPH_INVALID', `standard-feature ${module.packageId} provides '${key}'; S feature keys live in the standard: namespace`);
-    }
-    if (module.role === 'kernel-extension' && (key.startsWith('standard:') || AUTHORITY_NAMESPACES.some((ns) => key.startsWith(ns)))) {
-      fail('V10_AUTHORITY_FORGERY', `kernel-extension ${module.packageId} provides advisory hook '${key}'; advisory hooks may not squat authority or Standard namespaces`);
-    }
-  }
-  // Collisions and provider authority are properties of the *selected*
-  // closure. Absent optional advisories (no bytes/digest) are recorded in
-  // skippedOptional below, and must not reserve a real selected provider key.
-  const selectedExtensions = extensions.filter(
-    (module) => !(module.optional && module.moduleSource === null),
-  );
-  const selectedFeatures = features.filter(
-    (module) => !(module.optional && module.moduleSource === null),
-  );
-  for (const module of selectedExtensions) {
-    const providerId = module.providerId as string;
-    const hook = module.provides[0] as string;
-    const providerOwner = byProvider.get(providerId);
-    if (providerOwner !== undefined) {
-      fail('V10_PROVIDER_COLLISION', `advisory provider ${providerId} is claimed by both ${providerOwner.packageId} and ${module.packageId}`);
-    }
-    const hookOwner = byHook.get(hook);
-    if (hookOwner !== undefined) {
-      fail('V10_PROVIDER_COLLISION', `advisory hook ${hook} is claimed by both ${hookOwner.packageId} and ${module.packageId}`);
-    }
-    byProvider.set(providerId, module);
-    byHook.set(hook, module);
-  }
-  for (const module of selectedFeatures) {
-    const feature = module.provides[0] as string;
-    const owner = byFeature.get(feature);
-    if (owner !== undefined) {
-      fail('V10_FEATURE_COLLISION', `standard feature ${feature} is provided by both ${owner.packageId} and ${module.packageId}`);
-    }
-    byFeature.set(feature, module);
-  }
-  for (const module of business) {
-    for (const key of module.provides) {
-      if (INTENT_KEY_RE.test(key)) {
-        const owner = byIntent.get(key);
-        if (owner !== undefined) {
-          fail('V10_INTENT_CONFLICT', `intent ${key} is provided by both ${owner.packageId} and ${module.packageId}; business intents stay injective in one App`);
+  const elementDeps = new Map<string, readonly string[]>();
+  for (const loaded of elements.values()) {
+    const deps: string[] = [];
+    for (const dep of loaded.def.dependencies ?? []) {
+      const versions = byLogicalId.get(dep.element);
+      const resolved = versions
+        ? [...versions.values()].find((candidate) => satisfiesSemver(candidate.def.version, dep.version))
+        : undefined;
+      if (!resolved) {
+        throw refusal(
+          'DH_BUILD_REF_UNRESOLVED',
+          `element '${loaded.def.id}' depends on '${dep.element}@${dep.version}' which is not in the selected closure`,
+        );
+      }
+      deps.push(resolved.key);
+      for (const fnId of dep.functions ?? []) {
+        const fn = resolved.def.functions.find((candidate) => candidate.id === fnId);
+        if (!fn) {
+          throw refusal(
+            'DH_BUILD_REF_UNRESOLVED',
+            `element '${loaded.def.id}' pins function '${fnId}' which does not exist on '${dep.element}'`,
+          );
         }
-        byIntent.set(key, module);
+        if (resolved.owner.id !== loaded.owner.id && !isExported(resolved.owner, resolved, fn)) {
+          throw refusal(
+            'DH_BUILD_EXPORT_MISSING',
+            `element '${loaded.def.id}' pins non-exported function '${dep.element}.${fnId}'`,
+          );
+        }
+      }
+    }
+    elementDeps.set(loaded.key, deps);
+  }
+  if (kahnTopologicalOrder([...elements.keys()], elementDeps) === null) {
+    throw refusal('DH_BUILD_ELEMENT_CYCLE', 'element build-time dependency DAG carries a cycle');
+  }
+
+  for (const manifest of packagesSorted) {
+    const owned = [...elements.values()].filter((loaded) => loaded.owner.id === manifest.id);
+    for (const [index, entry] of manifest.exports.entries()) {
+      if (entry.elementId !== undefined) {
+        if (!owned.some((loaded) => loaded.def.id === entry.elementId)) {
+          throw refusal(
+            'DH_BUILD_REF_UNRESOLVED',
+            `'${manifest.id}' exports element '${entry.elementId}' it does not own`,
+            `exports[${index}]`,
+          );
+        }
+      } else if (entry.functionId !== undefined) {
+        const carriers = owned.filter((loaded) =>
+          loaded.def.functions.some((fn) => fn.id === entry.functionId),
+        );
+        if (carriers.length !== 1) {
+          throw refusal(
+            'DH_BUILD_REF_UNRESOLVED',
+            `'${manifest.id}' exports function '${entry.functionId}' resolved to ${carriers.length} owned elements`,
+            `exports[${index}]`,
+          );
+        }
       }
     }
   }
 
-  // Capability bindings: injective capabilityId, sealed operation→handler map.
-  for (const module of capabilities) {
-    if (module.capabilityId === null) {
-      fail('BUILD_GRAPH_INVALID', `capability module ${module.packageId} declares no capabilityId`);
+  const resolveFunctionRef = (ref: FunctionRef, refPath: string): ResolvedFunction => {
+    const versions = byLogicalId.get(ref.element.id);
+    const loaded = versions?.get(ref.element.version);
+    if (!loaded || loaded.namespace !== ref.element.namespace) {
+      throw refusal('DH_BUILD_REF_UNRESOLVED', `function reference '${ref.element.id}' is not in the selected closure`, refPath);
     }
-    if (module.handlers === null) {
-      fail('BUILD_GRAPH_INVALID', `capability module ${module.packageId} carries no sealed operation→handler map`);
+    if (loaded.definitionDigest !== ref.element.digest) {
+      throw refusal(
+        'DH_BUILD_REF_UNRESOLVED',
+        `function reference '${ref.element.id}@${ref.element.version}' digest does not match the selected definition`,
+        refPath,
+      );
     }
-    const existing = byCapabilityId.get(module.capabilityId);
-    if (existing !== undefined) {
-      fail('BUILD_GRAPH_INVALID', `capability identity ${module.capabilityId} is bound by both ${existing.module.packageId} and ${module.packageId}`);
+    const fn = loaded.def.functions.find((candidate) => candidate.id === ref.functionId);
+    if (!fn || fn.contractVersion !== ref.contractVersion) {
+      throw refusal(
+        'DH_BUILD_REF_UNRESOLVED',
+        `function '${ref.functionId}' (contract ${ref.contractVersion}) does not exist on '${ref.element.id}'`,
+        refPath,
+      );
     }
-    byCapabilityId.set(module.capabilityId, { module, handlers: [...(module.handlers as { operationId: string; handler: string }[])] });
+    return { element: loaded, fn, owner: loaded.owner };
+  };
+  const requireExported = (resolved: ResolvedFunction, consumer: string | null): void => {
+    if (consumer !== null && resolved.owner.id === consumer) return;
+    if (!isExported(resolved.owner, resolved.element, resolved.fn)) {
+      throw refusal(
+        'DH_BUILD_EXPORT_MISSING',
+        `'${consumer ?? descriptor.id}' references '${resolved.element.def.id}.${resolved.fn.id}' which its owner does not export`,
+      );
+    }
+  };
+
+  const ingressResolved: { entry: DomainAppDescriptor['ingress'][number]; resolved: ResolvedFunction }[] = [];
+  for (const entry of descriptor.ingress) {
+    const resolved = resolveFunctionRef(entry.function, `ingress.${entry.id}`);
+    requireExported(resolved, null);
+    ingressResolved.push({ entry, resolved });
   }
 
-  // ---- Selection: optional advisory modules without bytes fall back ----
-  const skippedOptional: string[] = [];
-  const selected: ParsedModule[] = [];
-  for (const module of modules) {
-    const advisory = module.role === 'kernel-extension' || module.role === 'standard-feature';
-    if (advisory && module.optional && module.moduleSource === null) {
-      skippedOptional.push(module.packageId);
+  const appInitCandidates: ResolvedFunction[] = [];
+  for (const loaded of elements.values()) {
+    const fn = loaded.def.functions.find(
+      (candidate) =>
+        candidate.id === descriptor.businessAppInit.functionId &&
+        candidate.contractVersion === descriptor.businessAppInit.contractVersion,
+    );
+    if (!fn || loaded.namespace !== descriptor.businessAppInit.element.namespace || loaded.def.id !== descriptor.businessAppInit.element.id) {
       continue;
     }
-    selected.push(module);
-  }
-  // ---- One private, deterministic selected-closure owner ----
-  const { selectedIds, byId, loadOrder } = resolveV10SelectedClosure(selected);
-
-  // ---- Byte pinning + once-only sealed import closure (zero evaluation) ----
-  const sealed: V10SealedModule[] = [];
-  for (const packageId of loadOrder) {
-    const module = byId.get(packageId) as ParsedModule;
-    const source = module.moduleSource as string;
-    const actual = sha256Hex(source);
-    if (actual !== module.moduleSha256) {
-      fail('V10_DIGEST_MISMATCH', `module ${module.packageId} bytes hash to ${actual} but the composition seals ${String(module.moduleSha256)}; byte substitution before sealing is refused`);
+    if (
+      loaded.def.version === descriptor.businessAppInit.element.version &&
+      loaded.definitionDigest === descriptor.businessAppInit.element.digest
+    ) {
+      appInitCandidates.push({ element: loaded, fn, owner: loaded.owner });
     }
-    assertSealedImportClosure(`${module.packageId} (module bytes ${actual})`, source, module.externalImports, selectedIds);
-    sealed.push(Object.freeze({
-      packageId: module.packageId,
-      role: module.role,
-      abiVersion: module.abiVersion,
-      moduleSource: source,
-      moduleSha256: actual,
-      endpoint: module.endpoint,
-      dependencies: module.dependencies,
-      externalImports: module.externalImports,
-      provides: module.provides,
-      requires: module.requires,
-      optional: module.optional,
-      providerId: module.providerId,
-      hookExport: module.hookExport,
-      featureExport: module.featureExport,
-      capabilityId: module.capabilityId,
-      handlers: module.handlers === null ? null : Object.freeze(module.handlers.map((handler) => Object.freeze({ ...handler }))),
-      externalEffect: module.externalEffect,
-    }));
+  }
+  if (appInitCandidates.length === 0) {
+    throw refusal(
+      'DH_BUILD_APP_INIT_MISSING',
+      `businessAppInit '${descriptor.businessAppInit.element.id}.${descriptor.businessAppInit.functionId}' did not resolve to a selected Function`,
+    );
+  }
+  if (appInitCandidates.length > 1) {
+    throw refusal('DH_BUILD_APP_INIT_DUPLICATE', 'more than one App Init candidate matched the descriptor reference');
+  }
+  const appInit = appInitCandidates[0]!;
+  if (appInit.owner.layer !== 'business') {
+    throw refusal(
+      'DH_BUILD_LAYER_ROLE_MISMATCH',
+      `businessAppInit '${appInit.element.def.id}.${appInit.fn.id}' is owned by layer '${appInit.owner.layer}' package '${appInit.owner.id}', not the business layer`,
+    );
+  }
+  requireExported(appInit, null);
+
+  const importedFunctions = new Map<string, ResolvedFunction>();
+  for (const manifest of packagesSorted) {
+    for (const ref of manifest.imports) {
+      const resolved = resolveFunctionRef(ref, `imports.${manifest.id}`);
+      requireExported(resolved, manifest.id);
+      importedFunctions.set(`${resolved.element.key}|${resolved.fn.id}`, resolved);
+    }
   }
 
-  // ---- Route admission against the sealed graph's OWN authority ----
-  const routesRaw = snap.routes;
-  if (routesRaw.length === 0 || routesRaw.length > MAX_ITEMS) {
-    fail('BUILD_GRAPH_INVALID', `routes must be a non-empty bounded array of route rows`);
-  }
-  const routes: { intentId: string; operationId: string; capabilityId: string; handlerId: string }[] = [];
-  const routeKeys = new Set<string>();
-  for (const raw of routesRaw) {
-    if (!isObjectRecord(raw)) {
-      fail('BUILD_GRAPH_INVALID', 'each route row must be a record');
+  const selectedFunctions = new Map<string, ResolvedFunction>();
+  const addSelected = (resolved: ResolvedFunction): void => {
+    selectedFunctions.set(`${resolved.element.key}|${resolved.fn.id}`, resolved);
+  };
+  for (const { resolved } of ingressResolved) addSelected(resolved);
+  addSelected(appInit);
+  for (const resolved of importedFunctions.values()) addSelected(resolved);
+  for (const loaded of elements.values()) {
+    for (const fn of loaded.def.functions) {
+      if (isExported(loaded.owner, loaded, fn)) addSelected({ element: loaded, fn, owner: loaded.owner });
     }
-    strictFields(raw, ROUTE_FIELDS, 'route row');
-    const intentId = boundedString(raw.intentId, 'route intentId');
-    const operationId = boundedString(raw.operationId, 'route operationId');
-    const capabilityId = boundedString(raw.capabilityId, 'route capabilityId');
-    const handlerId = boundedString(raw.handlerId, 'route handlerId');
-    const intentKey = `intent:${intentId}`;
-    if (!byIntent.has(intentKey)) {
-      fail('V10_ROUTE_INVALID', `route intent ${intentId} is not sealed as a business intent of this composition; caller input cannot add intents`);
-    }
-    const capability = byCapabilityId.get(capabilityId);
-    if (capability === undefined) {
-      fail('V10_ROUTE_INVALID', `route intent ${intentId} names capability ${capabilityId} which is not sealed in this composition`);
-    }
-    const sealedOperation = capability.handlers.find((handler) => handler.operationId === operationId);
-    if (sealedOperation === undefined) {
-      fail('V10_ROUTE_INVALID', `route intent ${intentId} names operation ${operationId} which capability ${capabilityId} does not seal`);
-    }
-    if (sealedOperation.handler !== handlerId) {
-      fail('V10_ROUTE_INVALID', `route intent ${intentId} claims handler ${handlerId} but the sealed binding pins ${sealedOperation.handler} for ${operationId}`);
-    }
-    const key = `${intentId}\u0000${operationId}`;
-    if (routeKeys.has(key)) {
-      fail('V10_ROUTE_INVALID', `duplicate route for intent ${intentId} → operation ${operationId}`);
-    }
-    routeKeys.add(key);
-    routes.push({ intentId, operationId, capabilityId, handlerId });
   }
 
-  // ---- Canonical subject digest over the roster + bindings + policy ----
-  const roster = sealed.map((module) => ({
-    packageId: module.packageId,
-    role: module.role,
-    abiVersion: module.abiVersion,
-    moduleSha256: module.moduleSha256,
-    endpoint: module.endpoint,
-    dependencies: [...module.dependencies],
-    externalImports: { node: [...module.externalImports.node], npm: [...module.externalImports.npm], native: [...module.externalImports.native] },
-    provides: [...module.provides],
-    requires: [...module.requires],
-    optional: module.optional,
-    providerId: module.providerId,
-    hookExport: module.hookExport,
-    featureExport: module.featureExport,
-    capabilityId: module.capabilityId,
-    handlers: module.handlers === null ? null : module.handlers.map((handler) => ({ ...handler })),
-    externalEffect: module.externalEffect,
-  }));
-  const subjectDigest = sha256Canonical({
-    formatVersion: V10_BUILD_FORMAT,
-    appId,
-    audience,
-    buildId,
-    targetProfile: V10_TARGET_PROFILE,
-    runtimeAbi: V10_RUNTIME_ABI,
-    hostAbi: V10_HOST_ABI,
-    bundlerRevision: V10_BUNDLER_REVISION,
-    importPolicyRevision: V10_IMPORT_POLICY_REVISION,
-    hardBudget,
-    roster,
-    loadOrder: [...loadOrder],
-    skippedOptional: [...skippedOptional],
-    routes: routes.map((route) => ({ ...route })),
+  const sealedFunctions: SelectedFunction[] = [];
+  for (const resolved of [...selectedFunctions.values()].sort(compareResolvedFunction)) {
+    validateSelectedFunctionSchemas(schemas, scope, selected, resolved);
+    if (resolved.fn.effects !== 'none') {
+      throw refusal(
+        'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED',
+        `selected function '${resolved.element.def.id}.${resolved.fn.id}' declares effects '${resolved.fn.effects as EffectIntent}'; 0.11.0 implements 'none' only`,
+      );
+    }
+    const candidates: { manifest: DomainPackageManifest; binding: DomainPackageManifest['targetVariants'][number]['implementations'][number] }[] = [];
+    for (const manifest of packagesSorted) {
+      for (const variant of manifest.targetVariants) {
+        if (!isCompatibleVariantTarget(variant.target)) continue;
+        for (const binding of variant.implementations) {
+          if (
+            binding.elementId === resolved.element.def.id &&
+            binding.functionId === resolved.fn.id &&
+            binding.contractVersion === resolved.fn.contractVersion
+          ) {
+            candidates.push({ manifest, binding });
+          }
+        }
+      }
+    }
+    if (candidates.length === 0) {
+      throw refusal(
+        'DH_BUILD_IMPLEMENTATION_MISSING',
+        `selected function '${resolved.element.def.id}.${resolved.fn.id}' has no compatible node22-esm/1 implementation binding`,
+      );
+    }
+    if (candidates.length > 1) {
+      throw refusal(
+        'DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION',
+        `selected function '${resolved.element.def.id}.${resolved.fn.id}' has ${candidates.length} compatible implementation bindings`,
+      );
+    }
+    const { manifest: implementor, binding } = candidates[0]!;
+    if (binding.entry.module.packageId !== implementor.id) {
+      throw refusal(
+        'DH_BUILD_SCHEMA_INVALID',
+        `'${implementor.id}' binds function '${resolved.element.def.id}.${resolved.fn.id}' with an entry module from package '${binding.entry.module.packageId}'; a binding carries its own package's artifact`,
+      );
+    }
+    if (implementor.id !== resolved.owner.id) {
+      const ownerEntry = resolved.owner.elements.find(
+        (entry) => entry.id === resolved.element.def.id && entry.version === resolved.element.def.version,
+      );
+      if (!ownerEntry || ownerEntry.visibility !== 'public' || !isExported(resolved.owner, resolved.element, resolved.fn)) {
+        throw refusal(
+          'DH_BUILD_EXPORT_MISSING',
+          `implementation owner '${implementor.id}' binds '${resolved.element.def.id}.${resolved.fn.id}' which is not visible through the definition owner's exports`,
+        );
+      }
+    }
+    scope.verify(binding.entry.module);
+    for (const resource of binding.resources ?? []) scope.verify(resource);
+    sealedFunctions.push({
+      ref: toFunctionRef(resolved),
+      outcomes: [...resolved.fn.outcomes],
+      effects: resolved.fn.effects,
+      implementation: binding.entry,
+      resources: [...(binding.resources ?? [])],
+    });
+  }
+
+  const hookBindings: SealedHookBinding[] = [];
+  for (const owner of packagesSorted) {
+    const declared = owner.provides?.hooks ?? [];
+    for (const hook of declared) {
+      const providers: EntryRef[] = [];
+      for (const manifest of packagesSorted) {
+        for (const contribution of manifest.contributesTo) {
+          if (contribution.ownerPackageId !== owner.id || contribution.hookId !== hook.id) continue;
+          if (contribution.entry.module.packageId !== manifest.id) {
+            throw refusal(
+              'DH_BUILD_SCHEMA_INVALID',
+              `'${manifest.id}' contributes hook '${owner.id}/${hook.id}' with an entry module from package '${contribution.entry.module.packageId}'; a contribution carries its own package's artifact`,
+            );
+          }
+          scope.verify(contribution.entry.module);
+          providers.push(contribution.entry);
+        }
+      }
+      if (hook.cardinality === 'single' && providers.length > 1) {
+        throw refusal(
+          'DH_BUILD_HOOK_CARDINALITY',
+          `single hook '${owner.id}/${hook.id}' received ${providers.length} provider bindings`,
+        );
+      }
+      providers.sort(compareEntryRef);
+      hookBindings.push({
+        ownerPackageId: owner.id,
+        hookId: hook.id,
+        cardinality: hook.cardinality,
+        providers,
+      });
+    }
+  }
+  for (const manifest of packagesSorted) {
+    for (const contribution of manifest.contributesTo) {
+      const owner = selected.get(contribution.ownerPackageId);
+      const declared = owner?.provides?.hooks ?? [];
+      if (!owner || !declared.some((hook) => hook.id === contribution.hookId)) {
+        throw refusal(
+          'DH_BUILD_HOOK_TARGET_INVALID',
+          `'${manifest.id}' contributes to hook '${contribution.ownerPackageId}/${contribution.hookId}' which is not declared by the selected owner package`,
+        );
+      }
+    }
+  }
+
+  for (const manifest of packagesSorted) {
+    if ((manifest.technicalInit === undefined) !== (manifest.technicalDispose === undefined)) {
+      throw refusal(
+        'DH_BUILD_LIFECYCLE_HALF',
+        `package '${manifest.id}' declares only one of technicalInit / technicalDispose`,
+      );
+    }
+    for (const [entry, expectedExport] of [
+      [manifest.technicalInit, 'technicalInit'],
+      [manifest.technicalDispose, 'technicalDispose'],
+    ] as const) {
+      if (!entry) continue;
+      const artifactPath = input.packageArtifacts[manifest.id];
+      if (entry.module.packageId !== manifest.id || entry.module.path !== artifactPath || entry.exportName !== expectedExport) {
+        throw refusal('DH_BUILD_SCHEMA_INVALID',
+          `package '${manifest.id}' lifecycle '${expectedExport}' must use its selected package artifact and named export '${expectedExport}'`);
+      }
+      scope.verify(entry.module);
+    }
+  }
+
+  const initOrder = kahnTopologicalOrder(
+    packagesSorted.map((manifest) => manifest.id),
+    dependsOnEdges,
+  );
+  if (initOrder === null) {
+    throw refusal('DH_BUILD_PACKAGE_CYCLE', 'package dependsOn closure carries a cycle');
+  }
+  const disposeOrder = [...initOrder].reverse();
+
+  const excludedUnknownContent: string[] = [];
+  const sealedElements: SelectedElement[] = [];
+  for (const loaded of [...elements.values()].sort(compareLoadedElement)) {
+    const contentDigests: ContentDigest[] = [];
+    for (const block of loaded.def.content) {
+      if (isUnknownContentKind(block.contentKind)) {
+        if (block.required) {
+          throw refusal(
+            'DH_BUILD_SCHEMA_UNKNOWN_REQUIRED',
+            `required content block '${loaded.def.id}/${block.id}' carries unknown contentKind '${block.contentKind}'`,
+          );
+        }
+        excludedUnknownContent.push(`${loaded.def.id}/${block.id}`);
+        continue;
+      }
+      contentDigests.push(validateBlockContent(schemas, loaded, block, scope));
+    }
+    if (loaded.def.validation) scope.verify(loaded.def.validation.ref);
+    sealedElements.push({
+      ref: toElementRef(loaded),
+      ownerPackageId: loaded.owner.id,
+      visibility: loaded.visibility,
+      contentDigests,
+      contractDigests: loaded.def.functions.map((fn) => contentDigestOf(toJson(fn))),
+    });
+  }
+
+  const sealedPackages: SelectedPackage[] = [];
+  for (const manifest of packagesSorted) {
+    const artifactPath = input.packageArtifacts[manifest.id];
+    if (!artifactPath) {
+      throw refusal('DH_BUILD_RESOURCE_MISSING', `no artifact path provided for selected package '${manifest.id}'`);
+    }
+    const bytes = scope.read(manifest.id, artifactPath);
+    const digest = digestOfBytes(bytes);
+    scope.record(manifest.id, artifactPath, digest);
+    sealedPackages.push({
+      packageId: manifest.id,
+      version: manifest.version,
+      layer: manifest.layer,
+      role: manifest.role,
+      artifact: { packageId: manifest.id, path: artifactPath, digest },
+      technicalLifecycle: manifest.technicalInit !== undefined,
+      dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
+    });
+  }
+  const kdpBytes = scope.read(input.kdpArtifact.packageId, input.kdpArtifact.path);
+  const kdpDigest = digestOfBytes(kdpBytes);
+  scope.record(input.kdpArtifact.packageId, input.kdpArtifact.path, kdpDigest);
+
+  const descriptorDigest = contentDigestOf(toJson(descriptor));
+  const assemble = (): DomainAppLock => {
+    const withoutDigest = {
+      kind: 'DomainAppLock' as const,
+      schemaVersion: DH_LOCK_SCHEMA_VERSION,
+      appIdentity: { id: descriptor.id, version: descriptor.version, descriptorDigest },
+      target,
+      bootstrapKdpPin: {
+        kdpPackageId: input.kdpArtifact.packageId,
+        kdpPrimaryEntry: 'bootstrap' as const,
+        kdpPrimaryDigest: kdpDigest,
+      },
+      selectedPackages: sealedPackages,
+      selectedElements: sealedElements,
+      selectedFunctions: sealedFunctions,
+      hookBindings: [...hookBindings].sort(compareHookBinding),
+      technicalInitOrder: initOrder,
+      technicalDisposeOrder: disposeOrder,
+      businessAppInit: toFunctionRef(appInit),
+      ingress: ingressResolved
+        .map(({ entry, resolved }): SealedIngress => ({
+          id: entry.id,
+          function: toFunctionRef(resolved),
+          optional: entry.optional ?? false,
+        }))
+        .sort((a, b) => (a.id < b.id ? -1 : 1)),
+      resourceDigests: scope.toLockMap(),
+      excludedUnknownContent: [...excludedUnknownContent].sort(),
+    };
+    return {
+      ...withoutDigest,
+      closureDigest: contentDigestOf(toJson(withoutDigest)),
+    };
+  };
+  const lock = assemble();
+  const lockText = canonicalJson(toJson(lock));
+  if (canonicalJson(toJson(assemble())) !== lockText) {
+    throw refusal('DH_BUILD_LOCK_NOT_REPRODUCIBLE', 'double-build self-check produced divergent Lock bytes');
+  }
+  return { lock, lockBytes: new TextEncoder().encode(lockText) };
+}
+
+
+function validateSelectedFunctionSchemas(
+  schemas: SchemaChecker,
+  scope: ResourceScope,
+  selectedPackages: ReadonlyMap<string, DomainPackageManifest>,
+  resolved: ResolvedFunction,
+): void {
+  const functionPath = `${resolved.element.def.id}.${resolved.fn.id}`;
+  for (const channel of ['inputSchemaRef', 'outputSchemaRef'] as const) {
+    const ref = resolved.fn[channel];
+    const refPath = `${functionPath}.${channel}`;
+    if (!('inline' in ref) && !selectedPackages.has(ref.packageId)) {
+      throw refusal(
+        'DH_BUILD_SCHEMA_INVALID',
+        `runtime Function schema resource '${ref.packageId}/${ref.path}' is not in the selected package closure`,
+        refPath,
+      );
+    }
+    const inline = 'inline' in ref;
+    const schema = inline
+      ? ref.inline
+      : parseSchemaResource(scope, ref, refPath, `runtime Function '${functionPath}.${channel}'`);
+    schemas.compileFunctionSchema(schema, `${refPath}${inline ? '.inline' : ''}`);
+  }
+}
+
+function isExported(
+  owner: DomainPackageManifest,
+  element: LoadedElement,
+  fn: FunctionContract | undefined,
+): boolean {
+  const entry = owner.elements.find(
+    (candidate) => candidate.id === element.def.id && candidate.version === element.def.version,
+  );
+  if (!entry || entry.visibility !== 'public') return false;
+  return owner.exports.some((exported) => {
+    if (exported.elementId === undefined && exported.functionId === undefined) return false;
+    if (exported.elementId !== undefined && exported.elementId !== element.def.id) return false;
+    if (exported.functionId !== undefined) {
+      if (fn === undefined || exported.functionId !== fn.id) return false;
+    }
+    return true;
   });
+}
 
-  return Object.freeze({
-    formatVersion: V10_BUILD_FORMAT,
-    subjectDigest,
-    appId,
-    audience,
-    buildId,
-    targetProfile: V10_TARGET_PROFILE,
-    runtimeAbi: V10_RUNTIME_ABI,
-    hostAbi: V10_HOST_ABI,
-    bundlerRevision: V10_BUNDLER_REVISION,
-    importPolicyRevision: V10_IMPORT_POLICY_REVISION,
-    hardBudget,
-    modules: Object.freeze(sealed),
-    loadOrder: Object.freeze([...loadOrder]),
-    skippedOptional: Object.freeze([...skippedOptional]),
-    routes: Object.freeze(routes.map((route) => Object.freeze({ ...route }))),
-  });
+function toElementRef(loaded: LoadedElement): ElementRef {
+  return {
+    namespace: loaded.namespace,
+    id: loaded.def.id,
+    version: loaded.def.version,
+    digest: loaded.definitionDigest,
+  };
+}
+
+function toFunctionRef(resolved: ResolvedFunction): FunctionRef {
+  return {
+    element: toElementRef(resolved.element),
+    functionId: resolved.fn.id,
+    contractVersion: resolved.fn.contractVersion,
+  };
+}
+
+function compareLoadedElement(a: LoadedElement, b: LoadedElement): number {
+  if (a.def.id !== b.def.id) return a.def.id < b.def.id ? -1 : 1;
+  return compareSemver(a.def.version, b.def.version);
+}
+
+function compareResolvedFunction(a: ResolvedFunction, b: ResolvedFunction): number {
+  const byElement = compareLoadedElement(a.element, b.element);
+  if (byElement !== 0) return byElement;
+  return a.fn.id < b.fn.id ? -1 : a.fn.id > b.fn.id ? 1 : 0;
+}
+
+function compareEntryRef(a: EntryRef, b: EntryRef): number {
+  if (a.module.packageId !== b.module.packageId) return a.module.packageId < b.module.packageId ? -1 : 1;
+  if (a.module.path !== b.module.path) return a.module.path < b.module.path ? -1 : 1;
+  return a.exportName < b.exportName ? -1 : a.exportName > b.exportName ? 1 : 0;
+}
+
+function compareHookBinding(a: SealedHookBinding, b: SealedHookBinding): number {
+  return a.ownerPackageId < b.ownerPackageId
+    ? -1
+    : a.ownerPackageId > b.ownerPackageId
+      ? 1
+      : a.hookId < b.hookId
+        ? -1
+        : 1;
+}
+
+function validateBlockContent(
+  schemas: SchemaChecker,
+  loaded: LoadedElement,
+  block: ContentBlock,
+  scope: ResourceScope,
+): ContentDigest {
+  const blockPath = `${loaded.def.id}/${block.id}`;
+  if (!block.ref) {
+    const value = toJson(block.value);
+    validateAgainstSchema(schemas, scope, block, value, blockPath);
+    return contentDigestOf(value);
+  }
+  const bytes = scope.verify(block.ref);
+  let parsed: JsonValue;
+  try {
+    parsed = JSON.parse(Buffer.from(bytes).toString('utf8')) as JsonValue;
+  } catch {
+    if (block.contentKind !== 'document') {
+      throw refusal(
+        'DH_BUILD_SCHEMA_INVALID',
+        `content block '${blockPath}' (kind '${block.contentKind}') carries non-JSON ref bytes; only document content may be opaque`,
+        blockPath,
+      );
+    }
+    return block.ref.digest;
+  }
+  validateAgainstSchema(schemas, scope, block, parsed, blockPath);
+  return contentDigestOf(parsed);
+}
+
+function validateAgainstSchema(
+  schemas: SchemaChecker,
+  scope: ResourceScope,
+  block: ContentBlock,
+  value: JsonValue,
+  blockPath: string,
+): void {
+  const validate =
+    'inline' in block.schemaRef
+      ? schemas.compileInlineSchema(block.schemaRef.inline, `${blockPath}.schemaRef`)
+      : schemas.compileInlineSchema(
+          parseSchemaResource(scope, block.schemaRef, blockPath),
+          `${blockPath}.schemaRef`,
+        );
+  if (!validate(value)) {
+    throw refusal(
+      'DH_BUILD_SCHEMA_INVALID',
+      `content block '${blockPath}' does not pass its declared schema`,
+      blockPath,
+    );
+  }
+}
+
+function parseSchemaResource(
+  scope: ResourceScope,
+  ref: ResourceRef,
+  refPath: string,
+  subject = `content block '${refPath}'`,
+): JsonValue {
+  const bytes = scope.verify(ref);
+  try {
+    return JSON.parse(Buffer.from(bytes).toString('utf8')) as JsonValue;
+  } catch {
+    throw refusal(
+      'DH_BUILD_SCHEMA_INVALID',
+      `schema resource '${ref.packageId}/${ref.path}' for ${subject} is not JSON`,
+      refPath,
+    );
+  }
 }
