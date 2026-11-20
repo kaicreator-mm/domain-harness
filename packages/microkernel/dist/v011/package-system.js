@@ -151,9 +151,10 @@ export class PackageSystem {
                 }
                 const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
                 const technicalInit = mod['technicalInit'];
-                if (technicalInit !== undefined) {
+                // No implicit init: the exact BUILD Lock must have declared this pair.
+                if (pkg.technicalLifecycle) {
                     if (typeof technicalInit !== 'function') {
-                        throw new KdpLoadError(`package '${packageId}' export 'technicalInit' is not a function`);
+                        throw new KdpLoadError(`package '${packageId}' declared technicalInit but its artifact has no callable named export`);
                     }
                     const context = { packageId, hostPorts: this.hostPorts };
                     await technicalInit(context);
@@ -197,9 +198,9 @@ export class PackageSystem {
                 }
                 const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
                 const technicalDispose = mod['technicalDispose'];
-                if (technicalDispose !== undefined) {
+                if (pkg.technicalLifecycle) {
                     if (typeof technicalDispose !== 'function') {
-                        throw new KdpLoadError(`package '${packageId}' export 'technicalDispose' is not a function`);
+                        throw new KdpLoadError(`package '${packageId}' declared technicalDispose but its artifact has no callable named export`);
                     }
                     const context = { packageId, hostPorts: this.hostPorts };
                     await technicalDispose(context);

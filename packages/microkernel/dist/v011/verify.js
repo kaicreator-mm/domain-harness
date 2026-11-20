@@ -185,6 +185,11 @@ export async function verifyLockAgainstRecord(installRoot, record) {
         return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock closureDigest does not equal the installed record lockDigest') };
     }
     const lock = parsed;
+    if (!Array.isArray(lock.selectedPackages) || !lock.selectedPackages.every((candidate) => isRecord(candidate) &&
+        typeof candidate['technicalLifecycle'] === 'boolean' &&
+        isRecord(candidate['artifact']) && typeof candidate['packageId'] === 'string')) {
+        return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock selectedPackages lacks required lifecycle declarations or artifact entries') };
+    }
     // Structural shape checks on the fields the runtime dereferences: a
     // digest-consistent but malformed Lock must be a typed mismatch, never a
     // TypeError downstream.

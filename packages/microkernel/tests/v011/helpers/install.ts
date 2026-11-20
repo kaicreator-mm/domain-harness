@@ -504,10 +504,10 @@ export async function buildFixtureInstall(
       kdpPrimaryDigest: kdpEntryDigest,
     },
     selectedPackages: [
-      { packageId: FIXTURE_KERNEL, version: '1.0.0', layer: 'kernel', role: 'primary', artifact: kernelArtifact, dependsOn: [] },
-      { packageId: FIXTURE_SDK, version: '1.0.0', layer: 'sdk', role: 'primary', artifact: sdkArtifact, dependsOn: [FIXTURE_KERNEL] },
-      { packageId: FIXTURE_BUSINESS, version: '1.0.0', layer: 'business', role: 'primary', artifact: businessArtifact, dependsOn: [FIXTURE_SDK] },
-      { packageId: FIXTURE_EXT, version: '1.0.0', layer: 'business', role: 'extension', artifact: extArtifact, dependsOn: [FIXTURE_BUSINESS] },
+      { packageId: FIXTURE_KERNEL, version: '1.0.0', technicalLifecycle: true, layer: 'kernel', role: 'primary', artifact: kernelArtifact, dependsOn: [] },
+      { packageId: FIXTURE_SDK, version: '1.0.0', technicalLifecycle: true, layer: 'sdk', role: 'primary', artifact: sdkArtifact, dependsOn: [FIXTURE_KERNEL] },
+      { packageId: FIXTURE_BUSINESS, version: '1.0.0', technicalLifecycle: true, layer: 'business', role: 'primary', artifact: businessArtifact, dependsOn: [FIXTURE_SDK] },
+      { packageId: FIXTURE_EXT, version: '1.0.0', technicalLifecycle: true, layer: 'business', role: 'extension', artifact: extArtifact, dependsOn: [FIXTURE_BUSINESS] },
     ],
     selectedElements: [
       {

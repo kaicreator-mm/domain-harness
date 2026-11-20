@@ -443,6 +443,31 @@ test('DEGRADED with duplicate suppressedIngress ids is refused', async (t) => {
   );
 });
 
+test('R27: Lock-declared lifecycle executes only when explicitly selected and callable', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const { PackageSystem } = await import('../../src/v011/package-system.js');
+  const noLifecycle = {
+    ...fixture.lock,
+    selectedPackages: fixture.lock.selectedPackages.map((pkg) => ({ ...pkg, technicalLifecycle: false })),
+  };
+  await new PackageSystem(fixture.installRoot, noLifecycle, []).runTechnicalInit();
+  assert.equal(events().filter((e) => e['event'] === 'technical-init').length, 0,
+    'an undeclared export is never implicitly invoked');
+
+  const hookDigest = fixture.lock.resourceDigests['fixture-ext/dist/hook.mjs']!;
+  const badLifecycle = {
+    ...fixture.lock,
+    selectedPackages: fixture.lock.selectedPackages.map((pkg) => pkg.packageId === 'fixture-ext'
+      ? { ...pkg, artifact: { packageId: 'fixture-ext', path: 'dist/hook.mjs', digest: hookDigest } }
+      : pkg),
+  };
+  await assert.rejects(
+    new PackageSystem(fixture.installRoot, badLifecycle, []).runTechnicalInit(),
+    /declared technicalInit but its artifact has no callable named export/,
+  );
+});
+
 test('R27: post-initialization Business App Init failure rolls back every technical package', async (t) => {
   for (const init of [{ status: 'FAILED' as const }, { status: 'READY' as const, throw: true }]) {
     const fixture = await buildFixtureInstall({ init, functions: {} });
