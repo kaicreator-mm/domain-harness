@@ -523,6 +523,13 @@ test('T01 repair P2-3: resource path pattern matches the handwritten validator o
     ['a/../b', false],
     ['-lead/x.js', true], // leading '-' legal in both layers
     ['_lead/x.js', true],
+    ['res:x', true], // colon after the first char is legal in both layers
+    ['@x', true], // '@'/'+' and other non-separator POSIX chars are legal
+    ['+x', true],
+    ['a b/c d', true],
+    ['c:x', false], // /^[A-Za-z]:/ drive prefix refused
+    ['C:/x/y', false],
+    ['a\\b', false], // backslash refused anywhere
     ['', false],
   ];
   for (const [path, expected] of cases) {

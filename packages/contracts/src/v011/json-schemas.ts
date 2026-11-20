@@ -44,13 +44,13 @@ const IDENTIFIER_PATTERN = '^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9_])?$';
 const SEMVER_PATTERN = '^[0-9]+\\.[0-9]+\\.[0-9]+$';
 const CONTENT_DIGEST_PATTERN = '^sha256:[0-9a-f]{64}$';
 /**
- * Package-root relative POSIX path: no leading '/', no drive letter (':'
- * outside charset), no backslash, no empty segment ('//' or trailing '/'),
- * no '.'/'..' segments. A leading '_'/'-'/'.' (non-dot-segment) head char
- * stays legal — the handwritten rule only bans '/', '\\' and 'X:' at the
- * head (validate.ts isRelativeResourcePath parity).
+ * Package-root relative POSIX path — exact validate.ts isRelativeResourcePath
+ * parity, expressed segment-wise: non-empty; no backslash anywhere; no
+ * /^[A-Za-z]:/ drive prefix; every '/'-separated segment non-empty and not
+ * '.' or '..'. Anything else is legal, including ':' after the first char
+ * ('res:x'), '@', '+' and other non-separator POSIX characters.
  */
-const RESOURCE_PATH_PATTERN = '^(?!.*//)(?!.*(/)$)(?!.*(^|/)\\.{1,2}($|/))[A-Za-z0-9._-][A-Za-z0-9._\\-/]*$';
+const RESOURCE_PATH_PATTERN = '^(?!.*\\\\)(?![A-Za-z]:)(?!.*(^|/)\\.{1,2}($|/))[^/]+(?:/[^/]+)*$';
 
 // ---- Shared $defs bodies (composed into every self-contained document) ----
 
