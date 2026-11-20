@@ -117,7 +117,14 @@ export async function readTrustedRecord(installRoot: unknown): Promise<TrustResu
     return { ok: false, failure: trustFailure('DH_BOOT_RECORD_INVALID', shapeError) };
   }
   const { recordDigest, ...withoutDigest } = parsed;
-  if (contentDigestOf(withoutDigest as JsonValue) !== recordDigest) {
+  let actualDigest: string;
+  try {
+    actualDigest = contentDigestOf(withoutDigest as JsonValue);
+  } catch {
+    // 对非有限数字等不可规范化的 JSON 必须受控拒绝，不能让 Boot 异常退出。
+    return { ok: false, failure: trustFailure('DH_BOOT_RECORD_INVALID', 'installed record contains non-canonical JSON data') };
+  }
+  if (actualDigest !== recordDigest) {
     return {
       ok: false,
       failure: trustFailure('DH_BOOT_RECORD_INVALID', 'recordDigest does not match the canonical record without recordDigest'),
@@ -162,7 +169,14 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'locked Lock file has no valid closureDigest field') };
   }
   const { closureDigest, ...preimage } = parsed;
-  if (contentDigestOf(preimage as JsonValue) !== closureDigest) {
+  let actualDigest: string;
+  try {
+    actualDigest = contentDigestOf(preimage as JsonValue);
+  } catch {
+    // Lock 的规范化错误必须在加载任何 Package 前转化为固定拒绝码。
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock contains non-canonical JSON data') };
+  }
+  if (actualDigest !== closureDigest) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock closureDigest recomputation failed (one-byte tamper is refused here)') };
   }
   if (closureDigest !== record.lockDigest) {
