@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CORE_CONTENT_KINDS,
+  DomainHarnessError,
   DH_APP_SCHEMA_VERSION,
   DH_DOMAIN_SCHEMA_VERSION,
   DH_ELEMENT_SCHEMA_VERSION,
@@ -56,6 +57,18 @@ import {
 } from './function-outcome-negatives.js';
 import type { FunctionOutcome } from '@kaicreator/domain-harness-contracts';
 import Ajv2020 from 'ajv/dist/2020';
+
+
+test('当前领域错误应继承原生 Error，保留稳定名称、错误码及 cause', () => {
+  const cause = new globalThis.Error('原始原因');
+  const error = new DomainHarnessError('DH_BUILD_SCHEMA_INVALID', '领域定义无效', { cause });
+  assert.ok(error instanceof globalThis.Error);
+  assert.ok(error instanceof DomainHarnessError);
+  assert.equal(error.name, 'DomainHarnessError');
+  assert.equal(error.code, 'DH_BUILD_SCHEMA_INVALID');
+  assert.equal(error.message, '领域定义无效');
+  assert.equal(error.cause, cause);
+});
 
 test('T01: schemaVersion discriminators carry the frozen spellings (L2 §2.1)', () => {
   assert.equal(DH_DOMAIN_SCHEMA_VERSION, 'dh.domain/0.11');

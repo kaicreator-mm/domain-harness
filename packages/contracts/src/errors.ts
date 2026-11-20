@@ -1,11 +1,11 @@
-/** 当前领域契约：使用统一 Schema 和明确的类型边界，禁止运行时隐式升级。 */
+/** DomainHarness 的可分类领域错误。名称与原生 Error 区分，保留标准错误链和堆栈。 */
 import type { ErrorCode } from './error-codes.js';
 
-export class Error extends Error {
+export class DomainHarnessError extends globalThis.Error {
   readonly code: ErrorCode;
   constructor(code: ErrorCode, message: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = 'Error';
+    this.name = 'DomainHarnessError';
     this.code = code;
   }
 }
