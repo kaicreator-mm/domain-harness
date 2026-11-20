@@ -34,11 +34,14 @@ export function canonicalJson(value) {
         try {
             if (Array.isArray(input)) {
                 out.push('[');
-                input.forEach((item, index) => {
+                for (let index = 0; index < input.length; index += 1) {
+                    if (!Object.prototype.hasOwnProperty.call(input, index)) {
+                        throw new Error('v011 digest input contains a sparse array');
+                    }
                     if (index > 0)
                         out.push(',');
-                    write(item, out);
-                });
+                    write(input[index], out);
+                }
                 out.push(']');
                 return;
             }

@@ -240,6 +240,8 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
 
   function dispose(): Promise<{ readonly status: 'DISPOSED' }> {
     if (disposeFlight === null) {
+      // Close ingress synchronously before the first asynchronous teardown.
+      disposed = true;
       disposeFlight = (async () => {
         try {
           // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).

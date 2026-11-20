@@ -665,13 +665,15 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
         `package '${manifest.id}' declares only one of technicalInit / technicalDispose`,
       );
     }
-    for (const entry of [manifest.technicalInit, manifest.technicalDispose]) {
+    for (const [entry, expectedExport] of [
+      [manifest.technicalInit, 'technicalInit'],
+      [manifest.technicalDispose, 'technicalDispose'],
+    ] as const) {
       if (!entry) continue;
-      if (entry.module.packageId !== manifest.id) {
-        throw refusal(
-          'DH_BUILD_SCHEMA_INVALID',
-          `'${manifest.id}' declares a lifecycle entry from package '${entry.module.packageId}'; lifecycle entries carry their own package's artifact`,
-        );
+      const artifactPath = input.packageArtifacts[manifest.id];
+      if (entry.module.packageId !== manifest.id || entry.module.path !== artifactPath || entry.exportName !== expectedExport) {
+        throw refusal('DH_BUILD_SCHEMA_INVALID',
+          `package '${manifest.id}' lifecycle '${expectedExport}' must use its selected package artifact and named export '${expectedExport}'`);
       }
       scope.verify(entry.module);
     }

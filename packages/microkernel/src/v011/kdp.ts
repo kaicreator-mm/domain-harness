@@ -177,23 +177,17 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
 
   const packages = new PackageSystem(safeContext.installRoot, lock, safeContext.hostPorts);
 
-  // 3. Technical package load + init in the Lock's exact order.
+  // A failed startup must never strand initialized packages without an App
+  // handle. Once technical init succeeds, every later failure rolls back.
+  let initialized = false;
   try {
+    // ESM can transitively load another selected module during any import.
+    await packages.verifySelectedArtifacts();
     await packages.runTechnicalInit();
-  } catch (error) {
-    return failed((error as KdpLoadError).code ?? 'DH_KDP_PACKAGE_LOAD_FAILED', (error as Error).message);
-  }
-
-  // 4. Seal Hook bindings (import providers, freeze; no invocation channel).
-  try {
+    initialized = true;
     await packages.sealHooks();
-  } catch (error) {
-    return failed((error as KdpLoadError).code ?? 'DH_KDP_PACKAGE_LOAD_FAILED', (error as Error).message);
-  }
-
-  // 5a. Resolve the locked ingress implementations and the one businessAppInit.
-  const ingressImpls = new Map<string, { fn: NonNullable<ReturnType<PackageSystem['functionByRef']>>; impl: (input: unknown) => unknown }>();
-  try {
+    // Resolve the Lock-selected ingress implementations and Business App Init.
+    const ingressImpls = new Map<string, { fn: NonNullable<ReturnType<PackageSystem['functionByRef']>>; impl: (input: unknown) => unknown }>();
     for (const entry of lock.ingress) {
       const selected = packages.functionByRef(entry.function);
       if (selected === undefined) {
@@ -248,15 +242,15 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     try {
       rawInitResult = await initFn(initContext);
     } catch (error) {
-      return failed('DH_RUNTIME_NOT_READY', `businessAppInit threw: ${(error as Error).message}; ordinary startup failure, no retry (PRD K07)`);
+      throw new KdpLoadError(`businessAppInit threw: ${(error as Error).message}; ordinary startup failure, no retry (PRD K07)`, 'DH_RUNTIME_NOT_READY');
     }
 
     const validated = validateInitResult(rawInitResult, lock.ingress);
     if (typeof validated === 'string') {
-      return failed('DH_RUNTIME_NOT_READY', `businessAppInit result refused: ${validated}`);
+      throw new KdpLoadError(`businessAppInit result refused: ${validated}`, 'DH_RUNTIME_NOT_READY');
     }
     if (validated.status === 'FAILED') {
-      return failed('DH_RUNTIME_NOT_READY', 'businessAppInit reported status FAILED; ordinary startup failure, no ingress, no retry (PRD K07)');
+      throw new KdpLoadError('businessAppInit reported status FAILED; ordinary startup failure, no ingress, no retry (PRD K07)', 'DH_RUNTIME_NOT_READY');
     }
 
     const app = createDomainApp({
@@ -274,7 +268,15 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     appRef = app;
     return { status: 'BOOTED', app };
   } catch (error) {
+    let cleanupFailure = '';
+    if (initialized) {
+      try {
+        await packages.runTechnicalDispose();
+      } catch (cleanupError) {
+        cleanupFailure = `; cleanup also failed: ${(cleanupError as Error).message}`;
+      }
+    }
     const loadError = error as KdpLoadError;
-    return failed(loadError.code ?? 'DH_KDP_PACKAGE_LOAD_FAILED', (error as Error).message);
+    return failed(loadError.code ?? 'DH_KDP_PACKAGE_LOAD_FAILED', `${(error as Error).message}${cleanupFailure}`);
   }
 }

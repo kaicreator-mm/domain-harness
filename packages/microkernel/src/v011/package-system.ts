@@ -113,6 +113,31 @@ export class PackageSystem {
     return bytes;
   }
 
+  /**
+   * Verify EVERY selected executable entry before the first selected ESM import.
+   * Node ESM may import another selected Function module transitively before
+   * loadEntry() observes it. This preflight prevents execution of tampered
+   * selected Package, Function and Hook modules. The trusted installer still
+   * owns the on-disk installRoot and any nonselected ESM sidecars.
+   */
+  async verifySelectedArtifacts(): Promise<void> {
+    const selected = new Map<string, ResourceRef>();
+    const collect = (ref: ResourceRef): void => {
+      const key = `${ref.packageId}/${ref.path}`;
+      const previous = selected.get(key);
+      if (previous !== undefined && previous.digest !== ref.digest) {
+        throw new KdpLoadError(`inconsistent executable digests for '${key}'`, 'DH_BOOT_PIN_MISMATCH');
+      }
+      selected.set(key, ref);
+    };
+    for (const pkg of this.lock.selectedPackages) collect(pkg.artifact);
+    for (const fn of this.lock.selectedFunctions) collect(fn.implementation.module);
+    for (const hook of this.lock.hookBindings) for (const provider of hook.providers) collect(provider.module);
+    for (const [key, ref] of selected) {
+      await this.readVerifiedBytes(ref.packageId, ref.path, ref.digest, `selected executable '${key}'`);
+    }
+  }
+
   /** Load a package artifact module addressed by its sealed ResourceRef. */
   async loadArtifactModule(ref: ResourceRef, what: string): Promise<ModuleExports> {
     const absolute = resolvePackageFile(this.installRoot, ref.packageId, ref.path);

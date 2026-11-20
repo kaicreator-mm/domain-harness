@@ -10,6 +10,8 @@ export function validateJsonSubset(instance, schema) {
     // Non-finite numbers are not JSON data — refuse them outright.
     if (typeof instance === 'number' && !Number.isFinite(instance))
         return false;
+    if (Array.isArray(instance) && Array.from({ length: instance.length }, (_, i) => i).some((i) => !Object.prototype.hasOwnProperty.call(instance, i)))
+        return false;
     if (typeof schema === 'boolean')
         return schema;
     // Fail closed: anything that is not a boolean or a plain schema object
@@ -199,8 +201,13 @@ export function isPlainJsonValue(value) {
         return true;
     if (typeof value === 'number')
         return Number.isFinite(value);
-    if (Array.isArray(value))
-        return value.every(isPlainJsonValue);
+    if (Array.isArray(value)) {
+        for (let index = 0; index < value.length; index += 1) {
+            if (!Object.prototype.hasOwnProperty.call(value, index) || !isPlainJsonValue(value[index]))
+                return false;
+        }
+        return true;
+    }
     if (isPlainObject(value)) {
         const prototype = Object.getPrototypeOf(value);
         if (prototype !== Object.prototype && prototype !== null)

@@ -86,6 +86,31 @@ export class PackageSystem {
         }
         return bytes;
     }
+    /**
+     * Preflight all Lock-selected executables before ESM import follows
+     * transitive selected imports. Nonselected sidecars remain installer-owned.
+     */
+    async verifySelectedArtifacts() {
+        const selected = new Map();
+        const collect = (ref) => {
+            const key = `${ref.packageId}/${ref.path}`;
+            const previous = selected.get(key);
+            if (previous !== undefined && previous.digest !== ref.digest) {
+                throw new KdpLoadError(`inconsistent executable digests for '${key}'`, 'DH_BOOT_PIN_MISMATCH');
+            }
+            selected.set(key, ref);
+        };
+        for (const pkg of this.lock.selectedPackages)
+            collect(pkg.artifact);
+        for (const fn of this.lock.selectedFunctions)
+            collect(fn.implementation.module);
+        for (const hook of this.lock.hookBindings)
+            for (const provider of hook.providers)
+                collect(provider.module);
+        for (const [key, ref] of selected) {
+            await this.readVerifiedBytes(ref.packageId, ref.path, ref.digest, `selected executable '${key}'`);
+        }
+    }
     /** Load a package artifact module addressed by its sealed ResourceRef. */
     async loadArtifactModule(ref, what) {
         const absolute = resolvePackageFile(this.installRoot, ref.packageId, ref.path);

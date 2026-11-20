@@ -177,6 +177,8 @@ export function createDomainApp(deps) {
     }
     function dispose() {
         if (disposeFlight === null) {
+            // Close ingress before awaiting the first teardown operation.
+            disposed = true;
             disposeFlight = (async () => {
                 try {
                     // Strict reverse technical teardown; no concurrent stop/drain semantics (PRD A07).
