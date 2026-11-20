@@ -69,12 +69,13 @@ export function evaluate(input) {
 export function optionalReport() { return { kind: 'SUCCEEDED', value: 'optional-report-ok' }; }
 `;
 }
-function businessModule(withUnsupportedEffect) {
+function businessModule(withUnsupportedEffect, initThrows = false) {
   return `
 import { evaluate, initializeRule } from 'rules-package/rules';
 const events = (globalThis.__v011T05Events ??= []);
 events.push({ event: 'module-evaluated', package: 'app-business-entry' });
 export async function businessAppInit(ctx) {
+  ${initThrows ? "throw new Error('demo intentionally failed Business App Init');" : ''}
   const handle = ctx.resources.get('rules-package/content/rules.json');
   if (handle === undefined) throw new Error('selected rule resource is not sealed');
   const rule = JSON.parse(Buffer.from(await handle.read()).toString('utf8'));
@@ -113,7 +114,7 @@ async function authoring(label, rule, options = {}) {
     artifacts[id] = await write(dirs[id], 'dist/index.mjs', lifecycleModule(id));
   }
   const rulesEntry = await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule());
-  const businessEntry = await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true));
+  const businessEntry = await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true));
   await write(dirs['rules-package'], 'package.json', JSON.stringify({
     name: 'rules-package', version: '1.0.0', type: 'module', exports: { './rules': './dist/rules.mjs' },
   }));
@@ -433,6 +434,31 @@ async function main() {
   await expectBuildRefusal('unsupported-effect', { unsupportedEffect: true }, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
   await expectBuildRefusal('unsupported-target', { unsupportedTarget: true }, 'DH_BUILD_TARGET_INVALID');
 
+  // An App Init exception must not strand a half-initialized Package graph.
+  // This is a real installed consumer, not a mock of KDP's cleanup function.
+  const failedInitPrepared = await authoring('init-failure', { minOrderTotal: 50, regions: ['EU', 'US'] }, { initThrows: true });
+  try {
+    const failedInitBuild = await buildV011App(failedInitPrepared.input);
+    assert.equal(failedInitBuild.ok, true, JSON.stringify(failedInitBuild));
+    if (!failedInitBuild.ok) throw new Error('demo failed to BUILD the App Init failure fixture');
+    const failedInitInstall = await materialize('init-failure', failedInitPrepared, failedInitBuild);
+    globalThis.__v011T05Events = [];
+    const failedInit = await boot(failedInitInstall.pin, failedInitInstall.context);
+    assert.equal(failedInit.status, 'FAILED', JSON.stringify(failedInit));
+    assert.equal(failedInit.code, 'DH_RUNTIME_NOT_READY');
+    assert.equal('app' in failedInit, false, 'failed App Init must not expose any App/ingress handle');
+    const timeline = globalThis.__v011T05Events;
+    const initialized = timeline.filter((event) => event.event === 'technical-init').map((event) => event.package);
+    const disposed = timeline.filter((event) => event.event === 'technical-dispose').map((event) => event.package);
+    assert.ok(initialized.length > 0, 'failure fixture must actually initialize technical Packages');
+    assert.deepEqual(initialized, failedInitInstall.lock.technicalInitOrder);
+    assert.deepEqual(disposed, [...initialized].reverse(), 'failed App Init must roll back all technical Packages in reverse order');
+    assert.equal(timeline.some((event) => event.event === 'business-init'), false);
+    await evidence('negative.app-init-failure-rollback', { status: 'PASS', code: failedInit.code, initialized: initialized.length, disposed: disposed.length, exposedApp: false });
+  } finally {
+    await rm(failedInitPrepared.root, { recursive: true, force: true });
+  }
+
   // Every negative uses a NEW installRoot: module URLs cannot be hidden by the
   // earlier positive boot's ESM cache, so any accidental package import is visible.
   const tamperInstall = await cloneInstall(a.install);
@@ -481,6 +507,19 @@ async function main() {
   assert.equal(globalThis.__v011T05Events.length, before, 'KDP byte tamper must not load packages');
   await evidence('negative.kdp-artifact-tamper', { status: 'PASS', code: refused.code, freshInstall: true });
 
+  // A selected Business executable must be verified BEFORE any selected
+  // Package module is evaluated, including indirect ESM imports.
+  const businessTamperInstall = await cloneInstall(a.install);
+  const businessEntry = join(businessTamperInstall.installRoot, 'node_modules', 'app-business', 'dist', 'app.mjs');
+  const businessBytes = await readFile(businessEntry);
+  await writeFile(businessEntry, `${businessBytes.toString('utf8')}\n// post-install selected Business executable tamper\n`);
+  before = globalThis.__v011T05Events.length;
+  refused = await boot(businessTamperInstall.pin, businessTamperInstall.context);
+  assert.equal(refused.status, 'FAILED', JSON.stringify(refused));
+  assert.equal(refused.code, 'DH_BOOT_PIN_MISMATCH');
+  assert.equal(globalThis.__v011T05Events.length, before, 'selected executable byte tamper must fail before any selected Package evaluation');
+  await evidence('negative.selected-business-executable-tamper', { status: 'PASS', code: refused.code, freshInstall: true, loadedPackageEvents: 0 });
+
   const forgedInstall = await cloneInstall(a.install);
   before = globalThis.__v011T05Events.length;
   refused = await boot({ ...forgedInstall.pin, lockDigest: `sha256:${'0'.repeat(64)}` }, forgedInstall.context);
@@ -515,13 +554,13 @@ async function main() {
     },
     AC05: {
       status: 'PASS_E2E',
-      e2e: ['trusted installer -> Boot/KDP/init order', 'Lock byte tamper', 'missing/invalid record', 'KDP artifact tamper', 'forged pin', 'zero package load on every refusal'],
+      e2e: ['trusted installer -> Boot/KDP/init order', 'Lock byte tamper', 'missing/invalid record', 'KDP artifact tamper', 'selected Business executable tamper', 'forged pin', 'zero package load on every refusal'],
       scope: 'The acceptance script is the trusted installer per L2 §6.2.4/§8.5.3; caller-writable installRoot forgery and PKI are outside the frozen threat model.',
       upstream: [],
     },
     AC06: {
       status: 'PASS_E2E_WITH_UPSTREAM',
-      e2e: ['one App Init after all technical init', 'direct cross-package POS/NEG/UNKNOWN', 'same-code content exchange'],
+      e2e: ['one App Init after all technical init', 'direct cross-package POS/NEG/UNKNOWN', 'same-code content exchange', 'App Init exception reverse cleanup and no exposed App handle'],
       upstream: [upstream('T04', 'packages/domain-harness/tests/v011/final-integration.test.ts (required-ingress suppression and DEGRADED negatives)')],
     },
     AC07: {
