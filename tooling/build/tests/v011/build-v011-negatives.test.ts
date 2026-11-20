@@ -144,7 +144,7 @@ refusalCase('DH_BUILD_HOOK_CARDINALITY', (s) => {
 // ---------------------------------------------------------------------------
 
 refusalCase('DH_BUILD_TARGET_INVALID', (s) => {
-  s.descriptorTarget = { runtime: 'node', module: 'esm', nodeMajor: 22 };
+  s.descriptorTarget = { runtime: 'node', module: 'esm', nodeMajor: 20 };
 });
 
 refusalCase('DH_BUILD_RESOURCE_MISSING', (s) => {

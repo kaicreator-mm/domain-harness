@@ -253,12 +253,12 @@ export const UNKNOWN_OPTIONAL_EXCLUSION_FIXTURE = {
 const APP_TARGET_SELECTOR = {
   runtime: 'node',
   module: 'esm',
-  nodeMajor: 24,
+  nodeMajor: 22,
 } as const;
 
 const APP_TARGET: ResolvedTarget = {
   ...APP_TARGET_SELECTOR,
-  profile: 'node24-esm/1',
+  profile: 'node22-esm/1',
 };
 
 const EVALUATE_FUNCTION_REF: FunctionRef = {

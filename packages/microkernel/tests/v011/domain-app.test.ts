@@ -177,8 +177,8 @@ test('inspect projects Lock facts only (B06), including DEGRADED suppression', a
   assert.deepEqual(inspection.target, {
     runtime: 'node',
     module: 'esm',
-    nodeMajor: 24,
-    profile: 'node24-esm/1',
+    nodeMajor: 22,
+    profile: 'node22-esm/1',
   });
   assert.deepEqual(
     inspection.packages.map((pkg) => [pkg.packageId, pkg.layer, pkg.role]),

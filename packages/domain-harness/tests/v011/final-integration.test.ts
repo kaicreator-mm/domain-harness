@@ -96,7 +96,7 @@ test('T04-INT-1: build → boot → exactly one locked Business App Init → REA
     // Inspection is a read-only projection of Lock facts.
     const inspection = await app.inspect();
     assert.equal(inspection.appIdentity.lockDigest, lock.closureDigest);
-    assert.equal(inspection.target.profile, 'node24-esm/1');
+    assert.equal(inspection.target.profile, 'node22-esm/1');
     assert.deepEqual(inspection.suppressedIngress, []);
     assert.deepEqual(
       inspection.functions.map((fn) => fn.ref.functionId).sort(),
@@ -206,17 +206,17 @@ test('T04-INT-6: a Business App Init that suppresses a REQUIRED ingress is typed
   });
 });
 
-test('T04-INT-7: unsupported Boot target (env.nodeMajor 22) is a typed failure before selected packages load', { timeout: 120_000 }, async (t) => {
+test('T04-INT-7: unsupported Boot target (env.nodeMajor 20) is a typed failure before selected packages load', { timeout: 120_000 }, async (t) => {
   await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (install) => {
-    // BUILD emits the frozen node24-esm/1 Lock. The KDP compares the Host's
+    // BUILD emits the frozen node22-esm/1 Lock. The KDP compares the Host's
     // declared runtime probe with that Target's applicability floor before
     // loading any selected package; Boot passes through the typed failure.
-    const badContext = { ...install.context, env: { nodeMajor: 22, platform: process.platform } };
+    const badContext = { ...install.context, env: { nodeMajor: 20, platform: process.platform } };
     const result = await boot(install.pin, badContext);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status !== 'FAILED') return;
     assert.equal(result.code, 'DH_RUNTIME_UNSUPPORTED_PROFILE');
-    assert.match(result.reason, /below the Lock target floor 24/);
+    assert.match(result.reason, /below the Lock target floor 22/);
     assert.equal(
       events().some((event) => event['event'] === 'module-evaluated' || event['event'] === 'technical-init' || event['event'] === 'business-init'),
       false,
@@ -225,7 +225,7 @@ test('T04-INT-7: unsupported Boot target (env.nodeMajor 22) is a typed failure b
   });
 });
 
-test('T04-INT-8: authoring against a non-node24 Target is a typed BUILD refusal (DH_BUILD_TARGET_INVALID)', { timeout: 120_000 }, async () => {
+test('T04-INT-8: authoring against a non-node22 Target is a typed BUILD refusal (DH_BUILD_TARGET_INVALID)', { timeout: 120_000 }, async () => {
   await assert.rejects(
     buildScenarioInstall({ rule: RULE_A, init: { status: 'READY' }, withUnsupportedTarget: true }),
     (error: unknown) => {

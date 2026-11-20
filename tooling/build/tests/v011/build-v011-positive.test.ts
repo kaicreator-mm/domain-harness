@@ -4,7 +4,7 @@
  * Covers the AC02/AC03/AC04/AC07 BUILD positive rows: 0- and multi-Function
  * Elements, >=2 content kinds, inline/ref digest equivalence, cycle-legal
  * semantic relations, K/S/B primaries + extensions + typed Hook, exact
- * node24-esm/1 target selection with the wrong-Target alternative excluded,
+ * node22-esm/1 target selection with the wrong-Target alternative excluded,
  * deterministic Kahn plan with lexicographic tie-break, strict-reverse
  * dispose order, byte-identical repeated BUILD, mutation-sensitive
  * closureDigest with the exact L2 §5.3 predecessor image.
@@ -37,7 +37,7 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
   // frozen envelope
   assert.equal(lock.kind, 'DomainAppLock');
   assert.equal(lock.schemaVersion, 'dh.lock/0.11');
-  assert.deepEqual(lock.target, { runtime: 'node', module: 'esm', nodeMajor: 24, profile: 'node24-esm/1' });
+  assert.deepEqual(lock.target, { runtime: 'node', module: 'esm', nodeMajor: 22, profile: 'node22-esm/1' });
   assert.deepEqual(lock.appIdentity, {
     id: 'orders.basic',
     version: '1.0.0',
@@ -77,7 +77,7 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     ['orders.app-main.init', 'orders.eligibility.evaluate'],
   );
   const evaluate = lock.selectedFunctions.find((fn) => fn.ref.functionId === 'evaluate')!;
-  // the wrong-Target (node22) alternative must NOT enter the Lock
+  // the wrong-Target (node20) alternative must NOT enter the Lock
   assert.equal(evaluate.implementation.module.path, 'dist/evaluate.mjs');
   assert.equal(evaluate.effects, 'none');
   assert.deepEqual(

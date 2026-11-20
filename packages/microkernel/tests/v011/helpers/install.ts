@@ -42,8 +42,8 @@ export const KDP_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
 export const TARGET: ResolvedTarget = {
   runtime: 'node',
   module: 'esm',
-  nodeMajor: 24,
-  profile: 'node24-esm/1',
+  nodeMajor: 22,
+  profile: 'node22-esm/1',
 };
 export const LOCK_RELATIVE_PATH = 'dh-lock/app.lock.json';
 export const DESCRIPTOR_RELATIVE_PATH = 'descriptor/app.json';
@@ -442,7 +442,7 @@ export async function buildFixtureInstall(
     schemaVersion: 'dh.app/0.11',
     id: APP_ID,
     version: APP_VERSION,
-    target: { runtime: 'node', module: 'esm', nodeMajor: 24 },
+    target: { runtime: 'node', module: 'esm', nodeMajor: 22 },
     roots: {
       kernelPrimary: { package: FIXTURE_KERNEL, version: '1.0.0' },
       sdkPrimary: { package: FIXTURE_SDK, version: '1.0.0' },
@@ -606,7 +606,7 @@ export async function buildFixtureInstall(
     descriptorPath: DESCRIPTOR_RELATIVE_PATH,
     lockPath: LOCK_RELATIVE_PATH,
     hostPorts: [{ name: 'fixture-channel', port: 0 }],
-    env: { nodeMajor: 24, platform: process.platform },
+    env: { nodeMajor: 22, platform: process.platform },
   };
 
   const recordPath = join(installRoot, 'dh-install', 'installed-record.json');

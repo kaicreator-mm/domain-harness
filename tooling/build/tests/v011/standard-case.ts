@@ -32,7 +32,7 @@ export interface StandardRefs {
   initRef: FunctionRef;
 }
 
-const TARGET_24: TargetSelector = { runtime: 'node', module: 'esm', nodeMajor: 24 };
+const TARGET_22: TargetSelector = { runtime: 'node', module: 'esm', nodeMajor: 22 };
 
 function requireValue(value: JsonValue | undefined, key: string): JsonValue {
   if (value === undefined) throw new Error(`fixture: no extraElementFileValues for ${key}`);
@@ -208,7 +208,7 @@ export function standardCase(): StandardCase {
     businessDependsOn: [{ package: 'sdk-core', version: '1.0.0', interface: 'sdk.api' }],
     kdpDependsOn: [],
     sdkLifecycle: 'paired',
-    descriptorTarget: TARGET_24,
+    descriptorTarget: TARGET_22,
     ingress: [],
     finalize,
   };
@@ -276,12 +276,10 @@ export function standardCase(): StandardCase {
 
     // implementation modules + artifacts (real bytes)
     const evaluateModule = writeRaw(businessDir, 'dist/evaluate.mjs', new TextEncoder().encode('export function evaluate() { return { decision: "POS" }; }\n'));
-    const evaluateLegacyModule = writeRaw(businessDir, 'dist/evaluate-node22.mjs', new TextEncoder().encode('export function evaluate() { return { decision: "LEGACY" }; }\n'));
+    const evaluateLegacyModule = writeRaw(businessDir, 'dist/evaluate-node20.mjs', new TextEncoder().encode('export function evaluate() { return { decision: "LEGACY" }; }\n'));
     const initModule = writeRaw(businessDir, 'dist/init.mjs', new TextEncoder().encode('export function init() { return "ready"; }\n'));
     writeRaw(businessDir, 'dist/business.mjs', new TextEncoder().encode('export const artifact = "orders-business";\n'));
-    const sdkInit = writeRaw(sdkDir, 'dist/sdk-init.mjs', new TextEncoder().encode('export function init() {}\n'));
-    const sdkDispose = writeRaw(sdkDir, 'dist/sdk-dispose.mjs', new TextEncoder().encode('export function dispose() {}\n'));
-    writeRaw(sdkDir, 'dist/sdk.mjs', new TextEncoder().encode('export const artifact = "sdk-core";\n'));
+    const sdkArtifact = writeRaw(sdkDir, 'dist/sdk.mjs', new TextEncoder().encode('export const artifact = "sdk-core";\nexport function technicalInit() {}\nexport function technicalDispose() {}\n'));
     writeRaw(kdpDir, 'dist/kdp.mjs', new TextEncoder().encode('export const artifact = "kdp-kernel";\n'));
     const aaaArtifact = writeRaw(aaaDir, 'dist/aaa.mjs', new TextEncoder().encode('export const artifact = "aaa-ext";\n'));
     const auditModule = writeRaw(extDir, 'dist/audit.mjs', new TextEncoder().encode('export function audit() {}\n'));
@@ -320,7 +318,7 @@ export function standardCase(): StandardCase {
       exports: case_.businessExports,
       targetVariants: [
         {
-          target: TARGET_24,
+          target: TARGET_22,
           implementations: [
             {
               elementId: 'orders.eligibility',
@@ -339,7 +337,7 @@ export function standardCase(): StandardCase {
           ],
         },
         {
-          target: { runtime: 'node', module: 'esm', nodeMajor: 22 },
+          target: { runtime: 'node', module: 'esm', nodeMajor: 20 },
           implementations: [
             {
               elementId: 'orders.eligibility',
@@ -370,10 +368,10 @@ export function standardCase(): StandardCase {
       targetVariants: [],
       ...(case_.sdkLifecycle === 'paired'
         ? {
-            technicalInit: { module: sdkInit, exportName: 'init' },
-            technicalDispose: { module: sdkDispose, exportName: 'dispose' },
+            technicalInit: { module: sdkArtifact, exportName: 'technicalInit' },
+            technicalDispose: { module: sdkArtifact, exportName: 'technicalDispose' },
           }
-        : { technicalInit: { module: sdkInit, exportName: 'init' } }),
+        : { technicalInit: { module: sdkArtifact, exportName: 'technicalInit' } }),
     });
 
     const kdpManifest = manifest('kdp-kernel', '1.0.0', {
