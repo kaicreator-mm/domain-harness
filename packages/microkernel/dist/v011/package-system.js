@@ -87,8 +87,11 @@ export class PackageSystem {
         return bytes;
     }
     /**
-     * Preflight all Lock-selected executables before ESM import follows
-     * transitive selected imports. Nonselected sidecars remain installer-owned.
+     * Verify EVERY selected executable entry before the first selected ESM import.
+     * Node ESM may import another selected Function module transitively before
+     * loadEntry() observes it. This preflight prevents execution of tampered
+     * selected Package, Function and Hook modules. The trusted installer still
+     * owns the on-disk installRoot and any nonselected ESM sidecars.
      */
     async verifySelectedArtifacts() {
         const selected = new Map();

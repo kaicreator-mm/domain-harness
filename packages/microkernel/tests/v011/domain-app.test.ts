@@ -10,6 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { BootResult, DomainApp } from '@kaicreator/domain-harness-contracts/v011';
+import { normalizeOutcome } from '../../src/v011/domain-app.js';
 import {
   boot,
   buildFixtureInstall,

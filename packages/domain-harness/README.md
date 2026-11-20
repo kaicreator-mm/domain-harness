@@ -20,9 +20,29 @@ import {
 - Version 0.11.0 ships **only `dist/v011`**: the packed tarball contains the canonical v011 entry plus this README. The legacy v0.2–v0.10 executable App ABI is **not shipped** — old subpath entries (e.g. `./legacy`, `./v2`, `./v7`) stay in the exports map for workspace compatibility but resolve to files that are absent from the tarball (`ERR_MODULE_NOT_FOUND` fence).
 - 本包 0.11.0 的发行物只包含 `dist/v011` 与本文档：legacy 可执行 App ABI 不进入 tarball。exports map 中的旧子路径（如 `./legacy`、`./v2`、`./v7`）仅为 workspace 兼容保留，在发行物中不可达（行为围栏）。
 - **No 0.10.x compatibility** is provided or claimed; there is no parity verification with the old App ABI. / 不提供、也不宣称任何 0.10.x 兼容，不做旧 ABI parity 验证。
-- Requires Node.js >= 24 (single verified target `node24-esm/1`). / 需要 Node.js >= 24（唯一已验证目标 `node24-esm/1`）。
+- Requires Node.js >= 22.12 (canonical target `node22-esm/1`, also runnable on newer Node majors). / 需要 Node.js >= 22.12（标准目标 `node22-esm/1`，较新的 Node 大版本也可运行）。
 - Runtime dependencies are exactly `@kaicreator/domain-harness-contracts`, `@kaicreator/domain-harness-build` and `@kaicreator/domain-harness-microkernel`, all at the same 0.11.0 version — zero third-party runtime dependencies (legacy third-party packages stay workspace devDependencies only).
 - `@kaicreator/domain-harness-contracts` carries a scoped exception: its `.` remains the legacy **inert** type/constant face; `./v011` is the canonical 0.11 contracts entry.
+
+## Diagnostics / 日志与故障定位
+
+The core SDK returns **structured and stable** `BootResult` / `FunctionOutcome` status and error codes, rather than writing to `console` or a global log transport. The calling Host is responsible for logging events; this avoids leaking business inputs, rules, local paths or secrets by default.
+
+核心 SDK 不依赖全局日志框架或自动打印业务数据。Host 可按下述方式记录结构化结果；`code` 用于机器判断，`reason` 用于人工诊断，`lockDigest` 与 `activationId` 可由授权 Host 作为关联字段管理。不要默认记录原始输入、规则内容或凭据。
+
+```js
+const result = await boot(pin, context);
+if (result.status !== 'BOOTED') {
+  hostLogger.warn({
+    event: 'domain-harness.boot',
+    status: result.status,
+    code: result.code,
+    reason: result.reason,
+  });
+}
+```
+
+For an invoked Function, log `kind` and the selected `failure.code` or `unknownReason.code` on non-success; never treat UNKNOWN as FAILED or log the `value` payload by default. T05's external clean-install acceptance records machine-readable NDJSON events, but those are **test evidence**, not a production logging backend. A failed App Init runs reverse technical cleanup and appends any cleanup failure to its typed startup reason.
 
 ## Legacy workspace surface / Workspace 内的 legacy 面
 

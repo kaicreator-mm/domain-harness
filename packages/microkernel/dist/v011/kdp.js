@@ -145,13 +145,16 @@ export async function bootstrap(context) {
         return configResult.result;
     const config = configResult.config;
     const packages = new PackageSystem(safeContext.installRoot, lock, safeContext.hostPorts);
-    // Once initialized, every post-init failure must dispose the packages.
+    // A failed startup must never strand initialized packages without an App
+    // handle. Once technical init succeeds, every later failure rolls back.
     let initialized = false;
     try {
+        // ESM can transitively load another selected module during any import.
         await packages.verifySelectedArtifacts();
         await packages.runTechnicalInit();
         initialized = true;
         await packages.sealHooks();
+        // Resolve the Lock-selected ingress implementations and Business App Init.
         const ingressImpls = new Map();
         for (const entry of lock.ingress) {
             const selected = packages.functionByRef(entry.function);

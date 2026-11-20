@@ -12,8 +12,8 @@
 import { readFileSync, realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { refusal } from './refusal.js';
 import { isRelativeResourcePath } from '@kaicreator/domain-harness-contracts/v011';
+import { refusal } from './refusal.js';
 export function digestOfBytes(bytes) {
     return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 }

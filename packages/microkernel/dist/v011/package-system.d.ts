@@ -34,6 +34,14 @@ export declare class PackageSystem {
      * DH_BOOT_PIN_MISMATCH.
      */
     private readVerifiedBytes;
+    /**
+     * Verify EVERY selected executable entry before the first selected ESM import.
+     * Node ESM may import another selected Function module transitively before
+     * loadEntry() observes it. This preflight prevents execution of tampered
+     * selected Package, Function and Hook modules. The trusted installer still
+     * owns the on-disk installRoot and any nonselected ESM sidecars.
+     */
+    verifySelectedArtifacts(): Promise<void>;
     /** Load a package artifact module addressed by its sealed ResourceRef. */
     loadArtifactModule(ref: ResourceRef, what: string): Promise<ModuleExports>;
     /** Resolve an EntryRef to its named export; refuses default/anonymous and missing exports. */
