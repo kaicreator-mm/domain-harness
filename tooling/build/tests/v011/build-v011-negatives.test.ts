@@ -215,7 +215,7 @@ test('DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION: two compatible bindings for on
     targetVariants: unknown[];
   };
   sdk.targetVariants.push({
-    target: { runtime: 'node', module: 'esm', nodeMajor: 24 },
+    target: { runtime: 'node', module: 'esm', nodeMajor: 22 }
     implementations: [
       {
         elementId: 'orders.eligibility',

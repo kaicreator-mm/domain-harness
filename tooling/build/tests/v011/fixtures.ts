@@ -133,7 +133,7 @@ export function descriptor(options: {
     schemaVersion: DH_APP_SCHEMA_VERSION,
     id: options.id ?? 'orders.basic',
     version: '1.0.0',
-    target: options.target ?? { runtime: 'node', module: 'esm', nodeMajor: 24 },
+    target: options.target ?? { runtime: 'node', module: 'esm', nodeMajor: 22 },
     roots: options.roots,
     extensions: options.extensions ?? [],
     businessAppInit: options.businessAppInit,

@@ -51,7 +51,7 @@ export interface StandardCase {
   extraElementFileValues: Record<string, JsonValue>;
   /** `<elementId>/<contentBlockId>` -> RAW bytes written for a pending ref (opaque content) */
   extraElementRawFiles: Record<string, Uint8Array>;
-  /** extra implementation bindings appended to the business node24 variant */
+  /** extra implementation bindings appended to the business node22 variant */
   extraImplementations: DomainPackageManifest['targetVariants'][number]['implementations'];
   eligibilityVisibility: ElementVisibility;
   businessExports: DomainPackageManifest['exports'];
