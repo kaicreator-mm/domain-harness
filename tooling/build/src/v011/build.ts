@@ -737,6 +737,7 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
       layer: manifest.layer,
       role: manifest.role,
       artifact: { packageId: manifest.id, path: artifactPath, digest },
+      technicalLifecycle: manifest.technicalInit !== undefined,
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
   }

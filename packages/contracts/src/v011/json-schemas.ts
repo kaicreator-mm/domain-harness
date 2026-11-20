@@ -674,13 +674,14 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['packageId', 'version', 'layer', 'role', 'artifact', 'dependsOn'],
+          required: ['packageId', 'version', 'layer', 'role', 'artifact', 'technicalLifecycle', 'dependsOn'],
           properties: {
             packageId: { type: 'string', minLength: 1 },
             version: { type: 'string', pattern: SEMVER_PATTERN },
             layer: { enum: ['kernel', 'sdk', 'business'] },
             role: { enum: ['primary', 'extension'] },
             artifact: { $ref: '#/$defs/resourceRef' },
+            technicalLifecycle: { type: 'boolean' },
             dependsOn: { type: 'array', items: { type: 'string', minLength: 1 } },
           },
         },

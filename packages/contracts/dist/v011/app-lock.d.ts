@@ -25,6 +25,8 @@ export interface SelectedPackage {
     readonly role: PackageRole;
     /** Exact Target artifact + digest. */
     readonly artifact: ResourceRef;
+    /** True iff authoring declared a paired, digest-sealed technical lifecycle. */
+    readonly technicalLifecycle: boolean;
     /** Resolved package-id dependency edges. */
     readonly dependsOn: readonly string[];
 }

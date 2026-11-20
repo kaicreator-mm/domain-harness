@@ -524,6 +524,7 @@ function runBuild(input) {
             layer: manifest.layer,
             role: manifest.role,
             artifact: { packageId: manifest.id, path: artifactPath, digest },
+            technicalLifecycle: manifest.technicalInit !== undefined,
             dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
         });
     }

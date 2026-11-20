@@ -330,6 +330,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       version: '1.0.0',
       layer: 'kernel',
       role: 'primary',
+      technicalLifecycle: false,
       artifact: {
         packageId: 'kdp-basic',
         path: 'dist/kdp-basic.mjs',
@@ -342,6 +343,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       version: '1.0.0',
       layer: 'sdk',
       role: 'primary',
+      technicalLifecycle: false,
       artifact: {
         packageId: 'sdk-core',
         path: 'dist/sdk-core.mjs',
@@ -354,6 +356,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       version: '1.0.0',
       layer: 'business',
       role: 'primary',
+      technicalLifecycle: false,
       artifact: ORDERS_BUSINESS_ARTIFACT,
       dependsOn: ['sdk-core'],
     },
