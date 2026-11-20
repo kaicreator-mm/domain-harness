@@ -11,20 +11,22 @@ import {
   verifySdkVersionConsistency,
 } from '../../scripts/distribution/verify-sdk-version-consistency.mjs';
 
-const VERSION = '0.10.3';
+const VERSION = '0.11.0';
 const CONSUMER_DIR = 'packages/domain-harness';
 const CONTRACTS = '@kaicreator/domain-harness-contracts';
+const BUILD = '@kaicreator/domain-harness-build';
+const MICROKERNEL = '@kaicreator/domain-harness-microkernel';
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'dh-sdk-version-consistency-'));
   const lockPackages = {
-    '': { name: 'domain-harness-monorepo', version: '0.2.0' },
+    '': { name: 'domain-harness-monorepo', version: '0.11.0' },
   };
   const manifests = new Map();
   writeFileSync(join(root, 'package.json'), JSON.stringify({
     name: 'domain-harness-monorepo',
     private: true,
-    version: '0.2.0',
+    version: '0.11.0',
   }, null, 2) + '\n');
   for (const item of SDK_PACKAGES) {
     const dependencies = Object.fromEntries(item.internal.map((name) => [name, VERSION]));
@@ -44,15 +46,15 @@ function fixture() {
 
   const consumer = {
     name: '@kaicreator/domain-harness',
-    version: '0.2.0',
-    dependencies: { [CONTRACTS]: VERSION },
+    version: '0.11.0',
+    dependencies: { [BUILD]: VERSION, [CONTRACTS]: VERSION, [MICROKERNEL]: VERSION },
   };
   mkdirSync(join(root, CONSUMER_DIR), { recursive: true });
   writeFileSync(join(root, CONSUMER_DIR, 'package.json'), JSON.stringify(consumer, null, 2) + '\n');
   lockPackages[CONSUMER_DIR] = globalThis.structuredClone(consumer);
   writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
     name: 'domain-harness-monorepo',
-    version: '0.2.0',
+    version: '0.11.0',
     lockfileVersion: 3,
     requires: true,
     packages: lockPackages,
@@ -81,7 +83,7 @@ test('accepts source manifests and lockfile aligned to one stable SDK version', 
 test('rejects a prerelease residue in one public SDK manifest', () => {
   withFixture(({ root, manifests }) => {
     const manifest = manifests.get('packages/microkernel');
-    manifest.version = '0.10.2-rc.0';
+    manifest.version = '0.11.0-rc.0';
     writeFileSync(join(root, 'packages/microkernel/package.json'), JSON.stringify(manifest));
     assert.throws(() => verifySdkVersionConsistency(root, VERSION), /source manifest version/);
   });
@@ -90,18 +92,28 @@ test('rejects a prerelease residue in one public SDK manifest', () => {
 test('rejects an internal SDK dependency edge that drifts from the release version', () => {
   withFixture(({ root, manifests }) => {
     const manifest = manifests.get('packages/host-node');
-    manifest.dependencies[CONTRACTS] = '0.10.2-rc.0';
+    manifest.dependencies[CONTRACTS] = '0.11.0-rc.0';
     writeFileSync(join(root, 'packages/host-node/package.json'), JSON.stringify(manifest));
-    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 0\.10\.3/);
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 0\.11\.0/);
+  });
+});
+
+test('rejects a consumer that drifts from the frozen contracts/build/microkernel graph', () => {
+  withFixture(({ root }) => {
+    const path = join(root, CONSUMER_DIR, 'package.json');
+    const consumer = JSON.parse(readFileSync(path, 'utf8'));
+    delete consumer.dependencies[MICROKERNEL];
+    writeFileSync(path, JSON.stringify(consumer));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /frozen 0\.11\.0 graph/);
   });
 });
 
 test('rejects a lockfile that disagrees with the source workspace manifest', () => {
   withFixture(({ root, lockPackages }) => {
-    lockPackages['packages/host-node'].version = '0.10.2-rc.0';
+    lockPackages['packages/host-node'].version = '0.11.0-rc.0';
     writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
       name: 'domain-harness-monorepo',
-      version: '0.2.0',
+      version: '0.11.0',
       lockfileVersion: 3,
       requires: true,
       packages: lockPackages,
@@ -112,7 +124,7 @@ test('rejects a lockfile that disagrees with the source workspace manifest', () 
 
 test('rejects prerelease or malformed expected release versions', () => {
   withFixture(({ root }) => {
-    assert.throws(() => verifySdkVersionConsistency(root, '0.10.3-rc.0'), /stable x\.y\.z/);
+    assert.throws(() => verifySdkVersionConsistency(root, '0.11.0-rc.0'), /stable x\.y\.z/);
   });
 });
 
@@ -121,7 +133,7 @@ test('rejects a root monorepo product version change', () => {
     writeFileSync(join(root, 'package.json'), JSON.stringify({
       name: 'domain-harness-monorepo',
       private: true,
-      version: '0.2.1',
+      version: '0.11.1',
     }));
     assert.throws(() => verifySdkVersionConsistency(root, VERSION), /root monorepo product version/);
   });
@@ -131,18 +143,18 @@ test('rejects a consumer product version change', () => {
   withFixture(({ root }) => {
     const path = join(root, CONSUMER_DIR, 'package.json');
     const consumer = JSON.parse(readFileSync(path, 'utf8'));
-    consumer.version = '0.2.1';
+    consumer.version = '0.11.1';
     writeFileSync(path, JSON.stringify(consumer));
-    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /product version must remain 0\.2\.0/);
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /product version must remain 0\.11\.0/);
   });
 });
 
 test('rejects a root lockfile product version drift', () => {
   withFixture(({ root, lockPackages }) => {
-    lockPackages[''].version = '0.2.1';
+    lockPackages[''].version = '0.11.1';
     writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
       name: 'domain-harness-monorepo',
-      version: '0.2.0',
+      version: '0.11.0',
       lockfileVersion: 3,
       requires: true,
       packages: lockPackages,
@@ -185,7 +197,7 @@ test('rejects a root lock workspace name that drifts from package.json', () => {
     lockPackages[''].name = 'wrong-root-name';
     writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
       name: 'domain-harness-monorepo',
-      version: '0.2.0',
+      version: '0.11.0',
       lockfileVersion: 3,
       requires: true,
       packages: lockPackages,
@@ -199,7 +211,7 @@ test('rejects a consumer lock workspace name that drifts from package.json', () 
     lockPackages[CONSUMER_DIR].name = 'wrong-consumer-name';
     writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
       name: 'domain-harness-monorepo',
-      version: '0.2.0',
+      version: '0.11.0',
       lockfileVersion: 3,
       requires: true,
       packages: lockPackages,

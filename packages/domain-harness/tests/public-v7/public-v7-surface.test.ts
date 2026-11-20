@@ -299,13 +299,16 @@ test('T001E: the two v0.7 digest domain tags are pairwise-distinct frozen versio
 // Pack test 7: additive-only exports diff guard.
 // ---------------------------------------------------------------------------
 
-test('T001E: package.json exports diff is exactly the additive ./v7 keys; version stays 0.2.0', () => {
+test('T001E: package.json exports diff is exactly the additive ./v7 keys; version stays 0.11.0', () => {
   const packageJsonPath = fileURLToPath(new URL('../../package.json', import.meta.url));
   const parsed = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
     version: string;
     exports: Record<string, Record<string, string>>;
   };
-  assert.equal(parsed.version, '0.2.0');
+  // v0.11.0 T04 M-bump (#1578, L2 §8.6): the consumer manifest version is
+  // mechanically aligned to the 0.11.0 release; the legacy export map stays
+  // untouched until the T04 final wiring flips `./` to v011.
+  assert.equal(parsed.version, '0.11.0');
   // T001E added './v7'; T012-D1 bounded repair (gate #930, adjudication
   // #537@6052473158) added exactly one further additive key './v7/execution'
   // with types/import/require — no legacy target modified, none reordered.

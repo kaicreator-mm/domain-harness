@@ -1,6 +1,6 @@
 {
   "name": "@kaicreator/domain-harness",
-  "version": "0.2.0",
+  "version": "0.11.0",
   "description": "Portable DomainHarness Runtime Core and Contract SDK",
   "type": "module",
   "main": "./dist/index.js",
@@ -75,13 +75,15 @@
     "test": "npm run build && npm run build:legacy-test && node --import tsx --test \"tests/**/*.test.ts\" && tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
-    "@kaicreator/domain-harness-contracts": "0.10.3",
-    "ajv": "^8.17.1",
-    "json-schema-library": "11.6.2",
-    "xstate": "^5.26.0"
+    "@kaicreator/domain-harness-build": "0.11.0",
+    "@kaicreator/domain-harness-contracts": "0.11.0",
+    "@kaicreator/domain-harness-microkernel": "0.11.0"
   },
   "devDependencies": {
+    "ajv": "^8.17.1",
+    "json-schema-library": "11.6.2",
     "jsonata": "^2.2.2",
+    "xstate": "^5.26.0",
     "yaml": "^2.0.0",
     "zod": "^4.0.0"
   },
