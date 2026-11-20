@@ -193,6 +193,9 @@ export class PackageSystem {
           const pkg = this.packageById(packageId);
           if (pkg === undefined) continue;
           const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
+          // Roll back only a lifecycle explicitly admitted by the sealed Lock.
+          // A non-lifecycle package may coincidentally export this name.
+          if (!pkg.technicalLifecycle) continue;
           const technicalDispose = mod['technicalDispose'];
           if (typeof technicalDispose === 'function') {
             const context: TechnicalLifecycleContext = { packageId, hostPorts: this.hostPorts };

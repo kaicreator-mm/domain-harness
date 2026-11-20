@@ -492,6 +492,27 @@ test('R27: a tampered selected Hook module is refused before any selected packag
     'selected module integrity must be checked before first technical init');
 });
 
+test('R31: rollback never invokes an undeclared technicalDispose export', async (t) => {
+  const fixture = await buildFixtureInstall({
+    init: { status: 'READY' },
+    functions: {},
+    sdkInitThrow: true,
+  });
+  t.after(async () => fixture.cleanup());
+  const { PackageSystem } = await import('../../src/v011/package-system.js');
+  const narrowedLock = {
+    ...fixture.lock,
+    selectedPackages: fixture.lock.selectedPackages.map((pkg) =>
+      pkg.packageId === 'fixture-kernel' ? { ...pkg, technicalLifecycle: false } : pkg),
+  };
+  const packages = new PackageSystem(fixture.installRoot, narrowedLock, []);
+  await assert.rejects(packages.runTechnicalInit(), /fixture sdk technicalInit threw/);
+  const kernelDisposes = events().filter((event) =>
+    event['event'] === 'technical-dispose' && event['package'] === 'fixture-kernel');
+  assert.equal(kernelDisposes.length, 0,
+    'rollback must not execute technicalDispose for a package whose Lock lifecycle is false');
+});
+
 test('technicalInit failure: already-initialized packages are torn down in strict reverse order', async (t) => {
   const fixture = await buildFixtureInstall({
     init: { status: 'READY' },
