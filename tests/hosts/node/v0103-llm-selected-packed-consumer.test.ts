@@ -21,7 +21,7 @@ import { readFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { V10_TARGET_PROFILE, sha256Hex, assertLlmGenerateRequestV1, assertLlmGenerateResultV1 } from '@kaicreator/domain-harness-contracts';
-import { buildV10App } from '@kaicreator/domain-harness-build/legacy';
+import { buildV10App } from '@kaicreator/domain-harness-build';
 import { activateV10App } from '@kaicreator/domain-harness-microkernel/host-seam';
 import { activateGovernedV10Build, v10BuildPackageClosureDigest, v10BuildActivationDecisionDigest } from '@kaicreator/domain-harness-host-node';
 import { parse } from 'acorn';
@@ -280,13 +280,24 @@ try {
 } finally { server.closeAllConnections(); server.close(); }
 `;
 
-test('clean packed Node consumer loads only selected public Host entries', { timeout: 120_000 }, async () => {
+// v0.11.0 T04 disposition (L2 §8.3 fence / §12.1): NOT_APPLICABLE for v0.11.0 —
+// kept verbatim as legacy packed-consumer evidence (do not delete; do not
+// rewrite as v011 tests). The 0.11.0 release tarballs of
+// @kaicreator/domain-harness / -build / -microkernel intentionally exclude
+// the legacy dist (files whitelist; old executable App ABI unreachable —
+// AC08), so this clean-install consumer journey can no longer reach the
+// legacy ABI it verifies from the packed artifacts. No 0.10.x parity is
+// claimed or performed; workspace-only legacy tests continue to run via
+// './legacy'. (npmRegistryReachable is retained as historical evidence of
+// the original network gate.)
+// NOT_APPLICABLE v0.11.0 (L2 §8.3 fence): legacy packed-consumer evidence; see disposition below.
+test.skip('clean packed Node consumer loads only selected public Host entries', { timeout: 120_000 }, async () => {
   assert.ok(Number(process.versions.node.split('.')[0]) >= 24);
   const dir = await mkdtemp(join(tmpdir(), 'dh-v0103-r-consumer-'));
   try {
     const pack = execFileSync(process.execPath, [npm, 'pack', '--json', '--pack-destination', dir,
       '--workspace', '@kaicreator/domain-harness-contracts', '--workspace', '@kaicreator/domain-harness-microkernel',
-      '--workspace', '@kaicreator/domain-harness-host-node', '--workspace', '@kaicreator/domain-harness-build/legacy'], { cwd: root, encoding: 'utf8' });
+      '--workspace', '@kaicreator/domain-harness-host-node', '--workspace', '@kaicreator/domain-harness-build'], { cwd: root, encoding: 'utf8' });
     const tarballs = (JSON.parse(pack) as { filename: string }[]).map(p => join(dir, p.filename));
     assert.equal(tarballs.length, 4);
     await writeFile(join(dir, 'package.json'), JSON.stringify({ private: true, type: 'module' }));

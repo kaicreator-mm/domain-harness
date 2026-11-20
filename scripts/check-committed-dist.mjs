@@ -19,11 +19,11 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const neverCommittedDist = new Set([
   '@kaicreator/domain-harness-node',
   '@kaicreator/domain-harness-expo',
-  // v0.11.0 T04 final wiring (L2 §8.3): the root SDK package becomes
-  // publishable (private removed) but its dist stays UNCOMMITTED — the L2
-  // ruling explicitly keeps the root build chain's "dist 不入库" semantics;
-  // only the pack `files` whitelist changed. Guarding it here would demand a
-  // tracked dist tree the frozen architecture does not want.
+  // v0.11.0 T04 final wiring: the root SDK ships via npm pack with a
+  // `prepack: npm run build` guarantee (dist/v011 is rebuilt at pack time,
+  // so the packed artifact always matches the committed sources). Its dist
+  // tree stays UNTRACKED (generated), so the present/tracked/fresh guard
+  // cannot apply; the pack-time rebuild is the freshness enforcement.
   '@kaicreator/domain-harness',
 ]);
 

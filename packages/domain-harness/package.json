@@ -74,6 +74,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs",
+    "prepack": "npm run build",
     "build:legacy-test": "tsc -p tsconfig.legacy-test.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && npm run build:legacy-test && node --import tsx --test \"tests/**/*.test.ts\" && tsc -p tsconfig.test.json --noEmit"
