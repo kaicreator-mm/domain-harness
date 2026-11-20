@@ -114,8 +114,8 @@ async function authoring(label, rule, options = {}) {
   for (const id of Object.keys(dirs)) {
     artifacts[id] = await write(dirs[id], 'dist/index.mjs', lifecycleModule(id));
   }
-  const rulesEntry = await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule());
-  const businessEntry = await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
+  await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule());
+  await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
   await write(dirs['rules-package'], 'package.json', JSON.stringify({
     name: 'rules-package', version: '1.0.0', type: 'module', exports: { './rules': './dist/rules.mjs' },
   }));
@@ -163,7 +163,7 @@ async function authoring(label, rule, options = {}) {
     knowledge.dependencies = [{ element: 'basic.app', version: '1.0.0' }];
   }
   if (options.inlineRule === true) {
-    rules.content[0].value = structuredClone(rule);
+    rules.content[0].value = globalThis.structuredClone(rule);
     delete rules.content[0].ref;
   }
   if (options.missingRuleRef === true) {
@@ -361,7 +361,7 @@ async function runPositive(label, rule, expectedAtHundred) {
     assert.equal(contentDigestOf(rule), prepared.ruleRef.digest);
     assert.equal(validateDomainDefinition({ ...domain, schemaVersion: 'invalid' }).ok, false);
     assert.equal(validateDomainDefinition({ ...domain, elements: [prepared.domainElements[0], prepared.domainElements[0]] }).issues[0].code, 'DH_BUILD_ELEMENT_ID_INVALID');
-    const unknown = structuredClone(prepared.domainElements[0]);
+    const unknown = globalThis.structuredClone(prepared.domainElements[0]);
     unknown.content[0].contentKind = 'unknown-required-kind';
     assert.equal(validateElementDefinition(unknown).issues.some((issue) => issue.code === 'DH_BUILD_SCHEMA_UNKNOWN_REQUIRED'), true);
     await evidence(`${label}.domain-and-content`, { status: 'PASS', zeroFunction: true, twoFunction: true, semanticCycle: true, unknownRequiredRefused: true });
@@ -453,8 +453,8 @@ async function main() {
   assert.ok(sdkEntry.startsWith(join(consumerRoot, 'node_modules') + (process.platform === 'win32' ? '\\' : '/')), `SDK escaped external root: ${sdkEntry}`);
   await evidence('consumer.external-root', { status: 'PASS', sdkEntry });
   for (const specifier of ['@kaicreator/domain-harness/v7', '@kaicreator/domain-harness/legacy', '@kaicreator/domain-harness-microkernel/legacy']) {
-    await assert.rejects(import(specifier), (error) => error?.code === 'ERR_MODULE_NOT_FOUND', `${specifier} must be unreachable`);
-    await evidence('negative.legacy-import', { status: 'PASS', specifier, code: 'ERR_MODULE_NOT_FOUND' });
+    await assert.rejects(import(specifier), (error) => error?.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED', `${specifier} must be unreachable`);
+    await evidence('negative.legacy-import', { status: 'PASS', specifier, code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
   }
   const contracts = await import('@kaicreator/domain-harness-contracts');
   assert.equal(typeof contracts.contentDigestOf, 'function');

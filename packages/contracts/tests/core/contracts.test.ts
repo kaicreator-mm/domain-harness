@@ -55,8 +55,8 @@ import {
   OUTCOME_NEGATIVE_SUCCEEDED_WITH_FAILURE,
   OUTCOME_NEGATIVE_UNKNOWN_MISSING_REASON,
 } from './function-outcome-negatives.js';
-import type { FunctionOutcome } from '@kaicreator/domain-harness-contracts';
-import Ajv2020 from 'ajv/dist/2020';
+import type { FunctionOutcome, JsonValue } from '@kaicreator/domain-harness-contracts';
+import Ajv2020 from 'ajv/dist/2020.js';
 
 
 test('当前领域错误应继承原生 Error，保留稳定名称、错误码及 cause', () => {
@@ -233,9 +233,10 @@ test('T01: static negatives are real runtime values with the expected broken sha
 test('T01: fixtures round-trip through canonical JSON with stable digests', () => {
   for (const fixture of [KNOWLEDGE_ELEMENT_FIXTURE, ELIGIBILITY_ELEMENT_FIXTURE, ORDERS_DOMAIN_FIXTURE]) {
     const encoded = canonicalJson(fixture);
-    const decoded = JSON.parse(encoded) as unknown;
+    const decoded = JSON.parse(encoded) as JsonValue;
     assert.equal(canonicalJson(decoded), encoded, 'parse → canonicalize is a fixpoint');
-    const clone = structuredClone(fixture) as unknown;
+    // 已知合法的 JSON Fixture 经结构化复制后，摘要仍应与往返序列化结果一致。
+    const clone = structuredClone(fixture) as unknown as JsonValue;
     assert.equal(contentDigestOf(decoded), contentDigestOf(clone), 'digest survives the round-trip');
   }
 });
@@ -273,17 +274,8 @@ test('T01: every exported JSON Schema document carries $schema/$id and compiles 
     'app-lock',
   ];
   assert.deepEqual(Object.keys(JSON_SCHEMAS).sort(), [...expectedDocs].sort());
-  const registry: Record<string, object> = {
-    'domain': DOMAIN_DEFINITION_JSON_SCHEMA as Record<string, object>,
-    'element': ELEMENT_DEFINITION_JSON_SCHEMA as Record<string, object>,
-    'content-block': CONTENT_BLOCK_JSON_SCHEMA as Record<string, object>,
-    'function-contract': FUNCTION_CONTRACT_JSON_SCHEMA as Record<string, object>,
-    'element-ref': ELEMENT_REF_JSON_SCHEMA as Record<string, object>,
-    'function-ref': FUNCTION_REF_JSON_SCHEMA as Record<string, object>,
-    'package-manifest': DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA as Record<string, object>,
-    'app-descriptor': DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA as Record<string, object>,
-    'app-lock': DOMAIN_APP_LOCK_JSON_SCHEMA as Record<string, object>,
-  };
+  // 直接使用契约包导出的 Schema 注册表，保留每份文档的 JSON 类型。
+  const registry = JSON_SCHEMAS;
   for (const [name, doc] of Object.entries(registry)) {
     assert.equal(doc.$schema, JSON_SCHEMA_DIALECT, `${name} dialect`);
     assert.equal(doc.$id, `${SCHEMA_BASE_ID}/${name}.json`, `${name} $id`);

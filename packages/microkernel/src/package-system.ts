@@ -150,6 +150,7 @@ export class PackageSystem {
             await (technicalDispose as (ctx: TechnicalLifecycleContext) => unknown)(context);
           }
         } catch {
+          // 回滚仅尽力清理，保留最先发生的初始化失败，避免后续清理异常覆盖根因。
         }
       }
       throw error;

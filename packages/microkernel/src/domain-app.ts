@@ -171,8 +171,8 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     return outcome;
   }
 
-  async function inspect(): Promise<DomainAppInspection> {
-    return {
+  function inspect(): Promise<DomainAppInspection> {
+    return Promise.resolve<DomainAppInspection>({
       appIdentity: {
         id: lock.appIdentity.id,
         version: lock.appIdentity.version,
@@ -197,7 +197,7 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
       })),
       ingress: lock.ingress.map((entry) => ({ id: entry.id, optional: entry.optional })),
       suppressedIngress: status === 'DEGRADED' ? [...suppressed].sort() : [],
-    };
+    });
   }
 
   function dispose(): Promise<{ readonly status: 'DISPOSED' }> {
