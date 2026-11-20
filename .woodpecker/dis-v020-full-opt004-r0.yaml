@@ -1,0 +1,38 @@
+# O4 R211 OPT-004 server promotion lifecycle Native (full-opt004-r0).
+# In-process server semantics only: authorized promotion -> new AOT package
+# manifest version -> future activation explicitly separated (never performed
+# here). No real Server, Domain/Forge, governance authority, AOT build,
+# activation, upload or business Effect.
+when:
+  - event: pull_request
+  - event: manual
+labels:
+  backend: local
+skip_clone: true
+steps:
+  - name: clone-retry
+    image: bash
+    commands:
+      - git init --object-format sha1
+      - git config --global --replace-all safe.directory "$CI_WORKSPACE"
+      - git remote add origin "$CI_REPO_CLONE_URL"
+      - |
+        n=0
+        while true; do
+          if git fetch --no-tags --depth=1 --filter=tree:0 origin "+$CI_COMMIT_SHA" && git reset --hard -q "$CI_COMMIT_SHA"; then break; fi
+          n=$((n+1))
+          if [ "$n" -ge 5 ]; then echo "clone failed after $n attempts"; exit 1; fi
+          echo "clone attempt $n failed (transient egress), retrying"
+          sleep 10
+        done
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+
+  - name: o4-server-promotion-lifecycle-native
+    image: bash
+    commands:
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+      - node --version
+      - node -e "if(Number(process.versions.node.split('.')[0])<24)process.exit(1)"
+      - node --check examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.mjs
+      - node --check examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.test.mjs
+      - node --test examples/dis-v020-native-sdk/full-opt004-r0/o4-server-promotion-lifecycle.test.mjs

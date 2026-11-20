@@ -1,0 +1,101 @@
+{
+  "outputLabel": "DIE_DKE2_R213_OWNER_TIER_PROVISIONING_RUN",
+  "tier": "OWNER_ATTESTED_ORIGINAL_RESEARCH_ADMISSION",
+  "grant": {
+    "issue": "kaicreator-mm/domain-intelligence-engineering#155",
+    "commentId": 7016171014,
+    "recordedAtIso": "2026-11-19T17:04:36Z",
+    "grantScopeSha256": "c814f4246f9b4163cb5ef34107666669c2ea9af4ae591f9ee2435a21cf5943f2"
+  },
+  "evidenceVerification": {
+    "committed": {
+      "verifiedAtKind": "COMMITTED_FIXTURE_BYTE_EXACT",
+      "graph": {
+        "gitBlob": "a49ddf58a0c4a5b25ebdd4018c8234f64e6365e0",
+        "sha256": "cf734019aa28b09a9f7b6dab2020202ab614cd590728f965b10dc964cef97a6e",
+        "nodes": 815,
+        "knowledgeClaims": 106,
+        "claimsPendingReview": 106,
+        "reviewDecisions": 0
+      },
+      "selectedClaim": {
+        "id": "se:CLM-TVV-0001",
+        "lifecycle": "PENDING_REVIEW",
+        "supportedBy": "se:EVD-TVV-0003"
+      },
+      "twoLegBinding": {
+        "bindingId": "se:SCB-CS2023-VV-R1",
+        "sectionLeg": {
+          "locator": "se:LOC-CS2023-SE-VALIDATION-KU",
+          "printedPage": 246,
+          "evidence": "se:EVD-TVV-0003"
+        },
+        "outcomeLeg": {
+          "locator": "se:LOC-CS2023-SE-VALIDATION-LO2",
+          "printedPage": 248,
+          "evidence": "se:EVD-TVV-0016",
+          "claimSupport": "se:REL-TVV-0024",
+          "lifecycle": "PENDING_REVIEW"
+        },
+        "invariants": {
+          "distinctLocators": true,
+          "distinctPdfPages": true,
+          "claimLifecycleEffect": "NONE_ORIGINAL_AND_CANDIDATE_CLAIM_REMAIN_PENDING"
+        }
+      },
+      "forgeRepin": {
+        "gitBlob": "63d671aa270df0eff649cd34a5f6258f4c9cbc21",
+        "sha256": "6909dbe94658ff95d9dac5f954f94c38c9de6ec5fc0cdd2edd6e3dade4833bf3",
+        "state": "PREPARED_UNQUALIFIED",
+        "evidenceTier": "PUBLIC_SOURCE_BACKED_CANDIDATE_NOT_PROFESSIONAL_ORACLE",
+        "retainedBaseGitBlob": "bb25c02952b39637aeac6f25d4d030dfb6fae28b"
+      },
+      "reader": {
+        "gitBlob": "234997708b5520d7f9ce5997eb7ad6ff963a5e68",
+        "sha256": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632"
+      }
+    },
+    "extraEvidencePins": [
+      {
+        "gitBlob": "f93190035f33516afd374b756897e0ce01fa29cb",
+        "sha256": "db7f5179cab74e80ef71f5c6fc6baa55ee56d58a56a2a73f91f21516f3f74b4d",
+        "description": "Tally R180 AI-only cross-family review ledger",
+        "verifiedFrom": "LOCAL_MIRROR_MATERIALIZED_BYTES"
+      },
+      {
+        "gitBlob": "96e9f42cf30e0ba41938f0450bcbbedc3abb9320",
+        "sha256": "5453b4b2acaa4aff5c2e59bfcfe39f7971f5be51f1f4eadb9e7c944717a36455",
+        "description": "DIE R151 merged source record",
+        "verifiedFrom": "LOCAL_MIRROR_MATERIALIZED_BYTES"
+      },
+      {
+        "gitBlob": "bb25c02952b39637aeac6f25d4d030dfb6fae28b",
+        "sha256": "8f6929d3c8aa9cf30c72d1b7fc7c39aa5bba739d67672a34d5adc3c09d875956",
+        "description": "Forge R123 REQ/VV source-backed SAP prep (retained base)",
+        "verifiedFrom": "LOCAL_MIRROR_MATERIALIZED_BYTES"
+      },
+      {
+        "gitBlob": "801cec8b28524958429be1e47091271ec6c764fc",
+        "sha256": "a1efafed5e55193cccc5e2f20c4636051605ae607103a1c41809b968cc49b8bb",
+        "description": "DIE R199 durable native-closeout receipt (commit 00f7612d6a468d8968f4e4b87f3c9ae421cecdaa)",
+        "verifiedFrom": "LOCAL_MIRROR_MATERIALIZED_BYTES"
+      }
+    ]
+  },
+  "bindings": {
+    "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+    "sdkDigest": "71ca4c1316fd6158337d87c3a7930e2354122f0306ca557f2b87f9f73d5f3d22",
+    "ruleDigest": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632",
+    "installedBytesDigest": "d5822caf929fbc4c066f719b8a0327ddb0f0858973a686e923533f11c39ab980",
+    "sourceGitBlob": "234997708b5520d7f9ce5997eb7ad6ff963a5e68"
+  },
+  "admission": {
+    "status": "OBSERVED_SCOPED_CANDIDATE",
+    "reason": "ADMITTED_OBSERVATION_ONLY",
+    "hostReceiptSha256": "68d439eb7af56a996028cdfe79066a147d8a1d04b4f99aca1ff631e5006fa9bd"
+  },
+  "nodeVersion": "v24.21.0",
+  "ranAtIso": "2026-11-19T17:18:08.325Z",
+  "keyCustody": "PRIVATE_KEYS_OUTSIDE_REPO",
+  "honesty": "SINGLE_OWNER_ECOSYSTEM structural independence only; owner-tier research admission; NOT professional/publisher/formal qualification; FORMAL_ORIGINAL_E2E stays 0/1."
+}

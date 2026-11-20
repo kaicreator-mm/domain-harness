@@ -1,0 +1,60 @@
+{
+  "schema": "dis.v020.core016-governance-dependency.red-green/1",
+  "date": "2026-11-11",
+  "authority": {
+    "masterIssue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+    "pr": "https://github.com/kaicreator-mm/domain-harness/pull/1497",
+    "product": "https://github.com/kaicreator-mm/domain-harness/issues/1496"
+  },
+  "red": {
+    "originalValidatorCodeGitBlob": "406578d36518e4c77f299df764b29f4ffc5c6406",
+    "originalMatrixGitBlob": "b6b1468fbba76bf8a7c4ae8189483d8b5363856f",
+    "originalExactHead": "a406927e9408424a09776e3896c1aa7ed1d0e9ef",
+    "source": "docs/standards/domain-intelligence/DIS-0.2.0/conformance/experiments/R91_CORE016_GOV_DEPENDENCY_RED.json",
+    "findings": [
+      "CORE016 VERIFIED with all 15 other Core NOT_RUN accepted by old genuine validator",
+      "GOV001 VERIFIED with all 16 Core NOT_RUN accepted by old genuine validator"
+    ],
+    "risk": "MATRIX_PREMATURE_VERSION_AND_GOV_COMPLETION_ACCEPTANCE",
+    "technique": "Constructed 21-ID actual-shaped matrix with controlled in-memory test source/receipt stubs, not real native CI"
+  },
+  "green": {
+    "patchSourceCommit": "03d593c82e4bef4fe7c53f2b869e5e7eb22c39ee",
+    "patchValidatorGitBlob": "b7b378224f43beeeee91b8d0fe26d643334a39f0",
+    "testsSourceCommit": "00e02600bf8bcb678325a1ac3c69d4b318df2685",
+    "patchTestGitBlob": "0e9bbf96cf6a4f4f769c98fc051a1e034354a9dd",
+    "assertionCases": 8,
+    "passed": 8,
+    "failed": 0,
+    "declaredExecutableRegressionNames": 4,
+    "actualOldBypassBlocked": 2,
+    "conformsCurrentMatrix": true,
+    "allowsFuture16of16": true,
+    "outOfScopeStillRequiresExistingProductDecisionUrl": true,
+    "newPreconditions": [
+      "CORE016 VERIFIED requires each CORE001..CORE015 VERIFIED or explicitly OUT_OF_SCOPE",
+      "GOV001 VERIFIED requires CORE016 VERIFIED"
+    ],
+    "execution": "CONNECTED_HOSTED_V8_ACTUAL_GITHUB_READBACK_VALIDATOR_WITH_CONTROLLED_IO_STUB_NOT_NATIVE_NODE"
+  },
+  "qualification": {
+    "coreVerified": 12,
+    "corePartial": 4,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1,
+    "dkeR8": "0/53",
+    "sap": 0,
+    "effects": 0,
+    "productC3Pending": true,
+    "formalCellNotPromoted": true,
+    "release": false,
+    "merge": false,
+    "freeze": false
+  },
+  "limitations": [
+    "This closes only completion ORDER guard and does not create semantic Owner/Oracle qualification for CORE002/CORE005 or Product acceptance for CORE008",
+    "Existing per-row positive/negative/test/CI receipts still require full native checker and current CI success after main PR commit",
+    "Optional profile applicability and Governance L1/L2 freeze remain their separately governed gates",
+    "Malformed native test parse check in Hosted V8 import-stripping also fails on unchanged pre-existing original test, so not claimed as successful or newly introduced. New 4 test declaration names were directly found by current source parser, while Node execution remains pending"
+  ]
+}

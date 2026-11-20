@@ -1,0 +1,31 @@
+{
+  "schema": "dis.v0.2.c1.ev16.r1.failure-first/1",
+  "date": "2026-11-11",
+  "issue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+  "sourceHead": "588588a691928c7bfac75ab5defd36e3d58eba64",
+  "sourceBlob": "2cdb5759190d72b00679e5ddd952178cd9ab7a0e",
+  "sourcePath": "examples/dis-v020-native-sdk/dke-ev16-r3-reader.mjs",
+  "runtime": "CONNECTED_HOSTED_V8_LITERAL_GITHUB_BLOB_READBACK",
+  "failure": {
+    "id": "MUTABLE_SUBJECT_GETTER_TOCTOU",
+    "expected": "DKE_EV16_R3_SUBJECT_INVALID",
+    "observed": "UNKNOWN with unselected subject se:UNSELECTED",
+    "actualGetterReads": 4,
+    "severity": "P1",
+    "why": "Object.keys + typeof + Object.hasOwn + output read the same caller subject property four times; a changing getter bypassed single-Selection semantics and caused inconsistent typed value"
+  },
+  "additional": {
+    "id": "UNTRUSTED_PROXY_EXCEPTION_NOT_NORMALIZED",
+    "observed": "hostile proxy",
+    "expected": "DKE_EV16_R3_SUBJECT_INVALID",
+    "why": "Object.keys can throw from Proxy ownKeys outside a normalized guarded request boundary",
+    "severity": "P2"
+  },
+  "safetyBoundary": {
+    "notFullEv16Cell": true,
+    "formalR8": "0/53",
+    "sapQualified": 0,
+    "effectsAuthorized": 0
+  },
+  "repairPlan": "Check Object.getPrototypeOf, Reflect.ownKeys and own DATA descriptor once under try/catch; use captured immutable scalar subject exclusively in lookup and result; reject accessors, symbols, inherited fields and hostile proxies. Add native regression tests; no re-run unrelated previous full graph work."
+}

@@ -1,0 +1,59 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B19",
+  "roundId": "B19-01",
+  "globalRoundId": "R65",
+  "status": "VERIFIED",
+  "originCommit": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+  "originTree": "4a98014f5f33b73bc43f25e9d6ed13fd36046530",
+  "testPath": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+  "testGitBlob": "096003852a253b4a3921ebfd88c2ca75baed48b4",
+  "receipt": "receipts/r65-b19-r26-typed-source-native-ci.json",
+  "sourceHead": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/3"
+    }
+  ],
+  "positive": [
+    "Original complete Tally 807-node/271-relationship graph DATA and original DKE R8/Gate DATA source identities unchanged; DKE R26 Reader selected as pinned LOCAL_CODE",
+    "Real DIS AOT→SDK→KDP selected read-only Function remains UNKNOWN/authority NONE under compatible 1.1.0 typed contract",
+    "Original 76 R26 strict request-type/source/scope adversarial vectors executed as mandatory native selected test, not just prior hosted V8"
+  ],
+  "negative": [
+    "All 8 Boolean and 3 String fields strictly typed; falsey non-booleans rejected before returning UNKNOWN",
+    "Old R23 Reader full original source SHA/commit rejected by independently installed R26 source pin",
+    "Forged producer repo/path/commit, false source RFC Join/SAP, DATA-as-LOCAL, malformed public input and stale version fail closed"
+  ],
+  "limits": [
+    "R65 is source-selected native ABI/Reader type and installer provenance conformance only; not a positive independently accepted RFC↔Tally relation or DKE SAP.",
+    "Original full DKE R8 EV16 remains 0/2, whole 53 EV cells 0/53; SAP=0 Effects=0, independent source-first semantic reviewer and full RFC Editor publisher raw-byte pin NOT_RUN.",
+    "Historical original B18/R64 source c37b09082a50eeec7e17c17ecd9366a79c4ce8ae remains unchanged and separately qualified at #2355. New R26 Reader b0e02389abc156cbd8006371765d597ebf86c61c is selected only in B19/R65.",
+    "Original R26 76 hosted V8 negatives and newly executed B19 native 76 vectors are separate source-execution contexts, not proof of all arbitrary JavaScript objects or arbitrary consumer graph completeness.",
+    "No Core automatic promotion, Product/L2 Freeze, merge, release or physical Effect."
+  ],
+  "finalTree": "4a98014f5f33b73bc43f25e9d6ed13fd36046530",
+  "qualificationHead": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+  "qualificationTree": "4a98014f5f33b73bc43f25e9d6ed13fd36046530",
+  "history": [
+    {
+      "sourceHead": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+      "testBlob": "096003852a253b4a3921ebfd88c2ca75baed48b4",
+      "pipeline": "#2357",
+      "native": "SUCCESS",
+      "finding": "Original R26 strict Reader selected full source in B19 native CI at same SHA; 3/3 SUCCESS"
+    }
+  ]
+}

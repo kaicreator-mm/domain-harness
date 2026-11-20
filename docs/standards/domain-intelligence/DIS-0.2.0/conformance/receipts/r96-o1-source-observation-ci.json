@@ -1,0 +1,65 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r96-o1-source-observation-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "O1_NATIVE_SOURCE_OBSERVATION_GUARD_AND_R83_MANIFEST_CONTEXT_INTEGRITY",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "d4f0b8bb57090a994794f7c15a3eaa062627dd38",
+    "tree": "68150ec4445554744d476be2b8ceb9f1de7cf9e9"
+  },
+  "native": {
+    "o1Helper": {
+      "path": "examples/dis-v020-native-sdk/o1-bounded-harness.mjs",
+      "gitBlob": "c1f50d7ca6782dcc781e3689727cd9f719436571"
+    },
+    "o1Test": {
+      "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+      "gitBlob": "d8c79da2225ff25bbf735ed3d4b1ec603fc67329"
+    },
+    "r83Model": {
+      "path": "examples/dis-v020-source-authority-formal/model-r83.mjs",
+      "gitBlob": "228f13a8df31cd266a5c7eb13c7688137dd39e4e"
+    },
+    "r83Tests": {
+      "path": "examples/dis-v020-source-authority-formal/test-r83.mjs",
+      "gitBlob": "6348ac56b0291652fc1c96d38f3af8d44358fc97"
+    },
+    "r83Runner": {
+      "path": "examples/dis-v020-source-authority-formal/run-r83.mjs",
+      "gitBlob": "f02a09b890c318889e5021f9940a2522272425c3"
+    },
+    "woodpeckerYamlBlob": "47db874dd06fe0c9f1b0bce05388eead1c0e5fac"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2451/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2451/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2451/3"
+    }
+  ],
+  "observations": [
+    "Exact selected xDownload xdownload.describePolicy is consumed through native AOT→SDK/KDP; R96 requires OBSERVED disposition, contract v1.0.0, authority NONE, attested=false and original xdownload-business source ID/Git Blob before fixture Provider fallback.",
+    "Native O1 tests reject FAILED/UNKNOWN disposition, wrong source ID/Git Blob and missing source witness without consuming Provider budget.",
+    "R83 validates exact ID→profile→state and requires unique full coverage of all three original CI contexts in both B22 manifest qualificationChecks and round checks.",
+    "R83 exact original R33/B22 source boundary retains 768-state model, original Reader, no SAP or Effect promotion; R96 adds duplicate-context mutation negatives.",
+    "Woodpecker #2451/1-3 all SUCCESS at this exact source HEAD."
+  ],
+  "limits": [
+    "O1 Provider is still fixture-only, not AOT-bound and not a real LLM; O1 remains PARTIAL.",
+    "R96 checks selected app metadata and exact source witness but does not cryptographically attest an arbitrary caller-injected app instance.",
+    "Hosted source replay is not a separate native receipt; only the listed Woodpecker contexts establish native integration execution.",
+    "No independent business Oracle, Source Owner/SAP, physical Effect, O2/O3/O4 or Governance qualification is granted."
+  ]
+}

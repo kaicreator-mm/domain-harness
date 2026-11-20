@@ -1,0 +1,58 @@
+{
+  "schema": "dis.v0.2.c1.ev16.r1.red-green-source-consumer-repair/1",
+  "date": "2026-11-11",
+  "authority": {
+    "masterIssue": 1499,
+    "pr": 1497,
+    "crossDkeIssue": "https://github.com/kaicreator-mm/domain-forge/issues/209"
+  },
+  "priorCommittedNativeCandidate": {
+    "head": "588588a691928c7bfac75ab5defd36e3d58eba64",
+    "ci": {
+      "woodpecker": 2418,
+      "contexts": 3,
+      "reportedStatuses": "3/3 SUCCESS"
+    }
+  },
+  "red": {
+    "exactReadbackCodeBlob": "2cdb5759190d72b00679e5ddd952178cd9ab7a0e",
+    "firstFailureGitBlob": "90b1d81246dff7d9807bcf1b52145163e9031192",
+    "case": "MUTABLE_SUBJECT_GETTER_TOCTOU",
+    "before": "Accepted unselected subject as UNKNOWN after 4 dynamic property reads",
+    "additional": "Raw hostile Proxy ownKeys exception escaped unnormalized",
+    "p1Found": 1
+  },
+  "green": {
+    "readerSourceCommit": "a930237035e466ec9ab15d93e9dfa8f5ceae2d01",
+    "readerSourceGitBlob": "177a36d35955cae02deb2c9bcdb349f0107a447c",
+    "nativeTestSourceCommit": "777798bab10710a0e6451bd988ce7cbff0b3eeea",
+    "nativeTestGitBlob": "02098232d92c588fea4f8f660bc8abbf4fcbf243",
+    "readbackSourceCases": 17,
+    "passed": 17,
+    "failed": 0,
+    "mitigation": "single own-data-property descriptor snapshot; reject getter, inherited/symbol properties and throwing Proxy; all downstream lookup and output use captured subject; read only DKE R3/R7/R1 exact pinned DATA",
+    "execution": "CONNECTED_HOSTED_V8_LITERAL_GITHUB_READBACK_SOURCE; DOES_NOT_CLAIM_NATIVE_KDP"
+  },
+  "upstreamOriginalEvidence": {
+    "r3GitBlob": "844a16219e31cc994d4d958e565879cb5e0c6872",
+    "r7GitBlob": "6abb5fb59843845e594aedd749f78cbbe0efeea7",
+    "r1GitBlob": "4fe1b2ec9ae359e3b75c775267a7f354641006bd"
+  },
+  "qualification": {
+    "disCore": "12/16_VERIFIED_OFFICIALLY; CORE008_SCOPED_REVIEW_PENDING_PRODUCT_ACCEPTANCE",
+    "dkeR8": "0/53",
+    "sap": 0,
+    "effects": 0,
+    "formalEV16": "NOT_RUN",
+    "nativeFinalExactHeadCI": "PENDING_NEW_REPAIR_COMMIT",
+    "release": false,
+    "merge": false,
+    "freeze": false
+  },
+  "limits": [
+    "The source-only 17/17 does not qualify a native SDK/KDP run",
+    "Original DKE R1 receipt remains source-reviewed DATA; this function reports independent existing evidence, not rerunning RFC/Tally semantics inside DIS",
+    "Raw Git blob SHA locks identity and do not replace external semantic Source Owner authority",
+    "New exact-HEAD CI must pass; never reuse #2418 for the new repair HEAD"
+  ]
+}

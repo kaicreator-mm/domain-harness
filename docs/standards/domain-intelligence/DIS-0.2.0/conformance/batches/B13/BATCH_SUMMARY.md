@@ -1,0 +1,9 @@
+# B13 / R59 — Full 26 historical rounds' Git/CI evidence readback
+
+**B13-01 R59 1/1 scoped Demo VERIFIED**. Source `bbf076316e5c9cb4f153a88ea9c756c38722d9f5` / TREE `34430b78c6dc02a0df9a781e257c8a06b87c1b63`, original test Git Blob `e6164737fa1d37dcb3e2d51706c17a25f0e92455`, mandatory [Woodpecker #2327](https://ci.kaicreator.com/repos/18/pipeline/2327/1) native, compatibility and Verify **3/3 SUCCESS**.
+
+The read-only `examples/dis-v020-conformance/full-ledger.mjs` checks all 12 B01–B12 batches with **26** independently frozen source/round/test/original Git Blob identifiers, exact CI source head/tree, three named contexts in one Woodpecker pipeline, native-CI test paths, unique receipts and links in the conformance matrix. Unlike old fixed-three-round history, it handles B07's differing per-round qualification HEADs and B08+ single-round manifests. B09 R55 historical source `2d96e16942dcff518619b37e4b6c0664ca032ae3` and #2312 three CI SUCCESS were already correct, but stale standalone R55 round remained CI_PENDING; ledger record was corrected without changing original Git test source. Negative tests reject round CI_PENDING, Git Blob/HEAD/TREE tamper, mixed pipeline, duplicate CI job slots and missing matrix linkage.
+
+This tests consistency of **stored historical evidence**, not an independent live CI lookup at each historical commit, independent business/SAP semantic qualification, Product/L1 Target decision, all Core completion or release. No automatic Core promotion.
+
+**Cumulative B01–B13 = 27/27 bounded Demo rounds VERIFIED; Core 9/16 VERIFIED (56.25%) +7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN.** PR remains Draft and no merge/Freeze/Release.

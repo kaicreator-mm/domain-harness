@@ -1,0 +1,47 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r11-integration-blocked",
+  "disVersion": "0.2.0",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "4632d5e0b331f0119da0c8d78249b7c1437856a1",
+    "tree": "8f347807680db455cc8627590bc3c60778b9e953"
+  },
+  "status": "BLOCKED",
+  "scope": "EXACT_SHA_CANDIDATE_NOT_ACCEPTED",
+  "notCurrentHead": true,
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "FAILURE",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2232/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2232/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2232/3"
+    }
+  ],
+  "observations": [
+    "Eight R11 source-real typed Function tests were authored but integration PASS was NOT observed.",
+    "97 named R9.5 and 103 named R10 suites are pinned to different source SHAs and do not qualify R11.",
+    "Only status context results are accessible; the first failing Woodpecker step and entire failure cause have not been established."
+  ],
+  "staticSourceFinding": {
+    "kind": "STALE_MATRIX_VALIDATOR_EXPECTATION",
+    "path": "examples/dis-v020-conformance/validate.test.mjs",
+    "observed": "R11 matrix core:NOT_RUN = 0 (9 VERIFIED, 7 PARTIAL), while first validate.test.mjs case asserts core:NOT_RUN > 0. This must fail if the test is executed.",
+    "attribution": "DETERMINISTIC_SOURCE_DEFECT_NOT_YET_PROVEN_FIRST_CI_FAILURE",
+    "repair": "Use total 16-core cardinality and unresolved PARTIAL/NOT_RUN check; add BLOCKED-receipt negative assertion."
+  },
+  "next": "Re-run affected integration test and all required CI contexts at the repaired exact SHA; diagnose the first CI failure from real step logs if still failing. Never report new R11 SUCCESS without matching receipts.",
+  "limits": [
+    "BLOCKED receipt must not be referenced from any VERIFIED requirement receiptIds.",
+    "No L2 Freeze, merge, release or independent review."
+  ]
+}

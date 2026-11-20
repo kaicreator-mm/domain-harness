@@ -1,0 +1,56 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r101-o2-canonical-lineage-native-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "R100_P2_02_CANONICAL_LINEAGE_BLANK_PADDING_NFC_ALIAS_NEGATIVE_NATIVE",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "b025f50c728ebd3dc7582b1934d931a1849470a3",
+    "tree": "29f7fad2ba1e2bb8e933dbc6cec5dc901c2505fc"
+  },
+  "native": {
+    "o2Helper": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-gate.mjs",
+      "gitBlob": "059732a04f11450df3bbfa6eb12929ac4fc3f440",
+      "originCommit": "d76d0b0b182a68c3c10286705beb46d4a64346cd"
+    },
+    "o2Test": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+      "gitBlob": "67fa03b519a9936fb104700d9d348832ee37a99f"
+    },
+    "integrationYaml": {
+      "path": ".woodpecker/dis-v020-integration.yaml",
+      "gitBlob": "0609f76c6f6b50ef5deb067d3ce211db8cf31eb5"
+    }
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2469/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2469/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2469/3"
+    }
+  ],
+  "observations": [
+    "R100 post-repair independent source-first reviewer identified blank/padded Source/Cohort/Case/Run identifiers being falsely counted as independent and incorrectly partitioned DISJOINT.",
+    "R101 canonical identifier predicate now excludes whitespace-only, padding, Unicode non-NFC and invisible aliases without trim-and-credit; the same predicate is used in cohort dedupe and synthesis/holdout/negative partition.",
+    "R101 adds three targeted native regression cases (source/case/run; padded aliases and order/replay; partition holdout with valid internal spaces); actual selected O2 SDK/KDP suite is executed by standard DIS Integration YAML.",
+    "GitHub statuses on exactly the qualifiedHead commit: Woodpecker #2469/1 Integration SUCCESS, /2 Min-Node SUCCESS, /3 Verify SUCCESS.",
+    "Prior #2468/1,3 were explicitly canceled and produced no claimed source Test PASS; #2469 is a new exact-head run."
+  ],
+  "limits": [
+    "No real trusted ExecutionTrace issuer or independent business Validator; no qualified Experience, result reuse, Effect, SAP or L2 release.",
+    "R101 source and tests have NOT yet had separate fresh independent post-repair review; original reviewer result is against prior R100 HEAD.",
+    "Documentation/receipt-registration commit following this exact implementation head requires its own CI and never inherits #2469 success by default."
+  ]
+}

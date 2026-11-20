@@ -1,0 +1,54 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r97-o2-native-no-trust-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "O2_NATIVE_SELECTED_EXPERIENCE_READINESS_FAIL_CLOSED_PARTIAL_ONLY",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "b5f7c76117674ef312e8e8595016c91dbb337837",
+    "tree": "2bedd7c527bcca53eeaec3e970611e4f90721a9a"
+  },
+  "native": {
+    "o2Helper": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-gate.mjs",
+      "gitBlob": "9c99f5f23fa43c333f552e57e0277aa22e9f2bf1"
+    },
+    "o2Test": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+      "gitBlob": "ee16c2a0a6d86a8fe21465504afac27efd0fd982"
+    },
+    "integrationYaml": {
+      "path": ".woodpecker/dis-v020-integration.yaml",
+      "gitBlob": "0609f76c6f6b50ef5deb067d3ce211db8cf31eb5"
+    }
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2462/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2462/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2462/3"
+    }
+  ],
+  "observations": [
+    "Original xDownload Interaction is AOT selected and invoked through real DIS SDK/KDP before the non-authoritative O2 Experience gate.",
+    "Untrusted caller PASS/attested/Trace/Validator fields cannot mint trusted Experience or Effect; O2 reports NEED_MORE_EVIDENCE.",
+    "Cohort dedupe, retry/cache exclusion, synthetic holdout partition leakage refusal and currentness/reuse/export negatives execute in native suite.",
+    "Three Woodpecker contexts SUCCESS at the exact pre-reconciliation source HEAD."
+  ],
+  "limits": [
+    "No independently authenticated trusted Trace receipt or business Validator issuer/verifier, so no Experience, result reuse, SAP or Effect qualified.",
+    "Declared cohorts/holdout are structural and not externally independently authenticated; O2 remains PARTIAL.",
+    "The subsequent accounting commit must earn separate exact-SHA CI success and independent review."
+  ]
+}

@@ -1,0 +1,11 @@
+# DIS B20-01 / R66 — native selected nested Schema
+
+# DIS B20-01 / R66 — exact native nested Function Schema closeout
+
+**VERIFIED 1/1**, original exact code [`2616ca326d3c0e0dd06d9b68b8d2127d60ec4825`](https://github.com/kaicreator-mm/domain-harness/commit/2616ca326d3c0e0dd06d9b68b8d2127d60ec4825), TREE `afa42ec88cfbdd9044b3fef253ea18db86548610`, mandatory native selected xDownload test Git Blob `239d925689ad7c90e7cece72f5db21e6aa31d96c`. Original Woodpecker [#2364/1 integration](https://ci.kaicreator.com/repos/18/pipeline/2364/1), [#2364/2 compatibility](https://ci.kaicreator.com/repos/18/pipeline/2364/2), [#2364/3 generic verify](https://ci.kaicreator.com/repos/18/pipeline/2364/3) **3/3 SUCCESS for the same source commit**. Original failing/error #2360–#2363 remain historical source-specific evidence, not retroactively PASS.
+
+Selected `xdownload.inspectPolicyTree` exercises optional bounded nested Function output schemas with typed records and arrays through real DIS AOT→SDK→KDP and original pinned xDownload policy data. Existing bare record/array behavior is unchanged, invalid nested depth/cardinality/schema and same-major structural drift fail closed. The R3 source-depth inconsistency was corrected before this qualified code HEAD, and new native regression exists in the exact test Blob. Read-only source data, no SAP, external Effect or owner authority.
+
+**Historic B01–B19 33/33 + newly qualified B20/R66 1/1 = 34/34 bounded native/demo rounds VERIFIED**. Core remains **9/16 VERIFIED, 7 PARTIAL**; Optional **4 NOT_RUN**, Governance **1 NOT_RUN**. The new R66 is evidence for CORE-003 and CORE-016 but does not turn either full requirement into VERIFIED. DKE original R8 full 0/53, EV16 full 0/2, source-independent semantic critic NOT_RUN, SAP=0, Effects=0. No Product L2 Freeze, merge or release.
+
+[Machine receipt](../../receipts/r66-b20-nested-function-schema-native-ci.json) · [B20 manifest](manifest.json) · [round](rounds/B20-01/round.json) · [matrix](../../matrix.json).

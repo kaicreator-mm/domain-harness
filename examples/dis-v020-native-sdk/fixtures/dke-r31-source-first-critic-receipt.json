@@ -1,0 +1,102 @@
+{
+  "schema": "dke.r31.source-first-independent-review-and-repair/1",
+  "authority": {
+    "masterIssue": 209,
+    "productIssue": 207,
+    "productDraftPR": 208,
+    "existingBranch": "experiment/dke-r31-outcome-first-tally-source-cq-r0"
+  },
+  "stage0": {
+    "frozen": true,
+    "firstPassURL": "https://github.com/kaicreator-mm/domain-forge/issues/209#issuecomment-6775837182",
+    "githubCommentId": 6775837182,
+    "githubCreatedAt": "2026-11-10T18:32:30Z",
+    "reviewerContext": "ChatGPT separate source-first decision context; GitHub login kaicreator-mm; not a distinct authenticated human principal",
+    "stage0EntryHead": "308a2c3fde9609d61866fbfcfc204771cbea3cc0",
+    "stage0EntryBlob": "8b6f61e3f4babab034a3d03f6fd8416f690d481d",
+    "authorReportsReadBeforeFreeze": false,
+    "firstPassVerdicts": {
+      "se:CLM-REQ-FUNCTIONAL-DOC-METHODS": "SUPPORTED_WITH_SCOPE",
+      "se:CLM-TVV-0001": "SUPPORTED_WITH_SCOPE",
+      "se:REL-TVV-0020": "NEEDS_REPAIR_ANALYST_DERIVED_NOT_PUBLISHER_ASSERTED"
+    }
+  },
+  "sources": {
+    "cs2023": "https://csed.acm.org/wp-content/uploads/2025/11/CS2023-Report.htm",
+    "cs2023Anchors": [
+      "SE-Requirements KA Core 1(a-c)",
+      "SE-Validation CS Core 1(a-b), Learning Outcome 2, KA Core 8(a-e)"
+    ],
+    "nistV11": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-218.pdf",
+    "nistTaskAndExample": "Table 1 PDF index 24 printed page 16; TASK RV.1.2 review/analyze/test code; Notional Implementation Examples Example 2 'See PW.7 and PW.8'",
+    "producer": {
+      "repo": "kaicreator-mm/tally",
+      "head": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+      "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+      "GitBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+      "nodes": 807
+    },
+    "productIssue207": "https://github.com/kaicreator-mm/domain-forge/issues/207"
+  },
+  "stage1": {
+    "oldHead": "308a2c3fde9609d61866fbfcfc204771cbea3cc0",
+    "originalR4AuthorHead": "402d3ce98820b7c62e29407ec5ee5bcb38ef559c",
+    "originalCheckerBlob": "734df4bd3ea47acd9c27b5d42dac0056767d99b8",
+    "originalTestBlob": "da923af1f33033a5607f6eaae28335a8a8eeb6f4",
+    "original24Tests": "24/24 BOUNDED_SOURCE_CHAIN_PASS",
+    "negativeOriginal": {
+      "input": "rv12Pw7Pw8SourceTier=TASK;crosscutPublisherAuthority=PUBLISHER_ASSERTED;uniformMethodObligation=true",
+      "observed": "SOURCE_LINKED_SEMANTICS_OPEN",
+      "unexpectedAccept": true
+    },
+    "sourceRepairHead": "2271e374b417eb606b4c25e439ee5792d2a54a03",
+    "sourceRepairTree": "e47aaddc950f36174591004f0a80fc8bf7b7933d",
+    "repairedCheckerBlob": "f49d03f0875c2a02e04df6093e63847ed342bb2a",
+    "repairedTestBlob": "7ed3d6207342fb4ca73ddb0e6f72e2d5b39d7063",
+    "independentReviewDocBlob": "10cc8aeade4b9019105490c08995aa7496e093f4",
+    "tests": {
+      "environment": "HOSTED_V8_EVALUATED_FRESH_GITHUB_MODULE_SOURCE_AND_FULL_ORIGINAL_807_NODE_TALLY_GRAPH",
+      "nativeNode": "NOT_RUN",
+      "fullOriginalR33GafScan": "NOT_REPEATED",
+      "originalPassed": 24,
+      "added": 5,
+      "totalPassed": 29,
+      "total": 29,
+      "status": "BOUNDED_SOURCE_CHAIN_PASS",
+      "addedCases": [
+        "r5-nist-example-misclassified-as-task REJECT",
+        "r5-publisher-crosslink-falsely-asserted REJECT",
+        "r5-functional-method-uniformity-added REJECT",
+        "r5-forged-review-permission-ignored REJECT",
+        "r5-source-tier-preserved-pending SOURCE_LINKED_SEMANTICS_OPEN_WITH_ZERO_QUALIFICATION"
+      ]
+    }
+  },
+  "findings": {
+    "p0": 0,
+    "p1Found": 1,
+    "p1Repaired": 1,
+    "p1Open": 0,
+    "p2Open": 2,
+    "p2": [
+      "Tally original DecisionModel's uniform-method requirement is not supported by CS2023 curriculum. Do not modify immutable producer graph; Owner/source producer must adjudicate/suppress project-wide projection.",
+      "CS2023 publisher full source bytes/licensing for redistribution not independently verified; restrict to bounded snippets/URLs and request rights review if republishing."
+    ]
+  },
+  "disposition": {
+    "twoClaims": "CRITIC_RECOMMENDS_ACCEPT_WITH_CURRICULUM_SCOPE",
+    "relation": "AUTHOR_DERIVED_TOPIC_ANALOGY_PENDING_INDEPENDENT_OWNER_REVIEW_NOT_PUBLISHER_RULE",
+    "rootChildGlobal": "ROOT_PLUS_TWO_CHILDREN_EXTERNAL_SSDF_ROOT_OWNS_PENDING_RELATION_NO_NEW_GLOBAL",
+    "criticReviewCompleted": true,
+    "ownerReviewDecision": "NOT_RUN",
+    "sapQualified": 0,
+    "authorizedEffects": 0,
+    "d02Qualified": "0/5",
+    "r8Qualified": "0/53",
+    "qualificationAdmission": "OWNER_SCOPED_REVIEW_NEEDED_BEFORE_CELL_QUALIFICATION",
+    "releaseEligible": false,
+    "noIssueCreated": true,
+    "noPrCreated": true,
+    "noGoRescan": true
+  }
+}

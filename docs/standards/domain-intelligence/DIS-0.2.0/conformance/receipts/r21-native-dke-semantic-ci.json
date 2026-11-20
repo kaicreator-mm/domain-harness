@@ -1,0 +1,44 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r21-native-dke-semantic-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "qualification": "DIS_SEMANTIC_ONLY",
+  "notCurrentHead": true,
+  "scope": "DKE_ED06_NATIVE_AOT_SDK_SELECTED_FUNCTION_EXACT_SHA_SEMANTIC",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "3f6393c49cad2b8e8768c46f5c4b267114ce5ea5",
+    "tree": "a608548721b42cb7ce9f0ed06957b3c59e2e9b34"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2249/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2249/3"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "ERROR",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2249/2"
+    }
+  ],
+  "observations": [
+    "At exact code HEAD the dedicated DIS native Integration ran dke-selected-consumer.test.mjs (plus existing native suite) through canonical compileDisV020Aot, installed digest, KDP boot and selected LOCAL app.invoke.",
+    "Three selected source-pinned Knowledge Functions executed 24 cross-domain CQ calls (Tally 12 UNKNOWN; Textile 6 OBSERVED and 6 UNKNOWN) without KDP Effect or Release permit. Tests additionally cover source byte drift, forged local registry and digest, stale reader, wrong input and missing original reference Evidence.",
+    "General Verify also reported SUCCESS for the same HEAD; engine-only verify-min-node reported ERROR, explicitly recorded without reclassifying the DIS semantic result or claiming 3/3 CI.",
+    "The Git projection's original DKE core blob and complete cases/textile JSON values were independently cross-checked; 19 bounded Tally source nodes matched the original 807-node source graph. Source-level replay of full original ED06 core ran 24 CQ, 11 negatives and 12 local dependency invalidations."
+  ],
+  "limits": [
+    "The receipt is scoped to the selected DKE LOCAL Knowledge Functions and original fixed source projection, not cross-application production DKE deployment or selected KDP Business/Effect.",
+    "Source identity, nonempty declared evidence references and typed SUCCEEDED are not independent Knowledge truth or SAP acceptance; Tally remains PENDING_REVIEW and Textile REFERENCE.",
+    "No registered inverse dependency from those CQs to an independently selected external Package/Function/ECP or complete change-currentness closure was established.",
+    "The verify-min-node CI context has ERROR (not SUCCESS); engine compatibility is a separate implementation concern, not a DIS semantic prerequisite per Owner clarification.",
+    "CORE-002/003/005/016 remain PARTIAL and this receipt cannot substitute for independent reviewer, L2 Freeze or Release."
+  ]
+}

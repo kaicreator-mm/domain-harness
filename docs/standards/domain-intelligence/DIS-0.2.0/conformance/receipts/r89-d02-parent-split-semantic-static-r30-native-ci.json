@@ -1,0 +1,59 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r89-d02-parent-split-semantic-static-r30-native-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "D02_PARENT_SPLIT_AND_SEMANTIC_STATIC_DAG_PLUS_R30_ELEMENT_VERSION_NATIVE",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "83ddc0b2d3e741f1d607d1095cc1221476ce160f",
+    "tree": "9b6a7146036458f547c6bf070360777ef6c69996"
+  },
+  "native": {
+    "test": {
+      "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+      "gitBlob": "b3f81f9333df0e717dd7340b94836b56c6f1bc71"
+    },
+    "contracts": {
+      "path": "packages/contracts/dis-v020.mjs",
+      "gitBlob": "5bb9bf413cdae462a6af0e2678d83a2203c41a14"
+    },
+    "build": {
+      "path": "tooling/build/dis-v020.mjs",
+      "gitBlob": "e747c332f4c3e59b07ee702035fbf9309651fa3a"
+    },
+    "microkernel": {
+      "path": "packages/microkernel/dis-v020.mjs",
+      "gitBlob": "55c2d0e88964ec3a90d19d7bc48b2b651054b28d"
+    },
+    "woodpeckerYamlBlob": "e4bb30630a6c3a095f26717384c4c440b8534aa0"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2419/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2419/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2419/3"
+    }
+  ],
+  "observations": [
+    "Same two original Tally advisory Function outputs are compared between split Elements and a fused parent Element at the same source/fixture, with exact deep output equality and no admission or merge authority.",
+    "Semantic cooperation metadata may be cyclic while static Element dependency DAG cycles are rejected; a cross-Element constraint cannot nominate an absent owner.",
+    "R30 native selected Elements require valid versions, source-linked validation is limited to sources consumed by the Element's own LOCAL Functions, and same-major structural ABI drift is rejected.",
+    "All named cases execute in the mandatory native DIS integration suite at this exact source HEAD."
+  ],
+  "limits": [
+    "The parent-vs-split comparison proves output preservation for the tested fixture only; it does not determine universally correct Element granularity.",
+    "Semantic cooperation metadata is not SAP, independent Domain Oracle acceptance, runtime ECP collaboration or KDP Effect.",
+    "CORE-002 and CORE-005 remain PARTIAL pending independent source/semantic ownership, SAP and broader Element responsibility evidence."
+  ]
+}

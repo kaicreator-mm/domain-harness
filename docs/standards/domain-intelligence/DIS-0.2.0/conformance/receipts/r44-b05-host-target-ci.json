@@ -1,0 +1,107 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r44-b05-host-target-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "B05_B05-01_REAL_HOST_AND_ORIGINAL_SOURCE",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+    "tree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f"
+  },
+  "originalSourceHead": "36bcdca50d1b79b82bc0944d4691979631010707",
+  "originalSourceTree": "a992a31dc4267e688c584cac5b6f621a8e7274c3",
+  "testGitBlob": "650ac196f2df5fe9ba24f05f86edded9c41819e5",
+  "casePath": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "36bcdca50d1b79b82bc0944d4691979631010707",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2290/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "ERROR",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2290/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2290/3"
+        }
+      ]
+    },
+    {
+      "sourceHead": "42fc7bde28bdbc653113651f2f87aa1021df614c",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/3"
+        }
+      ],
+      "meaning": "Cumulative three-round native replay"
+    },
+    {
+      "head": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+      "tree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+        }
+      ],
+      "meaning": "Final exact full-suite source, original test Blob unchanged"
+    }
+  ],
+  "limitations": [
+    "Real process.platform/process.arch is not hardware attestation or distinct source variant; Product/L1 supported targets not approved.",
+    "Trusted installer original source pins are SHA provenance, not independent Tally SAP semantics.",
+    "KDP admission is not proof of business Effect completion or human review."
+  ],
+  "testPath": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+  "observations": [
+    "Original independent test Blob unchanged at 2293 exact native+compatibility+general Verify 3/3 SUCCESS."
+  ]
+}

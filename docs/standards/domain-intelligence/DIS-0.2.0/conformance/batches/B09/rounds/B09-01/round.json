@@ -1,0 +1,119 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B09",
+  "roundId": "B09-01",
+  "globalRoundId": "R55",
+  "status": "VERIFIED",
+  "originCommit": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+  "originTree": "4ab65c63a19fb839215b500be21a94e96abdf098",
+  "testPath": "examples/dis-v020-native-sdk/b09-dke-conditional-proof.test.mjs",
+  "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
+  "receipt": "receipts/r55-b09-dke-conditional-proof-native-ci.json",
+  "sourceHead": "2d96e16942dcff518619b37e4b6c0664ca032ae3",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/3"
+    }
+  ],
+  "positive": [
+    "B09-01 R55 original source-pinned SymPy proof is a selected DIS Knowledge Function with exact two DATA sources",
+    "B09-01 R55 real selected SDK consumes 2 entailed + 2 refuted + 7 UNKNOWN with no independent SAP claim",
+    "B09-01 R55 a source-conditional REFUTED proof never means positive domain qualification or Effect permission"
+  ],
+  "negative": [
+    "B09-01 R55 original DKE formal input/receipt tampering or forged caller approval fail closed",
+    "B09-01 R55 original DATA path cannot become an executable Function or an unpinned installer source",
+    "B09-01 R55 forged LOCAL SUCCEEDED or fabricated semantic Oracle cannot pass typed outcome"
+  ],
+  "limits": [
+    "The upstream DKE R9 actual Python/SymPy formal proof is conditional on frozen same-model authored source facts; independent solver is NOT independent domain semantic reviewer or original publisher source owner.",
+    "Original upstream R9 Node reader is not executed here; this uses the original actual FORMAL_INPUT and SymPy R9_FORMAL_RECEIPT under original Git Blob, via a new native DIS BUILD/SDK/KDP Knowledge Function.",
+    "Logical REFUTED describes a refuted proposition in the selected source theory; it is not an accepted domain fact. UNKNOWN remains explicitly indeterminate with countermodels, no unqualified claims promoted.",
+    "Source Git Blob/installer locks and observations cannot authorize KDP Effect or Production Release. CORE-003/006/016 and CORE-002/005 remain PARTIAL until independent SAP and complete contract scope."
+  ],
+  "R0SourceHead": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+  "originalR0TestGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+  "repairHistory": [
+    {
+      "head": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+      "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+      "status": "INITIAL_SOURCE_ONLY",
+      "finding": "R0 returned all four DKE upstream publisher document references for every individual query, overclaiming per-CQ source provenance; not yet CI qualified"
+    },
+    {
+      "head": "4da0c6afb7ede4686092cfcf62321ea2378a7683",
+      "readerGitBlob": "5aba024775a759ba992d1bd06f71770c408f3cec",
+      "status": "SAME_WRITER_SOURCE_REPAIR",
+      "finding": "Read-only reader now exactly matches DKE original Node source mapping S01–S11 and verifies four publisher docs Git Blobs"
+    },
+    {
+      "head": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+      "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
+      "status": "REPINNED_SOURCE_AND_TEST",
+      "finding": "Selected DIS original reader commit/pin updated, each CQ verifies exact original publisher doc references; awaits real exact CI"
+    }
+  ],
+  "finalTree": "f2d708c797216c94439e8b24d4e011699da266fe",
+  "history": [
+    {
+      "head": "3c8bd89d8ed12f4dfcdb73a90de3742c7662d5c6",
+      "testGitBlob": "de3dbfa8a98380a35e0c9d6894afc543670e2efa",
+      "status": "INITIAL_SOURCE_ONLY",
+      "finding": "R0 returned all four DKE upstream publisher document references for every individual query, overclaiming per-CQ source provenance; not yet CI qualified"
+    },
+    {
+      "head": "4da0c6afb7ede4686092cfcf62321ea2378a7683",
+      "readerGitBlob": "5aba024775a759ba992d1bd06f71770c408f3cec",
+      "status": "SAME_WRITER_SOURCE_REPAIR",
+      "finding": "Read-only reader now exactly matches DKE original Node source mapping S01–S11 and verifies four publisher docs Git Blobs"
+    },
+    {
+      "head": "79f367cce82e9f69fe962bd5e0417790f7fc0e09",
+      "testGitBlob": "973eaffc13dd059f929a6ee77045fc11ea86ad93",
+      "status": "REPINNED_SOURCE_AND_TEST",
+      "finding": "Selected DIS original reader commit/pin updated, each CQ verifies exact original publisher doc references; awaits real exact CI"
+    },
+    {
+      "head": "2d96e16942dcff518619b37e4b6c0664ca032ae3",
+      "tree": "f2d708c797216c94439e8b24d4e011699da266fe",
+      "status": "CI_VERIFIED",
+      "ci": "Woodpecker #2312/1–3 SUCCESS",
+      "finding": "R55 11 scoped read-only logical verdicts via real selected DIS native BUILD/SDK/KDP; original R9 original data+reader test Git Blob unchanged. No R10 proof certificate or independently qualified SAP."
+    },
+    {
+      "head": "2d96e16942dcff518619b37e4b6c0664ca032ae3",
+      "tree": "f2d708c797216c94439e8b24d4e011699da266fe",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2312/3"
+        }
+      ],
+      "status": "HISTORICAL_CI_VERIFIED",
+      "meaning": "Metadata alignment only: true original R55 #2312 exact 3/3 SUCCESS already recorded in source receipt/manifest"
+    }
+  ]
+}

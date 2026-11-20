@@ -1,0 +1,47 @@
+{
+  "schema": "dis.v0.2.full-host-admission.registry/1",
+  "registryId": "owner-admission-registry-r209",
+  "trustTopology": "SINGLE_OWNER_ECOSYSTEM_STRUCTURAL_INDEPENDENCE_NOT_INTERPERSONAL",
+  "ownerGrant": {
+    "issue": "kaicreator-mm/domain-harness#1527",
+    "commentId": 7007585312,
+    "recordedAtIso": "2026-11-19T11:23:00Z",
+    "grantTextSha256": "5437d95d9c0c0f530e7bee989de3e4c7c080ae72bcc6d70bb44c83a4300fad6e"
+  },
+  "revocationEpoch": 1,
+  "issuers": {
+    "owner-issuer-r209": {
+      "spkiDerBase64Url": "MCowBQYDK2VwAyEAvkY2fTZ5tT3eaGOlim8d7P6st-GZnYgeiUT0u2h76J8",
+      "spkiSha256": "a18cdd503d3718a0ce369035b2559e11d2e1bf96f9d4d7045918f946b3cc5918",
+      "activeSinceMs": 1795088383826,
+      "functionBindings": [
+        "dke.ev16.d02.vv.r188.observe"
+      ],
+      "custody": "OWNER_OPERATOR_CONTROLLED_FILE_OUTSIDE_REPO"
+    }
+  },
+  "hosts": {
+    "owner-admission-host-r209": {
+      "spkiDerBase64Url": "MCowBQYDK2VwAyEAIpgnkms27zgqNfZxRgtEl9qmKQnbPyoH26QfBShq5c4",
+      "spkiSha256": "ee1187462548ec44edbb4715009d9d63ddbd8b33162516e5b8c26e15c5aa1fcb",
+      "kind": "ENGINEERING_ADMISSION_HOST_OWNER_ATTESTED_NOT_PRODUCTION_ORACLE"
+    }
+  },
+  "deployments": {
+    "deployment:dis-v020-full-admission-r209": {
+      "tenantId": "tenant:owner-admission-r209",
+      "scope": "scope:r188-observe-admission",
+      "functionId": "dke.ev16.d02.vv.r188.observe",
+      "issuerId": "owner-issuer-r209",
+      "hostId": "owner-admission-host-r209",
+      "bindings": {
+        "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+        "sdkDigest": "71ca4c1316fd6158337d87c3a7930e2354122f0306ca557f2b87f9f73d5f3d22",
+        "ruleDigest": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632",
+        "installedBytesDigest": "16f4b833ce2e77f06e725106c620f717a4edf95a8b0f133907d221681364b1c9",
+        "sourceGitBlob": "234997708b5520d7f9ce5997eb7ad6ff963a5e68"
+      },
+      "validUntilMs": 1802864383826
+    }
+  }
+}

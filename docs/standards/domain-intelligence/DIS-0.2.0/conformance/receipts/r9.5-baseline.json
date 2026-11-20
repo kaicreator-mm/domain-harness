@@ -1,0 +1,45 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r9.5-baseline",
+  "disVersion": "0.2.0",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "7954bd91d51eb13fbeab96385f37ac8d9cd35c5e",
+    "tree": "9250ad08f500bc8924458af1c833947c99ad0d4c"
+  },
+  "status": "SUCCESS",
+  "scope": "HISTORICAL_EXACT_SHA",
+  "notCurrentHead": true,
+  "counts": {
+    "native21": 21,
+    "bridge34": 34,
+    "physical7": 7,
+    "sourceConsumer26": 26,
+    "sourceSelected9": 9,
+    "totalNamed": 97
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2223/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2223/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2223/3"
+    }
+  ],
+  "limits": [
+    "97 named Demo cases are not 97 distinct DIS requirements.",
+    "This receipt is exact to historical R9.5 HEAD; later commits must not inherit PASS.",
+    "LLM/Harness/Experience/Evolution and Interaction native profiles remain unverified.",
+    "Physical SQLite replay is real; external xDownload and Runx live Host/Provider actions are not executed.",
+    "Owner-declared self-built sealed native code is trusted; arbitrary malicious native OS isolation is out of scope."
+  ]
+}

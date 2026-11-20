@@ -1,0 +1,77 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B01",
+  "roundId": "B01-01",
+  "globalRoundId": "R32",
+  "status": "VERIFIED",
+  "requirements": [
+    "DIS020-CORE-003"
+  ],
+  "startParent": "3fac3c4ff8d6af2d2c0bb91f7eae5a4849949c67",
+  "sourceHead": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+  "finalTree": "707a0b11b9a8691b7dc7efad7c5d91d3e735edda",
+  "receipt": "receipts/r32-b01-function-ci.json",
+  "testPath": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+  "positive": [
+    "B01-01 R32 real selected Tally rule and xDownload Knowledge/Interaction Functions retain typed source and authority",
+    "B01-01 R32 KDP admission remains typed separately from LOCAL evidence and never proves Effect success"
+  ],
+  "negative": [
+    "B01-01 R32 a forged LOCAL output, undecared outcome or effect-bearing Knowledge input fails closed",
+    "B01-01 R32 contract same-version drift and forged declared Evidence cannot qualify truth"
+  ],
+  "sourceExamples": [
+    "kaicreator-mm/tally original source pins in native-fixture.mjs",
+    "kaicreator-mm/xDownload selected Business source pins in native-fixture.mjs"
+  ],
+  "resultBoundary": "The selected native contract is structurally typed; UNKNOWN or OBSERVED does not produce SAP/ECP authority, and declared fake evidenceRefs are not attestation.",
+  "ciContexts": [
+    "ci/woodpecker/pr/dis-v020-integration",
+    "ci/woodpecker/pr/verify-min-node",
+    "ci/woodpecker/pr/verify"
+  ],
+  "ciUrls": [],
+  "findings": [],
+  "lessons": [
+    "Do not confuse typed EvidenceRef presence with accepted domain evidence.",
+    "Run real selected Knowledge/Rule/Interaction Functions with one actual KDP admission separated from Effect completion."
+  ],
+  "fullCorePromoted": false,
+  "metadata": "Actual Exact-SHA and CI receipt must be added after this round commit and status readback.",
+  "result": "EXACT_SHA_3_OF_3_SUCCESS",
+  "originCommit": "af2ebeaaa66c9701a82dd063b6b1d6816a3049a8",
+  "testGitBlob": "da74e6d1318f4746da6bc41779b2f591f3b9749a",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+    }
+  ],
+  "history": [
+    {
+      "commit": "af2ebeaaa66c9701a82dd063b6b1d6816a3049a8",
+      "ci": "https://ci.kaicreator.com/repos/18/pipeline/2273/1",
+      "native": "SUCCESS",
+      "minNode": "ERROR",
+      "verify": "PENDING_AT_REVIEW"
+    },
+    {
+      "commit": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+      "ci": "https://ci.kaicreator.com/repos/18/pipeline/2276/1",
+      "native": "SUCCESS",
+      "minNode": "SUCCESS",
+      "verify": "SUCCESS"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r79-core003-public-functions-semantic-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "qualification": "DIS_SEMANTIC_ONLY",
+  "notCurrentHead": true,
+  "scope": "CORE003_SELECTED_PUBLIC_FUNCTION_NINE_TYPE_PROFILES_SOURCE_ABI_EXACT_SHA",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "c1f3fb71e0ab4616ad6bf4c98db9d81275c4dacb",
+    "tree": "0d8329dce7fdc7893c0a7adfa7c90d4e66ab44d3"
+  },
+  "testPath": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+  "testGitBlob": "a3ea6608d63b1cac274d99aacac2ea444908de10",
+  "typeSmokePath": "examples/dis-v020-native-sdk/types-smoke.mts",
+  "typeSmokeGitBlob": "96c026a0e96851cb65ff5c793c48384dc52747c1",
+  "publicDeclarationPath": "packages/contracts/dis-v020.d.mts",
+  "publicDeclarationGitBlob": "003c9b25aeaabba50d6e0f21bd090710ad9962d3",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2391/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2391/3"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "FAILURE",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2391/2"
+    }
+  ],
+  "observations": [
+    "At original exact SHA the mandatory selected DIS AOT/SDK/KDP native integration and general verify both SUCCESS, with Node compatibility verify-min-node FAILURE recorded unchanged.",
+    "Original native source-selected Tally, Runx, xDownload and Orders Functions: 9/9 explicit descriptions and 9/9 applicable typed public interfaces (5 LOCAL JSON, 2 KDP Intent/Receipt, 1 Business Init and 1 process-local Runx Handle).",
+    "Positive/negative source tests reject unsupported metadata, forged KDP Effect, wrong typed Outcome, malformed Runx clock/method/result, stale installed AOT, Element same-major ABI drift, and mutation of internal Runx state behind the method-only facade.",
+    "Published .d.mts ABI and native TypeScript import consumer are exercised by the mandatory integration path; generic verification succeeded at the same SHA.",
+    "Scoped qualification uses the repository's pre-existing DIS_SEMANTIC_ONLY rule already established for R21, not a 3/3 PASS or a waiver of a release-required Node compatibility context."
+  ],
+  "limits": [
+    "verify-min-node FAILED at the same source SHA, with underlying failure step unavailable; this receipt does not qualify v0.10 compatibility, whole-PR CI health, OS variation, Freeze, merge or release.",
+    "Classification of KDP admission does not prove Effect execution; Process-local Runx observation does not produce a portable state engine or independent business truth.",
+    "Independent DKE/source-owner SAP and cross-Domain semantic collaboration remain unqualified under CORE-002/005. Target applicability remains undecided under CORE-008. CORE-016 is downstream.",
+    "Historical 35 scoped demo rounds remain distinct from this core contract closure; their original 3-context receipts and identities are unchanged."
+  ]
+}

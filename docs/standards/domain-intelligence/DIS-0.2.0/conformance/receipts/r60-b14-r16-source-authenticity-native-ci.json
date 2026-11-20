@@ -1,0 +1,76 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r60-b14-r16-source-authenticity-native-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "9b761ad3628048706a6207deb645add5dc27eee1",
+    "tree": "7ed525bf9852175215452ec13647ada2ec5de075"
+  },
+  "originCommit": "905730d6a86a7593d070893acba12fd3fc1c7702",
+  "testGitBlob": "8c639dd06a2c9509abdccafc7057cde3ba80c7bb",
+  "testPath": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+  "readerSourceGitBlob": "9393ab929a7689e0aad1a435f96ae11d229e720b",
+  "upstreamDkeSource": {
+    "repository": "kaicreator-mm/domain-forge",
+    "commit": "2e06e1047eb1eec146a808a49aefe2d555d0923e",
+    "path": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r16-full-publisher/RUN_RECEIPT_R1.json",
+    "gitBlob": "942d3e06073b27eade5c40c918996bb55a5a0d03"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/3"
+    }
+  ],
+  "observations": [
+    "Original upstream DKE R16 final native Python receipt is byte-identical Git Blob 942d3e06073b27eade5c40c918996bb55a5a0d03. Its 4 full-source publisher blob checks and 25/25 reject-mutations were already executed in DKE; DIS does not replay the original full source bytes.",
+    "The new DIS real AOT/SDK/KDP native reader is SELECTED as Knowledge with separately pinned LOCAL code and original upstream DATA Git origin; 4 bounded source-text observations / 7 source-insufficient UNKNOWN. No source-owner SAP.",
+    "R60 test includes explicit empty source/selection/metadata fail-closed paths recovered from actual upstream R16 fail-open bug; current candidate awaits new exact real Woodpecker native/compat/general checks.",
+    "Original source 9b761ad3628048706a6207deb645add5dc27eee1 / TREE 7ed525bf9852175215452ec13647ada2ec5de075 Woodpecker #2329/1-3 all SUCCESS for original R60 test Git Blob 8c639dd06a2c9509abdccafc7057cde3ba80c7bb. Upstream 4 full files verified by DKE only; DIS reads original pinned receipt, no SAP."
+  ],
+  "limitations": [
+    "Original four complete publisher documents were authenticated by DKE R16 native Python, not copied or byte-reverified by DIS R60; DIS consumes an immutable DKE producer machine receipt as selected DATA.",
+    "Four limited direct publisher source/document observations become read-only OBSERVED of authenticity/scope, not verified independent business meaning; seven source-insufficient CQs remain UNKNOWN.",
+    "Unrendered GitHub Liquid placeholder remains unrendered; independent blinded primary-source reviewer, source-owner approval, SAP and KDP Effects all remain 0.",
+    "Same-model source selection/anchor interpretations may not be promoted to authoritative Domain Knowledge on the strength of a correct Git Blob or native Function invocation.",
+    "CORE-002/003/005/016 all remain PARTIAL until independent semantics, full Function scope and conformance criteria are met."
+  ],
+  "history": [
+    {
+      "head": "9b761ad3628048706a6207deb645add5dc27eee1",
+      "tree": "7ed525bf9852175215452ec13647ada2ec5de075",
+      "status": "SUCCESS",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2329/3"
+        }
+      ],
+      "meaning": "R60 upstream DKE R16 4 original publisher full-byte authenticity receipt through actual selected native DIS Knowledge Function #2329 3/3 SUCCESS"
+    }
+  ]
+}

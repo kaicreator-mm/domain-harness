@@ -1,0 +1,80 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B19",
+  "status": "VERIFIED",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "9bd06d98e340262231a17f555aa2f2b5c1e198e6",
+    "verifiedRounds": 32,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "R26 exact-blob source-selected incremental versioned DIS Knowledge Reader, strong typed request rejection and source-origin installer downgrade refusal; not positive RFC↔Tally SAP",
+  "rounds": [
+    {
+      "batchRoundId": "B19-01",
+      "globalRoundId": "R65",
+      "status": "VERIFIED",
+      "testPath": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+      "testGitBlob": "096003852a253b4a3921ebfd88c2ca75baed48b4",
+      "originalSourceHead": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+      "sourceHead": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/3"
+        }
+      ],
+      "receipt": "receipts/r65-b19-r26-typed-source-native-ci.json",
+      "qualificationHead": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+      "qualificationTree": "4a98014f5f33b73bc43f25e9d6ed13fd36046530"
+    }
+  ],
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
+  "unstartedRounds": 0,
+  "noAutomaticCorePromotion": true,
+  "limitations": [
+    "R65 is source-selected native ABI/Reader type and installer provenance conformance only; not a positive independently accepted RFC↔Tally relation or DKE SAP.",
+    "Original full DKE R8 EV16 remains 0/2, whole 53 EV cells 0/53; SAP=0 Effects=0, independent source-first semantic reviewer and full RFC Editor publisher raw-byte pin NOT_RUN.",
+    "Historical original B18/R64 source c37b09082a50eeec7e17c17ecd9366a79c4ce8ae remains unchanged and separately qualified at #2355. New R26 Reader b0e02389abc156cbd8006371765d597ebf86c61c is selected only in B19/R65.",
+    "Original R26 76 hosted V8 negatives and newly executed B19 native 76 vectors are separate source-execution contexts, not proof of all arbitrary JavaScript objects or arbitrary consumer graph completeness.",
+    "No Core automatic promotion, Product/L2 Freeze, merge, release or physical Effect."
+  ],
+  "qualificationHead": "6b1904f9933b1c59070bed1621b3c9f9f329882c",
+  "qualificationTree": "4a98014f5f33b73bc43f25e9d6ed13fd36046530",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2357/3"
+    }
+  ]
+}

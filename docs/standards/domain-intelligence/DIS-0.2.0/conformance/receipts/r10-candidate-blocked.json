@@ -1,0 +1,60 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r10-candidate-blocked",
+  "disVersion": "0.2.0",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "c043fdaf22074cbda8230a2d1c36226205beda17",
+    "tree": "8a12f10d9c3fa5b4b9fb8396550a6823fbc3b2b5"
+  },
+  "status": "BLOCKED",
+  "scope": "EXACT_SHA_CANDIDATE_NOT_ACCEPTED",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "FAILURE",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2227/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "FAILURE",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2227/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "FAILURE",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2227/3"
+    }
+  ],
+  "localChecks": [
+    {
+      "kind": "SOURCE_PIN_GIT_BLOB",
+      "result": "PASS",
+      "source": "examples/dis-v020-interaction/download-goal.mjs",
+      "gitBlob": "f57747aa7996c88833e72288a0acd594a7ce5468",
+      "committedAt": "7011b3fe3faa177ba9bc8679cc5884479ca52159"
+    },
+    {
+      "kind": "NODE_LOCAL_PURE_FUNCTION_ASSERTIONS",
+      "result": "PASS",
+      "runtime": "Node v22.16.0",
+      "assertions": 12,
+      "scope": "Standalone inspected download-goal.mjs exact Git Blob only; NO native SDK/KDP installed dependencies."
+    },
+    {
+      "kind": "MATRIX_CODE_VALIDATION",
+      "result": "PASS",
+      "scope": "GitHub-backed in-process evaluation of 21 matrix records, real test names and historical receipt. Does NOT replace Woodpecker node --test execution."
+    }
+  ],
+  "blocker": {
+    "cause": "UNKNOWN_PENDING_PIPELINE_LOGS",
+    "observation": "All three GitHub commit statuses reported Pipeline failed; the available GitHub connection provides status/target URL but not Woodpecker step logs.",
+    "requiredNext": "Inspect pipeline 2227/1, 2227/2, 2227/3 exact-SHA step logs; distinguish checkout/agent/npm install errors from new matrix/native SDK test errors; same Writer repairs only identified failure, re-run three contexts on latest SHA.",
+    "noFalsePass": true
+  },
+  "limits": [
+    "Interaction remains PARTIAL; new 6 native SDK test cases are not qualified until CI succeeds.",
+    "Historical R9.5 receipt remains valid only for historical SHA."
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r27-native-impact-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "R27_NATIVE_SELECTED_TWO_BUSINESS_SOURCE_CQ_SAP_PROPOSAL_IMPACT_EXACT_SHA",
+  "notCurrentHead": true,
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "349b58f985970aeeaf77621a4451154e4cd6a353",
+    "tree": "d310878eeb2127adbfc4fa9d2bb368446e6d203b"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2263/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2263/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2263/3"
+    }
+  ],
+  "observations": [
+    "At exact R27 source HEAD the dedicated Woodpecker DIS Integration executed dke-two-business.test.mjs (alongside existing native KDP/SDK/AOT integration), including four appended R27 cases.",
+    "DKE-authored R26 catalog was copied byte-identically as Git Blob e710997c3b4a1abbe33287f7b79596385c8382d3; source-anchored original Tally 793→807 graph introduced 14 authentic records, mapped to two original 09F CQ IDs and two unqualified R26 SAP proposals.",
+    "Two actual BUILD-selected read-only Business Functions in separate selected Business Packages were cross-checked against the exact AOT reverse sourceConsumers and their source pins; old installed AOT source anchor failed against new accepted installer-selected source version before native KDP boot.",
+    "Negative cases reject missing/forged readers, unselected Business owner, fabricated approved SAP/Oracle, forged source identity, missing or duplicate Evidence and incomplete Evidence→SourceLocator→Source closure. Original CQ-T-CROSSCUT source view remains unchanged despite global AOT digest drift."
+  ],
+  "limits": [
+    "The SAP registrations are PROPOSAL_ONLY, qualified=false, oracle=NOT_VERIFIED and sourceAuthority=NONE. R27 does NOT demonstrate independently accepted incident truth, business authority, production ECP/Effect or cross-application global consumer closure.",
+    "The native read-only graph view contains 14 authentic changed record objects, not a full original 807-node semantic query engine. Original GitHub commit/Blob readback verified the source data separately.",
+    "Installer expectedSourcePins is load-time, opt-in and owned by trusted caller; no auto watch, running-instance revocation or autonomous AOT re-selection.",
+    "This exact-source receipt is historical after the R28 documentation and conformance matrix commit; it does not qualify the new current HEAD until its own CI passes.",
+    "CORE-003/005/016 remain PARTIAL; no Product/L1 scope reduction or L2 Freeze; no Node major-version gate for semantic content."
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "schema": "dis.demo.self-validation/v0.2-r2",
+  "scope": "SELF_VERIFIED_STANDALONE_DESIGN_DEMO",
+  "repository": "kaicreator-mm/domain-harness",
+  "sourcePath": "examples/dis-v020-evolution-demo/demo.mjs",
+  "sourceGitBlob": "8f3ff4ce32157f8a42aa8e98d6e8eaec1be5ab8b",
+  "sourceSha256": "db74ae5a779e6e0c04e82339391e57180f5fa872aed93fc2ff9059a102e94564",
+  "executionHost": {
+    "node": "v22.16.0",
+    "node24Executed": false,
+    "woodpecker": false
+  },
+  "tests": {
+    "positive": 10,
+    "negative": 15,
+    "pass": 25,
+    "fail": 0,
+    "command": "node examples/dis-v020-evolution-demo/demo.mjs"
+  },
+  "flow": "AOT_FIRST -> FAKE_LLM -> VERIFIED_EXPERIENCE -> CACHE -> RULE_CANDIDATE -> LOCAL_QUALIFICATION -> LOCAL_ACTIVATION -> SERVER_QUALIFICATION -> MOCK_PACKAGE",
+  "evidenceKind": "FIXTURE_FAKE_LLM_AND_ORACLE",
+  "verifiedNot": {
+    "liveLLM": false,
+    "realKDP": false,
+    "realSDK": false,
+    "realForge": false,
+    "realAOTBuild": false,
+    "deviceOrHost": false,
+    "independentReview": false,
+    "L2Freeze": false
+  },
+  "fullModularBundle": {
+    "sha256": "8998fbf790e216666a1368f646faf5473d63d648dbdfb1953b384ca89360eab1",
+    "availableAsConversationArtifact": true
+  },
+  "status": "PASS_SIMULATED_ONLY"
+}

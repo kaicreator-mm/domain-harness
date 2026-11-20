@@ -1,0 +1,43 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r34-b01-abi-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "B01_03_R34_C2_ABI_AND_AOT_STALENESS",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+    "tree": "707a0b11b9a8691b7dc7efad7c5d91d3e735edda"
+  },
+  "originCommit": "175851591eacbc2c5ca2d391e18f1e9adcdd34ba",
+  "originRoundTree": "3539cc416dc21278d7feef6e8508c26a35da0038",
+  "sourceTestBlob": "f12549c3edc2f5f79895bcafcd7a402b23959249",
+  "casePath": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+    }
+  ],
+  "notCurrentHead": false,
+  "observations": [
+    "Native actual selected Tally Rule and xDownload public Interaction Function/Element ABI reject required-output loss, required-input growth, owner reassignment, and unversioned Function roster drift.",
+    "Native KDP loader denies old installer digest and externally changed source checkpoint before KDP boot.",
+    "Original R34 #2275/1 native FAILURE was followed by R33 same-writer preceding-suite fix and final #2276/1-3 SUCCESS, retaining original R34 immutable test Blob."
+  ],
+  "limits": [
+    "This proves structural same-major ABI only; semantic equivalence and knowledge/SAP source-owner qualification are not automatically accepted.",
+    "The final replay uses the later repaired HEAD; initial R34 SHA is not reported as PASS."
+  ]
+}

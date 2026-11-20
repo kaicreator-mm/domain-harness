@@ -1,0 +1,94 @@
+{
+  "schema": "dke.r8.r9.symbolic-formal-input/1",
+  "parentPlanGitBlob": "7bc714a2676c81d9467a36714cc980019b8b8585",
+  "publisherGitBlobs": {
+    "CF_FAQ": "91443a1ba972ab4b172adf0cf2bda0d4594b9c29",
+    "CF_HOW": "15370b3c521db075a3b36c72b0461fa0a0239349",
+    "CF_CHANGE": "8124fd2d647578345d84664b1319b878e0760259",
+    "GH_WEBHOOK": "0e04c366d80375dd377a2200b98962693d47dfba"
+  },
+  "facts": {
+    "kv_doc_mode_eventual": true,
+    "github_auto_retry_failed_delivery": false,
+    "github_manual_or_script_retry": true,
+    "cloudflare_aug22_rollout_complete": true
+  },
+  "exclusiveModes": [
+    [
+      "kv_doc_mode_eventual",
+      "kv_doc_mode_strong"
+    ]
+  ],
+  "challenges": [
+    {
+      "id": "S01",
+      "atom": "kv_doc_mode_strong",
+      "expected": "REFUTED"
+    },
+    {
+      "id": "S02",
+      "atom": "kv_doc_mode_eventual",
+      "expected": "ENTAILED"
+    },
+    {
+      "id": "S03",
+      "atom": "cf_incident_cached_success",
+      "expected": "UNDERDETERMINED"
+    },
+    {
+      "id": "S04",
+      "atom": "cf_p99_scoped_conflict",
+      "expected": "UNDERDETERMINED"
+    },
+    {
+      "id": "S05",
+      "atom": "cf_all_storage_providers_removed",
+      "expected": "UNDERDETERMINED"
+    },
+    {
+      "id": "S06",
+      "atom": "cf_all_remediations_done_june12",
+      "expected": "UNDERDETERMINED"
+    },
+    {
+      "id": "S07",
+      "atom": "gh_2018_ttl_expired_200k",
+      "expected": "UNDERDETERMINED"
+    },
+    {
+      "id": "S08",
+      "atom": "gh_2018_ttl_expired_200k",
+      "expected": "UNDERDETERMINED"
+    },
+    {
+      "id": "S09",
+      "atom": "github_auto_retry_failed_delivery",
+      "expected": "REFUTED"
+    },
+    {
+      "id": "S10",
+      "atom": "github_manual_or_script_retry",
+      "expected": "ENTAILED"
+    },
+    {
+      "id": "S11",
+      "atom": "same_gh_cf_root_cause",
+      "expected": "UNDERDETERMINED"
+    }
+  ],
+  "sourceScopedNoInference": [
+    "S03",
+    "S04",
+    "S05",
+    "S06",
+    "S07",
+    "S08",
+    "S11"
+  ],
+  "qualification": {
+    "independentSemanticReviewer": false,
+    "sourceFactSelectionAuthoredByCurrentAssistant": true,
+    "qualifiedSap": false,
+    "effectAllowed": false
+  }
+}

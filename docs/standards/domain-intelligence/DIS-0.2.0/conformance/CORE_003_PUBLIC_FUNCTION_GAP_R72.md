@@ -1,0 +1,11 @@
+# DIS v0.2.0 — CORE-003 actual Public Function contract gap R72
+
+**Status: SOURCE_COMMITTED / NATIVE_CI_PENDING.** This uses the existing PR #1497 native AOT→SDK/KDP lane, **no B22 bookkeeping round**.
+
+Product/L1 #1496 / DIS R3 §2 require explicit Public Function purposes (Description), typed I/O Schema, outcomes, Evidence and compatibility. Before this change `packages/contracts/dis-v020.mjs` rejected `Function.description` as an unknown property; its absence could never be detected as a conformance gap. R72 adds a bounded source-checked description field, rejects empty/non-string/oversized values, and an explicit **strict inventory** that rejects missing descriptions while allowing historical unannotated experimental AOTs to remain loadable. It adds actual source-grounded descriptions to the nine real selected native Tally/Runx/xDownload/Orders functions; metadata is included in the AOT digest, and a changed description requires a changed installed AOT digest.
+
+**Actual completeness result:** 9/9 selected descriptions now present; **5/9 complete typed I/O**. Four open public Function contract gaps remain: `orders.appInit` (App Init lifecycle without typed I/O), `orders.approve` and `xdownload.confirmDownload` (KDP admission receipts only), `runx.createPresenceObserver` (local Stateful handle methods only). These are **not** misreported as full Function I/O. All missing profiles remain negative/tested in `examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs` and mandatory Woodpecker native integration.
+
+**Limitations:** This is structural selected-app metadata only; descriptions are authored interpretations of selected source, not independent Domain source-owner SAP. KDP admission is not Effect success, Stateful handle is not portable JSON Schema. CORE-003 remains PARTIAL pending actual full applicable Function contracts/compatibility, independently qualified semantics where required, and original same-SHA CI.
+
+**Core baseline:** 11/16 VERIFIED + 5 PARTIAL, 35/35 previously defined bounded demos; no new original source CI claimed until the current commit's three original contexts complete. Four optional profiles, GOV-001 and independent business semantic SAP remain OPEN; no Freeze/merge/release.

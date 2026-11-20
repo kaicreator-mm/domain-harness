@@ -1,0 +1,105 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B16",
+  "status": "VERIFIED",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "8e2fa7277a90fba01915c1b3b7f31be8156bb57d",
+    "previousQualifiedRounds": 29,
+    "coreVerified": 9,
+    "corePartial": 7,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "C1/C2: true original DKE R18 native ten-node evidence DAG transitive invalidation and selective source fact preservation consumed by selected DIS native Knowledge Function; compressed original source/receipt integrity and graph-authority fail-closed.",
+  "rounds": [
+    {
+      "batchRoundId": "B16-01",
+      "globalRoundId": "R62",
+      "status": "VERIFIED",
+      "testPath": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+      "originalSourceHead": "1da216faafb60b99f2cd75b74a10b294bd6ae16b",
+      "testGitBlob": "2a61a0ed371ea500ec05cc2e277dec5d25c4bd78",
+      "receipt": "receipts/r62-b16-r18-native-transitive-knowledge-impact-ci.json",
+      "sourceHead": "e16362004f3f40f763a733e2a3973d025898a26d",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2344/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2344/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2344/3"
+        }
+      ],
+      "readerSourceGitBlob": "0a51feffaec5119dff2bb3176fb00ae93bca7ed5",
+      "qualificationTree": "dbcdafacbd20106520531af2f18b9610338e8bac"
+    }
+  ],
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
+  "unstartedRounds": 0,
+  "noAutomaticCorePromotion": true,
+  "limitations": [
+    "Original DKE R18 source+receipt were truly executed in native Node upstream and independently verified with Python, unlike original R17 hosted V8 only; DIS R62 consumes byte-identical compressed DATA and runs a separate, source-selected SDK/KDP native graph replay, not physical repair.",
+    "Original Framework RTCRework README Git Blob verified upstream 1/1, but official Guide 203/79 full original HTML/PDF raw bytes not SHA-pinned, independent source-first semantic Critic NOT_RUN, SAP=0, Effects=0.",
+    "Four invalidated evidence DAG nodes are selectively invalidated; three unrelated/RTC Knowledge nodes preserve source observed, not independent source-owner Semantic approval.",
+    "Even hypothetical semantic alignment of step numbers remains BLOCKED_SOURCE_PIN until authentic source versions and independent reviewer, and a Function reporting UNKNOWN cannot authorize a KDP Effect.",
+    "New narrow contract support for Git-pinned DKE .json.zlib.b64/.mjs.zlib.b64 origins as DATA only is required because original producer stored byte-exact zlib+base64 packages; it is forbidden to bind these DATA sources as LOCAL executables.",
+    "CORE-002/003/005/006/016 remain PARTIAL; R62 cannot substitute Product/L1 scope approval, full domain semantic SAP, actual EV lifecycle closure or final independent review."
+  ],
+  "qualificationHead": "e16362004f3f40f763a733e2a3973d025898a26d",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2344/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2344/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2344/3"
+    }
+  ],
+  "qualificationTree": "dbcdafacbd20106520531af2f18b9610338e8bac",
+  "priorQualification": {
+    "head": "a544ed57fb0bb69d7176e332c84f83e8889014d5",
+    "tree": "2d8201952fe2dc6645edb160979a4367cfd7e0fd",
+    "testGitBlob": "9aa5bc3a77c9f666ffe44a5439aa14d936625ed3",
+    "readerSourceGitBlob": "71d55ad1e13cce255276794eec4afa417b139c45",
+    "checks": [
+      {
+        "context": "ci/woodpecker/pr/dis-v020-integration",
+        "state": "SUCCESS",
+        "url": "https://ci.kaicreator.com/repos/18/pipeline/2333/1"
+      },
+      {
+        "context": "ci/woodpecker/pr/verify-min-node",
+        "state": "SUCCESS",
+        "url": "https://ci.kaicreator.com/repos/18/pipeline/2333/2"
+      },
+      {
+        "context": "ci/woodpecker/pr/verify",
+        "state": "SUCCESS",
+        "url": "https://ci.kaicreator.com/repos/18/pipeline/2333/3"
+      }
+    ],
+    "status": "SUCCESS"
+  }
+}

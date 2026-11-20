@@ -1,0 +1,72 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B13",
+  "roundId": "B13-01",
+  "globalRoundId": "R59",
+  "status": "VERIFIED",
+  "originCommit": "57cd02b11ff532d093fa79c0780d0fdc82ba8a9c",
+  "originTree": "2b762c4e0cc21294aa4e2dde6260f37bc0d85d99",
+  "testPath": "examples/dis-v020-conformance/full-ledger.test.mjs",
+  "testGitBlob": "e6164737fa1d37dcb3e2d51706c17a25f0e92455",
+  "receipt": "receipts/r59-b13-26-round-full-ledger-ci.json",
+  "sourceHead": "bbf076316e5c9cb4f153a88ea9c756c38722d9f5",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2327/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2327/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2327/3"
+    }
+  ],
+  "positive": [
+    "B13 R59 all B01-B12 genuine 26 native source rounds have consistent 3-context exact stored CI and matrix refs",
+    "B13 R59 the previously stale B09 R55 standalone round now agrees with original verified #2312 receipts"
+  ],
+  "negative": [
+    "B13 R59 fake verified status or historical Git test Blob are rejected before CI attribution",
+    "B13 R59 forged qualifying Source HEAD/TREE, mixed named contexts and duplicate job slots fail closed",
+    "B13 R59 missing matrix claim, swapped Function source and unexecuted native test cannot masquerade as proof"
+  ],
+  "limits": [
+    "Universal ledger replay reads current checked-in historical receipts and original Git Blob identifiers; it does not fetch live GitHub CI for each historical SHA or independently re-execute all 26 old source commits.",
+    "Historical individual source qualification and original native/compatibility/verify jobs remain separate from current B13 audit source and its own CI.",
+    "Documentation B09 round metadata repair corrects stale CI_PENDING to true prior #2312 SUCCESS but does not add a new R55 test or semantic SAP authority.",
+    "Current source code Git Blob may differ from historical test Git Blob after later version changes; ledger reports drift without retroactively substituting an unrelated test Blob.",
+    "CORE-016 requires independent governance and complete other Core scopes; scoped CI ledger does not grant L2 Freeze, merge or release."
+  ],
+  "finalTree": "34430b78c6dc02a0df9a781e257c8a06b87c1b63",
+  "history": [
+    {
+      "head": "bbf076316e5c9cb4f153a88ea9c756c38722d9f5",
+      "tree": "34430b78c6dc02a0df9a781e257c8a06b87c1b63",
+      "status": "SUCCESS",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2327/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2327/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2327/3"
+        }
+      ],
+      "meaning": "Full actual mandatory #2327 native batch audit + compatibility + general Verify SUCCESS"
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B05",
+  "roundId": "B05-03",
+  "globalRoundId": "R46",
+  "status": "VERIFIED",
+  "startParent": "6db5024fadb1b524e8eed39d604605404044e157",
+  "testPath": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+  "testGitBlob": "6aba7dd4a1bfd7597b6143ab3ef048c8150aa053",
+  "receipt": "receipts/r46-b05-target-original-consumer-ci.json",
+  "positive": [
+    "B05-03 R46 real host original Tally Rule xDownload Knowledge Runx Stateful and KDP admission compose without business authority"
+  ],
+  "negative": [
+    "B05-03 R46 original source and host matching still cannot make unreviewed semantic Tally claim succeed",
+    "B05-03 R46 stale independent source pin denies selected native KDP boot before side effects"
+  ],
+  "boundary": "Real selected original multi-domain consumers and independent preflight; no physical Host Effect, SAP Oracle, or per-OS native implementation certification.",
+  "originCommit": "42fc7bde28bdbc653113651f2f87aa1021df614c",
+  "originTree": "48bd574c89c1c47e0858ff6d937b255610540035",
+  "sourceHead": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+  "finalTree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "42fc7bde28bdbc653113651f2f87aa1021df614c",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/3"
+        }
+      ]
+    },
+    {
+      "sourceHead": "42fc7bde28bdbc653113651f2f87aa1021df614c",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "PENDING",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2292/3"
+        }
+      ],
+      "meaning": "Cumulative three-round native replay"
+    },
+    {
+      "head": "1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de",
+      "tree": "4c3e3ecbac8cf1489fc807a60ce22806672f414f",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2293/3"
+        }
+      ],
+      "meaning": "Final exact full-suite source, original test Blob unchanged"
+    }
+  ]
+}

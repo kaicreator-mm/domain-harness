@@ -1,0 +1,234 @@
+{
+  "schema": "dke.r8.r9.native-symbolic-source-proof/1",
+  "status": "PASS_BOUNDED_FORMAL_SOURCE_SCOPE",
+  "frozenInputGitBlob": "426c7d165c19b7aa459de82d5d776962dba13fb0",
+  "parentPlanGitBlob": "7bc714a2676c81d9467a36714cc980019b8b8585",
+  "runtime": "NATIVE_PYTHON_SYMPY_SAT_AND_INDEPENDENT_ENUMERATION",
+  "sympyVersion": "1.14.0",
+  "variables": 11,
+  "consistentWorlds": 64,
+  "cases": [
+    {
+      "id": "S01",
+      "atom": "kv_doc_mode_strong",
+      "verdict": "REFUTED",
+      "satisfiablePositive": false,
+      "satisfiableNegative": true,
+      "countermodels": [],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S02",
+      "atom": "kv_doc_mode_eventual",
+      "verdict": "ENTAILED",
+      "satisfiablePositive": true,
+      "satisfiableNegative": false,
+      "countermodels": [],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S03",
+      "atom": "cf_incident_cached_success",
+      "verdict": "UNDERDETERMINED",
+      "satisfiablePositive": true,
+      "satisfiableNegative": true,
+      "countermodels": [
+        {
+          "assertion": "cf_incident_cached_success",
+          "value": true
+        },
+        {
+          "assertion": "cf_incident_cached_success",
+          "value": false
+        }
+      ],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S04",
+      "atom": "cf_p99_scoped_conflict",
+      "verdict": "UNDERDETERMINED",
+      "satisfiablePositive": true,
+      "satisfiableNegative": true,
+      "countermodels": [
+        {
+          "assertion": "cf_p99_scoped_conflict",
+          "value": true
+        },
+        {
+          "assertion": "cf_p99_scoped_conflict",
+          "value": false
+        }
+      ],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S05",
+      "atom": "cf_all_storage_providers_removed",
+      "verdict": "UNDERDETERMINED",
+      "satisfiablePositive": true,
+      "satisfiableNegative": true,
+      "countermodels": [
+        {
+          "assertion": "cf_all_storage_providers_removed",
+          "value": true
+        },
+        {
+          "assertion": "cf_all_storage_providers_removed",
+          "value": false
+        }
+      ],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S06",
+      "atom": "cf_all_remediations_done_june12",
+      "verdict": "UNDERDETERMINED",
+      "satisfiablePositive": true,
+      "satisfiableNegative": true,
+      "countermodels": [
+        {
+          "assertion": "cf_all_remediations_done_june12",
+          "value": true
+        },
+        {
+          "assertion": "cf_all_remediations_done_june12",
+          "value": false
+        }
+      ],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S07",
+      "atom": "gh_2018_ttl_expired_200k",
+      "verdict": "UNDERDETERMINED",
+      "satisfiablePositive": true,
+      "satisfiableNegative": true,
+      "countermodels": [
+        {
+          "assertion": "gh_2018_ttl_expired_200k",
+          "value": true
+        },
+        {
+          "assertion": "gh_2018_ttl_expired_200k",
+          "value": false
+        }
+      ],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S08",
+      "atom": "gh_2018_ttl_expired_200k",
+      "verdict": "UNDERDETERMINED",
+      "satisfiablePositive": true,
+      "satisfiableNegative": true,
+      "countermodels": [
+        {
+          "assertion": "gh_2018_ttl_expired_200k",
+          "value": true
+        },
+        {
+          "assertion": "gh_2018_ttl_expired_200k",
+          "value": false
+        }
+      ],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S09",
+      "atom": "github_auto_retry_failed_delivery",
+      "verdict": "REFUTED",
+      "satisfiablePositive": false,
+      "satisfiableNegative": true,
+      "countermodels": [],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S10",
+      "atom": "github_manual_or_script_retry",
+      "verdict": "ENTAILED",
+      "satisfiablePositive": true,
+      "satisfiableNegative": false,
+      "countermodels": [],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    },
+    {
+      "id": "S11",
+      "atom": "same_gh_cf_root_cause",
+      "verdict": "UNDERDETERMINED",
+      "satisfiablePositive": true,
+      "satisfiableNegative": true,
+      "countermodels": [
+        {
+          "assertion": "same_gh_cf_root_cause",
+          "value": true
+        },
+        {
+          "assertion": "same_gh_cf_root_cause",
+          "value": false
+        }
+      ],
+      "qualifiedSap": false,
+      "effectAllowed": false
+    }
+  ],
+  "outcomes": {
+    "ENTAILED": 2,
+    "REFUTED": 2,
+    "UNDERDETERMINED": 7
+  },
+  "mutationChecks": [
+    {
+      "id": "INVERT_KV_MODE",
+      "rejected": true
+    },
+    {
+      "id": "INVERT_GH_AUTO_RETRY",
+      "rejected": true
+    },
+    {
+      "id": "REMOVE_GH_MANUAL_FACT",
+      "rejected": true
+    },
+    {
+      "id": "FORGE_HISTORIC_2018_TTL",
+      "rejected": true
+    },
+    {
+      "id": "FORGE_METRIC_EQUIVALENCE",
+      "rejected": true
+    },
+    {
+      "id": "CONTRADICT_PRODUCT_CLASSIFICATION",
+      "rejected": true
+    },
+    {
+      "id": "FORGE_EXPECTED_VERDICT",
+      "rejected": true
+    },
+    {
+      "id": "TAMPER_GIT_BLOB",
+      "rejected": true
+    }
+  ],
+  "mutationChecksPassed": 8,
+  "qualification": {
+    "originalPublisherGitDocBytesPreviouslyVerified": true,
+    "sourceFactsAndAxiomsAuthoredBySameAssistant": true,
+    "independentSemanticCritic": false,
+    "disNativeSDKInvoked": false,
+    "qualifiedSap": 0,
+    "externalEffects": 0,
+    "fullR8EVPromoted": 0
+  }
+}

@@ -1,0 +1,1998 @@
+{
+  "schema": "dis.v0.2.conformance-matrix/1",
+  "version": "0.2.0",
+  "issue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+  "authority": "https://github.com/kaicreator-mm/domain-harness/issues/1496",
+  "pr": "https://github.com/kaicreator-mm/domain-harness/pull/1497",
+  "semantics": {
+    "VERIFIED": "Positive and negative executable cases confirmed by a referenced exact-SHA receipt, within stated scope only.",
+    "PARTIAL": "At least some supporting implementation/evidence, but the full named requirement not yet demonstrated.",
+    "NOT_RUN": "No native conformant executable proof, including design-only or simulation-only coverage.",
+    "OUT_OF_SCOPE": "Only after explicit Product/L1 decision with rationale and URL; none assumed."
+  },
+  "receipts": [
+    "r9.5-baseline",
+    "r10-candidate-blocked",
+    "r10-ci-recovery",
+    "r11-integration-blocked",
+    "r14-d01-ci-recovered",
+    "r15-d02-d03-native",
+    "r16-kdp-admission-ci",
+    "r17-bounded-schema-ci",
+    "r19-native-integration-blocked",
+    "r19.1-integration-blocked",
+    "r18-r20-native-integration-repaired",
+    "r21-native-dke-semantic-ci",
+    "r27-native-impact-ci",
+    "r29-native-source-first-ci",
+    "r32-b01-function-ci",
+    "r33-b01-state-ci",
+    "r34-b01-abi-ci",
+    "r35-b02-selected-target-ci",
+    "r36-b02-channel-parity-ci",
+    "r37-b02-interaction-negative-ci",
+    "r38-b03-target-roster-ci",
+    "r39-b03-installer-target-ci",
+    "r40-b03-target-sap-boundary-ci",
+    "r41-b04-source-ledger-ci",
+    "r42-b04-closure-dag-ci",
+    "r43-b04-readiness-gate-ci",
+    "r44-b05-host-target-ci",
+    "r45-b05-source-closure-ci",
+    "r46-b05-target-original-consumer-ci",
+    "r47-b06-http-transport-ci",
+    "r48-b06-http-negative-ci",
+    "r49-b06-http-lifecycle-ci",
+    "r51-b07-full-ledger-ci",
+    "r52-b07-function-dependency-ci",
+    "r53-b07-source-semantic-relation-ci",
+    "r54-b08-real-dke-knowledge-consumer-ci",
+    "r55-b09-dke-conditional-proof-native-ci",
+    "r56-b10-r10-complete-witness-native-ci",
+    "r57-b11-real-cli-native-ci",
+    "r58-b12-runx-physical-process-state-ci",
+    "r59-b13-26-round-full-ledger-ci",
+    "r60-b14-r16-source-authenticity-native-ci",
+    "r61-b15-r17-guide-version-native-ci",
+    "r62-b16-r18-native-transitive-knowledge-impact-ci",
+    "r63-b17-full-30-round-ledger-integrity-ci",
+    "r64-b18-ev16-full-original-source-native-ci",
+    "r65-b19-r26-typed-source-native-ci",
+    "r66-b20-nested-function-schema-native-ci",
+    "r67-b21-34-round-full-ledger-ci",
+    "r79-core003-public-functions-semantic-ci",
+    "r82-b22-r33-source-native-ci",
+    "r84-c3-selected-closure-ci",
+    "r85-c3-core008-source-review",
+    "r86-c3-fresh-exact-sha-review-ci",
+    "r88-c1-ev16-r3-r1-query-snapshot-native-ci",
+    "r89-d02-parent-split-semantic-static-r30-native-ci",
+    "r96-o1-source-observation-ci",
+    "r97-o2-native-no-trust-ci",
+    "r100-o2-cohort-bridge-r99-repair-ci",
+    "r101-o2-canonical-lineage-native-ci",
+    "r102-o2-unicode-lineage-native-ci"
+  ],
+  "requirements": [
+    {
+      "id": "DIS020-CORE-001",
+      "title": "Domain identity and trusted source ownership",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "2"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native Contracts + canonical BUILD select 4 heterogeneous domains and explicit global semantics"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "actual Runx Element cannot silently import Tally source as its LOCAL stateful implementation"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Original source repos pinned to exact origin; not a proof of semantic knowledge graph completeness."
+    },
+    {
+      "id": "DIS020-CORE-002",
+      "title": "Element identity, version, description and cohesive Function granularity",
+      "profile": "core",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "3"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs",
+        "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+        "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r16-source-reader.mjs",
+        "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r17-guide-reader.mjs",
+        "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r18-impact-reader.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native Contracts + canonical BUILD select 4 heterogeneous domains and explicit global semantics"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R29 original source-first ledger identifies two Case-owned Elements and two selected Business readers, but never accepts unreviewed SAP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R30 native selected heterogeneous Elements all have a version; multi-Function Interaction shares source-pinned validation"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+          "case": "B07-02 R52 original xDownload acquisition statically pins two separate Interaction Functions and one Knowledge Function"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 original DKE R16 full-original-publisher receipt is selected AOT Knowledge DATA, not executable or SAP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 original publisher byte-authenticity and all 11 source-scope questions are typed OBSERVED vs UNKNOWN, never qualified semantics"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original DKE R17 publisher observations/cases/V8 receipt are three exact AOT DATA pins, Reader is a separate selected Knowledge LOCAL"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 actual native SDK replays all original DKE 20 cases, holds two real stale-step conflicts as typed UNKNOWN without physical KDP Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original two step-reference conflicts do not permit silent 16→26/17→28 remap even in a hypothetical fixed-looking target"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE R18 native runner and machine receipt compressed Git Blobs are selected AOT DATA, never executable"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE native evidence DAG: only four nodes invalidated, unrelated RTC Knowledge preserved in real selected SDK"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 native independent graph replay verifies original baseline/partial/hypothetical and conservative missing-publisher-source gate"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "D02 parent-vs-split Tally rule Elements preserve two source-real advisory Function outputs"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R29 original reviewer/source gap and proposed decomposition cannot mint independent domain authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R30 missing, malformed and silently unversioned Element identity is denied before native KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R30 selected Element validation references only sources consumed by its own Functions, never foreign claims or business attestations"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R30 same-major Element ABI comparator denies unversioned description drift, removed public Function, missing dependency and changed owner"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+          "case": "B07-02 R52 undeclared target Function, missing version and duplicate Function selection fail closed at AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 explicit empty caller source, selection and semantic reviewer maps cannot fallback to trusted receipt"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 counterfeit source or JSON-as-code and caller SAP/Effect/Function-version forged requests fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 forged LOCAL semantic owner approval cannot become typed SDK success even with pinned source"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 forged full publisher pin, source semantic approval, missing case and broken DKE V8 receipt fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 wrong installer DATA pin, JSON-as-code, unselected case and forged Function input/effect all rejected"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 forged origin package/full source SHA, false semantic Owner SAP, altered method graph/cycle/duplicate fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 compressed upstream DATA cannot masquerade as LOCAL code, installer drift and forged Function Effect rejected"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline",
+        "r15-d02-d03-native",
+        "r29-native-source-first-ci",
+        "r52-b07-function-dependency-ci",
+        "r60-b14-r16-source-authenticity-native-ci",
+        "r61-b15-r17-guide-version-native-ci",
+        "r62-b16-r18-native-transitive-knowledge-impact-ci",
+        "r89-d02-parent-split-semantic-static-r30-native-ci"
+      ],
+      "note": "R9 Element has id/description/functions, but no required version/validation metadata or multi-function native Element conformance. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 source-pinned DKE ED06 native selected LOCAL Knowledge functions across three decomposition variants; identity and Function selection bounded, not an independently verified cohesive Element-owner decision. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN. R30 Element version/source-validation ABI and same-major structural comparator are exact-SHA native-qualified at #2419/1–3 (r89); every selected Element version is mandatory and opt-in source-linked validation has authority NONE. The D02 same-source parent-vs-split test compares the same two advisory Function outputs in split and fused Element layouts at the same source. These are structural compatibility/output-preservation proofs only; they do not decide optimal semantic boundaries, approve SAP or close C1. B07 R52/R53 exact real selected xDownload Function-level static dependencies and source-version-linked semantic constraint qualified at source 0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f / #2305/1-3 all SUCCESS, with separate original test Git Blobs and negative cases. This is bounded structural provenance and advisory Knowledge consumption; complete domain semantic Oracle/SAP, full public ABI or Product/L1 Target applicability remains unproven; state PARTIAL. B14/R60 DKE R16 original full-source native authenticity upstream receipt DATA selected through actual DIS SDK/KDP native Knowledge; exact 9b761ad3628048706a6207deb645add5dc27eee1 Woodpecker #2329/1–3 3/3 SUCCESS. Only four source-scope OBSERVED, seven UNKNOWN; independent semantics/SAP absent; remains PARTIAL. B15/R61 genuine original DKE R17 Framework Guide 203→79 stale step-reference case 20 native DIS SDK/KDP cases, exact 2d331ec0aa38464808d419318422a86fa60c6d7a #2331/1–3 SUCCESS. Method stays UNKNOWN/invalidated, full publisher source not byte pinned and independent SAP=0. Core remains PARTIAL. B16/R62 selected actual original DKE R18 native 10-node graph under DIS AOT/SDK/KDP, four selectively INVALIDATED and RTC Knowledge unaffected, exact e1636200... #2344/1–3 3/3 SUCCESS; original publisher Guide 203/79 unpinned and independent SAP=0; remains PARTIAL."
+    },
+    {
+      "id": "DIS020-CORE-003",
+      "title": "Public Function I/O schema, typed outcomes, evidence obligations, compatibility",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "3"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs",
+        "packages/microkernel/dis-v020.mjs",
+        "examples/dis-v020-native-sdk/native-fixture.mjs",
+        "examples/dis-v020-native-sdk/dke-r27-impact.mjs",
+        "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+        "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+        "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+        "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+        "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+        "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+        "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+        "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r16-source-reader.mjs",
+        "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r17-guide-reader.mjs",
+        "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r18-impact-reader.mjs",
+        "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+        "examples/dis-v020-native-sdk/b20-nested-function-schema.test.mjs",
+        "packages/contracts/dis-v020.d.mts",
+        "packages/microkernel/dis-v020.d.mts",
+        "examples/dis-v020-native-sdk/types-smoke.mts",
+        "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 typed Function I/O and provenance preserve original Tally UNKNOWN advisory semantics"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 native xDownload clarification and confirmation remain typed and never authorize Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R16 selected native KDP Intent has typed ADMITTED without pretending Effect completion"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R17 AOT-selected Tally bounded optional and closed record schema preserves UNKNOWN and refuses extra keys"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R21 selected AOT native SDK consumes 24 DKE CQ Functions with SOURCE status and no authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R22 each AOT-selected DKE Knowledge Function registers its exact data source dependency"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R27 actual Tally 14-record source delta maps into two CQs, two unqualified SAP proposals and two selected Business packages"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+          "case": "B01-01 R32 real selected Tally rule and xDownload Knowledge/Interaction Functions retain typed source and authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+          "case": "B01-01 R32 KDP admission remains typed separately from LOCAL evidence and never proves Effect success"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+          "case": "B01-03 R34 same-major Function ABI preserves selected Tally rule required output and optional reader contract"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+          "case": "B01-03 R34 Element public Function membership and ownership cannot silently drift at unchanged source version"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 R45 selected Linux/x64 native BUILD + complete installer Source + Host close in one real KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+          "case": "B05-03 R46 real host original Tally Rule xDownload Knowledge Runx Stateful and KDP admission compose without business authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+          "case": "B07-02 R52 original xDownload acquisition statically pins two separate Interaction Functions and one Knowledge Function"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 original DKE #209 R6 Git receipt is actual selected native DIS Knowledge dependency"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 two actual Tally source versions distinguish new graph evidence without SAP upgrade"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 original R10 Python certificate and DIS Reader are AOT-selected DATA and local code with exact Git origin"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 native real KDP SDK replays all 2048 valuations and 18 complete witness worlds; seven UNKNOWN remain UNKNOWN"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 original DKE R16 full-original-publisher receipt is selected AOT Knowledge DATA, not executable or SAP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 original publisher byte-authenticity and all 11 source-scope questions are typed OBSERVED vs UNKNOWN, never qualified semantics"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original DKE R17 publisher observations/cases/V8 receipt are three exact AOT DATA pins, Reader is a separate selected Knowledge LOCAL"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 actual native SDK replays all original DKE 20 cases, holds two real stale-step conflicts as typed UNKNOWN without physical KDP Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original two step-reference conflicts do not permit silent 16→26/17→28 remap even in a hypothetical fixed-looking target"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE R18 native runner and machine receipt compressed Git Blobs are selected AOT DATA, never executable"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE native evidence DAG: only four nodes invalidated, unrelated RTC Knowledge preserved in real selected SDK"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 native independent graph replay verifies original baseline/partial/hypothetical and conservative missing-publisher-source gate"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 actual selected KDP invoking original full-source-bound EV16 returns typed UNKNOWN, never RFC join or Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 immutable exact R23 reader installer pin cannot silently replace R26; versioned contract remains compatible"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b20-nested-function-schema.test.mjs",
+          "case": "B20 R66 actual source-locked native SDK reads bounded nested xDownload policy with typed arrays"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R72 selected Tally Runx xDownload and Orders nine public Functions have explicit distinct nonempty purposes in native AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R72–R75 selected Function inventory distinguishes nine typed profiles without certifying source SAP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R73 typed actual KDP Intent envelope and KDP receipt never imply executed Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R74 selected Business App Init has typed Context / READY lifecycle and no public ingress"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R75 real selected Runx process-local Factory, observe list and latest method I/O are checked"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 refuses malformed Function output rather than claiming a typed successful outcome"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 declared SUCCEEDED without required evidence fails closed even for source-pinned local code"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R11 AOT rejects incompatible Function contract reader/major and weak success evidence policy"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R16 KDP admission profile refuses a forged success / unrelated accepted status"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "R17 ABI comparator refuses unversioned drift, required-input addition and output loss"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R21 source drift, forged registry, stale Function and missing real Evidence fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R22 unknown, duplicate and cross-origin source dependencies are rejected before KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R27 false SAP approval, unknown selected package, omitted reader, forged source and stable-CQ claims fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+          "case": "B01-01 R32 a forged LOCAL output, undecared outcome or effect-bearing Knowledge input fails closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+          "case": "B01-01 R32 contract same-version drift and forged declared Evidence cannot qualify truth"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+          "case": "B01-03 R34 an internally valid rebuilt AOT is denied by stale installed digest before KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-abi-regression.test.mjs",
+          "case": "B01-03 R34 authoritative caller source change denies old AOT; false semantic claims cannot appear in Element source validation"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 R45 removing one consumed Domain original source pin cannot admit a target"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 R45 malicious source Git origin and forged unrelated source fail closed independent of AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 R45 nonboolean and absent strict Source closure options fail before KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+          "case": "B05-03 R46 original source and host matching still cannot make unreviewed semantic Tally claim succeed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+          "case": "B05-03 R46 stale independent source pin denies selected native KDP boot before side effects"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+          "case": "B07-02 R52 same-version silent dependency drift and same-major Function binding removal are incompatible"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 changed DKE source, false producer approval and source-origin mismatch fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 independently installer-pinned DKE input, Function schema and forged outcome refuse privilege"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 producer DKE JSON source is selectable only as DATA, never executable LOCAL or unsafe docs path"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 complete countermodel verifier rejects missing variable, false source-fact, incorrect polarity and SAP impersonation"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 stale installer source, JSON-as-code and caller forged owner/Effect fail closed before authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 explicit empty caller source, selection and semantic reviewer maps cannot fallback to trusted receipt"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 counterfeit source or JSON-as-code and caller SAP/Effect/Function-version forged requests fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 forged LOCAL semantic owner approval cannot become typed SDK success even with pinned source"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 forged full publisher pin, source semantic approval, missing case and broken DKE V8 receipt fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 wrong installer DATA pin, JSON-as-code, unselected case and forged Function input/effect all rejected"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 forged origin package/full source SHA, false semantic Owner SAP, altered method graph/cycle/duplicate fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 compressed upstream DATA cannot masquerade as LOCAL code, installer drift and forged Function Effect rejected"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 exact R26 typed Reader: 76 source-bound adversarial request vectors and native selected Knowledge remain fail-closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 native selected Knowledge rejects wrong EV, extra payload, false approvals and contract mismatch"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 immutable exact R23 reader installer pin cannot silently replace R26; versioned contract remains compatible"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b20-nested-function-schema.test.mjs",
+          "case": "B20 R66 malformed recursive schemas and over-budget depth/cardinality fail closed at AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R72 invalid selected Function purpose fails AOT compilation and legacy missing purpose cannot pass explicit strict inspector"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R72 descriptions do not authorize business truth or change an installed AOT source lock"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R73 incomplete or forged KDP schema fails source-selected AOT qualification"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R74 forged App Init Schema and fake outcome cannot grant startup authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R75 forged clock, method output, and unsafe source-selected method schema fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/public-function-contract-coverage.test.mjs",
+          "case": "R76 real selected Function compatibility denies hidden Handle, Init and KDP policy drift under a same-major Element bump"
+        }
+      ],
+      "receiptIds": [
+        "r14-d01-ci-recovered",
+        "r16-kdp-admission-ci",
+        "r17-bounded-schema-ci",
+        "r18-r20-native-integration-repaired",
+        "r21-native-dke-semantic-ci",
+        "r27-native-impact-ci",
+        "r29-native-source-first-ci",
+        "r32-b01-function-ci",
+        "r34-b01-abi-ci",
+        "r45-b05-source-closure-ci",
+        "r46-b05-target-original-consumer-ci",
+        "r52-b07-function-dependency-ci",
+        "r54-b08-real-dke-knowledge-consumer-ci",
+        "r55-b09-dke-conditional-proof-native-ci",
+        "r56-b10-r10-complete-witness-native-ci",
+        "r60-b14-r16-source-authenticity-native-ci",
+        "r61-b15-r17-guide-version-native-ci",
+        "r62-b16-r18-native-transitive-knowledge-impact-ci",
+        "r65-b19-r26-typed-source-native-ci",
+        "r66-b20-nested-function-schema-native-ci",
+        "r79-core003-public-functions-semantic-ci",
+        "r84-c3-selected-closure-ci"
+      ],
+      "note": "R11 native source-real Tally/xDownload bounded Function I/O, typed outcomes, provenance and reader major guard plus R13 validator fix passed exact-SHA Woodpecker #2234 at 51a39d2 (r14-d01-ci-recovered). Still PARTIAL: not all public Functions profiled, no native KDP_INTENT typed receipt, no independent domain evidence attestation and no complete schema/cross-version structural compatibility. R16 candidate adds a separately AOT-locked KDP receipt admission profile (actual selected orders KDP Intent), not a completed Effect/business evidence attestation; pending new exact-SHA CI. R16 exact SHA db10ddbc / Woodpecker #2237 three contexts SUCCESS; KDP admission classified, not executed Effect or independent Evidence. R17 draft tests bounded opt-in record Schema and same-major structural reader compatibility; pending exact-SHA CI. R17 bounded record/optional/closed Schema and structural same-major comparator passed exact-SHA Woodpecker #2238 at fe51db3. R18 uses original Tally release advisory source, adds all-reported-PASS but never independently attested negative and forged local Release status guard; not yet current CI-verified. R19 #2240 dedicated integration FAILURE with other contexts SUCCESS (blocked historical receipt; root cause not demonstrated). R19.1 addresses a separate source-backed zero-argument public Knowledge ABI compatibility regression with allowAbsent on closed empty records and negative tests. Await new exact HEAD CI. R19.1 dedicated #2241 integration FAILURE (2 other contexts SUCCESS) is preserved as blocked historical receipt, not a verifier. R20 proposes source-real Runx PROCESS_LOCAL Handle method contract; no serialized record lie, Host lease or independent evidence verification. New CI pending. R18-R20 native integration repair: authenticated Woodpecker step logs show #2240/#2241/#2242 each failed exactly one legacy test (native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule) because R19's new receipt contract on xdownload.confirmDownload tripped the earlier R16 receipt-binding guard (DIS_KDP_RECEIPT_BINDING_UNSUPPORTED) before DIS_LOCAL_NOT_QUALIFIED; repair dfba82a7 completes the fixture mutation by stripping receiptContract in the clone, keeping the load-bearing R16 guard order pinned by its own dedicated test. Exact HEAD dfba82a7723d709ee22acd65b079fdcc98000f69 / TREE 57b789dff8039888f39e7045e0216b9962ae87fb qualified by Woodpecker #2243/1-3 all SUCCESS (65/65 native tests incl. R18/R19/R19.1/R20 plus the two previously unreached lane tail commands; receipt r18-r20-native-integration-repaired). CORE-003 stays PARTIAL. R21 true AOT-selected DKE source consumer qualified by exact-SHA #2249/1 DIS Integration SUCCESS + #2249/3 General Verify SUCCESS; #2249/2 engine-only CI ERROR is recorded but not a semantic gate per Owner. 24 true selected Function CQ calls and source/currentness negatives, no independent Knowledge Oracle/Package inverse registry. Historical mixed-CI receipt r21-native-dke-semantic-ci. R22 candidate adds optional per-LOCAL-Function sourceDependencies in AOT, reverse sourceConsumers lookup for DKE original execution + data projection, fail-closed missing/duplicate/foreign source and forged KDP_INTENT cases. Not a CQ→SAP→external Package/ECP change-currentness proof; awaiting own exact-SHA native integration CI. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. Batch B01 exact R32/R33/R34 source test blobs qualified at replay SHA 0e0d9ad8b227ed1f1ef90af648e423cd43214563 / Woodpecker #2276/1-3 3/3 SUCCESS, with original three round commits and prior FAILURE/ERROR retained; Function I/O and structural ABI are bounded, SAP/Oracle and full applicable ABI obligations still PARTIAL. B05 native real process OS/arch preflight, optional complete installer original source locks and actual Tally/Runx/xDownload/KDP invocation candidate. It remains a bounded C2/C3 implementation; it is not distinct per-OS module source or independent Tally semantic SAP acceptance. No Core promotion without authoritative scope and exact CI. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B07 R52/R53 exact real selected xDownload Function-level static dependencies and source-version-linked semantic constraint qualified at source 0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f / #2305/1-3 all SUCCESS, with separate original test Git Blobs and negative cases. This is bounded structural provenance and advisory Knowledge consumption; complete domain semantic Oracle/SAP, full public ABI or Product/L1 Target applicability remains unproven; state PARTIAL. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL. B09 R55 exact source `2d96e16942dcff518619b37e4b6c0664ca032ae3` / Woodpecker #2312/1-3 all SUCCESS, original DKE R9 fixed Git formal DATA + per-CQ source refs consumed by actual native selected DIS BUILD/SDK/KDP Knowledge Function: 2 ENTAILED, 2 REFUTED, 7 UNKNOWN. Read-only OBSERVED of REFUTED is not positive SAP; source facts same-model authored and upstream DKE R10 complete certificate NOT part of selected R55 source. No independent domain-semantic approval, source owner SAP, Effect or full Core conformance; this requirement remains PARTIAL. B10 R56 original DKE R10 full 11-var witness certificate, 2048 assignments/64 satisfying/18 complete witnesses selected native SDK Knowledge Function qualified at 66d7024f551faa69fa432e19cc535ced8065abd0 #2320/1-3 3/3 SUCCESS; independent semantic SAP and source-owner truth still NOT qualified. Core stays PARTIAL. B14/R60 DKE R16 original full-source native authenticity upstream receipt DATA selected through actual DIS SDK/KDP native Knowledge; exact 9b761ad3628048706a6207deb645add5dc27eee1 Woodpecker #2329/1–3 3/3 SUCCESS. Only four source-scope OBSERVED, seven UNKNOWN; independent semantics/SAP absent; remains PARTIAL. B15/R61 genuine original DKE R17 Framework Guide 203→79 stale step-reference case 20 native DIS SDK/KDP cases, exact 2d331ec0aa38464808d419318422a86fa60c6d7a #2331/1–3 SUCCESS. Method stays UNKNOWN/invalidated, full publisher source not byte pinned and independent SAP=0. Core remains PARTIAL. B16/R62 selected actual original DKE R18 native 10-node graph under DIS AOT/SDK/KDP, four selectively INVALIDATED and RTC Knowledge unaffected, exact e1636200... #2344/1–3 3/3 SUCCESS; original publisher Guide 203/79 unpinned and independent SAP=0; remains PARTIAL. B19/R65 DKE R26 strict typed Reader original exact source 6b1904f9933b1c59070bed1621b3c9f9f329882c Woodpecker #2357/1–3 3/3 SUCCESS, 76 real native selected Reader negative vectors, versioned 1.1 Function compatibility and old SHA installer refusal; Core stays PARTIAL without independent SAP/semantic acceptance. B20/R66 original optional bounded nested Function I/O Schema on actual xDownload source, exact 2616ca326d3c0e0dd06d9b68b8d2127d60ec4825 Woodpecker #2364/1–3 3/3 SUCCESS, native typed record/array depth and same-major ABI tests; still PARTIAL because full public Functions, independent semantics/SAP and governance are unqualified. R79 selected public Function contract source qualified at exact c1f3fb71e0ab4616ad6bf4c98db9d81275c4dacb TREE 0d8329dce7fdc7893c0a7adfa7c90d4e66ab44d3 Woodpecker #2391/1 integration SUCCESS and #2391/3 general verify SUCCESS. #2391/2 verify-min-node FAILURE retained without 3/3 or release eligibility. Pre-existing owner-authorized DIS_SEMANTIC_ONLY rule (R21) applies only to the bounded DIS Function semantic/structural conformance. Nine real selected Functions have explicit descriptions, applicable typed IO/Outcome/Evidence boundaries and source-bound ABI negative tests; public .d.mts/native TS consumer exercised. KDP admission != Effect, Runx handle state != KDP lease, semantic SAP still UNQUALIFIED, Target applicability and full CORE016 unqualified. C3 B05-02 selected Linux/x64 BUILD + complete installer Source + Host one-KDP-boot positive was renamed by commit b8682277 and re-anchored in this Matrix after #2409/1 failed 7 validator cases with MATRIX_CASE_NOT_FOUND (anchor drift, not a native or product defect); repaired HEAD 1c9826bcfecdbd83c57a466e624eec4defb29604 qualified 3/3 SUCCESS at Woodpecker #2410 with DIS_C3_SELECTED_CLOSURE linux/x64/node evidence (receipt r84-c3-selected-closure-ci)."
+    },
+    {
+      "id": "DIS020-CORE-004",
+      "title": "LOCAL vs KDP_INTENT Function binding, effect classification, authority boundary",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "3"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs",
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native public SDK loads actual selected KDP, initializes one Business and executes admitted orders Intent"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Actual source-real Tally/Runx/xDownload consumer tests including forged Effect binding."
+    },
+    {
+      "id": "DIS020-CORE-005",
+      "title": "Static Element DAG and semantic relations/constraints/collaboration",
+      "profile": "core",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "2,4"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs",
+        "examples/dis-v020-native-sdk/dke-r27-impact.mjs",
+        "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+        "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+        "examples/dis-v020-native-sdk/b07-semantic-relation.test.mjs",
+        "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r16-source-reader.mjs",
+        "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r17-guide-reader.mjs",
+        "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r18-impact-reader.mjs",
+        "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r33-go-reader.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native Contracts + canonical BUILD select 4 heterogeneous domains and explicit global semantics"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R27 actual Tally 14-record source delta maps into two CQs, two unqualified SAP proposals and two selected Business packages"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R29 original source-first ledger identifies two Case-owned Elements and two selected Business readers, but never accepts unreviewed SAP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+          "case": "B03-03 R40 one-model DKE reviewer and synthetic locator repair remain unqualified, independent of Target label"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+          "case": "B07-02 R52 static dependency cycles are refused while semantic collaboration cycles are legal metadata"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b07-semantic-relation.test.mjs",
+          "case": "B07-03 R53 real xDownload source-owned policy constraint has versioned pinned non-authoritative relation and Knowledge verifier"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 original DKE R16 full-original-publisher receipt is selected AOT Knowledge DATA, not executable or SAP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 original publisher byte-authenticity and all 11 source-scope questions are typed OBSERVED vs UNKNOWN, never qualified semantics"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original DKE R17 publisher observations/cases/V8 receipt are three exact AOT DATA pins, Reader is a separate selected Knowledge LOCAL"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 actual native SDK replays all original DKE 20 cases, holds two real stale-step conflicts as typed UNKNOWN without physical KDP Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original two step-reference conflicts do not permit silent 16→26/17→28 remap even in a hypothetical fixed-looking target"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE R18 native runner and machine receipt compressed Git Blobs are selected AOT DATA, never executable"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE native evidence DAG: only four nodes invalidated, unrelated RTC Knowledge preserved in real selected SDK"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 native independent graph replay verifies original baseline/partial/hypothetical and conservative missing-publisher-source gate"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+          "case": "R33 receipt and reader are exact original Git source selected by AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+          "case": "R33 full real original source tier consumes into KDP and only yields typed UNKNOWN"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "D02 semantic cooperation may be cyclic while static Element dependency DAG remains acyclic"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+          "case": "C1 EV16 R3 two original DKE sources are selected DATA only by real AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+          "case": "C1 EV16 R3 actual KDP Function produces typed UNKNOWN and never source SAP"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "declared semantic depends-on relationship must agree with the sealed Element DAG"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R27 false SAP approval, unknown selected package, omitted reader, forged source and stable-CQ claims fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R29 original reviewer/source gap and proposed decomposition cannot mint independent domain authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+          "case": "B03-03 R40 Target descriptor cannot grant Source or SAP approval via extra declared fields"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+          "case": "B07-02 R52 undeclared target Function, missing version and duplicate Function selection fail closed at AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b07-semantic-relation.test.mjs",
+          "case": "B07-03 R53 forged domain authority, missing source and invalid relation identity fail closed before selected SDK boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b07-semantic-relation.test.mjs",
+          "case": "B07-03 R53 a nonselected source or a semantic backlink cannot imply an unselected KDP permission"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 explicit empty caller source, selection and semantic reviewer maps cannot fallback to trusted receipt"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 counterfeit source or JSON-as-code and caller SAP/Effect/Function-version forged requests fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 forged LOCAL semantic owner approval cannot become typed SDK success even with pinned source"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 forged full publisher pin, source semantic approval, missing case and broken DKE V8 receipt fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 wrong installer DATA pin, JSON-as-code, unselected case and forged Function input/effect all rejected"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 forged origin package/full source SHA, false semantic Owner SAP, altered method graph/cycle/duplicate fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 compressed upstream DATA cannot masquerade as LOCAL code, installer drift and forged Function Effect rejected"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+          "case": "R33 independently installed original producer DATA and executable reader pins deny stale origin and registry before KDP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+          "case": "R33 original source tamper, wrong tier, forged SAP/Effect fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "D02 cross-Element constraint relation cannot nominate an absent owner"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/c1-ev16-r3-source-consumer.test.mjs",
+          "case": "C1 EV16 R3 provenance forgery or Owner/Effect escalation is rejected at source, AOT or SDK"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline",
+        "r15-d02-d03-native",
+        "r27-native-impact-ci",
+        "r29-native-source-first-ci",
+        "r40-b03-target-sap-boundary-ci",
+        "r52-b07-function-dependency-ci",
+        "r53-b07-source-semantic-relation-ci",
+        "r60-b14-r16-source-authenticity-native-ci",
+        "r61-b15-r17-guide-version-native-ci",
+        "r62-b16-r18-native-transitive-knowledge-impact-ci",
+        "r82-b22-r33-source-native-ci",
+        "r88-c1-ev16-r3-r1-query-snapshot-native-ci",
+        "r89-d02-parent-split-semantic-static-r30-native-ci"
+      ],
+      "note": "DAG and relation edges verified; business invariants and runtime collaboration semantics are not interpreted as generalized executable contracts. D02 same-source parent-vs-split and semantic-vs-static dependency cases are registered and native CI-qualified at #2419 (r89): cooperation relations may be cyclic metadata while static Element dependency DAG cycles remain rejected; absent relation owners fail closed. This is structural behavior, not independent semantic ownership or SAP. C1 EV16 R3/R7/R1 selected-source reader and native AOT/SDK/KDP consumer are exact-SHA qualified at #2419 (r88); caller getter/Proxy/inherited/symbol attacks fail closed and selected outcomes remain typed UNKNOWN. No Owner/SAP/Effect promotion. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. R21 24 CQ native AOT source-consumption confirmed on real original Tally KG projection/Textile reference. No registered complete CQ→SAP→external Package inverse dependency or independent semantic oracle; remains PARTIAL. R22 first bounded static reverse provenance edge source→selected LOCAL Function, distinctly not Element DAG cycle, automatic SAP invalidation or ECP dependent closure. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. R29 repaired exact native C1 source-first ledger at 91e48b1b0d6a30173cc0b3cce001040878e381bb / Woodpecker #2266/1-3 SUCCESS; case-specific Element ownership still a proposal (one model, not independent Oracle), original GH locator gap OPEN. B03 R38–R40 candidate typed target/installer checks and DKE semantic authority negative are actual source-committed, new target identity is optional and bound to canonical module SHA roster; physical OS variant/independent SAP source owner not yet qualified. No automatic Core promotion. B03 R40 Git-Blob-pinned first-party DKE reviewer/locator status explicitly remains unqualified; no independent original source/SAP approval. R40 exact #2284/1–3 SUCCESS scoped negative only; CORE still PARTIAL. B07 R52/R53 exact real selected xDownload Function-level static dependencies and source-version-linked semantic constraint qualified at source 0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f / #2305/1-3 all SUCCESS, with separate original test Git Blobs and negative cases. This is bounded structural provenance and advisory Knowledge consumption; complete domain semantic Oracle/SAP, full public ABI or Product/L1 Target applicability remains unproven; state PARTIAL. B14/R60 DKE R16 original full-source native authenticity upstream receipt DATA selected through actual DIS SDK/KDP native Knowledge; exact 9b761ad3628048706a6207deb645add5dc27eee1 Woodpecker #2329/1–3 3/3 SUCCESS. Only four source-scope OBSERVED, seven UNKNOWN; independent semantics/SAP absent; remains PARTIAL. B15/R61 genuine original DKE R17 Framework Guide 203→79 stale step-reference case 20 native DIS SDK/KDP cases, exact 2d331ec0aa38464808d419318422a86fa60c6d7a #2331/1–3 SUCCESS. Method stays UNKNOWN/invalidated, full publisher source not byte pinned and independent SAP=0. Core remains PARTIAL. B16/R62 selected actual original DKE R18 native 10-node graph under DIS AOT/SDK/KDP, four selectively INVALIDATED and RTC Knowledge unaffected, exact e1636200... #2344/1–3 3/3 SUCCESS; original publisher Guide 203/79 unpinned and independent SAP=0; remains PARTIAL. B22/R82 original DKE source-scoped Knowledge qualified at fe2334e63d39a9c006746caad695f7e3c5ade97d #2397/1-3 3/3; earlier #2395 clone failures retained, all R33 source dispositions UNKNOWN. No independent SAP/Effect/Target approval; remains PARTIAL."
+    },
+    {
+      "id": "DIS020-CORE-006",
+      "title": "Knowledge query/Rule/Stateful implementations and Domain state ownership",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "3"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs",
+        "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+        "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+        "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+        "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+        "examples/dis-v020-stateful/runx-process-state.mjs",
+        "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs",
+        "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r17-guide-reader.mjs",
+        "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r18-impact-reader.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "Runx native stateful observer is not reclassified as a Business or execution lease"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+          "case": "B01-02 R33 real Runx Stateful handles isolate each invocation, source and process-local ownership"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+          "case": "B01-02 R33 Domain-owned Stateful presence does not mutate Tally Rule or xDownload Knowledge outputs"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+          "case": "B05-03 R46 real host original Tally Rule xDownload Knowledge Runx Stateful and KDP admission compose without business authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 original DKE #209 R6 Git receipt is actual selected native DIS Knowledge dependency"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 two actual Tally source versions distinguish new graph evidence without SAP upgrade"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 original R10 Python certificate and DIS Reader are AOT-selected DATA and local code with exact Git origin"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 native real KDP SDK replays all 2048 valuations and 18 complete witness worlds; seven UNKNOWN remain UNKNOWN"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs",
+          "case": "B12 R58 original Runx Stateful local presence does NOT auto-resurrect through second Node process with same physical KDP SQLite file"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original DKE R17 publisher observations/cases/V8 receipt are three exact AOT DATA pins, Reader is a separate selected Knowledge LOCAL"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 actual native SDK replays all original DKE 20 cases, holds two real stale-step conflicts as typed UNKNOWN without physical KDP Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original two step-reference conflicts do not permit silent 16→26/17→28 remap even in a hypothetical fixed-looking target"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE R18 native runner and machine receipt compressed Git Blobs are selected AOT DATA, never executable"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE native evidence DAG: only four nodes invalidated, unrelated RTC Knowledge preserved in real selected SDK"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 native independent graph replay verifies original baseline/partial/hypothetical and conservative missing-publisher-source gate"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-cross-project/consumer.test.mjs",
+          "case": "Runx: presence observation cannot be treated as a fresh lease or execution permit"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+          "case": "B01-02 R33 source-real Runx token mismatch cannot create presence or grant lease"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+          "case": "B01-02 R33 SDK stop denies new Stateful and Effect ingress, but existing in-process handles are not remotely revoked"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+          "case": "B05-03 R46 original source and host matching still cannot make unreviewed semantic Tally claim succeed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+          "case": "B05-03 R46 stale independent source pin denies selected native KDP boot before side effects"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 changed DKE source, false producer approval and source-origin mismatch fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 independently installer-pinned DKE input, Function schema and forged outcome refuse privilege"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 producer DKE JSON source is selectable only as DATA, never executable LOCAL or unsafe docs path"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 complete countermodel verifier rejects missing variable, false source-fact, incorrect polarity and SAP impersonation"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 stale installer source, JSON-as-code and caller forged owner/Effect fail closed before authority"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs",
+          "case": "B12 R58 forged Runx agent token cannot put a fake execution lease into the physical KDP or Runx owner map"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b12-runx-physical-state-process.test.mjs",
+          "case": "B12 R58 invalid OS process modes and source spoofed argument shape fail closed before KDP DB opening"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 forged full publisher pin, source semantic approval, missing case and broken DKE V8 receipt fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 wrong installer DATA pin, JSON-as-code, unselected case and forged Function input/effect all rejected"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 forged origin package/full source SHA, false semantic Owner SAP, altered method graph/cycle/duplicate fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 compressed upstream DATA cannot masquerade as LOCAL code, installer drift and forged Function Effect rejected"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline",
+        "r33-b01-state-ci",
+        "r34-b01-abi-ci",
+        "r46-b05-target-original-consumer-ci",
+        "r54-b08-real-dke-knowledge-consumer-ci",
+        "r55-b09-dke-conditional-proof-native-ci",
+        "r56-b10-r10-complete-witness-native-ci",
+        "r58-b12-runx-physical-process-state-ci",
+        "r61-b15-r17-guide-version-native-ci",
+        "r62-b16-r18-native-transitive-knowledge-impact-ci"
+      ],
+      "note": "Actual Tally rule and Runx observer run as LOCAL, but general per-Element state ownership and knowledge query contract do not have complete executable profile. B01 R33 real Runx Stateful handle independence, token mismatch, process-local boundary and separated Tally Rule/xDownload Knowledge sources PASS at exact replay #2276/1-3; closing SDK ingress does not revoke existing in-process handles or prove persistent Domain state or real KDP lease. Still PARTIAL. B05 native real process OS/arch preflight, optional complete installer original source locks and actual Tally/Runx/xDownload/KDP invocation candidate. It remains a bounded C2/C3 implementation; it is not distinct per-OS module source or independent Tally semantic SAP acceptance. No Core promotion without authoritative scope and exact CI. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL. B09 R55 exact source `2d96e16942dcff518619b37e4b6c0664ca032ae3` / Woodpecker #2312/1-3 all SUCCESS, original DKE R9 fixed Git formal DATA + per-CQ source refs consumed by actual native selected DIS BUILD/SDK/KDP Knowledge Function: 2 ENTAILED, 2 REFUTED, 7 UNKNOWN. Read-only OBSERVED of REFUTED is not positive SAP; source facts same-model authored and upstream DKE R10 complete certificate NOT part of selected R55 source. No independent domain-semantic approval, source owner SAP, Effect or full Core conformance; this requirement remains PARTIAL. B10 R56 original DKE R10 full 11-var witness certificate, 2048 assignments/64 satisfying/18 complete witnesses selected native SDK Knowledge Function qualified at 66d7024f551faa69fa432e19cc535ced8065abd0 #2320/1-3 3/3 SUCCESS; independent semantic SAP and source-owner truth still NOT qualified. Core stays PARTIAL. B12/R58 original Runx Stateful is PROCESS_LOCAL despite identical physical file-backed KDP SQLite reopened across OS child processes; exact 67bd90839e3634427845181a406cd32804c75e17 / Woodpecker #2325/1–3 SUCCESS. A Domain-owned persistent State schema/recovery contract NOT implemented, still PARTIAL. B15/R61 genuine original DKE R17 Framework Guide 203→79 stale step-reference case 20 native DIS SDK/KDP cases, exact 2d331ec0aa38464808d419318422a86fa60c6d7a #2331/1–3 SUCCESS. Method stays UNKNOWN/invalidated, full publisher source not byte pinned and independent SAP=0. Core remains PARTIAL. B16/R62 selected actual original DKE R18 native 10-node graph under DIS AOT/SDK/KDP, four selectively INVALIDATED and RTC Knowledge unaffected, exact e1636200... #2344/1–3 3/3 SUCCESS; original publisher Guide 203/79 unpinned and independent SAP=0; remains PARTIAL. R71 structural selected-consumer source acceptance: Product/L1 #1496 + DIS R3 §3/§5 require Domain-owned Knowledge/Rule/Stateful business semantics, not a universal persistent State Engine or automatic KDP lease. Original R33 source-real Runx PROCESS_LOCAL independent handle ownership vs Tally Rule and xDownload Knowledge, R46 original three-Business native integration, R54 DKE read-only source DATA, and R58 genuine separate OS processes sharing physical SQLite all have exact-source Woodpecker 3/3 SUCCESS, linked native positive/negative receipts and no implicit Effect. Selected Function ownership/consumption boundary is qualified; source owner's independent approval of particular business claims, general arbitrary producer semantic truth and application-specific durable-state promises are NOT qualified. No fabricated SAP; separate C1 semantic gate stays OPEN."
+    },
+    {
+      "id": "DIS020-CORE-007",
+      "title": "Canonical AOT full BUILD identity, source provenance, selected route/handler",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "5"
+      },
+      "implementation": [
+        "tooling/build/dis-v020.mjs",
+        "packages/contracts/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-cross-project/selected-build.test.mjs",
+          "case": "R8 canonical BUILD selects byte-locked Tally and xDownload real Business packages"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "installed independent digest catches altered but rehashed and internally valid AOT semantics"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Current built target closure + independent digest verified; cross-Target packaging handled by another requirement."
+    },
+    {
+      "id": "DIS020-CORE-008",
+      "title": "Target-specific package dependency and implementation selection",
+      "profile": "core",
+      "state": "VERIFIED",
+      "qualifiedTarget": {
+        "platform": "linux",
+        "architecture": "x64",
+        "runtime": "node"
+      },
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "5"
+      },
+      "implementation": [
+        "tooling/build/dis-v020.mjs",
+        "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+        "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+        "examples/dis-v020-native-sdk/b03-target-closure.test.mjs",
+        "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+        "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+        "packages/microkernel/dis-v020.mjs",
+        "packages/contracts/dis-v020.mjs",
+        "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+        "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+        "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs",
+          "case": "AOT target drift fails closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+          "case": "B02-01 R35 real selected Tally and xDownload Business packages resolve original source and KDP implementation without target fiction"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 selected Interaction and its governed Effect bind to distinct native Function authorities"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-closure.test.mjs",
+          "case": "B03-01 R38 selected canonical Tally/xDownload and KDP modules have exact source-locked Target digest roster"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+          "case": "B03-02 R39 independently installed exact Target accepts original Tally xDownload canonical BUILD without Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+          "case": "B03-02 R39 legacy unqualified Target cannot be interpreted as independently pinned"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+          "case": "B03-03 R40 same canonical modules can self-claim distinct OS labels, which is not actual native Target qualification"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+          "case": "B05-01 R44 real runtime OS and CPU architecture match selected original canonical Business/KDP modules"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+          "case": "B05-01 R44 legacy untargeted artifacts remain usable but cannot inherit a claimed host qualification"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 R45 selected Linux/x64 native BUILD + complete installer Source + Host close in one real KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+          "case": "B05-03 R46 real host original Tally Rule xDownload Knowledge Runx Stateful and KDP admission compose without business authority"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+          "case": "B02-01 R35 install refuses tampered selected module bytes or unbound source before KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-package-target.test.mjs",
+          "case": "B02-01 R35 undeclared runtime Target selection is rejected, not implicitly treated as Windows/Linux/Android conformance"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 native SDK stop rejects further interaction with no hidden auto-resume"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-closure.test.mjs",
+          "case": "B03-01 R38 Target claim cannot omit selected original KDP/C or Business modules"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-closure.test.mjs",
+          "case": "B03-01 R38 forged Target source SHA, unknown package, duplicate and unsupported architecture fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+          "case": "B03-02 R39 targeted AOT requires independent installed Target, not a self-authorizing program label"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-installer.test.mjs",
+          "case": "B03-02 R39 correct Target identity never overrides stale installer AOT or source pin"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+          "case": "B03-03 R40 Target descriptor cannot grant Source or SAP approval via extra declared fields"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+          "case": "B05-01 R44 caller and AOT agreeing on a wrong OS label cannot bypass the real runtime host identity"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-host-target.test.mjs",
+          "case": "B05-01 R44 caller and AOT agreeing on a wrong architecture cannot boot the KDP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 R45 removing one consumed Domain original source pin cannot admit a target"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 R45 malicious source Git origin and forged unrelated source fail closed independent of AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 R45 nonboolean and absent strict Source closure options fail before KDP boot"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+          "case": "B05-03 R46 original source and host matching still cannot make unreviewed semantic Tally claim succeed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-target-consumer.test.mjs",
+          "case": "B05-03 R46 stale independent source pin denies selected native KDP boot before side effects"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+          "case": "B05-02 C3 cross-boundary forged selected module roster cannot be rescued by a correct host and full installer source pins"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline",
+        "r35-b02-selected-target-ci",
+        "r37-b02-interaction-negative-ci",
+        "r38-b03-target-roster-ci",
+        "r39-b03-installer-target-ci",
+        "r40-b03-target-sap-boundary-ci",
+        "r44-b05-host-target-ci",
+        "r45-b05-source-closure-ci",
+        "r46-b05-target-original-consumer-ci",
+        "r84-c3-selected-closure-ci",
+        "r85-c3-core008-source-review",
+        "r86-c3-fresh-exact-sha-review-ci"
+      ],
+      "note": "R92 PRODUCT_ACCEPTED: Requester explicitly accepted the completed independent C3 review in #1496 comment 6782273293 (https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293); the earlier approved bounded Demo target is linux/x64/node only (#1496 comment 6777762870). B03/B05 target-specific AOT+BUILD selected module/source/installer/actual Linux x64 Node Host+SDK/KDP closure positives and fail-closed negatives were independently reviewed and qualified at R86 review HEAD c21a7763c1d4539f5ae062f24faead6c9a5f1a9b, Woodpecker #2415/1-3 3/3 SUCCESS; current non-promoted integration baseline a406927e9408424a09776e3896c1aa7ed1d0e9ef #2429/1-3 3/3 SUCCESS. This VERIFIED concerns only selected Target structural closure. Other platforms remain NOT QUALIFIED, Tally semantic SAP/Source Owner remain CORE-002/005 PARTIAL, CORE-016 stays PARTIAL, Effects=0, governance NOT_RUN, no merge/freeze/release. NEW PROMOTION HEAD CI MUST be independently checked. Historical R86 pre-acceptance discussion, now superseded by this narrower accepted Product decision: R86 C3 fresh independent exact-SHA review (2026-11-11, tag DIS1499_C3_FRESH_REVIEW_REPAIR_RESULT) — CORE-008 stays PARTIAL, by rule and by the Product acceptance's own terms. Product/L1 #1496 comment 6777762870 accepted linux/x64/node as the ONLY required applicable Target for this bounded Demo (versioned decision decisions/C3_USER_ACCEPTED_LINUX_X64_NODE_2026-11-11.json, Git Blob 7f0d195849647282fad09a53a117b4f3a705b138, commit 7ada7ae8a73457dfec9937b40ffd4eea4a037b32; reconciliation record decisions/C3_R4_APPROVED_TARGET_R84_CI_RECONCILIATION.json, Blob 183b85359722232ba1336da38f80e452115d1867). Portable byte-identical module sources across Target labels are explicitly allowed and are not per-OS qualification fiction: qualification binds selected target == independent installer target == real process host in one native KDP consumption with fail-closed forged-roster/host/source-pin negatives (B03 R38-R40 + B05 R44-R46; qualifying code HEAD 1c9826bcfecdbd83c57a466e624eec4defb29604 Woodpecker #2410/1-3 SUCCESS; docs HEAD 989a5858ac1393bdecbf20f0344df9c56a889fa6 #2411/1-3 SUCCESS; receipt r85-c3-core008-source-review records the R85 scoped review round). The fresh independent review re-verified the original R1 s5/R3 s3 specs, #1496 Product record, BUILD/Contracts/Microkernel source, B03/B05 tests and CI #2409-#2414 step logs: no P0 product defect in the closure/installer/host/source-pin chain; the r85 receipt was missing from the top-level receipts inventory (3 CI failures #2412-#2414, MATRIX_RECEIPT_INVALID), repaired here. The interim VERIFIED flip at ebaae7de preceded the completed independent review and lacks documented Product/L1 acceptance of it ('CORE-008 remains PARTIAL until remaining engineering evidence and review close', #1496 comment 6777762870), so the state is restored to PARTIAL without deleting any evidence or negative anchor; the closure-plan anti-promotion blocker stays fail-closed. Remaining before any VERIFIED promotion: (1) Product/L1 acceptance of the completed fresh independent review on this exact repaired HEAD (receipt r86 pins it), (2) single-Writer re-application of the scoped linux/x64/node promotion package, (3) independent Tally semantic SAP stays the separate DKE-owned C1 gate (CORE-002/005). Windows/Android/other Targets are neither qualified nor required for this Demo; no SAP, Effect, hardware attestation, L2 Freeze, Merge or Release authority is claimed. Supersedes all earlier sentences in the historical note below that treat Target applicability or per-OS-different-bytes as outstanding C3 requirements. Receipt r86-c3-fresh-exact-sha-review-ci pins this repaired review HEAD c21a7763c1d4539f5ae062f24faead6c9a5f1a9b (TREE b7d678417ed61fd70231dff309275109c5abdc18) with Woodpecker #2415/1-3 all SUCCESS."
+    },
+    {
+      "id": "DIS020-CORE-009",
+      "title": "Two-layer boot/package initialization and exactly one Business App Init",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native public SDK loads actual selected KDP, initializes one Business and executes admitted orders Intent"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK Business App Init refusal blocks every Function without exposing a facade"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Real KDP load then unique Business Init, denied ingress on blocked/invalid init."
+    },
+    {
+      "id": "DIS020-CORE-010",
+      "title": "Ingress direct Function dispatch without mandatory Main Workflow",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "Tally actual Task evidence Function stays OBSERVATION, never mints Task Claim or authorization"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK stop closes all Function ingress, including stateful LOCAL functions"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Native SDK exposes LOCAL and governed KDP function calls without a mandatory Main Workflow."
+    },
+    {
+      "id": "DIS020-CORE-011",
+      "title": "Optional service readiness, bounded DEGRADED, mandatory ingress denied",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK DEGRADED explicitly disables absent optional Tally Function without weakening mandatory KDP"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK refuses silent optional Function omission or optional Business App Init"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Original Tally optional Function is disabled only on explicit Business Init DEGRADED."
+    },
+    {
+      "id": "DIS020-CORE-012",
+      "title": "KDP Effect permit/Journal/UNKNOWN and no fabricated success",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6,8"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-sdk-integration/test.mjs",
+          "case": "trusted K view allows a real bounded temporary-file effect"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-sdk-integration/test.mjs",
+          "case": "after dispatch error is UNKNOWN, not pre-handler refusal"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Original selected-K real gate and negative unknown receipts."
+    },
+    {
+      "id": "DIS020-CORE-013",
+      "title": "Physical KDP Journal recovery and idempotent dual-domain replay",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "6"
+      },
+      "implementation": [
+        "examples/dis-v020-real-aot-bridge/physical-store.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs",
+          "case": "physical SQLite Journal survives close and a real second Node process without duplicated Effects"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs",
+          "case": "untrusted persisted Projection cannot restore physical KDP Journal with wrong installed digest"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Actual file-backed SQLite reopened from second Node process."
+    },
+    {
+      "id": "DIS020-CORE-014",
+      "title": "Progressive Intent Interaction Element across Form/Chat/CLI and no implicit Effect",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "7"
+      },
+      "implementation": [
+        "packages/contracts/dis-v020.mjs",
+        "packages/microkernel/dis-v020.mjs",
+        "examples/dis-v020-interaction/download-goal.mjs",
+        "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+        "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+        "examples/dis-v020-native-sdk/b06-http-transport.test.mjs",
+        "examples/dis-v020-native-sdk/b06-http-negative.test.mjs",
+        "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
+        "examples/dis-v020-interaction/http-transport.mjs",
+        "examples/dis-v020-interaction/cli-transport.mjs",
+        "examples/dis-v020-native-sdk/b11-cli-process.test.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "Chat, Form and CLI share native progressive clarification without triggering xDownload Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+          "case": "B02-02 R36 Chat Form and CLI real native consumers converge on the same authorized-by-none structured Intent"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+          "case": "B02-02 R36 no confirmation in any channel remains pending and never starts a KDP Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 selected Interaction and its governed Effect bind to distinct native Function authorities"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b06-http-transport.test.mjs",
+          "case": "B06-01 R47 actual loopback HTTP Form POST uses selected xDownload Interaction and remains unauthorized for Effects"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b06-http-transport.test.mjs",
+          "case": "B06-01 R47 actual loopback Chat JSON POST and Form produce equivalent source-selected structured Intent"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
+          "case": "B06-03 R49 simultaneous independent HTTP Chat/Form sessions cannot mix original selected Business intents"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b11-cli-process.test.mjs",
+          "case": "B11 R57 real CLI OS child process starts native DIS AOT selected Interaction but never dispatches Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b11-cli-process.test.mjs",
+          "case": "B11 R57 OS CLI without confirmation keeps source-selected Intent at NEEDS_CONFIRMATION"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b11-cli-process.test.mjs",
+          "case": "B11 R57 real child process isolates simultaneous request IDs and original business proposals"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "AOT refuses interaction with KDP_INTENT or governed Effect reclassification"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-parity.test.mjs",
+          "case": "B02-02 R36 all adapters refuse invented execution or ambiguous repeated Form fields before native dispatch"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 private token URL is rejected through all three native channels without Effect ingress"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 oversized confirmed intent and invented authorization are rejected before KDP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+          "case": "B02-03 R37 native SDK stop rejects further interaction with no hidden auto-resume"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b06-http-negative.test.mjs",
+          "case": "B06-02 R48 HTTP rejects forged Effect route, non-POST and unsupported mime before native KDP ingress"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b06-http-negative.test.mjs",
+          "case": "B06-02 R48 duplicate Form values and forged Chat authorization cannot reach selected Interaction"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b06-http-negative.test.mjs",
+          "case": "B06-02 R48 oversized body and credential-bearing URL fail closed over real network"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
+          "case": "B06-03 R49 no confirmation stays pending and cannot transform into KDP Effect permission"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b06-http-lifecycle.test.mjs",
+          "case": "B06-03 R49 actual SDK STOP prevents further HTTP Function ingress without hidden Effect dispatch"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b11-cli-process.test.mjs",
+          "case": "B11 R57 forbidden CLI Effect flags and spoofed caller authorization are refused before native SDK"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b11-cli-process.test.mjs",
+          "case": "B11 R57 real CLI passes credential-bearing URL into selected business rejection, never silent success"
+        }
+      ],
+      "receiptIds": [
+        "r10-ci-recovery",
+        "r15-d02-d03-native",
+        "r36-b02-channel-parity-ci",
+        "r37-b02-interaction-negative-ci",
+        "r47-b06-http-transport-ci",
+        "r48-b06-http-negative-ci",
+        "r49-b06-http-lifecycle-ci",
+        "r57-b11-real-cli-native-ci"
+      ],
+      "note": "Native source-pinned Interaction Element, two public Functions and actual Microkernel SDK consumption run green in exact-SHA CI at c9cc8d63 (receipt r10-ci-recovery; the 6 new Interaction cases are inside the 27-case native consumer suite). Still PARTIAL: no real Chat/Form UI transport, external download Host execution or broader cross-mode conformance. D03 deterministic Chat text/Form URLSearchParams/CLI argv adapters added as native SDK consumer candidates; pending next exact-SHA CI and external UI transport/Host validation. R15 D02/D03 tests were executed in #2235 all three exact-SHA SUCCESS at d2dbda6; limited structural/native adapter proof only. B02 R35–R37 source-pinned native C3 positive+negative cases are versioned; still PARTIAL pending exact full-suite CI plus Product/L1 Target/transport applicability. The current DIS AOT lacks explicit OS Target selector. B02 R36/R37 actual UI-neutral Chat/Form/CLI adapter native #2280/1–3 3/3 SUCCESS, including negative consent, token URLs and no Effect; no deployed real transport; CORE remains PARTIAL. B06 R47–R49 independently committed actual loopback node:http Form/Chat native Interaction transport and negative/effect/concurrency/stop tests, with final batch CI pending; scoped to nonproduction loopback only. B06 R47-R49 actual loopback HTTP Form/Chat transport and negative/concurrency/STOP cases qualified at 272cc9e52df02a1261cc79b96fa2acd683e88680 / #2300/1-3 3/3 SUCCESS with original test Blobs unchanged after the r41-r46 receipt-field validator repair; loopback-only, CORE-014 remains PARTIAL pending actual Product/L1 required transport applicability and full contractual review. B11 R57 real CLI process → selected native SDK/KDP xDownload Interaction with caller and Effect negatives, source b5762ae29ac7234d45d8bc1cbf974faebad39e2e #2323 3/3 SUCCESS; Product/L1 architecture/production CLI target and full Core scope not accepted. Remains PARTIAL. R69 source-scope closure: Product/L1 #1496 and DIS R3 §7/§5 define selected Interaction as optional UI-neutral progressive Intent clarification; a production Form+Chat+CLI UI engine or Host Effect is not a universal DIS Core MUST. Genuine selected xDownload native Chat/Form/CLI parity #2280/1–3, real loopback HTTP #2300/1–3 and Node CLI child process #2323/1–3 are original three-context SUCCESS with both positive and negative source-linked Matrix cases. This qualifies the selected structural Interaction/no-implied-Effect scope ONLY. Independent product-level governance, any domain semantic SAP and production UI/Effect remain unclaimed. Builder source-alignment explanation https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6765984690; GOV-001 remains NOT_RUN."
+    },
+    {
+      "id": "DIS020-CORE-015",
+      "title": "Deterministic / LLM-disabled native Consumer path",
+      "profile": "core",
+      "state": "VERIFIED",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "8"
+      },
+      "implementation": [
+        "packages/microkernel/dis-v020.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "xDownload original policy is exposed as knowledge without providing direct acquisition authority"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native compiler rejects Effect downgrade from KDP_INTENT to arbitrary LOCAL rule"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline"
+      ],
+      "note": "Tally rules and Runx stateful observer run without selecting model provider."
+    },
+    {
+      "id": "DIS020-CORE-016",
+      "title": "Version-specific reproducible traceable Demo and positive/negative evidence",
+      "profile": "core",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "10"
+      },
+      "implementation": [
+        ".woodpecker/dis-v020-integration.yaml",
+        "examples/dis-v020-native-sdk/dke-r27-impact.mjs",
+        "examples/dis-v020-conformance/batch-audit.test.mjs",
+        "examples/dis-v020-conformance/batch-audit.mjs",
+        "examples/dis-v020-conformance/closure-audit.test.mjs",
+        "examples/dis-v020-conformance/closure-audit.mjs",
+        "examples/dis-v020-conformance/readiness-gate.test.mjs",
+        "examples/dis-v020-conformance/readiness-gate.mjs",
+        "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
+        "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+        "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+        "examples/dis-v020-conformance/full-ledger.test.mjs",
+        "examples/dis-v020-conformance/full-ledger.mjs",
+        "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r16-source-reader.mjs",
+        "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r17-guide-reader.mjs",
+        "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r18-impact-reader.mjs",
+        "examples/dis-v020-conformance/full-ledger-30.test.mjs",
+        "examples/dis-v020-native-sdk/b18-r23-ev16-full-source.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r23-ev16-reader.mjs",
+        "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+        "examples/dis-v020-native-sdk/b20-nested-function-schema.test.mjs",
+        "examples/dis-v020-conformance/full-ledger-34.test.mjs",
+        "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+        "examples/dis-v020-native-sdk/dke-r33-go-reader.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/native-consumer.test.mjs",
+          "case": "native SDK requires a separately provisioned AOT digest, not an artifact self-declaration"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R21 DKE source projections are exact AOT-selected source pins, no unselected function"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R27 actual Tally 14-record source delta maps into two CQs, two unqualified SAP proposals and two selected Business packages"
+        },
+        {
+          "path": "examples/dis-v020-conformance/batch-audit.test.mjs",
+          "case": "B04-01 R41 verify B01 B02 B03 recorded 9 individually versioned exact-SHA receipts without promoting Core"
+        },
+        {
+          "path": "examples/dis-v020-conformance/closure-audit.test.mjs",
+          "case": "B04-02 R42 exact historical source ledger and 21 requirement DAG leave 7 substantive Core blockers"
+        },
+        {
+          "path": "examples/dis-v020-conformance/readiness-gate.test.mjs",
+          "case": "B04-03 R43 source-real C4 ledger says no auto Freeze Merge or Release with seven Core blockers"
+        },
+        {
+          "path": "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
+          "case": "B07-01 R51 all B01-B06 eighteen immutable native Demo receipts are checked without inventing semantic acceptance"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 original DKE #209 R6 Git receipt is actual selected native DIS Knowledge dependency"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 two actual Tally source versions distinguish new graph evidence without SAP upgrade"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 original R10 Python certificate and DIS Reader are AOT-selected DATA and local code with exact Git origin"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 native real KDP SDK replays all 2048 valuations and 18 complete witness worlds; seven UNKNOWN remain UNKNOWN"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 all B01-B12 genuine 26 native source rounds have consistent 3-context exact stored CI and matrix refs"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 the previously stale B09 R55 standalone round now agrees with original verified #2312 receipts"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 original DKE R16 full-original-publisher receipt is selected AOT Knowledge DATA, not executable or SAP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 original publisher byte-authenticity and all 11 source-scope questions are typed OBSERVED vs UNKNOWN, never qualified semantics"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original DKE R17 publisher observations/cases/V8 receipt are three exact AOT DATA pins, Reader is a separate selected Knowledge LOCAL"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 actual native SDK replays all original DKE 20 cases, holds two real stale-step conflicts as typed UNKNOWN without physical KDP Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 original two step-reference conflicts do not permit silent 16→26/17→28 remap even in a hypothetical fixed-looking target"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE R18 native runner and machine receipt compressed Git Blobs are selected AOT DATA, never executable"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 original DKE native evidence DAG: only four nodes invalidated, unrelated RTC Knowledge preserved in real selected SDK"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 native independent graph replay verifies original baseline/partial/hypothetical and conservative missing-publisher-source gate"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-30.test.mjs",
+          "case": "R63 every B01-B16 source-qualified round (30/30) has unique historical Git+3-context CI receipt and matrix link, without SAP promotion"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b18-r23-ev16-full-source.test.mjs",
+          "case": "R64 actual selected KDP invoking original full-source-bound EV16 returns typed UNKNOWN, never RFC join or Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 actual selected KDP invoking original full-source-bound EV16 returns typed UNKNOWN, never RFC join or Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 origin allowlist is exact by original producer repo, commit, path and Git Blob, not a broad docs or executable relaxation"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b20-nested-function-schema.test.mjs",
+          "case": "B20 R66 actual source-locked native SDK reads bounded nested xDownload policy with typed arrays"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
+          "case": "R67 all 34 original B01-B20 scoped rounds retain independent named 3-context stored receipts and Matrix links"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+          "case": "R33 receipt and reader are exact original Git source selected by AOT"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+          "case": "R33 full real original source tier consumes into KDP and only yields typed UNKNOWN"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/dke-selected-consumer.test.mjs",
+          "case": "R21 source drift, forged registry, stale Function and missing real Evidence fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+          "case": "R27 false SAP approval, unknown selected package, omitted reader, forged source and stable-CQ claims fail closed"
+        },
+        {
+          "path": "examples/dis-v020-conformance/batch-audit.test.mjs",
+          "case": "B04-01 R41 negative forged original test blob or Source HEAD does not inherit a later CI PASS"
+        },
+        {
+          "path": "examples/dis-v020-conformance/batch-audit.test.mjs",
+          "case": "B04-01 R41 negative three CI URLs must belong to a single exact source pipeline"
+        },
+        {
+          "path": "examples/dis-v020-conformance/batch-audit.test.mjs",
+          "case": "B04-01 R41 negative requirement receipt must be linked, and a source test must actually run in native CI"
+        },
+        {
+          "path": "examples/dis-v020-conformance/closure-audit.test.mjs",
+          "case": "B04-02 R42 fake SAP approval or historical reviewer byte substitution is rejected"
+        },
+        {
+          "path": "examples/dis-v020-conformance/closure-audit.test.mjs",
+          "case": "B04-02 R42 Core semantic or Target promotion without actual owner and approved scope is rejected"
+        },
+        {
+          "path": "examples/dis-v020-conformance/closure-audit.test.mjs",
+          "case": "B04-02 R42 skipped dependency, fake governance and incomplete prior round audit fail closed"
+        },
+        {
+          "path": "examples/dis-v020-conformance/readiness-gate.test.mjs",
+          "case": "B04-03 R43 a user or LLM-supplied self-attested independent review cannot grant release"
+        },
+        {
+          "path": "examples/dis-v020-conformance/readiness-gate.test.mjs",
+          "case": "B04-03 R43 forged C4 finalization and incomplete historical exact-SHA audit are denied"
+        },
+        {
+          "path": "examples/dis-v020-conformance/batch-ledger-18.test.mjs",
+          "case": "B07-01 R51 malicious cross-pipeline CI reuse and duplicate job numbers fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 changed DKE source, false producer approval and source-origin mismatch fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 independently installer-pinned DKE input, Function schema and forged outcome refuse privilege"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b08-dke-knowledge-consumer.test.mjs",
+          "case": "B08-01 R54 producer DKE JSON source is selectable only as DATA, never executable LOCAL or unsafe docs path"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 complete countermodel verifier rejects missing variable, false source-fact, incorrect polarity and SAP impersonation"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b10-r10-complete-witness.test.mjs",
+          "case": "R56 stale installer source, JSON-as-code and caller forged owner/Effect fail closed before authority"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 fake verified status or historical Git test Blob are rejected before CI attribution"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 forged qualifying Source HEAD/TREE, mixed named contexts and duplicate job slots fail closed"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger.test.mjs",
+          "case": "B13 R59 missing matrix claim, swapped Function source and unexecuted native test cannot masquerade as proof"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 explicit empty caller source, selection and semantic reviewer maps cannot fallback to trusted receipt"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 counterfeit source or JSON-as-code and caller SAP/Effect/Function-version forged requests fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b14-r16-source-authenticity.test.mjs",
+          "case": "R60 forged LOCAL semantic owner approval cannot become typed SDK success even with pinned source"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 forged full publisher pin, source semantic approval, missing case and broken DKE V8 receipt fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b15-r17-guide-compatibility.test.mjs",
+          "case": "R61 wrong installer DATA pin, JSON-as-code, unselected case and forged Function input/effect all rejected"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 forged origin package/full source SHA, false semantic Owner SAP, altered method graph/cycle/duplicate fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b16-r18-transitive-impact.test.mjs",
+          "case": "R62 compressed upstream DATA cannot masquerade as LOCAL code, installer drift and forged Function Effect rejected"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-30.test.mjs",
+          "case": "R63 forged Woodpecker source pipeline / missing matrix receipt / fake native test are rejected"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b18-r23-ev16-full-source.test.mjs",
+          "case": "R64 native full Tally graph tamper, false RFC source, fake SAP/Effect and empty data fail closed at Reader construction"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 native full Tally graph tamper, false RFC source, fake SAP/Effect and empty data fail closed at Reader construction"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 native installer refuses changed original full graph sha, missing source or DATA-as-LOCAL Function source"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b19-r26-typed-reader-native.test.mjs",
+          "case": "R65 exact R26 typed Reader: 76 source-bound adversarial request vectors and native selected Knowledge remain fail-closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b20-nested-function-schema.test.mjs",
+          "case": "B20 R66 malformed recursive schemas and over-budget depth/cardinality fail closed at AOT"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
+          "case": "R67 preserves pre-existing B13 ordinary forged source origin rejection code"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
+          "case": "R67 R64 R0->R1 repaired test origin cannot be forged without BOTH historical failure pedigrees"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
+          "case": "R67 R63 qualificationTree aliases finalTree only when actual source SHA and Tree agree"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
+          "case": "R67 R66 finalized origin is accepted only with original FAILURE and final identical test-blob SUCCESS"
+        },
+        {
+          "path": "examples/dis-v020-conformance/full-ledger-34.test.mjs",
+          "case": "R67 R66 newest original B20 proof cannot inherit mixed CI, source or Matrix link"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+          "case": "R33 independently installed original producer DATA and executable reader pins deny stale origin and registry before KDP"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+          "case": "R33 original source tamper, wrong tier, forged SAP/Effect fail closed"
+        }
+      ],
+      "receiptIds": [
+        "r9.5-baseline",
+        "r21-native-dke-semantic-ci",
+        "r27-native-impact-ci",
+        "r29-native-source-first-ci",
+        "r41-b04-source-ledger-ci",
+        "r42-b04-closure-dag-ci",
+        "r43-b04-readiness-gate-ci",
+        "r51-b07-full-ledger-ci",
+        "r54-b08-real-dke-knowledge-consumer-ci",
+        "r55-b09-dke-conditional-proof-native-ci",
+        "r56-b10-r10-complete-witness-native-ci",
+        "r59-b13-26-round-full-ledger-ci",
+        "r60-b14-r16-source-authenticity-native-ci",
+        "r61-b15-r17-guide-version-native-ci",
+        "r62-b16-r18-native-transitive-knowledge-impact-ci",
+        "r63-b17-full-30-round-ledger-integrity-ci",
+        "r64-b18-ev16-full-original-source-native-ci",
+        "r65-b19-r26-typed-source-native-ci",
+        "r66-b20-nested-function-schema-native-ci",
+        "r67-b21-34-round-full-ledger-ci",
+        "r82-b22-r33-source-native-ci"
+      ],
+      "note": "R9.5 exact-SHA CI is verified; version-wide Requirement matrix and receipts only being established in this commit. R21 native Exact-SHA semantic receipt documents dedicated Integration and Verify SUCCESS while preserving engine-only context ERROR; main version conformance remains incomplete. R22 extra AOT source dependencies structurally registered, must be CI-qualified on newer exact SHA; previous R21 receipt remains historical. R27 native selected two-Business source→CQ→SAP-proposal→Function audit is CI-qualified at 349b58f985970aeeaf77621a4451154e4cd6a353 / Woodpecker #2263/1-3, but the two SAPs remain UNQUALIFIED, and global consumer closure/independent Oracle remain unproven. B04 candidate R41/R42/R43 add read-only source Git Blob vs current drift audit, 21-requirement C1-C5 DAG blocker inventory, and fail-closed Freeze/Release gate; all seven normative Core gaps remain, so CORE-016 cannot be promoted even if native CI succeeds. Source reviewer/OS platform decision still missing. B04/B05 six exact test blobs independently unchanged at 1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de; #2293/1-3 ALL SUCCESS. This qualifies bounded test scope, not remaining normative Core authority, original SAP or real multi-target native implementation. B07-01 R51 read-only prior-18-round audit and Woodpecker reordering fix qualified at exact source 61f32bfc274b701f6b4d8ffcd66f58d4349f22fc / #2302/1-3 all SUCCESS. This audits recorded CI and Git claims only, not independent SAP/semantic authority, live CI attestation or final version-wide conformance; still PARTIAL. B08 R54 native real DKE #209 producer-receipt Knowledge Function source+old/new graph provenance+typed UNKNOWN and source DATA-only negative checks qualified exact 23dbb0ea5dabe661fb2a309adba00e4dbffe0c89 TREE fab96c9328a7bae37336b30a18f3cdc8d131a396, Woodpecker #2309/1-3 3/3 SUCCESS; original R0 #2307/1 and R1 #2308/1 FAILURE retained. This is real read-only producer/consumer interoperability, NOT independent SAP, first-party Tally publisher approval, entire graph recompute or complete Core contract/Version verification; state stays PARTIAL. B09 R55 exact source `2d96e16942dcff518619b37e4b6c0664ca032ae3` / Woodpecker #2312/1-3 all SUCCESS, original DKE R9 fixed Git formal DATA + per-CQ source refs consumed by actual native selected DIS BUILD/SDK/KDP Knowledge Function: 2 ENTAILED, 2 REFUTED, 7 UNKNOWN. Read-only OBSERVED of REFUTED is not positive SAP; source facts same-model authored and upstream DKE R10 complete certificate NOT part of selected R55 source. No independent domain-semantic approval, source owner SAP, Effect or full Core conformance; this requirement remains PARTIAL. B10 R56 original DKE R10 full 11-var witness certificate, 2048 assignments/64 satisfying/18 complete witnesses selected native SDK Knowledge Function qualified at 66d7024f551faa69fa432e19cc535ced8065abd0 #2320/1-3 3/3 SUCCESS; independent semantic SAP and source-owner truth still NOT qualified. Core stays PARTIAL. B13 R59 read-only full B01–B12 26-round heterogeneous stored provenance/CI ledger, originally stale B09 round fixed. Actual source bbf076316e5c9cb4f153a88ea9c756c38722d9f5 #2327/1–3 3/3 SUCCESS; not independent live CI recheck for each historic SHA, SAP owner qualification or full-version acceptance. Remains PARTIAL. B14/R60 DKE R16 original full-source native authenticity upstream receipt DATA selected through actual DIS SDK/KDP native Knowledge; exact 9b761ad3628048706a6207deb645add5dc27eee1 Woodpecker #2329/1–3 3/3 SUCCESS. Only four source-scope OBSERVED, seven UNKNOWN; independent semantics/SAP absent; remains PARTIAL. B15/R61 genuine original DKE R17 Framework Guide 203→79 stale step-reference case 20 native DIS SDK/KDP cases, exact 2d331ec0aa38464808d419318422a86fa60c6d7a #2331/1–3 SUCCESS. Method stays UNKNOWN/invalidated, full publisher source not byte pinned and independent SAP=0. Core remains PARTIAL. B16/R62 selected actual original DKE R18 native 10-node graph under DIS AOT/SDK/KDP, four selectively INVALIDATED and RTC Knowledge unaffected, exact e1636200... #2344/1–3 3/3 SUCCESS; original publisher Guide 203/79 unpinned and independent SAP=0; remains PARTIAL. B17/R63 #2348/1–3 three-context native CI verified exact 2d9c067... source, 30 previous rounds audited; still only historical CI/provenance conformance, not new independent semantic owner approval; CORE-016 stays PARTIAL. B18/R64 selects four byte-exact original Git Blobs (full Tally v2.1.1 807-node graph, DKE R8 matrix, R22 gate as DATA, R23 Reader as LOCAL) through real DIS AOT/SDK/KDP; typed UNKNOWN, zero asserted RFC9111 joins, exact ab78c52d9b6717c6badb27b4542736f47c69bc42 #2355/1-3 3/3 SUCCESS. Original R0 #2350/1 validatePins over-rejection and R1 #2353/1 retained R63 closeout free-text matrix rows both FAILURE-preserved; independent semantic SAP/Effect absent; CORE-016 stays PARTIAL. B19/R65 DKE R26 strict typed Reader original exact source 6b1904f9933b1c59070bed1621b3c9f9f329882c Woodpecker #2357/1–3 3/3 SUCCESS, 76 real native selected Reader negative vectors, versioned 1.1 Function compatibility and old SHA installer refusal; Core stays PARTIAL without independent SAP/semantic acceptance. B20/R66 original optional bounded nested Function I/O Schema on actual xDownload source, exact 2616ca326d3c0e0dd06d9b68b8d2127d60ec4825 Woodpecker #2364/1–3 3/3 SUCCESS, native typed record/array depth and same-major ABI tests; still PARTIAL because full public Functions, independent semantics/SAP and governance are unqualified. B21/R67 34-round full original-source ledger verified at 81073ac58090d11a2f26e3983ff85bdb247a194a #2376/1–3 3/3 SUCCESS, failed #2375/1 preserved; evidence archive does not qualify independent SAP or complete all Core MUSTs. Still PARTIAL. B22/R82 original DKE source-scoped Knowledge qualified at fe2334e63d39a9c006746caad695f7e3c5ade97d #2397/1-3 3/3; earlier #2395 clone failures retained, all R33 source dispositions UNKNOWN. No independent SAP/Effect/Target approval; remains PARTIAL."
+    },
+    {
+      "id": "DIS020-OPT-001",
+      "title": "Bounded Harness/LLM selected provider, budget and UNKNOWN handling",
+      "profile": "optional-profile",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "8"
+      },
+      "implementation": [
+        "examples/dis-v020-native-sdk/o1-bounded-harness.mjs",
+        "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+        "examples/dis-v020-native-sdk/native-fixture.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R94 actual selected xDownload native SDK Knowledge executes before bounded fixture-provider UNKNOWN fallback"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R94 provider-disabled and zero-budget paths preserve real SDK observation without model calls"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R94 unselected provider and forbidden Function/Effect entry fail closed before model fallback"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R94 fake model PASS, Effect claims, oversized output, failures and concurrency never certify semantic truth"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+          "case": "O1 R96 rejects FAILED/UNKNOWN or source-mismatched native observations before Provider fallback"
+        }
+      ],
+      "receiptIds": [
+        "r96-o1-source-observation-ci"
+      ],
+      "note": "R94 native selected xDownload Knowledge Function is invoked through actual canonical DIS v0.2 AOT→SDK/KDP before a bounded fixture-only provider fallback. R95 exact HEAD ed25934d2fb5d24a4e6a767441b129172e426a97 passed Woodpecker #2450/1-3 3/3; R96 exact HEAD d4f0b8bb57090a994794f7c15a3eaa062627dd38 passed #2451/1-3 3/3. R96 additionally requires typed OBSERVED, contract v1.0.0 and the exact original xdownload-business source ID/Git Blob before provider fallback; FAILED/UNKNOWN/unpinned observations fail closed. Provider remains fixture-only, NOT AOT-locked and not a real LLM; no independent business Oracle, full Harness provider contract, tool loop or end-to-end timeout/termination proof. Therefore PARTIAL, not VERIFIED."
+    },
+    {
+      "id": "DIS020-OPT-002",
+      "title": "Experience provenance, validator, exact reuse and independent holdout",
+      "profile": "optional-profile",
+      "state": "PARTIAL",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "9"
+      },
+      "implementation": [
+        "examples/dis-v020-native-sdk/o2-experience-gate.mjs",
+        "examples/dis-v020-native-sdk/o2-experience-native.test.mjs"
+      ],
+      "positive": [
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 native AOT→SDK consumes original xDownload interaction but emits only LearningObservation"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 repeated runs, cache hits and same-case source clones do not inflate independent cohorts"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 METHOD_REUSE can only request re-execution and revalidation, never replay an Effect"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 privacy defaults to local-only and consent never causes implicit export"
+        }
+      ],
+      "negative": [
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 caller-supplied PASS, attested flag, trace and validator JSON cannot mint Experience"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 missing trusted Trace or Validator receipt remains NEED_MORE_EVIDENCE"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 synthesis, holdout and negative partitions reject source-cohort leakage"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 cross-partition case and run clones block despite distinct declared cohort strings"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 malformed cache/retry flags never credit independent cohorts but still link lineage"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 accessor-shaped observations and sparse cohort arrays fail closed"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R100 missing-cohort case/run bridge cannot double-credit independent cases"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R100 out-of-order and mixed missing-key bridges remain conservatively connected"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R101 blank padded and noncanonical source case run tokens never mint independent cohorts"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R101 padded aliases never receive credit and do not break conservative bridge grouping"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R101 partition fail closes on blank padded noncanonical lineage without rejecting internal spaces"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R102 invisible Unicode source case run aliases cannot mint independent cohorts"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R102 invisible aliases in synthesis holdout negative fail closed while visible Unicode stays valid"
+        },
+        {
+          "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+          "case": "O2 R102 invisible lineage bridge never credits cache retry clones regardless of order"
+        }
+      ],
+      "receiptIds": [
+        "r97-o2-native-no-trust-ci",
+        "r100-o2-cohort-bridge-r99-repair-ci",
+        "r101-o2-canonical-lineage-native-ci",
+        "r102-o2-unicode-lineage-native-ci"
+      ],
+      "note": "R97 reconciles real native O2/D06 fail-closed readiness evidence, previously unregistered: source HEAD b5f7c76117674ef312e8e8595016c91dbb337837 and Woodpecker #2462/1–3 exact-SHA 3/3 SUCCESS. AOT-selected xDownload Interaction and the selected LOCAL Experience gate preserve LearningObservation/UNKNOWN and deny forged caller PASS, invalid independent cohort/cache/retry/holdout claims, Experience reuse and unauthorized export. Native gate has no trusted ExecutionTrace issuer, no independent business Validator receipt verifier, no real qualified Experience issuance or exact reuse, and no independently authenticated cross-Domain holdout. PARTIAL only; no SAP, Effect or governance promotion. R97 historical receipt is bound to pre-reconciliation HEAD; the accounting commit requires its own 3-context CI and independent review. R100 independent R99-P2-01 repair candidate: incomplete but linkable source-cohort rows are retained in the lineage graph via non-credit anonymous bridge nodes; exact native out-of-order, missing-key, cache and case/run link negatives added. Source helper is pinned to H1 6784388ad64ff5ef378426c0f32eab6aa7895135 / Blob 5beefd3ea67c04c46e8aa1fd722da3b729a78dc0. Native R100 implementation/test Matrix HEAD 6c11ef9b182a3a1b564db7f9129b4d920561b869 passed Woodpecker #2466/1–3 exact-SHA SUCCESS, receipt r100-o2-cohort-bridge-r99-repair-ci. Separate fresh independent R99 post-repair review and qualified Trace/Validator authority remain missing; O2 stays PARTIAL. R101 R100-P2-02 source repair candidate: noncanonical blank, leading/trailing whitespace, invisible and non-NFC Source/Case/Run identities are invalid and excluded as independent contributions without trim-and-credit; both cohort dedupe and partition leakage check apply the same canonicality. Legitimate internal spaces remain accepted. O2 stays PARTIAL; new HEAD native CI and independent fresh review required. R101 native source/test Matrix + recorded cancellation checkpoint HEAD b025f50c728ebd3dc7582b1934d931a1849470a3 / TREE 29f7fad2ba1e2bb8e933dbc6cec5dc901c2505fc passed Woodpecker #2469/1-3 3/3 SUCCESS; exact historical receipt r101-o2-canonical-lineage-native-ci. Earlier #2468/1,3 were CANCELED, not native source test failures. This is engineering/lineage-integrity evidence ONLY; separate independent post-R101 source-first review and trusted Trace/Validator authority remain absent. O2 PARTIAL. R102 registered exact-native source evidence r102-o2-unicode-lineage-native-ci: implementation/test/Matrix 9c1f894a566551b486a29175e5ba60bee4ed37e8, tree fe3dc737b5025f5bc1e7314a2b8ef61d0368cc6e, Woodpecker #2475/1-3 all SUCCESS. Separate prior standalone postrepair report remains historical. This technical O2 evidence is not authenticated issuer/independent cohort Oracle/qualified Experience; fresh R103 review and Product scope decision pending; OPT002 stays PARTIAL."
+    },
+    {
+      "id": "DIS020-OPT-003",
+      "title": "Local data-only Evolution Slot activation, task pin, rollback, revoke",
+      "profile": "optional-profile",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "9"
+      },
+      "implementation": [],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "R2 E07,N02,N09,N13,N14 not executed in selected SDK."
+    },
+    {
+      "id": "DIS020-OPT-004",
+      "title": "Server Promotion and new AOT lifecycle, privacy/scope governance",
+      "profile": "optional-profile",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "9"
+      },
+      "implementation": [],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "R2 E08-E10,N08,N11,N15 not executed."
+    },
+    {
+      "id": "DIS020-GOV-001",
+      "title": "Independent exact-SHA review and Product/L1 L2 Freeze",
+      "profile": "governance",
+      "state": "NOT_RUN",
+      "spec": {
+        "path": "docs/standards/domain-intelligence/DIS-0.2.0/DIS-0.2.0.zh-CN.md",
+        "section": "10"
+      },
+      "implementation": [],
+      "positive": [],
+      "negative": [],
+      "receiptIds": [],
+      "note": "Version delivery governance separate from Demo CI; PR remains Draft."
+    }
+  ]
+}

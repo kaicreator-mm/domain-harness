@@ -1,0 +1,79 @@
+{
+  "schema": "dis.v0.2.batch-round/1",
+  "batchId": "B07",
+  "roundId": "B07-02",
+  "globalRoundId": "R52",
+  "status": "VERIFIED",
+  "originCommit": "f2130918d9863aeabd36227886c05cc44c5670cd",
+  "originTree": "09553d57f6c33ca1a64469da0e59812f321ebbc1",
+  "testPath": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+  "testGitBlob": "c579299182569a5641683ec93a624eaba703e94b",
+  "receipt": "receipts/r52-b07-function-dependency-ci.json",
+  "sourceHead": "0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f",
+  "checks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/3"
+    }
+  ],
+  "positive": [
+    "B07-02 R52 original xDownload acquisition statically pins two separate Interaction Functions and one Knowledge Function",
+    "B07-02 R52 static dependency cycles are refused while semantic collaboration cycles are legal metadata"
+  ],
+  "negative": [
+    "B07-02 R52 undeclared target Function, missing version and duplicate Function selection fail closed at AOT",
+    "B07-02 R52 same-version silent dependency drift and same-major Function binding removal are incompatible"
+  ],
+  "limits": [
+    "Function binding is compile-time static AOT declaration, not runtime invoke authorization, independent SAP or semantic Oracle.",
+    "Existing dependsOn-only AOTs remain compatible; selected Target, original source pins and existing KDP permission checks unchanged.",
+    "B07-02 is CI_PENDING; B07-03 NOT_STARTED; no Core state promotion."
+  ],
+  "finalTree": "6fecc2a8c48f69996113d4f4d4fce1f037d79bcf",
+  "history": [
+    {
+      "head": "f2130918d9863aeabd36227886c05cc44c5670cd",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Independent original source commit; final cumulative source only receives actual full suite qualification."
+    },
+    {
+      "head": "ad9dc888e037be153d3659bf5708cfcbe834816c",
+      "ciStatus": "HISTORICAL_INCOMPLETE",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2304/1",
+      "note": "Old branch build not accepted, did not have three successful contexts; not used for qualification."
+    },
+    {
+      "head": "0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f",
+      "tree": "6fecc2a8c48f69996113d4f4d4fce1f037d79bcf",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/3"
+        }
+      ],
+      "meaning": "Original immutable test Git Blob replayed in cumulative R52+R53 exact full source and 3/3 Woodpecker PASS."
+    }
+  ]
+}

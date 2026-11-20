@@ -1,0 +1,283 @@
+{
+  "schema": "dke.r8.d02.actual-git-version-evolution-receipt/1",
+  "origin": {
+    "oldSourceGitBlob": "2d4498dfa5f90bcf57cc81e9c155fb9ede31bf00",
+    "newSourceGitBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+    "oldNodes": 793,
+    "newNodes": 807,
+    "realAncestorCommitDistance": 26
+  },
+  "oldQueryCount": 466,
+  "newNodeQueries": 14,
+  "newCaseEvidenceSourceQueries": 5,
+  "totalQueryCount": 485,
+  "nodeAdditions": [
+    {
+      "id": "se:CASE-09F-CF-KV-DEPENDENCY",
+      "type": "se:Case",
+      "lifecycle": "PENDING_REVIEW"
+    },
+    {
+      "id": "se:CASE-09F-GH-DB-FAILOVER",
+      "type": "se:Case",
+      "lifecycle": "PENDING_REVIEW"
+    },
+    {
+      "id": "se:EVD-09F-CF-REDESIGN",
+      "type": "se:Evidence",
+      "lifecycle": "PENDING_REVIEW"
+    },
+    {
+      "id": "se:EVD-09F-CF-REMEDIATION",
+      "type": "se:Evidence",
+      "lifecycle": "PENDING_REVIEW"
+    },
+    {
+      "id": "se:EVD-09F-CF-SHARED-DEPENDENCY",
+      "type": "se:Evidence",
+      "lifecycle": "PENDING_REVIEW"
+    },
+    {
+      "id": "se:EVD-09F-GH-RECOVERY",
+      "type": "se:Evidence",
+      "lifecycle": "PENDING_REVIEW"
+    },
+    {
+      "id": "se:EVD-09F-GH-REPLICATION",
+      "type": "se:Evidence",
+      "lifecycle": "PENDING_REVIEW"
+    },
+    {
+      "id": "se:LOC-09F-CF-INCIDENT-OVERVIEW",
+      "type": "se:SourceLocator",
+      "lifecycle": "ACTIVE"
+    },
+    {
+      "id": "se:LOC-09F-CF-INCIDENT-TIMELINE",
+      "type": "se:SourceLocator",
+      "lifecycle": "ACTIVE"
+    },
+    {
+      "id": "se:LOC-09F-CF-REDESIGN",
+      "type": "se:SourceLocator",
+      "lifecycle": "ACTIVE"
+    },
+    {
+      "id": "se:LOC-09F-GH-REPLICATION",
+      "type": "se:SourceLocator",
+      "lifecycle": "ACTIVE"
+    },
+    {
+      "id": "se:SRC-09F-CF-KV-REDESIGN-2025",
+      "type": "se:Source",
+      "lifecycle": "ACTIVE"
+    },
+    {
+      "id": "se:SRC-09F-CF-OUTAGE-2025",
+      "type": "se:Source",
+      "lifecycle": "ACTIVE"
+    },
+    {
+      "id": "se:SRC-09F-GH-POSTMORTEM-2018",
+      "type": "se:Source",
+      "lifecycle": "ACTIVE"
+    }
+  ],
+  "originalCompile": {
+    "total": 466,
+    "built": 466,
+    "reused": 0
+  },
+  "existingSourceIncrement": {
+    "total": 466,
+    "built": 0,
+    "reused": 466
+  },
+  "newSourceExtension": {
+    "built": 19,
+    "reused": 0,
+    "total": 19
+  },
+  "historicalQueryResultExactEqual": true,
+  "incrementalVersusCleanExactEqual": true,
+  "oldQueryEntriesIdentityMatchedInBothVersions": 466,
+  "sourceBoundOldQuerySamples": [
+    {
+      "id": "D1:se:REL-07A-001",
+      "oldAllowed": true,
+      "newAllowed": true
+    },
+    {
+      "id": "D1:se:REL-TVV-0023",
+      "oldAllowed": true,
+      "newAllowed": true
+    },
+    {
+      "id": "D2:se:REL-TVV-0018:se:REL-TVV-0004",
+      "oldAllowed": true,
+      "newAllowed": true
+    },
+    {
+      "id": "N:se:CLM-07D-HIGH-RELIABILITY-DEFECT-MINIMIZATION",
+      "oldAllowed": true,
+      "newAllowed": true
+    }
+  ],
+  "consumedNewEntriesOnlyInNewVersion": 19,
+  "newStatusCounts": {
+    "PENDING_REVIEW_NOT_QUALIFIED": 7,
+    "LOCATOR_ONLY_NOT_QUALIFIED": 4,
+    "PARTIAL_SOURCE_NOT_QUALIFIED": 3,
+    "PROVISIONAL_CASE_SOURCE_TRACE": 5
+  },
+  "sourceTraces": [
+    {
+      "id": "CHAIN:se:CASE-09F-CF-KV-DEPENDENCY:se:EVD-09F-CF-REDESIGN",
+      "linkedSourcePath": [
+        "se:CASE-09F-CF-KV-DEPENDENCY",
+        "se:EVD-09F-CF-REDESIGN",
+        "se:LOC-09F-CF-REDESIGN",
+        "se:SRC-09F-CF-KV-REDESIGN-2025"
+      ],
+      "reviewState": "CONTENT_PARTIAL_VERIFIED",
+      "qualified": false
+    },
+    {
+      "id": "CHAIN:se:CASE-09F-CF-KV-DEPENDENCY:se:EVD-09F-CF-REMEDIATION",
+      "linkedSourcePath": [
+        "se:CASE-09F-CF-KV-DEPENDENCY",
+        "se:EVD-09F-CF-REMEDIATION",
+        "se:LOC-09F-CF-INCIDENT-TIMELINE",
+        "se:SRC-09F-CF-OUTAGE-2025"
+      ],
+      "reviewState": "CONTENT_PARTIAL_VERIFIED",
+      "qualified": false
+    },
+    {
+      "id": "CHAIN:se:CASE-09F-CF-KV-DEPENDENCY:se:EVD-09F-CF-SHARED-DEPENDENCY",
+      "linkedSourcePath": [
+        "se:CASE-09F-CF-KV-DEPENDENCY",
+        "se:EVD-09F-CF-SHARED-DEPENDENCY",
+        "se:LOC-09F-CF-INCIDENT-OVERVIEW",
+        "se:SRC-09F-CF-OUTAGE-2025"
+      ],
+      "reviewState": "CONTENT_PARTIAL_VERIFIED",
+      "qualified": false
+    },
+    {
+      "id": "CHAIN:se:CASE-09F-GH-DB-FAILOVER:se:EVD-09F-GH-RECOVERY",
+      "linkedSourcePath": [
+        "se:CASE-09F-GH-DB-FAILOVER",
+        "se:EVD-09F-GH-RECOVERY",
+        "se:LOC-09F-GH-REPLICATION",
+        "se:SRC-09F-GH-POSTMORTEM-2018"
+      ],
+      "reviewState": "CONTENT_PARTIAL_VERIFIED",
+      "qualified": false
+    },
+    {
+      "id": "CHAIN:se:CASE-09F-GH-DB-FAILOVER:se:EVD-09F-GH-REPLICATION",
+      "linkedSourcePath": [
+        "se:CASE-09F-GH-DB-FAILOVER",
+        "se:EVD-09F-GH-REPLICATION",
+        "se:LOC-09F-GH-REPLICATION",
+        "se:SRC-09F-GH-POSTMORTEM-2018"
+      ],
+      "reviewState": "CONTENT_PARTIAL_VERIFIED",
+      "qualified": false
+    }
+  ],
+  "adversarial": {
+    "count": 10,
+    "passed": 10,
+    "rows": [
+      {
+        "id": "OLD_CANNOT_SELECT_NEW",
+        "pass": true
+      },
+      {
+        "id": "UNKNOWN_SELECTION",
+        "pass": true
+      },
+      {
+        "id": "FORGED_CALLER_OWNER",
+        "pass": true
+      },
+      {
+        "id": "FORGED_SOURCE_VERSION",
+        "pass": true
+      },
+      {
+        "id": "MUTATED_AOT_OUTPUT",
+        "pass": true
+      },
+      {
+        "id": "RESTORE_AOT",
+        "pass": true
+      },
+      {
+        "id": "MUTATED_SOURCE_AFTER_BIND",
+        "pass": true
+      },
+      {
+        "id": "RESTORE_SOURCE",
+        "pass": true
+      },
+      {
+        "id": "WRONG_NEW_VERSION_BLOB",
+        "pass": true
+      },
+      {
+        "id": "NO_QUALIFIED_RESULTS",
+        "pass": true
+      }
+    ]
+  },
+  "qualifiedSap": 0,
+  "effectsIssued": 0,
+  "independentSemanticOracle": false,
+  "realAutonomousModelEvolution": false,
+  "original53FullR8Cells": "NOT_RUN",
+  "status": "PASS_BOUNDED_REAL_SOURCE_VERSION_EVOLUTION",
+  "date": "2026-11-09",
+  "GitEvidence": {
+    "olderCommit": "74370f10d7cc294dec0275d835082feb28803e79",
+    "newerCommit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+    "olderBlob": "2d4498dfa5f90bcf57cc81e9c155fb9ede31bf00",
+    "newerBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+    "gitCompareAhead": 26,
+    "gitCompareBehind": 0,
+    "sourcePath": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+    "frozenPlanCommit": "04d914393d830801f2adee40798ad76cbebb2f23",
+    "frozenPlanBlob": "6a4840c6d95f01e25bb703888f7294a6869d5a0c",
+    "initialEngineCommit": "55e18ab8fab237df3ed939b1cea13fb280c73a31",
+    "initialEngineBlob": "874496a07805bec5ab57f25cd7cdf5ab6bdda654",
+    "repairedEngineCommit": "c5c9ed9c600c4cd036431b8cd9c92201e9fc5052",
+    "repairedEngineBlob": "098c8482650df1db829b61dc4d4b6f63c3adf40f",
+    "baselineCompilerBlob": "17c6dd9f9965de2cdeaa3bda30454b08be720fa7"
+  },
+  "execution": "ACTUAL_SOURCE_EXACT_JS_V8_GITHUB_FETCHED_TWO_REAL_TALLY_GIT_VERSIONS_AND_BOUND_CODE",
+  "optimizedAfterFirstTimedOutRun": true,
+  "originalTimeoutNoResultClaimed": true,
+  "runtimeValidationDistinction": {
+    "old466ComparedByExactAotEntries": true,
+    "oldFourRuntimeBoundSamples": 4,
+    "new19IndividuallyConsumed": true,
+    "oldCannotConsumeNew19": true
+  },
+  "nativeNodeCliExecuted": false,
+  "woodpeckerCIExecuted": false,
+  "externalModelCalls": 0,
+  "domainOwnerApproved": false,
+  "allPreviousClaimsPENDING": true,
+  "newCasesAndEvidencePENDING": true,
+  "newPublisherSourceVerification": "CONTENT_PARTIAL_VERIFIED",
+  "sapQualified": 0,
+  "limits": [
+    "Two real Git commits form true ancestry; this is Tally-authored *data* evolution, not a generated autonomous model evolution",
+    "All 466 prior query identities reused with four representative live source-bound runtime checks; NOT 466 individual runtime replays on each graph",
+    "New source cases are secondary generated graph claims; underlying Cloudflare/GitHub raw publisher sources not exact byte-pinned here",
+    "Original 53 full R8 EV domain cells remain NOT_RUN, no independent professional semantic critic and no qualified SAP",
+    "No production DIS/KDP runtime, real model invocation, native Node CLI or Woodpecker CI in this round"
+  ]
+}

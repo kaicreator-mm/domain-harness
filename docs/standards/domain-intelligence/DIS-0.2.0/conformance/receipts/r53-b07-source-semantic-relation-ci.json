@@ -1,0 +1,69 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r53-b07-source-semantic-relation-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f",
+    "tree": "6fecc2a8c48f69996113d4f4d4fce1f037d79bcf"
+  },
+  "originCommit": "0b4df62efa77e28fc9763f383706199074156170",
+  "testGitBlob": "dc0a51bfbdae6aba620f7ed596aedcd862732d9b",
+  "testPath": "examples/dis-v020-native-sdk/b07-semantic-relation.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/3"
+    }
+  ],
+  "observations": [
+    "Source-backed xDownload Policy Knowledge verifier and semantic relation AOT pin implemented but no CI claim yet.",
+    "Relation identity, provenance, version, applicability and verifier Function exact version are validated at AOT; output authority remains NONE."
+  ],
+  "limitations": [
+    "Opt-in source-linked relation metadata is not independently verified domain truth or an unconditional runtime constraint engine.",
+    "Actual selected source Knowledge verifier is observed with authority NONE and cannot dispatch an Effect.",
+    "All seven Core partial remain PARTIAL pending Product/L1 ownership, independent SAP and remaining contract coverage."
+  ],
+  "historical": [
+    {
+      "head": "0b4df62efa77e28fc9763f383706199074156170",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Independent original source commit; final cumulative source only receives actual full suite qualification."
+    },
+    {
+      "head": "0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f",
+      "tree": "6fecc2a8c48f69996113d4f4d4fce1f037d79bcf",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/3"
+        }
+      ],
+      "meaning": "Original immutable test Git Blob replayed in cumulative R52+R53 exact full source and 3/3 Woodpecker PASS."
+    }
+  ]
+}

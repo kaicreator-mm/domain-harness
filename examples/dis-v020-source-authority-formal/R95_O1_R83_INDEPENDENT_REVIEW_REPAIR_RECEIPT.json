@@ -1,0 +1,161 @@
+{
+  "schema": "dis.r95.o1-r83.source-first-review-repair/1",
+  "outputLabel": "DIS_1499_R95_O1_R83_INDEPENDENT_REVIEW_REPAIR",
+  "reviewDate": "2026-11-11",
+  "sourceFirstOrder": [
+    "Product/L1 #1496",
+    "DIS v0.2.0 specification §8",
+    "EVOLUTION_CONFORMANCE_R2",
+    "EVOLUTION_DESIGN_REPAIRS_R2",
+    "original R33/B22 exact source receipts",
+    "current O1/R83 implementation and tests",
+    "Builder/history reports treated as claims only"
+  ],
+  "reviewerContext": {
+    "sourceFirstCriteriaEstablishedBeforeImplementationReview": true,
+    "fullyIsolatedNewConversation": false,
+    "authenticatedDistinctReviewerPrincipal": false
+  },
+  "repository": {
+    "name": "kaicreator-mm/domain-harness",
+    "issue": 1499,
+    "productIssue": 1496,
+    "pr": 1497,
+    "branch": "dis/0.2.0-element-intelligence-r1",
+    "startHead": "d2e7e4f9807d3dab4acec5ed7b5e1843315577fd",
+    "preRepairActualHead": "5d643fb046a243e44aff7c24c3425e4f51719bd0",
+    "preRepairTree": "dec68870c5eea867e17ad8adaea57ef5441b0a3c"
+  },
+  "sourcePins": {
+    "originalR33Producer": "8e77f2a2b518c2cf5151b8f2b1e6707287ed33f6",
+    "originalR33GafSha256": "a0afba19dfb1f8fa996bc1bdcd61fd0c9bd4cf0d2bf2509d09ac86993c0e70a2",
+    "originalR33Rows": 910476,
+    "originalB22Reader": "650a0690774698b30992cddeed7791e6093f3b2d",
+    "originalB22NativeTest": "a0eb607aeca433109a703b2e699c2eb719f5ed96",
+    "originalB22SourceHead": "fe2334e63d39a9c006746caad695f7e3c5ade97d",
+    "originalB22Tree": "e458b65cb718fd399915d22e0a35ebe8611dc99b",
+    "selectedXdownloadSource": {
+      "repository": "kaicreator-mm/xDownload",
+      "commit": "e904f08c478b15147b1c07fbe53c610d2d81851f",
+      "path": "packages/download-domain-app/src/business/business-download.mjs",
+      "gitBlob": "a7dba9a896de0b84fc6d54093563adca2ccbcdfc"
+    },
+    "selectedXdownloadSnapshot": {
+      "path": "examples/dis-v020-cross-project/snapshots/xdownload/business-download.mjs",
+      "gitBlob": "a7dba9a896de0b84fc6d54093563adca2ccbcdfc",
+      "bytes": 6294,
+      "upstreamByteIdentityVerified": true
+    }
+  },
+  "priorCi": {
+    "#2448/1": "FAILURE",
+    "#2448/2": "SUCCESS",
+    "#2448/3": "SUCCESS",
+    "sha": "d2e7e4f9807d3dab4acec5ed7b5e1843315577fd",
+    "firstFailingCommand": "UNKNOWN_NOT_RETRIEVED",
+    "firstFailingExitCode": "UNKNOWN_NOT_RETRIEVED",
+    "rawWoodpeckerLogAccess": "UNAVAILABLE_FROM_CURRENT_GITHUB_WEB_BROWSER_CONNECTORS"
+  },
+  "preRepairCurrentCi": {
+    "#2449/1": "SUCCESS",
+    "#2449/2": "SUCCESS",
+    "#2449/3": "SUCCESS",
+    "sha": "5d643fb046a243e44aff7c24c3425e4f51719bd0",
+    "note": "GitHub status contexts on pre-repair actual HEAD; not inherited by new commit"
+  },
+  "o1": {
+    "selectedKnowledge": "xdownload.describePolicy",
+    "actualPath": "makeNativeFixture → compileDisV020Aot(expectedSourceOrigins) → loadDisV020Aot → app.invoke",
+    "sourceBlobMatchesOriginalUpstream": true,
+    "pipelineCommand": "node --import tsx --test examples/dis-v020-native-sdk/o1-bounded-harness.test.mjs",
+    "testCases": 4,
+    "provider": "fixture-o1-provider",
+    "providerAotPinned": false,
+    "realLlm": false,
+    "providerOutput": "UNKNOWN / authority NONE / qualified false / effectDispatched false",
+    "negativeCoverage": [
+      "disabled model",
+      "zero budget",
+      "concurrent maxCalls=1",
+      "provider error",
+      "invalid/oversized suggestion",
+      "fake PASS and KDP/Effect claims",
+      "unselected provider",
+      "unselected Effect Function"
+    ],
+    "status": "PARTIAL"
+  },
+  "r83": {
+    "originalSourceRows": 910476,
+    "dispositions": {
+      "QUARANTINE_FATAL": 233,
+      "REVIEW_SOFT": 3769,
+      "STRUCTURAL_CANDIDATE": 906474
+    },
+    "originalReaderConformance": "3 allowed source-tier queries + 768 rejected unauthorized Reader inputs = 771 calls",
+    "finiteModelStates": 768,
+    "priorNegativeMutations": 16,
+    "finding": {
+      "id": "P1-R95-R83-ID-PROFILE-DRIFT",
+      "reproducer": "Swap profile fields of DIS020-CORE-002 and DIS020-OPT-001 (both PARTIAL). Original R83 validateOriginalEvidence accepted because it pinned ID→state and only aggregate profile/state counts, not ID→profile identity. Standalone R83 CLI could therefore report its fixed Core/Optional counts for a semantically misclassified Matrix. General conformance validator separately has MATRIX_PROFILE_DRIFT, but R83's own standalone gate was incomplete."
+    },
+    "repair": {
+      "expectedProfilePinnedPerRequirementId": true,
+      "profiles": {
+        "CORE": "core",
+        "OPT": "optional-profile",
+        "GOV": "governance"
+      },
+      "negativeMutationsAdded": [
+        "optional-opt001-partial-demotion-to-not-run",
+        "optional-core-profile-swap-same-partial-state"
+      ],
+      "expectedNegativeCount": 18
+    }
+  },
+  "p2": [
+    {
+      "id": "P2-O1-DISPOSITION-AND-APP-INJECTION",
+      "finding": "makeO1BoundedHarness accepts an injected app object and checks OBSERVATION kind/authority/domainId but not observed.disposition==='OBSERVED'. A fake app returning disposition FAILED with authority NONE and domainId downloads is re-labelled OBSERVED. It remains unqualified, authority NONE and no Effect; bounded fixture helper only, so no P1 authority bypass demonstrated."
+    },
+    {
+      "id": "P2-O1-PROVIDER-NOT-AOT-BOUND",
+      "finding": "Provider is a fixture allowlist, not an AOT-pinned provider Function or real LLM. This is explicit and keeps O1 PARTIAL; no production Provider ABI/timeout/multi-round Harness proof."
+    },
+    {
+      "id": "P2-R83-MANIFEST-CHECK-CARDINALITY",
+      "finding": "R83 verifies three manifest qualificationChecks/round checks by length and receipt membership, but not uniqueness/completeness of the context set. Receipt.ci itself is unique/exact and remains the source authority; strengthen the redundant manifest witness if it becomes an independent consumer."
+    },
+    {
+      "id": "P2-CI2448-RAW-FIRST-FAILURE",
+      "finding": "Woodpecker #2448/1 is failed, but raw step logs/first nonzero command/exit code were not obtainable via available GitHub/Web/browser connectors. #2449 is green on a newer SHA but does not explain #2448; local authenticated Woodpecker API forensic retrieval remains open."
+    }
+  ],
+  "ciAfterRepair": "PENDING_AT_COMMIT_CREATION",
+  "gate": {
+    "P0": 0,
+    "P1Found": 1,
+    "P1Repaired": 1,
+    "P1Open": 0,
+    "core": "13/16",
+    "corePartial": [
+      "CORE-002",
+      "CORE-005",
+      "CORE-016"
+    ],
+    "optional": {
+      "O1": "PARTIAL",
+      "O2": "NOT_RUN",
+      "O3": "NOT_RUN",
+      "O4": "NOT_RUN"
+    },
+    "governance": "NOT_RUN",
+    "sap": 0,
+    "effects": 0,
+    "dkeR8": "0/53",
+    "merge": false,
+    "freeze": false,
+    "release": false,
+    "githubActions": false
+  }
+}

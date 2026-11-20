@@ -1,0 +1,127 @@
+{
+  "schema": "formal-tools/problem-spec/0.1",
+  "problem_id": "dis.xdownload.interaction.safety",
+  "source_refs": [
+    {
+      "id": "xdownload_interaction",
+      "sha256": "aa7dc083fd0a7dc6f9d98e0792058d567b16c1b4883f9fe9d80fa91733afe4c2",
+      "classification": "PUBLIC",
+      "purpose": "Exact inspect/confirm source; Git blob f57747aa7996c88833e72288a0acd594a7ce5468",
+      "consumer": "domain_harness"
+    },
+    {
+      "id": "case_valid",
+      "sha256": "024d6310636c6af2b585cf2c7d8ed3bb424c6176177e0c96f0996535c0de5022",
+      "classification": "PUBLIC",
+      "purpose": "Valid input can reach AWAITING_CONFIRMATION and READY_FOR_KDP after explicit confirmation.",
+      "consumer": "formal_tools"
+    },
+    {
+      "id": "case_unconfirmed",
+      "sha256": "7730fa095075fa5ee659c2401476f56d6ca2726c24358028b44717bb5835bbce",
+      "classification": "PUBLIC",
+      "purpose": "Missing explicit confirmation cannot reach READY_FOR_KDP.",
+      "consumer": "formal_tools"
+    },
+    {
+      "id": "case_invalid_input",
+      "sha256": "61a0cc44113a55107b1342bdd5b8e7385236202f3d9f63b93d3fe9dbe6b8da0a",
+      "classification": "PUBLIC",
+      "purpose": "Invalid channel, request ID, URL or byte size cannot reach READY_FOR_KDP.",
+      "consumer": "formal_tools"
+    },
+    {
+      "id": "case_undeclared_forged",
+      "sha256": "dd5a804c7bcbf0bf930eef61ac4c49df0f3d78bd1269aac0d8ea30761de6f5b6",
+      "classification": "PUBLIC",
+      "purpose": "Undeclared answer fields and a forged draft-ready flag cannot bypass revalidation.",
+      "consumer": "formal_tools"
+    },
+    {
+      "id": "case_no_effect",
+      "sha256": "dc9c6827b617990df18389c4444125ef59ceb4c701cc8c521879bb6ef07861f7",
+      "classification": "PUBLIC",
+      "purpose": "Neither effect dispatch nor effect permission is reachable.",
+      "consumer": "formal_tools"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "r1",
+      "source_ref": "xdownload_interaction",
+      "text": "A complete valid interaction input can reach AWAITING_CONFIRMATION."
+    },
+    {
+      "id": "r2",
+      "source_ref": "xdownload_interaction",
+      "text": "READY_FOR_KDP requires a valid re-evaluated proposal, allowed answer fields and explicit confirmation."
+    },
+    {
+      "id": "r3",
+      "source_ref": "xdownload_interaction",
+      "text": "READY_FOR_KDP remains an observation: authority NONE, effectDispatched false, permittedEffect false."
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim1",
+      "text": "Within the five-case bounded abstraction, a valid interaction can reach AWAITING_CONFIRMATION and READY_FOR_KDP after explicit confirmation, while unconfirmed or invalid input, undeclared answers, forged draft-ready state, effect dispatch and effect permission are rejected as modeled.",
+      "kind": "bounded_model",
+      "requirement_ids": [
+        "r1",
+        "r2",
+        "r3"
+      ],
+      "source_refs": [
+        "xdownload_interaction"
+      ],
+      "capability_ids": [
+        "logic.smt"
+      ]
+    }
+  ],
+  "oracles": [
+    {
+      "id": "xdownload_runtime_crosscheck",
+      "source_ref": "xdownload_interaction",
+      "frozen": true,
+      "positive_case_ids": [
+        "case_valid"
+      ],
+      "negative_case_ids": [
+        "case_unconfirmed",
+        "case_invalid_input",
+        "case_undeclared_forged",
+        "case_no_effect"
+      ],
+      "review_identity": "engineering_runtime_crosscheck"
+    }
+  ],
+  "capability_ids": [
+    "logic.smt"
+  ],
+  "budget": {
+    "max_steps": 10,
+    "max_depth": 1,
+    "max_cost_units": 10,
+    "max_total_time_ms": 10000,
+    "max_retries": 0
+  },
+  "policy": {
+    "allowed_tools": [
+      "z3",
+      "cvc5"
+    ],
+    "allowed_operations": {
+      "z3": [
+        "solve"
+      ],
+      "cvc5": [
+        "solve"
+      ]
+    },
+    "destination": "LOCAL",
+    "max_input_classification": "PUBLIC",
+    "allow_network": false
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r33-b01-state-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "B01_02_R33_C2_DOMAIN_OWNED_STATE",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+    "tree": "707a0b11b9a8691b7dc7efad7c5d91d3e735edda"
+  },
+  "originCommit": "0a404d343827d95ee6c08d962a369dc44c52f98b",
+  "originRoundTree": "008f3bedb6c0e79cd4f8e43aa1c013feb6f0834d",
+  "sourceTestBlob": "a460d8a199d735545b3ebb5e1c7c11588d683675",
+  "casePath": "examples/dis-v020-native-sdk/b01-state-owner.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+    }
+  ],
+  "notCurrentHead": false,
+  "observations": [
+    "Real Runx EnvironmentAgentPresence source-pinned Stateful class owns separate invocation-local maps; matched-agent token observation changes only that handle.",
+    "Original R33 #2274/1 native FAILURE retained, due source-level miscomparison of independently recreated original xDownload handler functions; same Writer repaired stable-data-only assertion, full #2276/1-3 SUCCESS."
+  ],
+  "limits": [
+    "Closing SDK ingress does not revoke previously returned in-process JavaScript handle references.",
+    "Presence state cannot create an execution lease, independent Claim, Host permit or ECP authority."
+  ]
+}

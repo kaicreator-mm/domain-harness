@@ -1,0 +1,9 @@
+# B14/R60 — genuine DKE R16 full publisher authenticity receipt consumed by selected DIS Knowledge
+
+**B14-01 R60 VERIFIED 1/1 scoped demo** at original `9b761ad3628048706a6207deb645add5dc27eee1`, TREE `7ed525bf9852175215452ec13647ada2ec5de075`, native test Git Blob `8c639dd06a2c9509abdccafc7057cde3ba80c7bb`. Woodpecker #2329/1–3 **3/3 SUCCESS**.
+
+The original DKE #209 R16 final Python receipt is pinned as non-executable producer DATA at `domain-forge@2e06e1047eb1eec146a808a49aefe2d555d0923e`, Git Blob `942d3e06073b27eade5c40c918996bb55a5a0d03`. Upstream Python R16 rechecked four complete original Cloudflare/GitHub publisher documents by GitBlob SHA1 + SHA256, 14 line anchors and 25 rejected mutation cases (including the real repaired three explicit-empty-map bypasses). DIS does **not** re-read the original publisher full documents: it selects R16 original receipt as DATA via `compileDisV020Aot`, `loadDisV020Aot`, and `dke.r16.readSourceScope` Knowledge Function, with separately pinned LOCAL Reader.
+
+Results: R16 lexical document scope S01/S02/S09/S10 four bounded `OBSERVED` source authenticity outcomes, seven S03–S08/S11 remain `UNKNOWN`. No independent semantic reviewer/owner SAP, no publisher template renderer authority, no Effect, no business semantic acceptance. Source/selection/reviewer empty objects, altered source Git blobs, forged effect/SAP, stale installer and JSON-as-code are rejected. Both provenance origin and native Function typed ABI verified.
+
+**Total B01–B14: 28/28 scoped Demo rounds VERIFIED. Core 9/16 VERIFIED (56.25%), 7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN.** Historical source/CI and current bookkeeping SHA are distinct. No merge/Freeze/release.

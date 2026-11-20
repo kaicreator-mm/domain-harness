@@ -1,0 +1,27 @@
+{
+  "schema": "formal-tools/g4-evidence-index/0.1",
+  "scope": "BOUNDED_BOOLEAN_ABSTRACTION_ENGINEERING_ONLY",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "commit": "b3a962c673f2e623ccd3db8ba059c4bae456b9dd",
+    "path": "examples/dis-v020-interaction/download-goal.mjs",
+    "git_blob": "f57747aa7996c88833e72288a0acd594a7ce5468",
+    "sha256": "aa7dc083fd0a7dc6f9d98e0792058d567b16c1b4883f9fe9d80fa91733afe4c2"
+  },
+  "model_set": {
+    "path": "benchmarks/llm-methods/g4/MODEL_SET.json",
+    "sha256": "ccffedd71e77e85faea3a98aee7e8b9a0bb3242d3b5e7fbf4103a974b571c7f2"
+  },
+  "evidence": [
+    {
+      "id": "initial_native_pair",
+      "path": "validation/xdownload-interaction-2026-11-16/PAIR.json",
+      "sha256": "2225c0dbde45c4b7eebddfd0a628e80451f46c847abf71a98281bcab5668fd22"
+    },
+    {
+      "id": "independent_native_rerun",
+      "path": "validation/xdownload-interaction-2026-11-16/PAIR-RERUN.json",
+      "sha256": "ca22c5adbcf81a966c8a214bc376e85a574754d69d325b4006db0dc0fff63d4b"
+    }
+  ]
+}

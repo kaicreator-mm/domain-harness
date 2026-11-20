@@ -1,0 +1,39 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r17-bounded-schema-ci",
+  "disVersion": "0.2.0",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "fe51db3b70450ae3abcc3d42f944d972af20cc2c",
+    "tree": "50496119e01ee54d793be897fb1946d79f585f0f"
+  },
+  "status": "SUCCESS",
+  "scope": "HISTORICAL_EXACT_SHA_R17_SOURCE_REAL_TYPED_RECORD_COMPAT",
+  "notCurrentHead": true,
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2238/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2238/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2238/3"
+    }
+  ],
+  "observations": [
+    "Original source-locked Tally bounded record Schema with optional fields, closed-field guard, finite number guard and valid UNKNOWN/OBSERVED passed the native integration lane.",
+    "Same-major structural reader comparator native regressions covered version bump, additive output, unversioned drift, output loss, mandatory input addition, Outcome remapping, Evidence weakening and major incompatibility."
+  ],
+  "limits": [
+    "Bounded nonrecursive primitive record validation only, not an exhaustive Schema dialect or full Function coverage.",
+    "Same-major compatibility comparator has no AOT activation authority; it is not proof of business evidence, KDP admission or L2 Freeze.",
+    "R18 real Tally release observations and independent-RQ negative proof are added in successor code, not in #2238."
+  ]
+}

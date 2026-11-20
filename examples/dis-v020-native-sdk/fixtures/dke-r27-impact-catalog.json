@@ -1,0 +1,93 @@
+{
+  "schema": "dke.r26.registered-impact-catalog/1",
+  "version": "0.0.1-demo",
+  "normative": false,
+  "owner": "DKE V07 experiment #209",
+  "sourceStatus": "PENDING_INDEPENDENT_REVIEW",
+  "sourcePair": {
+    "repository": "kaicreator-mm/tally",
+    "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+    "before": {
+      "commit": "ab5c8231e871fb3df18df05176943d2a97c997f5",
+      "blob": "2d4498dfa5f90bcf57cc81e9c155fb9ede31bf00",
+      "nodeCount": 793
+    },
+    "after": {
+      "commit": "a8f4986b099aba27cd86ce6a78e1c19159d1de55",
+      "blob": "b6dc804d3ccc3aac7ce818533c2948f54b34644a",
+      "nodeCount": 807
+    }
+  },
+  "boundedView": {
+    "repository": "kaicreator-mm/domain-harness",
+    "path": "examples/dis-v020-native-sdk/fixtures/dke-r25-tally-807.json",
+    "blob": "3849e4c96aa4abc3a87cd845511b12726e601689",
+    "recordCount": 14
+  },
+  "realDIS": {
+    "repo": "kaicreator-mm/domain-harness",
+    "commit": "58e27c52d35f45557398d56d0cfe72eac08f4ccf",
+    "sourceTestPath": "examples/dis-v020-native-sdk/dke-two-business.test.mjs",
+    "testBlob": "01b7454c57bd12c7bd3f0bab401e3ce26e83a5ac",
+    "sourceId": "dke-r25-tally-change",
+    "integrationCI": "https://ci.kaicreator.com/repos/18/pipeline/2261/1",
+    "status": "SUCCESS",
+    "scope": "BOUND_SELECTED_FUNCTIONS_ONLY"
+  },
+  "registrations": [
+    {
+      "cqId": "CQ-09F-CF",
+      "caseId": "se:CASE-09F-CF-KV-DEPENDENCY",
+      "sapCandidate": {
+        "id": "R26-PROPOSAL-CF",
+        "sourceAuthority": "NONE",
+        "qualified": false,
+        "oracle": "NOT_VERIFIED",
+        "status": "PROPOSAL_ONLY"
+      },
+      "readers": [
+        {
+          "functionId": "dke.r25.ed06.inspect",
+          "packageId": "business-dke-ed06-observation@0.0.1-demo"
+        },
+        {
+          "functionId": "dke.r25.crossview.inspect",
+          "packageId": "business-dke-crossview-observation@0.0.1-demo"
+        }
+      ]
+    },
+    {
+      "cqId": "CQ-09F-GH",
+      "caseId": "se:CASE-09F-GH-DB-FAILOVER",
+      "sapCandidate": {
+        "id": "R26-PROPOSAL-GH",
+        "sourceAuthority": "NONE",
+        "qualified": false,
+        "oracle": "NOT_VERIFIED",
+        "status": "PROPOSAL_ONLY"
+      },
+      "readers": [
+        {
+          "functionId": "dke.r25.ed06.inspect",
+          "packageId": "business-dke-ed06-observation@0.0.1-demo"
+        },
+        {
+          "functionId": "dke.r25.crossview.inspect",
+          "packageId": "business-dke-crossview-observation@0.0.1-demo"
+        }
+      ]
+    }
+  ],
+  "stableObservation": {
+    "cqId": "CQ-T-CROSSCUT",
+    "recordId": "se:REL-TVV-0020",
+    "source": "dke-r24-projection",
+    "readers": [
+      "dke.r24.ed06.consume",
+      "dke.r24.crossview.consume"
+    ],
+    "sapId": "O-T-CROSSCUT",
+    "qualified": false,
+    "oracle": "NOT_VERIFIED"
+  }
+}

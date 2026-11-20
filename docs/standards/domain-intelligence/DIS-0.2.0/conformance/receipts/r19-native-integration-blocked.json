@@ -1,0 +1,39 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r19-native-integration-blocked",
+  "disVersion": "0.2.0",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "d96fca1e45612cf07102f307f9bb90727a0380a2",
+    "tree": "5be1a1a99aabe1d4eb4547723e7dcecfed03edc3"
+  },
+  "status": "BLOCKED",
+  "notCurrentHead": true,
+  "scope": "R19_FIRST_CANDIDATE_MATCHED_SHA_INTEGRATION_FAILURE",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "FAILURE",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2240/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2240/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2240/3"
+    }
+  ],
+  "observations": [
+    "The exact R19 source failed its dedicated DIS integration context, while two other Woodpecker contexts succeeded. This is negative qualification, NOT a PASS.",
+    "Local code inspection additionally found that changing an existing parameterless Knowledge function to a closed record input without allowAbsent breaks the pre-existing invoke(id) call shape. R19.1 repairs that independently demonstrated compatibility risk."
+  ],
+  "limits": [
+    "GitHub context state does not disclose step logs; the first failing CI step and whether it was caused by that compatibility issue remain UNKNOWN.",
+    "Neither R18 historical #2239 pending nor this blocked R19 record may count as a successful receipt.",
+    "Full native CI must be re-run and qualified on the new R19.1 exact HEAD before any PASS claim."
+  ]
+}

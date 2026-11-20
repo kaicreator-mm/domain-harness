@@ -1,0 +1,39 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r16-kdp-admission-ci",
+  "disVersion": "0.2.0",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "db10ddbc4977a35c31754e4a8e23cdacb063f9a5",
+    "tree": "5398b312a36e345c06dd796063f4516c07d34d6e"
+  },
+  "status": "SUCCESS",
+  "scope": "HISTORICAL_EXACT_SHA_R16_NATIVE_KDP_ADMISSION",
+  "notCurrentHead": true,
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2237/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2237/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2237/3"
+    }
+  ],
+  "observations": [
+    "R16 real selected orders KDP_INTENT typed admission and negative version, forged success, malformed receipt, wrong LOCAL binding and source-pinned Tally evidence tests ran in native DIS integration lane.",
+    "The original R16 first candidate 67991649... reported ERROR for integration; repaired regex at db10ddbc... was the exact subject of the three successful CI contexts."
+  ],
+  "limits": [
+    "KDP ADMITTED is not completed Effect, independent domain evidence, Task Claim or release authorization.",
+    "R17 record-schema and structural compatibility candidates are added by later commits, and are NOT covered by this prior exact-SHA receipt.",
+    "CORE-003 remains PARTIAL; historical positive/negative receipt is not a version Freeze or independent review."
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema": "dke.r28.source-locator-repair-candidate/1",
+  "date": "2026-11-09",
+  "originalSource": {
+    "repository": "kaicreator-mm/tally",
+    "commit": "a8f4986b099aba27cd86ce6a78e1c19159d1de55",
+    "blob": "b6dc804d3ccc3aac7ce818533c2948f54b34644a",
+    "nodes": 807
+  },
+  "originalProjection": {
+    "repository": "kaicreator-mm/domain-harness",
+    "blob": "3849e4c96aa4abc3a87cd845511b12726e601689",
+    "records": 14
+  },
+  "r27Review": {
+    "commit": "844a2a295b962e10fff822913fa97d4b072f8b84",
+    "blob": "0b7d514cc297a07952b2cd536c2dafd3e47bda45"
+  },
+  "publisher": {
+    "url": "https://github.blog/news-insights/company-news/oct21-post-incident-analysis/",
+    "htmlSha256": null,
+    "timestamps": [
+      "16:24",
+      "16:45",
+      "23:03"
+    ],
+    "firstPartyOnly": true,
+    "allWebhooksDelivered": false
+  },
+  "canonicalSourceAmended": false,
+  "sourceQualified": false,
+  "independentOracle": false,
+  "additionalGlobalConsumerCoverage": "UNKNOWN",
+  "nativeDeploymentAuthorized": false,
+  "added": [
+    {
+      "@id": "dke-r28:LOC-GH-BACKLOG",
+      "@type": "se:SourceLocator",
+      "se:source_ref": {
+        "@id": "se:SRC-09F-GH-POSTMORTEM-2018"
+      },
+      "se:locator_type": "SECTION",
+      "se:locator": "GitHub postmortem timeline: 2018 October 22 16:24 topology recovery; 16:45 processing backlog and reporting expired payload drops; 23:03 webhooks and Pages builds queue completed and status green",
+      "se:lifecycle_status": "PENDING_REVIEW",
+      "se:verification_state": "DKE_CANDIDATE_NOT_ORIGINAL_OWNER_VERIFIED",
+      "se:synthetic": true
+    },
+    {
+      "@id": "dke-r28:EVD-GH-BACKLOG",
+      "@type": "se:Evidence",
+      "se:source_locator_ref": {
+        "@id": "dke-r28:LOC-GH-BACKLOG"
+      },
+      "se:statement": "GitHub's first-party postmortem reports processing the backlog after 16:24, expired webhook payloads dropped during the 16:45 recovery stage, and at 23:03 completion of queued work and green site status; it does not claim all expired webhooks were delivered.",
+      "se:limitations": "Publisher-reported history only; expired webhook payloads were dropped, not all delivered; no HTML byte pin or independent review",
+      "se:lifecycle_status": "PENDING_REVIEW",
+      "se:extraction_status": "PROPOSED_NOT_QUALIFIED",
+      "se:synthetic": true
+    }
+  ],
+  "caseEvidencePatch": {
+    "caseId": "se:CASE-09F-GH-DB-FAILOVER",
+    "exactOriginalRefs": [
+      "se:EVD-09F-GH-RECOVERY",
+      "se:EVD-09F-GH-REPLICATION"
+    ],
+    "append": "dke-r28:EVD-GH-BACKLOG",
+    "preserveAllOtherFields": true
+  },
+  "impact": {
+    "newSourceRecords": 2,
+    "changedCaseRecords": 1,
+    "affectedCQs": [
+      "CQ-09F-GH"
+    ],
+    "unaffectedCQs": [
+      "CQ-09F-CF",
+      "CQ-T-CROSSCUT"
+    ],
+    "knownRegisteredFunctions": [
+      "dke.r25.ed06.inspect",
+      "dke.r25.crossview.inspect"
+    ],
+    "proposedSAP": "R26-PROPOSAL-GH",
+    "sapQualified": false
+  },
+  "authority": "PATCH_PROPOSAL_ONLY"
+}

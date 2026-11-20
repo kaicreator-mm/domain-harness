@@ -1,0 +1,1785 @@
+{
+  "schema": "dke.ev14.domain-blueprint-deds-semantic-assurance/2",
+  "outputLabel": "DKE_209_EV14_ELEMENT_OWNED_SEMANTIC_ASSURANCE_PROFILES_R1",
+  "asOf": "2026-11-11",
+  "project": "kaicreator-mm/domain-forge",
+  "productIssue": 207,
+  "masterIssue": 209,
+  "draftPr": 208,
+  "sourceHead": "6288d6edffe84a14b5ef634a8ada2ab7f9b624b8",
+  "status": "CANDIDATE_REVIEWABLE_NOT_PROMOTED",
+  "canonicalKnowledgeSource": "PINNED_ORIGINAL_GO_R33_AND_DATED_GO_OBO_PLUS_RFC_ORIGINALS_NOT_SEPARATE_CANONICAL_GRAPH",
+  "targetProblem": "A GO annotation evidence record is retrieved/represented through HTTP but transport status does not imply biology, publisher validity, or SAP",
+  "explicitExclusions": [
+    "No authoritatively endorsed D03 biology",
+    "No original GO Source Owner/biocurator identity",
+    "No original EV14 formal qualified Cell",
+    "No produced DIS Package or executable ABI",
+    "No standalone duplicated GO ontology",
+    "No mutation of DKE frozen R8 or DIS #1497"
+  ],
+  "sources": {
+    "Product207": {
+      "locator": "https://github.com/kaicreator-mm/domain-forge/issues/207",
+      "status": "PRODUCT_L1_CANDIDATE_NOT_L2"
+    },
+    "R8_EV14": {
+      "locator": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/EV_CROSS_DOMAIN_MATRIX_R8.json",
+      "commit": "9104928912cc808ee76658968c3a1febe3afd799",
+      "gitBlob": "8cab8ead10d90a440c85fec86b01fd408022ae2c"
+    },
+    "R33_NATIVE": {
+      "locator": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r33-go-ic-source-triage/RUN_RECEIPT_R33_R1.json",
+      "commit": "9104928912cc808ee76658968c3a1febe3afd799",
+      "gitBlob": "8e77f2a2b518c2cf5151b8f2b1e6707287ed33f6",
+      "gafGzipSha256": "a0afba19dfb1f8fa996bc1bdcd61fd0c9bd4cf0d2bf2509d09ac86993c0e70a2"
+    },
+    "GO_SLICE_NATIVE": {
+      "locator": "docs/standards/dke/DKE-0.0.1/demos/d03-go-release-r0/EXECUTION_RECEIPT_R0_ORIGINAL_BYTES.json",
+      "gitBlob": "8b19a13afa7de4d0a227262a5b2dbeb1745c29e6",
+      "ontologySha256": "b08d45b268b8c24ccb2513dbbbc7d4df9f6521c099b413f79eb31e06e0fa3bcc",
+      "sampleCount": 36,
+      "originalGoVersion": "releases/2026-07-26"
+    },
+    "RFC9110": {
+      "locator": "RFC9110 original publisher TXT",
+      "gitBlob": "19a88abcb4df0744df2d55c6d1af53125b6d9bd2"
+    },
+    "RFC9111": {
+      "locator": "RFC9111 original publisher TXT",
+      "gitBlob": "cef95c761dfcbc6f649019efa2cf5f97dc5f9020"
+    },
+    "EV14_R1_REVIEW": {
+      "locator": "docs/standards/dke/DKE-0.0.1/demos/EV14_D03_D04_FRESH_SOURCE_FIRST_REVIEW_R1.md",
+      "gitBlob": "c94a8dee6c6f2648b272dfc6e134486f4fc3ad9d",
+      "technicalSuite": "33/33_HOSTED_V8_NOT_FORMAL"
+    }
+  },
+  "elements": [
+    {
+      "id": "EV14-ROOT",
+      "kind": "ROOT",
+      "parent": null,
+      "domainScope": [
+        "D03",
+        "D04"
+      ],
+      "semanticOwner": "EV14_COMPOSITION_ROOT",
+      "functions": [],
+      "responsibility": "Overall source/goal coverage and no false cross-domain qualification",
+      "sourceClaims": [
+        "Product207",
+        "R8_EV14"
+      ],
+      "independentOracle": "NOT_ATTESTED",
+      "semanticAssuranceProfile": {
+        "schema": "dke.semantic-assurance-profile/0.1",
+        "profileId": "SAP-EV14-ROOT-R1",
+        "revision": "R1",
+        "elementScopeId": "EV14-ROOT",
+        "state": "CANDIDATE_NOT_QUALIFIED",
+        "canonicalGraphRevision": "NOT_PRESENT_BOUNDED_SOURCE_SLICE_ONLY",
+        "sourceSnapshot": {
+          "sourceRefs": [
+            {
+              "ref": "Product207",
+              "gitBlob": null,
+              "identityStatus": "LIVE_ISSUE_REFERENCE_NOT_IMMUTABLE"
+            },
+            {
+              "ref": "R8_EV14",
+              "gitBlob": "8cab8ead10d90a440c85fec86b01fd408022ae2c",
+              "identityStatus": "PINNED_GIT_BLOB"
+            }
+          ],
+          "exactScope": "EV14 D03+D04 bounded source slice only",
+          "blueprintBaseGitBlob": "93f12dea21cf77121ddf2d28bacbd60e88ede91e"
+        },
+        "semanticScope": {
+          "purpose": "Overall source/goal coverage and no false cross-domain qualification",
+          "inScope": [
+            "D03/D04 top-level goal and scope coverage",
+            "parent composition obligations and cross-domain semantic constraints",
+            "root-level currentness and qualification boundaries"
+          ],
+          "outOfScope": [
+            "GO biological adjudication",
+            "HTTP implementation behavior",
+            "DIS Function, Effect, Package or runtime authority"
+          ],
+          "domainScope": [
+            "D03",
+            "D04"
+          ],
+          "semanticOwner": "EV14_COMPOSITION_ROOT"
+        },
+        "semanticClaims": [
+          {
+            "claimId": "ROOT-C01",
+            "statement": "Product #207 requires parent composition validation independently of child validation",
+            "knowledgeType": "NORMATIVE_REQUIREMENT",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "Product207"
+            ],
+            "limitation": "Product requirement, not frozen implementation contract"
+          },
+          {
+            "claimId": "ROOT-C02",
+            "statement": "Original frozen R8 EV14 is selected for D03+D04 but remains NOT_RUN and global qualification is 0/53",
+            "knowledgeType": "SOURCE_SCOPED_OBSERVATION",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "limitation": "Exact frozen Matrix status only"
+          },
+          {
+            "claimId": "ROOT-C03",
+            "statement": "The composed D03+D04 domain is semantically correct and qualified",
+            "knowledgeType": "DOMAIN_TRUTH",
+            "epistemicStatus": "UNKNOWN",
+            "sourceRefs": [],
+            "limitation": "Requires independent domain Oracle and accountable Source Owners"
+          }
+        ],
+        "relationAndConstraintRefs": [
+          "CHILD_PASS_NOT_PARENT_PASS",
+          "SEMANTIC_EDGE_NOT_EFFECT"
+        ],
+        "ownedConstraintRefs": [],
+        "competencyQuestions": [
+          {
+            "cqId": "ROOT-CQ01",
+            "question": "Do D03 and D04 compose without cross-publisher entailment?",
+            "state": "OPEN"
+          },
+          {
+            "cqId": "ROOT-CQ02",
+            "question": "Can the Root be qualified from the available evidence?",
+            "state": "OPEN"
+          }
+        ],
+        "assuranceObligations": [
+          {
+            "obligationId": "ROOT-O01",
+            "obligation": "Evaluate parent composition independently from child results",
+            "oracleType": "EVIDENCE_REVIEW",
+            "status": "OPEN"
+          },
+          {
+            "obligationId": "ROOT-O02",
+            "obligation": "Adjudicate domain-wide truth and root qualification",
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "status": "OPEN"
+          }
+        ],
+        "validationCases": [
+          {
+            "caseId": "EV14-ROOT-01",
+            "caseClass": "POSITIVE",
+            "scenario": "The pinned scope and R8 selection are traceable",
+            "fixtureKind": "PINNED_ORIGINAL_SOURCE",
+            "sourceRefs": [
+              "Product207",
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": true,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "SOURCE_SCOPED_ONLY",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-ROOT-02",
+            "caseClass": "NEGATIVE",
+            "scenario": "All child technical checks pass, therefore Root is PASS",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "Product207",
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "REFUTED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-ROOT-03",
+            "caseClass": "BOUNDARY",
+            "scenario": "The candidate covers only D03/D04 source slice, not all 18 EVs",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONDITIONAL",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-ROOT-04",
+            "caseClass": "CONFLICT",
+            "scenario": "A child PASS is asserted while root-level owner/oracle remains absent",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "Product207",
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONFLICT_PRESERVED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-ROOT-05",
+            "caseClass": "UNKNOWN",
+            "scenario": "No accountable root-level domain Oracle or Owner is attested",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "expectedDisposition": "UNKNOWN",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-ROOT-06",
+            "caseClass": "OUTDATED_EVIDENCE",
+            "scenario": "A newer frozen R8 revision supersedes the pinned qualification context",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "STALE_BLOCKED",
+            "executionStatus": "NOT_RUN"
+          }
+        ],
+        "oraclePolicy": {
+          "MACHINE_CHECKABLE": "Only schema, source pin, graph closure and explicitly encoded mechanical invariants; never domain truth by itself.",
+          "EVIDENCE_REVIEW": "Requires a reviewer to compare exact original source bytes and context; does not authenticate a publisher or domain owner.",
+          "DOMAIN_ORACLE_REQUIRED": "Requires a separately attributable, competent domain adjudicator/Owner with exact scope and evidence.",
+          "UNKNOWN": "Insufficient source, authority, version or context; preserve UNKNOWN and block dependent qualification."
+        },
+        "independentCritique": {
+          "status": "NOT_RUN",
+          "generatorAndCriticIndependence": "NOT_ATTESTED",
+          "noSelfSigning": true
+        },
+        "execution": {
+          "authorCheck": "NOT_RUN",
+          "independentEvidenceReview": "NOT_RUN",
+          "domainOracle": "NOT_ATTESTED",
+          "receipt": null
+        },
+        "accessUsageDisclosure": {
+          "sourceLicense": "NOT_ASSESSED",
+          "consumerScope": "REVIEW_ONLY",
+          "externalModelDisclosure": "NOT_AUTHORIZED_BY_THIS_CANDIDATE"
+        },
+        "runtimeRelevance": "UNKNOWN",
+        "qualification": {
+          "state": "CANDIDATE_NOT_QUALIFIED",
+          "qualified": false,
+          "simulatorPromotion": false,
+          "disEffectsAuthorized": false
+        }
+      }
+    },
+    {
+      "id": "EV14-GO",
+      "kind": "CHILD",
+      "parent": "EV14-ROOT",
+      "domainScope": [
+        "D03"
+      ],
+      "semanticOwner": "GO_GAF_ANNOTATION_VS_ONTOLOGY_TERM",
+      "functions": [],
+      "responsibility": "Evidence-coded GAF annotation claim vs ontology term, with unknown biological truth",
+      "sourceClaims": [
+        "R33_NATIVE",
+        "GO_SLICE_NATIVE"
+      ],
+      "independentOracle": "NOT_ATTESTED",
+      "semanticAssuranceProfile": {
+        "schema": "dke.semantic-assurance-profile/0.1",
+        "profileId": "SAP-EV14-GO-R1",
+        "revision": "R1",
+        "elementScopeId": "EV14-GO",
+        "state": "CANDIDATE_NOT_QUALIFIED",
+        "canonicalGraphRevision": "NOT_PRESENT_BOUNDED_SOURCE_SLICE_ONLY",
+        "sourceSnapshot": {
+          "sourceRefs": [
+            {
+              "ref": "R33_NATIVE",
+              "gitBlob": "8e77f2a2b518c2cf5151b8f2b1e6707287ed33f6",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "GO_SLICE_NATIVE",
+              "gitBlob": "8b19a13afa7de4d0a227262a5b2dbeb1745c29e6",
+              "identityStatus": "PINNED_GIT_BLOB"
+            }
+          ],
+          "exactScope": "EV14 D03+D04 bounded source slice only",
+          "blueprintBaseGitBlob": "93f12dea21cf77121ddf2d28bacbd60e88ede91e"
+        },
+        "semanticScope": {
+          "purpose": "Evidence-coded GAF annotation claim vs ontology term, with unknown biological truth",
+          "inScope": [
+            "Dated GO ontology term identity for the bounded 36-row source slice",
+            "R33 GAF annotation/evidence-tier technical disposition",
+            "explicit biological UNKNOWN and source version scope"
+          ],
+          "outOfScope": [
+            "Whole GO ontology completeness",
+            "gene/product biological truth",
+            "curator policy beyond pinned GO publisher rules"
+          ],
+          "domainScope": [
+            "D03"
+          ],
+          "semanticOwner": "GO_GAF_ANNOTATION_VS_ONTOLOGY_TERM"
+        },
+        "semanticClaims": [
+          {
+            "claimId": "GO-C01",
+            "statement": "GO:0031965 is present in the pinned dated OBO source referenced by the original 36-row receipt",
+            "knowledgeType": "SOURCE_SCOPED_OBSERVATION",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "GO_SLICE_NATIVE"
+            ],
+            "limitation": "Bounded dated source sample only"
+          },
+          {
+            "claimId": "GO-C02",
+            "statement": "The original GAF line 18026 has empty IC With/From and R33 marks it QUARANTINE_FATAL",
+            "knowledgeType": "SOURCE_SCOPED_OBSERVATION",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "limitation": "Does not imply ontology term absence"
+          },
+          {
+            "claimId": "GO-C03",
+            "statement": "The gene/product has the biological function asserted by the annotation",
+            "knowledgeType": "BIOLOGICAL_CLAIM",
+            "epistemicStatus": "UNKNOWN",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "limitation": "No qualified biocurator adjudication"
+          }
+        ],
+        "relationAndConstraintRefs": [
+          "SRC_BYTES_DO_NOT_SIGN_PUBLISHER",
+          "HTTP_STATUS_NOT_BIOLOGY",
+          "R33_TIER_NOT_GO_TRUTH",
+          "CHILD_PASS_NOT_PARENT_PASS",
+          "SEMANTIC_EDGE_NOT_EFFECT"
+        ],
+        "ownedConstraintRefs": [
+          "R33_TIER_NOT_GO_TRUTH"
+        ],
+        "competencyQuestions": [
+          {
+            "cqId": "GO-CQ01",
+            "question": "Does the pinned GO term exist in the pinned OBO release?",
+            "state": "CONDITIONAL"
+          },
+          {
+            "cqId": "GO-CQ02",
+            "question": "Is the GAF annotation biologically correct?",
+            "state": "OPEN"
+          }
+        ],
+        "assuranceObligations": [
+          {
+            "obligationId": "GO-O01",
+            "obligation": "Check source row, evidence code and ontology term identity",
+            "oracleType": "MACHINE_CHECKABLE",
+            "status": "OPEN"
+          },
+          {
+            "obligationId": "GO-O02",
+            "obligation": "Adjudicate biological annotation truth and evidence sufficiency",
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "status": "OPEN"
+          }
+        ],
+        "validationCases": [
+          {
+            "caseId": "EV14-GO-01",
+            "caseClass": "POSITIVE",
+            "scenario": "The pinned 36-row source receipt links the sampled annotation to GO:0031965 in the dated OBO",
+            "fixtureKind": "PINNED_ORIGINAL_SOURCE",
+            "sourceRefs": [
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": true,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "SOURCE_SCOPED_ONLY",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-GO-02",
+            "caseClass": "NEGATIVE",
+            "scenario": "R33 QUARANTINE_FATAL means the GO ontology term is absent",
+            "fixtureKind": "PINNED_ORIGINAL_SOURCE",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": true,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "REFUTED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-GO-03",
+            "caseClass": "BOUNDARY",
+            "scenario": "36 rows are a bounded sample and cannot establish full canonical GO KG coverage",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONDITIONAL",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-GO-04",
+            "caseClass": "CONFLICT",
+            "scenario": "Annotation disposition and ontology-term existence appear different but refer to distinct semantic questions",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONFLICT_PRESERVED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-GO-05",
+            "caseClass": "UNKNOWN",
+            "scenario": "Biological truth lacks an attested GO biocurator/oracle",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "expectedDisposition": "UNKNOWN",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-GO-06",
+            "caseClass": "OUTDATED_EVIDENCE",
+            "scenario": "The GO OBO release changes and the previous term lookup is reused without revalidation",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "STALE_BLOCKED",
+            "executionStatus": "NOT_RUN"
+          }
+        ],
+        "oraclePolicy": {
+          "MACHINE_CHECKABLE": "Only schema, source pin, graph closure and explicitly encoded mechanical invariants; never domain truth by itself.",
+          "EVIDENCE_REVIEW": "Requires a reviewer to compare exact original source bytes and context; does not authenticate a publisher or domain owner.",
+          "DOMAIN_ORACLE_REQUIRED": "Requires a separately attributable, competent domain adjudicator/Owner with exact scope and evidence.",
+          "UNKNOWN": "Insufficient source, authority, version or context; preserve UNKNOWN and block dependent qualification."
+        },
+        "independentCritique": {
+          "status": "NOT_RUN",
+          "generatorAndCriticIndependence": "NOT_ATTESTED",
+          "noSelfSigning": true
+        },
+        "execution": {
+          "authorCheck": "NOT_RUN",
+          "independentEvidenceReview": "NOT_RUN",
+          "domainOracle": "NOT_ATTESTED",
+          "receipt": null
+        },
+        "accessUsageDisclosure": {
+          "sourceLicense": "NOT_ASSESSED",
+          "consumerScope": "REVIEW_ONLY",
+          "externalModelDisclosure": "NOT_AUTHORIZED_BY_THIS_CANDIDATE"
+        },
+        "runtimeRelevance": "KNOWLEDGE_ONLY",
+        "qualification": {
+          "state": "CANDIDATE_NOT_QUALIFIED",
+          "qualified": false,
+          "simulatorPromotion": false,
+          "disEffectsAuthorized": false
+        }
+      }
+    },
+    {
+      "id": "EV14-HTTP",
+      "kind": "CHILD",
+      "parent": "EV14-ROOT",
+      "domainScope": [
+        "D04"
+      ],
+      "semanticOwner": "HTTP_REPRESENTATION_STATUS",
+      "functions": [],
+      "responsibility": "RFC 9110/9111 200/404/410/no-store only in transport/caching scope",
+      "sourceClaims": [
+        "RFC9110",
+        "RFC9111"
+      ],
+      "independentOracle": "SOURCE_FIRST_RFC_TECHNICAL_ONLY",
+      "semanticAssuranceProfile": {
+        "schema": "dke.semantic-assurance-profile/0.1",
+        "profileId": "SAP-EV14-HTTP-R1",
+        "revision": "R1",
+        "elementScopeId": "EV14-HTTP",
+        "state": "CANDIDATE_NOT_QUALIFIED",
+        "canonicalGraphRevision": "NOT_PRESENT_BOUNDED_SOURCE_SLICE_ONLY",
+        "sourceSnapshot": {
+          "sourceRefs": [
+            {
+              "ref": "RFC9110",
+              "gitBlob": "19a88abcb4df0744df2d55c6d1af53125b6d9bd2",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "RFC9111",
+              "gitBlob": "cef95c761dfcbc6f649019efa2cf5f97dc5f9020",
+              "identityStatus": "PINNED_GIT_BLOB"
+            }
+          ],
+          "exactScope": "EV14 D03+D04 bounded source slice only",
+          "blueprintBaseGitBlob": "93f12dea21cf77121ddf2d28bacbd60e88ede91e"
+        },
+        "semanticScope": {
+          "purpose": "RFC 9110/9111 200/404/410/no-store only in transport/caching scope",
+          "inScope": [
+            "RFC 9110 representation and status semantics for 200/404/410",
+            "RFC 9111 cache directives and no-store scope",
+            "separation of HTTP transport/cache observations from GO biological claims"
+          ],
+          "outOfScope": [
+            "Actual live HTTP observations not present in the pinned sample",
+            "GO term deletion/obsolescence adjudication",
+            "privacy guarantee beyond cited HTTP caching requirements"
+          ],
+          "domainScope": [
+            "D04"
+          ],
+          "semanticOwner": "HTTP_REPRESENTATION_STATUS"
+        },
+        "semanticClaims": [
+          {
+            "claimId": "HTTP-C01",
+            "statement": "RFC 9110 defines 404 as current non-finding/withheld existence, not proof of permanent removal",
+            "knowledgeType": "NORMATIVE_SOURCE_CLAIM",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "RFC9110"
+            ],
+            "limitation": "Scoped to cited RFC semantics"
+          },
+          {
+            "claimId": "HTTP-C02",
+            "statement": "RFC 9110 describes 410 as likely permanent unavailability, not certainty about biological or ontology status",
+            "knowledgeType": "NORMATIVE_SOURCE_CLAIM",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "RFC9110"
+            ],
+            "limitation": "Origin resource semantics only"
+          },
+          {
+            "claimId": "HTTP-C03",
+            "statement": "HTTP no-store is not a complete privacy guarantee",
+            "knowledgeType": "NORMATIVE_SOURCE_CLAIM",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "RFC9111"
+            ],
+            "limitation": "Only cited cache semantics are in scope"
+          }
+        ],
+        "relationAndConstraintRefs": [
+          "SRC_BYTES_DO_NOT_SIGN_PUBLISHER",
+          "HTTP_STATUS_NOT_BIOLOGY",
+          "CHILD_PASS_NOT_PARENT_PASS",
+          "SEMANTIC_EDGE_NOT_EFFECT"
+        ],
+        "ownedConstraintRefs": [],
+        "competencyQuestions": [
+          {
+            "cqId": "HTTP-CQ01",
+            "question": "What does each pinned HTTP status establish about the origin representation?",
+            "state": "CONDITIONAL"
+          },
+          {
+            "cqId": "HTTP-CQ02",
+            "question": "Can transport/cache status establish GO biological truth?",
+            "state": "OPEN"
+          }
+        ],
+        "assuranceObligations": [
+          {
+            "obligationId": "HTTP-O01",
+            "obligation": "Check normative status/cache semantics against pinned RFC text",
+            "oracleType": "EVIDENCE_REVIEW",
+            "status": "OPEN"
+          },
+          {
+            "obligationId": "HTTP-O02",
+            "obligation": "Reject biological entailment from transport status",
+            "oracleType": "MACHINE_CHECKABLE",
+            "status": "OPEN"
+          }
+        ],
+        "validationCases": [
+          {
+            "caseId": "EV14-HTTP-01",
+            "caseClass": "POSITIVE",
+            "scenario": "Pinned RFC text supports the bounded interpretation of HTTP status/cache directives",
+            "fixtureKind": "PINNED_ORIGINAL_SOURCE",
+            "sourceRefs": [
+              "RFC9110",
+              "RFC9111"
+            ],
+            "assertsOriginalFact": true,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "SOURCE_SCOPED_ONLY",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-HTTP-02",
+            "caseClass": "NEGATIVE",
+            "scenario": "HTTP 410 proves a GO term or gene annotation has been deleted",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "RFC9110"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "REFUTED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-HTTP-03",
+            "caseClass": "BOUNDARY",
+            "scenario": "No live HTTP capture is part of this candidate; only RFC normative semantics are pinned",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "RFC9110",
+              "RFC9111"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONDITIONAL",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-HTTP-04",
+            "caseClass": "CONFLICT",
+            "scenario": "Two hypothetical status observations from different times are treated as contradictory current representations",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "RFC9110"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONFLICT_PRESERVED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-HTTP-05",
+            "caseClass": "UNKNOWN",
+            "scenario": "No live HTTP response capture is pinned; RFC semantics alone cannot establish a current origin response.",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "RFC9110",
+              "RFC9111"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "UNKNOWN",
+            "expectedDisposition": "UNKNOWN",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-HTTP-06",
+            "caseClass": "OUTDATED_EVIDENCE",
+            "scenario": "A newer RFC revision is available but old status semantics are reused without a revision check",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "RFC9110",
+              "RFC9111"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "STALE_BLOCKED",
+            "executionStatus": "NOT_RUN"
+          }
+        ],
+        "oraclePolicy": {
+          "MACHINE_CHECKABLE": "Only schema, source pin, graph closure and explicitly encoded mechanical invariants; never domain truth by itself.",
+          "EVIDENCE_REVIEW": "Requires a reviewer to compare exact original source bytes and context; does not authenticate a publisher or domain owner.",
+          "DOMAIN_ORACLE_REQUIRED": "Requires a separately attributable, competent domain adjudicator/Owner with exact scope and evidence.",
+          "UNKNOWN": "Insufficient source, authority, version or context; preserve UNKNOWN and block dependent qualification."
+        },
+        "independentCritique": {
+          "status": "NOT_RUN",
+          "generatorAndCriticIndependence": "NOT_ATTESTED",
+          "noSelfSigning": true
+        },
+        "execution": {
+          "authorCheck": "NOT_RUN",
+          "independentEvidenceReview": "NOT_RUN",
+          "domainOracle": "NOT_ATTESTED",
+          "receipt": null
+        },
+        "accessUsageDisclosure": {
+          "sourceLicense": "NOT_ASSESSED",
+          "consumerScope": "REVIEW_ONLY",
+          "externalModelDisclosure": "NOT_AUTHORIZED_BY_THIS_CANDIDATE"
+        },
+        "runtimeRelevance": "KNOWLEDGE_ONLY",
+        "qualification": {
+          "state": "CANDIDATE_NOT_QUALIFIED",
+          "qualified": false,
+          "simulatorPromotion": false,
+          "disEffectsAuthorized": false
+        }
+      }
+    },
+    {
+      "id": "EV14-PROVENANCE",
+      "kind": "GLOBAL_SEMANTIC",
+      "parent": "EV14-ROOT",
+      "domainScope": [
+        "D03",
+        "D04"
+      ],
+      "semanticOwner": "SOURCE_REVISION_AND_BYTES_PROVENANCE",
+      "functions": [],
+      "responsibility": "Bind original Git blobs plus dated OBO and GAF digest without elevating unsigned producer authority",
+      "sourceClaims": [
+        "R8_EV14",
+        "R33_NATIVE",
+        "GO_SLICE_NATIVE",
+        "RFC9110",
+        "RFC9111"
+      ],
+      "independentOracle": "TECHNICAL_7_BLOB_REVIEW_DONE_NOT_PUBLISHER_SIGNATURE",
+      "semanticAssuranceProfile": {
+        "schema": "dke.semantic-assurance-profile/0.1",
+        "profileId": "SAP-EV14-PROVENANCE-R1",
+        "revision": "R1",
+        "elementScopeId": "EV14-PROVENANCE",
+        "state": "CANDIDATE_NOT_QUALIFIED",
+        "canonicalGraphRevision": "NOT_PRESENT_BOUNDED_SOURCE_SLICE_ONLY",
+        "sourceSnapshot": {
+          "sourceRefs": [
+            {
+              "ref": "R8_EV14",
+              "gitBlob": "8cab8ead10d90a440c85fec86b01fd408022ae2c",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "R33_NATIVE",
+              "gitBlob": "8e77f2a2b518c2cf5151b8f2b1e6707287ed33f6",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "GO_SLICE_NATIVE",
+              "gitBlob": "8b19a13afa7de4d0a227262a5b2dbeb1745c29e6",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "RFC9110",
+              "gitBlob": "19a88abcb4df0744df2d55c6d1af53125b6d9bd2",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "RFC9111",
+              "gitBlob": "cef95c761dfcbc6f649019efa2cf5f97dc5f9020",
+              "identityStatus": "PINNED_GIT_BLOB"
+            }
+          ],
+          "exactScope": "EV14 D03+D04 bounded source slice only",
+          "blueprintBaseGitBlob": "93f12dea21cf77121ddf2d28bacbd60e88ede91e"
+        },
+        "semanticScope": {
+          "purpose": "Bind original Git blobs plus dated OBO and GAF digest without elevating unsigned producer authority",
+          "inScope": [
+            "exact Git blob identity of bounded source artifacts",
+            "source locator, source revision and digest lineage",
+            "separation of byte identity from publisher authentication/authority"
+          ],
+          "outOfScope": [
+            "publisher signature verification not present in original artifacts",
+            "copyright/license determination",
+            "biological or normative truth"
+          ],
+          "domainScope": [
+            "D03",
+            "D04"
+          ],
+          "semanticOwner": "SOURCE_REVISION_AND_BYTES_PROVENANCE"
+        },
+        "semanticClaims": [
+          {
+            "claimId": "PROV-C01",
+            "statement": "Pinned Git Blob values identify exact bytes of the cited repository artifacts",
+            "knowledgeType": "SOURCE_INTEGRITY_OBSERVATION",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "R8_EV14",
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE",
+              "RFC9110",
+              "RFC9111"
+            ],
+            "limitation": "Byte identity only"
+          },
+          {
+            "claimId": "PROV-C02",
+            "statement": "The Git Blob pin proves that the original publisher authenticated or endorsed the content",
+            "knowledgeType": "FALSE_ENTAILMENT",
+            "epistemicStatus": "REJECTED",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "limitation": "Repository identity is not publisher signature"
+          },
+          {
+            "claimId": "PROV-C03",
+            "statement": "The original GO Source Owner identity is authenticated by the current evidence",
+            "knowledgeType": "AUTHORITY_CLAIM",
+            "epistemicStatus": "UNKNOWN",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "limitation": "No attestation present"
+          }
+        ],
+        "relationAndConstraintRefs": [],
+        "ownedConstraintRefs": [
+          "SRC_BYTES_DO_NOT_SIGN_PUBLISHER"
+        ],
+        "competencyQuestions": [
+          {
+            "cqId": "PROV-CQ01",
+            "question": "Are all consumed source bytes bound to exact immutable revisions?",
+            "state": "CONDITIONAL"
+          },
+          {
+            "cqId": "PROV-CQ02",
+            "question": "Is the original publisher/Source Owner identity independently authenticated?",
+            "state": "OPEN"
+          }
+        ],
+        "assuranceObligations": [
+          {
+            "obligationId": "PROV-O01",
+            "obligation": "Verify exact source blob/digest and locator closure",
+            "oracleType": "MACHINE_CHECKABLE",
+            "status": "OPEN"
+          },
+          {
+            "obligationId": "PROV-O02",
+            "obligation": "Verify publisher identity, authority and license",
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "status": "OPEN"
+          }
+        ],
+        "validationCases": [
+          {
+            "caseId": "EV14-PROVENANCE-01",
+            "caseClass": "POSITIVE",
+            "scenario": "Original source artifacts match the pinned Git Blob identities",
+            "fixtureKind": "PINNED_ORIGINAL_SOURCE",
+            "sourceRefs": [
+              "R8_EV14",
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE",
+              "RFC9110",
+              "RFC9111"
+            ],
+            "assertsOriginalFact": true,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "SOURCE_SCOPED_ONLY",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-PROVENANCE-02",
+            "caseClass": "NEGATIVE",
+            "scenario": "A matching Git Blob alone proves publisher signature or Owner authority",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "REFUTED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-PROVENANCE-03",
+            "caseClass": "BOUNDARY",
+            "scenario": "Git byte identity does not establish source license or permission for external disclosure",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONDITIONAL",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-PROVENANCE-04",
+            "caseClass": "CONFLICT",
+            "scenario": "Two pinned source versions differ but neither has an authenticated publisher precedence rule",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "expectedDisposition": "CONFLICT_PRESERVED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-PROVENANCE-05",
+            "caseClass": "UNKNOWN",
+            "scenario": "Publisher Source Owner and rights status are not attested",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "expectedDisposition": "UNKNOWN",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-PROVENANCE-06",
+            "caseClass": "OUTDATED_EVIDENCE",
+            "scenario": "A source Blob changes while an Element profile retains the old source revision as current",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "STALE_BLOCKED",
+            "executionStatus": "NOT_RUN"
+          }
+        ],
+        "oraclePolicy": {
+          "MACHINE_CHECKABLE": "Only schema, source pin, graph closure and explicitly encoded mechanical invariants; never domain truth by itself.",
+          "EVIDENCE_REVIEW": "Requires a reviewer to compare exact original source bytes and context; does not authenticate a publisher or domain owner.",
+          "DOMAIN_ORACLE_REQUIRED": "Requires a separately attributable, competent domain adjudicator/Owner with exact scope and evidence.",
+          "UNKNOWN": "Insufficient source, authority, version or context; preserve UNKNOWN and block dependent qualification."
+        },
+        "independentCritique": {
+          "status": "NOT_RUN",
+          "generatorAndCriticIndependence": "NOT_ATTESTED",
+          "noSelfSigning": true
+        },
+        "execution": {
+          "authorCheck": "NOT_RUN",
+          "independentEvidenceReview": "NOT_RUN",
+          "domainOracle": "NOT_ATTESTED",
+          "receipt": null
+        },
+        "accessUsageDisclosure": {
+          "sourceLicense": "NOT_ASSESSED",
+          "consumerScope": "REVIEW_ONLY",
+          "externalModelDisclosure": "NOT_AUTHORIZED_BY_THIS_CANDIDATE"
+        },
+        "runtimeRelevance": "KNOWLEDGE_ONLY",
+        "qualification": {
+          "state": "CANDIDATE_NOT_QUALIFIED",
+          "qualified": false,
+          "simulatorPromotion": false,
+          "disEffectsAuthorized": false
+        }
+      }
+    },
+    {
+      "id": "EV14-NONENTAILMENT",
+      "kind": "GLOBAL_SEMANTIC",
+      "parent": "EV14-ROOT",
+      "domainScope": [
+        "D03",
+        "D04"
+      ],
+      "semanticOwner": "CROSS_PUBLISHER_NONENTAILMENT",
+      "functions": [],
+      "responsibility": "Reject HTTP or GAF source observation -> biological truth or GO term obliteration",
+      "sourceClaims": [
+        "EV14_R1_REVIEW",
+        "RFC9110",
+        "GO_SLICE_NATIVE",
+        "R33_NATIVE"
+      ],
+      "independentOracle": "TECHNICAL_R1_REVIEW_NOT_FORMAL_ORACLE",
+      "semanticAssuranceProfile": {
+        "schema": "dke.semantic-assurance-profile/0.1",
+        "profileId": "SAP-EV14-NONENTAILMENT-R1",
+        "revision": "R1",
+        "elementScopeId": "EV14-NONENTAILMENT",
+        "state": "CANDIDATE_NOT_QUALIFIED",
+        "canonicalGraphRevision": "NOT_PRESENT_BOUNDED_SOURCE_SLICE_ONLY",
+        "sourceSnapshot": {
+          "sourceRefs": [
+            {
+              "ref": "EV14_R1_REVIEW",
+              "gitBlob": "c94a8dee6c6f2648b272dfc6e134486f4fc3ad9d",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "RFC9110",
+              "gitBlob": "19a88abcb4df0744df2d55c6d1af53125b6d9bd2",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "GO_SLICE_NATIVE",
+              "gitBlob": "8b19a13afa7de4d0a227262a5b2dbeb1745c29e6",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "R33_NATIVE",
+              "gitBlob": "8e77f2a2b518c2cf5151b8f2b1e6707287ed33f6",
+              "identityStatus": "PINNED_GIT_BLOB"
+            }
+          ],
+          "exactScope": "EV14 D03+D04 bounded source slice only",
+          "blueprintBaseGitBlob": "93f12dea21cf77121ddf2d28bacbd60e88ede91e"
+        },
+        "semanticScope": {
+          "purpose": "Reject HTTP or GAF source observation -> biological truth or GO term obliteration",
+          "inScope": [
+            "cross-publisher semantic non-entailment constraints between GO and HTTP",
+            "prohibition on converting transport/annotation-tier observations into biological truth",
+            "provenance-preserving cross-element composition constraints"
+          ],
+          "outOfScope": [
+            "publisher-authored ontology relations not present in original source sample",
+            "biological adjudication or policy not signed by a qualified Owner",
+            "runtime Function/Effect behavior"
+          ],
+          "domainScope": [
+            "D03",
+            "D04"
+          ],
+          "semanticOwner": "CROSS_PUBLISHER_NONENTAILMENT"
+        },
+        "semanticClaims": [
+          {
+            "claimId": "NON-C01",
+            "statement": "HTTP 200/404/410 observations do not by themselves establish GO term or biological annotation truth",
+            "knowledgeType": "CROSS_DOMAIN_INVARIANT",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "RFC9110",
+              "GO_SLICE_NATIVE"
+            ],
+            "limitation": "Non-entailment constraint candidate"
+          },
+          {
+            "claimId": "NON-C02",
+            "statement": "R33 FATAL/SOFT/STRUCTURAL_CANDIDATE tiers are not independent biological truth",
+            "knowledgeType": "CROSS_DOMAIN_INVARIANT",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "R33_NATIVE"
+            ],
+            "limitation": "Source triage only"
+          },
+          {
+            "claimId": "NON-C03",
+            "statement": "The current cross-publisher non-entailment semantic policy is formally approved by both publishers",
+            "knowledgeType": "AUTHORITY_CLAIM",
+            "epistemicStatus": "UNKNOWN",
+            "sourceRefs": [
+              "RFC9110",
+              "GO_SLICE_NATIVE"
+            ],
+            "limitation": "No joint publisher approval"
+          }
+        ],
+        "relationAndConstraintRefs": [
+          "SEMANTIC_EDGE_NOT_EFFECT"
+        ],
+        "ownedConstraintRefs": [
+          "HTTP_STATUS_NOT_BIOLOGY"
+        ],
+        "competencyQuestions": [
+          {
+            "cqId": "NON-CQ01",
+            "question": "Which cross-domain inferences are explicitly unsupported by the original sources?",
+            "state": "CONDITIONAL"
+          },
+          {
+            "cqId": "NON-CQ02",
+            "question": "Can a qualified authority approve cross-publisher semantic composition?",
+            "state": "OPEN"
+          }
+        ],
+        "assuranceObligations": [
+          {
+            "obligationId": "NON-O01",
+            "obligation": "Check prohibited inference paths and preserve source scope",
+            "oracleType": "MACHINE_CHECKABLE",
+            "status": "OPEN"
+          },
+          {
+            "obligationId": "NON-O02",
+            "obligation": "Adjudicate any cross-publisher semantic rule requiring authority",
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "status": "OPEN"
+          }
+        ],
+        "validationCases": [
+          {
+            "caseId": "EV14-NONENTAILMENT-01",
+            "caseClass": "POSITIVE",
+            "scenario": "The candidate keeps GO and HTTP evidence in separate source namespaces",
+            "fixtureKind": "PINNED_ORIGINAL_SOURCE",
+            "sourceRefs": [
+              "RFC9110",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": true,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "SOURCE_SCOPED_ONLY",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-NONENTAILMENT-02",
+            "caseClass": "NEGATIVE",
+            "scenario": "HTTP 404/410 or GAF evidence tier alone entails GO biology or term deletion",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "RFC9110",
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "REFUTED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-NONENTAILMENT-03",
+            "caseClass": "BOUNDARY",
+            "scenario": "Only the named GO/RFC source claims and cited sections are covered",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "RFC9110",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONDITIONAL",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-NONENTAILMENT-04",
+            "caseClass": "CONFLICT",
+            "scenario": "GO annotation triage and ontology term existence are collapsed into one validity status",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R33_NATIVE",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONFLICT_PRESERVED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-NONENTAILMENT-05",
+            "caseClass": "UNKNOWN",
+            "scenario": "No independent cross-publisher authority has adjudicated the combined semantic rule",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "RFC9110",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "expectedDisposition": "UNKNOWN",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-NONENTAILMENT-06",
+            "caseClass": "OUTDATED_EVIDENCE",
+            "scenario": "One publisher's source revision changes and the prior cross-domain profile is reused",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "RFC9110",
+              "GO_SLICE_NATIVE"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "STALE_BLOCKED",
+            "executionStatus": "NOT_RUN"
+          }
+        ],
+        "oraclePolicy": {
+          "MACHINE_CHECKABLE": "Only schema, source pin, graph closure and explicitly encoded mechanical invariants; never domain truth by itself.",
+          "EVIDENCE_REVIEW": "Requires a reviewer to compare exact original source bytes and context; does not authenticate a publisher or domain owner.",
+          "DOMAIN_ORACLE_REQUIRED": "Requires a separately attributable, competent domain adjudicator/Owner with exact scope and evidence.",
+          "UNKNOWN": "Insufficient source, authority, version or context; preserve UNKNOWN and block dependent qualification."
+        },
+        "independentCritique": {
+          "status": "NOT_RUN",
+          "generatorAndCriticIndependence": "NOT_ATTESTED",
+          "noSelfSigning": true
+        },
+        "execution": {
+          "authorCheck": "NOT_RUN",
+          "independentEvidenceReview": "NOT_RUN",
+          "domainOracle": "NOT_ATTESTED",
+          "receipt": null
+        },
+        "accessUsageDisclosure": {
+          "sourceLicense": "NOT_ASSESSED",
+          "consumerScope": "REVIEW_ONLY",
+          "externalModelDisclosure": "NOT_AUTHORIZED_BY_THIS_CANDIDATE"
+        },
+        "runtimeRelevance": "KNOWLEDGE_ONLY",
+        "qualification": {
+          "state": "CANDIDATE_NOT_QUALIFIED",
+          "qualified": false,
+          "simulatorPromotion": false,
+          "disEffectsAuthorized": false
+        }
+      }
+    },
+    {
+      "id": "EV14-QUALIFICATION",
+      "kind": "GLOBAL_SEMANTIC",
+      "parent": "EV14-ROOT",
+      "domainScope": [
+        "D03",
+        "D04"
+      ],
+      "semanticOwner": "ROOT_INDEPENDENT_QUALIFICATION_AND_EFFECT_GATE",
+      "functions": [],
+      "responsibility": "Root/parent only qualifies after distinct authority, qualified semantic Oracle, formal Cell; no child-pass promotion",
+      "sourceClaims": [
+        "Product207",
+        "R8_EV14",
+        "EV14_R1_REVIEW"
+      ],
+      "independentOracle": "NOT_ATTESTED",
+      "semanticAssuranceProfile": {
+        "schema": "dke.semantic-assurance-profile/0.1",
+        "profileId": "SAP-EV14-QUALIFICATION-R1",
+        "revision": "R1",
+        "elementScopeId": "EV14-QUALIFICATION",
+        "state": "CANDIDATE_NOT_QUALIFIED",
+        "canonicalGraphRevision": "NOT_PRESENT_BOUNDED_SOURCE_SLICE_ONLY",
+        "sourceSnapshot": {
+          "sourceRefs": [
+            {
+              "ref": "Product207",
+              "gitBlob": null,
+              "identityStatus": "LIVE_ISSUE_REFERENCE_NOT_IMMUTABLE"
+            },
+            {
+              "ref": "R8_EV14",
+              "gitBlob": "8cab8ead10d90a440c85fec86b01fd408022ae2c",
+              "identityStatus": "PINNED_GIT_BLOB"
+            },
+            {
+              "ref": "EV14_R1_REVIEW",
+              "gitBlob": "c94a8dee6c6f2648b272dfc6e134486f4fc3ad9d",
+              "identityStatus": "PINNED_GIT_BLOB"
+            }
+          ],
+          "exactScope": "EV14 D03+D04 bounded source slice only",
+          "blueprintBaseGitBlob": "93f12dea21cf77121ddf2d28bacbd60e88ede91e"
+        },
+        "semanticScope": {
+          "purpose": "Root/parent only qualifies after distinct authority, qualified semantic Oracle, formal Cell; no child-pass promotion",
+          "inScope": [
+            "semantic and authority gates for Element and Root qualification",
+            "no child-pass-to-parent-pass inference",
+            "no semantic-edge-to-Effect or runtime permission inference"
+          ],
+          "outOfScope": [
+            "actual independent qualification issuance",
+            "DIS ECP implementation tests",
+            "runtime/package release or activation"
+          ],
+          "domainScope": [
+            "D03",
+            "D04"
+          ],
+          "semanticOwner": "ROOT_INDEPENDENT_QUALIFICATION_AND_EFFECT_GATE"
+        },
+        "semanticClaims": [
+          {
+            "claimId": "QUAL-C01",
+            "statement": "Frozen R8 requires original source, distinct independent semantic/source adjudication, owner decision and exact-scope execution evidence",
+            "knowledgeType": "NORMATIVE_QUALIFICATION_RULE",
+            "epistemicStatus": "CONDITIONAL",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "limitation": "Exact frozen matrix admission policy"
+          },
+          {
+            "claimId": "QUAL-C02",
+            "statement": "Current EV14 source/structural technical checks constitute a qualified R8 Cell",
+            "knowledgeType": "FALSE_ENTAILMENT",
+            "epistemicStatus": "REJECTED",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "limitation": "Bounded technical checks cannot substitute original cell"
+          },
+          {
+            "claimId": "QUAL-C03",
+            "statement": "All six Elements have independently qualified SAPs",
+            "knowledgeType": "QUALIFICATION_CLAIM",
+            "epistemicStatus": "UNKNOWN",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "limitation": "No per-Element SAP is qualified in this candidate"
+          }
+        ],
+        "relationAndConstraintRefs": [],
+        "ownedConstraintRefs": [
+          "CHILD_PASS_NOT_PARENT_PASS",
+          "SEMANTIC_EDGE_NOT_EFFECT"
+        ],
+        "competencyQuestions": [
+          {
+            "cqId": "QUAL-CQ01",
+            "question": "Are source, semantic Oracle, Owner and exact Cell requirements all met?",
+            "state": "OPEN"
+          },
+          {
+            "cqId": "QUAL-CQ02",
+            "question": "Can any child result authorize Root, SAP or Effect?",
+            "state": "CONDITIONAL"
+          }
+        ],
+        "assuranceObligations": [
+          {
+            "obligationId": "QUAL-O01",
+            "obligation": "Check qualification gate completeness and non-promotion invariants",
+            "oracleType": "MACHINE_CHECKABLE",
+            "status": "OPEN"
+          },
+          {
+            "obligationId": "QUAL-O02",
+            "obligation": "Obtain independent domain Oracle and accountable Owner decisions",
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "status": "OPEN"
+          }
+        ],
+        "validationCases": [
+          {
+            "caseId": "EV14-QUALIFICATION-01",
+            "caseClass": "POSITIVE",
+            "scenario": "Frozen R8 explicitly records the original EV14 status and qualification conditions",
+            "fixtureKind": "PINNED_ORIGINAL_SOURCE",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": true,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "SOURCE_SCOPED_ONLY",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-QUALIFICATION-02",
+            "caseClass": "NEGATIVE",
+            "scenario": "Hosted V8 structural/source checks can promote a formal R8 Cell",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "REFUTED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-QUALIFICATION-03",
+            "caseClass": "BOUNDARY",
+            "scenario": "DKE SAP is semantic assurance and is not DIS ECP or Function unit tests",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14",
+              "Product207"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONDITIONAL",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-QUALIFICATION-04",
+            "caseClass": "CONFLICT",
+            "scenario": "Technical child PASS coexists with missing Root authority and open qualification",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "EVIDENCE_REVIEW",
+            "expectedDisposition": "CONFLICT_PRESERVED",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-QUALIFICATION-05",
+            "caseClass": "UNKNOWN",
+            "scenario": "No distinct formal domain Oracle or accountable Source Owner is attested",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "DOMAIN_ORACLE_REQUIRED",
+            "expectedDisposition": "UNKNOWN",
+            "executionStatus": "NOT_RUN"
+          },
+          {
+            "caseId": "EV14-QUALIFICATION-06",
+            "caseClass": "OUTDATED_EVIDENCE",
+            "scenario": "A changed R8 matrix or qualification policy is ignored while reusing old SAP results",
+            "fixtureKind": "SYNTHETIC_CONTROL_NOT_SOURCE_FACT",
+            "sourceRefs": [
+              "R8_EV14"
+            ],
+            "assertsOriginalFact": false,
+            "oracleType": "MACHINE_CHECKABLE",
+            "expectedDisposition": "STALE_BLOCKED",
+            "executionStatus": "NOT_RUN"
+          }
+        ],
+        "oraclePolicy": {
+          "MACHINE_CHECKABLE": "Only schema, source pin, graph closure and explicitly encoded mechanical invariants; never domain truth by itself.",
+          "EVIDENCE_REVIEW": "Requires a reviewer to compare exact original source bytes and context; does not authenticate a publisher or domain owner.",
+          "DOMAIN_ORACLE_REQUIRED": "Requires a separately attributable, competent domain adjudicator/Owner with exact scope and evidence.",
+          "UNKNOWN": "Insufficient source, authority, version or context; preserve UNKNOWN and block dependent qualification."
+        },
+        "independentCritique": {
+          "status": "NOT_RUN",
+          "generatorAndCriticIndependence": "NOT_ATTESTED",
+          "noSelfSigning": true
+        },
+        "execution": {
+          "authorCheck": "NOT_RUN",
+          "independentEvidenceReview": "NOT_RUN",
+          "domainOracle": "NOT_ATTESTED",
+          "receipt": null
+        },
+        "accessUsageDisclosure": {
+          "sourceLicense": "NOT_ASSESSED",
+          "consumerScope": "REVIEW_ONLY",
+          "externalModelDisclosure": "NOT_AUTHORIZED_BY_THIS_CANDIDATE"
+        },
+        "runtimeRelevance": "UNKNOWN",
+        "qualification": {
+          "state": "CANDIDATE_NOT_QUALIFIED",
+          "qualified": false,
+          "simulatorPromotion": false,
+          "disEffectsAuthorized": false
+        }
+      }
+    }
+  ],
+  "root": "EV14-ROOT",
+  "hierarchy": {
+    "edges": [
+      {
+        "parent": "EV14-ROOT",
+        "child": "EV14-GO"
+      },
+      {
+        "parent": "EV14-ROOT",
+        "child": "EV14-HTTP"
+      },
+      {
+        "parent": "EV14-ROOT",
+        "child": "EV14-PROVENANCE"
+      },
+      {
+        "parent": "EV14-ROOT",
+        "child": "EV14-NONENTAILMENT"
+      },
+      {
+        "parent": "EV14-ROOT",
+        "child": "EV14-QUALIFICATION"
+      }
+    ],
+    "canBeCyclic": false
+  },
+  "semanticLinks": [
+    {
+      "from": "EV14-GO",
+      "to": "EV14-NONENTAILMENT",
+      "relation": "SEMANTIC_EVIDENCE_CONTEXT",
+      "origin": "ANALYST_CANDIDATE_NOT_PUBLISHER_FACT"
+    },
+    {
+      "from": "EV14-NONENTAILMENT",
+      "to": "EV14-GO",
+      "relation": "SEMANTIC_SCOPE_CONSTRAINT",
+      "origin": "ANALYST_CANDIDATE_NOT_PUBLISHER_FACT"
+    },
+    {
+      "from": "EV14-HTTP",
+      "to": "EV14-NONENTAILMENT",
+      "relation": "SEMANTIC_TRANSPORT_SCOPE",
+      "origin": "ANALYST_CANDIDATE_NOT_PUBLISHER_FACT"
+    },
+    {
+      "from": "EV14-PROVENANCE",
+      "to": "EV14-GO",
+      "relation": "SOURCE_VERSION_SCOPE",
+      "origin": "ANALYST_CANDIDATE_NOT_PUBLISHER_FACT"
+    },
+    {
+      "from": "EV14-QUALIFICATION",
+      "to": "EV14-ROOT",
+      "relation": "ROOT_GATE_APPLIES",
+      "origin": "PRODUCT207_OWNERSHIP_CANDIDATE"
+    }
+  ],
+  "staticExecutableFunctionDag": {
+    "edges": [],
+    "meaning": "NO_RUNTIME_FUNCTIONS_OR_ABI_MINTED; SEMANTIC_CYCLES_NOT_REJECTED_AS_FUNCTION_CYCLES"
+  },
+  "verificationPlanDag": {
+    "edges": [
+      [
+        "EV14-PROVENANCE",
+        "EV14-GO"
+      ],
+      [
+        "EV14-PROVENANCE",
+        "EV14-HTTP"
+      ],
+      [
+        "EV14-GO",
+        "EV14-NONENTAILMENT"
+      ],
+      [
+        "EV14-HTTP",
+        "EV14-NONENTAILMENT"
+      ],
+      [
+        "EV14-NONENTAILMENT",
+        "EV14-QUALIFICATION"
+      ],
+      [
+        "EV14-QUALIFICATION",
+        "EV14-ROOT"
+      ]
+    ],
+    "meaning": "ONLY_ANALYST_EVALUATION_ORDER_NOT_STATIC_CALL_DEPENDENCY_OR_EFFECT_PERMISSION"
+  },
+  "globalInvariants": [
+    {
+      "id": "SRC_BYTES_DO_NOT_SIGN_PUBLISHER",
+      "owner": "EV14-PROVENANCE",
+      "appliesTo": [
+        "EV14-GO",
+        "EV14-HTTP"
+      ],
+      "property": "Exact Git/blob/sha => byte identity, NOT original publisher authentication",
+      "violation": "UNKNOWN_OR_BLOCK",
+      "result": "SOURCE_SCOPE_ONLY"
+    },
+    {
+      "id": "HTTP_STATUS_NOT_BIOLOGY",
+      "owner": "EV14-NONENTAILMENT",
+      "appliesTo": [
+        "EV14-GO",
+        "EV14-HTTP"
+      ],
+      "property": "HTTP 200/404/410 cannot entail biological acceptance, GO term removal or annotation validity",
+      "violation": "REFUTE_FALSE_ENTAILMENT",
+      "result": "SOURCE_SCOPE_ONLY"
+    },
+    {
+      "id": "R33_TIER_NOT_GO_TRUTH",
+      "owner": "EV14-GO",
+      "appliesTo": [
+        "EV14-GO"
+      ],
+      "property": "R33 FATAL/SOFT/STRUCTURAL_CANDIDATE are source triage not independent biological truth",
+      "violation": "UNKNOWN_OR_BLOCK",
+      "result": "SOURCE_SCOPE_ONLY"
+    },
+    {
+      "id": "CHILD_PASS_NOT_PARENT_PASS",
+      "owner": "EV14-QUALIFICATION",
+      "appliesTo": [
+        "EV14-ROOT",
+        "EV14-GO",
+        "EV14-HTTP"
+      ],
+      "property": "All technical source checks PASS while Root remains UNKNOWN until independent domain Oracle, authorized Owner and formal R8 Cell",
+      "violation": "ROOT_BLOCK",
+      "result": "ROOT_UNKNOWN"
+    },
+    {
+      "id": "SEMANTIC_EDGE_NOT_EFFECT",
+      "owner": "EV14-QUALIFICATION",
+      "appliesTo": [
+        "EV14-ROOT",
+        "EV14-GO",
+        "EV14-HTTP",
+        "EV14-NONENTAILMENT"
+      ],
+      "property": "Cyclic semantic edges do not grant Function/Effect authority or runtime dependency",
+      "violation": "BLOCK_EFFECT",
+      "result": "NO_EFFECT"
+    }
+  ],
+  "decisionLog": {
+    "strategy": "MINIMUM_COHESIVE_SEPARATION_OF_AUTHORITY_AND_CROSS_DOMAIN_INVARIANTS",
+    "alternatives": [
+      {
+        "id": "ONE_ELEMENT_PER_FACT",
+        "decision": "REJECT",
+        "reason": "Over-fragmentation; source and invariants not independently meaningful per assertion"
+      },
+      {
+        "id": "ONE_GIANT_GO_HTTP_ELEMENT",
+        "decision": "REJECT",
+        "reason": "Mixes biological truth, transport semantics and qualification authority"
+      },
+      {
+        "id": "GO_AND_HTTP_CHILDREN_PLUS_GLOBAL_SEMANTIC_ELEMENTS",
+        "decision": "SELECT_FOR_REVIEW",
+        "reason": "Owner boundaries remain explicit; semantic graph allows cyclic constraint navigation without a cyclic static executable DAG"
+      }
+    ],
+    "semanticGraphMayCycle": true,
+    "staticDagMayCycle": false,
+    "stoppingRule": "Do not split more if it weakens independent verifiability or increases cross-domain coordination",
+    "sourceAuthority": "ANALYST_PROPOSAL_NOT_PRODUCT_L2"
+  },
+  "validationBundle": [
+    {
+      "id": "V01",
+      "kind": "SOURCE_POSITIVE",
+      "source": "GO_SLICE_NATIVE",
+      "witness": "GAF physical line 18026 has an actual GO term GO:0031965 in dated ontology",
+      "expected": "SCOPED_SOURCE_OBSERVATION_NOT_VALID_ANNOTATION"
+    },
+    {
+      "id": "V02",
+      "kind": "NEGATIVE",
+      "source": "R33_NATIVE",
+      "witness": "GAF physical line 18026 IC With/From empty; GO term still current",
+      "expected": "ANNOTATION_QUARANTINE_AND_ONTOLOGY_TERM_PRESENT_BOTH_PRESERVED"
+    },
+    {
+      "id": "V03",
+      "kind": "NEGATIVE",
+      "source": "RFC9110",
+      "witness": "hypothetical HTTP 404 cannot remove published GO term",
+      "expected": "REFUTED_FALSE_ENTAILMENT"
+    },
+    {
+      "id": "V04",
+      "kind": "NEGATIVE",
+      "source": "RFC9110",
+      "witness": "hypothetical HTTP 410 means likely remote status, not ontology obsolescence",
+      "expected": "REFUTED_FALSE_ENTAILMENT"
+    },
+    {
+      "id": "V05",
+      "kind": "UNKNOWN",
+      "source": "EV14_R1_REVIEW",
+      "witness": "Both Child source checks pass, domain biocurator and Owner NOT_ATTESTED",
+      "expected": "ROOT_UNKNOWN"
+    },
+    {
+      "id": "V06",
+      "kind": "NEGATIVE",
+      "source": "Product207",
+      "witness": "Cyclic semantic links between GO and nonentailment global Element do not permit Effect",
+      "expected": "NO_RUNTIME_EFFECTS"
+    },
+    {
+      "id": "V07",
+      "kind": "NEGATIVE",
+      "source": "GO_SLICE_NATIVE",
+      "witness": "has_part/regulates negative claim without an original source-level relation witness",
+      "expected": "RULE_ONLY_NOT_OBSERVED_GO_SAMPLE"
+    },
+    {
+      "id": "V08",
+      "kind": "UNKNOWN",
+      "source": "EV14_R1_REVIEW",
+      "witness": "Independent qualified biocurator has not signed semantic truth",
+      "expected": "BIOLOGY_UNKNOWN"
+    }
+  ],
+  "coverage": {
+    "criticalJourney1BlueprintFromGraph": "CANDIDATE_PROJECTION_NOT_LLM_GENERATION_PIPELINE_VERIFIED",
+    "criticalJourney2SplitMerge": "CANDIDATE_DECISION_LOG_ONLY",
+    "criticalJourney3ParentComposition": "CHECKABLE_NEGATIVE",
+    "criticalJourney4CyclicSemanticVsAcyclicExecutable": "CHECKABLE",
+    "criticalJourney5IndependentSourceCritic": "EV14_R1_TECHNICAL_ONLY_NOT_QUALIFIED_ORACLE",
+    "criticalJourney6SourceUnknown": "CHECKABLE",
+    "criticalJourney7PinnedGraphBlueprint": "PINNED_SOURCES_CANDIDATE_NOT_CANONICAL_GRAPH_DERIVATION",
+    "criticalJourney8IncrementalEvolution": "NOT_RUN",
+    "criticalJourney9DISProjection": "NOT_RUN_NO_PACKAGE_ACTIVATION",
+    "perElementSemanticAssurance": "6_FIRST_CLASS_ELEMENT_PROFILES_36_CASES_CANDIDATE_DEFINED_ALL_NOT_RUN",
+    "canonicalGraphConstructionTimeDeds": "NOT_RUN_BOUNDED_GO_SOURCE_SLICE_ONLY",
+    "actualPublisherSourceEvolution": "NOT_RUN"
+  },
+  "admission": {
+    "productL1": "CANDIDATE_NOT_L2_FROZEN",
+    "semanticReview": "R1_SOURCE_FIRST_TECHNICAL_ONLY",
+    "independentBlueprintReview": "NOT_RUN",
+    "originalPublisherOwner": "NOT_ATTESTED",
+    "qualifiedGoBiocurator": "NOT_ATTESTED",
+    "formalR8Ev14": "NOT_RUN",
+    "fullyQualifiedR8": "0/53",
+    "SAP": 0,
+    "Effects": 0,
+    "root": "UNKNOWN",
+    "freeze": false,
+    "merge": false,
+    "release": false,
+    "perElementSemanticAssurance": "CANDIDATE_DEFINED_NOT_QUALIFIED",
+    "qualifiedElementSAPs": 0
+  },
+  "revision": "EV14_BLUEPRINT_R1_ELEMENT_SAP_CANDIDATE",
+  "derivedFrom": {
+    "path": "docs/standards/dke/DKE-0.0.1/demos/ev14-domain-blueprint-r0/BLUEPRINT_CANDIDATE.json"
+  },
+  "validationBundleRole": "CROSS_ELEMENT_COMPOSITION_CASES_ONLY; ELEMENT_LEVEL_SEMANTIC_OBLIGATIONS_ARE_ATTACHED_TO_EACH_ELEMENT.semanticAssuranceProfile"
+}

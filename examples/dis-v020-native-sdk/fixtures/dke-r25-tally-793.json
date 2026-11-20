@@ -1,0 +1,41 @@
+{
+  "schema": "dke.r25.tally-09f-source-snapshot/1",
+  "authority": "ORIGINAL_TALLY_GRAPH_PINNED_UNREVIEWED",
+  "source": {
+    "repository": "kaicreator-mm/tally",
+    "commit": "ab5c8231e871fb3df18df05176943d2a97c997f5",
+    "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+    "gitBlob": "2d4498dfa5f90bcf57cc81e9c155fb9ede31bf00",
+    "totalGraphNodes": 793
+  },
+  "selectedCqs": {
+    "CQ-09F-CF": "se:CASE-09F-CF-KV-DEPENDENCY",
+    "CQ-09F-GH": "se:CASE-09F-GH-DB-FAILOVER"
+  },
+  "records": [],
+  "stableOriginalProjection": {
+    "gitBlob": "47cd14bd7ddaeb45c46f445e5f59ff3b5338d23a",
+    "existingIds": [
+      "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+      "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+      "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE",
+      "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+      "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES",
+      "se:CLM-REQ-FUNCTIONAL-DOC-METHODS",
+      "se:CLM-TVV-0001",
+      "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+      "se:EVD-07C-SWEBOK-SECURITY-BY-DESIGN",
+      "se:EVD-07C-SWEBOK-SECURITY-PROPERTIES",
+      "se:EVD-07C-SWEBOK-SECURITY-REQUIREMENTS",
+      "se:EVD-07C-SWEBOK-SECURITY-TESTING",
+      "se:EVD-REQ-FUNCTIONAL-REQ-METHODS",
+      "se:EVD-TVV-0003",
+      "se:EVD-TVV-0009",
+      "se:EVD-TVV-0011",
+      "se:NODE-CS2023-SE-VALIDATION",
+      "se:NODE-SSDF-RV",
+      "se:REL-TVV-0020"
+    ]
+  },
+  "sourceQualification": "PENDING_INDEPENDENT_REVIEW"
+}

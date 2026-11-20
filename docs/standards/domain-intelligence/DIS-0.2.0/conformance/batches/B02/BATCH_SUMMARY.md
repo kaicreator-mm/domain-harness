@@ -1,0 +1,17 @@
+# B02 — C3 Batch Closure: actual selected Package and Interaction (3/3 scoped rounds)
+
+**Batch result:** **3/3 individually committed rounds replay-qualified** by exact SHA `1a803ac452348dc73afea1483a9283cfe527abfc`, tree `8a478066e61e304c77b9515ee6e92712734b61f4`. [Woodpecker #2280/1 DIS Integration](https://ci.kaicreator.com/repos/18/pipeline/2280/1), [#2280/2](https://ci.kaicreator.com/repos/18/pipeline/2280/2), and [#2280/3](https://ci.kaicreator.com/repos/18/pipeline/2280/3) all **SUCCESS** at that exact source, with all three new test files included in the same native command. Individual rounds have their own original source commits, Git test Blob, ROUND.md/round.json and receipts in the matrix; full-suite replay is not retroactive PASS for earlier ERROR commits.
+
+| Round | Original independent Git source | Test Git Blob | Actual proof |
+| --- | --- | --- | --- |
+| [B02-01 / R35](rounds/B02-01/ROUND.md) | `2181072c1a5101366b90ec8aa2c65dde9c571b15` | `f76cd33303363848753f870c4797833c54a2fd88` | original Tally/xDownload Business BUILD-selected bindings, KDP Intent separation, drift and fake Target refusal |
+| [B02-02 / R36](rounds/B02-02/ROUND.md) | `d79e83c8536afee6aa406b090e1fa086f439f038` | `d48bd86fff26c534e6ed0199b1420718ddf096b0` | actual UI-neutral Chat/Form/CLI progressive clarification, explicit confirmation and normalized intent |
+| [B02-03 / R37](rounds/B02-03/ROUND.md) | `1a803ac452348dc73afea1483a9283cfe527abfc` | `5c70916c66a4deecdc355258a931c2b58e2283ab` | token-bearing URL, oversized bytes, forged authorization, STOP ingress and separate KDP Effect denial |
+
+**Historical CI defects recorded precisely:** original [R35 #2278/1](https://ci.kaicreator.com/repos/18/pipeline/2278/1) and [R36 #2279/1](https://ci.kaicreator.com/repos/18/pipeline/2279/1) yielded **ERROR** with no independently readable step logs; these are not attributed to faulty native tests or treated as SUCCESS. Their exact original test blobs were preserved and fully replayed at #2280/1–3 SUCCESS. No runtime business source was altered or Host side effect executed.
+
+**Normative gap remains:** Current DIS 0.2 Draft `program` and selected AOT do **not** encode a validated OS Target identity or a Windows/Linux/Android variant closure. Verified selected original modules and source pins are not proof of cross-Target implementation selection. Chat/Form/CLI tests consume three different UI-neutral adapters, *not* deployed production transports. An Interaction `READY_FOR_KDP` state remains `authority:NONE`, not an Effect permit or verified business authorization. Product/L1 needs a decision on applicable Target and actual interaction transport profiles, or a true native Target contract with negative mismatch proofs. **CORE-008 and CORE-014 stay PARTIAL.**
+
+**Delivery effectiveness finding:** Two successive batches B01/B02 each achieved 3/3 source-scoped native validation yet none of the remaining seven Core MUSTs was closed. This indicates **normative authority / scope decisions**, not missing permutations of simulated tests, are now on the critical path. Future batches should deliver an approved actual target ABI / independent source-SAP decision or test an unblocked final Core; avoid generating extra rounds that merely restate known limitations.
+
+**Total DIS v0.2 coverage after B02:** Core **9 VERIFIED / 7 PARTIAL (56.25%)**, Optional **4 NOT_RUN**, Governance **1 NOT_RUN**. No merge, Freeze, Release, GitHub Actions, physical Effect or Node major-version semantic gate.

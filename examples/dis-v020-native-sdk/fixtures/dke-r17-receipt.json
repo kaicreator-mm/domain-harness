@@ -1,0 +1,213 @@
+{
+  "schema": "dke.r17.hosted-V8-bounded-receipt/v1",
+  "status": "PASS_BOUNDED_V8_NOT_NATIVE_NODE_NOT_SAP",
+  "observedAt": "2026-11-10",
+  "evidenceBlob": "608c336f472b3f6eb979ae4ef13dcf3d133c86c5",
+  "casesBlob": "1816b799c064d4793e055892c42b1c0fd0d77855",
+  "runnerBlob": "c334b15c0a20b32000bc8d87674df7d32e567318",
+  "sourceAuthority": "Framework official webpages, web-located snippets; original README Git pinned",
+  "originalREADMEBlob": "dbdfc6ba1556689864d733401f7c8f824d965cdf",
+  "fullHtmlOrPdfPinned": false,
+  "actualLanguageRuntime": "functions.exec V8, exact committed gate text evaluated",
+  "tests": 20,
+  "expectedCasesPassed": 20,
+  "testFailures": 0,
+  "realSourceMismatches": [
+    {
+      "source": "203:step1",
+      "linkedStep": 16,
+      "needed": "REMOVE_MAINBOARD",
+      "found": "REMOVE_SSD",
+      "webLine": 438
+    },
+    {
+      "source": "203:conclusion",
+      "linkedStep": 17,
+      "needed": "REASSEMBLE_MAINBOARD",
+      "found": "DISCONNECT_SPEAKER",
+      "webLine": 462
+    }
+  ],
+  "partialRestorationStillInvalid": "INVALIDATED_STALE_STEP_REF",
+  "syntheticMatchedRolesButUnpinned": "BLOCKED_UNPINNED_GUIDE_BYTES",
+  "affected": [
+    "R16_METHOD_STEP4",
+    "D05_METHOD_CANDIDATE"
+  ],
+  "unaffected": [
+    "R15_RTC_CONDITIONAL_SOURCE_FACT"
+  ],
+  "closedD05Cases": 0,
+  "closedFullR8EV": 0,
+  "closedAutonomousEV": 0,
+  "sap": 0,
+  "effects": 0,
+  "independentSemanticCritic": "NOT_RUN",
+  "physicalRepair": "NOT_RUN",
+  "nativeNodeCli": "NOT_RUN",
+  "caseResults": [
+    {
+      "case": "real_cross_guide_two_conflicts",
+      "expected": "INVALIDATED_STALE_STEP_REF",
+      "actual": {
+        "status": "INVALIDATED_STALE_STEP_REF",
+        "mismatches": [
+          {
+            "source": "203:step1",
+            "linkedStep": 16,
+            "needed": "REMOVE_MAINBOARD",
+            "found": "REMOVE_SSD",
+            "webLine": 438
+          },
+          {
+            "source": "203:conclusion",
+            "linkedStep": 17,
+            "needed": "REASSEMBLE_MAINBOARD",
+            "found": "DISCONNECT_SPEAKER",
+            "webLine": 462
+          }
+        ],
+        "affected": [
+          "R16_METHOD_STEP4",
+          "D05_METHOD_CANDIDATE"
+        ],
+        "unaffected": [
+          "R15_RTC_CONDITIONAL_SOURCE_FACT"
+        ]
+      }
+    },
+    {
+      "case": "different_model",
+      "expected": "REJECTED_MODEL_SCOPE",
+      "actual": {
+        "status": "REJECTED_MODEL_SCOPE"
+      }
+    },
+    {
+      "case": "framework_new_generation",
+      "expected": "REJECTED_MODEL_SCOPE",
+      "actual": {
+        "status": "REJECTED_MODEL_SCOPE"
+      }
+    },
+    {
+      "case": "unsafe_execution_request",
+      "expected": "REJECTED_NO_PHYSICAL_AUTHORIZATION",
+      "actual": {
+        "status": "REJECTED_NO_PHYSICAL_AUTHORIZATION"
+      }
+    },
+    {
+      "case": "missing_dependencies",
+      "expected": "REJECTED_DEPENDENCY_SHAPE",
+      "actual": {
+        "status": "REJECTED_DEPENDENCY_SHAPE"
+      }
+    },
+    {
+      "case": "duplicated_remove_reference",
+      "expected": "REJECTED_DEPENDENCY_SHAPE",
+      "actual": {
+        "status": "REJECTED_DEPENDENCY_SHAPE"
+      }
+    },
+    {
+      "case": "silently_skip_remove_reference",
+      "expected": "REJECTED_DEPENDENCY_SHAPE",
+      "actual": {
+        "status": "REJECTED_DEPENDENCY_SHAPE"
+      }
+    },
+    {
+      "case": "changed_remove_target",
+      "expected": "REJECTED_SOURCE_REFERENCE_MUTATION",
+      "actual": {
+        "status": "REJECTED_SOURCE_REFERENCE_MUTATION"
+      }
+    },
+    {
+      "case": "changed_reassembly_target",
+      "expected": "REJECTED_SOURCE_REFERENCE_MUTATION",
+      "actual": {
+        "status": "REJECTED_SOURCE_REFERENCE_MUTATION"
+      }
+    },
+    {
+      "case": "swapped_reference_roles",
+      "expected": "REJECTED_SOURCE_REFERENCE_MUTATION",
+      "actual": {
+        "status": "REJECTED_SOURCE_REFERENCE_MUTATION"
+      }
+    },
+    {
+      "case": "fake_guide_203_revision",
+      "expected": "REJECTED_UNRECOGNIZED_RELEASE",
+      "actual": {
+        "status": "REJECTED_UNRECOGNIZED_RELEASE"
+      }
+    },
+    {
+      "case": "fake_guide_79_revision",
+      "expected": "REJECTED_UNRECOGNIZED_RELEASE",
+      "actual": {
+        "status": "REJECTED_UNRECOGNIZED_RELEASE"
+      }
+    },
+    {
+      "case": "wrong_parent_guide",
+      "expected": "REJECTED_SOURCE_ID",
+      "actual": {
+        "status": "REJECTED_SOURCE_ID"
+      }
+    },
+    {
+      "case": "wrong_target_guide",
+      "expected": "REJECTED_SOURCE_ID",
+      "actual": {
+        "status": "REJECTED_SOURCE_ID"
+      }
+    },
+    {
+      "case": "assert_owner_review",
+      "expected": "REJECTED_FALSE_AUTHORITY",
+      "actual": {
+        "status": "REJECTED_FALSE_AUTHORITY"
+      }
+    },
+    {
+      "case": "assert_SAP",
+      "expected": "REJECTED_FALSE_AUTHORITY",
+      "actual": {
+        "status": "REJECTED_FALSE_AUTHORITY"
+      }
+    },
+    {
+      "case": "assert_Effects",
+      "expected": "REJECTED_FALSE_AUTHORITY",
+      "actual": {
+        "status": "REJECTED_FALSE_AUTHORITY"
+      }
+    },
+    {
+      "case": "claim_physical_repair",
+      "expected": "REJECTED_FALSE_OUTCOME",
+      "actual": {
+        "status": "REJECTED_FALSE_OUTCOME"
+      }
+    },
+    {
+      "case": "invent_auto_remap",
+      "expected": "REJECTED_AUTO_RENUMBER",
+      "actual": {
+        "status": "REJECTED_AUTO_RENUMBER"
+      }
+    },
+    {
+      "case": "forge_raw_pin",
+      "expected": "REJECTED_FALSE_SOURCE_PIN",
+      "actual": {
+        "status": "REJECTED_FALSE_SOURCE_PIN"
+      }
+    }
+  ]
+}

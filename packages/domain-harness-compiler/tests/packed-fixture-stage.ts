@@ -494,6 +494,17 @@ function stageNewWorkspace(kind: keyof typeof NEW_WORKSPACE_ROOTS, fragment: str
   // v0.10.2 A2: mirror the live npm pack inventory when README exists.
   stagePackageSkeleton(source, stageRoot, existsSync(join(source, 'README.md')));
   cpSync(join(source, 'dist'), join(stageRoot, 'dist'), { recursive: true });
+  // P2-01 live-pack parity: the live npm pack ships EVERY package.json#files
+  // entry, not only dist and README — the DIS 0.2 workspaces also ship
+  // dis-v020.mjs / dis-v020.d.mts at the package root. Copy the remaining
+  // root-level file entries so the staged baseline cannot diverge from the
+  // live pack inventory it is compared against.
+  const packManifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8')) as { files?: readonly unknown[] };
+  for (const entry of Array.isArray(packManifest.files) ? packManifest.files : []) {
+    if (typeof entry !== 'string' || entry === 'dist' || entry.includes('/') || entry.includes('\\') || entry.includes('*')) continue;
+    if (!existsSync(join(source, entry))) continue;
+    cpSync(join(source, entry), join(stageRoot, entry));
+  }
   const tarball = packStage(stageRoot, packsDirectory, fragment, 1);
   const manifest = JSON.parse(readFileSync(join(stageRoot, 'package.json'), 'utf8')) as { name?: unknown; version?: unknown };
   if (typeof manifest.name !== 'string' || typeof manifest.version !== 'string' || manifest.name.length === 0 || manifest.version.length === 0) {

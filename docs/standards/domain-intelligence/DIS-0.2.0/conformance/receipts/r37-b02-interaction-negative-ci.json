@@ -1,0 +1,49 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r37-b02-interaction-negative-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "B02_R37_UI_NEUTRAL_ADVERSARIAL_FAIL_CLOSED",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "1a803ac452348dc73afea1483a9283cfe527abfc",
+    "tree": "8a478066e61e304c77b9515ee6e92712734b61f4"
+  },
+  "originCommit": "1a803ac452348dc73afea1483a9283cfe527abfc",
+  "originTree": "8a478066e61e304c77b9515ee6e92712734b61f4",
+  "sourceTestBlob": "5c70916c66a4deecdc355258a931c2b58e2283ab",
+  "casePath": "examples/dis-v020-native-sdk/b02-interaction-adversarial.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/3"
+    }
+  ],
+  "history": [
+    {
+      "sourceHead": "1a803ac452348dc73afea1483a9283cfe527abfc",
+      "native": "SUCCESS",
+      "minNode": "SUCCESS",
+      "verify": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2280/1"
+    }
+  ],
+  "observations": [
+    "Original R37 source/test SHA has exact #2280/1–3 native/min/verify SUCCESS.",
+    "Three UI-neutral adapters deny token URLs, excessive bytes, invented authorization; runtime separates LOCAL interaction from KDP effect admission and stop ingress."
+  ],
+  "limits": [
+    "No real OS Target selection, browser UI, physical Effect or independent semantic source authority."
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r32-b01-function-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "B01_01_R32_C2_FUNCTION_SCHEMA_TYPED_EVIDENCE",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "0e0d9ad8b227ed1f1ef90af648e423cd43214563",
+    "tree": "707a0b11b9a8691b7dc7efad7c5d91d3e735edda"
+  },
+  "originCommit": "af2ebeaaa66c9701a82dd063b6b1d6816a3049a8",
+  "originRoundTree": "df580bfc6fac09d417c6628d61bf7cc4d8f28afc",
+  "sourceTestBlob": "da74e6d1318f4746da6bc41779b2f591f3b9749a",
+  "casePath": "examples/dis-v020-native-sdk/b01-function-contract.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2276/3"
+    }
+  ],
+  "notCurrentHead": false,
+  "observations": [
+    "R32 original source native Integration was SUCCESS; minimum-node ERROR historical; R32 source/test Blob remained unchanged through R33 repair and was replayed in the final 3/3 SUCCESS native full suite.",
+    "Actual selected Tally Rule, xDownload Knowledge/Interaction and Orders KDP preserve typed UNKNOWN, OBSERVED, NEEDS_INPUT vs real KDP ADMITTED with execution NOT_PROVEN."
+  ],
+  "limits": [
+    "This is a later full-suite requalification SHA, not a falsified PASS on original R32 SHA.",
+    "Structural declared EvidenceRef does not independently attest a Domain Claim, SAP or Effect."
+  ]
+}

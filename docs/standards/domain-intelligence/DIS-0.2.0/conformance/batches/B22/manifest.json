@@ -1,0 +1,78 @@
+{
+  "schema": "dis.v0.2.demo-batch/1",
+  "version": "0.2.0",
+  "batchId": "B22",
+  "status": "VERIFIED",
+  "masterIssue": 1499,
+  "productIssue": 1496,
+  "pr": 1497,
+  "branch": "dis/0.2.0-element-intelligence-r1",
+  "baseline": {
+    "sourceHead": "cd354873127a718e39309427b2bca886a1fc5563",
+    "verifiedRounds": 35,
+    "coreVerified": 12,
+    "corePartial": 4,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "target": "Original R33 full GO source-selected read-only Knowledge consumption through DIS AOT/SDK/KDP",
+  "rounds": [
+    {
+      "batchRoundId": "B22-01",
+      "globalRoundId": "R82",
+      "status": "VERIFIED",
+      "testPath": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+      "testGitBlob": "a0eb607aeca433109a703b2e699c2eb719f5ed96",
+      "originalSourceHead": "93ad2e22bebfc57b158a6f8e0efc370ebc78ddb2",
+      "sourceHead": "fe2334e63d39a9c006746caad695f7e3c5ade97d",
+      "checks": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2397/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2397/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2397/3"
+        }
+      ],
+      "receipt": "receipts/r82-b22-r33-source-native-ci.json",
+      "qualificationHead": "fe2334e63d39a9c006746caad695f7e3c5ade97d",
+      "qualificationTree": "e458b65cb718fd399915d22e0a35ebe8611dc99b"
+    }
+  ],
+  "verifiedRounds": 1,
+  "pendingRounds": 0,
+  "unstartedRounds": 0,
+  "noAutomaticCorePromotion": true,
+  "limitations": [
+    "Original GO source classifications do not prove semantic biology, each individual row, publisher rights, independently accepted DKE SAP or production Effect.",
+    "DIS CORE-002/005/008/016 remain PARTIAL, optional 4 NOT_RUN, governance NOT_RUN, no L2 Freeze/merge/release.",
+    "Closeout commit's own CI is separate from the exact original qualifying native code head and may remain pending."
+  ],
+  "qualificationHead": "fe2334e63d39a9c006746caad695f7e3c5ade97d",
+  "qualificationTree": "e458b65cb718fd399915d22e0a35ebe8611dc99b",
+  "qualificationChecks": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2397/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2397/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2397/3"
+    }
+  ]
+}

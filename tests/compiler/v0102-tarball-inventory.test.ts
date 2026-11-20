@@ -50,9 +50,23 @@ test('T07b selected workspace engines and export identities are the Node24-only 
     assert.equal(manifest.engines?.node, '>=24.0.0');
     assert.equal(manifest.main, './dist/index.js');
     assert.equal(manifest.types, './dist/index.d.ts');
+    const disNative = selected.name === '@kaicreator/domain-harness-contracts' ||
+      selected.name === '@kaicreator/domain-harness-microkernel' ||
+      selected.name === '@kaicreator/domain-harness-build';
     assert.deepEqual(Object.keys(manifest.exports ?? {}).sort(),
-      selected.name === '@kaicreator/domain-harness-microkernel' ? ['.', './host-seam'] :
-        selected.name === '@kaicreator/domain-harness-host-node' ? ['.', './llm/anthropic', './llm/openai'] : ['.']);
+      selected.name === '@kaicreator/domain-harness-microkernel' ? ['.', './dis-v020', './host-seam'] :
+        selected.name === '@kaicreator/domain-harness-host-node' ? ['.', './llm/anthropic', './llm/openai'] :
+          disNative ? ['.', './dis-v020'] : ['.']);
+    if (disNative) {
+      assert.deepEqual(manifest.exports?.['./dis-v020'], {
+        types: './dis-v020.d.mts',
+        import: './dis-v020.mjs',
+      }, selected.name + ': DIS 0.2 native subpath must have exact runtime and types');
+      assert.ok(manifest.files?.includes('dis-v020.mjs'),
+        selected.name + ': native DIS runtime must be included in publish inventory');
+      assert.ok(manifest.files?.includes('dis-v020.d.mts'),
+        selected.name + ': native DIS typings must be included in publish inventory');
+    }
     assert.ok(manifest.files?.includes('dist'), 'selected runtime/build must ship dist');
   }
 });
@@ -97,6 +111,12 @@ test('T07b npm pack dry-run shows clean selected tarballs, no retired Compiler /
     assert.ok(files.includes('package.json'), selected.name + ': manifest missing');
     assert.ok(files.every((path) => !forbidden.test(path)), selected.name + ': legacy runtime/fragment shipped');
     assert.ok(files.every((path) => !path.startsWith('src/')), selected.name + ': unselected source shipped');
+    if (selected.name === '@kaicreator/domain-harness-contracts' ||
+        selected.name === '@kaicreator/domain-harness-microkernel' ||
+        selected.name === '@kaicreator/domain-harness-build') {
+      assert.ok(files.includes('dis-v020.mjs'), selected.name + ': DIS v0.2 native runtime not packed');
+      assert.ok(files.includes('dis-v020.d.mts'), selected.name + ': DIS v0.2 native types not packed');
+    }
     if (selected.name === '@kaicreator/domain-harness-microkernel') {
       assert.ok(files.includes('dist/host-seam.js'), 'selected trusted Host bootstrap must be shipped');
       assert.ok(files.includes('dist/host-seam.d.ts'), 'typed host-seam entry must be shipped');

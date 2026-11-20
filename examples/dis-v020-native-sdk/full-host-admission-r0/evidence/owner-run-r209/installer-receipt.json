@@ -1,0 +1,21 @@
+{
+  "issuerId": "owner-issuer-r209",
+  "spkiDerBase64Url": "MCowBQYDK2VwAyEAvkY2fTZ5tT3eaGOlim8d7P6st-GZnYgeiUT0u2h76J8",
+  "signatureBase64Url": "cJdd7F8XXvnu3Qb5vjAFYDilc3Dz5MzpJokx6GAToCs6Hwcf0gMD4qKHUs2yB8Cj6PEVv8m7Fp0sMLm3VtPdBg",
+  "payload": {
+    "schema": "dis.v0.2.o2.installed-rule-attestation-candidate/1",
+    "aotDigest": "3fe8eee4b48d39fc848b41a5e60cc6978164191b6530d1f02866799c5fb53dc9",
+    "sdkDigest": "71ca4c1316fd6158337d87c3a7930e2354122f0306ca557f2b87f9f73d5f3d22",
+    "ruleDigest": "61bb117c860f6ab715ae66dca94c755a1e51670cf2d003450b73239c1ca54632",
+    "installedBytesDigest": "16f4b833ce2e77f06e725106c620f717a4edf95a8b0f133907d221681364b1c9",
+    "tenantId": "tenant:owner-admission-r209",
+    "scope": "scope:r188-observe-admission",
+    "deploymentId": "deployment:dis-v020-full-admission-r209",
+    "sourceGitBlob": "234997708b5520d7f9ce5997eb7ad6ff963a5e68",
+    "nonceChallenge": "owner-r209-challenge-mwnh9xle",
+    "issuedAtMs": 1795088383826,
+    "expiresAtMs": 1795174783826,
+    "nonce": "owner-r209-installer-mwnh9xle",
+    "revocationEpoch": 1
+  }
+}

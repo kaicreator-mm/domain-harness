@@ -1,0 +1,220 @@
+{
+  "schema": "dke.r17.adversarial-cases/v1",
+  "baseline": {
+    "model": "FRAMEWORK_11_GEN_INTEL",
+    "purpose": "READ_ONLY_CANDIDATE",
+    "sourceGuide": "203",
+    "sourceGuideRevision": "2023-11-12",
+    "targetGuide": "79",
+    "targetRevision": "2026-07-02",
+    "dependencies": [
+      {
+        "source": "203:step1",
+        "toStep": 16,
+        "role": "REMOVE_MAINBOARD"
+      },
+      {
+        "source": "203:conclusion",
+        "toStep": 17,
+        "role": "REASSEMBLE_MAINBOARD"
+      }
+    ],
+    "assertOwner": false,
+    "assertSAP": false,
+    "assertEffects": false,
+    "claimPhysicalRepair": false,
+    "autoRemap": false,
+    "claimRawPinned": false
+  },
+  "caseRoster": [
+    {
+      "id": "real_cross_guide_two_conflicts",
+      "overrides": {},
+      "expected": "INVALIDATED_STALE_STEP_REF"
+    },
+    {
+      "id": "different_model",
+      "overrides": {
+        "model": "LENOVO_T480"
+      },
+      "expected": "REJECTED_MODEL_SCOPE"
+    },
+    {
+      "id": "framework_new_generation",
+      "overrides": {
+        "model": "FRAMEWORK_12"
+      },
+      "expected": "REJECTED_MODEL_SCOPE"
+    },
+    {
+      "id": "unsafe_execution_request",
+      "overrides": {
+        "purpose": "ACTUATE_DEVICE"
+      },
+      "expected": "REJECTED_NO_PHYSICAL_AUTHORIZATION"
+    },
+    {
+      "id": "missing_dependencies",
+      "overrides": {
+        "dependencies": []
+      },
+      "expected": "REJECTED_DEPENDENCY_SHAPE"
+    },
+    {
+      "id": "duplicated_remove_reference",
+      "overrides": {
+        "dependencies": [
+          {
+            "source": "203:step1",
+            "toStep": 16,
+            "role": "REMOVE_MAINBOARD"
+          },
+          {
+            "source": "203:step1",
+            "toStep": 16,
+            "role": "REMOVE_MAINBOARD"
+          }
+        ]
+      },
+      "expected": "REJECTED_DEPENDENCY_SHAPE"
+    },
+    {
+      "id": "silently_skip_remove_reference",
+      "overrides": {
+        "dependencies": [
+          {
+            "source": "203:conclusion",
+            "toStep": 17,
+            "role": "REASSEMBLE_MAINBOARD"
+          }
+        ]
+      },
+      "expected": "REJECTED_DEPENDENCY_SHAPE"
+    },
+    {
+      "id": "changed_remove_target",
+      "overrides": {
+        "dependencies": [
+          {
+            "source": "203:step1",
+            "toStep": 26,
+            "role": "REMOVE_MAINBOARD"
+          },
+          {
+            "source": "203:conclusion",
+            "toStep": 17,
+            "role": "REASSEMBLE_MAINBOARD"
+          }
+        ]
+      },
+      "expected": "REJECTED_SOURCE_REFERENCE_MUTATION"
+    },
+    {
+      "id": "changed_reassembly_target",
+      "overrides": {
+        "dependencies": [
+          {
+            "source": "203:step1",
+            "toStep": 16,
+            "role": "REMOVE_MAINBOARD"
+          },
+          {
+            "source": "203:conclusion",
+            "toStep": 28,
+            "role": "REASSEMBLE_MAINBOARD"
+          }
+        ]
+      },
+      "expected": "REJECTED_SOURCE_REFERENCE_MUTATION"
+    },
+    {
+      "id": "swapped_reference_roles",
+      "overrides": {
+        "dependencies": [
+          {
+            "source": "203:step1",
+            "toStep": 16,
+            "role": "REASSEMBLE_MAINBOARD"
+          },
+          {
+            "source": "203:conclusion",
+            "toStep": 17,
+            "role": "REASSEMBLE_MAINBOARD"
+          }
+        ]
+      },
+      "expected": "REJECTED_SOURCE_REFERENCE_MUTATION"
+    },
+    {
+      "id": "fake_guide_203_revision",
+      "overrides": {
+        "sourceGuideRevision": "2025-08-24"
+      },
+      "expected": "REJECTED_UNRECOGNIZED_RELEASE"
+    },
+    {
+      "id": "fake_guide_79_revision",
+      "overrides": {
+        "targetRevision": "2023-11-12"
+      },
+      "expected": "REJECTED_UNRECOGNIZED_RELEASE"
+    },
+    {
+      "id": "wrong_parent_guide",
+      "overrides": {
+        "sourceGuide": "113"
+      },
+      "expected": "REJECTED_SOURCE_ID"
+    },
+    {
+      "id": "wrong_target_guide",
+      "overrides": {
+        "targetGuide": "203"
+      },
+      "expected": "REJECTED_SOURCE_ID"
+    },
+    {
+      "id": "assert_owner_review",
+      "overrides": {
+        "assertOwner": true
+      },
+      "expected": "REJECTED_FALSE_AUTHORITY"
+    },
+    {
+      "id": "assert_SAP",
+      "overrides": {
+        "assertSAP": true
+      },
+      "expected": "REJECTED_FALSE_AUTHORITY"
+    },
+    {
+      "id": "assert_Effects",
+      "overrides": {
+        "assertEffects": true
+      },
+      "expected": "REJECTED_FALSE_AUTHORITY"
+    },
+    {
+      "id": "claim_physical_repair",
+      "overrides": {
+        "claimPhysicalRepair": true
+      },
+      "expected": "REJECTED_FALSE_OUTCOME"
+    },
+    {
+      "id": "invent_auto_remap",
+      "overrides": {
+        "autoRemap": true
+      },
+      "expected": "REJECTED_AUTO_RENUMBER"
+    },
+    {
+      "id": "forge_raw_pin",
+      "overrides": {
+        "claimRawPinned": true
+      },
+      "expected": "REJECTED_FALSE_SOURCE_PIN"
+    }
+  ],
+  "nonNegotiable": "original 203 refs 16 & 17 preserved; no automatic correction to 26 & 28"
+}

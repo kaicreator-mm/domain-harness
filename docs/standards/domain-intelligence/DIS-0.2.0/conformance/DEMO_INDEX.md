@@ -1,0 +1,322 @@
+# DIS v0.2.0 — Demo 验证总索引、证据依赖与历史归档（R12 组织化）
+
+> **实践模式：** [ADS PR #1362](https://github.com/kaicreator-mm/ai-development-standard/pull/1362) 的“现有主 Issue + Git 版本证据 + 按需具体 Issue”，仅复用**组织方式**；这是 DIS 版本级的 Conformance Demo，不是 Stage 1 Product Research 的替身，也不代替适用的 Stage 2 Research Demo Issue/受隔离分支/E1–E3、独立 Review、L2 Freeze、CI、Release。
+>
+> **单一入口：** [DIS v0.2.0 Demo 主 Issue #1499](https://github.com/kaicreator-mm/domain-harness/issues/1499)；**规范决策：** [Product/L1 #1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)；**实现与实验版本：** [Draft PR #1497](https://github.com/kaicreator-mm/domain-harness/pull/1497)。旧的 #1494 / PR #1493 是 superseded 设计，不新建第二个主 Issue。
+>
+> **机器证据权威：** [matrix.json](matrix.json) 的 21 个 requirement 的分类/状态；[validation-summary.md](validation-summary.md) 是结果摘要；[receipts/](receipts/) 是已入 Git 的 Exact-SHA 运行回执。本文件只索引和规划，不另立状态机、二次覆盖率权威或新的 Product 版本。
+
+## 1. 验证目标与边界
+
+本轮要回答的是：**DIS 0.2.0 的 Element/Function、AOT、SDK/KDP、真实 Domain 消费与被选择的可选 Profile 是否能在可复现的真实实现里满足各自的可证伪契约？** 不是“测试数量能否增加”、不是“模拟器能否输出 PASS”，也不是“所有生产应用都已迁移”。每次 study 使用 r0/r1 等**实验修订号**，不创建 DIS 0.2.1/新的 Product SemVer；测试/失败修复只更新现有 Draft PR 的 Git 产物，旧 commit/receipt 仍可从历史精确定位。
+
+- **输入**：优先复用 R7 的真实原项目源码 Pin（Tally @ `e988321439f65b55936a691c02250b6d62a29409`、Runx @ `b9e0c953d9bfd5834315012426fd8e10c21bdd7c`、xDownload @ `e904f08c478b15147b1c07fbe53c610d2d81851f`），及已选 KDP/真实 SQLite/C01 物理回归。固定输入只证明被 Pin 的提交，不是外部项目当日 HEAD、独立语义 Oracle 或生产资格。
+- **真实/模拟分界**：R2 FakeLLM、fixture Oracle、in-memory 经验晋升属于自演示；R4 Sidecar、R6 SQLite、R7 源码重放、R9 Public SDK 的资格**只按对应精确 SHA 的真实 CI**认定，不能把桥接称为已发布的正式 ABI。
+- **Effect 与信任**：自建可信封闭原生代码的任意敌意 OS 沙箱明确 OUT_OF_SCOPE；KDP 真实 effect admission/Journal/receipt、Evidence currentness、未选 Function/Provider 拒绝、UNKNOWN fail-closed 继续在适用范围内验证。用户界面上的 READY 不等于 KDP 许可。
+- **证据不混算**：`SOURCE_PIN / SEMANTIC_INTERPRETATION / NATIVE_EXECUTION / INDEPENDENT_AUTHORITY` 是解释性维度，不是新 ADS enum。Runner 崩溃不是反例成功；CI 的一个 context PASS 不代表另一个失败 context PASS。
+
+## 2. 必要 Demo 目录及可证伪停止条件
+
+编号是**研究索引**，不是实施 Task ID、冻结 DAG 节点或规定每项必开 Issue。对于 optional profiles，是否启用、适用 Target 由 #1496 持有明确范围决策；未启用且无正式裁定时保持 NOT_RUN，不擅自填 OUT_OF_SCOPE。
+
+| Study | 真实问题 / Scope 对应 Matrix | 最小正例（需要观察） | 关键反例 / UNKNOWN（需要拒绝或诚实保留） | 当前真实证据 | 下一步 / 完成条件 |
+| --- | --- | --- | --- | --- | --- |
+| **D00 — 权威基线/回归** | CORE-001/004/007/009–013/015，CORE-016 基础 | 真 BUILD → selected KDP/SDK → 双 Domain 物理 SQLite Journal 重启；Tally/Runx/xDownload 原始 Pin | 来源字节/路由漂移、无许可 Effect、重复回放、伪造权威 | R9.5 97 named + R10 103 named，分别由独立历史 SHA 回执证明；非整个版本 PASS | 引用已有 PASS，不复制 fixture 或重跑未改变的范围；记录当前受影响增量 |
+| **D01 — Function Contract** | CORE-002/003/004：Element metadata、Public Function I/O、typed outcome、Evidence、reader/consumer 兼容 | 真实 Tally rule UNKNOWN、xDownload 两个 LOCAL Function；正向 Schema/typed outcome/来源 Pin，随后覆盖所有适用 Public Function、KDP_INTENT 回执 | 非法输入输出、未知状态、无凭据伪 SUCCEEDED、陈旧 reader、错误调用期合约、只凭声明 evidenceRefs 伪授权 | **R11 candidate / PARTIAL**；8 新用例已提交，但本轮 DIS 集成 CI 失败 | **第一优先**查 #2232/1 第一真实失败步骤，同一 Writer 修复/重跑三项 CI；之后补齐正式 Schema、KDP_INTENT typed receipt、独立 Evidence 验证及全 Function 对照 |
+| **D02 — Element 内聚/知识与协作** | CORE-002/005/006：Function 聚合、静态 DAG vs 语义关系、约束、跨 Element 协作、业务 State ownership | Tally rules/knowledge 与 Runx stateful 观察在真实 SDK 中协作；合法语义环不等于静态依赖环；独立知识查询和规则结果可追溯 | 未声明依赖、关系拥有者缺失、过度拆出只放一条关系/UNKNOWN 的 Global、观察者冒充 Lease、语义推断冒充原始事实 | R9.5 的 DAG/观察者窄范围 PASS；CORE-002/005/006 仍 PARTIAL | 同一 source pin 上构造 **parent-vs-split** 反事实、跨 Element invariant 的正反例；全面 Function 约束的最终资格依赖 D01 |
+| **D03 — Progressive Interaction** | CORE-014，借用 CORE-003 的 typed outcome | xDownload LOCAL inspect → clarify → confirm，Form/Chat/CLI 真实适配最终消费一个协议；再选择 KDP Intent | 未确认、恶意 URL/size、伪造 READY、跳过确认、Interaction 试图发送 Effect | R10 6 个 native cases 已含于 103-case [成功回执](receipts/r10-ci-recovery.json)；**仍 PARTIAL** | 用真实 CLI/表单/聊天接口适配而非仅 channel 标签补缺口；typed 版本一致性与 D01 联合验证 |
+| **D04 — Target/AOT/Package 变体** | CORE-007/008/009–013/015：适用 Target 上 Package/Provider 选择、Init/Ingress/Effect | selected BUILD/Function/Target/完整闭包；真实 C01 Guard、原始 Receipt、重启；跨 Target 的差异在可用环境验证 | 未选 Package/Provider、Target 漂移、跨进程假凭证、初始化失败、过期 Journal、对不支持 Target 虚构 PASS | R6/R8/R9.5 selected TARGET 的有限真实 PASS；CORE-008 PARTIAL | 先由 Product/L1 确认 **实际适用 Target 集合**，只补各 Target 缺失的增量证据，不能用 Linux PASS 冒充 Windows/Android |
+| **D05 — Harness/LLM 可选能力** | OPT-001：真实 AOT-selected Provider、预算、工具调用、UNKNOWN | 接入真实选中 Provider，有限预算/取消；正常返回、不可用降级、无模型确定性回退 | 伪造 Provider/工具输出、预算超额、模型幻觉冒充事实、未选择的 Model 调用 | R94 native selected xDownload AOT→SDK/KDP + fixture Provider；R95 implementation HEAD `ed25934d` 的 #2450/1–3 3/3 SUCCESS，R96 implementation HEAD `d4f0b8bb` 的 #2451/1–3 3/3 SUCCESS；后续 R96 evidence/docs-sync HEAD `1920a7f0` 的 #2452/1–3 也独立 3/3 SUCCESS；OPT-001 **PARTIAL** | Provider 仍非 AOT-bound/非真实 LLM；继续补真实 Provider ABI、预算/终止证明和独立业务 Oracle，禁止提前 VERIFIED |
+| **D06 — Experience 与独立校验** | OPT-002：Experience provenance、源 Cohort、独立 Oracle/holdout、可重用性 | 对真实 Function/Domain 结果生成观察→可信校验→Experience；新的 holdout 检查与精确版本复用 | 同一来源重复计数为独立证据、Cache 命中伪验证、模拟 Oracle 自证、跨版本/隐私混淆 | R2 设计和 fixture 自演示；**native optional profile NOT_RUN** | 复用 D01 的 typed evidence；不依赖 D05 即可先验证确定性经验，选中模型路径再复核 D05 |
+| **D07 — Evolution / Meta 晋升** | OPT-003/004：数据规则 Slot、Task pin、撤销/回滚、Server Meta/Forge 晋升及新 AOT | 被明确选择的 bounded rule data 在适用 SDK 中验证/激活/撤销；Meta 产新候选→独立校验→新 AOT | 未获授权热更新、任意 native code 注入、跨 Task 激活、过期受众/无效撤销、Server 自行晋升或泄漏 | R2 模拟晋升和设计；**native optional profiles NOT_RUN** | D06 真实 Evidence 与 D04 AOT/Target 先成立；若选择 LLM 生成候选还需 D05，不能自动生产自演进 |
+| **D08 — 版本闭环与独立审核** | CORE-016 + GOV-001；全部适用 MUST/启用 Profile 的证据闭环 | 每个适用 requirement 与可执行 source/test/negative/实际匹配的 CI receipt 一一对照；独立 Exact-SHA review、Product/L1/L2 decision | 未运行、缺日志、混合 context FAIL、借旧 SHA、无 Owner Freeze、自评替代独审 | CORE-016 PARTIAL、GOV-001 NOT_RUN | D00–D07 的**适用**条件满足后，执行现有独立门禁；最终才决定 Freeze / merge / release |
+
+## 3. 证据依赖图（不是 Frozen Task DAG）
+
+```text
+D00 — 原有 R9.5/R10 source/CI 固定基线
+ ├── D01 — Function typed I/O / Evidence  ★ 当前最早门槛：R11 CI FAIL
+ ├── D02 — Element / Semantic（源与方案可先行；终验依赖 D01）
+ ├── D03 — Interaction（R10 窄范围已验；typed 完成依赖 D01）
+ └── D04 — Target / AOT（原有真实 Target 已验；跨版本 ABI 补验依赖 D01）
+           ├── D05 — Harness/LLM（还依赖 D01；可选）
+           └── D07 — Evolution / Server Meta（还依赖 D06）
+D01 ──> D06 — Experience / Evidence（确定性路径可与 D05 并行）
+D05 ──> D07（仅当 Evolution 使用真实 LLM 候选）
+D00+D01+D02+D03+D04+(启用时 D05/D06/D07) ──> D08 — 全覆盖与正式决策
+```
+
+- **可并行**：D02 的语义反例与颗粒度分析、D03 的 UI adapter 调研、D04 的 Target 适用性确认，以及 D01 CI 根因定位；同一写集必须单 Writer、验证与修复合并。
+- **不可越过**：D01 未通过本次 exact SHA 集成，不能标记 R11 新 native tests SUCCESS；没有独立 Evidence Oracle 不能称 D06 VERIFIED；D05/D06/D07 的旧 Mock 自测不等于真实可选 Profile 合格。
+- **最小拆分规则**：当前沿用 #1499 一个主索引；只有跨仓库权限/独立 Writer/真正不同的 CAS 或高风险外部副作用、长期阻塞需要单独验收，或适用 Stage 2 研究标准有强制要求时，才开具体 Issue。单个 Demo 修订、负例失败、不必制造子 Issue 或版本。
+
+## 4. 历史 Demo 迁移索引：保留原 Git 文件与证明边界
+
+下表的“迁入”仅表示**索引历史证据**，不是移动原 Demo、复用过期 CI 资格，也不是重写旧实验结果。原始 README/演进日志是项目历史记录；只有另附 exact CI receipt 的窄范围才作为版本矩阵 VERIFIED 证据。
+
+| 阶段 | 原有 Demo / 入口 | 历史结论的真实限度 | 归入 Study |
+| --- | --- | --- | --- |
+| R1–R2 | [EVOLUTION_DESIGN_REPAIRS_R2](../EVOLUTION_DESIGN_REPAIRS_R2.zh-CN.md)、[FakeLLM Demo](../../../../../examples/dis-v020-evolution-demo/README.md) | R2 25-case fixture 自测、设计级负例；没有真实 LLM/SDK/独立 Oracle，不能晋升 OPT Profile | D05–D07 |
+| R3 / R3.1 / R3.2 | [FULL_SCOPE_DEMO_SELF_VALIDATION_R3](../FULL_SCOPE_DEMO_SELF_VALIDATION_R3.zh-CN.md)、[SDK seam](../../../../../examples/dis-v020-sdk-integration/README.md) | R3 74 项模块化测试在历史说明中为本地演示且 ZIP 不在本 PR Git CI；真实 KDP/Gate 界面探索；原 hostile-native OS 隔离试验已按 Product 决定排除必需门禁 | D00、D02、D04（历史研究） |
+| R4–R5 | [REAL_AOT_APP_INIT_BRIDGE_R4](../REAL_AOT_APP_INIT_BRIDGE_R4.zh-CN.md)、[bridge suite](../../../../../examples/dis-v020-real-aot-bridge/aot-bridge.test.mjs) | 从 Sidecar 真实 BUILD/SDK 过渡到恢复；R4.3 27 项曾获专项 exact-SHA CI，后 R5 扩至 34；不能称 Sidecar 已发布 ABI | D00、D04 |
+| R6 | [PHYSICAL_TWO_DOMAIN_R6](../PHYSICAL_TWO_DOMAIN_R6.zh-CN.md)、[physical suite](../../../../../examples/dis-v020-real-aot-bridge/two-domain-physical.test.mjs) | 两个 Business Domain，真实 SQLite WAL/CAS KDP Journal 跨进程 idempotent replay；不是外部库存修改 | D00、D04 |
+| R7–R8 | [CROSS_PROJECT_CONSUMER_R7](../CROSS_PROJECT_CONSUMER_R7.zh-CN.md)、[CROSS_PROJECT_BUILD_R8](../CROSS_PROJECT_BUILD_R8.zh-CN.md)、[source manifest](../../../../../examples/dis-v020-cross-project/manifest.json) | 三个原项目固定来源；实际 original-source Function 与 canonical BUILD，未执行产品真实 GitHub/Runx Host/xDownload transfer | D00、D02、D04 |
+| R9–R9.5 | [NATIVE_ELEMENT_FUNCTION_AOT_R9](../NATIVE_ELEMENT_FUNCTION_AOT_R9.zh-CN.md)、[native test](../../../../../examples/dis-v020-native-sdk/native-consumer.test.mjs)、[r9.5 receipt](receipts/r9.5-baseline.json) | Exact HEAD `7954bd91d51eb13fbeab96385f37ac8d9cd35c5e`、TREE `9250ad08f500bc8924458af1c833947c99ad0d4c`；[CI 2223/1](https://ci.kaicreator.com/repos/18/pipeline/2223/1)、[2223/2](https://ci.kaicreator.com/repos/18/pipeline/2223/2)、[2223/3](https://ci.kaicreator.com/repos/18/pipeline/2223/3) 3/3 SUCCESS，97 named cases；仅对应矩阵 9 项窄范围 VERIFIED | D00 |
+| R10 | [INTERACTION_NATIVE_R10](../INTERACTION_NATIVE_R10.zh-CN.md)、[blocked history](receipts/r10-candidate-blocked.json)、[recovery](receipts/r10-ci-recovery.json) | 原 CI 2227 失败保留；修复 npm 预编译依赖下载 + 本地 Node24 pack inventory；Exact HEAD `c9cc8d63e13b150cf462af05a58daef5748f0030` 的 [CI 2229/1–3](https://ci.kaicreator.com/repos/18/pipeline/2229/1) 为 SUCCESS（103 named，含 6 Interaction）；后文档 HEAD `771c5d2e00e597acb55b5881e6921a8ea9709630` 的 2230/1–3 另行 3/3 SUCCESS；CORE-014 仍 PARTIAL | D00、D03 |
+| R11 | [FUNCTION_IO_OUTCOME_R11](../FUNCTION_IO_OUTCOME_R11.zh-CN.md)、[native test](../../../../../examples/dis-v020-native-sdk/native-consumer.test.mjs) | Exact HEAD `4632d5e0b331f0119da0c8d78249b7c1437856a1`、TREE `8f347807680db455cc8627590bc3c60778b9e953`；[CI 2232/1 integration FAILURE](https://ci.kaicreator.com/repos/18/pipeline/2232/1)、[2232/2 min-node SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2232/2)、[2232/3 verify SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2232/3)。**失败原因 UNKNOWN（仅 GitHub status 可读）**；8 新测试已写入但不能计作本次集成 PASS；[R11 BLOCKED receipt](receipts/r11-integration-blocked.json) 记录三项 CI 的混合状态；CORE-003 PARTIAL、无 R11 success receipt | D01 |
+
+**样本数量 ≠ 要求数量**：R9.5 的 97 或 R10 的 103 是同一条真实集成 lane 的 named tests，不是 97/103 个独立 Requirement，也不是互相独立的 Domain Oracle。历史 R2/R3 测试不能与其简单相加作为当前完成率。源/语义/Native/Owner 是四种不同的证明维度。
+
+## 5. 本轮已观察状态、下一步与经验回流
+
+- **Matrix readback（R11 候选）**：16 Core = 9 VERIFIED / 7 PARTIAL；4 optional = 4 NOT_RUN；1 governance = 1 NOT_RUN。Core 窄范围 VERIFIED 比率 9/16=56.25%，**不是整体完成率**。初次证据索引整理由此开始，原机器状态不因整理改动。
+- **下一最小可改变决策的步骤**：查 Woodpecker 2232/1 第一失败命令/日志，修复有证据的根因，在原写集复测并把新 SHA 的独立 context 结果写进新的 receipt。不能只因随后 docs-only HEAD 获得其他 green context 就借 R11 integration PASS。
+- **停止/复盘**：每项 Demo 结论包含 `Question | input source+exact pin | execution+environment | positive/negative/UNKNOWN | result | what NOT proven | next smallest evidence | inherited scope/invalidated receipts`。无必要时一个 Markdown 就够；不追求每项单独 Issue 或机器 Schema。
+- **通用经验写回 [ADS #1361](https://github.com/kaicreator-mm/ai-development-standard/issues/1361)**：版本 Conformance 可借用 ADS #1362 的证据组织技术，但不得混淆 Stage 1/2 权威；历史成功的 exact SHA、领域来源 Pin、独立语义判定、Effect 权限与本轮 CI 必须分别表达；研究依赖图不等于 Frozen Task DAG。Issue 开销与时间/成本只有实际测量才声称节省。
+
+**R13 验证器反例修复**：旧 `validate.test.mjs` 要求 `core:NOT_RUN > 0`，与真实 Matrix 9 VERIFIED / 7 PARTIAL / 0 NOT_RUN 矛盾；现在以完整 16 Core 数和剩余未验证数核对，并新增“BLOCKED 收据不能为 VERIFIED 背书”的负例。此源级问题不等于确认 Woodpecker 的第一失败步骤；只认后续 exact-SHA CI。
+
+## 6. R14–R15 incremental evidence update
+
+
+### R14 — D01 recovered; D02/D03 native consumer candidate; D04 applicability boundary
+
+- **D01 verified limited execution:** matching exact SHA `51a39d293c06402835a28ac9a766f94d4933eccc`, TREE `9c1676c446f30e2b150b1d1b4dd047d1aac6eb30`, Woodpecker #2234 contexts **3/3 SUCCESS**. Checked-in [r14-d01-ci-recovered](receipts/r14-d01-ci-recovered.json) is a **historical success**, not a verdict for the commit adding this record. R11 original mixed-status failure remains immutable. `CORE-003` stays **PARTIAL**, despite now having a narrow successful source+typed test receipt.
+- **D02 candidate (NOT YET CI-QUALIFIED):** using the actual source-pinned Tally task/rule and release projection, compare intact split Elements vs a fused parent Element with identical two public Functions, outcome-by-outcome. Add the distinct negative cases: static DAG cycle fails, semantic cooperation cycle is allowed, and an absent constraint owner is refused. This is a structural/observable counterfactual, **not** an independent semantic oracle or a generalized invariant ownership algorithm.
+- **D03 candidate (NOT YET CI-QUALIFIED):** distinct deterministic Chat text, browser-form `URLSearchParams` and CLI `argv` parsing adapters call the **real selected native SDK Function** twice (inspect → confirm); bypass/unknown options fail. No production UI deployment or authorized external transfer is claimed.
+- **D04:** current original-source selected BUILD/KDP evidence does not establish a complete Target applicability matrix. Windows/Android/Linux-specific execution is **NOT PROVEN** unless individually pinned and executed; Product/L1 #1496 retains the actual applicable Target set decision. No invented OUT_OF_SCOPE verdict.
+- **Current commit boundary:** the newly added D02/D03 tests and D04 report require *new* matching Woodpecker context results before being treated as executed; current Core/Optional/Governance counts stay **9 VERIFIED / 7 PARTIAL; 4 NOT_RUN; 1 NOT_RUN**.
+
+## 7. R15 pass / R16 D01 KDP receipt candidate
+
+
+### R15 exact-SHA native D02/D03 PASS and R16 D01 KDP admission candidate
+
+- **R15 exact qualified HEAD** `d2dbda617ed93ad59a33f4e57af2b4858cc41c2e`, TREE `01746a654b1747992da38de8568e21d354f0012e`; [#2235/1](https://ci.kaicreator.com/repos/18/pipeline/2235/1) Integration, [#2235/2](https://ci.kaicreator.com/repos/18/pipeline/2235/2) Node and [#2235/3](https://ci.kaicreator.com/repos/18/pipeline/2235/3) Verify all **SUCCESS**. [Receipt](receipts/r15-d02-d03-native.json) pins the old HEAD only, including native split-vs-parent source-real Tally cases and distinct input adapters. D02 independent semantic oracle and production D03 UI/Host remain **NOT PROVEN**.
+- **R16 candidate** adds opt-in `dis.v0.2.kdp-receipt-contract/1` to the *already selected* orders KDP Intent, separate from existing LOCAL `dis.v0.2.function-contract/1`. Real `app.send()` admission may be typed `ADMITTED`; unfamiliar receipt status is `UNKNOWN`; no receipt status can be reinterpreted as completed Effect, current business fact, independent evidence or `SUCCEEDED`. Version guard rejects stale consumers before KDP send; AOT rejects forged `ADMITTED` mappings and a LOCAL binding masquerading as KDP.
+- **R16 new tests are candidate only** until this new code HEAD's Woodpecker integration / Node / general verification succeeds. No reviewer, L2 or release claimed. Core remains **9 VERIFIED / 7 PARTIAL**, optional **4 NOT_RUN**, governance **1 NOT_RUN**. Full I/O schema vocabulary, remaining public Function profile, independent business evidence Oracle and cross-version structural diffs still unresolved.
+
+## 8. R16 success and R17 bounded Function compatibility
+
+
+### R16 all three Woodpecker contexts SUCCESS / R17 bounded schema and compatibility candidate
+
+- **R16 exact SOURCE** \`db10ddbc4977a35c31754e4a8e23cdacb063f9a5\`, TREE \`5398b312a36e345c06dd796063f4516c07d34d6e\`; Woodpecker **#2237/1–3 all SUCCESS**. Historical native receipt [r16-kdp-admission-ci.json](receipts/r16-kdp-admission-ci.json) covers real KDP_INTENT typed admission (not Effect completion), source-pinned Tally non-attestation, version guard and fake receipt negatives.
+- **R17 new candidate:** bounded \`record\` shape additionally supports explicit \`optional\` fields and \`additionalProperties:false\`; a separate *v2 major* opt-in contract runs against unchanged original Tally source, rejects unexpected keys/nonfinite numbers, preserves real UNKNOWN/OBSERVED. Original v1.0.0 AOT fixture remains unchanged.
+- **Compatibility obligation:** \`compareDisV020FunctionContracts(previous,next)\` checks same-major *structural consumer compatibility*: monotone SemVer, input narrowing, existing output field removal/type drift, outcome remapping and evidence-policy weakening. Same-version drift is forbidden. A v2 breaking opt-in Schema is deliberately **not** represented as a compatible in-place update. This pure comparator does not automatically authorize updating a running AOT nor replace independent semantic/business evidence validation.
+- R17 tests and source are **NOT CI-VERIFIED** until the newer exact SHA has a successful Woodpecker integration context; distinct general CI contexts must also pass. Counts stay **Core 9 VERIFIED / 7 PARTIAL; Optional 4 NOT_RUN; Governance 1 NOT_RUN**.
+
+## 9. R17 success and R18 independent RQ boundary
+
+
+### R17 3/3 exact-SHA SUCCESS; R18 Tally Release Evidence obligation candidate
+
+- R17 historical HEAD `fe51db3b70450ae3abcc3d42f944d972af20cc2c` / TREE `50496119e01ee54d793be897fb1946d79f585f0f` qualified by Woodpecker [#2238/1](https://ci.kaicreator.com/repos/18/pipeline/2238/1), [#2238/2](https://ci.kaicreator.com/repos/18/pipeline/2238/2), [#2238/3](https://ci.kaicreator.com/repos/18/pipeline/2238/3), **all SUCCESS**; immutable [receipt](receipts/r17-bounded-schema-ci.json) is pinned only to that code HEAD, not this receipt commit or later tests.
+- R18 newly profiles original source-pinned Tally `tally.projectReleaseReadiness` as an optional native typed LOCAL Function. A complete-looking 13-gate caller-reported PASS set must still yield `OBSERVATION/NONE`, `UNKNOWN`, `BLOCKED`, `INDEPENDENT_RQ_AND_AUTHORITY_NOT_ATTESTED`, no merge/tag/publish and `evidence.attested=false`. Wrong source SHA, future timestamp, malformed identity and forged `RELEASE_PASS` are negative cases. Unlike an invented business proof, this candidate explicitly **demonstrates non-attestation** of supplied claims.
+- Not yet delivered: an actual independent native GitHub C/RQ source attestation, complete Public Function profiles, full recursive I/O Schema, broad cross-version abi. This candidate's new cases require **new matching exact-SHA CI**; do not mark CORE-003 VERIFIED or fake release approvals. Core **9 VERIFIED / 7 PARTIAL**, Optional **4 NOT_RUN**, Governance **1 NOT_RUN**.
+
+## 10. R19 incremental native Function profile
+
+### R19 candidate — source-real Knowledge typed Function + Effect receipt contract (no Host dispatch)
+
+- Selected xDownload `getPolicy()` is consumed through the existing **native SDK Function** with `domainId=downloads → OBSERVED`, source pin and `evidence.attested=false`; nested acquisition policy remains KDP-owned. Negative tests reject arbitrary Effect parameters, a forged Domain status, and malformed policy result shapes. This covers one previously unprofiled native Public Function, not a full knowledge-graph query Schema.
+- Selected `xdownload.confirmDownload` KDP_INTENT gains a versioned receipt contract, but testing is deliberately **preflight-only**: stale expected version and invalid envelope reject without invoking a non-idempotent external Host acquisition. AOT forbids turning arbitrary terminal status into ADMITTED. Actual terminal Effect receipt, native Host and Target applicability **not proven**.
+- The remaining **Runx stateful** Public Function returns a class instance, not a plain structured record; must be treated as an explicit unprofiled lifecycle/opaque-return question, **not forced into a fake record Schema**. Product/L1 decides valid Function result representation. Core 9 VERIFIED / 7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN. R19 new tests require its own matched SHA CI.
+
+## 11. R19.1 Knowledge zero-argument ABI repair
+
+### R19 #2240 blocked, R19.1 zero-argument Knowledge ABI repair candidate
+
+- Exact historical R19 HEAD `d96fca1e45612cf07102f307f9bb90727a0380a2`/TREE `5be1a1a99aabe1d4eb4547723e7dcecfed03edc3`: [#2240/1](https://ci.kaicreator.com/repos/18/pipeline/2240/1) Integration **FAILURE**, [#2240/2](https://ci.kaicreator.com/repos/18/pipeline/2240/2) Node **SUCCESS**, [#2240/3](https://ci.kaicreator.com/repos/18/pipeline/2240/3) General **SUCCESS**. [Blocked historical receipt](receipts/r19-native-integration-blocked.json) explicitly cannot support a VERIFIED requirement. **Root cause of CI failure UNKNOWN** without step logs.
+- Independent source-level compatibility issue: public xDownload Knowledge `invoke('xdownload.describePolicy')` was previously valid with no argument, but the newly added closed-record input would reject it. R19.1 adds bounded `allowAbsent:true` on **only a zero-field closed input**, not output or open/nonempty schemas; no-arg and `{}` both preserve typed `OBSERVED/NONE`, while `null` and injected Effect fields still fail. Same-major ABI comparator rejects removing this permission in a successor.
+- These new tests **require new exact-SHA CI**. The original R18 #2239 remains PENDING, and no historical R18 PASS is invented. Core remains 9/16 VERIFIED, 7 PARTIAL; no L2 freeze, merge, or release.
+
+## 12. Stateful Handle Function experiment
+
+### R19.1 actual CI blocked / R20 Runx native stateful Handle candidate
+
+- R19.1 exact HEAD `4af4cfd82cd6983970279f454e365ecd2b338089`, TREE `7517d615f12f92dc26967c6790d96ff16cdf214f`, [#2241/1](https://ci.kaicreator.com/repos/18/pipeline/2241/1) **FAILURE**, [#2241/2](https://ci.kaicreator.com/repos/18/pipeline/2241/2) and [#2241/3](https://ci.kaicreator.com/repos/18/pipeline/2241/3) **SUCCESS**. The [blocked historical receipt](receipts/r19.1-integration-blocked.json) is *negative evidence*. Root cause of integration failure not conclusively established without step logs.
+- R20 real selected `runx.createPresenceObserver` returns `EnvironmentAgentPresence` class instance, with `observe/list/latest` methods, live in-memory state and no execution lease. Add separately versioned `dis.v0.2.local-handle-contract/1` with bounded method shape and `PROCESS_LOCAL` lifetime. This does **not** pretend the handle is JSON-serializable, remotely transportable, or independently attested. SDK preserves `OBSERVATION/NONE`, exact source pin, stale consumer rejection and plain-object forgery refusal. Already-returned handles are **not** claimed to be revoked on `stop()`; KDP maintains its own independent execution authority.
+- R20 tests need **fresh exact-SHA native CI** and do not repair/qualify the unresolved R18/R19/R19.1 prior run history automatically. Core 9 VERIFIED / 7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN. No L2 Freeze, merge or release.
+
+## 13. R21 actual native DKE qualification — semantic-only CI
+
+### R21 completed narrow native AOT/SDK semantic conformance (engine-only CI ERROR retained)
+
+- Exact historical SHA `3f6393c49cad2b8e8768c46f5c4b267114ce5ea5` / TREE `a608548721b42cb7ce9f0ed06957b3c59e2e9b34`. [Woodpecker #2249/1](https://ci.kaicreator.com/repos/18/pipeline/2249/1) native Integration **SUCCESS** (selected DKE ED06 Functions actually invoked through AOT/KDP-backed native SDK), [#2249/3](https://ci.kaicreator.com/repos/18/pipeline/2249/3) general Verify **SUCCESS**, [#2249/2](https://ci.kaicreator.com/repos/18/pipeline/2249/2) engine-only verify-min-node **ERROR**. Following Owner's explicit semantic-vs-runtime separation, [r21-native-dke-semantic-ci.json](receipts/r21-native-dke-semantic-ci.json) is marked **DIS_SEMANTIC_ONLY**; no false statement that the overall CI is 3/3 SUCCESS. Existing historical 3/3 receipt checks remain unchanged. New conformance regressions reject missing/failed DIS Integration or general verification even in semantic-only mode.
+- Source-real DKE `CONTEXT/REVIEWER_ROOT/GLOBAL` variants used 24 exact-source CQ calls (Tally 12 UNKNOWN, Textile 6 OBSERVED/6 UNKNOWN), plus bounded real-source and registry/reader/evidence fail-closed cases. Cross-project original code and fixed projection are checked in the prior Issue report; external full source graphs and accepted Claims are **not** replaced by a 19-node projection.
+- Existing selected DKE LOCAL Knowledge Function does **not** constitute installed DKE Business Package, selected external ECP or reverse CQ→SAP→Package dependency registration. A source pin/declared evidence ref is not an independent Oracle. CORE-002/003/005/016 remain **PARTIAL**; Core 9 VERIFIED/7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN; no merge, Freeze or Release.
+
+## 14. R22 bounded source-to-Function reverse lookup
+
+### R22 — first bounded AOT source-to-selected-Function reverse dependency
+
+- R21 sealed AOT contains **two separately pinned sources**: DKE original executable core and the Tally/Textile reduced projection. R22 explicitly declares `sourceDependencies:[dke-ed06-projection]` on each of the **three actually selected LOCAL Knowledge Functions**; the existing code `binding.sourceId=dke-ed06-consumer` remains unchanged. Qualification builds `sourceConsumers[sourceId] → selected Function IDs` directly from the sealed AOT, not an invented external registry.
+- New native positive verifies the original code *and* the real fixed data projection both map to the three selected Function IDs; native negatives reject missing, duplicated, same-as-execution, cross-origin (Tally-owned source in DKE Domain) and KDP_INTENT source-dependency forgery **before KDP boot**.
+- **Boundary:** this is a static trusted AOT provenance edge only. It **does not** demonstrate real external change notification, automatic SAP re-qualification, complete CQ→SAP→external Package/ECP reverse closure, independent graph-Claim acceptance, or runtime authority. Original pin replacement still needs independent trusted builder, new AOT and installed digest. R22 tests are candidates until Woodpecker confirms their exact SHA. Existing R21 semantic-only receipt remains bound to its earlier HEAD `3f6393c`.
+- Conformance remains Core **9 VERIFIED / 7 PARTIAL**, Optional **4 NOT_RUN**, Governance **1 NOT_RUN**, no Merge/Freeze/Release and no Node-version gate for semantic checks.
+
+
+### R25 original Tally 793→807 graph source / native selected readers
+- Exact prior DIS R25 repair HEAD `58e27c52d35f45557398d56d0cfe72eac08f4ccf` has DIS Integration [Woodpecker #2261/1](https://ci.kaicreator.com/repos/18/pipeline/2261/1), compatibility [#2261/2](https://ci.kaicreator.com/repos/18/pipeline/2261/2), general [#2261/3](https://ci.kaicreator.com/repos/18/pipeline/2261/3) all **SUCCESS** at that SHA.
+- The R25 tests use Tally original whole-graph Git source pins for an authentic **793→807 node** revision (14 additions, zero existing-node modifications), two AOT-selected DKE read-only Business Readers, and explicit installer-owned stale installed digest checks; the consumed fixture is a **14-node scoped original-source projection** and independent Review remains PENDING. These tests do not auto-promote incident truth to business evidence.
+- R26 continues with [native opt-in installer source-currentness checkpoint](R26_INSTALLER_SOURCE_ANCHORS.md) bound to actual original-source Tally Business Functions, before native KDP load. R26's exact-head CI is a separate future gate; no conformance score promotion.
+
+
+### R27 — real source record → CQ → unqualified SAP → selected Business Function closure (candidate)
+- Baseline R26 native source checkpoint `25f13b1df9ff4e0ab53957903627b0029c1d4293` was verified by Woodpecker [#2262/1 integration](https://ci.kaicreator.com/repos/18/pipeline/2262/1), [#2262/2 compatibility](https://ci.kaicreator.com/repos/18/pipeline/2262/2) and [#2262/3 verify](https://ci.kaicreator.com/repos/18/pipeline/2262/3), all SUCCESS for that exact SHA.
+- R27 reuses DKE's original [registered impact catalog](../../../../../examples/dis-v020-native-sdk/fixtures/dke-r27-impact-catalog.json) byte-identically from `kaicreator-mm/domain-forge@bddfaa5d035a0a241e2de263be7dfb56034ba800`, blob `e710997c3b4a1abbe33287f7b79596385c8382d3`; see [R27 qualification scope](R27_RECORDED_IMPACT_CLOSURE.md).
+- [R27 checker](../../../../../examples/dis-v020-native-sdk/dke-r27-impact.mjs) and appended native [two-Business tests](../../../../../examples/dis-v020-native-sdk/dke-two-business.test.mjs) cross-check the **real 793→807 Tally 14-record** bounded delta, Evidence→SourceLocator→Source closure, two registered CQ→unqualified SAP proposals, both AOT-selected Business Function/Package identities, untouched original `CQ-T-CROSSCUT`, and true R26 native installer source preflight. Missing registry, invented source/approval and orphan records must fail closed.
+- **Proof limitation:** both SAPs are research proposals with `qualified:false`, `sourceAuthority:NONE` and `oracle:NOT_VERIFIED`; the checker establishes **only the declared two selected reader set**, not completeness of all outside-domain consumers, acceptance of original incident assertions, ECP/Effects or live running-app revocation. R27 remains pending its own exact-SHA native CI; no Core coverage promotion.
+
+
+### R28 — R27 exact-SHA qualification + convergence of remaining Core work
+- **R27 native qualifier readback:** `349b58f985970aeeaf77621a4451154e4cd6a353` / TREE `d310878eeb2127adbfc4fa9d2bb368446e6d203b` succeeded in [#2263/1 native](https://ci.kaicreator.com/repos/18/pipeline/2263/1), [#2263/2 engine](https://ci.kaicreator.com/repos/18/pipeline/2263/2), [#2263/3 verify](https://ci.kaicreator.com/repos/18/pipeline/2263/3), all SUCCESS at **that exact historical SHA**.
+- Added [R27 machine-readable receipt](receipts/r27-native-impact-ci.json) and scoped Requirement links (CORE-003/005/016 remain PARTIAL). New [R28 matrix tests](../../../../../examples/dis-v020-conformance/validate.test.mjs) refuse forged R27 status/test cases, and assert all seven outstanding Core requirements appear exactly once in [machine-readable closure plan](closure-plan-r28.json).
+- [R28 closure analysis](R28_CLOSURE_PLAN.md): **5–8 further integrated native/demo rounds** for applicable Core plus separate independent governance, with three tasks batched by 2 requirements; **2–4 extra** if all optional Profiles are enabled and must also qualify. R28 is receipt normalization and dependency prioritization, not new Business Oracle proof or a CORE promotion. R28 changes must pass their own exact-SHA CI before claiming the new Matrix itself validated.
+
+
+### R29 — C1 original-source Element ownership comparison / unapproved SAP guard (candidate)
+- R28 `2793e61f1cf798d2c3b3ac24abb5c293dbfe4bdf` / TREE `6a93f02fc7e19aaeac5ee5c064b1a1403071ba7e` has [Woodpecker #2264/1 integration](https://ci.kaicreator.com/repos/18/pipeline/2264/1), [#2264/2 compatibility](https://ci.kaicreator.com/repos/18/pipeline/2264/2), [#2264/3 verify](https://ci.kaicreator.com/repos/18/pipeline/2264/3) **all SUCCESS** at that exact source SHA.
+- R29 copies the **unchanged Git blobs** of DKE's source-first 2-Case/5-Evidence independent-role (one model, not independent Oracle) ledger and the **unapproved synthetic GH outcome source locator proposal**. [Scoped report](R29_SOURCE_FIRST_ELEMENT_C1.md), [source-first checker](../../../../../examples/dis-v020-native-sdk/dke-r29-source-first.mjs) and new native [tests](../../../../../examples/dis-v020-native-sdk/dke-two-business.test.mjs) compare case-specific Element ownership vs one generic incident Element with original Tally 807 source / real two selected Business Knowledge readers.
+- The GH outcome locator shortfall `R27-P1-GH-LOCATOR-TIMESPAN` **remains OPEN**: candidate new records have not been accepted or installed. Neither proposed Element/ SAP is independently qualified; no C1/Core state promotion. R29 CI must run the appended cases at its own exact HEAD.
+
+
+### R30 — C1 native versioned Element and source-pin-referenced validation (candidate)
+- R29 repaired exact SHA `91e48b1b0d6a30173cc0b3cce001040878e381bb` has [Woodpecker #2266/1 native](https://ci.kaicreator.com/repos/18/pipeline/2266/1), [#2266/2 compatibility](https://ci.kaicreator.com/repos/18/pipeline/2266/2), [#2266/3 verify](https://ci.kaicreator.com/repos/18/pipeline/2266/3) **all SUCCESS**.
+- [R29 machine-qualified historical receipt](receipts/r29-native-source-first-ci.json) is linked from CORE-002/005 and all referenced actual cases remain **PARTIAL**, not claimed independent semantic authority.
+- [R30 technical scope and ABI migration caveat](R30_ELEMENT_VERSION_PROFILE.md): the native Draft now requires `version` on **every selected Element**, allows strictly source-pinned non-authoritative `validation` metadata, and exposes a bounded same-major structural Element compatibility comparator. All existing heterogeneous and DKE actual selected native Element fixtures supply explicit versions. Added four source-real native positive/negative tests to existing Woodpecker native suite. Changes intentionally reject old unversioned experimental v0.2 artifacts; no v0.1 ABI change.
+- R30 native and conformance checks require exact new-HEAD CI; no C1/Core promotion until source-owner-approved Tally repairs, independently qualified SAP and remaining normative semantics.
+
+
+### Execution strategy — batches with separately versioned rounds (effective after R30)
+- [Batch policy](BATCH_POLICY.md): default 3 consecutive bounded validation rounds per batch; each **independently commits tests, Demo, case evidence, exact-SHA CI receipt, findings/repair**, with status and evidence readback. Batch ends with a summary, not an evidence substitute; pending/error/blocked rounds never inherit PASS.
+- [B01](batches/B01/README.md) / [B01 manifest](batches/B01/manifest.json): planned CORE-003/006 Function ABI + domain-owned state rounds B01-01..03; **not yet executed**, no made-up exact HEADs. Subsequent batches follow C1–C5/O1–O3 actual dependencies.
+- Historical repaired R30 exact `4d3e52bc1a14a7c6d1557fd0589f8de3afe600c8` obtained Woodpecker [#2271/1 native](https://ci.kaicreator.com/repos/18/pipeline/2271/1), [#2271/2](https://ci.kaicreator.com/repos/18/pipeline/2271/2), [#2271/3](https://ci.kaicreator.com/repos/18/pipeline/2271/3) all **SUCCESS**; C1/CORE-002/005 **remain PARTIAL**, source-owner and independent Oracle not qualified. A policy-only newer HEAD must have its own CI and does not inherit these statuses.
+
+
+### B01 batch complete — three independent R32/R33/R34 round records, replay 3/3 exact CI
+- [B01 final summary](batches/B01/BATCH_SUMMARY.md), [B01 manifest](batches/B01/manifest.json), [R32](batches/B01/rounds/B01-01/ROUND.md), [R33](batches/B01/rounds/B01-02/ROUND.md), [R34](batches/B01/rounds/B01-03/ROUND.md); each has independent source/test Git blob and source history, with [R32 receipt](receipts/r32-b01-function-ci.json), [R33 receipt](receipts/r33-b01-state-ci.json), [R34 receipt](receipts/r34-b01-abi-ci.json).
+- Standalone round commits `af2ebeaaa66c9701a82dd063b6b1d6816a3049a8`, `0a404d343827d95ee6c08d962a369dc44c52f98b`, `175851591eacbc2c5ca2d391e18f1e9adcdd34ba` remain immutable; R33 same-writer repair `0e0d9ad8b227ed1f1ef90af648e423cd43214563` / TREE `707a0b11b9a8691b7dc7efad7c5d91d3e735edda` replays all three round test blobs with Woodpecker #2276/1–3 **SUCCESS**. The earlier #2273 minimum-node ERROR and #2274/#2275 native FAILURES remain recorded, not overwritten.
+- B01 scoped round work **3/3 VERIFIED**; **CORE-003 and CORE-006 still PARTIAL**, whole DIS Core **9/16 VERIFIED**. B01 did not accept a SAP, persistent Host state or semantic Oracle.
+
+
+### Batch B02 — 3/3 separately committed R35/R36/R37, exact replay qualified
+- [B02 summary](batches/B02/BATCH_SUMMARY.md), [manifest](batches/B02/manifest.json) and independent [R35](batches/B02/rounds/B02-01/ROUND.md), [R36](batches/B02/rounds/B02-02/ROUND.md), [R37](batches/B02/rounds/B02-03/ROUND.md) each retain own Git test SHA, positive/negative native cases and [R35](receipts/r35-b02-selected-target-ci.json), [R36](receipts/r36-b02-channel-parity-ci.json), [R37](receipts/r37-b02-interaction-negative-ci.json) Git receipts.
+- Original native commits `2181072c1a5101366b90ec8aa2c65dde9c571b15`, `d79e83c8536afee6aa406b090e1fa086f439f038`, `1a803ac452348dc73afea1483a9283cfe527abfc`. First two #2278/1 and #2279/1 **ERROR** preserved; cumulative immutable source requalification at `1a803ac452348dc73afea1483a9283cfe527abfc` TREE `8a478066e61e304c77b9515ee6e92712734b61f4`, Woodpecker #2280/1–3 **3/3 SUCCESS**.
+- **CORE-008 and CORE-014 still PARTIAL**; actual OS Target binding and deployed channels unproven. The full Demo baseline stays 9 VERIFIED / 7 PARTIAL, not inflated by research-only selected-source scope.
+
+
+### B03 complete — three individually committed R38/R39/R40 exact source-qualified rounds
+- [B03 summary](batches/B03/BATCH_SUMMARY.md), [Target contract / authoritative limitations](batches/B03/B03_TARGET_ABI_R38_R40.md), [manifest](batches/B03/manifest.json), independently [R38](batches/B03/rounds/B03-01/ROUND.md), [R39](batches/B03/rounds/B03-02/ROUND.md), [R40](batches/B03/rounds/B03-03/ROUND.md) and [R38 receipt](receipts/r38-b03-target-roster-ci.json), [R39 receipt](receipts/r39-b03-installer-target-ci.json), [R40 receipt](receipts/r40-b03-target-sap-boundary-ci.json).
+- Original commits `1ad7748842bb02693790e0f3cd2081cfb0fd113f` (#2282/1 ERROR), `b57c20126bcd6b64f2e5031486d1bab5a6dabc4f` (#2283/2 ERROR), `2d04fa512b5928c3796dbc6d1173a966c55a6286` requalified all original native test blobs at final TREE `d2a4fa1bdb14a939067c551353de2e158ec6498d` and Woodpecker #2284/1–3 **3/3 SUCCESS**.
+- Optional original selected `program.target`/module digest roster + independent installer `expectedTarget` native ABI; this proves structural selection, not actual OS-specific source. R40 original DKE single-model SAP remains unqualified, GH source locator gap OPEN. B03 3/3 bounded tests, CORE-008/005/002 PARTIAL; total Core **9/16 VERIFIED**.
+
+
+### Batch B04 C4 provenance / closeout gate (CI_PENDING at recorded readback)
+- [B04 status](batches/B04/BATCH_STATUS.md), [manifest](batches/B04/manifest.json), separate [R41](batches/B04/rounds/B04-01/ROUND.md), [R42](batches/B04/rounds/B04-02/ROUND.md), [R43](batches/B04/rounds/B04-03/ROUND.md). Original commits `8a94a1aec41dc80dbb748d2883d2db8240771bf9`, `9e6c05e4328614ea8a5e86a0ea201869eb4333a1`, `d451eb36b8c4058d14c501c8965c300bee88acd9` carry 11 new read-only source/CI/closure and negative-governance tests; each has an independent PENDING receipt `r41-b04-source-ledger-ci`, `r42-b04-closure-dag-ci`, `r43-b04-readiness-gate-ci` not indexed as SUCCESS yet.
+- R41's source-integrity audit detects changed *current* R35 source test Blob versus its historical exact-SHA receipt, without falsifying old qualification. R42 original Tally/SAP source-locked blocker inventory; R43 refuses fake C4/C5 Freeze. Latest #2288/1–3 still PENDING at the snapshot. Core-016 stays PARTIAL, GOV-001 NOT_RUN; no full conformance.
+
+
+### B05 — source-scoped R44/R45/R46 real runtime Target and complete Source coverage (CI_PENDING)
+- [B05 status](batches/B05/BATCH_STATUS.md), [manifest](batches/B05/manifest.json), independently [R44](batches/B05/rounds/B05-01/ROUND.md), [R45](batches/B05/rounds/B05-02/ROUND.md), [R46](batches/B05/rounds/B05-03/ROUND.md). Original source SHAs `36bcdca50d1b79b82bc0944d4691979631010707`, `6db5024fadb1b524e8eed39d604605404044e157`, `42fc7bde28bdbc653113651f2f87aa1021df614c`. Each has independent Git Blob and `PENDING` source receipt.
+- Actual Node process OS/arch compared with independently installed Target before KDP boot; new optional `requireAllSourcesPinned` checks all original consumed Business source origins/SHAs; original Tally/Runx/xDownload/KDP native end-to-end uses distinct Function/KDP authorities. #2292/1 Integration SUCCESS, #2292/2 and #2292/3 PENDING at readback. No actual cross-OS variant or independent Tally SAP approval.
+
+
+### B04/B05 successful final joint replay — 6 unchanged independent round test blobs
+- B04 R41–R43 and B05 R44–R46 now have independently versioned SUCCESS receipts at `1a00ecad9dcb795eb6df55cd2f53bd6208e7b9de` (#2293/1-3 SUCCESS). [B04](batches/B04/BATCH_STATUS.md) · [B05](batches/B05/BATCH_STATUS.md). Earlier CI cancellation statuses preserved. Total bounded rounds **15/15 VERIFIED**; Core remains **9/16 VERIFIED** due separate normative acceptance gates.
+
+
+### Batch B06 — real loopback HTTP Form/Chat native Interaction, 3 source rounds (VERIFIED)
+- [B06 source-scoped status](batches/B06/BATCH_STATUS.md), [manifest](batches/B06/manifest.json), separate [R47](batches/B06/rounds/B06-01/ROUND.md), [R48](batches/B06/rounds/B06-02/ROUND.md), [R49](batches/B06/rounds/B06-03/ROUND.md). Three immutable test Git Blobs unchanged, 8 native cases all PASS, qualified at `272cc9e52df02a1261cc79b96fa2acd683e88680` / #2300/1-3 3/3 SUCCESS after a root-caused r41-r46 receipt-field validator repair (#2294/#2295 native failures were that regression, not B06 tests). This is an actual loopback HTTP transport, not deployed public UI or KDP effect; CORE-014 stays PARTIAL.
+
+
+### B07-01 / R51 — six-batch evidence-ledger generalization
+
+R51 stores its own [versioned round](batches/B07/rounds/B07-01/ROUND.md), original test Blob, [receipt](receipts/r51-b07-full-ledger-ci.json) and [B07 running manifest](batches/B07/manifest.json). It extends read-only source/CI-claim audit from 9 historic B01–B03 rounds to all 18 B01–B06 rounds, validating context identity independent of scheduled Woodpecker job number. Source `61f32bfc274b701f6b4d8ffcd66f58d4349f22fc`, TREE `1dbcc01229a75dbb259d3f0d96c93b8a33c11369`, #2302/1–3 3/3 SUCCESS. B07 is 1/3; CORE-016 remains PARTIAL, GOV-001 NOT_RUN. This does not confer live CI/status attestation, domain-owner SAP, Product/L1 Target applicability or full DIS conformance.
+
+
+### B07 R52/R53 — source-selected Function dependencies and semantic relation provenance
+
+R51 **historical 18-round read-only ledger** + R52 true multi-Function static dependency/ABI + R53 original xDownload Policy constraint/selected Knowledge verifier each have [individually versioned rounds](batches/B07/manifest.json) and separate exact source/test Blobs. Full cumulative R52/R53 source `0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f` / TREE `6fecc2a8c48f69996113d4f4d4fce1f037d79bcf` verified at Woodpecker **#2305/1–3 3/3 SUCCESS**; [B07 summary](batches/B07/BATCH_SUMMARY.md). Those scoped results strengthen CORE-002/003/005 but all remain PARTIAL awaiting complete normative semantics and genuinely independent SAP/source-owner authority. B01–B07 = **21/21 Demo rounds**, NOT 100% Core conformance.
+
+
+### B08 — actual upstream DKE → native DIS Knowledge consumer
+
+Original [DKE #209 R6](https://github.com/kaicreator-mm/domain-forge/issues/209) immutable Git producer receipt bound to DIS AOT native `dke.provisional.query` and KDP SDK; real Tally old/new source provenance, UNKNOWN/no-evidence, data-origin vs executable trust boundary, negative spoofed SAP. [B08 round](batches/B08/rounds/B08-01/ROUND.md), [summary](batches/B08/BATCH_SUMMARY.md) and [receipt](receipts/r54-b08-real-dke-knowledge-consumer-ci.json); exact source `23dbb0ea5dabe661fb2a309adba00e4dbffe0c89` / TREE `fab96c9328a7bae37336b30a18f3cdc8d131a396`, #2309/1-3 **3/3 SUCCESS**. B01–B08 **22/22 source-scoped**; Core **9/16**; complete source-owner/SAP acceptance remains missing.
+
+
+### B09-01 / R55 — real DKE R9 conditional symbolic proof → native DIS/KDP Knowledge consumer (exact CI VERIFIED)
+
+[Original B09 round](batches/B09/rounds/B09-01/ROUND.md), [B09 closeout](batches/B09/BATCH_SUMMARY.md), [source-verified manifest](batches/B09/manifest.json), and [actual R55 machine receipt](receipts/r55-b09-dke-conditional-proof-native-ci.json). Exact qualifying DIS source `2d96e16942dcff518619b37e4b6c0664ca032ae3`, TREE `f2d708c797216c94439e8b24d4e011699da266fe`, original selected test Git Blob `973eaffc13dd059f929a6ee77045fc11ea86ad93`: true [Woodpecker #2312/1](https://ci.kaicreator.com/repos/18/pipeline/2312/1) native, [#2312/2](https://ci.kaicreator.com/repos/18/pipeline/2312/2) compatibility and [#2312/3](https://ci.kaicreator.com/repos/18/pipeline/2312/3) Verify **3/3 SUCCESS at same source SHA**.
+
+Selected `dke.r9.readProof` Function uses real BUILD/SDK/KDP and exact original upstream DKE R9 DATA Git Blobs `426c7d165c19b7aa459de82d5d776962dba13fb0` + `7387ca838e37d314e28a33e35ef21ba2f4358730`, with separately pinned LOCAL reader Git Blob `5aba024775a759ba992d1bd06f71770c408f3cec`. All 11 source-scoped logical queries preserve 2 ENTAILED, 2 REFUTED, 7 UNKNOWN and `authority:NONE`; the refuted outcome is an observation of refutation, not positive certified knowledge. Immutable R0 overbroad-source and R1 source-first repair histories remain auditable.
+
+**Demo count B01–B09 = 23/23 scoped VERIFIED; product Core 9/16 VERIFIED + 7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN.** Original DKE R9 source facts still same-model authored, SAP=0 and Effect denied. New DKE R10 complete replayable source-conditional SAT certificate is **not consumed by this R55 version** and must not inherit #2312 CI. This docs-only bookkeeping is not a fresh source CI run, Product/L2 Freeze or release.
+
+
+### B10 R56 full DKE SAT proof certificate native replay
+
+[Batch summary](batches/B10/BATCH_SUMMARY.md), [source-scoped round](batches/B10/rounds/B10-01/ROUND.md), [original receipt](receipts/r56-b10-r10-complete-witness-native-ci.json), exact source 66d7024f551faa69fa432e19cc535ced8065abd0 Woodpecker #2320/1-3 3/3 SUCCESS. Cumulative 24/24 bounded rounds. Core 9/16; independent SAP remains absent.
+
+
+### B11 / R57 actual OS CLI native Interaction
+
+[Batch](batches/B11/BATCH_SUMMARY.md), [round](batches/B11/rounds/B11-01/ROUND.md), [receipt](receipts/r57-b11-real-cli-native-ci.json), source `b5762ae29ac7234d45d8bc1cbf974faebad39e2e` #2323/1-3 SUCCESS. Cumulative 25/25, Core 9/16 (CORE-014 PARTIAL).
+
+
+### B12 / R58 real Runx Stateful vs physical KDP SQLite
+
+[Batch](batches/B12/BATCH_SUMMARY.md), [round](batches/B12/rounds/B12-01/ROUND.md), [receipt](receipts/r58-b12-runx-physical-process-state-ci.json). Source `67bd90839e3634427845181a406cd32804c75e17` #2325/1–3 **3/3 SUCCESS**. Cumulative 26/26 scoped demos; Core 9/16, no automatic Domain-owned persistent State.
+
+
+### B13 / R59 complete 26 historical source/CI ledger readback
+
+[Summary](batches/B13/BATCH_SUMMARY.md), [round](batches/B13/rounds/B13-01/ROUND.md), [receipt](receipts/r59-b13-26-round-full-ledger-ci.json); source `bbf076316e5c9cb4f153a88ea9c756c38722d9f5` TREE `34430b78c6dc02a0df9a781e257c8a06b87c1b63` #2327/1–3 3/3 SUCCESS. Cumulative 27/27 scoped Demo rounds; Core 9/16 remains, independent semantic/approval pending.
+
+
+### B14/R60 real DKE R16 source-authenticity receipt native Knowledge consumer
+
+[Summary](batches/B14/BATCH_SUMMARY.md), [round](batches/B14/rounds/B14-01/ROUND.md), [receipt](receipts/r60-b14-r16-source-authenticity-native-ci.json). Original exact source `9b761ad3628048706a6207deb645add5dc27eee1` #2329/1–3 3/3 SUCCESS; total B01–B14 **28/28 bounded demos VERIFIED**, Core 9/16 and SAP unqualified.
+
+
+### B15/R61 native Framework guide 203→79 source-version invalidation
+
+[Batch](batches/B15/BATCH_SUMMARY.md), [round](batches/B15/rounds/B15-01/ROUND.md), [receipt](receipts/r61-b15-r17-guide-version-native-ci.json). Original source `2d331ec0aa38464808d419318422a86fa60c6d7a` #2331/1–3 3/3 SUCCESS, all 20 source-bounded cases native DIS KDP, no automatic Method repair. Cumulative 29/29 bounded Demo rounds, Core 9/16.
+
+
+### B16/R62 — real DKE R18 native ten-node evidence DAG into selected DIS KDP Knowledge
+
+[Batch](batches/B16/BATCH_SUMMARY.md), [round](batches/B16/rounds/B16-01/ROUND.md), [native original CI receipt](receipts/r62-b16-r18-native-transitive-knowledge-impact-ci.json). Original DKE source `domain-forge@a9f02a31b86013435bf91a1b43755ad5fb52fd11` 3 original compressed/plan DATA Git Blobs preserved exactly and consumed in native DIS AOT/SDK/KDP Knowledge Function. Original DIS native test Git Blob `9aa5bc3a77c9f666ffe44a5439aa14d936625ed3` at source `domain-harness@1da216faafb60b99f2cd75b74a10b294bd6ae16b`, selected Reader Blob `71d55ad1e13cce255276794eec4afa417b139c45`; original CI qualification commit `a544ed57fb0bb69d7176e332c84f83e8889014d5`, Woodpecker [#2333/1](https://ci.kaicreator.com/repos/18/pipeline/2333/1), [#2333/2](https://ci.kaicreator.com/repos/18/pipeline/2333/2), [#2333/3](https://ci.kaicreator.com/repos/18/pipeline/2333/3) **3/3 SUCCESS**. Ten-node partial graph: exactly four affected references/Method/consumer nodes invalidated; unrelated RTC source Knowledge unaffected; typed UNKNOWN, authority NONE, no Effects or unauthorized 16→26/17→28 auto-correction. **B01–B16 cumulative 30/30 bounded scoped Demo rounds VERIFIED**, Core 9/16 VERIFIED / 7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN. Original manufacturer Guide203/79 full raw bytes and independent source-first semantics NOT_RUN; no DKE original EV or SAP promotion.
+
+### B16/R62-R1 — canonical source DAG edge integrity repair (same bounded round)
+
+DKE [R21 exact source-replayed original false-negative and native repair](https://github.com/kaicreator-mm/domain-forge/issues/209#issuecomment-6751141651): acyclic missing source edges reduced affected Method/consumer count 4→2/3 in original standalone replay. Repaired selected DIS Reader Git Blob `0a51feffaec5119dff2bb3176fb00ae93bca7ed5` and test Git Blob `2a61a0ed371ea500ec05cc2e277dec5d25c4bd78` on exact source `e16362004f3f40f763a733e2a3973d025898a26d`, TREE `dbcdafacbd20106520531af2f18b9610338e8bac`, [Woodpecker #2344/1](https://ci.kaicreator.com/repos/18/pipeline/2344/1) / [#2344/2](https://ci.kaicreator.com/repos/18/pipeline/2344/2) / [#2344/3](https://ci.kaicreator.com/repos/18/pipeline/2344/3) **3/3 SUCCESS**. Old #2333 source and original Git Blobs retained in R62 receipt history. **B01–B16 remains 30/30** (no added round), Core 9/16, SAP=0 Effects=0; this is a source-integrity repair, not new independently qualified manufacturer semantics.
+
+### B17/R63 — original 30-round ledger and repaired Reader exact-source CI
+
+[Manifest](batches/B17/manifest.json), [Round](batches/B17/rounds/B17-01/ROUND.md), [machine receipt](receipts/r63-b17-full-30-round-ledger-integrity-ci.json). Original R2 source `5b0f5733e8fbdbe9fde4cea1e3ac734cc9b42182` test Blob `3d5489badb3433b071e3c23255574242fddf78c8`, exact qualifying source `2d9c0674789d56b3fb02adb8c22396e3fa8cbbba` [Woodpecker #2348/1](https://ci.kaicreator.com/repos/18/pipeline/2348/1) native, [#2348/2](https://ci.kaicreator.com/repos/18/pipeline/2348/2) compatibility, [#2348/3](https://ci.kaicreator.com/repos/18/pipeline/2348/3) verify **3/3 SUCCESS**. Real original R0 #2346 native FAIL for orphaned B16 matrix receipt and R1 #2347 native FAIL for stale audit-only test name preserved; both repaired in R2. Source-locked B01–B16 30-round CI archive replay; no old original semantics independently rerun. **B01–B17 31/31 scoped VERIFIED**, Core 9/16 VERIFIED, 7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN; owner/SAP/Effects=0, original R8 53 full EV cells not promoted.
+
+### B18/R64 — full-original Tally EV16 source-bound selected native exact-source CI
+
+[Manifest](batches/B18/manifest.json), [Round](batches/B18/rounds/B18-01/ROUND.md), [machine receipt](receipts/r64-b18-ev16-full-original-source-native-ci.json). Four byte-exact original Git Blobs (full Tally v2.1.1 807-node graph, DKE R8 matrix, R22 gate as DATA; R23 Reader as LOCAL) selected through real DIS AOT→SDK→KDP; `dke.ev16.readSourceBound` returns typed UNKNOWN, 807 nodes/271 RelationshipAssertions, zero asserted RFC9111 joins. Final test source `b011497b085c96735d09a4952302be36ac41b36a` test Blob `8aa27a9911dbed8874c90face38d8af96b665b43`, exact qualifying source `ab78c52d9b6717c6badb27b4542736f47c69bc42` [Woodpecker #2355/1](https://ci.kaicreator.com/repos/18/pipeline/2355/1) native, [#2355/2](https://ci.kaicreator.com/repos/18/pipeline/2355/2) compatibility, [#2355/3](https://ci.kaicreator.com/repos/18/pipeline/2355/3) verify **3/3 SUCCESS**. Real original R0 #2350 native FAIL for contracts validatePins source-origin over-rejection and R1 #2353 native FAIL for retained R63 closeout free-text matrix rows preserved; both repaired (allowlist, then real-Case anchors) in R2. **B01–B18 32/32 scoped VERIFIED**, Core 9/16 VERIFIED, 7 PARTIAL, Optional 4 NOT_RUN, Governance 1 NOT_RUN; owner/SAP/Effects=0, original R8 53 full EV cells not promoted.
+
+### B19/R65 — actual R26 strict typed Reader native exact source 3/3
+
+[Manifest](batches/B19/manifest.json), [Round](batches/B19/rounds/B19-01/ROUND.md), [original-source machine receipt](receipts/r65-b19-r26-typed-source-native-ci.json). New complete DKE R26 Reader source \`domain-forge@38f5c6bbb93873f5042dd0afd31e6b051639d41d\` Git Blob \`b0e02389abc156cbd8006371765d597ebf86c61c\` is selected LOCAL_CODE in native DIS alongside exact original Tally full 807-node graph/R8/Gate DATA. B19 eight native tests Git Blob \`096003852a253b4a3921ebfd88c2ca75baed48b4\` at exact original DIS code \`6b1904f9933b1c59070bed1621b3c9f9f329882c\`, TREE \`4a98014f5f33b73bc43f25e9d6ed13fd36046530\`, passed [Woodpecker #2357/1](https://ci.kaicreator.com/repos/18/pipeline/2357/1) integration, [#2357/2](https://ci.kaicreator.com/repos/18/pipeline/2357/2) compatibility and [#2357/3](https://ci.kaicreator.com/repos/18/pipeline/2357/3) generic verify **3/3 SUCCESS**. Native selected 1.1.0 Function ABI, all 76 type/scope/authority negatives, read-only UNKNOWN and old R23 Reader installer downgrade refusal are bounded; original B18 source/receipts untouched. **B01–B19 33/33 bounded scoped native Demo rounds VERIFIED**, DIS Core **9/16 VERIFIED + 7 PARTIAL**, Optional 4 NOT_RUN, Governance 1 NOT_RUN. Original DKE EV16 full 0/2, all original R8 EV 0/53, SAP=0, Effects=0, independent domain Critic NOT_RUN, no Freeze/merge/release.
+
+### B20/R66 — native selected nested Function Schema exact CI closeout (2026-11-10)
+
+Source-qualified candidate `2616ca326d3c0e0dd06d9b68b8d2127d60ec4825`, TREE `afa42ec88cfbdd9044b3fef253ea18db86548610`, original selected B20 test Git Blob `239d925689ad7c90e7cece72f5db21e6aa31d96c`. Woodpecker [#2364/1](https://ci.kaicreator.com/repos/18/pipeline/2364/1) integration, [#2364/2](https://ci.kaicreator.com/repos/18/pipeline/2364/2) compatibility, [#2364/3](https://ci.kaicreator.com/repos/18/pipeline/2364/3) verify **3/3 SUCCESS** on the **same original code SHA**, not on the subsequent docs-only closure commit. [B20 manifest](batches/B20/manifest.json), [R66 round](batches/B20/rounds/B20-01/round.json), [Git receipt](receipts/r66-b20-nested-function-schema-native-ci.json) and [machine matrix](matrix.json) link the same source. B01–B20 **34/34 scoped Demo rounds VERIFIED** (historical B01–B19 33/33 + new B20 1/1); **Core 9/16 VERIFIED, 7 PARTIAL; Optional 4 NOT_RUN; Governance 1 NOT_RUN**. R66 proves bounded optional nested Function Schema/ABI on original xDownload source, not all Public Functions, independent DKE semantic truth, SAP, Effects or release. Earlier R66 native integration ERROR/FAIL sources are preserved in its receipt/round history; no silent PASS or original R8 promotion.
+
+### B21/R67 — 34-round historical ledger audit original 3/3 native SUCCESS (2026-11-10)
+
+[Manifest](batches/B21/manifest.json) / [Round](batches/B21/rounds/B21-01/ROUND.md) / [Receipt](receipts/r67-b21-34-round-full-ledger-ci.json) / [Matrix](matrix.json). Original source `81073ac58090d11a2f26e3983ff85bdb247a194a`, TREE `6da1c75a10c0d193ba507369465f9112589000d5`, test Blob `c3b429e350e9b6ecd2c02da0f0f241b5f8640fe3`, [Woodpecker #2376/1](https://ci.kaicreator.com/repos/18/pipeline/2376/1), [#2376/2](https://ci.kaicreator.com/repos/18/pipeline/2376/2), [#2376/3](https://ci.kaicreator.com/repos/18/pipeline/2376/3) **3/3 native SUCCESS**. Original #2375/1 FAILURE and R67 repair history retained. B21 audits historic B01–B20 34 original scoped receipts and adversarial B18/B20 provenance without replaying 34 old code SHAs. **B01–B21 35/35 scoped rounds VERIFIED**, Core **9/16 VERIFIED / 7 PARTIAL**, optional 4 NOT_RUN, governance 1 NOT_RUN. Structural evidence ≠ independent SAP or full DIS normative acceptance. No Freeze, merge or release.
+
+### R79 — CORE-003 selected Public Function contract qualified, mixed CI preserved (2026-11-10)
+
+[Machine receipt](receipts/r79-core003-public-functions-semantic-ci.json), [Matrix](matrix.json), [closure plan](closure-plan-r28.json). Original source `c1f3fb71e0ab4616ad6bf4c98db9d81275c4dacb`, TREE `0d8329dce7fdc7893c0a7adfa7c90d4e66ab44d3`, native test Git Blob `a3ea6608d63b1cac274d99aacac2ea444908de10`, native TS smoke Blob `96c026a0e96851cb65ff5c793c48384dc52747c1`. Woodpecker [#2391/1](https://ci.kaicreator.com/repos/18/pipeline/2391/1) selected DIS original-native integration **SUCCESS**, [#2391/3](https://ci.kaicreator.com/repos/18/pipeline/2391/3) generic Verify **SUCCESS**, [#2391/2](https://ci.kaicreator.com/repos/18/pipeline/2391/2) Node compatibility **FAILURE** preserved. Reuses already-versioned `DIS_SEMANTIC_ONLY` rule from R21, **not** a claim of 3/3 CI or release eligibility. Selected original Tally/Runx/xDownload/Orders 9/9 public Function purposes + 9/9 applicable typed I/O, bounded typed Outcome/Evidence/non-Effect proof, original source-aligned ABI/TS declarations, native negatives for forged KDP admission, invalid Function/Stateful Handle, same-major ABI and leaked source Map. **CORE-003 VERIFIED in scoped Domain Function conformance; aggregate Core 12/16 (75%), remaining 002/005/008/016 PARTIAL.** Historical Demo B01–B21 35/35 scoped rounds VERIFIED. Independent semantic SAP and Target scope remain unqualified, four optional profiles NOT_RUN, Governance NOT_RUN. The failed Node lane still blocks whole-PR technical/release health; no Freeze, merge or release.
+
+### B22/R82 — DKE R33 original GO selected native knowledge, repaired clone #2397 3/3 (2026-11-10)
+
+[Manifest](batches/B22/manifest.json) · [Round](batches/B22/rounds/B22-01/round.json) · [Receipt](receipts/r82-b22-r33-source-native-ci.json). Original exact DIS source `fe2334e63d39a9c006746caad695f7e3c5ade97d`, TREE `e458b65cb718fd399915d22e0a35ebe8611dc99b`, B22 native test Git Blob `a0eb607aeca433109a703b2e699c2eb719f5ed96`, source-pinned Reader Blob `650a0690774698b30992cddeed7791e6093f3b2d`, original DKE producer source `9104928912cc808ee76658968c3a1febe3afd799`/Blob `8e77f2a2b518c2cf5151b8f2b1e6707287ed33f6`. Previous #2395 three CI failures were clone-step network errors, repaired by same-SHA #2396 3/3; new clone-retry source [#2397/1](https://ci.kaicreator.com/repos/18/pipeline/2397/1) native, [#2397/2](https://ci.kaicreator.com/repos/18/pipeline/2397/2) min-node, [#2397/3](https://ci.kaicreator.com/repos/18/pipeline/2397/3) verify **all SUCCESS**. Original 910,476-row GO tier counts 233 / 3769 / 906474 are selected as `UNKNOWN` Knowledge only; no SAP, biological truth or Effect. **B01–B22 bounded demos 36/36 VERIFIED; Core 12/16 (75%), 4 PARTIAL 002/005/008/016, Optional 0/4, Governance 0/1**. Current closeout commit's CI is separate. No Freeze, merge or release.

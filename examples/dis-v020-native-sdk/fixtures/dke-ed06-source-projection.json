@@ -1,0 +1,3675 @@
+{
+  "schema": "dke.ed06.native-source-projection/1",
+  "disclaimer": "Exact bounded GitHub source-node projection; no authorized source acceptance or live KDP consumer at creation.",
+  "sourcePins": {
+    "dkeCommit": "9426ceaa9666128649748212afade6e75e578fe2",
+    "dkeCoreBlob": "1bfc1358409fa8851fefcdb4696858b6b6a8e360",
+    "casesBlob": "0a2426e8fdc2cb423613598c12f470548acedf9f",
+    "alternativesBlob": "d8a273cf6e964d9ba79ea8e364374abba2c0cc71",
+    "strategiesBlob": "eff38de2bf6c8768fa2afbb3a6f354fbd92cb27f",
+    "tallyGraphBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+    "textileFixtureBlob": "d53125358455057d9315240e05b6bc038f515241"
+  },
+  "cases": {
+    "kind": "DKE_ELEMENT_STRATEGY_CASES_R0",
+    "normativeR2Blob": "eff48a7aad57f588a8abe08632967fd45b5ad29f",
+    "sourceData": {
+      "tally": {
+        "id": "tally",
+        "sourcePin": {
+          "repository": "kaicreator-mm/tally",
+          "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+          "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+          "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+        },
+        "sourceStatus": "PENDING_REVIEW",
+        "items": [
+          "se:CLM-REQ-FUNCTIONAL-DOC-METHODS",
+          "se:CLM-TVV-0001",
+          "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+          "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES",
+          "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+          "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+        ],
+        "relations": [
+          "se:REL-TVV-0020"
+        ],
+        "gaps": [],
+        "cq": [
+          {
+            "id": "CQ-T-REQ",
+            "refs": [
+              "se:CLM-REQ-FUNCTIONAL-DOC-METHODS"
+            ]
+          },
+          {
+            "id": "CQ-T-VV",
+            "refs": [
+              "se:CLM-TVV-0001"
+            ]
+          },
+          {
+            "id": "CQ-T-SECURITY",
+            "refs": [
+              "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+              "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES",
+              "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+              "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+            ]
+          },
+          {
+            "id": "CQ-T-CROSSCUT",
+            "refs": [
+              "se:REL-TVV-0020"
+            ]
+          }
+        ],
+        "obligations": [
+          {
+            "id": "O-T-LIFECYCLE",
+            "items": [
+              "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+              "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+            ],
+            "relations": [],
+            "gaps": [],
+            "relevance": "UNKNOWN"
+          },
+          {
+            "id": "O-T-CROSSCUT",
+            "items": [],
+            "relations": [
+              "se:REL-TVV-0020"
+            ],
+            "gaps": [],
+            "relevance": "KNOWLEDGE_ONLY"
+          }
+        ],
+        "change": {
+          "id": "TALLY_ADD_HELDOUT_REAL_CLAIM",
+          "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+          "newItem": "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+          "evidence": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+          "status": "PENDING_REVIEW"
+        },
+        "sourceRationale": "CS2023/IEEE SWEBOK+NIST source assertions are not automatically application runtime mandates; CROSS_CUTS is an unaccepted derived taxonomy assertion"
+      },
+      "textile": {
+        "id": "textile",
+        "sourcePin": {
+          "repository": "kaicreator-mm/domain-harness",
+          "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+          "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+          "blob": "d53125358455057d9315240e05b6bc038f515241"
+        },
+        "sourceStatus": "REFERENCE",
+        "items": [
+          "jacquard",
+          "block-printing",
+          "embroidery"
+        ],
+        "relations": [
+          "dke:rel-pattern-method-roles",
+          "dke:rel-layered-methods-possible"
+        ],
+        "relationMetadata": [
+          {
+            "id": "dke:rel-pattern-method-roles",
+            "kind": "SOURCE_BACKED_CATEGORIZATION",
+            "sources": [
+              "ncsu-lab",
+              "gwu-traditions"
+            ]
+          },
+          {
+            "id": "dke:rel-layered-methods-possible",
+            "kind": "DERIVED_INFERENCE_PENDING_ORACLE",
+            "sources": [
+              "gwu-traditions",
+              "nps-weaves"
+            ]
+          }
+        ],
+        "gaps": [
+          "local production availability",
+          "cost",
+          "MOQ",
+          "lead time",
+          "machine suitability",
+          "commercial feasibility"
+        ],
+        "cq": [
+          {
+            "id": "CQ-X-STRUCTURE",
+            "refs": [
+              "jacquard"
+            ]
+          },
+          {
+            "id": "CQ-X-SURFACE",
+            "refs": [
+              "block-printing",
+              "embroidery"
+            ]
+          },
+          {
+            "id": "CQ-X-COMPOSE",
+            "refs": [
+              "dke:rel-pattern-method-roles",
+              "dke:rel-layered-methods-possible"
+            ]
+          },
+          {
+            "id": "CQ-X-UNKNOWN",
+            "refs": [
+              "local production availability",
+              "cost",
+              "MOQ",
+              "lead time",
+              "machine suitability",
+              "commercial feasibility"
+            ]
+          }
+        ],
+        "obligations": [
+          {
+            "id": "O-X-COMPOSITION",
+            "items": [],
+            "relations": [
+              "dke:rel-pattern-method-roles",
+              "dke:rel-layered-methods-possible"
+            ],
+            "gaps": [],
+            "relevance": "KNOWLEDGE_ONLY"
+          },
+          {
+            "id": "O-X-COMMERCIAL",
+            "items": [],
+            "relations": [],
+            "gaps": [
+              "local production availability",
+              "cost",
+              "MOQ",
+              "lead time",
+              "machine suitability",
+              "commercial feasibility"
+            ],
+            "relevance": "UNKNOWN"
+          }
+        ],
+        "change": {
+          "id": "TEXTILE_ADD_EXTERNAL_HOLDOUT_RELATION",
+          "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+          "newRelation": "dke:rel-jacquard-printing-aalto-case",
+          "sourceUrl": "https://www.aalto.fi/en/news/the-new-landscapes-in-textile-design-project-is-being-displayed-at-emma-museum",
+          "sourceClass": "UNIVERSITY_PROJECT_REPORT",
+          "status": "DERIVED_INFERENCE_PENDING_ORACLE"
+        },
+        "sourceRationale": "Different process roles do not imply universal cloth-level exclusivity; a bounded Aalto Jacquard+print demonstration does not establish all industrial feasibility"
+      }
+    },
+    "reviewMode": "SOURCE_GROUNDED_SELF_ADVERSARIAL_NOT_EXTERNAL_REVIEW",
+    "strategyIds": [
+      "MONOLITH",
+      "ATOMIC",
+      "CONTEXT",
+      "GLOBAL",
+      "RECURSIVE"
+    ]
+  },
+  "alternatives": {
+    "kind": "REVIEWER_ALTERNATIVES_R0",
+    "inputHead": "4c1b0310d59cfe14c3b567480f34695997e24546",
+    "originalReviewComment": 6721862681,
+    "originalReviewBlob": "493fad8eeecbbd95dac9ded0b4b4dbd9ef71826c",
+    "casesBlob": "0a2426e8fdc2cb423613598c12f470548acedf9f",
+    "strategyBlob": "eff38de2bf6c8768fa2afbb3a6f354fbd92cb27f",
+    "derivedFrom": "Independent source-first proposal documented on GitHub, interpreted as two concrete author-typed candidate trees",
+    "candidates": [
+      {
+        "id": "dke-reviewed-semantic-alternative-tally-r0",
+        "domain": "tally",
+        "method": "INDEPENDENT_REVIEWER_SOURCE_FIRST_PROPOSAL_TESTED_BY_FOLLOWUP_AUTHOR",
+        "reviewerOrigin": {
+          "issue209Comment": 6721862681,
+          "reviewDocumentBlob": "493fad8eeecbbd95dac9ded0b4b4dbd9ef71826c",
+          "firstPassBeforeCandidateReveal": true,
+          "fullyBlind": false
+        },
+        "sourcePin": {
+          "repository": "kaicreator-mm/tally",
+          "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+          "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+          "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+        },
+        "sourceStatus": "PENDING_REVIEW",
+        "scopes": [
+          {
+            "id": "tally.root",
+            "parent": null,
+            "kind": "ROOT",
+            "items": [],
+            "relations": [
+              "se:REL-TVV-0020"
+            ],
+            "gaps": [],
+            "purpose": "Aggregate source status and CQ across requirements, V&V, security; keep thin CROSS_CUTS inference conditional.",
+            "cq": [
+              "CQ-T-CROSSCUT"
+            ],
+            "scopeStatus": "AUTHOR_PROPOSED_UNQUALIFIED",
+            "reviewOracle": "NOT_VERIFIED"
+          },
+          {
+            "id": "tally.requirements",
+            "parent": "tally.root",
+            "kind": "CHILD",
+            "items": [
+              "se:CLM-REQ-FUNCTIONAL-DOC-METHODS"
+            ],
+            "relations": [],
+            "gaps": [],
+            "purpose": "Document functional requirements evidence and method; not a project implementation mandate.",
+            "cq": [
+              "CQ-T-REQ"
+            ],
+            "scopeStatus": "AUTHOR_PROPOSED_UNQUALIFIED",
+            "reviewOracle": "NOT_VERIFIED"
+          },
+          {
+            "id": "tally.validation",
+            "parent": "tally.root",
+            "kind": "CHILD",
+            "items": [
+              "se:CLM-TVV-0001"
+            ],
+            "relations": [],
+            "gaps": [],
+            "purpose": "Distinguish verification and validation meanings and source status.",
+            "cq": [
+              "CQ-T-VV"
+            ],
+            "scopeStatus": "AUTHOR_PROPOSED_UNQUALIFIED",
+            "reviewOracle": "NOT_VERIFIED"
+          },
+          {
+            "id": "tally.security",
+            "parent": "tally.root",
+            "kind": "CHILD",
+            "items": [
+              "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+              "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES",
+              "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+              "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+            ],
+            "relations": [],
+            "gaps": [],
+            "purpose": "Keep security requirements, testing and secure-lifecycle claims within one coherent pending knowledge boundary.",
+            "cq": [
+              "CQ-T-SECURITY"
+            ],
+            "scopeStatus": "AUTHOR_PROPOSED_UNQUALIFIED",
+            "reviewOracle": "NOT_VERIFIED"
+          }
+        ],
+        "sap": {
+          "status": "REVIEWED_CANDIDATE_UNQUALIFIED",
+          "qualified": false,
+          "oracle": "NOT_VERIFIED",
+          "obligations": [
+            {
+              "id": "O-T-LIFECYCLE",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+              ],
+              "relations": [],
+              "gaps": [],
+              "relevance": "UNKNOWN",
+              "owner": "tally.security"
+            },
+            {
+              "id": "O-T-CROSSCUT",
+              "items": [],
+              "relations": [
+                "se:REL-TVV-0020"
+              ],
+              "gaps": [],
+              "relevance": "KNOWLEDGE_ONLY",
+              "owner": "tally.root"
+            }
+          ]
+        },
+        "consumerEvidence": "NO_REGISTERED_DIS_CONSUMER",
+        "appAuthorityRef": null,
+        "realModelGenerator": "NOT_RUN",
+        "domainOracle": "NOT_VERIFIED",
+        "wholeProductExclusive": false,
+        "exactSourceStatus": "UNALTERED",
+        "qualifications": {
+          "accepted": false,
+          "disEcpExecuted": false
+        },
+        "studyPurpose": "Test reviewer-proposed coherent responsibility boundaries against original source and CQ, not retrospectively accept reviewer as oracle."
+      },
+      {
+        "id": "dke-reviewed-semantic-alternative-textile-r0",
+        "domain": "textile",
+        "method": "INDEPENDENT_REVIEWER_SOURCE_FIRST_PROPOSAL_TESTED_BY_FOLLOWUP_AUTHOR",
+        "reviewerOrigin": {
+          "issue209Comment": 6721862681,
+          "reviewDocumentBlob": "493fad8eeecbbd95dac9ded0b4b4dbd9ef71826c",
+          "firstPassBeforeCandidateReveal": true,
+          "fullyBlind": false
+        },
+        "sourcePin": {
+          "repository": "kaicreator-mm/domain-harness",
+          "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+          "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+          "blob": "d53125358455057d9315240e05b6bc038f515241"
+        },
+        "sourceStatus": "REFERENCE",
+        "scopes": [
+          {
+            "id": "textile.root",
+            "parent": null,
+            "kind": "ROOT",
+            "items": [],
+            "relations": [
+              "dke:rel-pattern-method-roles",
+              "dke:rel-layered-methods-possible"
+            ],
+            "gaps": [
+              "local production availability",
+              "cost",
+              "MOQ",
+              "lead time",
+              "machine suitability",
+              "commercial feasibility"
+            ],
+            "purpose": "Compose weave and surface pattern explanations conditionally and preserve all unsupported commercial/production facts as UNKNOWN.",
+            "cq": [
+              "CQ-X-COMPOSE",
+              "CQ-X-UNKNOWN"
+            ],
+            "scopeStatus": "AUTHOR_PROPOSED_UNQUALIFIED",
+            "reviewOracle": "NOT_VERIFIED"
+          },
+          {
+            "id": "textile.woven",
+            "parent": "textile.root",
+            "kind": "CHILD",
+            "items": [
+              "jacquard"
+            ],
+            "relations": [],
+            "gaps": [],
+            "purpose": "Distinguish jacquard structure-embedded pattern from added surface decoration.",
+            "cq": [
+              "CQ-X-STRUCTURE"
+            ],
+            "scopeStatus": "AUTHOR_PROPOSED_UNQUALIFIED",
+            "reviewOracle": "NOT_VERIFIED"
+          },
+          {
+            "id": "textile.surface",
+            "parent": "textile.root",
+            "kind": "CHILD",
+            "items": [
+              "block-printing",
+              "embroidery"
+            ],
+            "relations": [],
+            "gaps": [],
+            "purpose": "Explain print vs embroidery as surface methods without declaring whole-fabric method exclusivity.",
+            "cq": [
+              "CQ-X-SURFACE"
+            ],
+            "scopeStatus": "AUTHOR_PROPOSED_UNQUALIFIED",
+            "reviewOracle": "NOT_VERIFIED"
+          }
+        ],
+        "sap": {
+          "status": "REVIEWED_CANDIDATE_UNQUALIFIED",
+          "qualified": false,
+          "oracle": "NOT_VERIFIED",
+          "obligations": [
+            {
+              "id": "O-X-COMPOSITION",
+              "items": [],
+              "relations": [
+                "dke:rel-pattern-method-roles",
+                "dke:rel-layered-methods-possible"
+              ],
+              "gaps": [],
+              "relevance": "KNOWLEDGE_ONLY",
+              "owner": "textile.root"
+            },
+            {
+              "id": "O-X-COMMERCIAL",
+              "items": [],
+              "relations": [],
+              "gaps": [
+                "local production availability",
+                "cost",
+                "MOQ",
+                "lead time",
+                "machine suitability",
+                "commercial feasibility"
+              ],
+              "relevance": "UNKNOWN",
+              "owner": "textile.root"
+            }
+          ]
+        },
+        "consumerEvidence": "NO_REGISTERED_DIS_CONSUMER",
+        "appAuthorityRef": null,
+        "realModelGenerator": "NOT_RUN",
+        "domainOracle": "NOT_VERIFIED",
+        "wholeProductExclusive": false,
+        "exactSourceStatus": "UNALTERED",
+        "qualifications": {
+          "accepted": false,
+          "disEcpExecuted": false
+        },
+        "studyPurpose": "Test reviewer-proposed coherent responsibility boundaries against original source and CQ, not retrospectively accept reviewer as oracle."
+      }
+    ]
+  },
+  "strategies": {
+    "schema": "dke/element-strategy-demo-v0",
+    "revision": "r0",
+    "originalSourceTruth": "TALLY_GRAPH_AND_DIS_F012_ARE_READ_ONLY",
+    "strategies": [
+      {
+        "id": "MONOLITH",
+        "summary": "No child: all responsibility/root; convenient for very small independent knowledge problem, high coupling risk on growth"
+      },
+      {
+        "id": "ATOMIC",
+        "summary": "One item = one leaf; great for indexing/provenance, not by itself semantically cohesive Domain Elements"
+      },
+      {
+        "id": "CONTEXT",
+        "summary": "Bounded responsibilities + named parent for thin relation and unknown gaps; balanced default for bounded multi-topic domain"
+      },
+      {
+        "id": "GLOBAL",
+        "summary": "Explicit Global scope for every notable crosscut/gap; useful where a separately qualified oracle/owner actually exists, risks over-segmentation"
+      },
+      {
+        "id": "RECURSIVE",
+        "summary": "Root → cohesive group → specific leaf (depth 2) + global where useful; justified by independent ownership and evolution, not forced depth"
+      }
+    ],
+    "cases": {
+      "kind": "DKE_ELEMENT_STRATEGY_CASES_R0",
+      "normativeR2Blob": "eff48a7aad57f588a8abe08632967fd45b5ad29f",
+      "sourceData": {
+        "tally": {
+          "id": "tally",
+          "sourcePin": {
+            "repository": "kaicreator-mm/tally",
+            "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+            "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+            "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+          },
+          "sourceStatus": "PENDING_REVIEW",
+          "items": [
+            "se:CLM-REQ-FUNCTIONAL-DOC-METHODS",
+            "se:CLM-TVV-0001",
+            "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+            "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES",
+            "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+            "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+          ],
+          "relations": [
+            "se:REL-TVV-0020"
+          ],
+          "gaps": [],
+          "cq": [
+            {
+              "id": "CQ-T-REQ",
+              "refs": [
+                "se:CLM-REQ-FUNCTIONAL-DOC-METHODS"
+              ]
+            },
+            {
+              "id": "CQ-T-VV",
+              "refs": [
+                "se:CLM-TVV-0001"
+              ]
+            },
+            {
+              "id": "CQ-T-SECURITY",
+              "refs": [
+                "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+                "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES",
+                "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+              ]
+            },
+            {
+              "id": "CQ-T-CROSSCUT",
+              "refs": [
+                "se:REL-TVV-0020"
+              ]
+            }
+          ],
+          "obligations": [
+            {
+              "id": "O-T-LIFECYCLE",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+              ],
+              "relations": [],
+              "gaps": [],
+              "relevance": "UNKNOWN"
+            },
+            {
+              "id": "O-T-CROSSCUT",
+              "items": [],
+              "relations": [
+                "se:REL-TVV-0020"
+              ],
+              "gaps": [],
+              "relevance": "KNOWLEDGE_ONLY"
+            }
+          ],
+          "change": {
+            "id": "TALLY_ADD_HELDOUT_REAL_CLAIM",
+            "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+            "newItem": "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+            "evidence": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+            "status": "PENDING_REVIEW"
+          },
+          "sourceRationale": "CS2023/IEEE SWEBOK+NIST source assertions are not automatically application runtime mandates; CROSS_CUTS is an unaccepted derived taxonomy assertion"
+        },
+        "textile": {
+          "id": "textile",
+          "sourcePin": {
+            "repository": "kaicreator-mm/domain-harness",
+            "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+            "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+            "blob": "d53125358455057d9315240e05b6bc038f515241"
+          },
+          "sourceStatus": "REFERENCE",
+          "items": [
+            "jacquard",
+            "block-printing",
+            "embroidery"
+          ],
+          "relations": [
+            "dke:rel-pattern-method-roles",
+            "dke:rel-layered-methods-possible"
+          ],
+          "relationMetadata": [
+            {
+              "id": "dke:rel-pattern-method-roles",
+              "kind": "SOURCE_BACKED_CATEGORIZATION",
+              "sources": [
+                "ncsu-lab",
+                "gwu-traditions"
+              ]
+            },
+            {
+              "id": "dke:rel-layered-methods-possible",
+              "kind": "DERIVED_INFERENCE_PENDING_ORACLE",
+              "sources": [
+                "gwu-traditions",
+                "nps-weaves"
+              ]
+            }
+          ],
+          "gaps": [
+            "local production availability",
+            "cost",
+            "MOQ",
+            "lead time",
+            "machine suitability",
+            "commercial feasibility"
+          ],
+          "cq": [
+            {
+              "id": "CQ-X-STRUCTURE",
+              "refs": [
+                "jacquard"
+              ]
+            },
+            {
+              "id": "CQ-X-SURFACE",
+              "refs": [
+                "block-printing",
+                "embroidery"
+              ]
+            },
+            {
+              "id": "CQ-X-COMPOSE",
+              "refs": [
+                "dke:rel-pattern-method-roles",
+                "dke:rel-layered-methods-possible"
+              ]
+            },
+            {
+              "id": "CQ-X-UNKNOWN",
+              "refs": [
+                "local production availability",
+                "cost",
+                "MOQ",
+                "lead time",
+                "machine suitability",
+                "commercial feasibility"
+              ]
+            }
+          ],
+          "obligations": [
+            {
+              "id": "O-X-COMPOSITION",
+              "items": [],
+              "relations": [
+                "dke:rel-pattern-method-roles",
+                "dke:rel-layered-methods-possible"
+              ],
+              "gaps": [],
+              "relevance": "KNOWLEDGE_ONLY"
+            },
+            {
+              "id": "O-X-COMMERCIAL",
+              "items": [],
+              "relations": [],
+              "gaps": [
+                "local production availability",
+                "cost",
+                "MOQ",
+                "lead time",
+                "machine suitability",
+                "commercial feasibility"
+              ],
+              "relevance": "UNKNOWN"
+            }
+          ],
+          "change": {
+            "id": "TEXTILE_ADD_EXTERNAL_HOLDOUT_RELATION",
+            "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+            "newRelation": "dke:rel-jacquard-printing-aalto-case",
+            "sourceUrl": "https://www.aalto.fi/en/news/the-new-landscapes-in-textile-design-project-is-being-displayed-at-emma-museum",
+            "sourceClass": "UNIVERSITY_PROJECT_REPORT",
+            "status": "DERIVED_INFERENCE_PENDING_ORACLE"
+          },
+          "sourceRationale": "Different process roles do not imply universal cloth-level exclusivity; a bounded Aalto Jacquard+print demonstration does not establish all industrial feasibility"
+        }
+      },
+      "reviewMode": "SOURCE_GROUNDED_SELF_ADVERSARIAL_NOT_EXTERNAL_REVIEW",
+      "strategyIds": [
+        "MONOLITH",
+        "ATOMIC",
+        "CONTEXT",
+        "GLOBAL",
+        "RECURSIVE"
+      ]
+    },
+    "results": [
+      {
+        "domain": "tally",
+        "strategy": "MONOLITH",
+        "inputPin": {
+          "repository": "kaicreator-mm/tally",
+          "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+          "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+          "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 1,
+            "maxDepth": 0,
+            "singleItemScopes": 0,
+            "emptyGroupingScopes": 0,
+            "rootItemCount": 6,
+            "rootRelationCount": 1,
+            "rootGapCount": 0,
+            "globalScopes": 0
+          }
+        },
+        "candidate": {
+          "id": "tally:MONOLITH",
+          "domain": "tally",
+          "strategy": "MONOLITH",
+          "pin": {
+            "repository": "kaicreator-mm/tally",
+            "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+            "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+            "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+          },
+          "root": "MONOLITH.root",
+          "scopes": [
+            {
+              "id": "MONOLITH.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [
+                "se:CLM-REQ-FUNCTIONAL-DOC-METHODS",
+                "se:CLM-TVV-0001",
+                "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+                "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES",
+                "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+              ],
+              "relations": [
+                "se:REL-TVV-0020"
+              ],
+              "gaps": [],
+              "purpose": "Single cohesive bounded knowledge task"
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-T-LIFECYCLE",
+                "items": [
+                  "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                  "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+                ],
+                "relations": [],
+                "gaps": [],
+                "relevance": "UNKNOWN",
+                "owner": "MONOLITH.root"
+              },
+              {
+                "id": "O-T-CROSSCUT",
+                "items": [],
+                "relations": [
+                  "se:REL-TVV-0020"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "MONOLITH.root"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+          "from": 7,
+          "to": 8,
+          "pass": true,
+          "checks": 15,
+          "owner": "MONOLITH.root",
+          "affectedScopes": [
+            "MONOLITH.root"
+          ],
+          "invalidatedObligations": [
+            "O-T-LIFECYCLE"
+          ],
+          "addedElementIds": [],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TALLY_ADD_HELDOUT_REAL_CLAIM",
+            "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+            "newItem": "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+            "evidence": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+            "status": "PENDING_REVIEW"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "PARENTS_AND_TYPES",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      },
+      {
+        "domain": "tally",
+        "strategy": "ATOMIC",
+        "inputPin": {
+          "repository": "kaicreator-mm/tally",
+          "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+          "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+          "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 7,
+            "maxDepth": 1,
+            "singleItemScopes": 6,
+            "emptyGroupingScopes": 0,
+            "rootItemCount": 0,
+            "rootRelationCount": 1,
+            "rootGapCount": 0,
+            "globalScopes": 0
+          }
+        },
+        "candidate": {
+          "id": "tally:ATOMIC",
+          "domain": "tally",
+          "strategy": "ATOMIC",
+          "pin": {
+            "repository": "kaicreator-mm/tally",
+            "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+            "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+            "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+          },
+          "root": "ATOMIC.root",
+          "scopes": [
+            {
+              "id": "ATOMIC.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [],
+              "relations": [
+                "se:REL-TVV-0020"
+              ],
+              "gaps": [],
+              "purpose": "Root composition"
+            },
+            {
+              "id": "tally.atom.0",
+              "parent": "ATOMIC.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-REQ-FUNCTIONAL-DOC-METHODS"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Atomic knowledge record, not necessarily domain Element"
+            },
+            {
+              "id": "tally.atom.1",
+              "parent": "ATOMIC.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-TVV-0001"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Atomic knowledge record, not necessarily domain Element"
+            },
+            {
+              "id": "tally.atom.2",
+              "parent": "ATOMIC.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Atomic knowledge record, not necessarily domain Element"
+            },
+            {
+              "id": "tally.atom.3",
+              "parent": "ATOMIC.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Atomic knowledge record, not necessarily domain Element"
+            },
+            {
+              "id": "tally.atom.4",
+              "parent": "ATOMIC.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Atomic knowledge record, not necessarily domain Element"
+            },
+            {
+              "id": "tally.atom.5",
+              "parent": "ATOMIC.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Atomic knowledge record, not necessarily domain Element"
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-T-LIFECYCLE",
+                "items": [
+                  "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                  "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+                ],
+                "relations": [],
+                "gaps": [],
+                "relevance": "UNKNOWN",
+                "owner": "ATOMIC.root"
+              },
+              {
+                "id": "O-T-CROSSCUT",
+                "items": [],
+                "relations": [
+                  "se:REL-TVV-0020"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "ATOMIC.root"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+          "from": 7,
+          "to": 8,
+          "pass": true,
+          "checks": 15,
+          "owner": "tally.heldout.nist",
+          "affectedScopes": [
+            "tally.heldout.nist",
+            "ATOMIC.root"
+          ],
+          "invalidatedObligations": [
+            "O-T-LIFECYCLE"
+          ],
+          "addedElementIds": [
+            "tally.heldout.nist"
+          ],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TALLY_ADD_HELDOUT_REAL_CLAIM",
+            "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+            "newItem": "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+            "evidence": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+            "status": "PENDING_REVIEW"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      },
+      {
+        "domain": "tally",
+        "strategy": "CONTEXT",
+        "inputPin": {
+          "repository": "kaicreator-mm/tally",
+          "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+          "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+          "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 5,
+            "maxDepth": 1,
+            "singleItemScopes": 2,
+            "emptyGroupingScopes": 0,
+            "rootItemCount": 0,
+            "rootRelationCount": 1,
+            "rootGapCount": 0,
+            "globalScopes": 1
+          }
+        },
+        "candidate": {
+          "id": "tally:CONTEXT",
+          "domain": "tally",
+          "strategy": "CONTEXT",
+          "pin": {
+            "repository": "kaicreator-mm/tally",
+            "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+            "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+            "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+          },
+          "root": "CONTEXT.root",
+          "scopes": [
+            {
+              "id": "CONTEXT.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [],
+              "relations": [
+                "se:REL-TVV-0020"
+              ],
+              "gaps": [],
+              "purpose": "Parent owns thin relation"
+            },
+            {
+              "id": "tally.requirements",
+              "parent": "CONTEXT.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-REQ-FUNCTIONAL-DOC-METHODS"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.verification",
+              "parent": "CONTEXT.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-TVV-0001"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.security",
+              "parent": "CONTEXT.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+                "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.global.security-lifecycle",
+              "parent": "CONTEXT.root",
+              "kind": "GLOBAL_SEMANTIC",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Cross lifecycle semantics"
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-T-LIFECYCLE",
+                "items": [
+                  "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                  "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+                ],
+                "relations": [],
+                "gaps": [],
+                "relevance": "UNKNOWN",
+                "owner": "tally.global.security-lifecycle"
+              },
+              {
+                "id": "O-T-CROSSCUT",
+                "items": [],
+                "relations": [
+                  "se:REL-TVV-0020"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "CONTEXT.root"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+          "from": 7,
+          "to": 8,
+          "pass": true,
+          "checks": 15,
+          "owner": "tally.global.security-lifecycle",
+          "affectedScopes": [
+            "tally.global.security-lifecycle",
+            "CONTEXT.root"
+          ],
+          "invalidatedObligations": [
+            "O-T-LIFECYCLE"
+          ],
+          "addedElementIds": [],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TALLY_ADD_HELDOUT_REAL_CLAIM",
+            "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+            "newItem": "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+            "evidence": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+            "status": "PENDING_REVIEW"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      },
+      {
+        "domain": "tally",
+        "strategy": "GLOBAL",
+        "inputPin": {
+          "repository": "kaicreator-mm/tally",
+          "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+          "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+          "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 6,
+            "maxDepth": 1,
+            "singleItemScopes": 2,
+            "emptyGroupingScopes": 0,
+            "rootItemCount": 0,
+            "rootRelationCount": 0,
+            "rootGapCount": 0,
+            "globalScopes": 2
+          }
+        },
+        "candidate": {
+          "id": "tally:GLOBAL",
+          "domain": "tally",
+          "strategy": "GLOBAL",
+          "pin": {
+            "repository": "kaicreator-mm/tally",
+            "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+            "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+            "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+          },
+          "root": "GLOBAL.root",
+          "scopes": [
+            {
+              "id": "GLOBAL.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Only root composition"
+            },
+            {
+              "id": "tally.requirements",
+              "parent": "GLOBAL.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-REQ-FUNCTIONAL-DOC-METHODS"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.verification",
+              "parent": "GLOBAL.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-TVV-0001"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.security",
+              "parent": "GLOBAL.root",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+                "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.global.security-lifecycle",
+              "parent": "GLOBAL.root",
+              "kind": "GLOBAL_SEMANTIC",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.global.crosscut",
+              "parent": "GLOBAL.root",
+              "kind": "GLOBAL_SEMANTIC",
+              "items": [],
+              "relations": [
+                "se:REL-TVV-0020"
+              ],
+              "gaps": [],
+              "purpose": ""
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-T-LIFECYCLE",
+                "items": [
+                  "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                  "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+                ],
+                "relations": [],
+                "gaps": [],
+                "relevance": "UNKNOWN",
+                "owner": "tally.global.security-lifecycle"
+              },
+              {
+                "id": "O-T-CROSSCUT",
+                "items": [],
+                "relations": [
+                  "se:REL-TVV-0020"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "tally.global.crosscut"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+          "from": 7,
+          "to": 8,
+          "pass": true,
+          "checks": 15,
+          "owner": "tally.global.security-lifecycle",
+          "affectedScopes": [
+            "tally.global.security-lifecycle",
+            "GLOBAL.root"
+          ],
+          "invalidatedObligations": [
+            "O-T-LIFECYCLE"
+          ],
+          "addedElementIds": [],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TALLY_ADD_HELDOUT_REAL_CLAIM",
+            "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+            "newItem": "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+            "evidence": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+            "status": "PENDING_REVIEW"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      },
+      {
+        "domain": "tally",
+        "strategy": "RECURSIVE",
+        "inputPin": {
+          "repository": "kaicreator-mm/tally",
+          "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+          "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+          "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 7,
+            "maxDepth": 2,
+            "singleItemScopes": 2,
+            "emptyGroupingScopes": 2,
+            "rootItemCount": 0,
+            "rootRelationCount": 1,
+            "rootGapCount": 0,
+            "globalScopes": 1
+          }
+        },
+        "candidate": {
+          "id": "tally:RECURSIVE",
+          "domain": "tally",
+          "strategy": "RECURSIVE",
+          "pin": {
+            "repository": "kaicreator-mm/tally",
+            "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+            "path": "docs/versions/v2.1.1/knowledge/generated/graph.jsonld",
+            "blob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+          },
+          "root": "RECURSIVE.root",
+          "scopes": [
+            {
+              "id": "RECURSIVE.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [],
+              "relations": [
+                "se:REL-TVV-0020"
+              ],
+              "gaps": [],
+              "purpose": "Root composes security and engineering groups"
+            },
+            {
+              "id": "tally.engineering",
+              "parent": "RECURSIVE.root",
+              "kind": "CHILD",
+              "items": [],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Requirements and Verification context"
+            },
+            {
+              "id": "tally.requirements",
+              "parent": "tally.engineering",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-REQ-FUNCTIONAL-DOC-METHODS"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.verification",
+              "parent": "tally.engineering",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-TVV-0001"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.security-domain",
+              "parent": "RECURSIVE.root",
+              "kind": "CHILD",
+              "items": [],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Security knowledge parent"
+            },
+            {
+              "id": "tally.security-practice",
+              "parent": "tally.security-domain",
+              "kind": "CHILD",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+                "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "tally.global.security-lifecycle",
+              "parent": "RECURSIVE.root",
+              "kind": "GLOBAL_SEMANTIC",
+              "items": [
+                "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-T-LIFECYCLE",
+                "items": [
+                  "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+                  "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE"
+                ],
+                "relations": [],
+                "gaps": [],
+                "relevance": "UNKNOWN",
+                "owner": "tally.global.security-lifecycle"
+              },
+              {
+                "id": "O-T-CROSSCUT",
+                "items": [],
+                "relations": [
+                  "se:REL-TVV-0020"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "RECURSIVE.root"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+          "from": 7,
+          "to": 8,
+          "pass": true,
+          "checks": 15,
+          "owner": "tally.global.security-lifecycle",
+          "affectedScopes": [
+            "tally.global.security-lifecycle",
+            "RECURSIVE.root"
+          ],
+          "invalidatedObligations": [
+            "O-T-LIFECYCLE"
+          ],
+          "addedElementIds": [],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TALLY_ADD_HELDOUT_REAL_CLAIM",
+            "kind": "SCOPE_EXPANSION_FROM_SAME_PINNED_GRAPH",
+            "newItem": "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+            "evidence": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+            "status": "PENDING_REVIEW"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      },
+      {
+        "domain": "textile",
+        "strategy": "MONOLITH",
+        "inputPin": {
+          "repository": "kaicreator-mm/domain-harness",
+          "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+          "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+          "blob": "d53125358455057d9315240e05b6bc038f515241"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 1,
+            "maxDepth": 0,
+            "singleItemScopes": 0,
+            "emptyGroupingScopes": 0,
+            "rootItemCount": 3,
+            "rootRelationCount": 2,
+            "rootGapCount": 6,
+            "globalScopes": 0
+          }
+        },
+        "candidate": {
+          "id": "textile:MONOLITH",
+          "domain": "textile",
+          "strategy": "MONOLITH",
+          "pin": {
+            "repository": "kaicreator-mm/domain-harness",
+            "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+            "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+            "blob": "d53125358455057d9315240e05b6bc038f515241"
+          },
+          "root": "MONOLITH.root",
+          "scopes": [
+            {
+              "id": "MONOLITH.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [
+                "jacquard",
+                "block-printing",
+                "embroidery"
+              ],
+              "relations": [
+                "dke:rel-pattern-method-roles",
+                "dke:rel-layered-methods-possible"
+              ],
+              "gaps": [
+                "local production availability",
+                "cost",
+                "MOQ",
+                "lead time",
+                "machine suitability",
+                "commercial feasibility"
+              ],
+              "purpose": "One small sampling task"
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-X-COMPOSITION",
+                "items": [],
+                "relations": [
+                  "dke:rel-pattern-method-roles",
+                  "dke:rel-layered-methods-possible"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "MONOLITH.root"
+              },
+              {
+                "id": "O-X-COMMERCIAL",
+                "items": [],
+                "relations": [],
+                "gaps": [
+                  "local production availability",
+                  "cost",
+                  "MOQ",
+                  "lead time",
+                  "machine suitability",
+                  "commercial feasibility"
+                ],
+                "relevance": "UNKNOWN",
+                "owner": "MONOLITH.root"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+          "from": 11,
+          "to": 12,
+          "pass": true,
+          "checks": 15,
+          "owner": "MONOLITH.root",
+          "affectedScopes": [
+            "MONOLITH.root"
+          ],
+          "invalidatedObligations": [
+            "O-X-COMPOSITION"
+          ],
+          "addedElementIds": [],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TEXTILE_ADD_EXTERNAL_HOLDOUT_RELATION",
+            "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+            "newRelation": "dke:rel-jacquard-printing-aalto-case",
+            "sourceUrl": "https://www.aalto.fi/en/news/the-new-landscapes-in-textile-design-project-is-being-displayed-at-emma-museum",
+            "sourceClass": "UNIVERSITY_PROJECT_REPORT",
+            "status": "DERIVED_INFERENCE_PENDING_ORACLE"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "PARENTS_AND_TYPES",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      },
+      {
+        "domain": "textile",
+        "strategy": "ATOMIC",
+        "inputPin": {
+          "repository": "kaicreator-mm/domain-harness",
+          "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+          "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+          "blob": "d53125358455057d9315240e05b6bc038f515241"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 4,
+            "maxDepth": 1,
+            "singleItemScopes": 3,
+            "emptyGroupingScopes": 0,
+            "rootItemCount": 0,
+            "rootRelationCount": 2,
+            "rootGapCount": 6,
+            "globalScopes": 0
+          }
+        },
+        "candidate": {
+          "id": "textile:ATOMIC",
+          "domain": "textile",
+          "strategy": "ATOMIC",
+          "pin": {
+            "repository": "kaicreator-mm/domain-harness",
+            "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+            "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+            "blob": "d53125358455057d9315240e05b6bc038f515241"
+          },
+          "root": "ATOMIC.root",
+          "scopes": [
+            {
+              "id": "ATOMIC.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [],
+              "relations": [
+                "dke:rel-pattern-method-roles",
+                "dke:rel-layered-methods-possible"
+              ],
+              "gaps": [
+                "local production availability",
+                "cost",
+                "MOQ",
+                "lead time",
+                "machine suitability",
+                "commercial feasibility"
+              ],
+              "purpose": "Root composes single-item subscopes"
+            },
+            {
+              "id": "textile.atom.0",
+              "parent": "ATOMIC.root",
+              "kind": "CHILD",
+              "items": [
+                "jacquard"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "One process rule"
+            },
+            {
+              "id": "textile.atom.1",
+              "parent": "ATOMIC.root",
+              "kind": "CHILD",
+              "items": [
+                "block-printing"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "One process rule"
+            },
+            {
+              "id": "textile.atom.2",
+              "parent": "ATOMIC.root",
+              "kind": "CHILD",
+              "items": [
+                "embroidery"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": "One process rule"
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-X-COMPOSITION",
+                "items": [],
+                "relations": [
+                  "dke:rel-pattern-method-roles",
+                  "dke:rel-layered-methods-possible"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "ATOMIC.root"
+              },
+              {
+                "id": "O-X-COMMERCIAL",
+                "items": [],
+                "relations": [],
+                "gaps": [
+                  "local production availability",
+                  "cost",
+                  "MOQ",
+                  "lead time",
+                  "machine suitability",
+                  "commercial feasibility"
+                ],
+                "relevance": "UNKNOWN",
+                "owner": "ATOMIC.root"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+          "from": 11,
+          "to": 12,
+          "pass": true,
+          "checks": 15,
+          "owner": "ATOMIC.root",
+          "affectedScopes": [
+            "ATOMIC.root"
+          ],
+          "invalidatedObligations": [
+            "O-X-COMPOSITION"
+          ],
+          "addedElementIds": [],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TEXTILE_ADD_EXTERNAL_HOLDOUT_RELATION",
+            "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+            "newRelation": "dke:rel-jacquard-printing-aalto-case",
+            "sourceUrl": "https://www.aalto.fi/en/news/the-new-landscapes-in-textile-design-project-is-being-displayed-at-emma-museum",
+            "sourceClass": "UNIVERSITY_PROJECT_REPORT",
+            "status": "DERIVED_INFERENCE_PENDING_ORACLE"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      },
+      {
+        "domain": "textile",
+        "strategy": "CONTEXT",
+        "inputPin": {
+          "repository": "kaicreator-mm/domain-harness",
+          "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+          "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+          "blob": "d53125358455057d9315240e05b6bc038f515241"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 4,
+            "maxDepth": 1,
+            "singleItemScopes": 1,
+            "emptyGroupingScopes": 0,
+            "rootItemCount": 0,
+            "rootRelationCount": 0,
+            "rootGapCount": 6,
+            "globalScopes": 1
+          }
+        },
+        "candidate": {
+          "id": "textile:CONTEXT",
+          "domain": "textile",
+          "strategy": "CONTEXT",
+          "pin": {
+            "repository": "kaicreator-mm/domain-harness",
+            "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+            "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+            "blob": "d53125358455057d9315240e05b6bc038f515241"
+          },
+          "root": "CONTEXT.root",
+          "scopes": [
+            {
+              "id": "CONTEXT.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [],
+              "relations": [],
+              "gaps": [
+                "local production availability",
+                "cost",
+                "MOQ",
+                "lead time",
+                "machine suitability",
+                "commercial feasibility"
+              ],
+              "purpose": "Root owns domain-wide feasibility gaps"
+            },
+            {
+              "id": "textile.woven",
+              "parent": "CONTEXT.root",
+              "kind": "CHILD",
+              "items": [
+                "jacquard"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "textile.surface",
+              "parent": "CONTEXT.root",
+              "kind": "CHILD",
+              "items": [
+                "block-printing",
+                "embroidery"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "textile.global.pattern",
+              "parent": "CONTEXT.root",
+              "kind": "GLOBAL_SEMANTIC",
+              "items": [],
+              "relations": [
+                "dke:rel-pattern-method-roles",
+                "dke:rel-layered-methods-possible"
+              ],
+              "gaps": [],
+              "purpose": ""
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-X-COMPOSITION",
+                "items": [],
+                "relations": [
+                  "dke:rel-pattern-method-roles",
+                  "dke:rel-layered-methods-possible"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "textile.global.pattern"
+              },
+              {
+                "id": "O-X-COMMERCIAL",
+                "items": [],
+                "relations": [],
+                "gaps": [
+                  "local production availability",
+                  "cost",
+                  "MOQ",
+                  "lead time",
+                  "machine suitability",
+                  "commercial feasibility"
+                ],
+                "relevance": "UNKNOWN",
+                "owner": "CONTEXT.root"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+          "from": 11,
+          "to": 12,
+          "pass": true,
+          "checks": 15,
+          "owner": "textile.global.pattern",
+          "affectedScopes": [
+            "textile.global.pattern",
+            "CONTEXT.root"
+          ],
+          "invalidatedObligations": [
+            "O-X-COMPOSITION"
+          ],
+          "addedElementIds": [],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TEXTILE_ADD_EXTERNAL_HOLDOUT_RELATION",
+            "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+            "newRelation": "dke:rel-jacquard-printing-aalto-case",
+            "sourceUrl": "https://www.aalto.fi/en/news/the-new-landscapes-in-textile-design-project-is-being-displayed-at-emma-museum",
+            "sourceClass": "UNIVERSITY_PROJECT_REPORT",
+            "status": "DERIVED_INFERENCE_PENDING_ORACLE"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      },
+      {
+        "domain": "textile",
+        "strategy": "GLOBAL",
+        "inputPin": {
+          "repository": "kaicreator-mm/domain-harness",
+          "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+          "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+          "blob": "d53125358455057d9315240e05b6bc038f515241"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 5,
+            "maxDepth": 1,
+            "singleItemScopes": 1,
+            "emptyGroupingScopes": 0,
+            "rootItemCount": 0,
+            "rootRelationCount": 0,
+            "rootGapCount": 0,
+            "globalScopes": 2
+          }
+        },
+        "candidate": {
+          "id": "textile:GLOBAL",
+          "domain": "textile",
+          "strategy": "GLOBAL",
+          "pin": {
+            "repository": "kaicreator-mm/domain-harness",
+            "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+            "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+            "blob": "d53125358455057d9315240e05b6bc038f515241"
+          },
+          "root": "GLOBAL.root",
+          "scopes": [
+            {
+              "id": "GLOBAL.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Root only"
+            },
+            {
+              "id": "textile.woven",
+              "parent": "GLOBAL.root",
+              "kind": "CHILD",
+              "items": [
+                "jacquard"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "textile.surface",
+              "parent": "GLOBAL.root",
+              "kind": "CHILD",
+              "items": [
+                "block-printing",
+                "embroidery"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "textile.global.pattern",
+              "parent": "GLOBAL.root",
+              "kind": "GLOBAL_SEMANTIC",
+              "items": [],
+              "relations": [
+                "dke:rel-pattern-method-roles",
+                "dke:rel-layered-methods-possible"
+              ],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "textile.global.feasibility",
+              "parent": "GLOBAL.root",
+              "kind": "GLOBAL_SEMANTIC",
+              "items": [],
+              "relations": [],
+              "gaps": [
+                "local production availability",
+                "cost",
+                "MOQ",
+                "lead time",
+                "machine suitability",
+                "commercial feasibility"
+              ],
+              "purpose": "Gap scope, not yet an independently viable business capability"
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-X-COMPOSITION",
+                "items": [],
+                "relations": [
+                  "dke:rel-pattern-method-roles",
+                  "dke:rel-layered-methods-possible"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "textile.global.pattern"
+              },
+              {
+                "id": "O-X-COMMERCIAL",
+                "items": [],
+                "relations": [],
+                "gaps": [
+                  "local production availability",
+                  "cost",
+                  "MOQ",
+                  "lead time",
+                  "machine suitability",
+                  "commercial feasibility"
+                ],
+                "relevance": "UNKNOWN",
+                "owner": "textile.global.feasibility"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+          "from": 11,
+          "to": 12,
+          "pass": true,
+          "checks": 15,
+          "owner": "textile.global.pattern",
+          "affectedScopes": [
+            "textile.global.pattern",
+            "GLOBAL.root"
+          ],
+          "invalidatedObligations": [
+            "O-X-COMPOSITION"
+          ],
+          "addedElementIds": [],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TEXTILE_ADD_EXTERNAL_HOLDOUT_RELATION",
+            "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+            "newRelation": "dke:rel-jacquard-printing-aalto-case",
+            "sourceUrl": "https://www.aalto.fi/en/news/the-new-landscapes-in-textile-design-project-is-being-displayed-at-emma-museum",
+            "sourceClass": "UNIVERSITY_PROJECT_REPORT",
+            "status": "DERIVED_INFERENCE_PENDING_ORACLE"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      },
+      {
+        "domain": "textile",
+        "strategy": "RECURSIVE",
+        "inputPin": {
+          "repository": "kaicreator-mm/domain-harness",
+          "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+          "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+          "blob": "d53125358455057d9315240e05b6bc038f515241"
+        },
+        "baseline": {
+          "pass": true,
+          "checks": 15,
+          "metrics": {
+            "elements": 7,
+            "maxDepth": 2,
+            "singleItemScopes": 3,
+            "emptyGroupingScopes": 2,
+            "rootItemCount": 0,
+            "rootRelationCount": 0,
+            "rootGapCount": 6,
+            "globalScopes": 1
+          }
+        },
+        "candidate": {
+          "id": "textile:RECURSIVE",
+          "domain": "textile",
+          "strategy": "RECURSIVE",
+          "pin": {
+            "repository": "kaicreator-mm/domain-harness",
+            "commit": "afdb5d6a840e393d1bcef8c5c1ee89a6fe6c112b",
+            "path": "examples/dis-0.1.0-textile-pattern-selection/fixtures/textile-knowledge.json",
+            "blob": "d53125358455057d9315240e05b6bc038f515241"
+          },
+          "root": "RECURSIVE.root",
+          "scopes": [
+            {
+              "id": "RECURSIVE.root",
+              "parent": null,
+              "kind": "ROOT",
+              "items": [],
+              "relations": [],
+              "gaps": [
+                "local production availability",
+                "cost",
+                "MOQ",
+                "lead time",
+                "machine suitability",
+                "commercial feasibility"
+              ],
+              "purpose": "Root owns unresolved cross domain unknowns"
+            },
+            {
+              "id": "textile.fabric",
+              "parent": "RECURSIVE.root",
+              "kind": "CHILD",
+              "items": [],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Fabric construction context"
+            },
+            {
+              "id": "textile.jacquard",
+              "parent": "textile.fabric",
+              "kind": "CHILD",
+              "items": [
+                "jacquard"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "textile.decoration",
+              "parent": "RECURSIVE.root",
+              "kind": "CHILD",
+              "items": [],
+              "relations": [],
+              "gaps": [],
+              "purpose": "Surface treatment context"
+            },
+            {
+              "id": "textile.print",
+              "parent": "textile.decoration",
+              "kind": "CHILD",
+              "items": [
+                "block-printing"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "textile.embroidery",
+              "parent": "textile.decoration",
+              "kind": "CHILD",
+              "items": [
+                "embroidery"
+              ],
+              "relations": [],
+              "gaps": [],
+              "purpose": ""
+            },
+            {
+              "id": "textile.global.pattern",
+              "parent": "RECURSIVE.root",
+              "kind": "GLOBAL_SEMANTIC",
+              "items": [],
+              "relations": [
+                "dke:rel-pattern-method-roles",
+                "dke:rel-layered-methods-possible"
+              ],
+              "gaps": [],
+              "purpose": ""
+            }
+          ],
+          "sap": {
+            "obligations": [
+              {
+                "id": "O-X-COMPOSITION",
+                "items": [],
+                "relations": [
+                  "dke:rel-pattern-method-roles",
+                  "dke:rel-layered-methods-possible"
+                ],
+                "gaps": [],
+                "relevance": "KNOWLEDGE_ONLY",
+                "owner": "textile.global.pattern"
+              },
+              {
+                "id": "O-X-COMMERCIAL",
+                "items": [],
+                "relations": [],
+                "gaps": [
+                  "local production availability",
+                  "cost",
+                  "MOQ",
+                  "lead time",
+                  "machine suitability",
+                  "commercial feasibility"
+                ],
+                "relevance": "UNKNOWN",
+                "owner": "RECURSIVE.root"
+              }
+            ],
+            "oracle": "NOT_VERIFIED",
+            "independentCritic": "NOT_RUN",
+            "qualified": false,
+            "appAuthorityRef": null,
+            "stale": []
+          },
+          "qualification": {
+            "accepted": false,
+            "disExecuted": false
+          },
+          "flags": {
+            "wholeProductExclusive": false,
+            "knowledgeIsMandatoryRuntime": false
+          },
+          "authoring": "ANALYST_DESIGNED_TEST_CANDIDATE_NOT_AUTONOMOUS_LLM"
+        },
+        "evolution": {
+          "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+          "from": 11,
+          "to": 12,
+          "pass": true,
+          "checks": 15,
+          "owner": "textile.global.pattern",
+          "affectedScopes": [
+            "textile.global.pattern",
+            "RECURSIVE.root"
+          ],
+          "invalidatedObligations": [
+            "O-X-COMPOSITION"
+          ],
+          "addedElementIds": [],
+          "sourceQualification": "NOT_VERIFIED",
+          "sapStillQualified": false,
+          "provenance": {
+            "id": "TEXTILE_ADD_EXTERNAL_HOLDOUT_RELATION",
+            "kind": "ADD_DERIVED_RELATION_FROM_EXTERNAL_OFFICIAL_SOURCE",
+            "newRelation": "dke:rel-jacquard-printing-aalto-case",
+            "sourceUrl": "https://www.aalto.fi/en/news/the-new-landscapes-in-textile-design-project-is-being-displayed-at-emma-museum",
+            "sourceClass": "UNIVERSITY_PROJECT_REPORT",
+            "status": "DERIVED_INFERENCE_PENDING_ORACLE"
+          }
+        },
+        "negatives": [
+          {
+            "name": "missing-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP",
+              "CQ_REFERENCES_COVERED"
+            ]
+          },
+          {
+            "name": "duplicate-item",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_SOURCE_ITEM_OWNERSHIP"
+            ]
+          },
+          {
+            "name": "missing-relation",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "cycle",
+            "rejected": true,
+            "failureIds": [
+              "EXACT_ONE_ROOT",
+              "HIERARCHY_ACYCLIC"
+            ]
+          },
+          {
+            "name": "bad-pin",
+            "rejected": true,
+            "failureIds": [
+              "PIN_AND_AUTHOR_SCOPE"
+            ]
+          },
+          {
+            "name": "unqualified-promoted",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "unapproved-source",
+            "rejected": true,
+            "failureIds": [
+              "SOURCE_STATUS_UNPROMOTED"
+            ]
+          },
+          {
+            "name": "runtime-mandate",
+            "rejected": true,
+            "failureIds": [
+              "NO_UNAUTHORIZED_RUNTIME_MANDATES"
+            ]
+          },
+          {
+            "name": "inference-global-exclusive",
+            "rejected": true,
+            "failureIds": [
+              "CONTEXTUAL_COMPOSITION_NOT_UNIVERSAL_EXCLUSIVITY"
+            ]
+          },
+          {
+            "name": "obligation-owner-unknown",
+            "rejected": true,
+            "failureIds": [
+              "OBLIGATION_OWNERS_EXIST",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          },
+          {
+            "name": "no-relation-owner-after-move",
+            "rejected": true,
+            "failureIds": [
+              "UNIQUE_RELATION_OWNERSHIP",
+              "CQ_REFERENCES_COVERED",
+              "OBLIGATION_RELATIONS_GAPS_OWNED_OR_PARENT"
+            ]
+          }
+        ]
+      }
+    ],
+    "qualification": {
+      "independentReviewer": "NOT_RUN",
+      "actualAutonomousGenerator": "NOT_RUN",
+      "domainOracle": "NOT_VERIFIED",
+      "sapQualified": false
+    }
+  },
+  "graph": {
+    "@graph": [
+      {
+        "@id": "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+        "@type": "se:KnowledgeClaim",
+        "se:SUPPORTED_BY": {
+          "@id": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN"
+        },
+        "se:applicability": "Design-stage security work in organizations adopting SSDF-style practices; depth of risk modeling remains risk-based.",
+        "se:claim_kind": "PRACTICE_CLAIM",
+        "se:created_on": "2026-11-07",
+        "se:evidence_refs": {
+          "@id": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN"
+        },
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The recommendation does not prescribe a modeling notation or a fixed depth of analysis.",
+        "se:record_version": "0.1.0",
+        "se:review_status": "PENDING",
+        "se:scope_description": "NIST SP 800-218 v1.1 Section 2, Table 1, practice PW.1 and tasks PW.1.1-PW.1.2; a government recommendation, not a mandate.",
+        "se:statement": "NIST SSDF v1.1 practice PW.1 recommends designing software to meet security requirements and mitigate security risks, describing secure-by-design attention during design as key for improving software security and helpful to development efficiency, naming threat modeling, attack modeling and attack surface mapping as risk modeling forms, and expecting security requirements, risks and design decisions to be tracked with recorded risk responses, mitigation rationales and periodically re-evaluated exceptions, with any requirement relaxation justified by risk-based analysis."
+      },
+      {
+        "@id": "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+        "@type": "se:KnowledgeClaim",
+        "se:SUPPORTED_BY": {
+          "@id": "se:EVD-07C-SWEBOK-SECURITY-BY-DESIGN"
+        },
+        "se:applicability": "Professional-BOK grounding for lifecycle-integrated security; usable as the professional counterpart to the SSDF secure-by-design and curriculum security-mindset records in this lane.",
+        "se:claim_kind": "PRACTICE_CLAIM",
+        "se:created_on": "2026-11-07",
+        "se:evidence_refs": {
+          "@id": "se:EVD-07C-SWEBOK-SECURITY-BY-DESIGN"
+        },
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": [
+          "No effectiveness evidence is claimed by this lane.",
+          "The Guide itself states there are no bulletproof ways to achieve secure software development."
+        ],
+        "se:record_version": "0.1.0",
+        "se:review_status": "PENDING",
+        "se:scope_description": "SWEBOK Guide v4.0a Chapter 13 section 1; a professional-BOK characterization of a generally accepted belief, not an empirical finding.",
+        "se:statement": "SWEBOK Guide v4.0a KA13 reports a generally accepted belief that it is much better to design security into software than to patch it in after the software is developed, and that designing security in requires considering every development life cycle stage — requirements, design, construction and testing — with security also considered during maintenance, where security faults and loopholes are often introduced, and with vulnerabilities also arising from third-party components."
+      },
+      {
+        "@id": "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE",
+        "@type": "se:KnowledgeClaim",
+        "se:SUPPORTED_BY": {
+          "@id": "se:EVD-07C-SWEBOK-SECURITY-PROPERTIES"
+        },
+        "se:applicability": "Interpreting lifecycle expectations for security properties within SWEBOK-grounded records.",
+        "se:claim_kind": "NORMATIVE_CLAIM",
+        "se:created_on": "2026-11-07",
+        "se:evidence_refs": {
+          "@id": "se:EVD-07C-SWEBOK-SECURITY-PROPERTIES"
+        },
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The sections name the properties without operationalizing how to measure or check them.",
+        "se:record_version": "0.1.0",
+        "se:review_status": "PENDING",
+        "se:scope_description": "SWEBOK Guide v4.0a Chapter 13 sections 1.1-1.2; a professional-BOK 'should' statement, not a compliance requirement.",
+        "se:statement": "SWEBOK Guide v4.0a KA13 states that software engineers should define the security properties of their software and maintain them throughout the software development life cycle, characterizing security as a product quality characteristic and information security as preserving confidentiality, integrity and availability, with authenticity, accountability, non-repudiation and reliability possibly also involved."
+      },
+      {
+        "@id": "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+        "@type": "se:KnowledgeClaim",
+        "se:SUPPORTED_BY": {
+          "@id": "se:EVD-07C-SWEBOK-SECURITY-REQUIREMENTS"
+        },
+        "se:applicability": "Professional-BOK characterization of the security-requirements activity for the requirements-linkage records in this lane.",
+        "se:claim_kind": "PRACTICE_CLAIM",
+        "se:created_on": "2026-11-07",
+        "se:evidence_refs": {
+          "@id": "se:EVD-07C-SWEBOK-SECURITY-REQUIREMENTS"
+        },
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The subsection does not prescribe one elicitation or prioritization technique.",
+        "se:record_version": "0.1.0",
+        "se:review_status": "PENDING",
+        "se:scope_description": "SWEBOK Guide v4.0a Chapter 13 section 4.1; generally accepted KA content, not a mandated process shape.",
+        "se:statement": "SWEBOK Guide v4.0a KA13 characterizes security requirements engineering as elicitation, specification and prioritization informed by threats (illustrated by misuse and abuse cases), threat actors and security risk assessments, holds traceability of security requirements throughout the development process important, notes that the selected life cycle model may impact the order of activities, and expects security requirements to be revisited when the software product is revised."
+      },
+      {
+        "@id": "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES",
+        "@type": "se:KnowledgeClaim",
+        "se:SUPPORTED_BY": {
+          "@id": "se:EVD-07C-SWEBOK-SECURITY-TESTING"
+        },
+        "se:applicability": "Professional-BOK characterization of security verification; complements the SEK-06C testing-lane records, which cover test-execution practices PW.7/PW.8 rather than the dual-purpose framing.",
+        "se:claim_kind": "PRACTICE_CLAIM",
+        "se:created_on": "2026-11-07",
+        "se:evidence_refs": {
+          "@id": "se:EVD-07C-SWEBOK-SECURITY-TESTING"
+        },
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The subsection does not compare detection effectiveness across methods.",
+        "se:record_version": "0.1.0",
+        "se:review_status": "PENDING",
+        "se:scope_description": "SWEBOK Guide v4.0a Chapter 13 section 4.5; generally accepted KA content, not a comparative effectiveness claim.",
+        "se:statement": "SWEBOK Guide v4.0a KA13 assigns security testing two purposes — ensuring that the implemented software meets the security requirements, and verifying that the implementation contains none of the known vulnerabilities — with the former addressable by general testing methods and the latter requiring security-specific methods (static analysis of source or binaries, and authorized dynamic testing such as vulnerability assessment or penetration testing) operated with security expertise and within legal boundaries."
+      },
+      {
+        "@id": "se:CLM-REQ-FUNCTIONAL-DOC-METHODS",
+        "@type": "se:KnowledgeClaim",
+        "se:APPLIES_TO": {
+          "@id": "se:NODE-CS2023-SE-PRODUCT-REQUIREMENTS"
+        },
+        "se:SUPPORTED_BY": {
+          "@id": "se:EVD-REQ-FUNCTIONAL-REQ-METHODS"
+        },
+        "se:applicability": "Reading or teaching the CS2023 SE requirements curriculum; usable by practitioners only as curriculum guidance.",
+        "se:claim_kind": "PRACTICE_CLAIM",
+        "se:created_on": "2026-11-06",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The curriculum does not evaluate which method is superior; it requires understanding of support and trade-offs.",
+        "se:record_version": "0.1.0",
+        "se:review_status": "PENDING",
+        "se:scope_description": "CS2023 SE knowledge unit SE-Requirements: Product Requirements, KA Core topic 1 (subtopics 1a-1c); a curriculum teaching expectation, not a professional-consensus claim.",
+        "se:statement": "In the CS2023 curriculum, functional requirements are to be described using at least one documentation and structuring method (use cases and user stories are the named examples), with explicit attention to how the method supports design and implementation and to the strengths and weaknesses of the specific approach."
+      },
+      {
+        "@id": "se:CLM-TVV-0001",
+        "@type": "se:KnowledgeClaim",
+        "se:APPLIES_TO": {
+          "@id": "se:NODE-CS2023-SE-VALIDATION"
+        },
+        "se:SUPPORTED_BY": {
+          "@id": "se:EVD-TVV-0003"
+        },
+        "se:applicability": "Use as the curriculum's canonical V&V distinction; not a professional-standard definition (SWEBOK hold, ISO 29119 metadata-only).",
+        "se:claim_kind": "DEFINITION",
+        "se:created_on": "2026-11-06",
+        "se:evidence_refs": {
+          "@id": "se:EVD-TVV-0003"
+        },
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The two-question formulation distinguishes conformance-checking from fitness-for-purpose; it does not imply that passing tests proves correctness or that validation equals acceptance.",
+        "se:record_version": "0.1.0",
+        "se:review_status": "PENDING",
+        "se:scope_description": "CS2023 SE-Validation knowledge unit, CS Core topic 1 and CS Core learning outcome 2.",
+        "se:statement": "CS2023's SE-Validation unit defines verification and validation as two distinct questions — verification asks whether the thing is being built right, and validation asks whether the right thing was built — and its learning outcomes expect students to distinguish program validation from verification."
+      },
+      {
+        "@id": "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+        "@type": "se:Evidence",
+        "se:context": "NIST SP 800-218 v1.1 Section 2, Table 1, practice PW.1 and tasks PW.1.1-PW.1.3, printed page 11.",
+        "se:created_on": "2026-11-07",
+        "se:evidence_type": "DIRECT_SOURCE_PARAPHRASE",
+        "se:extraction_status": "EXTRACTED_PENDING_REVIEW",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "A recommendation framed for voluntary adoption; the publication's own ordering note states table order does not imply implementation sequence or relative importance.",
+        "se:method": "Direct inspection of the official NIST PDF on 2026-11-07 at the verified page index; original paraphrase.",
+        "se:record_version": "0.1.0",
+        "se:result": "The secure-by-design intent, the named risk-modeling forms, and the requirements/risks/design-decision tracking with re-evaluated exceptions were confirmed.",
+        "se:source_locator_ref": {
+          "@id": "se:LOC-07C-NIST218-PW1"
+        },
+        "se:statement": "NIST SSDF v1.1 practice PW.1 recommends designing software to meet security requirements and mitigate security risks: identify and evaluate the security requirements for the software, determine what security risks the software is likely to face during operation and how its design and architecture should mitigate those risks, and justify any cases where risk-based analysis indicates that security requirements should be relaxed or waived; the practice states that addressing security requirements and risks during software design (secure by design) is key for improving software security and also helps improve development efficiency. Task PW.1.1 names threat modeling, attack modeling and attack surface mapping as forms of risk modeling; task PW.1.2 tracks and maintains the software's security requirements, risks and design decisions, recording the response to each risk and the rationales for approved exceptions and periodically re-evaluating them.",
+        "se:synthetic": false
+      },
+      {
+        "@id": "se:EVD-07C-SWEBOK-SECURITY-BY-DESIGN",
+        "@type": "se:Evidence",
+        "se:context": "SWEBOK Guide v4.0a Chapter 13 section 1 Software Security Fundamentals (with 1.1/1.2), printed page 13-1.",
+        "se:created_on": "2026-11-07",
+        "se:evidence_type": "DIRECT_SOURCE_PARAPHRASE",
+        "se:extraction_status": "EXTRACTED_PENDING_REVIEW",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The Guide reports this as a generally accepted belief, not as an empirical finding; no effectiveness evidence is cited by this lane.",
+        "se:method": "Direct inspection of the official SWEBOK v4.0a PDF (SHA-256 0c9db4da0b2425c58cf778b99131eb31bb6c188e98b67163a549a1366d96e511) on 2026-11-07; text extracted at the verified page index and paraphrased originally.",
+        "se:record_version": "0.1.0",
+        "se:result": "The design-in preference, the every-stage scope and the third-party introduction of vulnerabilities were confirmed for the professional-BOK scoped claim.",
+        "se:source_locator_ref": {
+          "@id": "se:LOC-07C-SWEBOK-KA13-FUNDAMENTALS"
+        },
+        "se:statement": "SWEBOK v4.0a KA13 reports a generally accepted belief that it is much better to design security into software than to patch it in after the software is developed, and that designing security in requires considering every development life cycle stage — software requirements, design, construction and testing security — with security also considered during maintenance, where security faults and loopholes can be and often are introduced; the same introduction adds that security vulnerabilities are not only introduced during development but also by third-party components such as libraries, COTS and operating systems.",
+        "se:synthetic": false
+      },
+      {
+        "@id": "se:EVD-07C-SWEBOK-SECURITY-PROPERTIES",
+        "@type": "se:Evidence",
+        "se:context": "SWEBOK Guide v4.0a Chapter 13 sections 1.1 and 1.2, printed page 13-1.",
+        "se:created_on": "2026-11-07",
+        "se:evidence_type": "DIRECT_SOURCE_PARAPHRASE",
+        "se:extraction_status": "EXTRACTED_PENDING_REVIEW",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The section names the properties without prescribing measurement procedures.",
+        "se:method": "Direct inspection of the official SWEBOK v4.0a PDF on 2026-11-07 at the verified page index; original paraphrase.",
+        "se:record_version": "0.1.0",
+        "se:result": "The security quality-characteristic definition, the CIA property set with named additional properties, and the maintain-throughout-lifecycle expectation were confirmed.",
+        "se:source_locator_ref": {
+          "@id": "se:LOC-07C-SWEBOK-KA13-FUNDAMENTALS"
+        },
+        "se:statement": "SWEBOK v4.0a KA13 section 1.1 defines security as a product quality characteristic — the degree to which a product or system protects information and data so that persons or other products have data access appropriate to their types and levels of authorization — and section 1.2 characterizes information security as preserving confidentiality, integrity and availability, with authenticity, accountability, non-repudiation and reliability possibly also involved; it states software engineers should define the security properties of their software and maintain them throughout the software development life cycle.",
+        "se:synthetic": false
+      },
+      {
+        "@id": "se:EVD-07C-SWEBOK-SECURITY-REQUIREMENTS",
+        "@type": "se:Evidence",
+        "se:context": "SWEBOK Guide v4.0a Chapter 13 section 4.1, printed pages 13-3 to 13-4.",
+        "se:created_on": "2026-11-07",
+        "se:evidence_type": "DIRECT_SOURCE_PARAPHRASE",
+        "se:extraction_status": "EXTRACTED_PENDING_REVIEW",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The subsection names methods and considerations without prescribing one elicitation or prioritization technique.",
+        "se:method": "Direct inspection of the official SWEBOK v4.0a PDF on 2026-11-07 at the verified page indices; original paraphrase.",
+        "se:record_version": "0.1.0",
+        "se:result": "The activity triple, the threat/risk inputs, the lifecycle-order and revisiting qualifications, and the traceability expectation were confirmed.",
+        "se:source_locator_ref": {
+          "@id": "se:LOC-07C-SWEBOK-KA13-SECURITY-REQUIREMENTS"
+        },
+        "se:statement": "SWEBOK v4.0a KA13 section 4.1 characterizes security requirements engineering as including elicitation, specification and prioritization; it considers threats, illustrated by misuse and abuse cases, threat actors, and security risk assessments, and notes that the selection of life cycle models may impact the order of activities and that software product revision implies a need to revisit security requirements. It states that traceability of security requirements throughout the development process is important and that security teams may include specialists in security requirements.",
+        "se:synthetic": false
+      },
+      {
+        "@id": "se:EVD-07C-SWEBOK-SECURITY-TESTING",
+        "@type": "se:Evidence",
+        "se:context": "SWEBOK Guide v4.0a Chapter 13 section 4.5, printed page 13-5.",
+        "se:created_on": "2026-11-07",
+        "se:evidence_type": "DIRECT_SOURCE_PARAPHRASE",
+        "se:extraction_status": "EXTRACTED_PENDING_REVIEW",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The subsection names method families; it does not compare their detection effectiveness.",
+        "se:method": "Direct inspection of the official SWEBOK v4.0a PDF on 2026-11-07 at the verified page index; original paraphrase.",
+        "se:record_version": "0.1.0",
+        "se:result": "The dual purpose (requirements compliance and known-vulnerability absence), the static/dynamic method split, the expertise requirement and the authorization boundary were confirmed.",
+        "se:source_locator_ref": {
+          "@id": "se:LOC-07C-SWEBOK-KA13-CONSTRUCTION-TESTING"
+        },
+        "se:statement": "SWEBOK v4.0a KA13 section 4.5 gives security testing two purposes: ensuring that the implemented software meets the security requirements, and verifying that the software implementation contains none of the known vulnerabilities. Whereas general software testing methods can handle the former, the latter requires security-specific methods: static analysis, conducted on source code or compiled binaries, where automation plays a significant role but the expertise of security professionals is required to properly operate and configure the tools and verify the results; and dynamic testing, typically vulnerability assessment or penetration testing (also called ethical hacking), which should always be conducted within legal boundaries and with proper authorization so as to remain distinguishable from illegal hacking.",
+        "se:synthetic": false
+      },
+      {
+        "@id": "se:EVD-REQ-FUNCTIONAL-REQ-METHODS",
+        "@type": "se:Evidence",
+        "se:context": "SE-Requirements: Product Requirements, KA Core topic 1 with subtopics 1a-1c.",
+        "se:created_on": "2026-11-06",
+        "se:evidence_type": "DIRECT_SOURCE_PARAPHRASE",
+        "se:extraction_status": "EXTRACTED_PENDING_REVIEW",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The curriculum names example methods only; it does not rank use cases against user stories.",
+        "se:method": "Read the SE-Requirements topic list in the extracted full text on 2026-11-06; heading-anchored KU locator.",
+        "se:record_version": "0.1.0",
+        "se:result": "Topic 1 and subtopics 1a-1c were confirmed against the verbatim extraction.",
+        "se:source_locator_ref": {
+          "@id": "se:LOC-CS2023-SE-REQ-KU"
+        },
+        "se:statement": "CS2023 asks students to describe functional requirements using at least one method of documenting and structuring them, giving use cases and user stories as examples, to understand how the chosen method supports design and implementation, and to weigh the strengths and weaknesses of a specific approach.",
+        "se:synthetic": false,
+        "se:uncertainty": "The KU subsection's printed page number was not independently confirmed; heading-anchored citation is used."
+      },
+      {
+        "@id": "se:EVD-TVV-0003",
+        "@type": "se:Evidence",
+        "se:context": "The unit's foundational concept topic and its paired CS Core learning outcome.",
+        "se:created_on": "2026-11-06",
+        "se:evidence_type": "DIRECT_SOURCE_PARAPHRASE",
+        "se:extraction_status": "EXTRACTED_PENDING_REVIEW",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The two-question formulation is a curriculum teaching device; the source does not elaborate when each question is fully answered.",
+        "se:method": "Full-text extraction of the official Body of Knowledge PDF on 2026-11-06; heading-anchored topic text.",
+        "se:record_version": "0.1.0",
+        "se:source_locator_ref": {
+          "@id": "se:LOC-CS2023-SE-VALIDATION-KU"
+        },
+        "se:statement": "CS Core topic 1 of the SE-Validation unit distinguishes verification (\"Are we building the thing right?\") from validation (\"Did we build the right thing?\"); illustrative learning outcome 2 expects students to distinguish between program validation and verification.",
+        "se:synthetic": false
+      },
+      {
+        "@id": "se:EVD-TVV-0009",
+        "@type": "se:Evidence",
+        "se:context": "Development-cycle embedding of V&V activities in the SE-Validation unit.",
+        "se:created_on": "2026-11-06",
+        "se:evidence_type": "DIRECT_SOURCE_PARAPHRASE",
+        "se:extraction_status": "EXTRACTED_PENDING_REVIEW",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": "The tradeoff is presented qualitatively; no quantitative thresholds are given.",
+        "se:method": "Full-text extraction of the official Body of Knowledge PDF on 2026-11-06; heading-anchored topic text.",
+        "se:record_version": "0.1.0",
+        "se:source_locator_ref": {
+          "@id": "se:LOC-CS2023-SE-VALIDATION-KU"
+        },
+        "se:statement": "KA Core topic 8 covers verification and validation in the development cycle through code reviews, test automation including automation of tooling, pre-commit and post-commit testing, tradeoffs between test coverage and the throughput/latency of testing, and defect tracking and prioritization including reproducibility of reported defects; illustrative learning outcomes 14 and 15 ask students to explain the roles, pros and cons of pre-commit versus post-commit testing and to discuss the coverage versus throughput/latency tradeoff and its impact on verification.",
+        "se:synthetic": false
+      },
+      {
+        "@id": "se:EVD-TVV-0011",
+        "@type": "se:Evidence",
+        "se:context": "RV group structure spanning ongoing identification, risk-based disposition and root-cause learning.",
+        "se:created_on": "2026-11-06",
+        "se:evidence_type": "DIRECT_SOURCE_PARAPHRASE",
+        "se:extraction_status": "EXTRACTED_PENDING_REVIEW",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:limitations": [
+          "Framework structure of SP 800-218 v1.1 only; not a universal vulnerability-management taxonomy.",
+          "Practice order in the group does not imply implementation sequence."
+        ],
+        "se:method": "Page-level inspection of the locally downloaded official NIST PDF (SHA-256 recorded in SEK-06C observation); practices anchored at printed pages 16-18.",
+        "se:record_version": "0.1.0",
+        "se:source_locator_ref": {
+          "@id": "se:LOC-NIST-218-RV"
+        },
+        "se:statement": "The Respond to Vulnerabilities (RV) group of NIST SSDF v1.1 comprises three practices: RV.1 identify and confirm vulnerabilities on an ongoing basis, with task RV.1.2 reviewing, analyzing and/or testing the software's code to identify or confirm previously undetected vulnerabilities and explicitly cross-referencing PW.7 and PW.8; RV.2 assess, prioritize and remediate vulnerabilities so that remediation occurs in accordance with risk, with task RV.2.1 analyzing each vulnerability to gather sufficient risk information to plan remediation or another risk response; and RV.3 analyze vulnerabilities to identify their root causes, with task RV.3.1 determining the root causes of each vulnerability.",
+        "se:synthetic": false
+      },
+      {
+        "@id": "se:NODE-CS2023-SE-VALIDATION",
+        "@type": "se:TaxonomyNode",
+        "se:SUPPORTED_BY": {
+          "@id": "se:EVD-TVV-0001"
+        },
+        "se:created_on": "2026-11-06",
+        "se:definition": "The CS2023 Software Engineering knowledge unit \"SE-Validation: Software Verification and Validation\", carrying 1 CS Core hour and 3 KA Core hours and covering verification/validation concepts, testing objectives and test kinds, test planning and coverage, test development, V&V in the development cycle, domain-specific V&V challenges, and V&V tooling topics.",
+        "se:evidence_refs": [
+          {
+            "@id": "se:EVD-TVV-0001"
+          },
+          {
+            "@id": "se:EVD-TVV-0002"
+          }
+        ],
+        "se:label": "CS2023 SE-Validation Software Verification and Validation unit",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:node_kind": "KNOWLEDGE_UNIT",
+        "se:record_version": "0.1.0",
+        "se:view_ref": {
+          "@id": "se:VIEW-CS2023-SE"
+        }
+      },
+      {
+        "@id": "se:NODE-SSDF-RV",
+        "@type": "se:TaxonomyNode",
+        "se:CROSS_CUTS": {
+          "@id": "se:NODE-CS2023-SE-VALIDATION"
+        },
+        "se:SUPPORTED_BY": {
+          "@id": "se:EVD-TVV-0011"
+        },
+        "se:created_on": "2026-11-06",
+        "se:definition": "The \"Respond to Vulnerabilities\" (RV) practice group of NIST SP 800-218 v1.1, comprising three practices: RV.1 identify and confirm vulnerabilities on an ongoing basis, RV.2 assess, prioritize and remediate vulnerabilities, and RV.3 analyze vulnerabilities to identify their root causes.",
+        "se:evidence_refs": {
+          "@id": "se:EVD-TVV-0011"
+        },
+        "se:label": "SSDF Respond to Vulnerabilities group",
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:node_kind": "PRACTICE_GROUP",
+        "se:record_version": "0.1.0",
+        "se:view_ref": {
+          "@id": "se:VIEW-SSDF-SECURITY"
+        }
+      },
+      {
+        "@id": "se:REL-TVV-0020",
+        "@type": "se:RelationshipAssertion",
+        "se:context": "The SSDF RV group's ongoing code review/analysis/test task and record/triage flow cut across the curriculum unit that teaches testing and defect tracking.",
+        "se:created_on": "2026-11-06",
+        "se:evidence_refs": [
+          {
+            "@id": "se:EVD-TVV-0009"
+          },
+          {
+            "@id": "se:EVD-TVV-0011"
+          }
+        ],
+        "se:lifecycle_status": "PENDING_REVIEW",
+        "se:object_ref": {
+          "@id": "se:NODE-CS2023-SE-VALIDATION"
+        },
+        "se:predicate": {
+          "@id": "se:CROSS_CUTS"
+        },
+        "se:qualifiers": [
+          "RV.1.2 explicitly cross-references PW.7/PW.8 testing practices, motivating the intersection",
+          "secure-development vulnerability response intersects the curriculum V&V unit's testing and defect-tracking topics",
+          "views remain separate: SSDF recommendation framework versus CS2023 curriculum; no merge implied"
+        ],
+        "se:rationale": "Cross-view intersection is recorded as a typed edge rather than by merging taxonomy nodes from different views.",
+        "se:record_version": "0.1.0",
+        "se:subject_ref": {
+          "@id": "se:NODE-SSDF-RV"
+        }
+      }
+    ]
+  },
+  "textile": {
+    "id": "textile.process-knowledge",
+    "revision": "1.0.0",
+    "authority": "REFERENCE",
+    "sources": [
+      {
+        "id": "ncsu-studio",
+        "authority": "NC State Wilson College of Textiles",
+        "url": "https://textiles.ncsu.edu/industry/labs-and-facilities/weaving-studio/",
+        "locator": "Weaving Studio; Unique Capabilities; Equipment (lines 64–88)",
+        "accessed": "2026-11-07",
+        "supports": "Teaching and sampling equipment including individual-thread-control Jacquard.",
+        "limitations": "Institutional capabilities do not establish supplier availability or feasibility."
+      },
+      {
+        "id": "ncsu-lab",
+        "authority": "NC State Zeis Textiles Extension",
+        "url": "https://textiles.ncsu.edu/zte/weaving-lab/",
+        "locator": "Weaving Lab; What is Shedding?; Whats is dobby shedding?; What is jacquard shedding? (lines 35–40, 90–101)",
+        "accessed": "2026-11-07",
+        "supports": "Shedding distinguishes cam, dobby and individual-warp Jacquard control.",
+        "limitations": "Not machine suitability or production instructions."
+      },
+      {
+        "id": "gwu-traditions",
+        "authority": "George Washington University Museum and The Textile Museum",
+        "url": "https://museum.gwu.edu/textile-traditions",
+        "locator": "Block Printing in India (114–116); Suzani in Uzbekistan (129–131); Jacquard in Japan (140–142)",
+        "accessed": "2026-11-07",
+        "supports": "Printing applies pattern to cloth, embroidery uses stitching, and Jacquard forms design during weaving.",
+        "limitations": "No claim about a synthetic brief belonging to a named cultural tradition."
+      },
+      {
+        "id": "nps-weaves",
+        "authority": "U.S. National Park Service",
+        "url": "https://www.nps.gov/articles/000/weaving-patterns.htm",
+        "locator": "Weaving Patterns (19–25); Plain Weave (26–36); Twill (37–49); Satin (52–54)",
+        "accessed": "2026-11-07",
+        "supports": "Warp/weft interlacing and weave structure affect cloth properties.",
+        "limitations": "Weave structure is distinct from surface decoration."
+      }
+    ],
+    "rules": [
+      {
+        "id": "jacquard",
+        "placement": "structure",
+        "surfaceMethod": null,
+        "enabled": true,
+        "sources": [
+          "ncsu-studio",
+          "ncsu-lab",
+          "gwu-traditions",
+          "nps-weaves"
+        ]
+      },
+      {
+        "id": "block-printing",
+        "placement": "surface",
+        "surfaceMethod": "print",
+        "enabled": true,
+        "sources": [
+          "gwu-traditions"
+        ]
+      },
+      {
+        "id": "embroidery",
+        "placement": "surface",
+        "surfaceMethod": "stitch",
+        "enabled": true,
+        "sources": [
+          "gwu-traditions"
+        ]
+      }
+    ],
+    "unresolved": [
+      "local production availability",
+      "cost",
+      "MOQ",
+      "lead time",
+      "machine suitability",
+      "commercial feasibility"
+    ],
+    "limitations": [
+      "Candidate sample-planning only; supplier and sample validation required."
+    ]
+  },
+  "projectionGraphIds": [
+    "se:CLM-07C-NIST-SECURE-BY-DESIGN",
+    "se:CLM-07C-SWEBOK-SECURITY-BY-DESIGN",
+    "se:CLM-07C-SWEBOK-SECURITY-PROPERTIES-LIFECYCLE",
+    "se:CLM-07C-SWEBOK-SECURITY-REQUIREMENTS-SCOPE",
+    "se:CLM-07C-SWEBOK-SECURITY-TESTING-PURPOSES",
+    "se:CLM-REQ-FUNCTIONAL-DOC-METHODS",
+    "se:CLM-TVV-0001",
+    "se:EVD-07C-NIST-PW1-SECURE-BY-DESIGN",
+    "se:EVD-07C-SWEBOK-SECURITY-BY-DESIGN",
+    "se:EVD-07C-SWEBOK-SECURITY-PROPERTIES",
+    "se:EVD-07C-SWEBOK-SECURITY-REQUIREMENTS",
+    "se:EVD-07C-SWEBOK-SECURITY-TESTING",
+    "se:EVD-REQ-FUNCTIONAL-REQ-METHODS",
+    "se:EVD-TVV-0003",
+    "se:EVD-TVV-0009",
+    "se:EVD-TVV-0011",
+    "se:NODE-CS2023-SE-VALIDATION",
+    "se:NODE-SSDF-RV",
+    "se:REL-TVV-0020"
+  ]
+}

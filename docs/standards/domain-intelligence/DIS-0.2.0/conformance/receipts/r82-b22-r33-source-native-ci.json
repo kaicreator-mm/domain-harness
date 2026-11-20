@@ -1,0 +1,75 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r82-b22-r33-source-native-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "B22_R82_ORIGINAL_DKE_R33_GO_TRIAGE_SELECTED_NATIVE_KNOWLEDGE",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "fe2334e63d39a9c006746caad695f7e3c5ade97d",
+    "tree": "e458b65cb718fd399915d22e0a35ebe8611dc99b"
+  },
+  "originCommit": "93ad2e22bebfc57b158a6f8e0efc370ebc78ddb2",
+  "testPath": "examples/dis-v020-native-sdk/b22-r33-go-triage-native.test.mjs",
+  "testGitBlob": "a0eb607aeca433109a703b2e699c2eb719f5ed96",
+  "readerPath": "examples/dis-v020-native-sdk/dke-r33-go-reader.mjs",
+  "readerGitBlob": "650a0690774698b30992cddeed7791e6093f3b2d",
+  "producer": {
+    "repository": "kaicreator-mm/domain-forge",
+    "head": "9104928912cc808ee76658968c3a1febe3afd799",
+    "path": "docs/standards/dke/DKE-0.0.1/demos/knowledge-solidification-rv-r0/cross-domain-r8/executions/r33-go-ic-source-triage/RUN_RECEIPT_R33_R1.json",
+    "gitBlob": "8e77f2a2b518c2cf5151b8f2b1e6707287ed33f6"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2397/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2397/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2397/3"
+    }
+  ],
+  "observations": [
+    "Actual source-selected AOT/SDK/KDP consumes original DKE R33 910476-row source-scoped GO disposition receipt via DATA and independently pinned LOCAL reader.",
+    "233 QUARANTINE_FATAL, 3769 REVIEW_SOFT and 906474 STRUCTURAL_CANDIDATE are returned as typed UNKNOWN with no SAP, Effect or independent Critic.",
+    "#2395 clone-step egress FAILURE all three contexts was followed by unchanged SHA #2396 3/3 SUCCESS; #2397 3/3 SUCCESS on bounded clone retry new SHA, all four actual native R33 cases pass.",
+    "Negative tests block forged original DATA/reader pin and origin, unselected source and stale AOT digest before KDP business use."
+  ],
+  "limitations": [
+    "Original GO source classifications do not prove semantic biology, each individual row, publisher rights, independently accepted DKE SAP or production Effect.",
+    "DIS CORE-002/005/008/016 remain PARTIAL, optional 4 NOT_RUN, governance NOT_RUN, no L2 Freeze/merge/release.",
+    "Closeout commit's own CI is separate from the exact original qualifying native code head and may remain pending."
+  ],
+  "repairHistory": [
+    {
+      "sourceHead": "93ad2e22bebfc57b158a6f8e0efc370ebc78ddb2",
+      "status": "SOURCE_CANDIDATE"
+    },
+    {
+      "sourceHead": "6898ba93bed8362d382078380f2b6aa9a594528d",
+      "pipeline": "#2395",
+      "status": "NOT_QUALIFIED",
+      "finding": "3/3 first runs failed clone HTTP2/SSL egress exit 128 before npm or native tests"
+    },
+    {
+      "sourceHead": "6898ba93bed8362d382078380f2b6aa9a594528d",
+      "pipeline": "#2396",
+      "status": "QUALIFIED",
+      "finding": "same-SHA API rerun 3/3 SUCCESS"
+    },
+    {
+      "sourceHead": "fe2334e63d39a9c006746caad695f7e3c5ade97d",
+      "pipeline": "#2397",
+      "status": "QUALIFIED",
+      "finding": "bounded clone retry patched; fresh 3/3 SUCCESS"
+    }
+  ]
+}

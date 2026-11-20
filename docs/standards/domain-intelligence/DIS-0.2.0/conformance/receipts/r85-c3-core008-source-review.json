@@ -1,0 +1,76 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r85-c3-core008-source-review",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "C3_APPROVED_LINUX_X64_NODE_TARGET_STRUCTURAL_EXACT_SHA_SOURCE_REVIEW",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "989a5858ac1393bdecbf20f0344df9c56a889fa6",
+    "tree": "7c0328bfedb40fe4ea9e79e710f0f30d81f11d70"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2411/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2411/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2411/3"
+    }
+  ],
+  "implementation": {
+    "exactHead": "1c9826bcfecdbd83c57a466e624eec4defb29604",
+    "tree": "275fb915dc136b91e04c7ab66de2cbcc80eb9aab",
+    "testPath": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+    "testGitBlob": "a59f5c7e4b36803c957db729b9a5a1a1380679a8",
+    "woodpecker": [
+      "https://ci.kaicreator.com/repos/18/pipeline/2410/1",
+      "https://ci.kaicreator.com/repos/18/pipeline/2410/2",
+      "https://ci.kaicreator.com/repos/18/pipeline/2410/3"
+    ]
+  },
+  "authority": {
+    "productIssue": 1496,
+    "approvalComment": 6777762870,
+    "originalApprovalGitBlob": "7f0d195849647282fad09a53a117b4f3a705b138",
+    "approvedTarget": {
+      "platform": "linux",
+      "architecture": "x64",
+      "runtime": "node"
+    }
+  },
+  "review": {
+    "source": "Fresh reviewer in new ChatGPT reasoning context; GitHub authenticated identity is same org account, not a different human",
+    "admitted": "CORE008_VERIFIED_TARGET_STRUCTURAL_ONLY",
+    "p0": 0,
+    "p1Repaired": 1,
+    "p1Open": 0,
+    "p2Open": 2
+  },
+  "fixed": [
+    "Stale Target unapproved blocker in Matrix and closure plan",
+    "False mandatory per-OS distinct source bytes",
+    "DKE SAP incorrectly used as C3 structural prereq",
+    "Missing existing forged B05 selected module-roster negative anchor"
+  ],
+  "evidence": [
+    "B03 selected original BUILD Package module/source SHA exact roster and missing/forged Target negatives",
+    "B03 installer independent Target/AOT/source mismatch refusal",
+    "B05 actual Linux x64 Node Host, complete independent all-consumed-source pins, original Tally Runx xDownload KDP native observation, forged Target/Host/source negatives"
+  ],
+  "limits": [
+    "No Windows or Android OS conformance; approved Demo applies linux/x64/node only",
+    "Native Host process proof not hardware attestation or hostile native sandbox",
+    "DKE semantic SAP remains independent C1 CORE-002/005; no Effect or release authority",
+    "Historical R84 receipt remains immutable; its earlier PARTIAL interpretation superseded",
+    "Future modified repair HEAD must obtain new Woodpecker 3/3; #2411 belongs to previous exact SHA"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@domain-harness/dis-v020-evolution-compact-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check demo.mjs",
+    "test": "node demo.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

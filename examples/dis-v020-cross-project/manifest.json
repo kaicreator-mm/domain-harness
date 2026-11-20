@@ -1,0 +1,139 @@
+{
+  "schema": "dis.v0.2.cross-project-demo/1",
+  "origin": "kaicreator-mm",
+  "consumers": [
+    {
+      "id": "tally",
+      "repository": "kaicreator-mm/tally",
+      "sourceCommit": "e988321439f65b55936a691c02250b6d62a29409",
+      "domainId": "tally-engineering",
+      "sources": [
+        {
+          "file": "tally/business.mjs",
+          "originalPath": "packages/tally-engineering-business/src/index.mjs",
+          "gitBlob": "54015fb63ffb13b4f4e562f660d2172098b5f7f4"
+        },
+        {
+          "file": "tally/release-readiness.mjs",
+          "originalPath": "packages/tally-engineering-business/src/release-readiness.mjs",
+          "gitBlob": "2d4d6e7462156e4466192a0ed3207ac76fd288e1"
+        }
+      ],
+      "elements": [
+        {
+          "id": "tally.tasks",
+          "description": "工程 Task 的 Claim/Evidence 评估",
+          "functions": [
+            {
+              "id": "assessTaskEvidence",
+              "exportName": "assessTaskEvidence",
+              "source": "tally/business.mjs",
+              "implementation": "rule",
+              "effects": "none"
+            },
+            {
+              "id": "describeBusinessPolicy",
+              "exportName": "getPolicy",
+              "source": "tally/business.mjs",
+              "implementation": "knowledge",
+              "effects": "none"
+            }
+          ]
+        },
+        {
+          "id": "tally.release",
+          "description": "独立 RQ 授权前的证据投影",
+          "dependsOn": [
+            "tally.tasks"
+          ],
+          "functions": [
+            {
+              "id": "projectReleaseReadiness",
+              "exportName": "projectReleaseReadiness",
+              "source": "tally/release-readiness.mjs",
+              "implementation": "rule",
+              "effects": "none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "runx",
+      "repository": "kaicreator-mm/runx",
+      "sourceCommit": "b9e0c953d9bfd5834315012426fd8e10c21bdd7c",
+      "domainId": "execution-environment",
+      "sources": [
+        {
+          "file": "runx/environment-agent-presence.ts",
+          "originalPath": "packages/control-plane/src/environment-agent-presence.ts",
+          "gitBlob": "b2c669537a56638aeead4f55914533b00fe3935e"
+        }
+      ],
+      "elements": [
+        {
+          "id": "runx.agent.presence",
+          "description": "已观察 Agent incarnation 的进程内状态型能力",
+          "functions": [
+            {
+              "id": "createPresenceObserver",
+              "exportName": "EnvironmentAgentPresence",
+              "source": "runx/environment-agent-presence.ts",
+              "implementation": "stateful",
+              "effects": "none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "xdownload",
+      "repository": "kaicreator-mm/xDownload",
+      "sourceCommit": "e904f08c478b15147b1c07fbe53c610d2d81851f",
+      "domainId": "downloads",
+      "sources": [
+        {
+          "file": "xdownload/business-download.mjs",
+          "originalPath": "packages/download-domain-app/src/business/business-download.mjs",
+          "gitBlob": "a7dba9a896de0b84fc6d54093563adca2ccbcdfc"
+        },
+        {
+          "file": "xdownload/capability-acquisition-stub.mjs",
+          "originalPath": "packages/download-domain-app/src/business/capability-acquisition-stub.mjs",
+          "gitBlob": "2bfa722f88abade392b33964820ea178c072ef39"
+        }
+      ],
+      "elements": [
+        {
+          "id": "downloads.confirmation",
+          "description": "确认下载 Intent 与字节预算",
+          "functions": [
+            {
+              "id": "describeDownloadPolicy",
+              "exportName": "getPolicy",
+              "source": "xdownload/business-download.mjs",
+              "implementation": "knowledge",
+              "effects": "none"
+            }
+          ]
+        },
+        {
+          "id": "downloads.acquisition",
+          "description": "受 KDP permit 约束的真实外部采集 Effect",
+          "dependsOn": [
+            "downloads.confirmation"
+          ],
+          "functions": [
+            {
+              "id": "acquire",
+              "exportName": "acquire",
+              "source": "xdownload/capability-acquisition-stub.mjs",
+              "implementation": "external-effect",
+              "effects": "non-idempotent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

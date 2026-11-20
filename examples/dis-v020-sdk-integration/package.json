@@ -1,0 +1,10 @@
+{
+  "name": "@kaicreator-example/dis-v020-sdk-integration",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check test.mjs",
+    "test": "node --test test.mjs"
+  },
+  "description": "DIS 0.2.0 actual Microkernel internal gate consumption; no extra Node version gate"
+}

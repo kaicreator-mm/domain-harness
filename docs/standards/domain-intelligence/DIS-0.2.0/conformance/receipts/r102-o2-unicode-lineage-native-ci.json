@@ -1,0 +1,56 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r102-o2-unicode-lineage-native-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "R101_P2_03_UNICODE_DEFAULT_IGNORABLE_CANONICAL_LINEAGE_NATIVE",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "9c1f894a566551b486a29175e5ba60bee4ed37e8",
+    "tree": "fe3dc737b5025f5bc1e7314a2b8ef61d0368cc6e"
+  },
+  "native": {
+    "o2Helper": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-gate.mjs",
+      "gitBlob": "2f82147348ceb39b8577f3c982b1f968fe72c3ca",
+      "originCommit": "2490e7655f79b6f3c40e7dd2f395b1dddab738f2"
+    },
+    "o2Test": {
+      "path": "examples/dis-v020-native-sdk/o2-experience-native.test.mjs",
+      "gitBlob": "f59286c8844c5fdfcb50c2be944a8adffa85fd32"
+    },
+    "integrationYaml": {
+      "path": ".woodpecker/dis-v020-integration.yaml",
+      "gitBlob": "e6716e4bc460f77e1374502f30a3be1cf971ce3f"
+    },
+    "sourceEvidenceTrace": "r102-o2-unicode-lineage-postrepair-ci.json"
+  },
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2475/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2475/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2475/3"
+    }
+  ],
+  "observations": [
+    "R101 independent Reviewer R101-P2-03 found Unicode Default_Ignorable source/case/run aliases falsely independent in both dedupe and three-way partitions.",
+    "Original R102 helper source and native test Git Blobs were retrieved from matching immutable historical commit and the source origin commit is exact-pinned by native AOT/SDK/KDP suite.",
+    "R102 registers three exact existing native negative test anchors; no new test claim or rewrites to R102 standalone historical report.",
+    "Original implementation + native test + Matrix HEAD 9c1f894a566551b486a29175e5ba60bee4ed37e8 Tree fe3dc737b5025f5bc1e7314a2b8ef61d0368cc6e GitHub #2475/1-3 success."
+  ],
+  "limits": [
+    "Only O2 canonicality engineering is qualified by this receipt, not a trusted Experience issuer, independently authenticated cohort source, Domain Validator or real result reuse.",
+    "Current documentation/Matrix registration is a later Git HEAD and must have its own CI; historical #2475 does not transfer.",
+    "No post-repair independent R103 Reviewer approval, Tally Source Owner/semantic Oracle/SAP, Effect, L2 or Release authority."
+  ]
+}

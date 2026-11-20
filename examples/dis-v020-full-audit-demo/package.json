@@ -1,0 +1,12 @@
+{
+  "name": "@domain-harness/dis-v020-full-audit-compact",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check demo.mjs",
+    "test": "node demo.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

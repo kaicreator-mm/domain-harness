@@ -1,0 +1,102 @@
+{
+  "schema": "dis.v0.2.r83.source-authority-finite-model/1",
+  "recordedDate": "2026-11-10",
+  "authority": {
+    "demoIssue": 1499,
+    "productIssue": 1496,
+    "implementationPR": 1497,
+    "relatedDkeIssue": 209
+  },
+  "execution": {
+    "engine": "CONNECTED_GITHUB_SOURCE_EXACT_HOSTED_V8",
+    "nodeCli": "VERSIONED_BUT_NOT_EXECUTED_IN_THIS_HOST",
+    "originBaseHead": "74264821ac6af7da952af003d39e16e2f0e0e4dc",
+    "branch": "experiment/dis-v020-r83-source-authority-model-r0",
+    "programBlobs": {
+      "model": "bca64ed278d3e12ee4a0e65533c89901eb94157d",
+      "test": "b634bd7a99ab013f84e5d9367a6fc18a9546b7ec",
+      "nodeRunner": "e83c3f14c9645627d86a4c6562c3eb085d2c5b05"
+    },
+    "testScope": "literal Git-retrieved model+test source executed on literal JSON from Git on original R82 HEAD"
+  },
+  "originalSources": {
+    "dkeR33Source": "kaicreator-mm/domain-forge@9104928912cc808ee76658968c3a1febe3afd799",
+    "originalDkeReceiptGitBlob": "8e77f2a2b518c2cf5151b8f2b1e6707287ed33f6",
+    "originalGafSha256": "a0afba19dfb1f8fa996bc1bdcd61fd0c9bd4cf0d2bf2509d09ac86993c0e70a2",
+    "originalRows": 910476,
+    "dispositions": {
+      "QUARANTINE_FATAL": 233,
+      "REVIEW_SOFT": 3769,
+      "STRUCTURAL_CANDIDATE": 906474
+    },
+    "r33IndependentSemanticCritic": "NOT_RUN",
+    "sapApproved": 0,
+    "effectsAllowed": 0
+  },
+  "nativeB22": {
+    "qualifiedSourceHead": "fe2334e63d39a9c006746caad695f7e3c5ade97d",
+    "qualifiedSourceTree": "e458b65cb718fd399915d22e0a35ebe8611dc99b",
+    "testGitBlob": "a0eb607aeca433109a703b2e699c2eb719f5ed96",
+    "readerGitBlob": "650a0690774698b30992cddeed7791e6093f3b2d",
+    "qualifiedCi": [
+      "#2397/1 SUCCESS native",
+      "#2397/2 SUCCESS verify-min-node",
+      "#2397/3 SUCCESS verify"
+    ],
+    "versionedB22Manifest": "docs/standards/domain-intelligence/DIS-0.2.0/conformance/batches/B22/manifest.json",
+    "boundedDemoRoundCount": "36/36",
+    "coreQualifiedBounded": "12/16",
+    "corePartial": "4/16",
+    "optional": "4 NOT_RUN",
+    "governance": "1 NOT_RUN",
+    "newestR82CloseoutHead": "74264821ac6af7da952af003d39e16e2f0e0e4dc",
+    "newestR82CloseoutCI": [
+      "#2398/1 FAILURE",
+      "#2398/2 FAILURE",
+      "#2398/3 FAILURE"
+    ],
+    "newestR82FailureStage": "UNKNOWN_UNAVAILABLE_CI_STEP_LOG",
+    "note": "Prior exact original native head (#2397) SUCCESS does not imply new R82 index-commit HEAD (#2398) has passed; failure root cause not determined."
+  },
+  "formal": {
+    "verdict": "SOURCE_EXACT_BOUNDARY_MODEL_PASS",
+    "sourceDispositionCount": 3,
+    "booleanFields": [
+      "sourcePin",
+      "rowMembership",
+      "independentCritic",
+      "ownerAccepted",
+      "evidenceValidated",
+      "targetMatched",
+      "kdpPermit",
+      "policyPermit"
+    ],
+    "enumeratedStates": 768,
+    "violations": 0,
+    "realQualifiedRows": 0,
+    "realEffects": 0,
+    "realR33TypedOutcome": "UNKNOWN",
+    "hypotheticalFuturePolicyPositiveStates": 8,
+    "negativeMutationCases": 12,
+    "negativeMutationsRejected": 12,
+    "missingGateCounterexampleCount": 5,
+    "unsoundEffectRuleCounterexampleCount": 1,
+    "notAProofOf": [
+      "original biological semantics",
+      "independent Critic or Owner ReviewDecision",
+      "row membership in publisher data",
+      "actual physical platform/Effect",
+      "unbounded implementation correctness",
+      "current HEAD CI success"
+    ]
+  },
+  "firstFailureAndRepair": {
+    "initialFail": "Test batch-candidate forged B22 round status did not reject in initial model",
+    "repair": "Added manifest round status, no pending/unstarted, qualificationChecks 3/3 exact-context and round checks cross-matched to native original receipt",
+    "retainedNegative": "batch-candidate mutation now rejected B22_BATCH_INTEGRITY_INVALID",
+    "sourceModelBlobAfterRepair": "bca64ed278d3e12ee4a0e65533c89901eb94157d"
+  },
+  "final": true,
+  "qualification": "BOUNDED_FORMAL_EVIDENCE_ONLY_NO_CORE_OR_DKE_EV_PROMOTION",
+  "release": "BLOCKED"
+}

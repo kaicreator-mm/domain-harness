@@ -1,0 +1,75 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r52-b07-function-dependency-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f",
+    "tree": "6fecc2a8c48f69996113d4f4d4fce1f037d79bcf"
+  },
+  "originCommit": "f2130918d9863aeabd36227886c05cc44c5670cd",
+  "testGitBlob": "c579299182569a5641683ec93a624eaba703e94b",
+  "testPath": "examples/dis-v020-native-sdk/b07-function-dependency.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/3"
+    }
+  ],
+  "observations": [
+    "R52 native source and explicit two-Function static dependency tests are Git-committed; not qualified until exact CI.",
+    "Historic v0.2 dependsOn-only programs remain backward-compatible; no KDP execution permission follows from declaration."
+  ],
+  "limitations": [
+    "Function binding is compile-time static AOT declaration, not runtime invoke authorization, independent SAP or semantic Oracle.",
+    "Existing dependsOn-only AOTs remain compatible; selected Target, original source pins and existing KDP permission checks unchanged.",
+    "B07-02 is CI_PENDING; B07-03 NOT_STARTED; no Core state promotion."
+  ],
+  "historical": [
+    {
+      "head": "f2130918d9863aeabd36227886c05cc44c5670cd",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Independent original source commit; final cumulative source only receives actual full suite qualification."
+    },
+    {
+      "head": "ad9dc888e037be153d3659bf5708cfcbe834816c",
+      "ciStatus": "HISTORICAL_INCOMPLETE",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2304/1",
+      "note": "Old branch build not accepted, did not have three successful contexts; not used for qualification."
+    },
+    {
+      "head": "0918e6eb25bc6010b9a31ad58b71fe7e00f4ae3f",
+      "tree": "6fecc2a8c48f69996113d4f4d4fce1f037d79bcf",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2305/3"
+        }
+      ],
+      "meaning": "Original immutable test Git Blob replayed in cumulative R52+R53 exact full source and 3/3 Woodpecker PASS."
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+# DIS v0.2.0 — CORE-003 R73 typed KDP Intent I/O (source-selected)
+Status: SOURCE_COMMITTED, **fresh exact-SHA native CI pending**. No new B22 bookkeeping Demo round.
+
+R72 added source-specific Public Function descriptions. R73 extends the existing, separate `dis.v0.2.kdp-receipt-contract/1` with **optional, indivisible typed `input` + `output` record Schemas**. For selected `orders.approve` and `xdownload.confirmDownload`, the real native Microkernel SDK validates the submitted Intent envelope **before** physical KDP `send()`, rejects any extra caller authority/effectPermission fields, and validates the actual KDP Receipt `status` type after the real response. An accepted receipt remains admission **only**: `execution:NOT_PROVEN` and `businessAttested:false`. Unknown receipt statuses cannot be upgraded to business success.
+
+Native source-selected completeness: **9/9** function purposes, **7/9** typed I/O interfaces (five LOCAL JSON + two KDP typed admission); special remaining entries are `orders.appInit` lifecycle and `runx.createPresenceObserver` process-local handle. A class Handle cannot be falsely serialized as ordinary JSON; the missing profiles must be addressed with correct boundary contracts.
+
+Legacy experimental KDP receipt profiles without typed Schemas remain valid but are classified incomplete by the strict inventory. The existing real Tally, Runx, xDownload and Orders source locks remain; KDP authority, independent semantic SAP and Effect remain separate. CORE-003 remains **PARTIAL** despite progress. Core **11/16 VERIFIED**, 35/35 historically defined scoped Demo rounds VERIFIED; no L2 Freeze/merge/release.

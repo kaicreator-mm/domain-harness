@@ -1,0 +1,108 @@
+{
+  "schema": "dke.r30.source-first-bounded-semantic-review/1",
+  "date": "2026-11-09",
+  "normative": false,
+  "reviewMode": "SAME_ASSISTANT_SOURCE_FIRST_CHALLENGE_PLUS_DETERMINISTIC_CHECKER",
+  "independentHumanOrSecondModel": false,
+  "reviewerAuthority": "NONE",
+  "inputs": {
+    "producerRepo": "kaicreator-mm/tally",
+    "producerCommit": "a8f4986b099aba27cd86ce6a78e1c19159d1de55",
+    "originalGraphBlob": "b6dc804d3ccc3aac7ce818533c2948f54b34644a",
+    "graphRecords": 807,
+    "r27LedgerBlob": "0b7d514cc297a07952b2cd536c2dafd3e47bda45",
+    "r28ProposalBlob": "9dc978f5138c561efabe503f254e565aa5f5700a",
+    "r26CatalogBlob": "e710997c3b4a1abbe33287f7b79596385c8382d3"
+  },
+  "publisherSources": [
+    {
+      "id": "se:SRC-09F-CF-OUTAGE-2025",
+      "url": "https://blog.cloudflare.com/cloudflare-service-outage-june-12-2025/",
+      "sourceDate": "2025-06-12",
+      "section": "Summary and impact",
+      "facts": [
+        "KV shared backing storage disruption",
+        "2 hours 28 minutes affected services",
+        "publisher reported no data loss"
+      ],
+      "limitations": [
+        "First party only",
+        "Specific affected Cloudflare services"
+      ],
+      "publisherRawHtmlSha256": null
+    },
+    {
+      "id": "se:SRC-09F-CF-KV-REDESIGN-2025",
+      "url": "https://blog.cloudflare.com/rearchitecting-workers-kv-for-redundancy/",
+      "sourceDate": "2025-08-08",
+      "section": "Design follow up",
+      "facts": [
+        "Redesigned Workers KV redundancy"
+      ],
+      "limitations": [
+        "Design intent is not empirically proven permanent immunity"
+      ],
+      "publisherRawHtmlSha256": null
+    },
+    {
+      "id": "se:SRC-09F-GH-POSTMORTEM-2018",
+      "url": "https://github.blog/news-insights/company-news/oct21-post-incident-analysis/",
+      "sourceDate": "2018-10-30",
+      "section": "2018 October 22 16:24, 16:45 and 23:03 UTC",
+      "facts": [
+        "16:24 topology failback",
+        "16:45 backlog handling and expired webhook payloads dropped",
+        "23:03 pending work processed and site green"
+      ],
+      "limitations": [
+        "First party only",
+        "No conclusion that expired payloads were delivered"
+      ],
+      "publisherRawHtmlSha256": null
+    }
+  ],
+  "cases": [
+    {
+      "id": "se:CASE-09F-CF-KV-DEPENDENCY",
+      "cq": "CQ-09F-CF",
+      "source": "se:SRC-09F-CF-OUTAGE-2025",
+      "owner": "tally.resilience.shared-dependency-case",
+      "sap": "R26-PROPOSAL-CF",
+      "sourceStatus": "BOUNDED_PUBLISHER_REPORT",
+      "facts": {
+        "durationMinutes": 148,
+        "sharedKVDependency": true,
+        "publisherReportedNoDataLoss": true,
+        "futureAvailabilityGuaranteed": false
+      },
+      "claimedSemanticOracle": false,
+      "sapQualified": false
+    },
+    {
+      "id": "se:CASE-09F-GH-DB-FAILOVER",
+      "cq": "CQ-09F-GH",
+      "source": "se:SRC-09F-GH-POSTMORTEM-2018",
+      "owner": "tally.consistency.cross-region-failover-case",
+      "sap": "R26-PROPOSAL-GH",
+      "sourceStatus": "ORIGINAL_LOCATOR_TIME_GAP",
+      "facts": {
+        "topologyRecoveryUTC": "2018-10-22T16:24:00Z",
+        "backlogHandlingUTC": "2018-10-22T16:45:00Z",
+        "greenUTC": "2018-10-22T23:03:00Z",
+        "expiredPayloadsDropped": true,
+        "allExpiredPayloadsDelivered": false,
+        "noDataLossAcrossAllGithub": null
+      },
+      "claimedSemanticOracle": false,
+      "sapQualified": false
+    }
+  ],
+  "crossCaseCausality": "NOT_ATTESTED",
+  "sourceOwnerDisposition": "NOT_EVIDENCED",
+  "r28OwnerAccepted": false,
+  "publisherBytesPinned": false,
+  "globalConsumerDiscovery": "UNKNOWN",
+  "knowledgeQualification": "BLOCKED_NOT_QUALIFIED",
+  "nativeR30": "NOT_RUN",
+  "recommendedElementStrategy": "TWO_SOURCE_BOUNDED_CASE_ELEMENTS_PROPOSAL_ONLY"
+}

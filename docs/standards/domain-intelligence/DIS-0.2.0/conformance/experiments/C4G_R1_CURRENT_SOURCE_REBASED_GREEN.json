@@ -1,0 +1,73 @@
+{
+  "schema": "dis.v020.c4g.closeout-dependency-rebased-green/1",
+  "date": "2026-11-11",
+  "authority": {
+    "masterIssue": "https://github.com/kaicreator-mm/domain-harness/issues/1499",
+    "product": "https://github.com/kaicreator-mm/domain-harness/issues/1496",
+    "draftPr": "https://github.com/kaicreator-mm/domain-harness/pull/1497"
+  },
+  "version": "0.2.0",
+  "productionStatusAtSource": {
+    "sourcePrHead": "de4720a9b4ff3744950011a1163b9b2b5ba8a31a",
+    "coreVerified": 13,
+    "corePartial": 3,
+    "partial": [
+      "DIS020-CORE-002",
+      "DIS020-CORE-005",
+      "DIS020-CORE-016"
+    ],
+    "optionalNotRun": 4,
+    "governanceNotRun": 1,
+    "productC3Approval": "https://github.com/kaicreator-mm/domain-harness/issues/1496#issuecomment-6782273293"
+  },
+  "patch": {
+    "sourceBranch": "experiment/dis-v020-core016-closeout-r2",
+    "sourceHead": "147deadb3b1edbfad04f367464c6a7671ea542d1",
+    "validatorPath": "examples/dis-v020-conformance/validate.mjs",
+    "validatorGitBlob": "ae413ea711e0e50fd0009e39f23728b6e101e1a7",
+    "nativeTestPath": "examples/dis-v020-conformance/validate.test.mjs",
+    "testGitBlob": "0428aec917a148d8bf1fa26c974757a404a6a2a9",
+    "preservesR90RequirementSpecificVerifiedWitnesses": true,
+    "regressionTestsAdded": 4
+  },
+  "failureFirst": {
+    "sourceValidatorGitBlob": "406578d36518e4c77f299df764b29f4ffc5c6406",
+    "redSourcePath": "docs/standards/domain-intelligence/DIS-0.2.0/conformance/experiments/R91_CORE016_GOV_DEPENDENCY_RED.json",
+    "oldFalseAccepts": 2,
+    "offendingStates": [
+      "CORE016 VERIFIED when 15 prerequisite Core NOT_RUN",
+      "GOV001 VERIFIED with 16 Core NOT_RUN"
+    ],
+    "testMethod": "actual Git-readback source code executing with synthetic input evidence and controlled in-memory sourceText, no actual CI claim"
+  },
+  "actualWebExecution": {
+    "host": "CONNECTED_GITHUB_READBACK_HOSTED_V8",
+    "sourceLevelChecks": 7,
+    "passed": 7,
+    "failed": 0,
+    "normalCurrent13of16": "PASS",
+    "prematureCORE016": "BLOCK",
+    "prematureGOV001": "BLOCK",
+    "future16of16": "STRUCTURALLY_ALLOWED_PENDING_REAL_EVIDENCE",
+    "conditionalOutOfScope": "STRUCTURALLY_ALLOWED_PENDING_PRODUCT_DECISION",
+    "newTestDeclarationsFound": 4,
+    "preservesR90ExactRequirementWitness": true
+  },
+  "qualification": {
+    "newRequirementPromotions": 0,
+    "sourceNodeTest": "NOT_RUN",
+    "newWoodpecker": "NOT_RUN_ISOLATED_EXPERIMENT",
+    "dkeR8": "0/53",
+    "sap": 0,
+    "effects": 0,
+    "releaseEligible": false,
+    "mergeEligible": false,
+    "freezeEligible": false
+  },
+  "integrationPolicy": "Do not merge onto an active Draft PR with failing current exact-SHA Integration; first retrieve first failing current pipeline step and repair it in single Writer, then merge only this specific small C4/GOV guard and its tests from latest-pr rebased source; preserve concurrent R90 witness/CORE008 Product acceptance.",
+  "notes": [
+    "Not a claim 16/16 is complete. This only prevents false version-level finalization.",
+    "Current independent C3 Product approval and 13/16 Machine Matrix state remain unchanged.",
+    "No original R31 Owner scope reapproval requested; structural version closeout does not qualify DKE SAP."
+  ]
+}

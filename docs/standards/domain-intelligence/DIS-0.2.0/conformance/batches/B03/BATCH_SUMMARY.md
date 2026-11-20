@@ -1,0 +1,27 @@
+# B03 — final native selected Target / installer authority batch closure
+
+**Batch status:** 3/3 separately versioned rounds **VERIFIED** at final cumulative native exact SHA `2d04fa512b5928c3796dbc6d1173a966c55a6286` / TREE `d2a4fa1bdb14a939067c551353de2e158ec6498d`. [Woodpecker #2284/1](https://ci.kaicreator.com/repos/18/pipeline/2284/1) native Integration **SUCCESS**, [#2284/2](https://ci.kaicreator.com/repos/18/pipeline/2284/2) minimum-node **SUCCESS**, [#2284/3](https://ci.kaicreator.com/repos/18/pipeline/2284/3) generic Verify **SUCCESS**.
+
+| Round | Original separate source commit | Git test Blob | What was demonstrated |
+| --- | --- | --- | --- |
+| [B03-01 / R38](rounds/B03-01/ROUND.md) | `1ad7748842bb02693790e0f3cd2081cfb0fd113f` | `c2323cfa3e307bf8f4bd3729870663c45d3e8b90` | Native additive Target field over **complete original canonical BUILD-selected Package/module SHA roster**, rejects missing, wrong, duplicate, unselected source, Target metadata forgery |
+| [B03-02 / R39](rounds/B03-02/ROUND.md) | `b57c20126bcd6b64f2e5031486d1bab5a6dabc4f` | `f10a3b8f4452d8bf6db7343d10085590df69d3f9` | Trusted independent installer `expectedTarget` versus AOT target; wrong platform, architecture, runtime, stale AOT digest or source pin rejected before KDP boot |
+| [B03-03 / R40](rounds/B03-03/ROUND.md) | `2d04fa512b5928c3796dbc6d1173a966c55a6286` | `e4e91b820bc4e551d3b40270102115524755f9bf` | The SAME selected source bytes can label Linux and Windows differently, so label ≠ verified physical Target; original DKE/Tally reviewer/SAP remains independent UNKNOWN |
+
+**Historical CI preserved, not rewritten:** R38 original [#2282/1](https://ci.kaicreator.com/repos/18/pipeline/2282/1) was **ERROR**, R39 [#2283/1](https://ci.kaicreator.com/repos/18/pipeline/2283/1) native was SUCCESS but [#2283/2](https://ci.kaicreator.com/repos/18/pipeline/2283/2) was **ERROR**; both old candidate HEADs are distinct from the fully successful later #2284 replay. The three original selected source/test Git Blobs remained present at final full-suite source. Each round retains original SHA, typed native positive/negative tests, independent `round.json`, `ROUND.md` and versioned `receipts/r38-b03-target-roster-ci.json`, `r39-b03-installer-target-ci.json`, `r40-b03-target-sap-boundary-ci.json` with final source/CI links. Eleven additional named native cases in B03.
+
+## Actual native ABI delta
+
+`packages/contracts/dis-v020.mjs` / `.d.mts` optionally accepts `program.target` with `schema:'dis.v0.2.selected-target/1'`, `platform:linux|windows|android`, `architecture:x64|arm64`, `runtime:'node'` and **selectedModules** mapping every actual selected V10 BUILD Package ID to its module SHA256. Missing, extra, wrong or duplicate selected modules are denied. No automatic higher authority is granted. `packages/microkernel/dis-v020.mjs` / `.d.mts` requires **independent trusted installer expectedTarget** on targeted artifacts; its agreement with the sealed AOT is checked before any KDP boot. Untargeted legacy v0.2 artifacts retain compatibility with `target:null`. Changed target changes the installed AOT digest.
+
+**Precise limit:** Target labels and module digest binding alone are **not evidence of an actual distinct Windows/Linux/Android executable**, native API availability, host identity or platform-variant resource closure; R40 explicitly demonstrates that identical original real modules accept distinct Target labels structurally. Product/L1 must determine applicable OS/architecture/transport scope and qualify at least one genuinely Target-specific original implementation before CORE-008 can be called VERIFIED. Current Chat/Form/CLI are UI-neutral Demo adapters, not production UI transports.
+
+**Source/SAP authority is not faked:** R40's original DKE single-model reviewer and synthetic GitHub locator proposal still show a 16:24→23:03 evidence coverage gap, `independentHumanOrSecondModel:false`, unaccepted source owner patch and `independentOracle:false`. The real native Tally Rule returns `authority:NONE` and `attested:false` even on self-asserted positive evidence. No independent Tally source owner, accepted SAP or ECP authority was generated. CORE-002/005 remain PARTIAL.
+
+## Overall status and next highest-leverage work
+
+Three batches B01–B03: **9/9 source-scoped Demo rounds**, 33 new named native cases, 3/3 latest exact CI for each verified batch source. **DIS Core remains 9 VERIFIED / 7 PARTIAL = 56.25%**, Optional Profiles 4 NOT_RUN, Governance 1 NOT_RUN. Why no automatic promotion: seven remaining Core MUSTs need normative semantic acceptance/complete Function+Element coverage, at least one genuine Target-specific host/module implementation and Product/L1 transport scope, or independent source/SAP/Reviewer authority. Repeating more Target labels and ungrounded synthetic cases adds little.
+
+**Recommended next batch B04:** prioritize one **genuinely different original Target implementation** with Product/L1 scope and exact digest selection, and source-owner-approved GH locator/SAP independent reviewer decision. If no qualified source/OS implementation exists, mark blocker and use C4 audit to consolidate truthful machine matrix rather than inventing additional rounds. Independent audit / Freeze (C5) cannot be auto-PASS. No merge, freeze or release in B03.
+
+[Detailed implementation limits](B03_TARGET_ABI_R38_R40.md) · [manifest](manifest.json) · [per-round evidence](rounds/B03-01/ROUND.md).

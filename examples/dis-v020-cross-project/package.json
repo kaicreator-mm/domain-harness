@@ -1,0 +1,9 @@
+{
+  "name": "@domain-harness/dis-v020-cross-project-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check consumer.mjs && node --check consumer.test.mjs",
+    "test": "node --import tsx --test consumer.test.mjs"
+  }
+}

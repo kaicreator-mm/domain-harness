@@ -1,0 +1,56 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r84-c3-selected-closure-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "C3_SELECTED_LINUX_BUILD_FULL_SOURCE_HOST_ONE_KDP_BOOT",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "1c9826bcfecdbd83c57a466e624eec4defb29604",
+    "tree": "275fb915dc136b91e04c7ab66de2cbcc80eb9aab"
+  },
+  "testPath": "examples/dis-v020-native-sdk/b05-full-source-anchors.test.mjs",
+  "testGitBlob": "a59f5c7e4b36803c957db729b9a5a1a1380679a8",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2410/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2410/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2410/3"
+    }
+  ],
+  "observations": [
+    "Authenticated Woodpecker #2410/1 integration step log emitted DIS_C3_SELECTED_CLOSURE at the exact qualifying SHA: selectedTarget == actualHostTarget == {platform:linux, architecture:x64, runtime:node}, selected BUILD module roster fully closed, entire consumed original source set independently installer-pinned, one real KDP boot with typed OBSERVATION/UNKNOWN/NONE and evidence.attested=false.",
+    "Woodpecker #2409/1 first real failure was the conformance validator, not a native case: all 29 dis-v020-native-sdk suites including the renamed C3 positive and the new cross-boundary negative had already passed; 7/13 validate.test.mjs cases failed on one shared MATRIX_CASE_NOT_FOUND root cause.",
+    "Root cause classified as Matrix anchor drift (test data consistency), not a product implementation defect and not a CI environment defect: commit b8682277 renamed the B05-02 R45 positive case but matrix.json still anchored the pre-rename case name for CORE-003 and CORE-008 positives, so the fail-closed validator refused the stale anchor exactly as designed.",
+    "Repair re-anchored both Matrix positives to the renamed (stronger) case; states, tallies, receipt semantics and negative coverage unchanged. Local Node v24.21.0 evidence: validator 13/13, b05 5/5, run-r83 ok, conformance chain 38/38, v010-c01 12/12, packed-stage 2/2."
+  ],
+  "limitations": [
+    "This receipt pins the qualifying repair HEAD 1c9826bc; the docs commit that adds this receipt has a separate CI identity and inherits nothing automatically.",
+    "CORE-008 remains PARTIAL: Product/L1 applicable Target list decision is still open (#1496 D04), identical module bytes can still be labelled linux/windows, no distinct per-OS module source variant, no independent Tally semantic SAP acceptance.",
+    "Selected-target proof is bounded to the Linux/x64/Node CI worker runtime; it is not hardware attestation and not a multi-OS Target conformance matrix."
+  ],
+  "repairHistory": [
+    {
+      "sourceHead": "b86822776d642b2d083bdade4fbdbe32e39771f4",
+      "pipeline": "#2409",
+      "status": "NOT_QUALIFIED",
+      "finding": "dis-v020-integration FAILURE exit 1 at the conformance validator: 7/13 cases MATRIX_CASE_NOT_FOUND because matrix.json positives for CORE-003/CORE-008 still anchored the pre-rename B05-02 R45 case name; all native SDK suites including the new C3 positive/negative passed in the same run"
+    },
+    {
+      "sourceHead": "1c9826bcfecdbd83c57a466e624eec4defb29604",
+      "pipeline": "#2410",
+      "status": "QUALIFIED",
+      "finding": "Matrix positives re-anchored to the renamed case; Woodpecker #2410/1-3 all SUCCESS with DIS_C3_SELECTED_CLOSURE linux/x64/node evidence"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r47-b06-http-transport-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "272cc9e52df02a1261cc79b96fa2acd683e88680",
+    "tree": "98541d1fce171c392eaeaa8bbd5a8dc3af32b09a"
+  },
+  "originCommit": "b3b2fd993b74897f80142f8ca7afb3ee2855bdca",
+  "testGitBlob": "5c127b88996b219ff90caf225b45d41f99d05ab8",
+  "testPath": "examples/dis-v020-native-sdk/b06-http-transport.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/3"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/2"
+    }
+  ],
+  "historical": [
+    {
+      "sourceHead": "b3b2fd993b74897f80142f8ca7afb3ee2855bdca",
+      "ciStatus": "NOT_RUN_BY_DESIGN",
+      "note": "Per-round immutable commit; only final batch head is pushed to minimize canceled CI."
+    },
+    {
+      "head": "272cc9e52df02a1261cc79b96fa2acd683e88680",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/3"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2300/2"
+        }
+      ],
+      "meaning": "Exact later full-batch requalification preserving the original immutable source test Blob; first gates #2294/#2295 failed on an unrelated r41-r46 receipt validator regression, not these tests."
+    }
+  ],
+  "limitations": [
+    "Round was independently committed without per-round CI; qualified by the later exact full-batch source gate at 272cc9e52df02a1261cc79b96fa2acd683e88680 with the original test Blob unchanged.",
+    "Actual loopback HTTP Form/Chat is not a deployed production web/chat app or permission to execute a Host/KDP Effect.",
+    "No independent Tally/SAP acceptance, physical platform variants or Product/L1 applicability approval."
+  ]
+}

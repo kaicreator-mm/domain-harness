@@ -1,0 +1,28 @@
+{
+  "schema": "dis-v020-r3/repo-compact-self-demo",
+  "scope": "SELF_SIMULATED_ONLY",
+  "repository": "kaicreator-mm/domain-harness",
+  "source": "examples/dis-v020-full-audit-demo/demo.mjs",
+  "sourceGitBlobSha": "469e54edc4cac81301adaaa7a5fb308af2917195",
+  "sourceSha256": "19a46233354decd41d58670831d7322bf8edbd7beb92ecd5aa496df8ee594f92",
+  "executionEnvironment": {
+    "node": "v22.16.0",
+    "node24": "NOT_RUN",
+    "woodpecker": "NOT_RUN"
+  },
+  "tests": {
+    "compact": 24,
+    "existingEvolutionNested": 25,
+    "modularOuter": 74,
+    "modularPositive": 27,
+    "modularNegative": 47,
+    "failed": 0
+  },
+  "modularZipSha256": "d8e5740d478cbd38fae7b6d928d70d9ec2452668d4c0e81715bb2be1cd078c71",
+  "mockOnly": true,
+  "realProvider": false,
+  "realKDP": false,
+  "realAOT": false,
+  "independentReview": false,
+  "l2Freeze": false
+}

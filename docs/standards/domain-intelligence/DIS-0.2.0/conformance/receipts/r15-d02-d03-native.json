@@ -1,0 +1,40 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r15-d02-d03-native",
+  "disVersion": "0.2.0",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "d2dbda617ed93ad59a33f4e57af2b4858cc41c2e",
+    "tree": "01746a654b1747992da38de8568e21d354f0012e"
+  },
+  "status": "SUCCESS",
+  "scope": "HISTORICAL_EXACT_SHA_D02_D03_NATIVE_CANDIDATE",
+  "notCurrentHead": true,
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2235/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2235/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2235/3"
+    }
+  ],
+  "observations": [
+    "The D02 real source-pinned Tally split versus fused parent counterfactual, semantic collaboration cycle, DAG cycle and absent constraint owner tests are in native SDK integration lane.",
+    "The D03 Chat text, Form URLSearchParams and CLI argv parsers are distinct user input representations consumed through the selected native SDK; no implicit Effect was admitted.",
+    "All three GitHub Woodpecker CI contexts reported success for the exact subject SHA on 2026-11-08."
+  ],
+  "limits": [
+    "Structural equivalence is not independent ownership/semantic oracle or proof of all Element decomposition strategies.",
+    "Deterministic adapters are not deployed production Chat UI, browser UI or physical CLI/Host transfer.",
+    "R16 typed KDP tests added by the *next commit* are not part of #2235. All Core/Optional/Governance summary counts unchanged."
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "dke.r22.ev16-source-join-query/v1",
+  "refMatrix": {
+    "repo": "kaicreator-mm/domain-forge",
+    "gitBlob": "8cab8ead10d90a440c85fec86b01fd408022ae2c",
+    "selection": "EV16",
+    "expectedDomains": [
+      "D04",
+      "D02"
+    ],
+    "selectedCells": 2
+  },
+  "sourceGraph": {
+    "repo": "kaicreator-mm/tally",
+    "commit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+    "gitBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961"
+  },
+  "rfc": {
+    "publisher": "RFC Editor",
+    "document": "RFC9111",
+    "section": "5.2.2.5",
+    "url": "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.5",
+    "rawFullBytesSha256": null,
+    "normativeRuleScope": "HTTP response no-store; exceptions and normative context require original full source and independent reading"
+  },
+  "defaultRequest": {
+    "targetEV": "EV16",
+    "sourceGraphCommit": "3e94685ca57a4b7258988826697af1c1c3a6b3c8",
+    "sourceGraphBlob": "0f6007315fd7352fe6fd218effcfecf672cb4961",
+    "declaresExplicitRFCJoin": false,
+    "usesLexicalOnly": false,
+    "claimsNoStoreAlways": false,
+    "assertsSourceBytePin": false,
+    "assertsIndependentCritic": false,
+    "assertsSAP": false,
+    "assertsEffects": false,
+    "assertsRepair": false
+  },
+  "qualification": {
+    "fullEV16Qualified": false,
+    "fullR8CellsQualified": 0,
+    "autonomousEvolutionQualified": 0,
+    "blindSemanticCritic": "NOT_RUN",
+    "rfcCompleteRawHtmlBytes": "NOT_PINNED"
+  }
+}

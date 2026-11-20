@@ -1,0 +1,81 @@
+{
+  "schema": "dis.v0.2.r83-r1.real-reader-correspondence/1",
+  "date": "2026-11-11",
+  "authority": {
+    "masterIssue": 1499,
+    "productIssue": 1496,
+    "implPR": 1497,
+    "dkeIssue": 209
+  },
+  "status": "SOURCE_EXACT_READER_CORRESPONDENCE_PASS",
+  "sourceExecution": {
+    "engine": "CONNECTED_HOSTED_V8_GIT_SOURCE_READBACK",
+    "codeSource": "actual original B22 source Git blob, imported sourceGitBlob replaced by deterministic equality stub to original Git-retrieved R33 receipt text only",
+    "nativeNodeRunnerExecution": "NOT_RUN_IN_THIS_WEB_HOST",
+    "modelSourceSha": "bca64ed278d3e12ee4a0e65533c89901eb94157d",
+    "adversarialTestGitBlob": "7a3b5cec986978e03d997341170467d772d1e04b",
+    "nodeRunnerGitBlob": "3e2b83dc8934b656e028bbef2b7e016138ee4a4c",
+    "actualOriginalB22ReaderGitBlob": "650a0690774698b30992cddeed7791e6093f3b2d",
+    "originalDkeGafReceiptGitBlob": "8e77f2a2b518c2cf5151b8f2b1e6707287ed33f6",
+    "selectedNativeQualification": {
+      "head": "fe2334e63d39a9c006746caad695f7e3c5ade97d",
+      "woodpecker": "2397/1-3 SUCCESS"
+    },
+    "latestDraftCI": {
+      "head": "78d558b5bf494fdee349fd9beb9ca239de493425",
+      "woodpecker": "2399/1-3 SUCCESS"
+    }
+  },
+  "scope": {
+    "rawGafRows": 910476,
+    "sourceDispositionCounts": {
+      "QUARANTINE_FATAL": 233,
+      "REVIEW_SOFT": 3769,
+      "STRUCTURAL_CANDIDATE": 906474
+    },
+    "finiteAbstractStates": 768,
+    "modelViolations": 0,
+    "actualSourceReaderCalls": 771,
+    "realAllowedExactSelectionCalls": 3,
+    "realRejectedExtraAuthorityInputs": 768,
+    "originalEvidenceNegativeMutations": 12,
+    "wrongReaderNegative": {
+      "simulatedForgedReturn": {
+        "status": "SUCCEEDED",
+        "sapQualified": true,
+        "effectDispatched": true
+      },
+      "correctlyFailed": "REAL_READER_ABSTRACT_CONTRACT_MISMATCH_QUARANTINE_FATAL"
+    },
+    "expectedOutcomes": "UNKNOWN no independentCritic no SAP no Effect for each source tier",
+    "readerDoesNotOfferRowMembership": true,
+    "remainingCriticalGates": [
+      "independent DKE source-first Critic",
+      "accountable Owner ReviewDecision",
+      "per-row membership evidence",
+      "product Target applicability"
+    ]
+  },
+  "lineage": {
+    "previousR83SourceHead": "7054ddacdf90418069ce78d0408b6c85189a26bb",
+    "previousMachineReceipt": "R83_PROOF_RECEIPT.json",
+    "finding": "Previous model used a source-anchored abstract actualB22Observation(s), but modelCheck did not execute original B22 Reader source; constant UNKNOWN could yield vacuous correspondence",
+    "repair": "New testActualReaderConformance(reader,model,evidence) checks literal selected original Reader for each tier and all 255 nonzero authority-flag input combinations plus 3 explicit false-property inputs; a wrong Reader is rejected; Node CLI now imports actual Reader",
+    "note": "No production source files or active PR contents changed; only isolated formal branch changed. No new B23 count."
+  },
+  "qualification": "BOUNDED_SOURCE_CORRESPONDENCE_ONLY_NOT_INDEPENDENT_SEMANTIC_SAP_OR_UNBOUNDED_THEOREM",
+  "productCore": {
+    "scopedVerified": 12,
+    "total": 16,
+    "otherPartial": 4,
+    "optionalNotRun": 4,
+    "governanceNotRun": 1
+  },
+  "dke": {
+    "r8Qualified": 0,
+    "r8Total": 53,
+    "sapApproved": 0,
+    "effects": 0
+  },
+  "release": "BLOCKED"
+}

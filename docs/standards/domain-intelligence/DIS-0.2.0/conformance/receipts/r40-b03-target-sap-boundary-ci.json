@@ -1,0 +1,67 @@
+{
+  "schema": "dis.v0.2.validation-receipt/1",
+  "id": "r40-b03-target-sap-boundary-ci",
+  "disVersion": "0.2.0",
+  "status": "SUCCESS",
+  "scope": "B03_B03-03_SELECTED_TARGET_SEMANTIC_BOUNDARY",
+  "source": {
+    "repository": "kaicreator-mm/domain-harness",
+    "head": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+    "tree": "d2a4fa1bdb14a939067c551353de2e158ec6498d"
+  },
+  "originalSourceHead": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+  "originalSourceTree": "d2a4fa1bdb14a939067c551353de2e158ec6498d",
+  "testGitBlob": "e4e91b820bc4e551d3b40270102115524755f9bf",
+  "casePath": "examples/dis-v020-native-sdk/b03-target-source-authority.test.mjs",
+  "ci": [
+    {
+      "context": "ci/woodpecker/pr/dis-v020-integration",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify-min-node",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+    },
+    {
+      "context": "ci/woodpecker/pr/verify",
+      "state": "SUCCESS",
+      "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+    }
+  ],
+  "history": [
+    {
+      "head": "2d04fa512b5928c3796dbc6d1173a966c55a6286",
+      "ci": [
+        {
+          "context": "ci/woodpecker/pr/dis-v020-integration",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/1"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify-min-node",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/2"
+        },
+        {
+          "context": "ci/woodpecker/pr/verify",
+          "state": "SUCCESS",
+          "url": "https://ci.kaicreator.com/repos/18/pipeline/2284/3"
+        }
+      ],
+      "meaning": "Exact later full-suite requalification preserving original immutable source test Blob"
+    }
+  ],
+  "observations": [
+    "Actual original Tally/xDownload canonical BUILD and independent installer, with intentionally bounded Target metadata semantics.",
+    "All three B03 source tests verified by #2284/1-3 SUCCESS at final exact SHA; original intermediate errors preserved."
+  ],
+  "limitations": [
+    "No physical Windows/Linux/Android executed; identical module digest roster can be labeled for different Targets without any per-Target source proof.",
+    "Original Tally 807-node DKE evidence and SAP remain unqualified; GH SourceLocator gap unresolved.",
+    "Pure Source/Target metadata never mint accepted business Evidence, SAP, KDP Effect or independent Oracle."
+  ],
+  "fullCorePromoted": false,
+  "preciseBoundary": "No actual Windows/Linux/Android target variant provenance or physical OS verification; no independently accepted Tally source/SAP/Oracle/Effect authority."
+}
