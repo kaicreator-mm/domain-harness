@@ -38,8 +38,8 @@ test('Draft 2020-12 minLength/maxLength count Unicode code points, not UTF-16 un
   assert.equal(validateJsonSubset('😀😀', { type: 'string', maxLength: 1 }), false);
   assert.equal(validateJsonSubset('A😀', { type: 'string', maxLength: 2 }), true);
   // Combining accents are two code points (not one grapheme cluster).
-  assert.equal(validateJsonSubset('e\\u0301', { type: 'string', minLength: 2 }), true);
-  assert.equal(validateJsonSubset('e\\u0301', { type: 'string', maxLength: 1 }), false);
+  assert.equal(validateJsonSubset('e\u0301', { type: 'string', minLength: 2 }), true);
+  assert.equal(validateJsonSubset('e\u0301', { type: 'string', maxLength: 1 }), false);
   // Nested selected Function input schemas use exactly the same validator.
   assert.equal(validateJsonSubset({ label: '😀' }, {
     type: 'object', properties: { label: { type: 'string', minLength: 2 } },
