@@ -5,7 +5,7 @@
  * One pass, fail-fast at the FIRST refusal with the exact frozen code:
  *   1. machine-schema validation of Descriptor / Domains / Manifests through
  *      the T01 schemas + handwritten validators (single schema authority);
- *   2. exact `node24-esm/1` Target selection;
+ *   2. exact `node22-esm/1` Target selection;
  *   3. Package closure from descriptor roots + typed dependsOn (no repair, no
  *      rediscovery), one Primary per K/S/B layer, legal extensions;
  *   4. Element ownership (one owner), explicit export/import visibility,
@@ -25,7 +25,7 @@
  */
 import {
   DH_LOCK_SCHEMA_VERSION,
-  NODE24_ESM_PROFILE,
+  NODE22_ESM_PROFILE,
   contentDigestOf,
   isUnknownContentKind,
   validateDomainDefinition,
@@ -102,17 +102,17 @@ function isCompatibleTarget(target: TargetSelector): boolean {
   return (
     target.runtime === 'node' &&
     target.module === 'esm' &&
-    (target.nodeMajor === undefined || target.nodeMajor === 24)
+    (target.nodeMajor === undefined || target.nodeMajor === 22)
   );
 }
 
 /**
  * Package target VARIANTS must declare the exact verified floor: the sole
- * selected Target is node24-esm/1 (L2 §8.4), so a variant without an explicit
- * nodeMajor 24 is not selectable — never silently widened.
+ * selected Target is node22-esm/1 (L2 §8.4), so a variant without an explicit
+ * nodeMajor 22 is not selectable — never silently widened.
  */
 function isCompatibleVariantTarget(target: TargetSelector): boolean {
-  return target.runtime === 'node' && target.module === 'esm' && target.nodeMajor === 24;
+  return target.runtime === 'node' && target.module === 'esm' && target.nodeMajor === 22;
 }
 
 function toJson(value: unknown): JsonValue {
@@ -186,7 +186,7 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
   if (!isCompatibleTarget(descriptor.target)) {
     throw refusal(
       'DH_BUILD_TARGET_INVALID',
-      `descriptor target ${JSON.stringify(descriptor.target)} is not the unique supported node24-esm/1 family`,
+      `descriptor target ${JSON.stringify(descriptor.target)} is not the unique supported node22-esm/1 family`,
       'target',
     );
   }
@@ -194,7 +194,7 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
     runtime: 'node',
     module: 'esm',
     ...(descriptor.target.nodeMajor !== undefined ? { nodeMajor: descriptor.target.nodeMajor } : {}),
-    profile: NODE24_ESM_PROFILE,
+    profile: NODE22_ESM_PROFILE,
   };
 
   // ---- 5. roots / extensions lookup with layer+role checks --------------
@@ -572,7 +572,7 @@ function runBuild(input: V011BuildInput): Omit<V011BuildSuccess, 'ok'> {
     if (candidates.length === 0) {
       throw refusal(
         'DH_BUILD_IMPLEMENTATION_MISSING',
-        `selected function '${resolved.element.def.id}.${resolved.fn.id}' has no compatible node24-esm/1 implementation binding`,
+        `selected function '${resolved.element.def.id}.${resolved.fn.id}' has no compatible node22-esm/1 implementation binding`,
       );
     }
     if (candidates.length > 1) {

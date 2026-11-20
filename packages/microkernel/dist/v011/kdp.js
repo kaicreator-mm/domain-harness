@@ -26,7 +26,7 @@
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
-import { NODE24_ESM_PROFILE } from '@kaicreator/domain-harness-contracts/v011';
+import { NODE22_ESM_PROFILE } from '@kaicreator/domain-harness-contracts/v011';
 import { resolveInRoot } from './paths.js';
 import { verifyInstallTrust } from './verify.js';
 import { isPlainJsonValue } from './schema-subset.js';
@@ -133,12 +133,12 @@ export async function bootstrap(context) {
     const { lock } = trust.value;
     const safeContext = trust.value.context;
     const profile = lock.target.profile;
-    if (profile !== NODE24_ESM_PROFILE) {
-        return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock target profile '${profile}' is not the frozen '${NODE24_ESM_PROFILE}'`);
+    if (profile !== NODE22_ESM_PROFILE) {
+        return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock target profile '${profile}' is not the frozen '${NODE22_ESM_PROFILE}'`);
     }
-    const minimumNodeMajor = lock.target.nodeMajor ?? 24;
+    const minimumNodeMajor = lock.target.nodeMajor ?? 22;
     if (safeContext.env.nodeMajor < minimumNodeMajor) {
-        return failed('DH_RUNTIME_UNSUPPORTED_PROFILE', `Host nodeMajor ${safeContext.env.nodeMajor} is below the Lock target floor ${minimumNodeMajor} for '${NODE24_ESM_PROFILE}'`);
+        return failed('DH_RUNTIME_UNSUPPORTED_PROFILE', `Host nodeMajor ${safeContext.env.nodeMajor} is below the Lock target floor ${minimumNodeMajor} for '${NODE22_ESM_PROFILE}'`);
     }
     const configResult = await readDescriptorConfig(safeContext, lock);
     if (!configResult.ok)

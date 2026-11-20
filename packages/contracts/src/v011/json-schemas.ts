@@ -29,7 +29,7 @@ import {
   DH_LOCK_SCHEMA_VERSION,
   DH_PACKAGE_SCHEMA_VERSION,
 } from './schema-versions.js';
-import { NODE24_ESM_PROFILE } from './refs.js';
+import { NODE22_ESM_PROFILE } from './refs.js';
 import type { JsonValue } from './base.js';
 
 type JsonObject = { readonly [k: string]: JsonValue };
@@ -550,7 +550,7 @@ const RESOLVED_TARGET_DEF: JsonObject = {
     runtime: { const: 'node' },
     module: { const: 'esm' },
     nodeMajor: { type: 'integer', minimum: 0 },
-    profile: { const: NODE24_ESM_PROFILE },
+    profile: { const: NODE22_ESM_PROFILE },
   },
 };
 
