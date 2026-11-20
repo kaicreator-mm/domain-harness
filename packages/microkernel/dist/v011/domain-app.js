@@ -178,7 +178,7 @@ export function createDomainApp(deps) {
     }
     function dispose() {
         if (disposeFlight === null) {
-            // Close ingress before awaiting the first teardown operation.
+            // Close ingress synchronously before the first asynchronous teardown.
             disposed = true;
             disposeFlight = (async () => {
                 try {

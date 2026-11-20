@@ -10,7 +10,7 @@ const canonical = Object.freeze({
 });
 
 assert.notEqual(manifest.private, true, 'canonical root SDK must be publishable');
-assert.equal(manifest.engines?.node, '>=24.0.0', 'canonical root SDK must declare the verified Node target floor');
+assert.equal(manifest.engines?.node, '>=22.12.0', 'canonical root SDK must declare the verified Node target floor');
 assert.equal(manifest.main, canonical.import, 'main must be the canonical v011 entry');
 assert.equal(manifest.types, canonical.types, 'types must be the canonical v011 entry');
 assert.deepEqual(manifest.exports?.['.'], canonical, 'exports["."] must be canonical v011');

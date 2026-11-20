@@ -1,4 +1,4 @@
-import type { ContentDigest, ResourceRef } from '@kaicreator/domain-harness-contracts/v011';
+import { type ContentDigest, type ResourceRef } from '@kaicreator/domain-harness-contracts/v011';
 export declare function digestOfBytes(bytes: Uint8Array): ContentDigest;
 export declare class V011ResourceScope {
     private readonly roots;

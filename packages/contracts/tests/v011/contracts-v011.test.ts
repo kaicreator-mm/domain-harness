@@ -107,7 +107,9 @@ test('R27: canonical JSON refuses sparse arrays before hashing', () => {
   const sparse = new Array(1);
   assert.throws(() => canonicalJson(sparse), /sparse array/);
   assert.throws(() => contentDigestOf(sparse as unknown as import('../../src/v011/base.js').JsonValue), /sparse array/);
-  assert.throws(() => canonicalJson({ nested: [, 7] }), /sparse array/);
+  const nestedSparse = new Array(2);
+  nestedSparse[1] = 7;
+  assert.throws(() => canonicalJson({ nested: nestedSparse }), /sparse array/);
   assert.equal(canonicalJson([]), '[]');
   assert.equal(canonicalJson([null, 7]), '[null,7]');
 });

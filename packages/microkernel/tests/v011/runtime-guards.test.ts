@@ -49,7 +49,10 @@ test('Draft 2020-12 minLength/maxLength count Unicode code points, not UTF-16 un
 
 test('R27: sparse arrays cannot pass the plain JSON guard or boolean true schema', () => {
   const oneHole = new Array(1);
-  const nested = { list: [1, , 3] };
+  const nestedList = new Array(3);
+  nestedList[0] = 1;
+  nestedList[2] = 3;
+  const nested = { list: nestedList };
   assert.equal(isPlainJsonValue(oneHole), false);
   assert.equal(isPlainJsonValue(nested), false);
   assert.equal(validateJsonSubset(oneHole, true), false);

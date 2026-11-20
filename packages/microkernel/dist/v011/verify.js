@@ -185,8 +185,7 @@ export async function verifyLockAgainstRecord(installRoot, record) {
         return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock closureDigest does not equal the installed record lockDigest') };
     }
     const lock = parsed;
-    if (!Array.isArray(lock.selectedPackages) || !lock.selectedPackages.every((candidate) => isRecord(candidate) &&
-        typeof candidate['technicalLifecycle'] === 'boolean' &&
+    if (!Array.isArray(lock.selectedPackages) || !lock.selectedPackages.every((candidate) => isRecord(candidate) && typeof candidate['technicalLifecycle'] === 'boolean' &&
         isRecord(candidate['artifact']) && typeof candidate['packageId'] === 'string')) {
         return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock selectedPackages lacks required lifecycle declarations or artifact entries') };
     }

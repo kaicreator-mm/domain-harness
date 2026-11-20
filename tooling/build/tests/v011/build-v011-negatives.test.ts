@@ -117,9 +117,10 @@ test('R27: BUILD rejects artifact paths Runtime would reject', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  for (const path of ['./dist/sdk.mjs', 'dist/../dist/sdk.mjs']) {
+  // Keep the path witness independent from the lifecycle/artifact agreement guard.
+  for (const path of ['./dist/business.mjs', 'dist/../dist/business.mjs']) {
     expectRefusal(buildV011App({
-      ...input, packageArtifacts: { ...input.packageArtifacts, 'sdk-core': path },
+      ...input, packageArtifacts: { ...input.packageArtifacts, 'orders-business': path },
     }), 'DH_BUILD_RESOURCE_MISSING');
   }
   expectRefusal(buildV011App({
@@ -215,7 +216,7 @@ test('DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION: two compatible bindings for on
     targetVariants: unknown[];
   };
   sdk.targetVariants.push({
-    target: { runtime: 'node', module: 'esm', nodeMajor: 22 }
+    target: { runtime: 'node', module: 'esm', nodeMajor: 22 },
     implementations: [
       {
         elementId: 'orders.eligibility',

@@ -40,7 +40,7 @@ export class V011ResourceScope {
   read(packageId: string, path: string): Uint8Array {
     // BUILD must use the same canonical POSIX paths that Boot/KDP accepts.
     if (!isRelativeResourcePath(path)) {
-      throw refusal('DH_BUILD_RESOURCE_MISSING', `resource '${packageId}/${path}' is not a canonical relative POSIX path`);
+      throw refusal('DH_BUILD_RESOURCE_MISSING', `resource '${packageId}/${String(path)}' is not a canonical relative POSIX path`);
     }
     let root: string;
     let target: string;
