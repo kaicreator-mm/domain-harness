@@ -275,6 +275,39 @@ test('R27: disposal immediately closes ingress before asynchronous technical tea
   await teardown;
 });
 
+// inspect 返回值不得成为修改内部 Lock 和已选 Function 合同的可写通道。
+test('inspection provides independent snapshots and cannot change selected function policy', async (t) => {
+  const app = await bootApp(t, {
+    init: { status: 'READY' },
+    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
+  });
+  const first = await app.inspect();
+  const expectedTarget = first.target.profile;
+  const selected = first.functions.find((fn) => fn.ref.functionId === 'evaluate');
+  assert.ok(selected);
+  const expectedElementId = selected.ref.element.id;
+  const expectedOutcomes = [...selected.outcomes];
+  (first.target as { profile: string }).profile = 'hostile-profile';
+  (selected.ref.element as { id: string }).id = 'hostile.element';
+  (selected.outcomes as string[]).splice(0, selected.outcomes.length, 'UNKNOWN');
+  const firstElement = first.elements[0];
+  assert.ok(firstElement);
+  const originalElementId = firstElement.ref.id;
+  (firstElement.ref as { id: string }).id = 'hostile.id';
+  const second = await app.inspect();
+  assert.equal(second.target.profile, expectedTarget);
+  const reselected = second.functions.find((fn) => fn.ref.functionId === 'evaluate');
+  assert.ok(reselected);
+  assert.equal(reselected.ref.element.id, expectedElementId);
+  assert.deepEqual(reselected.outcomes, expectedOutcomes);
+  assert.equal(second.elements[0]?.ref.id, originalElementId);
+  assert.deepEqual(await app.invoke('evaluate', { total: 100, region: 'EU' }), {
+    kind: 'SUCCEEDED',
+    value: { decision: 'POS' },
+  });
+  await app.dispose();
+});
+
 test('invoke after dispose is refused; disposed apps stay disposed', async (t) => {
   const app = await bootApp(t, {
     init: { status: 'READY' },

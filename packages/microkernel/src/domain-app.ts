@@ -178,7 +178,8 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
         version: lock.appIdentity.version,
         lockDigest: lock.closureDigest,
       },
-      target: lock.target,
+      // 公开只读契约必须在运行时隔离，不能泄露可修改的 Lock 记录。
+      target: { ...lock.target },
       packages: lock.selectedPackages.map((pkg) => ({
         packageId: pkg.packageId,
         version: pkg.version,
@@ -186,13 +187,13 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
         role: pkg.role,
       })),
       elements: lock.selectedElements.map((element) => ({
-        ref: element.ref,
+        ref: { ...element.ref },
         ownerPackageId: element.ownerPackageId,
         visibility: element.visibility,
       })),
       functions: lock.selectedFunctions.map((fn) => ({
-        ref: fn.ref,
-        outcomes: fn.outcomes,
+        ref: { ...fn.ref, element: { ...fn.ref.element } },
+        outcomes: [...fn.outcomes],
         effects: fn.effects,
       })),
       ingress: lock.ingress.map((entry) => ({ id: entry.id, optional: entry.optional })),
