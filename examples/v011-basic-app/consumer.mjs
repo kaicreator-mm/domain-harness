@@ -515,7 +515,7 @@ async function main() {
     pkg(p, 'app-business').targetVariants[0].implementations[0].resources[0].digest = `sha256:${'0'.repeat(64)}`;
   }, 'DH_BUILD_RESOURCE_DIGEST_MISMATCH');
   await expectBuildMutationRefusal('noncanonical-artifact-path', (p) => {
-    p.input.packageArtifacts['kernel-primary'] = './dist/index.mjs';
+    p.input.kdpArtifact.path = './dist/v011/index.js';
   }, 'DH_BUILD_RESOURCE_MISSING');
 
   // Inline and ResourceRef rule content must produce identical selected
