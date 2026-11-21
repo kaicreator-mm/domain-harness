@@ -254,7 +254,9 @@ try {
   npm(['ls', '--json'], consumerRoot, 'consumer.ls');
   npm(['ls', 'xstate', 'yaml', '--json'], consumerRoot, 'consumer.workflow-runtime-ls');
   assertInstalledRealpaths(tarballMembers);
-  cpSync(fileURLToPath(new URL('./consumer.mjs', import.meta.url)), join(consumerRoot, 'consumer.mjs'));
+  for (const name of ['consumer.mjs', 'workflow-fixture.mjs']) {
+    cpSync(fileURLToPath(new URL(`./${name}`, import.meta.url)), join(consumerRoot, name));
+  }
   const consumerEvidence = join(evidenceDir, 'consumer');
   mkdirSync(consumerEvidence, { recursive: true });
   const child = spawnSync(process.execPath, ['consumer.mjs'], {
