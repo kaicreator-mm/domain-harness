@@ -373,6 +373,22 @@ test('T12 R11 P1: BUILD seals a preinstall verifier and script-free lock-first i
   write('package-lock.json', JSON.stringify(localLock));
   const localPass = run(localRegistry);
   assert.equal(localPass.status, 0, `显式本地 CI Registry 与相同 SRI 应通过：${localPass.stderr}`);
+  // WHATWG URL.hostname 将 IPv6 loopback 表示为 [::1]；仅允许显式配置的精确 HTTP origin。
+  const ipv6Registry = 'http://[::1]:14873';
+  const ipv6Lock = structuredClone(npmLock);
+  for (const pin of pins) {
+    (ipv6Lock.packages[`node_modules/${pin.name}`] as { resolved: string }).resolved =
+      `${ipv6Registry}/${pin.name}/-/${pin.name}-${pin.version}.tgz`;
+  }
+  write('package-lock.json', JSON.stringify(ipv6Lock));
+  const ipv6Pass = run(ipv6Registry);
+  assert.equal(ipv6Pass.status, 0,
+    `显式配置的 IPv6 回环地址与精确 SRI 必须被接受：${ipv6Pass.stderr}`);
+  const ipv6WrongOrigin = run('http://[::1]:14874');
+  assert.notEqual(ipv6WrongOrigin.status, 0,
+    '即使同为 IPv6 回环地址，Registry origin 不匹配也必须拒绝');
+  assert.match(ipv6WrongOrigin.stderr, /DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH/u);
+  write('package-lock.json', JSON.stringify(localLock));
   const unconfiguredLocal = run('https://registry.npmjs.org');
   assert.notEqual(unconfiguredLocal.status, 0, '不得允许与已声明 Registry 不符的 HTTP 源');
   assert.match(unconfiguredLocal.stderr, /DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH/u);
