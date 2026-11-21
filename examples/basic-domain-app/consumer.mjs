@@ -18,6 +18,7 @@ import {
   validateDomainDefinition,
   validateElementDefinition,
 } from '@kaicreator/domain-harness';
+import { prepareWorkflowElements } from './workflow-fixture.mjs';
 
 const consumerRoot = process.cwd();
 const require = createRequire(import.meta.url);
@@ -69,7 +70,7 @@ export async function init(ctx) {
 export async function exit() { events.push({ event: 'package-exit', package: '${packageId}' }); }
 `;
 }
-function rulesModule() {
+function rulesModule(withWorkflow = false, workflowFatalAt = '') {
   return `
 const events = (globalThis.__domainHarnessT05Events ??= []);
 events.push({ event: 'module-evaluated', package: 'rules-package-entry' });
@@ -81,9 +82,37 @@ export function evaluate(input) {
   return { kind: 'SUCCEEDED', value: { decision: input.total >= RULE.minOrderTotal ? 'POS' : 'NEG', via: 'rules-package/evaluate' } };
 }
 export function optionalReport() { return { kind: 'SUCCEEDED', value: 'optional-report-ok' }; }
+${withWorkflow ? `
+function workflowRead(input, expectedFormat) {
+  if (input?.format !== expectedFormat || typeof input?.source !== 'string' ||
+      input?.value === null || typeof input?.value !== 'object' || Array.isArray(input.value)) {
+    return { kind: 'UNKNOWN', unknownReason: { code: 'T14_READER_INVALID', message: 'data not selected as plain object' } };
+  }
+  events.push({ event: 'workflow-read', format: input.format, parsed: input.value });
+  if (${JSON.stringify(workflowFatalAt)} === 'leaf' && input.value.id === 'json-a') {
+    throw new Error('T14 deliberate selected Function fatal');
+  }
+  return { kind: 'SUCCEEDED', value: input.value };
+}
+export function jsonReader(input) { return workflowRead(input, 'json'); }
+export function yamlReader(input) { return workflowRead(input, 'yaml'); }
+export async function startWorkflow() {
+  events.push({ event: 'workflow-hook', kind: 'start' });
+  await Promise.resolve();
+  if (${JSON.stringify(workflowFatalAt)} === 'start') {
+    throw new Error('T14 deliberate selected start Hook fatal');
+  }
+  return { kind: 'SUCCEEDED', value: {} };
+}
+export async function endWorkflow() {
+  await Promise.resolve();
+  events.push({ event: 'workflow-hook', kind: 'end' });
+  return { kind: 'SUCCEEDED', value: {} };
+}
+` : ''}
 `;
 }
-function businessModule(withUnsupportedEffect, initThrows = false, initDegraded = false, selectedEvaluateKey = '') {
+function businessModule(withUnsupportedEffect, initThrows = false, initDegraded = false, selectedEvaluateKey = '', workflowRefJson = '') {
   return `
 import { evaluate, initializeRule } from 'rules-package/rules';
 const events = (globalThis.__domainHarnessT05Events ??= []);
@@ -102,6 +131,19 @@ export async function init(ctx) {
   const invalid = await selected.invoke({ total: 'invalid', region: 'US' });
   const eu = await selected.invoke({ total: 100, region: 'EU' });
   events.push({ event: 'init-selected-function', package: 'app-business', pos, neg, unknown, invalid, eu });
+${workflowRefJson ? `
+  if (!ctx.workflows) throw new Error('BUILD-selected Workflow starter missing during Package.Init');
+  const denied = await ctx.workflows.start({
+    ...${workflowRefJson}, contentId: 'unselected-workflow',
+  }, { origin: 'unauthorized-root' });
+  events.push({ event: 'workflow-unauthorized', outcome: denied });
+  if (denied.status !== 'FAILED' || denied.reason.code !== 'DH_WORKFLOW_UNSELECTED') {
+    throw new Error('Package.Init illegally started a Workflow not authorized by BUILD');
+  }
+  const outcome = await ctx.workflows.start(${workflowRefJson}, { origin: 'Package.Init' });
+  events.push({ event: 'workflow-outcome', outcome });
+  if (outcome.status !== 'COMPLETE') throw new Error('Selected Workflow rejected startup');
+` : ''}
   events.push({ event: 'business-init', package: 'app-business', minOrderTotal: rule.minOrderTotal });
   return ${initDegraded ? "{ status: 'DEGRADED' }" : "{ status: 'READY' }"};
 }
@@ -138,7 +180,8 @@ async function authoring(label, rule, options = {}) {
         ? `${lifecycleModule(id)}\nexport function auditHook(value) { return value; }\n`
         : lifecycleModule(id));
   }
-  await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule());
+  await write(dirs['rules-package'], 'dist/rules.mjs',
+    rulesModule(options.workflow === true, options.workflowFatalAt ?? ''));
   await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
   await write(dirs['kernel-primary'], 'dist/index.js', "export { bootstrap } from '@kaicreator/domain-harness-microkernel';\n");
   for (const id of Object.keys(dirs)) {
@@ -212,14 +255,22 @@ async function authoring(label, rule, options = {}) {
     rules.content[0].ref = { ...ruleRef, path: 'content/no-such-rule.json' };
   }
 
-  const definitions = { 'basic.knowledge': knowledge, 'basic.rules': rules, 'basic.app': app };
+  const workflow = options.workflow === true
+    ? await prepareWorkflowElements(dirs, rules, app, fn) : null;
+  const definitions = {
+    'basic.knowledge': knowledge, 'basic.rules': rules, 'basic.app': app,
+    ...(workflow ? {
+      [workflow.child.id]: workflow.child,
+      ...Object.fromEntries(workflow.dataElements.map((el) => [el.id, el])),
+    } : {}),
+  };
   const definitionRefs = {};
   for (const [id, definition] of Object.entries(definitions)) {
     const path = `elements/${id}.json`;
-    await write(dirs[id === 'basic.app' ? 'app-business' : 'rules-package'], path, canonicalJson(definition));
+    await write(dirs[(id === 'basic.app' || id === 'basic.workflow_child') ? 'app-business' : 'rules-package'], path, canonicalJson(definition));
     definitionRefs[id] = {
-      packageId: id === 'basic.app' ? 'app-business' : 'rules-package', path,
-      digest: await fileDigest(join(dirs[id === 'basic.app' ? 'app-business' : 'rules-package'], path)),
+      packageId: (id === 'basic.app' || id === 'basic.workflow_child') ? 'app-business' : 'rules-package', path,
+      digest: await fileDigest(join(dirs[(id === 'basic.app' || id === 'basic.workflow_child') ? 'app-business' : 'rules-package'], path)),
     };
   }
   const elementRef = (id) => ({
@@ -237,7 +288,8 @@ async function authoring(label, rule, options = {}) {
   for (const id of Object.keys(dirs)) artifactRefs[id] = await artifactRef(id, 'dist/index.mjs');
   await write(dirs['app-business'], 'dist/app.mjs',
     businessModule(options.unsupportedEffect === true, options.initThrows === true,
-      options.initDegraded === true, canonicalJson(refs.evaluate)));
+      options.initDegraded === true, canonicalJson(refs.evaluate),
+      workflow ? canonicalJson(workflow.rootRef) : ''));
   const rulesEntryRef = await artifactRef('rules-package', 'dist/rules.mjs');
   const businessEntryRef = await artifactRef('app-business', 'dist/app.mjs');
   const lifecycleDefs = {};
@@ -318,13 +370,22 @@ async function authoring(label, rule, options = {}) {
           definitionRef: await artifactRef('rules-package', 'elements/lifecycle.json'), visibility: 'private' },
         { id: 'basic.knowledge', version: '1.0.0', definitionRef: definitionRefs['basic.knowledge'], visibility: 'public' },
         { id: 'basic.rules', version: '1.0.0', definitionRef: definitionRefs['basic.rules'], visibility: 'public' },
+        ...(workflow ? workflow.dataElements.map((el) => ({
+          id: el.id, version: el.version, definitionRef: definitionRefs[el.id], visibility: 'public',
+        })) : []),
       ],
-      exports: [{ elementId: 'basic.knowledge' }, { elementId: 'basic.rules' }, { interfaceId: 'rules.api' }],
+      exports: [
+        { elementId: 'basic.knowledge' }, { elementId: 'basic.rules' },
+        { interfaceId: 'rules.api' },
+        ...(workflow ? workflow.dataElements.map((el) => ({ elementId: el.id })) : []),
+      ],
       targetVariants: variant([
         ...lifeImplementations('rules-package'),
         implementation('basic.rules', 'evaluate', rulesEntryRef, 'evaluate', [ruleRef]),
         implementation('basic.rules', 'optionalReport', rulesEntryRef, 'optionalReport'),
         implementation('basic.rules', 'initializeRule', rulesEntryRef, 'initializeRule'),
+        ...(workflow ? ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow']
+          .map((functionId) => implementation('basic.rules', functionId, rulesEntryRef, functionId)) : []),
       ]),
       init: lifecycleRefs['rules-package'],
       exit: lifecycleRefs['rules-package'],
@@ -335,8 +396,13 @@ async function authoring(label, rule, options = {}) {
         { id: lifecycleDefs['app-business'].id, version: '1.0.0',
           definitionRef: await artifactRef('app-business', 'elements/lifecycle.json'), visibility: 'private' },
         { id: 'basic.app', version: '1.0.0', definitionRef: definitionRefs['basic.app'], visibility: 'public' },
+        ...(workflow ? [{ id: workflow.child.id, version: workflow.child.version,
+          definitionRef: definitionRefs[workflow.child.id], visibility: 'private' }] : []),
       ],
-      imports: [refs.evaluate, refs.optionalReport, refs.initializeRule], exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
+      imports: [refs.evaluate, refs.optionalReport, refs.initializeRule,
+        ...(workflow ? workflow.readerRefs : [])],
+      ...(workflow ? { workflowRoots: [workflow.rootRef] } : {}),
+      exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
       targetVariants: variant([
         ...lifeImplementations('app-business'),
         implementation('basic.app', 'submit', businessEntryRef, 'submit', [ruleRef]),
@@ -369,18 +435,57 @@ async function authoring(label, rule, options = {}) {
     packageRoots: dirs,
     packageArtifacts: Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
     kdpArtifact: { packageId: 'kernel-primary', path: 'dist/index.js' },
-    runtimeDependencies: { '@kaicreator/domain-harness-microkernel': '0.11.0' },
+    runtimeDependencies: {
+      '@kaicreator/domain-harness-microkernel': '0.11.0',
+      ...(workflow ? { xstate: '5.33.2', yaml: '2.9.1' } : {}),
+    },
   };
-  return { root, dirs, input, descriptor, definitions, domainElements: [knowledge, rules, app], ruleRef, refs };
+  return {
+    root, dirs, input, descriptor, definitions,
+    domainElements: [knowledge, rules, app, ...(workflow ? [workflow.child] : [])],
+    ruleRef, refs, workflow,
+  };
 }
 
 async function installComposedDependencies(label, installRoot) {
-  const install = spawnSync(process.execPath, [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund'], {
+  // Workflow App 优先通过 BUILD 封存的受控安装器：先只解析 Lock，再验 SRI，最后 npm ci。
+  const installer = join(installRoot, 'dh-install', 'install-runtime.mjs');
+  let isWorkflowInstaller = false;
+  try {
+    await readFile(installer);
+    isWorkflowInstaller = true;
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  const installArgs = isWorkflowInstaller
+    ? [installer, microkernelTarball, contractsTarball]
+    : [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund', '--ignore-scripts'];
+  const install = spawnSync(process.execPath, installArgs, {
     cwd: installRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, npm_config_registry: process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry },
   });
-  await evidence(`${label}.composed-package-npm-install`, { exit: install.status, signal: install.signal });
+  await evidence(`${label}.composed-package-npm-install`, {
+    exit: install.status, signal: install.signal,
+    method: isWorkflowInstaller ? 'sealed-lock-first-ci' : 'legacy-non-workflow',
+  });
   assert.equal(install.status, 0, `${label}: composed App npm install failed\n${install.stdout}\n${install.stderr}`);
+  // An admitted Workflow App seals the exact archive SRI pins in the same Lock
+  // and ships a first-party verifier; check the resulting external npm install
+  // before importing the KDP or any selected third-party executable bytes.
+  const trustScript = join(installRoot, 'dh-install', 'verify-runtime.mjs');
+  try {
+    await readFile(trustScript);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+    return;
+  }
+  const verified = spawnSync(process.execPath, [trustScript], {
+    cwd: installRoot, encoding: 'utf8', timeout: 15000,
+  });
+  assert.equal(verified.status, 0,
+    `${label}: trusted third-party runtime archive SRI verification failed: ${verified.stderr}`);
+  await evidence(`${label}.trusted-runtime-install-sri`, { status: 'PASS', sha512Verified: true });
+
 }
 
 async function materialize(label, built) {
@@ -535,6 +640,127 @@ async function runPositive(label, rule, expectedAtHundred) {
   }
 }
 
+/** T14: full external tarball install → BUILD → Boot/KDP → Package.Init → real XState Workflow. */
+async function runWorkflowE2E() {
+  const prepared = await authoring('workflow-real-install', { minOrderTotal: 50, regions: ['EU', 'US'] },
+    { workflow: true });
+  try {
+    const first = await buildApp(prepared.input);
+    const second = await buildApp(prepared.input);
+    assert.equal(first.ok, true, JSON.stringify(first));
+    assert.equal(second.ok, true, JSON.stringify(second));
+    if (!first.ok || !second.ok) throw new Error('T14 selected Workflow must pass real BUILD');
+    assert.deepEqual(first.lockBytes, second.lockBytes, 'two actual Workflow BUILDs must yield exact Lock bytes');
+    assert.deepEqual(first.appPackage, second.appPackage, 'two actual Workflow BUILDs must yield exact package bytes');
+    assert.equal(first.lock.selectedWorkflows?.length, 2, 'parent and child selected in one Lock');
+    assert.equal(first.lock.selectedElements.filter((item) => item.ref.id.startsWith('basic.data_')).length, 4,
+      'two JSON and two YAML Data Elements must be selected, not only files');
+    for (const fnName of ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow']) {
+      assert.equal(first.lock.selectedFunctions.filter((item) => item.ref.functionId === fnName).length, 1,
+        `one selected FunctionRef for ${fnName}, reusable across distinct data Elements`);
+    }
+    const installed = await materialize('workflow-real-install', first);
+    for (const pkg of ['xstate', 'yaml']) {
+      const resolved = require.resolve(`${pkg}/package.json`, { paths: [installed.installRoot] });
+      assert.ok(resolved.startsWith(join(installed.installRoot, 'node_modules')),
+        `${pkg} must be installed in the exact composed consumer root`);
+    }
+    globalThis.__domainHarnessT05Events = [];
+    const booted = await boot(installed.pin, installed.context);
+    assert.equal(booted.status, 'BOOTED', JSON.stringify(booted));
+    if (booted.status !== 'BOOTED') throw new Error('T14 Workflow App failed real Boot');
+    assert.equal(booted.app.status, 'READY');
+    const timeline = globalThis.__domainHarnessT05Events;
+    const actualReaders = timeline.filter((item) => item.event === 'workflow-read');
+    assert.deepEqual(actualReaders.map((item) => [item.format, item.parsed.id, item.parsed.result]), [
+      ['json', 'json-a', 1],
+      ['yaml', 'yaml-a', 3],
+      ['json', 'json-b', 2],
+      ['yaml', 'yaml-b', 4],
+    ], 'two JSON and two YAML values must actually drive the same Reader Functions through real XState actors');
+    const hooks = timeline.filter((item) => item.event === 'workflow-hook');
+    assert.deepEqual(hooks.map((item) => item.kind), ['start', 'end']);
+    const startIndex = timeline.findIndex((item) => item.event === 'workflow-hook' && item.kind === 'start');
+    const endIndex = timeline.findIndex((item) => item.event === 'workflow-hook' && item.kind === 'end');
+    assert.ok(startIndex >= 0 && startIndex < endIndex && endIndex < timeline.findIndex(
+      (item) => item.event === 'workflow-read' && item.parsed.id === 'yaml-a'),
+    'end must be awaited before the next Workflow Node');
+    const outcome = timeline.filter((item) => item.event === 'workflow-outcome');
+    assert.equal(outcome.length, 1, 'Package.Init must start exactly one root Workflow');
+    assert.deepEqual(outcome[0].outcome, {
+      status: 'COMPLETE', value: { id: 'yaml-b', result: 4 },
+    });
+    assert.equal(timeline.filter((item) =>
+      item.event === 'package-init' && item.package === 'app-business').length, 1,
+    'Workflow children must never reenter Package.Init');
+    assert.equal(typeof booted.app.invoke, 'undefined', 'Workflow does not reintroduce public ingress');
+    await evidence('t14.workflow.clean-packed-actor', {
+      status: 'PASS', selectedWorkflows: 2, dataElements: 4, readerCalls: 4,
+      hooks: 2, outcome: outcome[0].outcome, lockDigest: installed.lock.closureDigest,
+    });
+    await booted.app.dispose();
+    assert.ok(timeline.findIndex((item) => item.event === 'package-exit') > timeline.findIndex(
+      (item) => item.event === 'workflow-outcome'),
+    'business Workflow end must not trigger Package.Exit');
+
+    // Tamper only an installed selected data resource. BUILD and signed Lock remain unchanged.
+    const tampered = await cloneInstall(installed);
+    const dataPath = join(tampered.installRoot, 'node_modules', 'rules-package',
+      'content', 'workflow-json-a.json');
+    await writeFile(dataPath, '{"id":"tampered","result":999}\n');
+    globalThis.__domainHarnessT05Events = [];
+    const refused = await boot(tampered.pin, tampered.context);
+    assert.notEqual(refused.status, 'BOOTED', 'tampered BUILD-selected Reader data must never reach READY');
+    assert.equal(globalThis.__domainHarnessT05Events.some((item) =>
+      item.event === 'workflow-read' && item.parsed.id === 'tampered'), false);
+    await evidence('t14.workflow.negative-resource-digest', {
+      status: 'PASS', resultStatus: refused.status,
+      code: refused.code, executedTamperedReader: false,
+    });
+    return { dataElements: 4, distinctFiles: 4, readerFunctions: 2, childActors: 1,
+      hookCalls: 2, cleanPacked: true, outcome: 'COMPLETE', tamperRejected: true };
+  } finally {
+    await rm(prepared.root, { recursive: true, force: true });
+  }
+}
+
+/** Actual production KDP ordering, not a mock SelectedWorkflowDriver. */
+async function runFatalWorkflowIntegration(fatalAt) {
+  const prepared = await authoring(`workflow-fatal-${fatalAt}`,
+    { minOrderTotal: 50, regions: ['EU', 'US'] },
+    { workflow: true, workflowFatalAt: fatalAt });
+  try {
+    const built = await buildApp(prepared.input);
+    assert.equal(built.ok, true, JSON.stringify(built));
+    if (!built.ok) throw new Error('T13 fatal Workflow fixture BUILD failed');
+    const install = await materialize(`workflow-fatal-${fatalAt}`, built);
+    globalThis.__domainHarnessT05Events = [];
+    const failed = await boot(install.pin, install.context);
+    assert.equal(failed.status, 'FAILED', `fatal ${fatalAt} must fail through real KDP`);
+    assert.equal(failed.code, 'DH_RUNTIME_NOT_READY');
+    const timeline = globalThis.__domainHarnessT05Events;
+    const hooks = timeline.filter((entry) => entry.event === 'workflow-hook').map((entry) => entry.kind);
+    assert.deepEqual(hooks, ['start', 'end'], 'fatal Hook/leaf must attempt end once');
+    const startIndex = timeline.findIndex((entry) => entry.event === 'workflow-hook' && entry.kind === 'start');
+    const endIndex = timeline.findIndex((entry) => entry.event === 'workflow-hook' && entry.kind === 'end');
+    const exitIndex = timeline.findIndex((entry) => entry.event === 'package-exit');
+    assert.ok(startIndex >= 0 && endIndex > startIndex && exitIndex > endIndex,
+      'production Workflow end MUST complete before first Package.Exit');
+    assert.equal(timeline.filter((entry) =>
+      entry.event === 'package-init' && entry.package === 'app-business').length, 1);
+    assert.equal(timeline.filter((entry) =>
+      entry.event === 'package-exit' && entry.package === 'app-business').length, 1,
+    'one reverse KDP Exit per entered business Package');
+    const unauthorized = timeline.find((entry) => entry.event === 'workflow-unauthorized');
+    assert.equal(unauthorized?.outcome?.reason?.code, 'DH_WORKFLOW_UNSELECTED');
+    await evidence(`t13.workflow-fatal-${fatalAt}.real-package-init-order`, {
+      status: 'PASS', startIndex, endIndex, exitIndex, exitedBusinessOnce: true,
+    });
+  } finally {
+    await rm(prepared.root, { recursive: true, force: true });
+  }
+}
+
 async function cloneInstall(source) {
   const installRoot = await mkdtemp(join(consumerRoot, 'negative-install-'));
   installRoots.add(installRoot);
@@ -566,6 +792,10 @@ async function main() {
   assert.notDeepEqual(a.install.lockBytes, b.install.lockBytes);
   assert.notEqual(a.install.lock.closureDigest, b.install.lock.closureDigest);
   await evidence('content-exchange.lock-and-output', { status: 'PASS', a: a.install.lock.closureDigest, b: b.install.lock.closureDigest, observed: 'Init-selected Function returned A POS vs B NEG for total=100; B EU UNKNOWN' });
+  const workflowAcceptance = await runWorkflowE2E();
+  await evidence('t14.workflow.acceptance-matrix', { status: 'PASS', ...workflowAcceptance });
+  await runFatalWorkflowIntegration('start');
+  await runFatalWorkflowIntegration('leaf');
 
   await expectBuildRefusal('unsupported-effect', { unsupportedEffect: true }, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
   await expectBuildRefusal('unsupported-target', { unsupportedTarget: true }, 'DH_BUILD_TARGET_INVALID');
@@ -774,6 +1004,16 @@ async function main() {
     AC08: { status: 'PASS_E2E', e2e: ['actual four-tarball SDK install + BUILD-composed App npm install + independent boot/dispose + per-entry realpath and byte equality', 'legacy import fences', 'contracts'], upstream: [] },
     AC09: { status: 'PASS_E2E', e2e: ['unsupported effect and target typed BUILD refusals', 'no unimplemented success path'], upstream: [] },
     AC10: { status: 'PASS_E2E', e2e: ['bilingual current-only author docs', 'executable canonical-source business-word scan (driver)'], upstream: [] },
+    AC11: { status: 'PASS_E2E', evidence: 'T14 real Workflow Definition and selected graph' },
+    AC12: { status: 'PASS_E2E', evidence: 'T14 Boot→Package.Init→XState root/child WorkflowRun' },
+    AC13: { status: 'PASS_E2E', evidence: 'Four Data Elements and exact reusable selected JSON/YAML Reader Functions' },
+    AC14: { status: 'PASS_E2E', evidence: 'Strict named Switch and COMPLETE outcome at final YAML Reader' },
+    AC15: { status: 'PASS_E2E', evidence: 'Async start/end Hooks await exactly once and never call Package.Exit' },
+    AC16: { status: 'PASS_E2E', evidence: 'Package.Init once, no public ingress, independent boot before READY' },
+    AC17: { status: 'UPSTREAM_SCOPED', evidence: 'T13 focused unit negative root call budget/depth and UNKNOWN/FAILED guard' },
+    AC18: { status: 'PASS_E2E', evidence: 'Tampered selected data bytes rejected by Boot/KDP before Reader' },
+    AC19: { status: 'PASS_E2E', evidence: 'Two BUILDs produce byte-equal Lock and complete App Package' },
+    AC20: { status: 'PARTIAL', evidence: 'Full remaining T14 negative matrix and independent audit pending' },
   };
   const result = { status: 'PASS', ac, events: events.length, sdkEntry };
   await writeFile(join(evidenceDir, 'consumer-result.json'), `${JSON.stringify(result, null, 2)}\n`);
