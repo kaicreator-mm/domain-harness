@@ -142,7 +142,7 @@ XState v5 的 Machine/Actor/guard callback 为 KDP 私有实现，不进入 Elem
 
 ### “声明式”和“确定性”应如何定义
 
-- **声明式**：业务作者在 Element Content 中描述状态、事件、合法转移、Guard/Step 绑定；XState 机器配置是 BUILD/Package 私有的派生产物，不以脚本字符串替代合同。
+- **声明式**：业务作者在 Element Content 中描述状态、事件、合法转移、Guard/Step 绑定；XState 机器配置是 BUILD 已编译、由 KDP 私有实例化的派生产物，不以脚本字符串替代合同。
 - **确定性**：同一已选 Package/Element 版本、同一输入与相同外部观测，Guard 与路由选择、步骤顺序、业务终态可重复；真实随机 ID、时间、异步 I/O 不被误称为确定性。
 - **显式歧义策略**：有多个候选 Guard/Transition 时优先在 BUILD 检查并要求确定的选择规则；不能把旧 XState bridge 的 routeIndex 原封不动升为新版产品 ABI。
 - **不混淆图**：Element 静态依赖图在 BUILD 无环；Workflow 业务行为图可以有环，但必须有边界；Domain 语义关系图可循环，三者不能混作一个 DAG。
