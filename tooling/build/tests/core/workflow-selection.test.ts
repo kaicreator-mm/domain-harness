@@ -40,33 +40,36 @@ function workflowCase(
     path: options.format === 'yaml' ? 'data/order.yml' : 'data/order.json',
     digest: sha256OfBytes(bytes),
   };
-  const check = functionRefOf(scenario.eligibility as ElementDefinition, 'evaluate');
-  const workflow: WorkflowDefinition = {
-    kind: 'Workflow',
-    schemaVersion: DH_WORKFLOW_SCHEMA_VERSION,
-    id: 'order-verification',
-    entryNodeId: 'assess',
-    maxElementCalls: 4,
-    maxDescendantWorkflowDepth: 0,
-    nodes: [{
-      id: 'assess', kind: 'function',
-      function: options.badNodeFunction ? { ...check, functionId: 'missing' } : check,
-      ...(options.withData ? { data: {
-        format: options.format ?? 'json', resource,
-        maxBytes: options.dataMaxBytes ?? 4096,
-      } } : {}),
-      switch: { exits: [
-        { label: 'SUCCEEDED', target: { terminal: 'COMPLETE' } },
-        { label: 'UNKNOWN', target: { terminal: 'UNKNOWN' } },
-        { label: 'FAILED', target: { terminal: 'FAILED' } },
-      ] },
-    }],
+  let workflow: WorkflowDefinition | undefined;
+  scenario.beforeSeal = () => {
+    const check = functionRefOf(scenario.eligibility as ElementDefinition, 'evaluate');
+    workflow = {
+      kind: 'Workflow',
+      schemaVersion: DH_WORKFLOW_SCHEMA_VERSION,
+      id: 'order-verification',
+      entryNodeId: 'assess',
+      maxElementCalls: 4,
+      maxDescendantWorkflowDepth: 0,
+      nodes: [{
+        id: 'assess', kind: 'function',
+        function: options.badNodeFunction ? { ...check, functionId: 'missing' } : check,
+        ...(options.withData ? { data: {
+          format: options.format ?? 'json', resource,
+          maxBytes: options.dataMaxBytes ?? 4096,
+        } } : {}),
+        switch: { exits: [
+          { label: 'SUCCEEDED', target: { terminal: 'COMPLETE' } },
+          { label: 'UNKNOWN', target: { terminal: 'UNKNOWN' } },
+          { label: 'FAILED', target: { terminal: 'FAILED' } },
+        ] },
+      }],
+    };
+    scenario.appMain.content.push({
+      id: 'business-flow', contentKind: 'workflow-definition',
+      schemaRef: { inline: { type: 'object' } },
+      required: true, value: workflow as unknown as JsonValue,
+    });
   };
-  scenario.appMain.content.push({
-    id: 'business-flow', contentKind: 'workflow-definition',
-    schemaRef: { inline: { type: 'object' } },
-    required: true, value: workflow as unknown as JsonValue,
-  });
   const { input } = scenario.finalize();
   if (options.withData && scenario.ws.packageRoots[resource.packageId]) {
     const onDisk = writeRaw(scenario.ws.packageRoots[resource.packageId]!, resource.path, bytes);
@@ -80,8 +83,13 @@ function workflowCase(
         contentId: 'business-flow',
       }] }
       : pkg);
+  if (workflow === undefined) throw new Error('fixture: beforeSeal did not create Workflow');
   return {
-    input: { ...input, packages },
+    input: {
+      ...input,
+      packages,
+      runtimeDependencies: { ...input.runtimeDependencies, xstate: '5.33.2', yaml: '2.9.1' },
+    },
     ref, resource, workflow,
   };
 }
@@ -102,6 +110,9 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
   const b = accepted(buildApp(input));
   assert.deepEqual(a.lockBytes, b.lockBytes, 'only one deterministic Lock is used');
   assert.equal(a.appPackage.packageDigest, b.appPackage.packageDigest);
+  const composedManifest = JSON.parse(Buffer.from(a.appPackage.files.find((file) => file.path === 'package.json')!.bytes).toString('utf8'));
+  assert.equal(composedManifest.dependencies.xstate, '5.33.2');
+  assert.equal(composedManifest.dependencies.yaml, '2.9.1');
   assert.equal(a.lock.selectedWorkflows?.length, 1);
   const selected = a.lock.selectedWorkflows![0]!;
   assert.deepEqual(selected.ref, { element: ref, contentId: 'business-flow' });
@@ -183,8 +194,36 @@ test('T12 R1: a Workflow cannot read unselected or undeclared Extension data', (
   rejected(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
-test('T12 R1: a Package without Workflow is still valid and has no synthetic Task', (t) => {
-  const scenario = standardCase();
+test('T12 R1: YAML anchors and aliases can resolve to bounded plain data', (t) => {
+  const { input, resource } = workflowCase(t, {
+    format: 'yaml', withData: true,
+    rawData: textEncoder.encode('base: &base {min: 50}\ncopy: *base\n'),
+  });
+  const built = accepted(buildApp(input));
+  assert.equal(built.lock.resourceDigests[`${resource.packageId}/${resource.path}`], resource.digest);
+});
+
+for (const [label, raw] of [
+  ['unknown custom tag', '!Foo {a: 1}\n'],
+  ['duplicate mapping key', 'a: 1\na: 2\n'],
+  ['unresolved alias', 'value: *missing\n'],
+  ['cyclic alias', 'a: &a [*a]\n'],
+  ['non-finite number', 'value: .inf\n'],
+] as const) {
+  test(`T12 R1: safe YAML parsing rejects ${label}`, (t) => {
+    const { input } = workflowCase(t, { format: 'yaml', withData: true, rawData: textEncoder.encode(raw) });
+    rejected(buildApp(input), 'DH_BUILD_SCHEMA_INVALID');
+  });
+}
+
+test('T12 R1: selected Workflow refuses a composed package without exact trusted runtime dependencies', (t) => {
+  const { input } = workflowCase(t, { format: 'yaml', withData: true });
+  const { xstate: ignored, ...runtimeDependencies } = input.runtimeDependencies;
+  void ignored;
+  rejected(buildApp({ ...input, runtimeDependencies }), 'DH_BUILD_TARGET_INVALID');
+});
+
+test('T12 R1: a Package without Workflow is still valid and has no synthetic Task', (t) => {  const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
   const result = accepted(buildApp(input));

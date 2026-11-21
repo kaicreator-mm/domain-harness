@@ -63,6 +63,8 @@ export interface StandardCase {
   kdpDependsOn: DomainPackageManifest['dependsOn'];
   sdkLifecycle: 'paired' | 'init-only';
   descriptorTarget: TargetSelector;
+  /** 在 pending 资源摘要替换完成后、定义序列化前补充 Fixture 内容。 */
+  beforeSeal?: () => void;
   finalize(): { input: BuildInput; refs: StandardRefs };
 }
 
@@ -264,6 +266,7 @@ export function standardCase(): StandardCase {
         }
       }
     }
+    case_.beforeSeal?.();
     const allBusiness = [faq, eligibility, legacyPrompt, appMain, ...case_.extraElements];
     const entries: DomainPackageManifest['elements'][number][] = [];
     for (const [index, element] of allBusiness.entries()) {
