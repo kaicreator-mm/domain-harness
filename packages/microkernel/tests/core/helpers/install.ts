@@ -485,7 +485,7 @@ export async function buildFixtureInstall(
     [`${FIXTURE_EXT}/dist/index.mjs`]: extArtifact.digest,
     [`${FIXTURE_EXT}/dist/hook.mjs`]: hookDigest,
     ...Object.fromEntries(lifeNames.map(([id]) => [
-      `${id}/elements/lifecycle.json`, digestOf(Buffer.from(JSON.stringify(lifecycleDefs[id]!), 'utf8')),
+      `${id}/elements/lifecycle.json`, bytesDigest(Buffer.from(JSON.stringify(lifecycleDefs[id]!), 'utf8')),
     ])),
   };
 
