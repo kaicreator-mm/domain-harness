@@ -595,7 +595,7 @@ async function main() {
     pkg(p, 'kernel-primary').layer = 'sdk';
   }, 'DH_BUILD_PRIMARY_MISSING');
   await expectBuildMutationRefusal('package-dependency-cycle', (p) => {
-    pkg(p, 'kernel-primary').dependsOn = [{ package: 'sdk-primary', version: '1.0.0', interface: 'sdk.api' }];
+    pkg(p, 'kernel-primary').dependsOn = [...pkg(p, 'kernel-primary').dependsOn, { package: 'sdk-primary', version: '1.0.0', interface: 'sdk.api' }];
   }, 'DH_BUILD_PACKAGE_CYCLE');
   await expectBuildMutationRefusal('hook-not-declared', (p) => {
     pkg(p, 'kernel-extension').contributesTo[0].hookId = 'not-an-audit-hook';
