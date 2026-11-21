@@ -409,6 +409,8 @@ export function standardCase(): StandardCase {
       dependsOn: [
         { package: 'kdp-kernel', version: '1.0.0', interface: 'kernel.api' },
         { package: 'orders-ext', version: '1.0.0', interface: 'orders.audit' },
+        ...(case_.aaaContributesTo.length > 0
+          ? [{ package: 'aaa-ext', version: '1.0.0', interface: 'aaa.audit' }] : []),
       ],
       imports: case_.sdkImports,
       exports: [{ interfaceId: 'sdk.api' }],

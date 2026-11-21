@@ -201,7 +201,7 @@ test('B0-07: Boot Pin must match Order 0 KDP identity before running package Ini
 });
 
 test('B0-07: immutable resource keys stay inside the selected Function closure', () => {
-  assert.deepEqual(splitResourceKey('fixture-business/content/rules.json', ['fixture-business']),
+  assert.deepEqual(splitResourceKey('fixture-business/content/rules.json'),
     { packageId: 'fixture-business', path: 'content/rules.json' });
   assert.equal(join('a', 'b').length > 0, true);
 });

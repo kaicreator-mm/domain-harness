@@ -349,7 +349,7 @@ test('R11 P1-02: four Cores with a repeated layer and non-contiguous Orders are 
   const definitionRef = writeRaw(dir, 'elements/lifecycle.json',
     new TextEncoder().encode(canonicalJson(element as JsonValue)));
   const lifeRef = {
-    namespace: 'orders', id: element.id, version: '1.0.0',
+    namespace: 'orders', id: element.id, version: '1.0.0' as const,
     digest: contentDigestOf(element as JsonValue),
   };
   const core = manifest('auxiliary-core', '1.0.0', {

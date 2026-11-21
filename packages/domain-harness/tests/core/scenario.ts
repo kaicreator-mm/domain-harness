@@ -353,9 +353,9 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       digest: await fileBytesDigest(businessModule),
     };
 
-    const lifecycle = {};
-    const lifecycleEntry = {};
-    const lifecycleRef = {};
+    const lifecycle: Record<string, ElementDefinition> = {};
+    const lifecycleEntry: Record<string, DomainPackageManifest['elements'][number]> = {};
+    const lifecycleRef: Record<string, FunctionRef['element']> = {};
     for (const [id, dir] of [
       ['kdp-kernel', kernelDir], ['sdk-core', sdkDir],
       ['orders-business', businessDir], ['orders-ext', extDir],

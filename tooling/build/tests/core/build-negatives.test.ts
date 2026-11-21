@@ -158,8 +158,12 @@ test('B0-02: lifecycle ElementRef digest mismatch is refused before choosing a T
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const packages = input.packages.map((pkg) => pkg.id === 'sdk-core'
-    ? { ...pkg, init: { ...pkg.init, digest: `sha256:${'0'.repeat(64)}` } } : pkg);
+  const packages = input.packages.map((raw) => {
+    const pkg = raw as DomainPackageManifest;
+    return pkg.id === 'sdk-core'
+      ? { ...pkg, init: { ...pkg.init, digest: `sha256:${'0'.repeat(64)}` } }
+      : pkg;
+  });
   expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_REF_UNRESOLVED');
 });
 
@@ -184,10 +188,7 @@ refusalCase('DH_BUILD_HOOK_CARDINALITY', (s) => {
     {
       ownerPackageId: 'sdk-core',
       hookId: 'audit',
-      entry: {
-        module: { packageId: 'aaa-ext', path: 'dist/aaa.mjs', digest: 'sha256:pending' },
-        exportName: 'audit',
-      },
+      function: functionRefOf(s.eligibility, 'evaluate'),
     },
   ];
 });
@@ -289,7 +290,7 @@ test('B0: BUILD refuses a module import from undeclared Extension even when its 
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const business = input.packages.find((pkg) => pkg.id === 'orders-business')!;
+  const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business')! as DomainPackageManifest;
   const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/cases/undeclared.mjs',
     new TextEncoder().encode("import 'aaa-ext';\nexport function init() { return { status: 'READY' }; }\n"));
   const changed = withInitTarget({ ...business, dependsOn: business.dependsOn.filter((dep) => dep.package !== 'aaa-ext') }, source);
@@ -301,7 +302,7 @@ test('B0-02: BUILD refuses declared Init Function whose Target module lacks name
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const sdk = input.packages.find((pkg) => pkg.id === 'sdk-core')!;
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core')! as DomainPackageManifest;
   const source = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/missing-init.mjs',
     new TextEncoder().encode("export function notInit() {}\n"));
   const changed = withInitTarget(sdk, source);
@@ -342,7 +343,7 @@ test('B0: raw cross-Package re-export cannot launder a Function handle', (t) => 
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const business = input.packages.find((pkg) => pkg.id === 'orders-business')!;
+  const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business')! as DomainPackageManifest;
   const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/cases/reexport.mjs',
     new TextEncoder().encode("export function init() {}\nexport { audit } from 'aaa-ext';\n"));
   const changed = withInitTarget(business, source);
@@ -354,7 +355,7 @@ test('B0: unapproved Node module loaders are not accepted in selected Function T
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const business = input.packages.find((pkg) => pkg.id === 'orders-business')!;
+  const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business')! as DomainPackageManifest;
   const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/cases/loader.mjs',
     new TextEncoder().encode("import { createRequire } from 'node:module';\nexport function init() {}\n"));
   const changed = withInitTarget(business, source);
@@ -388,7 +389,7 @@ function generatedLoaderCase(label: string, body: string, code: BuildErrorCode =
     const scenario = standardCase();
     t.after(scenario.ws.dispose);
     const { input } = scenario.finalize();
-    const business = input.packages.find((pkg) => pkg.id === 'orders-business')!;
+    const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business')! as DomainPackageManifest;
     const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/cases/guard.mjs',
       new TextEncoder().encode(body));
     const changed = withInitTarget(business, source);

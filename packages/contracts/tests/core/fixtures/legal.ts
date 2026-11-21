@@ -279,6 +279,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       exit: lifecycleElement('kdp-basic'),
       exitFunction: lifecycleFunction('kdp-basic', 'exit'),
       initResources: [],
+      imports: [],
       dependsOn: [],
     },
     {
@@ -297,6 +298,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       exit: lifecycleElement('sdk-core'),
       exitFunction: lifecycleFunction('sdk-core', 'exit'),
       initResources: [],
+      imports: [],
       dependsOn: ['kdp-basic'],
     },
     {
@@ -311,6 +313,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       exit: lifecycleElement('orders-business'),
       exitFunction: lifecycleFunction('orders-business', 'exit'),
       initResources: [],
+      imports: [],
       dependsOn: ['sdk-core'],
     },
   ],
