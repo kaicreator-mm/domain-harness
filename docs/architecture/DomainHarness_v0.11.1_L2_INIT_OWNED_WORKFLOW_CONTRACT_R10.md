@@ -1,3 +1,5 @@
+> **【CURRENT · R11 源码对照修订（2026-11-21）】**：[0.11.0 新规范 #1621](https://github.com/kaicreator-mm/domain-harness/pull/1621) 与 [源码实施 #1622](https://github.com/kaicreator-mm/domain-harness/pull/1622) **已合并至 `version/v0.11.x@da616929d6f794db0cd30183132231ba31d4eb05`**，其 R21 Exact-SHA 独立结论 `ACCEPT_SCOPED`，Woodpecker #2827 SUCCESS；不再是待审核 Draft/未实施。本文 R10 原设计范围依然有效，但执行接线**以 [R11 最新源码审计 A1–A8](DomainHarness_v0.11.1_R11_V0110_INTEGRATION_AUDIT.md) 优先**：当前 Package.init 是 `EntryRef` 而非 `ElementRef`；Init 内的 `context.functions` 暂不可通过尚未创建的 `DomainApp.invoke` 执行业务，需增加 BUILD 选定的受限 Workflow starter；Business Core.Init 仍负责 readiness 状态结果聚合；XState/YAML parser 必须服从最终组合包可信依赖闭包。两个 0.11.1 Draft PR 源分支相对最新列车均落后 62 commits，需在独立审核前同步基线。**以下旧 R10 文字出现“新版 0.11.0 未实施、仍是 Draft”等均仅是历史判断，以本更新为准。**
+
 # DomainHarness v0.11.1 — L2 R10：统一 Package.Init 内启动 Workflow
 
 > **设计状态：** Owner 2026-11-21 七项明确裁决的单源实施候选；尚未进行独立 Review/Freeze、源码实现或 CI。此文档在适用范围内**取代旧 R9.1 以及 X01–X10 跨版本冲突报告中未裁定的选项**；当前 v0.11.0 的真实源码仍是旧的 technicalInit/businessAppInit 机制，最新统一 Init/Exit 规范在 [#1621](https://github.com/kaicreator-mm/domain-harness/pull/1621) **仍为待审核的 Draft**，不能将任一设计决定冒充已实现。
