@@ -18,7 +18,7 @@ import {
 
 const element = {
   namespace: 'orders', id: 'decision', version: '1.0.0',
-  digest: `sha256:${'a'.repeat(64)}`,
+  digest: `sha256:${'a'.repeat(64)}` as `sha256:${string}`,
 } as const;
 const fn = {
   element, functionId: 'assess', contractVersion: '1',
