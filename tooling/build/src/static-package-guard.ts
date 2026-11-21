@@ -294,7 +294,7 @@ export function verifyImplementationExport(
   const source = ts.createSourceFile(target.module.path,
     new TextDecoder('utf-8', { fatal: true }).decode(scope.verify(target.module)),
     ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
-  const found = exportedNames(source);
+  const found = staticallyExportedNames(source);
   if (!found.has(target.exportName)) {
     throw refusal('DH_BUILD_IMPLEMENTATION_MISSING',
       `selected Function '${identity}' Target '${target.module.packageId}/${target.module.path}' lacks export '${target.exportName}'`);
