@@ -1,98 +1,32 @@
 {
   "name": "@kaicreator/domain-harness",
   "version": "0.11.0",
-  "description": "DomainHarness v0.11.0 Element-First public SDK (canonical entry; legacy ABI not shipped)",
+  "description": "Element-First DomainHarness 当前架构模块",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
   },
-  "main": "./dist/v011/index.js",
-  "types": "./dist/v011/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/v011/index.d.ts",
-      "import": "./dist/v011/index.js"
-    },
-    "./legacy": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
-    },
-    "./v2": {
-      "types": "./dist/public-v2/index.d.ts",
-      "import": "./dist/public-v2/index.js",
-      "require": "./dist/public-v2/index.js"
-    },
-    "./workflow": {
-      "types": "./dist/workflow/index.d.ts",
-      "import": "./dist/workflow/index.js",
-      "require": "./dist/workflow/index.js"
-    },
-    "./v3": {
-      "types": "./dist/public-v3/index.d.ts",
-      "import": "./dist/public-v3/index.js",
-      "require": "./dist/public-v3/index.js"
-    },
-    "./v4": {
-      "types": "./dist/public-v4/index.d.ts",
-      "import": "./dist/public-v4/index.js",
-      "require": "./dist/public-v4/index.js"
-    },
-    "./v7": {
-      "types": "./dist/public-v7/index.d.ts",
-      "import": "./dist/public-v7/index.js",
-      "require": "./dist/public-v7/index.js"
-    },
-    "./v7/execution": {
-      "types": "./dist/public-v7/execution.d.ts",
-      "import": "./dist/public-v7/execution.js",
-      "require": "./dist/public-v7/execution.js"
-    },
-    "./v9": {
-      "types": "./dist/public-v9/index.d.ts",
-      "import": "./dist/public-v9/index.js"
-    },
-    "./v9/deployment": {
-      "types": "./dist/public-v9/deployment.d.ts",
-      "import": "./dist/public-v9/deployment.js"
-    },
-    "./v8": {
-      "types": "./dist/public-v8/index.d.ts",
-      "import": "./dist/public-v8/index.js",
-      "require": "./dist/public-v8/index.js"
-    },
-    "./v8/host": {
-      "types": "./dist/host-v8/index.d.ts",
-      "import": "./dist/host-v8/index.js",
-      "require": "./dist/host-v8/index.js"
-    },
-    "./v8/dac": {
-      "types": "./dist/public-v8/dac.d.ts",
-      "import": "./dist/public-v8/dac.js"
+      "import": "./dist/index.js"
     }
   },
   "files": [
-    "dist/v011",
+    "dist",
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs",
-    "prepack": "npm run build && node scripts/assert-v011-pack-ready.mjs",
-    "build:legacy-test": "tsc -p tsconfig.legacy-test.json",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && npm run build:legacy-test && node --import tsx --test \"tests/**/*.test.ts\" && tsc -p tsconfig.test.json --noEmit"
+    "prepack": "npm run build",
+    "test:typecheck": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "@kaicreator/domain-harness-build": "0.11.0",
     "@kaicreator/domain-harness-contracts": "0.11.0",
     "@kaicreator/domain-harness-microkernel": "0.11.0"
-  },
-  "devDependencies": {
-    "ajv": "^8.17.1",
-    "json-schema-library": "11.6.2",
-    "jsonata": "^2.2.2",
-    "xstate": "^5.26.0",
-    "yaml": "^2.0.0",
-    "zod": "^4.0.0"
   }
 }

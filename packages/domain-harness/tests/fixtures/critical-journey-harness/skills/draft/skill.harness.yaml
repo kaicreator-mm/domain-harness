@@ -1,5 +1,0 @@
-output:
-  schema: output.schema.json
-resources:
-  - refs/context.md
-profile: synthetic-critical-journey

@@ -1,3 +1,7 @@
+<!-- DH_V0110_SOURCE_QUALITY_REWORK_OWNER_20261121 -->
+> **当前源码质量验收覆盖决议（Issue #1602）：** 虽然先前 0.11.0 Demo 的 AC01–AC10 获得 Scoped PASS，但 Owner 源码审核发现旧版代码、版本化包入口、英文历史注释、无关文件等重大问题。**0.11.0 源码架构/可维护性目前为 REWORK，不能按下文旧“已内部验收”的措辞提升代码质量资格。** 采用 [#1603](https://github.com/kaicreator-mm/domain-harness/pull/1603) 隔离重构，直到新版四包源码、类型、lint、真实单 Demo 通过且完整模块必要审核结束才可重新授予源码合格。后续阶段的规划与本次 0.11.0 重构是两个独立决策，本 PR 不实施未来阶段。
+<!-- /DH_V0110_SOURCE_QUALITY_REWORK_OWNER_20261121 -->
+
 # DomainHarness 0.11.x — 完整重写与 Domain-Bounded Harness 版本路线图（R4 · Owner Confirmed）
 
 <!-- DH_V011X_OWNER_CONFIRMED_FULL_REWRITE_STAGE_ROADMAP_20261121 -->
