@@ -1,9 +1,9 @@
-# DomainHarness v0.11.1 — Element/Init/Workflow 执行合同 L2 R9
+# DomainHarness v0.11.1 — Element/Init/Workflow 执行合同 L2 R9.1
 
-> **定位：** 根据用户 2026-11-21 六项明确决定，覆盖 R8 的未决选项及 R6/R7 中不再采用的方案；本稿是 L2 供独立审核的候选，尚未 Freeze/实施。L1 [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) · L2 [#1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) · 历史源码研究 [PR #1611](https://github.com/kaicreator-mm/domain-harness/pull/1611)。
+> **定位：** 根据用户 2026-11-21 六项决定及随后对嵌套深度的明确调整，形成 **R9.1 当前单源**：根 Run 的总调用预算继续共享，但**嵌套深度改为每个 Workflow 自己定义的相对子树上限**。覆盖 R9 原始“所有 Workflow 共享最大嵌套深度”表述；本稿为 L2 供独立审核的候选，尚未 Freeze/实施。L1 [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) · L2 [#1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) · 历史源码研究 [PR #1611](https://github.com/kaicreator-mm/domain-harness/pull/1611)。
 
 ```ini
-OUTPUT_LABEL=DH_V0111_L2_ELEMENT_INIT_WORKFLOW_SWITCH_HOOK_BUDGET_R9
+OUTPUT_LABEL=DH_V0111_L2_ELEMENT_INIT_WORKFLOW_SWITCH_HOOK_BUDGET_R9_1
 ELEMENT_DEFINITION=UNIQUE_VERSIONED_REF_MULTIPLE_USE
 NESTING_DECLARATION=OPTIONAL_TYPE_DEFAULT_WORKFLOW
 NESTING_IMPLEMENTED_KINDS=WORKFLOW_ONLY
@@ -14,7 +14,7 @@ BOOT_TECHNICAL_INIT=SEPARATE_NOT_BUSINESS_WORKFLOW_START
 READER_FORMATS=JSON_YAML
 CONTROL_ROUTING=EXPLICIT_SWITCH_NAMED_EXITS_NO_PRIORITY
 HOOK_NAMES=START_END
-BUDGET=SHARED_ROOT_CALL_COUNT_AND_MAX_DEPTH
+BUDGET=ROOT_SHARED_CALL_COUNT_PLUS_PER_WORKFLOW_RELATIVE_MAX_DESCENDANT_DEPTH
 XSTATE=KDP_PRIVATE_V5_WORKFLOW_ACTORS
 EXISTING_0110_RUNTIME_VALIDATION=UNCHANGED
 NEW_RUNTIME_BUSINESS_VALIDATION=FORBIDDEN
@@ -104,21 +104,39 @@ Element invocation entered
 - Workflow 自身作为 Element 有独立 start/end 生命周期；嵌套子 Workflow Actor 的最终结果与业务 end 收尾结束后才返回父 Actor。普通叶子调用不必分配独立 XState Workflow Actor。
 - **绝不可把 Hook 的 `start` 等同于 Package `technicalInit`，也不能把 `end` 等同于 `technicalDispose`**。`technicalDispose` 仍在整个 Package 销毁时运行一次；Task/Element 的结束不能销毁共享 Package。XState 同步 `exit` action 本身不保证异步清理完成，应显式 await 后进入机器最终状态。
 
-## 6. 预算：所有子 Workflow 共用一次根 Run 的全局限额
+## 6. 执行预算：根 Run 总调用数共享，嵌套深度各 Workflow 独立声明
 
-- BUILD 封存 `maxElementCalls`（或等价总调用预算）及 `maxWorkflowDepth`；根 Workflow、子 Workflow、重复引用的 Element、Reader/Guard 的实际 Element 调用共用**同一个根 Run 计数器**，不能为子 Workflow 重置配额。
-- 起始根层为 depth=1，调用一个子 Workflow 时 depth+1，返回父流程后深度恢复；超过深度/调用预算进入明确 FAILED/UNKNOWN 退出，不继续执行业务下一个节点。进入 Node 前检查剩余预算并计入一次调用；Guard/Reader 等若实际独立调用也计数。
-- 本版 Hook 为当前调用生命周期的一部分，不作为额外可动态递归进入的 Workflow：end 在预算耗尽时仍可尝试完成局部清理，不得借 Hook 调用隐藏的未授权业务 Element；所有业务可调用入口仍受 BUILD 已选权限限制。无限循环/递归不能用 Hook 逃避预算。
-- 运行身份 `rootRunId + hierarchicalInvocationPath + visit`，父子 Workflow 使用相同根身份但不同路径；Actor 仅是 KDP 私有机器实例。只做有限顺序、显式 Switch 分支、受限循环/子 Workflow；不做持久消息队列、多 Actor 任意并发或 Resume。
+**本节 R9.1 正式取代 R9「父子 Workflow 共用一个最大嵌套深度」的候选约束。** 两种限制独立：
+
+- **根 Run 总调用预算**：由 BUILD 为根入口封存 `maxElementCalls`（或等价总调用数），所有子 Workflow、Guard/Reader 等独立 Element 调用和重复节点访问共用**同一个根运行计数器**；进入子 Workflow 不可重置这个总数。该约束仍是整个 Run 的执行工作量上界。
+- **各 Workflow 自己的嵌套深度**：每个 Workflow Element 定义/选定实例绑定一个 `maxDescendantWorkflowDepth`（示意名字；**本身算 0 层、直接子 Workflow 算 1 层**）。这是当前 Workflow 对**自己整个子树**的允许深度，**不再在根 Run 存储/要求一个统一的 `maxWorkflowDepth` 值**。
+- **逐祖先生效、不被重置**：当准备进入新的子 Workflow 时，计算该子 Workflow 相对于所有活动祖先 Workflow 的距离；对于每个祖先 `a` 都必须满足 `prospectiveDepth - depth(a) <= a.maxDescendantWorkflowDepth`。子 Workflow 可以选择比父级更严格或更宽松的**自身子树**深度，但宽松值**不能扩张任何上层父 Workflow 已承诺的范围**；某祖先限制不足则不创建子 Actor、不进入新节点。
+- **BUILD 和缺省值**：BUILD 为每一个可执行 Workflow（含单节点 Workflow）封存有限非负的本地上限；未显式设置时，可从已解析、无环的 Workflow 静态包含图推导该定义实际所需的有限最大深度，并记录在 Lock，不在运行时动态猜值。上限为 0 表示这个 Workflow 不能嵌套子 Workflow。通过 `ElementRef` 复用同一 Workflow 定义时，相同版本定义采用相同本地上限，不因 node 位点覆盖/复制定义。
+- **确定性失败**：超出任何活动祖先的本地限制或根 Run 总调用预算时，本次分支明确进入失败/预算不足出口；禁止将超限伪装成业务 false/成功，也不能启动未获许可的下一层 Workflow。局部 end Hook 清理仍须尽可能完成，不能通过 Hook 产生隐藏的额外业务调用来突破预算。
+- **已有静态闭包边界不变**：静态 Element/Workflow 依赖图要求无环；Workflow 内行为转移允许在根调用总预算内有限循环；0.11.1 不引入无限递归、动态选择未选 Workflow、Durable 或任意多 Actor 并发。深度计数是 KDP 执行机制，而非新增通用业务 Schema 校验。
+
+### 一个跨层示例
+
+| Workflow | 自己允许的最大下级嵌套深度 | 约束说明 |
+|---|---:|---|
+| A（根） | 3 | A 的直接孩子、孙级、曾孙级最多 3 层 |
+| B（A 的孩子） | 1 | B 下方只允许再进入一层 C |
+| C（B 的孩子） | 4 | C 自身允许 4 层，但 B 的限制仍在生效 |
+
+A → B → C 可以启动：相对 A 的距离为 2，相对 B 的距离为 1。C 再调用 D 时，**虽然 C 的本地限制为 4，但 D 相对 B 的距离为 2，超过 B 的 1，必须拒绝**。
+
+反向情况也成立：A 若允许深度 1，B 声明 5，A → B 可启动，但 B → C 仍受 A 的 1 层范围限制。这保证“每个 Workflow 自定义上限”不是“新进一层就重新获得深度额度”。
+
+**验收补充**：同一个 B 定义复用在不同父 Workflow 下，每个父约束分别生效；B 的本地上限不得改写；根调用总数仍跨全部子流程、Guard/Reader、循环共享，不因父子切换归零。
 
 ## 7. T11–T14 工作拆分及最小验收（不增加第四个实现模块）
 
 | 子 Task | R9 交付 |
 |---|---|
 | T11 Element/Contracts | `nesting.kind=workflow` 缺省及单节点支持、Package Init Element/Workflow entry 合同、NodeRef、Switch exits、start/end hooks、Data Reader JSON/YAML 和共享 Run 身份 |
-| T12 BUILD/Lock | 每 Package Init→Workflow 封存、Element/Function/ResourceRef、Workflow 与子 Workflow 静态闭包、Switch 显式覆盖、JSON/YAML 生产期资格、全局预算、已选 Hook |
-| T13 KDP/XState | KDP 唯一 Workflow Actor 与 child Actor、Init Element 入口启动/Run 传播、Switch 转移、start/end await、根预算共用、最小失败退出/日志，复用 Stage0 已选调用 |
-| T14 SDK/packed E2E | 真四包 App 启动/READY → Package Init entry → 单节点及多节点/嵌套 Workflow；JSON/YAML Reader 各被两份数据复用；Switch APPROVED/REJECT/ASK/UNKNOWN/FAILED；start/end 正反路径和预算耗尽；Stage0 直接 Function 非退化 |
+| T12 BUILD/Lock | 每 Package Init→Workflow 封存、Element/Function/ResourceRef、Workflow 与子 Workflow 静态闭包、Switch 显式覆盖、JSON/YAML 生产期资格、根总调用预算及各 Workflow 本地嵌套深度、已选 Hook |
+| T13 KDP/XState | KDP 唯一 Workflow Actor 与 child Actor、Init Element 入口启动/Run 传播、Switch 转移、start/end await、根总调用预算共用、逐祖先应用 Workflow 本地嵌套上限、最小失败退出/日志，复用 Stage0 已选调用 |
+| T14 SDK/packed E2E | 真四包 App 启动/READY → Package Init entry → 单节点及多节点/嵌套 Workflow；JSON/YAML Reader 各被两份数据复用；Switch APPROVED/REJECT/ASK/UNKNOWN/FAILED；start/end 正反路径和根预算耗尽、父子不同本地深度限制；Stage0 直接 Function 非退化 |
 
 **范围冻结前审查**：L1 #1605 的产品行为必须反映本轮变更；L2 #1608 以 R9 为唯一当前候选，R8/R7 标记旧稿不再把 priority、JSON-only、onEnter/onFinally、任意嵌套类型作为实施依据。0.11.1 功能源码、Native Task DAG、独立审查/Freeze/CI/packed E2E 尚未完成，不得虚报。
 
