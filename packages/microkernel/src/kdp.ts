@@ -79,12 +79,12 @@ async function readDescriptorConfig(
 const APP_STATUSES: readonly AppStatus[] = ['READY', 'DEGRADED', 'BLOCKED', 'FAILED'];
 
 /** App 状态和业务 Function Outcome 各自独立；不通过 ingress 抑制表达降级。 */
-function validateInitResult(result: unknown): AppStatus | string {
+function validateInitResult(result: unknown): string {
   if (!isRecord(result) || typeof result['status'] !== 'string') return 'Business Core.Init must return AppInitResult';
   if (!APP_STATUSES.includes(result['status'] as AppStatus)) return 'Business Core.Init status invalid';
   if ('detail' in result && result['detail'] !== undefined && !isPlainJsonValue(result['detail']))
     return 'Business Core.Init detail invalid';
-  return result['status'] as AppStatus;
+  return result['status'];
 }
 export function validateBusinessCoreResults(raw: unknown): { status: AppStatus } {
   const list = Array.isArray(raw) ? raw : [raw];

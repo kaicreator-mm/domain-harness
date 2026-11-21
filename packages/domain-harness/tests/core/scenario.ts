@@ -340,10 +340,8 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       contractVersion: '1',
     });
     const evaluateRef = ref('evaluate');
-    const optionalReportRef = ref('optionalReport');
     await write(businessDir, 'dist/evaluate.mjs',
       businessEntryModuleSource(scenario, canonicalJson(evaluateRef)));
-    const dangerousRef = ref('dangerous');
     const evaluateModuleRef = {
       packageId: 'orders-business',
       path: 'dist/evaluate.mjs',
