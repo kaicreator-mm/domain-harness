@@ -357,11 +357,33 @@ test('T12 R11 P1: BUILD seals a preinstall verifier and script-free lock-first i
     };
   }
   const npmLock = { name: manifest.name, version: manifest.version, lockfileVersion: 3, requires: true, packages };
-  const run = () => spawnSync(process.execPath, [join(root, 'dh-install/verify-preinstall.mjs')],
-    { cwd: root, encoding: 'utf8', timeout: 15000 });
+  const run = (registry?: string) => spawnSync(process.execPath, [join(root, 'dh-install/verify-preinstall.mjs')],
+    { cwd: root, encoding: 'utf8', timeout: 15000,
+      env: registry ? { ...process.env, npm_config_registry: registry } : process.env });
   write('package-lock.json', JSON.stringify(npmLock));
   const pass = run();
   assert.equal(pass.status, 0, `已审核的 npm Lock 应通过：${pass.stderr}`);
+  // 真实 Woodpecker 使用 Docker 内部 HTTP Registry，必须匹配显式配置且不放松 SRI。
+  const localRegistry = 'http://host.docker.internal:14873';
+  const localLock = structuredClone(npmLock);
+  for (const pin of pins) {
+    (localLock.packages[`node_modules/${pin.name}`] as { resolved: string }).resolved =
+      `${localRegistry}/${pin.name}/-/${pin.name}-${pin.version}.tgz`;
+  }
+  write('package-lock.json', JSON.stringify(localLock));
+  const localPass = run(localRegistry);
+  assert.equal(localPass.status, 0, `显式本地 CI Registry 与相同 SRI 应通过：${localPass.stderr}`);
+  const unconfiguredLocal = run('https://registry.npmjs.org');
+  assert.notEqual(unconfiguredLocal.status, 0, '不得允许与已声明 Registry 不符的 HTTP 源');
+  assert.match(unconfiguredLocal.stderr, /DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH/u);
+  const untrustedOrigin = structuredClone(localLock);
+  (untrustedOrigin.packages['node_modules/xstate'] as { resolved: string }).resolved =
+    'http://untrusted.example/xstate/-/xstate-5.33.2.tgz';
+  write('package-lock.json', JSON.stringify(untrustedOrigin));
+  const remoteRefused = run(localRegistry);
+  assert.notEqual(remoteRefused.status, 0, '任意外部 HTTP Registry 必须在下载前被拒绝');
+  assert.match(remoteRefused.stderr, /DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH/u);
+  write('package-lock.json', JSON.stringify(npmLock));
   const altered = structuredClone(npmLock);
   (altered.packages['node_modules/xstate'] as { integrity: string }).integrity = 'sha512-UNAPPROVED';
   write('package-lock.json', JSON.stringify(altered));
