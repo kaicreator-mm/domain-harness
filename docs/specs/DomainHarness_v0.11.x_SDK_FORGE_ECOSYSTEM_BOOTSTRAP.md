@@ -99,7 +99,7 @@ CODE_STATUS=DESIGN_ONLY_NO_SOURCE_REFACTOR_CLAIM
 - **0.11.2 Domain Intelligence（#1612）**：Domain/Rule/Reader/Decision 的通用可复用能力作为**Standard Elements**；领域知识/业务规则仍由 Domain Package 携带，源创作/Package 生产属于 Forge。原先 #1644 的 Reader 解析职责设计，需要**重新以 SDK Package/Forge 生产分工为前提**审查，不得继续把“DomainHarness BUILD 复用 Reader 纯解析库”设为 Product 必须。
 - **0.11.3–0.11.6**：交互、授权 Effect、有界 LLM、Durable Task 都应作为 SDK 基础合同与可选标准/领域 Package 增量；禁止创造第二应用 Runtime、领域 Package 自动生产器或 Forge 替身。
 - **0.11.7–0.11.9**：执行证据、客户端经验、服务器汇总产出候选知识/流程改进；**真正新 Package 的生产/重新构建走 Forge Domain App**，使用 SDK 装配/激活新版本，不能由 SDK Server Meta 后台直接热写已运行 Package。
-- **自举目标进度**：必须在 0.11.x 后续版本规划和总控中有一条可追踪的 **SDK_SELF_HOSTING_NOT_YET_IMPLEMENTED** 跨阶段资格；最终唯一正式 main/Release 前是否为必要门，应由 Owner 在版本级 Product/AC 决定。不能把 Stage-0 Seed 伪装成已经完成的自举。
+- **自举目标进度与总 Release 资格**：Owner 已明确要求 **DomainHarness 自身也必须由 Domain Package 构建出来**，因此这是 **0.11.x 最终完整生态验收的必要条件**，不是可选特性；在总控 #1563 维持跨阶段资格 `SDK_SELF_HOSTING_NOT_YET_IMPLEMENTED`，完成真实 Stage-0→Forge App→新 DH Package→新 DH SDK→重复装配的 E2E 验收之前，不得宣称整个 0.11.x 自举完成或最终产品 Release 合格。每个内部阶段仅承担自己真实范围，不把自举的所有代码塞进 0.11.2 T00；Seed 绝不可冒充完成自举。
 - **标准 Element** 仍为普通选定的 Element/Package，按 R29 Catalog 递增；DomainForge 可以生产标准 Package 候选，但只有合格版本/来源/可复用真实 Consumer 与独审证据才可晋升 `STANDARD_ACCEPTED`。
 
 ## 6. 准入验收、否定标准及与旧规范的优先关系
