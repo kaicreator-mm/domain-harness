@@ -76,9 +76,6 @@ function staticallyExportedNames(source: ts.SourceFile): Set<string> {
 
 function publicFunctionExportNames(pkg: DomainPackageManifest, module: ResourceRef): Set<string> {
   const names = new Set<string>();
-  if (pkg.init.module.packageId === module.packageId && pkg.init.module.path === module.path) {
-    names.add(pkg.init.exportName);
-  }
   for (const variant of pkg.targetVariants) {
     for (const implementation of variant.implementations) {
       if (implementation.entry.module.packageId !== module.packageId || implementation.entry.module.path !== module.path) continue;
@@ -288,25 +285,18 @@ export function verifyGeneratedPackageImports(
   for (const entry of entries) visit(entry);
 }
 
-/** BUILD 不能只相信 Manifest 中的 EntryRef：最终 artifact 必须真实导出可调用的 Init/Exit。 */
-export function verifyLifecycleExports(scope: ResourceScope, pkg: DomainPackageManifest, artifact: ResourceRef): void {
-  const source = ts.createSourceFile(
-    artifact.path,
-    new TextDecoder('utf-8', { fatal: true }).decode(scope.read(artifact.packageId, artifact.path)),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.JS,
-  );
-  const found = new Set<string>();
-  for (const statement of source.statements) {
-    if (!ts.isFunctionDeclaration(statement) || !statement.name) continue;
-    if (!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
-    found.add(statement.name.text);
-  }
-  for (const name of [pkg.init && 'init', pkg.exit && 'exit'].filter((item): item is string => !!item)) {
-    if (!found.has(name)) {
-      throw refusal('DH_BUILD_SCHEMA_INVALID',
-        `Package '${pkg.id}' declares ${name} Element but artifact '${artifact.path}' does not statically export a function named '${name}'`);
-    }
+/** 已选 Function Target 必须在真实封存 ESM 中拥有该具名静态导出。 */
+export function verifyImplementationExport(
+  scope: ResourceScope,
+  target: { readonly module: ResourceRef; readonly exportName: string },
+  identity: string,
+): void {
+  const source = ts.createSourceFile(target.module.path,
+    new TextDecoder('utf-8', { fatal: true }).decode(scope.verify(target.module)),
+    ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  const found = exportedNames(source);
+  if (!found.has(target.exportName)) {
+    throw refusal('DH_BUILD_IMPLEMENTATION_MISSING',
+      `selected Function '${identity}' Target '${target.module.packageId}/${target.module.path}' lacks export '${target.exportName}'`);
   }
 }

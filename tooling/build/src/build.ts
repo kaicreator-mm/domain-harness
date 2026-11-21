@@ -15,14 +15,12 @@ import {
   type EffectIntent,
   type ElementDefinition,
   type ElementRef,
-  type EntryRef,
   type FunctionContract,
   type FunctionRef,
   type JsonValue,
   type ResolvedTarget,
   type ResourceRef,
   type SealedHookBinding,
-  type SealedIngress,
   type SelectedElement,
   type SelectedFunction,
   type SelectedPackage,
@@ -41,7 +39,7 @@ import { BuildRefusal, refusal } from './refusal.js';
 import { SchemaChecker } from './schema-check.js';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
-import { verifyGeneratedPackageImports, verifyLifecycleExports } from './static-package-guard.js';
+import { verifyGeneratedPackageImports, verifyImplementationExport } from './static-package-guard.js';
 import { composeAppPackage, sameAppPackageBytes, sealPackageManifest } from './app-package.js';
 
 
@@ -432,24 +430,34 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   };
 
-  // 公共入口由唯一 ID 映射至已选 FunctionRef；重复 ID 会被 Map 静默覆盖，所以必须在 BUILD 阶段拒绝。
-  const ingressResolved: { entry: DomainAppDescriptor['ingress'][number]; resolved: ResolvedFunction }[] = [];
-  const seenIngressIds = new Set<string>();
-  for (const [index, entry] of descriptor.ingress.entries()) {
-    if (seenIngressIds.has(entry.id)) {
-      throw refusal(
-        'DH_BUILD_SCHEMA_INVALID',
-        `duplicate ingress id '${entry.id}' would overwrite an already declared public entry`,
-        `ingress[${index}].id`,
-      );
+  // 真实生命周期 Element 的 Function/Target 由唯一选定逻辑身份解析，不从裸 artifact 推断。
+  const lifecycle = new Map<string, { init: ResolvedFunction; exit?: ResolvedFunction }>();
+  const lifecycleFunction = (pkg: DomainPackageManifest, ref: ElementRef, id: 'init' | 'exit'): ResolvedFunction => {
+    const loaded = elements.get(`${ref.namespace}|${ref.id}|${ref.version}`);
+    if (!loaded || loaded.owner.id !== pkg.id || loaded.definitionDigest !== ref.digest) {
+      throw refusal('DH_BUILD_REF_UNRESOLVED', `Package '${pkg.id}' ${id} must be an exact owned selected ElementRef`);
     }
-    seenIngressIds.add(entry.id);
-    const resolved = resolveFunctionRef(entry.function, `ingress.${entry.id}`);
-    requireExported(resolved, null);
-    ingressResolved.push({ entry, resolved });
+    const fns = loaded.def.functions.filter((fn) => fn.id === id);
+    if (fns.length !== 1) {
+      throw refusal('DH_BUILD_IMPLEMENTATION_MISSING', `Package '${pkg.id}' ${id} Element requires exactly one '${id}' Function`);
+    }
+    return { element: loaded, fn: fns[0]!, owner: pkg };
+  };
+  for (const pkg of packagesSorted) {
+    const init = lifecycleFunction(pkg, pkg.init, 'init');
+    const exit = pkg.exit ? lifecycleFunction(pkg, pkg.exit, 'exit') : undefined;
+    lifecycle.set(pkg.id, { init, ...(exit ? { exit } : {}) });
   }
-
-  // Business Core 的 Init Element 是唯一业务启动入口，不再额外绑定 Business App Init Function。
+  const hookFunctions: ResolvedFunction[] = [];
+  for (const pkg of packagesSorted) {
+    for (const contribution of pkg.contributesTo) {
+      const fn = resolveFunctionRef(contribution.function, `contributesTo.${pkg.id}.${contribution.hookId}`);
+      if (fn.owner.id !== pkg.id || !isExported(pkg, fn.element, fn.fn)) {
+        throw refusal('DH_BUILD_EXPORT_MISSING', `Hook provider '${pkg.id}' must be an owned exported selected FunctionRef`);
+      }
+      hookFunctions.push(fn);
+    }
+  }
 
   const importedFunctions = new Map<string, ResolvedFunction>();
   for (const manifest of packagesSorted) {
@@ -464,7 +472,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   const addSelected = (resolved: ResolvedFunction): void => {
     selectedFunctions.set(`${resolved.element.key}|${resolved.fn.id}`, resolved);
   };
-  for (const { resolved } of ingressResolved) addSelected(resolved);
+  for (const pair of lifecycle.values()) {
+    addSelected(pair.init);
+    if (pair.exit) addSelected(pair.exit);
+  }
+  for (const fn of hookFunctions) addSelected(fn);
   for (const resolved of importedFunctions.values()) addSelected(resolved);
   for (const loaded of elements.values()) {
     for (const fn of loaded.def.functions) {
@@ -528,6 +540,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       }
     }
     scope.verify(binding.entry.module);
+    verifyImplementationExport(scope, binding.entry, `${resolved.element.def.id}.${resolved.fn.id}`);
     for (const resource of binding.resources ?? []) {
       if (resource.packageId !== implementor.id &&
           !(dependsOnEdges.get(implementor.id) ?? []).includes(resource.packageId)) {
@@ -571,18 +584,19 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
         }
         throw error;
       }
-      const providers: EntryRef[] = [];
+      const providers: FunctionRef[] = [];
       for (const manifest of packagesSorted) {
         for (const contribution of manifest.contributesTo) {
           if (contribution.ownerPackageId !== owner.id || contribution.hookId !== hook.id) continue;
-          if (contribution.entry.module.packageId !== manifest.id) {
-            throw refusal(
-              'DH_BUILD_SCHEMA_INVALID',
-              `'${manifest.id}' contributes hook '${owner.id}/${hook.id}' with an entry module from package '${contribution.entry.module.packageId}'; a contribution carries its own package's artifact`,
-            );
+          if (!(dependsOnEdges.get(owner.id) ?? []).includes(manifest.id)) {
+            throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+              `Hook owner '${owner.id}' must declare provider '${manifest.id}' as direct Extension`);
           }
-          scope.verify(contribution.entry.module);
-          providers.push(contribution.entry);
+          const fn = resolveFunctionRef(contribution.function, `hook.${hook.id}`);
+          if (fn.owner.id !== manifest.id || !isExported(manifest, fn.element, fn.fn)) {
+            throw refusal('DH_BUILD_EXPORT_MISSING', `Hook '${hook.id}' provider must be an exported FunctionRef`);
+          }
+          providers.push(contribution.function);
         }
       }
       if (hook.cardinality === 'single' && providers.length > 1) {
@@ -591,7 +605,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
           `single hook '${owner.id}/${hook.id}' received ${providers.length} provider bindings`,
         );
       }
-      providers.sort(compareEntryRef);
+      providers.sort((a, b) => canonicalJson(toJson(a)).localeCompare(canonicalJson(toJson(b))));
       hookBindings.push({
         ownerPackageId: owner.id,
         hookId: hook.id,
@@ -633,22 +647,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     if (!artifactPath || !isRelativeResourcePath(artifactPath)) {
       throw refusal('DH_BUILD_RESOURCE_MISSING', `package '${manifest.id}' artifact path is not a canonical in-package path`);
     }
-    for (const [entry, name] of [[manifest.init, 'init'], [manifest.exit, 'exit']] as const) {
-      if (!entry) continue;
-      if (entry.module.packageId !== manifest.id || entry.module.path !== artifactPath || entry.exportName !== name) {
-        throw refusal('DH_BUILD_SCHEMA_INVALID',
-          `package '${manifest.id}' ${name} Element must resolve to its own selected artifact export '${name}'`);
-      }
-      scope.verify(entry.module);
-    }
-    for (const resource of manifest.initResources ?? []) {
-      if (resource.packageId !== manifest.id &&
-          !(dependsOnEdges.get(manifest.id) ?? []).includes(resource.packageId)) {
-        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
-          `Package '${manifest.id}' Init refers to undeclared Extension resource '${resource.packageId}'`);
-      }
-      scope.verify(resource);
-    }
+    // 物理入口只来自已选 Target，实现所在模块不必是 Package artifact。
   }
   const kdpId = descriptor.roots.kernelPrimary.package;
   if (coreOrders.get(0) !== kdpId || input.kdpArtifact.packageId !== kdpId) {
@@ -706,8 +705,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     const bytes = scope.read(manifest.id, artifactPath);
     const digest = digestOfBytes(bytes);
     scope.record(manifest.id, artifactPath, digest);
-    verifyLifecycleExports(scope, manifest, { packageId: manifest.id, path: artifactPath, digest });
+    // 已选 Target 的真实命名导出在 sealedFunctions 构造时逐个检验。
     sealPackageManifest(scope, manifest, manifest.id === kdpId ? input.kdpArtifact.path : undefined);
+    const pair = lifecycle.get(manifest.id)!;
+    const initRef = toFunctionRef(pair.init);
+    const initSelected = sealedFunctions.find((fn) => canonicalJson(toJson(fn.ref)) === canonicalJson(toJson(initRef)))!;
     sealedPackages.push({
       packageId: manifest.id,
       version: manifest.version,
@@ -716,8 +718,9 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       artifact: { packageId: manifest.id, path: artifactPath, digest },
       ...(manifest.order !== undefined ? { order: manifest.order } : {}),
       init: manifest.init,
-      ...(manifest.exit !== undefined ? { exit: manifest.exit } : {}),
-      initResources: [...(manifest.initResources ?? [])],
+      initFunction: initRef,
+      ...(pair.exit ? { exit: manifest.exit!, exitFunction: toFunctionRef(pair.exit) } : {}),
+      initResources: [...initSelected.resources],
       ...(manifest.recordInitFrom === true ? { recordInitFrom: true as const } : {}),
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
@@ -726,7 +729,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   verifyGeneratedPackageImports(scope, packagesSorted, [
     ...sealedPackages.map((pkg) => pkg.artifact),
     ...sealedFunctions.map((fn) => fn.implementation.module),
-    ...hookBindings.flatMap((hook) => hook.providers.map((entry) => entry.module)),
+    ...hookBindings.flatMap((hook) => hook.providers.map((ref) => {
+      const selected = sealedFunctions.find((fn) => canonicalJson(toJson(fn.ref)) === canonicalJson(toJson(ref)));
+      if (!selected) throw refusal('DH_BUILD_IMPLEMENTATION_MISSING', 'Hook provider implementation missing');
+      return selected.implementation.module;
+    })),
   ]);
   const kdpBytes = scope.read(input.kdpArtifact.packageId, input.kdpArtifact.path);
   const kdpDigest = digestOfBytes(kdpBytes);
@@ -750,13 +757,6 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       selectedFunctions: sealedFunctions,
       hookBindings: [...hookBindings].sort(compareHookBinding),
       coreOrder,
-      ingress: ingressResolved
-        .map(({ entry, resolved }): SealedIngress => ({
-          id: entry.id,
-          function: toFunctionRef(resolved),
-          optional: entry.optional ?? false,
-        }))
-        .sort((a, b) => (a.id < b.id ? -1 : 1)),
       resourceDigests: scope.toLockMap(),
       excludedUnknownContent: [...excludedUnknownContent].sort(),
     };
@@ -852,12 +852,6 @@ function compareResolvedFunction(a: ResolvedFunction, b: ResolvedFunction): numb
   const byElement = compareLoadedElement(a.element, b.element);
   if (byElement !== 0) return byElement;
   return a.fn.id < b.fn.id ? -1 : a.fn.id > b.fn.id ? 1 : 0;
-}
-
-function compareEntryRef(a: EntryRef, b: EntryRef): number {
-  if (a.module.packageId !== b.module.packageId) return a.module.packageId < b.module.packageId ? -1 : 1;
-  if (a.module.path !== b.module.path) return a.module.path < b.module.path ? -1 : 1;
-  return a.exportName < b.exportName ? -1 : a.exportName > b.exportName ? 1 : 0;
 }
 
 function compareHookBinding(a: SealedHookBinding, b: SealedHookBinding): number {
