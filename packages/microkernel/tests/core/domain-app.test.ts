@@ -181,7 +181,7 @@ test('inspect projects Lock facts only (B06), including DEGRADED suppression', a
   assert.equal(inspection.elements[0]?.ownerPackageId, 'fixture-business');
   assert.deepEqual(
     inspection.functions.map((fn) => fn.ref.functionId),
-    ['evaluate', 'optionalReport', 'appInit'],
+    ['evaluate', 'optionalReport'],
   );
   assert.deepEqual(
     inspection.ingress.map((entry) => [entry.id, entry.optional]),
