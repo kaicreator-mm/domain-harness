@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  boot, buildApp, contentDigestOf, type BuildInput,
+  boot, buildApp, canonicalJson, contentDigestOf, type BuildInput,
   type BuildSuccess, type DomainAppDescriptor,
   type DomainAppLock, type DomainPackageManifest, type JsonValue,
 } from '@kaicreator/domain-harness';
@@ -132,7 +132,8 @@ async function installAuthoredApp(
   await mkdir(join(installRoot, 'descriptor'), { recursive: true });
   await mkdir(join(installRoot, 'dh-lock'), { recursive: true });
   await mkdir(join(installRoot, 'dh-install'), { recursive: true });
-  await writeFile(join(installRoot, DESC_PATH), JSON.stringify(descriptor));
+  // Boot 验证 Descriptor 的规范化原始字节，不接受语义相同但非 canonical 的 JSON。
+  await writeFile(join(installRoot, DESC_PATH), canonicalJson(descriptor));
   await writeFile(join(installRoot, LOCK_PATH), built.lockBytes);
   const recordBase = {
     kind: 'DomainAppInstallRecord', schemaVersion: 'dh.install/0.11',
