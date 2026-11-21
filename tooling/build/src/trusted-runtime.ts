@@ -85,6 +85,22 @@ for (const [key, entry] of Object.entries(npmLock.packages)) {
   }
   if (!entry || typeof entry !== 'object') fail('DH_TRUSTED_RUNTIME_INSTALL_LOCK_INVALID');
 }
+// 外部 Registry 必须 HTTPS；仅 Docker/loopback 上显式配置的本地 CI Registry 可使用 HTTP。
+// 来源例外不能放松已批准的 archive SHA-512 SRI；npm ci 仍必须在执行脚本前检验实际字节。
+const approvedOrigin = (resolvedUrl) => {
+  try {
+    const parsed = new URL(resolvedUrl);
+    if (parsed.protocol === 'https:') return true;
+    if (parsed.protocol !== 'http:') return false;
+    if (!['localhost', '127.0.0.1', '::1', 'host.docker.internal'].includes(parsed.hostname)) return false;
+    const configured = process.env.npm_config_registry;
+    if (!configured) return false;
+    const registry = new URL(configured);
+    return registry.protocol === 'http:' && registry.origin === parsed.origin;
+  } catch {
+    return false;
+  }
+};
 for (const [index, archive] of manifest.archives.entries()) {
   if (archive.name !== ['xstate', 'yaml'][index] ||
       app.dependencies[archive.name] !== archive.version ||
@@ -96,7 +112,7 @@ for (const [index, archive] of manifest.archives.entries()) {
   if (!resolved || resolved.version !== archive.version ||
       resolved.integrity !== archive.integrity ||
       typeof resolved.resolved !== 'string' ||
-      !resolved.resolved.startsWith('https://')) {
+      !approvedOrigin(resolved.resolved)) {
     fail('DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH');
   }
 }
