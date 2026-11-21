@@ -1,3 +1,7 @@
+<!-- DH_V011X_OWNER_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP_20261121 -->
+> **0.11.x Owner 最新架构决定（覆盖旧候选）：** Workflow/State Machine 的**通用执行机制属于唯一 KDP Core**，内部可选用稳定 XState v5；Kernel Primary 通过自己的通用 Element/FunctionContract 表达机制，业务 Workflow/State/Guard 则作为 Business/Standard Element Content/Function 定义。BUILD 负责新流程的结构合法性与封存，Package 自行处理业务异常。**0.11.0 现有 Kernel/SDK 校验一律保留、不迁移、不删除；0.11.1 不再扩充 Kernel/SDK 运行时业务校验。** Kernel/SDK 保持原有 Boot Trust/生命周期/最小退出与日志，不承诺绝对安全或零异常。详情：[KDP/Element-First 设计 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 与 [质量信任和异常责任文档](../architecture/DomainHarness_v0.11.x_PACKAGE_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP.md)。该 Owner 决定不改变 0.11.1 L1 功能范围。
+<!-- /DH_V011X_OWNER_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP_20261121 -->
+
 <!-- DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
 > **0.11.0 源码质量最新状态（覆盖历史 REWORK）：** 先前的 REWORK 为真实历史，但已在 [Issue #1602](https://github.com/kaicreator-mm/domain-harness/issues/1602) / [PR #1603](https://github.com/kaicreator-mm/domain-harness/pull/1603) 通过 R12→R15 复审完成四模块重构，R15 `ACCEPT_SCOPED`（P0=0/P1=0、保留五项非阻断 P2），Woodpecker #2787 同 SHA SUCCESS，已合入 `version/v0.11.x`；后续 [PR #1606](https://github.com/kaicreator-mm/domain-harness/pull/1606) 补齐中文注释和调用流程文档并经 #2788 成功合入。**仅 0.11.0 Foundation/Stage-0 工程资格合格；main、统一 Release、0.11.1+ 和 Full Conformance 均不能据此晋升。**
 >
