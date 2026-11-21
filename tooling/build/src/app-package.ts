@@ -252,8 +252,8 @@ export function composeAppPackage(
   const needsWorkflowRuntime = (lock.selectedWorkflows?.length ?? 0) > 0;
   if (needsWorkflowRuntime) {
     const pins = TRUSTED_WORKFLOW_NPM_ARCHIVES.map((item) => ({ ...item }));
-    if (canonicalJson(lock.trustedRuntimeIntegrity as unknown as JsonValue) !==
-        canonicalJson(pins as unknown as JsonValue)) {
+    if (canonicalJson(lock.trustedRuntimeIntegrity) !==
+        canonicalJson(pins)) {
       throw refusal('DH_BUILD_LOCK_NOT_REPRODUCIBLE',
         'selected Workflow npm dependency tarball SRI pins do not match the sealed first-party BUILD list');
     }
