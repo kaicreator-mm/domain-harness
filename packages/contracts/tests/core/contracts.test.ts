@@ -420,8 +420,8 @@ test('T01 repair P2-2: ExportEntry accepts {} and every optional-key combination
     role: 'primary',
     order: 0,
     init: {
-      module: { packageId: 'orders.kdp', path: 'dist/index.mjs', digest: `sha256:${'0'.repeat(64)}` },
-      exportName: 'init',
+      namespace: 'orders', id: 'orders.kdp-lifecycle', version: '1.0.0',
+      digest: `sha256:${'0'.repeat(64)}`,
     },
     elements: [],
     dependsOn: [],

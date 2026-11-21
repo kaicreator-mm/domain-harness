@@ -230,13 +230,23 @@ export const DOMAIN_APP_DESCRIPTOR_FIXTURE: DomainAppDescriptor = {
     ],
   },
   extensions: [],
-  ingress: [
-    { id: 'evaluate', function: EVALUATE_FUNCTION_REF, optional: false },
-  ],
   config: {
     regionDefault: 'EU',
   },
 };
+
+const lifecycleElement = (id: string) => ({
+  namespace: 'fixture', id: `fixture.${id}-lifecycle`, version: '1.0.0' as const,
+  digest: contentDigestOf({ fixture: id, lifecycle: 1 }),
+});
+const lifecycleFunction = (id: string, name: 'init' | 'exit') => ({
+  element: lifecycleElement(id), functionId: name, contractVersion: '1',
+});
+const lifecycleSelected = (id: string, module: typeof ORDERS_BUSINESS_ARTIFACT) => ['init', 'exit'].map((name) => ({
+  ref: lifecycleFunction(id, name as 'init' | 'exit'),
+  outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
+  implementation: { module, exportName: name }, resources: [],
+}));
 
 export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
   kind: 'DomainAppLock',
@@ -264,7 +274,10 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
         path: 'dist/kdp-basic.mjs',
         digest: contentDigestOf({ fixture: 'kdp-basic/artifact', revision: 1 }),
       },
-      init: { module: { packageId: 'kdp-basic', path: 'dist/kdp-basic.mjs', digest: contentDigestOf({ fixture: 'kdp-basic/artifact', revision: 1 }) }, exportName: 'init' },
+      init: lifecycleElement('kdp-basic'),
+      initFunction: lifecycleFunction('kdp-basic', 'init'),
+      exit: lifecycleElement('kdp-basic'),
+      exitFunction: lifecycleFunction('kdp-basic', 'exit'),
       initResources: [],
       dependsOn: [],
     },
@@ -279,7 +292,10 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
         path: 'dist/sdk-core.mjs',
         digest: contentDigestOf({ fixture: 'sdk-core/artifact', revision: 1 }),
       },
-      init: { module: { packageId: 'sdk-core', path: 'dist/sdk-core.mjs', digest: contentDigestOf({ fixture: 'sdk-core/artifact', revision: 1 }) }, exportName: 'init' },
+      init: lifecycleElement('sdk-core'),
+      initFunction: lifecycleFunction('sdk-core', 'init'),
+      exit: lifecycleElement('sdk-core'),
+      exitFunction: lifecycleFunction('sdk-core', 'exit'),
       initResources: [],
       dependsOn: ['kdp-basic'],
     },
@@ -290,12 +306,19 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       role: 'primary',
       order: 2,
       artifact: ORDERS_BUSINESS_ARTIFACT,
-      init: { module: ORDERS_BUSINESS_ARTIFACT, exportName: 'init' },
+      init: lifecycleElement('orders-business'),
+      initFunction: lifecycleFunction('orders-business', 'init'),
+      exit: lifecycleElement('orders-business'),
+      exitFunction: lifecycleFunction('orders-business', 'exit'),
       initResources: [],
       dependsOn: ['sdk-core'],
     },
   ],
   selectedElements: [
+    ...['kdp-basic', 'sdk-core', 'orders-business'].map((id) => ({
+      ref: lifecycleElement(id), ownerPackageId: id, visibility: 'private' as const,
+      contentDigests: [], contractDigests: [contentDigestOf({ id, fn: 'init' }), contentDigestOf({ id, fn: 'exit' })],
+    })),
     {
       ref: EVALUATE_FUNCTION_REF.element,
       ownerPackageId: 'orders-business',
@@ -319,6 +342,9 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
     },
   ],
   selectedFunctions: [
+    ...lifecycleSelected('kdp-basic', { packageId: 'kdp-basic', path: 'dist/kdp-basic.mjs', digest: contentDigestOf({ fixture: 'kdp-basic/artifact', revision: 1 }) }),
+    ...lifecycleSelected('sdk-core', { packageId: 'sdk-core', path: 'dist/sdk-core.mjs', digest: contentDigestOf({ fixture: 'sdk-core/artifact', revision: 1 }) }),
+    ...lifecycleSelected('orders-business', ORDERS_BUSINESS_ARTIFACT),
     {
       ref: EVALUATE_FUNCTION_REF,
       outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'],
@@ -338,9 +364,6 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
   ],
   hookBindings: [],
   coreOrder: ['kdp-basic', 'sdk-core', 'orders-business'],
-  ingress: [
-    { id: 'evaluate', function: EVALUATE_FUNCTION_REF, optional: false },
-  ],
   resourceDigests: {
     'orders-business/content/rules.json': contentDigestOf({ fixture: 'orders/rules', revision: 1 }),
     'orders-business/content/faq.json': contentDigestOf({ fixture: 'orders/faq', revision: 1 }),
