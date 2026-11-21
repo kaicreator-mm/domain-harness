@@ -203,11 +203,14 @@ export class PackageSystem {
           return [key, this.resourceHandle(key)] as const;
         }));
         const allowedOwners = new Set([packageId, ...pkg.dependsOn]);
+        const explicitImports = new Set(pkg.imports.map((ref) => canonicalJson(ref)));
         const visibleFunctions = new Map<string, ReadonlyFunctionHandle>();
         for (const selected of this.lock.selectedFunctions) {
           const element = this.lock.selectedElements.find((candidate) =>
             canonicalJson(candidate.ref) === canonicalJson(selected.ref.element));
           if (!element || !allowedOwners.has(element.ownerPackageId)) continue;
+          if (element.ownerPackageId !== packageId && !explicitImports.has(canonicalJson(selected.ref))) continue;
+          if (element.ownerPackageId !== packageId && element.visibility !== 'public') continue;
           visibleFunctions.set(canonicalJson(selected.ref), Object.freeze({
             ref: structuredClone(selected.ref),
             invoke: (input: unknown): Promise<FunctionOutcome> => this.invokeSelectedFunction(selected.ref, input),

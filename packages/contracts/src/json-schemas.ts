@@ -596,7 +596,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['packageId', 'version', 'layer', 'role', 'artifact', 'init', 'initFunction', 'initResources', 'dependsOn'],
+          required: ['packageId', 'version', 'layer', 'role', 'artifact', 'init', 'initFunction', 'initResources', 'imports', 'dependsOn'],
           properties: {
             packageId: { type: 'string', minLength: 1 },
             version: { type: 'string', pattern: SEMVER_PATTERN },
@@ -609,6 +609,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
             exit: { $ref: '#/$defs/elementRef' },
             exitFunction: { $ref: '#/$defs/functionRef' },
             initResources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
+            imports: { type: 'array', items: { $ref: '#/$defs/functionRef' } },
             recordInitFrom: { const: true },
             dependsOn: { type: 'array', items: { type: 'string', minLength: 1 } },
           },

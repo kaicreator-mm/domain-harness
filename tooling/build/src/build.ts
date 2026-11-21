@@ -721,6 +721,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       initFunction: initRef,
       ...(pair.exit ? { exit: manifest.exit!, exitFunction: toFunctionRef(pair.exit) } : {}),
       initResources: [...initSelected.resources],
+      imports: [...manifest.imports],
       ...(manifest.recordInitFrom === true ? { recordInitFrom: true as const } : {}),
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
