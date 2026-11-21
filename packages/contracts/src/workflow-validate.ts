@@ -45,7 +45,8 @@ export function validateWorkflowDefinition(value: unknown): ValidationResult {
     if (!record(value)) { fail(path, 'expected FunctionRef object'); return; }
     keys(value, ['element', 'functionId', 'contractVersion'], path);
     checkElement(value['element'], `${path}.element`);
-    if (!id(value['functionId']) ||
+    // 复用 0.11.0 的公共 FunctionRef 规则：functionId 是非空字符串，不重新发明 ID 格式。
+    if (typeof value['functionId'] !== 'string' || value['functionId'].length === 0 ||
         typeof value['contractVersion'] !== 'string' || value['contractVersion'].length === 0) {
       fail(path, 'FunctionRef requires exact functionId and contractVersion');
     }
@@ -67,7 +68,8 @@ export function validateWorkflowDefinition(value: unknown): ValidationResult {
       fail(`${path}.resource`, 'expected ResourceRef object');
     } else {
       keys(resource, ['packageId', 'path', 'digest'], `${path}.resource`);
-      if (typeof resource['packageId'] !== 'string' || !id(resource['packageId']) ||
+      // 同样沿用 0.11.0 ResourceRef.packageId 的非空字符串合同。
+      if (typeof resource['packageId'] !== 'string' || resource['packageId'].length === 0 ||
           !isRelativeResourcePath(resource['path']) || !isContentDigest(resource['digest'])) {
         fail(`${path}.resource`, 'data must reference a BUILD-sealed package-root file with digest');
       }
@@ -95,6 +97,8 @@ export function validateWorkflowDefinition(value: unknown): ValidationResult {
 
   const ids = new Set<string>();
   const targets: { source: string; destination: string }[] = [];
+  // 将同源 Node 的已声明后继边索引一次，遍历可达性为 O(V+E)，不可再重复全量扫描。
+  const successors = new Map<string, string[]>();
   let terminalCount = 0;
   nodes.forEach((item: unknown, i: number) => {
     const path = `workflow.nodes[${i}]`;
@@ -150,7 +154,12 @@ export function validateWorkflowDefinition(value: unknown): ValidationResult {
       if ('nodeId' in target && !('terminal' in target)) {
         keys(target, ['nodeId'], `${ep}.target`);
         if (!id(target['nodeId'])) fail(`${ep}.target.nodeId`, 'invalid target node id');
-        else if (id(nodeId)) targets.push({ source: nodeId, destination: target['nodeId'] });
+        else if (id(nodeId)) {
+          targets.push({ source: nodeId, destination: target['nodeId'] });
+          const edges = successors.get(nodeId) ?? [];
+          edges.push(target['nodeId']);
+          successors.set(nodeId, edges);
+        }
       } else if ('terminal' in target && !('nodeId' in target)) {
         keys(target, ['terminal'], `${ep}.target`);
         if (!TERMINALS.has(target['terminal'] as string)) fail(`${ep}.target.terminal`, 'invalid Workflow terminal');
@@ -177,8 +186,9 @@ export function validateWorkflowDefinition(value: unknown): ValidationResult {
       const current = frontier.pop()!;
       if (visited.has(current)) continue;
       visited.add(current);
-      for (const edge of targets) if (edge.source === current && !visited.has(edge.destination))
-        frontier.push(edge.destination);
+      for (const next of successors.get(current) ?? []) {
+        if (!visited.has(next)) frontier.push(next);
+      }
     }
     for (const nodeId of ids) {
       if (!visited.has(nodeId)) fail(`workflow.nodes.${nodeId}`, 'node is unreachable from entry');
