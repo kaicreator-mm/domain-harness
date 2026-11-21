@@ -36,7 +36,7 @@ export const TRUSTED_RUNTIME_VERIFY_MODULE = `import { readFile } from 'node:fs/
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const appRoot = fileURLToPath(new URL('../../', import.meta.url));
+const appRoot = fileURLToPath(new URL('../', import.meta.url));
 const manifest = JSON.parse(await readFile(new URL('./trusted-runtime.json', import.meta.url), 'utf8'));
 if (manifest.kind !== 'DomainHarnessTrustedRuntime' ||
     manifest.schemaVersion !== 'dh.runtime-integrity/0.11' ||
