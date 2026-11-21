@@ -291,7 +291,7 @@ async function authoring(label, rule, options = {}) {
       exports: [{ interfaceId: 'kernel.extension' }, { elementId: lifecycleDefs['kernel-extension'].id, functionId: 'auditHook' }],
       init: lifecycleRefs['kernel-extension'],
       elements: [{ id: lifecycleDefs['kernel-extension'].id, version: '1.0.0',
-        definitionRef: await artifactRef('kernel-extension', 'elements/lifecycle.json'), visibility: 'private' }],
+        definitionRef: await artifactRef('kernel-extension', 'elements/lifecycle.json'), visibility: 'public' }],
       targetVariants: variant(lifeImplementations('kernel-extension')),
       exit: lifecycleRefs['kernel-extension'],
     }),
@@ -500,29 +500,25 @@ async function runPositive(label, rule, expectedAtHundred) {
     assert.equal(runtimeEvents.filter((event) => event.event === 'business-init').length, 1);
     await evidence(`${label}.boot-kdp-app-init`, { status: 'PASS', initOrder: initialized, businessInitCount: 1 });
 
-    const pos = await app.invoke('submit', { total: 100, region: 'US' });
-    const neg = await app.invoke('submit', { total: 10, region: 'US' });
-    const unknownOutcome = await app.invoke('submit', { total: 100, region: 'APAC' });
+    // v0.11.0 业务执行只在 Package.Init 中进行；不调用公开 App.invoke。
+    const selectedCall = runtimeEvents.find((event) => event.event === 'init-selected-function');
+    assert.ok(selectedCall, 'selected Function must execute while App is still being initialized');
+    const { pos, neg, unknown: unknownOutcome, invalid: invalidInput, eu } = selectedCall;
     assert.deepEqual(pos, { kind: 'SUCCEEDED', value: { decision: expectedAtHundred, via: 'rules-package/evaluate' } });
     assert.deepEqual(neg, { kind: 'SUCCEEDED', value: { decision: 'NEG', via: 'rules-package/evaluate' } });
     assert.equal(unknownOutcome.kind, 'UNKNOWN');
     assert.equal(unknownOutcome.unknownReason.code, 'REGION_UNKNOWN');
     if (!rule.regions.includes('EU')) {
-      const excluded = await app.invoke('submit', { total: 100, region: 'EU' });
-      assert.equal(excluded.kind, 'UNKNOWN');
-      assert.equal(excluded.unknownReason.code, 'REGION_UNKNOWN');
+      assert.equal(eu.kind, 'UNKNOWN');
+      assert.equal(eu.unknownReason.code, 'REGION_UNKNOWN');
     }
-    const invalidInput = await app.invoke('submit', { total: 'not-a-number', region: 'US' });
-    assert.equal(invalidInput.kind, 'FAILED', 'invalid input must not enter the domain implementation');
+    assert.equal(invalidInput.kind, 'FAILED', 'invalid input must fail before selected Function implementation');
     assert.equal(invalidInput.failure.code, 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH');
-    const unselectedIngress = await app.invoke('not-in-lock', { total: 100, region: 'US' });
-    assert.equal(unselectedIngress.kind, 'FAILED');
-    assert.equal(unselectedIngress.failure.code, 'DH_RUNTIME_INGRESS_UNKNOWN');
-    await evidence(`${label}.negative-ingress`, {
-      status: 'PASS', invalidInputCode: invalidInput.failure.code,
-      unselectedIngressCode: unselectedIngress.failure.code,
+    assert.equal(typeof app.invoke, 'undefined', 'v0.11.0 no longer exposes direct business ingress');
+    await evidence(`${label}.init-selected-function`, {
+      status: 'PASS', pos: pos.value, neg: neg.value,
+      unknown: unknownOutcome.unknownReason, invalid: invalidInput.failure.code,
     });
-    await evidence(`${label}.cross-package-pos-neg-unknown`, { status: 'PASS', pos: pos.value, neg: neg.value, unknown: unknownOutcome.unknownReason });
 
     const inspection = await app.inspect();
     assert.equal(inspection.appIdentity.lockDigest, install.lock.closureDigest);
@@ -532,10 +528,7 @@ async function runPositive(label, rule, expectedAtHundred) {
     assert.deepEqual(disposed,
       ['rules-package', 'app-business', 'sdk-extension', 'sdk-primary', 'kernel-extension', 'kernel-primary'],
       'Exit follows actual recursive Init entry stack, deepest first');
-    const afterDispose = await app.invoke('submit', { total: 100, region: 'EU' });
-    assert.equal(afterDispose.kind, 'FAILED');
-    assert.equal(afterDispose.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
-    await evidence(`${label}.inspect-dispose`, { status: 'PASS', exitOrder: disposed, postDisposeCode: afterDispose.failure.code });
+    await evidence(`${label}.inspect-dispose`, { status: 'PASS', exitOrder: disposed, directIngress: false });
     return { prepared, install };
   } finally {
     await rm(prepared.root, { recursive: true, force: true });
@@ -572,7 +565,7 @@ async function main() {
   const b = await runPositive('rule-b', { minOrderTotal: 500, regions: ['US'] }, 'NEG');
   assert.notDeepEqual(a.install.lockBytes, b.install.lockBytes);
   assert.notEqual(a.install.lock.closureDigest, b.install.lock.closureDigest);
-  await evidence('content-exchange.lock-and-output', { status: 'PASS', a: a.install.lock.closureDigest, b: b.install.lock.closureDigest, observed: 'A POS vs B NEG for total=100; B EU UNKNOWN' });
+  await evidence('content-exchange.lock-and-output', { status: 'PASS', a: a.install.lock.closureDigest, b: b.install.lock.closureDigest, observed: 'Init-selected Function returned A POS vs B NEG for total=100; B EU UNKNOWN' });
 
   await expectBuildRefusal('unsupported-effect', { unsupportedEffect: true }, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
   await expectBuildRefusal('unsupported-target', { unsupportedTarget: true }, 'DH_BUILD_TARGET_INVALID');
@@ -588,12 +581,12 @@ async function main() {
   await expectBuildMutationRefusal('missing-content-reference', () => {}, 'DH_BUILD_RESOURCE_MISSING', { missingRuleRef: true });
   await expectBuildMutationRefusal('element-dependency-cycle', () => {}, 'DH_BUILD_ELEMENT_CYCLE', { elementCycle: true });
   await expectBuildMutationRefusal('missing-public-export', (p) => {
-    pkg(p, 'app-business').exports = [{ interfaceId: 'business.api' }];
+    pkg(p, 'rules-package').exports = [{ interfaceId: 'rules.api' }];
   }, 'DH_BUILD_EXPORT_MISSING');
   await expectBuildMutationRefusal('missing-selected-implementation', (p) => {
     const business = pkg(p, 'app-business');
     business.targetVariants[0].implementations =
-      business.targetVariants[0].implementations.filter((binding) => binding.functionId !== 'submit');
+      business.targetVariants[0].implementations.filter((binding) => binding.functionId !== 'init');
   }, 'DH_BUILD_IMPLEMENTATION_MISSING');
   await expectBuildMutationRefusal('unselected-core-primary', (p) => {
     pkg(p, 'sdk-extension').role = 'primary';
@@ -608,8 +601,8 @@ async function main() {
     pkg(p, 'kernel-extension').contributesTo[0].hookId = 'not-an-audit-hook';
   }, 'DH_BUILD_HOOK_TARGET_INVALID');
   await expectBuildMutationRefusal('missing-selected-package-init', (p) => {
-    pkg(p, 'app-business').init.exportName = 'nonexistentInit';
-  }, 'DH_BUILD_SCHEMA_INVALID');
+    pkg(p, 'app-business').init.digest = `sha256:${'0'.repeat(64)}`;
+  }, 'DH_BUILD_REF_UNRESOLVED');
   await expectBuildMutationRefusal('bad-resource-digest', (p) => {
     pkg(p, 'app-business').targetVariants[0].implementations[0].resources[0].digest = `sha256:${'0'.repeat(64)}`;
   }, 'DH_BUILD_RESOURCE_DIGEST_MISMATCH');
@@ -640,7 +633,7 @@ async function main() {
     const failedInit = await boot(failedInitInstall.pin, failedInitInstall.context);
     assert.equal(failedInit.status, 'FAILED', JSON.stringify(failedInit));
     assert.equal(failedInit.code, 'DH_RUNTIME_NOT_READY');
-    assert.equal('app' in failedInit, false, 'failed App Init must not expose any App/ingress handle');
+    assert.equal('app' in failedInit, false, 'failed App Init must not expose a DomainApp');
     const timeline = globalThis.__domainHarnessT05Events;
     const initialized = timeline.filter((event) => event.event === 'package-init').map((event) => event.package);
     const disposed = timeline.filter((event) => event.event === 'package-exit').map((event) => event.package);
@@ -655,25 +648,20 @@ async function main() {
     await rm(failedInitPrepared.root, { recursive: true, force: true });
   }
 
-  const degradedPrepared = await authoring('degraded-optional-ingress', { minOrderTotal: 50, regions: ['EU', 'US'] }, { initDegraded: true });
+  const degradedPrepared = await authoring('degraded-status', { minOrderTotal: 50, regions: ['EU', 'US'] }, { initDegraded: true });
   try {
     const built = await buildApp(degradedPrepared.input);
     assert.equal(built.ok, true, JSON.stringify(built));
-    const install = await materialize('degraded-optional-ingress', built);
+    const install = await materialize('degraded-status', built);
     globalThis.__domainHarnessT05Events = [];
     const booted = await boot(install.pin, install.context);
     assert.equal(booted.status, 'BOOTED', JSON.stringify(booted));
-    if (booted.status !== 'BOOTED') throw new Error('degraded fixture failed Boot');
+    if (booted.status !== 'BOOTED') throw new Error('degraded status fixture did not Boot');
     assert.equal(booted.app.status, 'DEGRADED');
-    const inspection = await booted.app.inspect();
-    assert.deepEqual(inspection.suppressedIngress, ['optional-report']);
-    const stillCallable = await booted.app.invoke('submit', { total: 100, region: 'US' });
-    assert.deepEqual(stillCallable, { kind: 'SUCCEEDED', value: { decision: 'POS', via: 'rules-package/evaluate' } });
-    const suppressed = await booted.app.invoke('optional-report', {});
-    assert.equal(suppressed.kind, 'FAILED');
-    assert.equal(suppressed.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
+    const selected = globalThis.__domainHarnessT05Events.find((event) => event.event === 'init-selected-function');
+    assert.equal(selected?.pos?.kind, 'SUCCEEDED', 'even a DEGRADED App completed its selected Init Function');
     await booted.app.dispose();
-    await evidence('positive.degraded-optional-ingress', { status: 'PASS', suppressed: inspection.suppressedIngress, requiredCallable: true });
+    await evidence('positive.degraded-status', { status: 'PASS', directIngress: false });
   } finally {
     await rm(degradedPrepared.root, { recursive: true, force: true });
   }
