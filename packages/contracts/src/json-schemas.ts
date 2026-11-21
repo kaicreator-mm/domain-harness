@@ -4,6 +4,7 @@ import {
   DH_APP_SCHEMA_VERSION,
   DH_DOMAIN_SCHEMA_VERSION,
   DH_ELEMENT_SCHEMA_VERSION,
+  DH_WORKFLOW_SCHEMA_VERSION,
   DH_LOCK_SCHEMA_VERSION,
   DH_PACKAGE_SCHEMA_VERSION,
 } from './schema-versions.js';
@@ -771,7 +772,7 @@ export const WORKFLOW_DEFINITION_JSON_SCHEMA: JsonObject = defsEnvelope(
       'maxDescendantWorkflowDepth', 'nodes'],
     properties: {
       kind: { const: 'Workflow' },
-      schemaVersion: { const: 'dh.workflow/0.11' },
+      schemaVersion: { const: DH_WORKFLOW_SCHEMA_VERSION },
       id: { type: 'string', pattern: IDENTIFIER_PATTERN },
       entryNodeId: { type: 'string', pattern: IDENTIFIER_PATTERN },
       maxElementCalls: { type: 'integer', minimum: 1, maximum: 100000 },
