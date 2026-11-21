@@ -1,100 +1,84 @@
-# DomainHarness 0.11.x — Domain / Harness / SDK 三名称、完整产品目标与临时自举工具（R34）
+# DomainHarness 0.11.x — Domain / Harness / SDK 三名称与临时自举种子工具（R34/R35）
 
-> **Owner 最新产品定义的显式细化**。必须与 [SDK–Forge 生态与自举 R33](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) 一起使用。本规范修正先前“DomainHarness 就是 BUILD/Compiler/全套业务生产平台”的误归属。**本阶段仅确定产品语义、种子构建边界和验收模型；既有代码尚未整体重构、自举尚未 PASS。**
+> **0.11.x 独立完成 DomainHarness SDK；DomainForge 暂缓。** 本规范与 [SDK 生态、自举和 Forge 暂缓说明](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) 一起构成最新 Owner 范围。历史 R33/R34 要求“先完成 Forge Domain App 才能验收 DH 0.11.x”已经撤销。唯一 Forge 状态记录：[Forge #218](https://github.com/kaicreator-mm/domain-forge/issues/218)，**不阻塞 DH**。规范不是源码已经完成的证明。
 
 ```ini
-OUTPUT_LABEL=DH_V011X_R34_DOMAIN_HARNESS_SDK_THREE_NAMES_AND_TEMP_BOOTSTRAP
+OUTPUT_LABEL=DH_V011X_R35_THREE_NAMES_SEED_ONLY
 MASTER=#1563
 FOUNDATION=#1564
-VERSION_TRAIN=version/v0.11.x
-PRODUCT_GOAL=BUILD_THE_DOMAIN_HARNESS_SDK
-DOMAIN=BOUNDED_BUSINESS_SEMANTICS_AND_KNOWLEDGE
-HARNESS=BOUNDED_DOMAIN_TASK_EXECUTION_AND_CONTROL
-SDK=REUSABLE_EMBEDDABLE_PACKAGE_ASSEMBLY_BOOT_EXECUTION_API
-DOMAINFORGE=DOMAIN_HARNESS_SDK_BASED_DOMAIN_APP_PACKAGE_PRODUCER
-SEED_BUILDER=DH_ONLY_TEMPORARY_NON_PUBLIC_NON_GENERAL_PURPOSE
-SEED_BUILDER_SCOPE=ONLY_DOMAIN_HARNESS_OWN_DOMAIN_PACKAGES
-NEXT_STAGE=FORGE_AS_PRODUCTION_PACKAGE_PRODUCER
-FINAL_SELF_HOSTING=MANDATORY_NOT_YET_IMPLEMENTED
+GOAL=COMPLETE_DOMAIN_HARNESS_SDK
+DOMAIN=BOUNDED_KNOWLEDGE_FACTS_RULES
+HARNESS=BOUNDED_TASK_EXECUTION
+SDK=REUSABLE_BOOT_PLUS_DOMAIN_PACKAGE_CONTRACT_AND_ASSEMBLY
+SEED_TOOL=TEMP_DH_ONLY_NOT_PUBLIC
+SEED_TOOL_ISSUE=#1647
+FORGE=DEFERRED_FUTURE_CONSUMER
+FORGE_BLOCKER=FALSE
+SDK_SELF_HOSTING=SEED_SDK_TO_NEXT_SDK_NO_FORGE
 ```
 
-## 1. 三个名称不可混写
+## 1. 三个名称分别是什么
 
-| 名称 | 定义 | 0.11.x 中对应的可检查实体 |
+| 名称 | 定义 | DomainHarness 0.11.x 的落点 |
 |---|---|---|
-| **Domain**（领域） | 一个有清晰边界的知识、事实、业务对象、规则、流程、适用条件、版本/来源与权限语义空间。它回答“在**哪个领域**、什么信息与条件成立、允许做什么”。 | `DomainDefinition`、领域 Element/Content/Function/Knowledge/Workflow、Domain Package 内的有版本领域语义；Domain 不是单个运行时进程，也不是泛指 TypeScript Package |
-| **Harness**（领域执行支架） | 面向**已选 Domain** 的任务组织、确定性执行、状态与反馈/经验闭环；提供安全边界、可解释 Outcome、授权/宿主适配、控制与限制，必要时才调用受限模型/工具。它回答“怎样在该领域内**稳定地完成任务**”，不是无边界万能 Agent。 | Boot→唯一 KDP/Core.Init→已选 Workflow/Element.Function；0.11.1 确认的 Actor/Hook/Budget，0.11.2–0.11.9 渐进补齐 Domain Intelligence、交互、Effect、Reasoning、Durable/Evidence/Evolution |
-| **SDK**（可复用开发工具包） | 开发者可获取、版本固定、可嵌入或组合到不同 Domain App/SDK App 的统一 **Contracts + Boot + Package Assembly + Execution API** 与按需公共 Package。它回答“如何用相同组件和 API 构建不同领域应用”。 | `@kaicreator/domain-harness` 公共 facade 与基础/标准 Packages，Target/Host 适配，Package 装配/Pin/Boot；SDK **本身也是由 Domain Packages 组成的产物** |
+| **Domain** | 有界领域身份、对象、事实、知识、来源、规则、Applicability、业务流程和版本；回答“**在哪个领域、哪些条件与知识有效**” | DomainDefinition、Content/Element、领域知识和规则的普通 Domain Packages |
+| **Harness** | 已选 Domain 内 Task/Workflow、确定性状态、受限模型/Tool/Effect、权限、预算、异常与反馈经验；回答“**怎样稳健且可验证地执行领域任务**” | Boot/KDP、各阶段普通/Standard Domain Packages 所提供的任务执行、观测、进化能力 |
+| **SDK** | 可被其它应用真实安装、嵌入、选择 Package 并启动 Domain App 的公共合同和 API；回答“**怎样基于统一机制搭建应用**” | 最小 Boot、Package Schema/Assembly/Target/Host、SDK facade、通用 Standard Elements、可安装 Consumer |
 
-**全名必须按这个次序解释：`DomainHarness SDK = Domain-bounded Harness Software Development Kit`**，不是一个名为 BUILD 的生产平台，也不是一个“SDK 只是 `packages/domain-harness` façade、真实产品为编译器”的结构。SDK 的底层 Boot 是最小独立信任根；其余可 Package 化能力应通过同一 Domain Package 规范选择、编排和交付；不宣称初始 Boot 指令必须由 Forge 无中生有。
+**全名**：DomainHarness SDK = Domain-bounded Harness Software Development Kit。0.11.0–0.11.9 是这个 SDK 的**一个完整重写的多个内部阶段**，不包含 DomainForge 产品的开发。**SDK 自身也由同一 Package 协议和 Boot 构成**，仅允许极小可信根/固定种子编译作为第一代运行前提。
 
-**0.11.x 的整个产品目标**是构建这个 DomainHarness SDK：先有 Boot/Package 的可用基础 SDK，再持续以普通 Domain Packages 增强 Harness 的领域语义与任务/Agent 能力，直到完整交付且**能够用它自身所依赖的 Forge Domain App 生产后继 SDK 的 Packages，完成自举**。各 `0.11.n` 只是同一 SDK 的内部迭代，而不是每版独立发一个互不相干的 Compiler/Agent 平台。
+## 2. 临时、仅 DH 自用的 Domain Package Builder
 
-## 2. DomainForge 的产品位置、运行依赖与无环关系
+为了先用 Domain Packages 构成第一代 DomainHarness SDK，允许项目保留一个**非常小的、临时的种子 Package 生产工具**：
 
-- **DomainForge = 基于 DomainHarness SDK 构建的 Domain App**。**这是当前 Owner 的产品定义和新依赖规则，不是一个“未来可选集成”**：Forge 需要依赖**已发布/可安装且版本精确固定的公开 DomainHarness SDK**；可以直接调用 `@kaicreator/domain-harness` public root 组成自己的 Boot/Domain Packages/SDK App。Forge 创作逻辑仍是 Forge 私有 Domain Package/Functions/Elements，不直接拥有 KDP Runtime 代码。
-- **Forge 负责生产新 Domain Packages**：领域内容作者、源与权利验证、模型生成、Package 模板/源码/资源生成、Target 处理、生产者证据；生成后的 Domain Package 由 DomainHarness SDK 的统一 Assembly API 接收、验证和装配。
-- **代码依赖无环**：`DomainForge App → DomainHarness SDK(public)`；`DomainHarness SDK → 已有基础 Domain Packages + Boot`，**绝不** `DomainHarness SDK → DomainForge App`。Forge 生产后继 SDK Package 是**时间分代的工件流**，不构成当前进程的模块 import 环。
-- **现行状态必须诚实**：DomainForge 已冻结的 v0.0.3 R-005 对一切 Harness import 的禁令是过时规则；本轮应在 **domain-forge** 当前非冻结政策/测试中改成“允许公开 SDK、拒绝私有编译/runtime API”，保持历史冻结证据不变。本规范与 [domain-forge 修正规则 PR #217](https://github.com/kaicreator-mm/domain-forge/pull/217) 联动；**允许依赖 != 已实际接线/安装/运行**。在 Forge 还没通过真实 Boot/Package 生产 E2E 前必须标为 `FORGE_AS_DOMAIN_APP_RUNTIME_NOT_YET_PROVEN`，而不是因为政策改变直接宣布实现合格。
+1. **只为 `kaicreator-mm/domain-harness` 自己生成固定集合的基础 Core/SDK/Standard Package**；不能接收外部业务 Domain、生成任意新 Agent/业务规则、调用在线模型、服务其它仓库。
+2. 从明确登记的本仓库源码/Manifest/Content/Target 生成标准 Domain Package 与可核对摘要；完成后**仍须由同一 SDK Assembly/Lock/Pin/Boot** 审核，不能让自有产物绕过 Direct Extension/Order/Function/Resource 权限。
+3. 作为内部构建脚本/工具放置在 `tooling/bootstrap-seed/` 或 `scripts/bootstrap/`；**不导出到公共 SDK、不成为大型 BUILD 平台，不另建 Compiler/Kernel/Package System/Lock**。
+4. 参照已有 `examples/basic-domain-app/consumer.mjs::authoring()` 的最小真实示例，但它当前只是 Demo Fixture，不可冒领为已通过 SDK 自举。
+5. 对第一次和后续必要的 **DH 自身** SDK Package 构建均可使用此工具；在 **整个 0.11.x 内不依赖 DomainForge 替换它**。未来 Forge 能基于已完成 SDK 生产同义包后，才将此工具作为参照并视需要移除/冻结。
+6. 仅用真实产物与独立 Consumer、固定可追溯源/目标/Pin 和受影响正反例证明完成；当前源码实现和完整自举仍 `NOT_IMPLEMENTED`，有限任务归 [#1647](https://github.com/kaicreator-mm/domain-harness/issues/1647)。
 
-## 3. 临时 DH-only Domain Package 构建工具是允许的，而且必要时应保留
-
-解决“Forge 要依赖 Harness，但初版 Harness 又需要 Packages 才能存在”的启动问题：
-
-**允许在 `domain-harness` 仓库保留一个简单的 `bootstrap-domain-package-builder` 作为临时种子生产工具**。它只服务 DomainHarness **自己** 的基础 Domain Packages，从已有源码/声明/资源**确定性地输出包文件/Manifest/Content Digest**，为首版 SDK 的 Boot 与 Assembly 提供最小输入。它不是开发者公共 SDK、不是 DomainForge 替代品、不是生态通用 Domain Package Compiler，也不代表 Harness 未来有“生产任意 Domain Package”的能力。
-
-**必须满足的范围上限：**
-
-1. **只处理本仓库维护的、明确列举的 DomainHarness 基础/SDK/标准 Package 种子**；不能接收外部业务 Domain Data、用户领域创作请求或动态 Model/Agent 生成任务。
-2. **只做最小机械转换**：从现成包定义/目标源码/资源得到普通 `DomainPackageManifest` 和 Package 文件、版本/摘要；可借用开发期 Node/TypeScript/文件拷贝/签名工具。不创造另一种 Package 格式、Core 生命周期或与 SDK Assembly 并列的运行权威。
-3. **不作为 SDK 公共 API 发布**：建议暂放 `tooling/bootstrap-seed/` 或 `scripts/bootstrap/`（实际落位需源码设计决定），明确 `internal / bootstrap-only / no third-party Domain`；不要在 `packages/domain-harness` 公共入口暴露任意 Package 生成命令。
-4. **同一安全规则**：临时工具生成的 Package 不因“第一方”就跳过 SDK 的 Owner、Direct Extension、Target、Resource Digest、可信加载/Pin/真实 Boot 校验；同一个 AppPackage 仍使用原来已审必要权限边界。签名、重现性、Package 精确来源/依赖应有最小记录。
-5. **可替换且有结束条件**：在 DomainForge Domain App 已能生产与临时工具**同一公开 Package 合同**的 DH 基础 Package，并通过跨代 SDK 自举 E2E 验证时，删除/冻结该临时生产入口；其测试样例可以保留为 Forge 的**参照/golden fixture**，但不能形成永久“Forge 和 DH 两个通用生成器”。
-6. **研发态种子不等于线上运行依赖**：Seed Builder 只在初始或需要的自举构建时运行；Runtime/普通 App Consumer 不要调用它。正常 Domain App 用已产出的 Package + 公共 SDK Assembly/Boot 即可启动，**不需要运行 Forge 和临时 Builder**。
-
-**现有代码映射**：`examples/basic-domain-app/consumer.mjs::authoring()` 已在测试中从模板写出示例 Package 资源和 Manifest；这是**真实存在的最小种子生成机制候选证据**，但当前只是在 Demo Fixture 中运作，不得把它宣称为正式可供 DH 自举的 Seed Builder。受审 `tooling/build/src/build.ts::buildApp` 已接收既有 `PackageRoots/Artifacts`，主要执行 Assembly/Validation/Sealing 而非通用源码生产。下一步优先从已存在的测试 fixture/固定源创建一个**仅 DH 自用、一次性有限**的 Seed Builder，避免重写大型工具。
-
-## 4. 如何生成不同的 SDK App：一套组合机制，不是三套产品构建器
+## 3. 现成 Domain Packages 构建多种 SDK App
 
 ```text
-初始已有/Seed 固定的 DomainHarness 基础 Packages + Boot
-                             ↓
-                  DomainHarness SDK 可运行实例
-                       │               │
-     现成领域 Packages┘               └── Forge Domain App（基于同一个 SDK）
-               ↓                                    ↓
-    SDK Package Assembly                   生产新的 Domain Package
-               ├────────────────────────────────────┘
-               ↓
-      Boot + Selected Packages + Target/Host Adapter
-               ├─ CLI Domain App
-               ├─ Server/API Domain App
-               ├─ Client/UI Domain App
-               ├─ Agent/Domain Harness App
-               ├─ DomainForge Domain App
-               └─ 新的 DomainHarness SDK 自身（基础/标准 Packages）
+DH-only Seed Builder ──→ DH 基础 Domain Packages ─┐
+其它现成合格 Domain Packages ─────────────────────┤
+                                                ↓
+                      DomainHarness SDK Assembly/Linking
+                                                ↓
+                       Boot + 已选 Package + Host/Target
+                                    ├─ DomainHarness SDK 自身
+                                    ├─ CLI Domain App
+                                    ├─ Server/API Domain App
+                                    ├─ Client/UI Domain App
+                                    ├─ Agent/领域 Harness App
+                                    └─ 其它普通领域业务 App
 ```
 
-**每一个 App（包括 Forge、SDK 自身）共享**：相同的 Domain Package Schema、ElementRef/FunctionRef、Core.Order、Init/Exit/Extension 明确声明、SDK Assembly 检查、可信 Boot、KDP 与必要的 Target/Host 适配。各 Target 的 Host 功能可以分期支持，**当前 Node ESM 验收不能冒称已支持移动端/浏览器的物理交付**。
+应用并不需要实时依赖 DomainForge；DomainForge 是**SDK 完成之后**才能开发的普通 Domain App，今后才使用这个相同机制生产新的 Domain Packages。对各种 Host Target 的能力必须分期实证：已通过 Node ESM 不自动证明 Browser/Mobile 真正支持。
 
-**SDK App 与普通 Domain App 的区别**只在它导出了给其它开发者可嵌入/可复用的 SDK API、包组合和目标适配；底层不是另一种“SDK Package 类型”，也没有额外的全局 Package Registry/特殊权限。应用级 Boot 封装/Target 安装方式允许不同，但都必须来源于相同选定 Packages 与身份权限协议。
+所有 App 共享 ElementRef/FunctionRef、Package/Core.Order、Init/Exit/直接 Extension、已选 Target、可信 ResourceRef 和 Boot/KDP；SDK App 只是在同一 Package 构造基础上进一步**向其它开发者输出可复用 API**，不是一个新的特殊 Package 类型。
 
-## 5. 为什么之前的“完整 BUILD”不再是目标
+## 4. 不经过 Forge 的 SDK 自举
 
-**SDK 中只留下 Package Assembly/Linking + 必要验证**。它验证已有 Package 的合法性、引用/接口/Target/资源/安全启动闭包，并产生一个可复现的目标应用产物/Pin。它不负责创造业务 Domain 内容或通用 Package 编译语义。源码目录 `tooling/build`、公共 `buildApp`、`DH_BUILD_*` 仍是已受审实现的历史名称；不能把迁移重命名当作已经完成，也不能仅因词语过时就卸除安全门。
+| 阶段 | 可证伪目标 | 所需证明 |
+|---|---|---|
+| Stage 0 | 最小 Boot 与固定 DH 源，Seed Builder 输出真实 DH 基础 Packages | Package/内容摘要、固定 Target、正确拒绝非法直接依赖 |
+| Stage 1 | SDK Assembly 选择、验证、装配这些 Packages，产出可安装且能 Boot 的第一代 SDK | clean-packed Consumer 使用 SDK 真实 API 组装至少一个独立领域 App |
+| Stage 2 | 以前一代 SDK 的公共 Assembly 对更新/再生成的 DH 自有 Packages 进行装配，得到**下一代 SDK** | 下一代 SDK 同样可消费自身和代表性领域 App，且合法性/Target/Pin 可复现 |
+| Final | SDK 全部 0.11.x 功能与 Stage 0–2 受影响正反例可信 | 独立 Exact-SHA 审核；**不包含 Forge App/Package Producer 的运行 E2E** |
 
-**真正 Package Production** 归 DomainForge；**初始自举 Package Production** 可以暂由 DH-only Builder 负责，只限 DH 自己并须有明确替换计划；**完全没有价值的大 BUILD 产品愿景、双 Compiler、二次 Loader、过度重跑已审相同资源**应退出 Product/L2 范围。详见 [源码逐文件归属审计](../architecture/DomainHarness_v0.11.x_LEGACY_BUILD_OWNERSHIP_AUDIT.md)。
+这证明的是 **DomainHarness SDK 自己通过普通 Domain Packages 被构成并能继续装配下一代 SDK**。它不要求 Forge 在当前版本完成，也不意味着 Kernel 可在没有任何固定可信编译器/Boot 的情况下凭空启动。后续 Forge 取代临时种子工具属于 Forge 的后续资格，不影响本版完成。
 
-## 6. 所有 0.11.x 阶段必须遵守的 7 项准入
+## 5. 历史 BUILD 的边界和版本规范
 
-每一版在 Product/L1→L2→Task→代码→验收时须能回答：
+现有 `tooling/build/src/build.ts::buildApp` 主要接收已经生成的 `packages/roots/artifacts` 并完成已选资源/依赖闭包、权限/Host/Target/Lock/Pin 的安全组合；它是 SDK 组装能力的历史实现名，不是整个生态的通用新 Package 生成器。
 
-1. 本版交付的是否仍是**DomainHarness SDK** 的可复用/可嵌入能力，而不是新的通用 Domain Package 生成平台？
-2. 领域事实/规则/流程是否留在 Domain/普通 Domain Packages，而 Domain 执行/工作流/预算/授权属于 Harness？
-3. SDK 的公共 API/基础 Package/标准 Package 是否可由其它 Domain App 与 Forge 复用？不需要 Forge 在线才能运行现成 App？
-4. 新功能归属 **SDK Assembly**、**Harness Runtime**、**Standard Element**、**DomainForge Package Production** 还是临时 DH-only Bootstrap Builder？是否已经删去无理由的重复 BUILD 功能？
-5. 该版是否使用同一个 Boot/Core.Order/Extension/FunctionRef 权限模型？是否保留必要的摘要/Target/权限/可重现性安全？
-6. 真正 Forge App 是否只依赖公开 DomainHarness SDK，未通过私有 KDP/BUILD 实现绕过合同？DomainForge v0.0.3 的过时禁令是否由**当前规则**替代、历史冻结快照未篡改？
-7. 对新旧 SDK Package 生成是否存在真实可复现跨代自举证据？**无证据必须写 `NOT_IMPLEMENTED`**，整个 0.11.x 最终 Release 不可虚报自举成功。
+- **SDK 保留**：公共 Contracts/Package Assembly、可信摘要/资源验证、Core.Order/Direct Extension/FuncRef、Boot/KDP/目标执行、所需 Host Adapter。
+- **Seed Tool 临时保留**：仅为本项目基础 Domain Package 生成，未来可作为 Forge 生产器实现参照。
+- **不必要的历史 BUILD**：重复引擎、双 Lock、为所有领域写通用源码生产器、无产品价值的强制模板/过度编译——不进入 0.11.x 功能目标。
+- **未来 Forge**：真正通用的 Domain Package 生产者，**在 SDK 完成后**再根据 [Forge #218](https://github.com/kaicreator-mm/domain-forge/issues/218) 开展；Forge 旧依赖规则的更改也留在那时。关闭且未合并的 Forge PR #217 不影响 DH 继续推进。
 
-**阶段目标与总控**：#1564 负责 0.11.0 SDK/Boot/最小装配及 DH-only Seed；#1612 负责 Domain Intelligence/Standard Reader 等基础复用，不把 Forge 包生产强塞 Reader 任务；#1563 负责整个 0.11.x 包含自举在内的 SDK 最终合格。其余版本按正常产品功能交付，不创建无期限的“BUILD 完善任务”。
+**每个 0.11.x 版本的最小检查**：交付对象是否是 Domain/Harness/SDK 的可复用能力？是否通过普通 Package/Boot 复用？是否将 Package 生产错误加入公共 SDK？是否能完全不运行 Forge 进行构建、测试和验收？只有真实证据的内容才能升格为已实现。
+
+**阶段责任**：#1564 负责基础 SDK/最小 Seed，#1612–#1619 负责新增 SDK 能力，#1563 负责统一 SDK 产品和其自身 Package 化/自举合格。此文件不要求 DomainForge 的任何 Task 作为当前阶段前置。
