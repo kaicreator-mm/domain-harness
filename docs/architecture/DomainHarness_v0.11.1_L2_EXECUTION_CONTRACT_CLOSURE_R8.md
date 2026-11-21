@@ -1,3 +1,5 @@
+> **历史稿状态更新（2026-11-21）**：本文为 R8/R7 阶段的设计研究资料，涉及优先级选路、JSON-only Reader、`onEnter/onResult/onFinally` 及非 Workflow 的运行时组合方案均**已被最新 [R9 实施合同](DomainHarness_v0.11.1_L2_ELEMENT_WORKFLOW_EXECUTION_CONTRACT_R9.md) 取代，不得继续作为当前实施合同**。R9 确定仅 `workflow` 嵌套（可单节点）、Package Init Element 启动已选 Workflow、JSON+YAML、Switch 显式出口、`start/end` Hook、共享根预算。本文保留供设计溯源，不是 Freeze 证据。
+
 # DomainHarness 0.11.1 — L2 实施合同收口清单 R8（设计候选，待审核）
 
 **事实状态**：截至 2026-11-21，Product L1 #1605 / Draft PR #1607 已列出 F01–F10、AC11–AC20；L2 #1608 / Draft PR #1611 有 Element-First R7 候选，但还不是已审核的单源机器合同。版本列车 `version/v0.11.x` 基于已接受的 0.11.0 Foundation；此文档是**消除剩余 HOW 歧义的建议**，不得当作源码实现、L1/L2 Freeze、CI 或发布资格。
