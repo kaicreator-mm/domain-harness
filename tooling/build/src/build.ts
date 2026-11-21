@@ -525,7 +525,8 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     let raw: unknown = block.value;
     if (block.ref) {
       if (block.ref.packageId !== loaded.owner.id &&
-          !(dependsOnEdges.get(loaded.owner.id) ?? []).includes(block.ref.packageId)) {
+          (!(dependsOnEdges.get(loaded.owner.id) ?? []).includes(block.ref.packageId) ||
+           selected.get(block.ref.packageId)?.role !== 'extension')) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `Workflow '${loaded.def.id}' content resource is outside directly selected Extensions`);
       }
