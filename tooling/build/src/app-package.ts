@@ -16,7 +16,7 @@ import {
 } from '@kaicreator/domain-harness-contracts';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { refusal } from './refusal.js';
-import { TRUSTED_RUNTIME_MANIFEST_BYTES, TRUSTED_RUNTIME_VERIFY_MODULE, TRUSTED_WORKFLOW_NPM_ARCHIVES } from './trusted-runtime.js';
+import { TRUSTED_RUNTIME_MANIFEST_BYTES, TRUSTED_RUNTIME_PREINSTALL_MODULE, TRUSTED_RUNTIME_VERIFY_MODULE, TRUSTED_WORKFLOW_NPM_ARCHIVES } from './trusted-runtime.js';
 import type { AppPackageFile, ComposedAppPackage } from './types.js';
 
 interface PackageJsonShape {
@@ -258,6 +258,7 @@ export function composeAppPackage(
         'selected Workflow npm dependency tarball SRI pins do not match the sealed first-party BUILD list');
     }
     add('dh-install/trusted-runtime.json', TRUSTED_RUNTIME_MANIFEST_BYTES);
+    add('dh-install/verify-preinstall.mjs', new TextEncoder().encode(TRUSTED_RUNTIME_PREINSTALL_MODULE));
     add('dh-install/verify-runtime.mjs', new TextEncoder().encode(TRUSTED_RUNTIME_VERIFY_MODULE));
   }
 
