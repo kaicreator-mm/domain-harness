@@ -154,6 +154,11 @@ export class PackageSystem {
       if (seen.has(packageId)) throw new KdpLoadError(`recursive Init dependency cycle at '${packageId}'`);
       seen.add(packageId);
       try {
+        // 进入 Init 调用边界即记账；即使子 Extension 失败也必须为已进入的父 Package 安排 Exit。
+        const history = this.callerHistory.get(packageId) ?? [];
+        history.push(caller);
+        this.callerHistory.set(packageId, history);
+        this.initEvents.push(packageId);
         const extensions = pkg.dependsOn
           .map((id) => this.packageById(id))
           .filter((dep): dep is SelectedPackage => dep?.role === 'extension' && dep.layer === pkg.layer)
@@ -162,10 +167,6 @@ export class PackageSystem {
           await enter(dep.packageId, { type: 'Package', packageId }, pkg.layer);
         }
 
-        const history = this.callerHistory.get(packageId) ?? [];
-        history.push(caller);
-        this.callerHistory.set(packageId, history);
-        this.initEvents.push(packageId);
         const fn = await this.loadEntry(pkg.init, `Init Element of '${packageId}'`);
         if (typeof fn !== 'function') {
           throw new KdpLoadError(`Init Element of '${packageId}' is not a callable export`);

@@ -38,7 +38,7 @@ function packageContext(fixture: FixtureInstall) {
 }
 
 const INIT_ORDER = ['fixture-kernel', '@fixture/sdk', 'fixture-ext', 'fixture-business'];
-const DISPOSE_ORDER = [...INIT_ORDER].reverse();
+const DISPOSE_ORDER = ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-kernel'];
 
 test('KDP boots core + package system: init order, hook sealing, business init, READY', async (t) => {
   await withScenario(t, {
@@ -536,4 +536,25 @@ test('Init capability projection exposes only own or direct Extension ingress, n
       ['evaluate', 'optional-report'], 'Business Core receives its own selected ingress only');
     await result.app.dispose();
   });
+});
+
+test('parent Core Init entry is recorded before child Extension; child failure exits deepest-first including entered parent', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const { PackageSystem } = await import('../../src/package-system.js');
+  const invalid = {
+    ...fixture.lock,
+    selectedPackages: fixture.lock.selectedPackages.map((pkg) =>
+      pkg.packageId === 'fixture-ext' ? { ...pkg, init: { ...pkg.init, exportName: 'missingChildInit' } } : pkg),
+  };
+  const packages = new PackageSystem(fixture.installRoot, invalid, []);
+  await assert.rejects(packages.runInit(packageContext(fixture)), /missingChildInit/);
+  assert.deepEqual(packages.initFrom('fixture-business'),
+    [{ type: 'Package', packageId: '@fixture/sdk' }],
+    'the parent Core has already entered Init before recursively calling its Extension');
+  assert.deepEqual(packages.initFrom('fixture-ext'),
+    [{ type: 'Package', packageId: 'fixture-business' }]);
+  await packages.runExit();
+  assert.deepEqual(events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
+    DISPOSE_ORDER, 'failed child still exits before entered parent, regardless of own Init return');
 });

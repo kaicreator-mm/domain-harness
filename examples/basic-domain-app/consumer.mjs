@@ -431,7 +431,9 @@ async function runPositive(label, rule, expectedAtHundred) {
     assert.equal(inspection.target.profile, 'node22-esm/1');
     assert.deepEqual(await app.dispose(), { status: 'DISPOSED' });
     const disposed = runtimeEvents.filter((event) => event.event === 'package-exit').map((event) => event.package);
-    assert.deepEqual(disposed, [...initialized].reverse(), 'Exit must run in reverse actual Init entry order');
+    assert.deepEqual(disposed,
+      ['rules-package', 'app-business', 'sdk-extension', 'sdk-primary', 'kernel-extension', 'kernel-primary'],
+      'Exit follows actual recursive Init entry stack, deepest first');
     const afterDispose = await app.invoke('submit', { total: 100, region: 'EU' });
     assert.equal(afterDispose.kind, 'FAILED');
     assert.equal(afterDispose.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
@@ -537,7 +539,9 @@ async function main() {
     const disposed = timeline.filter((event) => event.event === 'package-exit').map((event) => event.package);
     assert.ok(initialized.length > 0, 'failure fixture must actually initialize Packages');
     assert.deepEqual(initialized, ['kernel-extension', 'kernel-primary', 'sdk-extension', 'sdk-primary', 'rules-package', 'app-business']);
-    assert.deepEqual(disposed, [...initialized].reverse(), 'failed App Init must roll back all Packages in reverse order');
+    assert.deepEqual(disposed,
+      ['rules-package', 'app-business', 'sdk-extension', 'sdk-primary', 'kernel-extension', 'kernel-primary'],
+      'failed Init must Exit all entered Packages from deepest to root');
     assert.equal(timeline.some((event) => event.event === 'business-init'), false);
     await evidence('negative.app-init-failure-rollback', { status: 'PASS', code: failedInit.code, initialized: initialized.length, disposed: disposed.length, exposedApp: false });
   } finally {

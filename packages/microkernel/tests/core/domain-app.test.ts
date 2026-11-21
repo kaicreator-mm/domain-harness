@@ -151,7 +151,7 @@ test('unhandled implementation exceptions cause KDP Exit and block subsequent in
   assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
   assert.deepEqual(
     events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
-    ['fixture-business', 'fixture-ext', '@fixture/sdk', 'fixture-kernel'],
+    ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-kernel'],
   );
   const after = await app.invoke('evaluate', { total: 1, region: 'EU' });
   assert.equal(after.kind === 'FAILED' && after.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');

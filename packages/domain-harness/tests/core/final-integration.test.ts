@@ -89,7 +89,7 @@ test('T04-INT-1: build → boot → single Business Core.Init → READY → dire
     const disposeEvents = events().filter((event) => event['event'] === 'package-exit');
     assert.deepEqual(
       disposeEvents.map((event) => event['package']),
-      ['orders-business', 'orders-ext', 'sdk-core', 'kdp-kernel'],
+      ['orders-ext', 'orders-business', 'sdk-core', 'kdp-kernel'],
     );
     const afterDispose = await app.invoke('evaluate', { total: 100, region: 'EU' });
     assert.equal(afterDispose.kind, 'FAILED');
