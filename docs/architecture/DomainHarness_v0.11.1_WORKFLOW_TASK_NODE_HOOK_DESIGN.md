@@ -1,3 +1,5 @@
+> **历史稿状态更新（2026-11-21）**：本文为 R8/R7 阶段的设计研究资料，涉及优先级选路、JSON-only Reader、`onEnter/onResult/onFinally` 及非 Workflow 的运行时组合方案均**已被最新 [R9 实施合同](DomainHarness_v0.11.1_L2_ELEMENT_WORKFLOW_EXECUTION_CONTRACT_R9.md) 取代，不得继续作为当前实施合同**。R9 确定仅 `workflow` 嵌套（可单节点）、Package Init Element 启动已选 Workflow、JSON+YAML、Switch 显式出口、`start/end` Hook、共享根预算。本文保留供设计溯源，不是 Freeze 证据。
+
 <!-- DH_V0111_R7_GENERIC_ELEMENT_NESTING_AND_FILE_READER_20261121 -->
 > **2026-11-21 L2 R7 Owner 补充（覆盖 R6 对数据适配的模糊表述）：** 不只有 Workflow 可以引用下层 Element，**任何 Element 都允许通过版本化引用进行嵌套组合和依赖**；同一子 Element 定义可在不同父级中复用，组合位点与运行实例独立。**数据 Element 不必内联数据或自带 JS Function**；其 ContentBlock 可通过现有 `ref: ResourceRef` 指向固定格式的 Package 文件，依赖通用 `FileReader/JsonReader` Element 解析后形成 Function 式可调用结果。通用 Reader Element 是一次定义、多个数据 Element 复用的真正能力，不能每个数据 Element 另造一套 Reader。0.11.0 的 `ContentBlock.ref` 是**资源引用**而不是 `ElementRef`；二者分开建模。详见下方 **§2A**。L1 增量范围纳入文件承载的只读数据和通用读取复用；不开放任意动态文件/Host 文件系统权限。
 
