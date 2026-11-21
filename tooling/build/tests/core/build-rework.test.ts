@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { symlinkSync, writeFileSync } from 'node:fs';
-import { DH_ELEMENT_SCHEMA_VERSION, contentDigestOf } from '@kaicreator/domain-harness-contracts';
+import { DH_ELEMENT_SCHEMA_VERSION } from '@kaicreator/domain-harness-contracts';
 import { buildApp, type BuildResult } from '../../src/index.js';
 import { sha256OfBytes } from './fixtures.js';
 import { standardCase } from './standard-case.js';
@@ -14,7 +14,7 @@ function expectRefusal(result: BuildResult, code: string): void {
   }
 }
 
-test('P1-2: app-level export check is NOT skipped when descriptor.id equals the owner package id', (t) => {
+test('B0-05: descriptor ID cannot implicitly demand a direct Function ingress', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
@@ -26,7 +26,7 @@ test('P1-2: app-level export check is NOT skipped when descriptor.id equals the 
   business.exports = business.exports.filter(
     (entry) => !(entry.elementId === 'orders.eligibility' && entry.functionId === 'evaluate'),
   );
-  expectRefusal(buildApp(input), 'DH_BUILD_EXPORT_MISSING');
+  assert.equal(buildApp(input).ok, true, 'removing an unused public Function export does not create an implicit ingress');
 });
 
 test('P2-1: a symlinked resource escaping the package root is RESOURCE_MISSING', (t) => {
@@ -57,11 +57,6 @@ test('P2-1: a symlinked resource escaping the package root is RESOURCE_MISSING',
   };
   businessManifest.elements.find((entry) => entry.id === 'orders.eligibility')!.definitionRef.digest =
     sha256OfBytes(defBytes);
-  const appDescriptor = input.descriptor as {
-    ingress: { function: { element: { digest: string } } }[];
-  };
-  const newDefinitionDigest = contentDigestOf(JSON.parse(Buffer.from(defBytes).toString('utf8')) as never);
-  for (const entry of appDescriptor.ingress) entry.function.element.digest = newDefinitionDigest;
   expectRefusal(buildApp(input), 'DH_BUILD_RESOURCE_MISSING');
 });
 
