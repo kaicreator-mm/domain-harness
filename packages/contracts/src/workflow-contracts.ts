@@ -47,6 +47,12 @@ export interface WorkflowDataSource {
   readonly maxBytes: number;
 }
 
+/** T13 从被封存 ResourceRef 读出 UTF-8 后，作为普通 JSON 传给 Reader Element.Function。 */
+export interface WorkflowReaderInput {
+  readonly format: 'json' | 'yaml';
+  readonly source: string;
+}
+
 export interface WorkflowElementHooks {
   readonly start?: FunctionRef;
   readonly end?: FunctionRef;
@@ -90,8 +96,9 @@ export interface WorkflowDefinition {
 
 /**
  * Package.Init 可访问的 KDP 绑定启动能力：没有通用全局函数列表，也没有
- * 已废弃的 DomainApp.invoke。T13 将本字段装配到现有 PackageInitContext。
+ * 已废弃的 DomainApp.invoke。T13 将只读 workflows 字段装配到现有 PackageInitContext。
  * BUILD/T12 只允许 Package 自身或显式直接 Extension 授权的已选 WorkflowRef。
+ * 返回 WorkflowOutcome 而非 Business Core.Init 的 AppInitResult。
  */
 export interface ReadonlyWorkflowStarter {
   start(ref: WorkflowRef, input: JsonValue): Promise<WorkflowOutcome>;
