@@ -1,18 +1,4 @@
-// 公共 SDK 唯一入口：只组合契约、BUILD 和 Microkernel，不复制实现。
-export * from '@kaicreator/domain-harness-contracts';
-export {
-  buildApp,
-  BuildRefusal,
-  digestOfBytes,
-} from '@kaicreator/domain-harness-build';
-export type {
-  BuildInput,
-  BuildResult,
-  BuildSuccess,
-  BuildFailure,
-  KdpArtifactInput,
-  AppPackageFile,
-  ComposedAppPackage,
-} from '@kaicreator/domain-harness-build';
-export { boot, bootstrap, installProcessExitHandoff } from '@kaicreator/domain-harness-microkernel';
-export type { ProcessExitEvent, ProcessExitHost } from '@kaicreator/domain-harness-microkernel';
+// 同一个嵌入式 SDK 的公共入口：运行与应用组合分别位于可独立加载的子模块。
+// 保持当前 v0.11.x 包根既有导出，避免已验收的 Domain App Consumer 发生无关变化。
+export * from './runtime.js';
+export * from './composition.js';
