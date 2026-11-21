@@ -1,7 +1,7 @@
 // 当前架构的可证伪测试：断言实际行为而非历史兼容。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { BootResult, BootstrapPin, ContentDigest } from '@kaicreator/domain-harness-contracts';
@@ -10,6 +10,7 @@ import {
   buildFixtureInstall,
   digestOf,
   events,
+  KDP_PACKAGE_ID,
   LOCK_RELATIVE_PATH,
   type FixtureInstall,
 } from './helpers/install.js';
@@ -274,6 +275,24 @@ test('cyclic or throwing pin values are typed REFUSED, never a TypeError', async
   });
 });
 
+async function writeKdpManifestAndReseal(fixture: FixtureInstall, manifest: unknown): Promise<BootstrapPin> {
+  await fixture.writeKdpManifest(manifest);
+  const manifestBytes = await readFile(join(fixture.installRoot, 'node_modules', ...KDP_PACKAGE_ID.split('/'), 'package.json'));
+  const manifestDigest = `sha256:${createHash('sha256').update(manifestBytes).digest('hex')}`;
+  const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
+  const resources = lock['resourceDigests'] as Record<string, string>;
+  resources[`${KDP_PACKAGE_ID}/package.json`] = manifestDigest;
+  delete lock['closureDigest'];
+  lock['closureDigest'] = digestOf(lock);
+  await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
+  const record = await fixture.readRecord();
+  record['lockDigest'] = lock['closureDigest'];
+  delete record['recordDigest'];
+  record['recordDigest'] = digestOf(record);
+  await fixture.writeRecord(record);
+  return { ...fixture.pin, lockDigest: lock['closureDigest'] as ContentDigest };
+}
+
 function deepFreeze(value: unknown): void {
   if (typeof value !== 'object' || value === null) return;
   for (const key of Object.keys(value)) {
@@ -284,33 +303,33 @@ function deepFreeze(value: unknown): void {
 
 test('KDP manifest exports conditions: nested node/import resolve, unresolvable shapes are typed entry-invalid', async (t) => {
   await withFixture(t, async (fixture) => {
-    await fixture.writeKdpManifest({
-      name: '@kaicreator/domain-harness-microkernel',
+    const nestedPin = await writeKdpManifestAndReseal(fixture, {
+      name: KDP_PACKAGE_ID,
       version: '0.11.0',
       type: 'module',
       exports: { '.': { node: { import: './dist/index.js' } } },
     });
-    const nested = await boot(fixture.pin, fixture.context);
+    const nested = await boot(nestedPin, fixture.context);
     assert.equal(nested.status, 'BOOTED', JSON.stringify(nested));
     if (nested.status === 'BOOTED') await nested.app.dispose();
 
-    await fixture.writeKdpManifest({
-      name: '@kaicreator/domain-harness-microkernel',
+    const orderedPin = await writeKdpManifestAndReseal(fixture, {
+      name: KDP_PACKAGE_ID,
       version: '0.11.0',
       type: 'module',
       exports: { '.': { browser: './dist/nowhere.js', import: './dist/index.js' } },
     });
-    const ordered = await boot(fixture.pin, fixture.context);
+    const ordered = await boot(orderedPin, fixture.context);
     assert.equal(ordered.status, 'BOOTED', JSON.stringify(ordered));
     if (ordered.status === 'BOOTED') await ordered.app.dispose();
 
-    await fixture.writeKdpManifest({
-      name: '@kaicreator/domain-harness-microkernel',
+    const unresolvedPin = await writeKdpManifestAndReseal(fixture, {
+      name: KDP_PACKAGE_ID,
       version: '0.11.0',
       type: 'module',
       exports: { '.': { browser: './dist/nowhere.js' } },
     });
-    const unresolved = await boot(fixture.pin, fixture.context);
+    const unresolved = await boot(unresolvedPin, fixture.context);
     assertRefused(unresolved, 'DH_BOOT_KDP_ENTRY_INVALID');
     if (unresolved.status === 'REFUSED') {
       assert.match(unresolved.reason, /node\/import\/default/);
