@@ -1,85 +1,79 @@
-> **R9.1 深度规则变更：** 用户将此前「所有父子 Workflow 共用同一个最大嵌套深度」修改为「每个 Workflow 对自己的子树声明最大下级嵌套深度」。**根 Run 总 Element 调用次数仍共享**。子 Workflow 的深度声明可以比父更宽/更严，但不能越过任一活动祖先约束；具体相对计数及 BUILD 封存在 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)。此为 L1 行为收口，不新增 F/AC 编号。
-
-# DomainHarness v0.11.1 — Task Execution Product PRD · L1 R9.1（WHAT）
-
-> **审阅说明：** 本文件与 [Version/Product #1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) 的 R9 产品合同对齐。旧 R3/R4 中“非 Workflow 嵌套可执行”“JSON-only”“三个生命周期 Hook”“优先级路由”均被用户后续的 R9 决议覆盖。源代码与 HOW 按 [L2 R9 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 处理；这是 Draft 未冻结，不是新功能已实现。
-
-# DomainHarness v0.11.1 — Task Execution（Version/Product L1 WHAT · R9.1）
+<!-- DH_V0111_L1_R10_INIT_OWNED_WORKFLOW_PRD -->
+# DomainHarness v0.11.1 — Task Execution · Product/L1 R10（WHAT）
 
 ```ini
-OUTPUT_LABEL=DH_V0111_PRODUCT_R9_1_LOCAL_NESTING_DEPTH
+OUTPUT_LABEL=DH_V0111_PRODUCT_L1_R10_INIT_OWNED_WORKFLOW
 MASTER=#1563
-VERSION_ISSUE=#1605
-PRODUCT_DRAFT_PR=#1607
+VERSION=#1605
+L1_PR=#1607
 L2=#1608
-ARCH_DRAFT_PR=#1611
-VERSION_TRAIN=version/v0.11.x
-MODEL=ELEMENT_FIRST_UNIQUE_DEFINITION_REUSED
-NESTING=WORKFLOW_ONLY_DEFAULT_WORKFLOW_SINGLE_NODE_ALLOWED
-ENTRY=INIT_ELEMENT_PER_SELECTED_PACKAGE
-FILE_READER=JSON_YAML
-ROUTING=EXPLICIT_SWITCH_EXITS_NO_PRIORITY
-HOOK=START_END
-BUDGET=SHARED_ROOT_CALL_COUNT_AND_PER_WORKFLOW_RELATIVE_DEPTH
-STATUS=L1_CANDIDATE_NOT_FROZEN
-NATIVE_DAG=NOT_CREATED
+L2_PR=#1611
+V0110_NEW_SPEC=#1621
+V0110_NEW_SPEC_STATUS=DRAFT_NOT_IMPLEMENTED
+INIT=PACKAGE_INIT_STARTS_ITS_WORKFLOW
+TECHNICAL_INIT=REMOVED_BY_NEW_V0110_SPEC
+SECOND_BUSINESS_APP_INIT=NO
+CORE_ORDER=OWNED_BY_V0110
+EXIT=PACKAGE_OPTIONAL
+INIT_FROM=PACKAGE_OPTIONAL
+NORMAL_EXECUTION=INIT_TO_WORKFLOW_TO_FUNCTION
+NESTING=WORKFLOW_ONLY_DEFAULT_SINGLE_NODE_ALLOWED
+READER=JSON_YAML
+SWITCH=NAMED_EXITS_NO_PRIORITY
+BUSINESS_HOOKS=START_END
+BUDGET=SHARED_ROOT_INVOCATIONS_PER_WORKFLOW_LOCAL_DEPTH
+SCHEMA=V0110_CONTENT_SCHEMA_EXTENSION
+ERRORS=ELEMENT_SELF_HANDLES_KDP_FINAL_EXIT
+STATUS=PRODUCT_CANDIDATE_NOT_FROZEN
+TASK_DAG=NOT_CREATED
 CODE=NOT_STARTED
-RELEASE=NO
 ```
 
-## 产品目标与范围
+## 产品目标与版本前提
 
-0.11.x 为彻底重写版本，v0.11.1 在已通过限定验收的 v0.11.0 Foundation 上新增确定性 Task/Workflow 执行，不兼容或移植旧 0.10 ABI。一个唯一 Element 定义可被多处引用，引用位置和每次运行独立。Element 可声明依赖；**有嵌套执行需求时只用 Workflow 嵌套类型**，该类型为默认值，**一个节点也合法**，支持子 Workflow。单独的 0.11.0 Function 调用不受影响。
+0.11.x 完全重写、不要求旧 v0.10.x 兼容。0.11.1 的**正常启动和执行链为 `Package.Init → Workflow → Element.Function`**：Package 自己已存在的 Init Element 可在初始化期间按其选定业务定义**启动相应 Workflow**；不能再出现 READY 后的第二次 BusinessAppInit、重复的 `technicalInit` 或所谓 Init Router。某 Package 无业务 Workflow 时，其 Init 仍可只处理 Package 自身初始化。0.11.0 的 Core.Order/KDP 0 与 Extension 直接依赖及 Init/Exit 由 [新版 0.11.0 规范 #1621](https://github.com/kaicreator-mm/domain-harness/pull/1621) 负责，0.11.1 不另外规定 Core 调度或 Init 的顺序；#1621 当前未冻结/未实施，不以旧 Stage0 Scoped CI 证明此项已完成。
 
-各选定 Package 以自己唯一的 **Init Element** 作为新版 Workflow 调用入口，经其已选能力启动 Workflow；与 Package technicalInit/technicalDispose 和 App businessAppInit 的技术启动、App 就绪阶段互不混淆。选定 Package 内的业务 Workflow 不应该因为 Boot 就无条件运行。Package Init 与对外 ingress 的具体绑定规则由 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 解决。
+`Package.Exit` 和 `InitFrom` **分别可选**，由 Package 自己决定；`InitFrom` 未启用不要求创建数组，启用时须保留每次直接 Init 调用者及重复/失败、激活隔离。业务 Workflow 的一次结束不等于整个 Package.Exit。业务异常由 Element/Package 自行处理，Kernel 只在未处理/不可继续的错误时做最小日志和退出，不负责通用重试、异常映射或跨包业务回滚。
 
-## F01–F10 · 产品能力（WHAT）
+## F01–F10 产品能力与可观察结果
 
-| 项 | 本版能力与用户可见效果 |
+| ID | 需求 |
 |---|---|
-| F01 | 每个选定 Package 的新版业务调用经 Init Element 入口发起 Workflow；同一入口可有独立执行实例 |
-| F02 | Element 嵌套类型显式、默认 workflow；v0.11.1 仅支持此类型，允许单节点、多节点、多层子 Workflow 和同一子 Element 多次引用 |
-| F03 | Guard/Outcome 经 **Switch 式具名出口**确定下一个 Element 引用位点或终态，不依赖竞争优先级 |
-| F04 | 数据 Element 可引用随 Package 封存的 **JSON/YAML** 固定格式文件；多个数据 Element 复用对应的通用 Reader Element，并可被其他 Element 依赖使用 |
-| F05 | ASK/WAIT 明确表达需要用户信息/等待条件，本版返回当次结果、不承诺持久化恢复 |
-| F06 | COMPLETE/REJECT 明确区别业务完成和拒绝 |
-| F07 | UNKNOWN/FAILED 明确区别未知与失败，不自动洗成成功或 false |
-| F08 | 根/子 Workflow 共享**总 Element 调用次数预算**；**每个 Workflow 单独决定其子树允许的最大嵌套深度**，所有活动祖先的约束共同生效；循环和子流程不能绕过 |
-| F09 | 每次 Element 调用的业务 Hook 只有 **start/end** 两个可选时机；最终结果包含路径和停止原因，业务收尾后才返回 |
-| F10 | 0.11.0 的 Boot/Pin/Lock、Init、Ingress/READY、直接 Function 调用和 Dispose 行为不得退化 |
+| F01 | Package 的既有 Init Element 作为**启动自己选定 Workflow 的唯一入口**，不单独创建第二个业务 Init/Router；普通业务路径为 Init→Workflow→Function |
+| F02 | Element 唯一定义多次引用；Workflow 是唯一支持的嵌套执行类型（缺省 workflow），允许**一个节点**、多节点和多级子 Workflow，运行结果与状态隔离 |
+| F03 | Guard/Outcome 使用 Switch 式**唯一具名出口**指向下一个 Workflow Node（Element 引用位置）或终态，不按优先级竞争 |
+| F04 | 固定 Package 封存的 JSON/YAML 数据可被多个 Data Element 使用、复用各自格式的通用 Reader Element，其他业务 Element 可消费数据 |
+| F05 | ASK/WAIT 是本轮明确结果，0.11.1 不承诺持久运行或 Resume |
+| F06 | COMPLETE 与 REJECT 不混淆 |
+| F07 | UNKNOWN/FAILED 不自动提升为成功或业务 false |
+| F08 | 根业务 WorkflowRun 内的 Element 调用次数共享；每个 Workflow 自己声明最大下级子 Workflow 深度，所有活动祖先约束生效 |
+| F09 | 每次业务 ElementRun 只有可选的 `start/end` 两个 Hook；异步 end 收尾完成后才结算结果，业务异常归所属 Package |
+| F10 | **继承 0.11.0 最新统一 Init/Exit/直接 Extension/完整组合 BUILD/可信 Boot/唯一 KDP**：Core.Order 的调整只属于 0.11.0；Exit、InitFrom 由 Package 选择，不能以旧技术 Init/直接 ingress 当新规范冻结门槛 |
 
-## AC11–AC20 · 真实可观察验收
+## AC11–AC20 真正需要验证的结果
 
-| AC | 合格要求 |
+| ID | 验收 |
 |---|---|
-| AC11 | 通过 Package Init Element 启动真实根 Workflow，2+ 节点及一个子 Workflow 可完成；仅一个节点的 Workflow 也合格 |
-| AC12 | 两种业务结果命中两个不同的显式 Switch 出口，未选 Element 不执行；UNKNOWN/FAILED 也有明确出口，无优先级选路 |
-| AC13 | ASK、WAIT 各给出明确停止原因，本版结束当前 Run，不伪造恢复 |
-| AC14 | REJECT、UNKNOWN、FAILED 各有真实执行结果，不报告 COMPLETE |
-| AC15 | BUILD 拒绝未知嵌套类型、失效依赖、非法出口目标及未选入口，危险执行零发生 |
-| AC16 | 同一根 Run 下子 Workflow、Reader/Guard 的实际 Element 调用共用总预算；不同 Workflow 可声明不同本地最大下级嵌套深度，进入子 Workflow 前逐祖先检查，不能通过下层更宽松的设置突破父限制；循环正确终止 |
-| AC17 | App 未就绪、已 Dispose、Ingress 被禁用时 Package Init 不能绕过既有约束 |
-| AC18 | Stage0 的直接 Function、App businessAppInit 与 Package technicalInit/Dispose 回归无退化 |
-| AC19 | 相同被选定义、输入及确定性业务结果的执行路径可复现；重复引用同一 Element 的运行结果各自独立 |
-| AC20 | 真实 clean-packed Domain App 展示：**两份 JSON/同一 JsonReader + 两份 YAML/同一 YamlReader**；一个其他 Element 依赖所读数据；start/end Hook 正反路径；子 Workflow/显式出口/失败传播均非纯 Mock |
+| AC11 | 一个真实 Package.Init 在其启动流程内发起已选 Workflow，完成至少 2 个节点及一个子 Workflow；另一单节点 Workflow 正常完成；不触发第二 Business App Init |
+| AC12 | 不同业务结果按明确 Switch label 到达不同 Node/终态；未选节点不执行，UNKNOWN/FAILED 不经优先级选路 |
+| AC13 | ASK/WAIT 各有清晰的本次运行结束原因，无虚假 Resume |
+| AC14 | REJECT/UNKNOWN/FAILED 与 COMPLETE 明确区分 |
+| AC15 | BUILD 对非法 Workflow 嵌套类型、失效 Element/FunctionRef、Switch 出口缺失或非法目标、跨 Package 非直接 Extension 访问拒绝；不运行时重新做授权闭包 |
+| AC16 | 各子 Workflow、Guard/Reader 等 Element 调用共享根业务调用预算；不同 Workflow 允许不同子树深度上限，但任何活动祖先限制都不能突破 |
+| AC17 | 一个 Package 不定义 Exit、不启用 InitFrom 时仍可正常初始化及运行业务 Workflow；另一个启用 InitFrom 时按定义保留调用者与重复记录；Exit 不被业务 ElementRun.end 误触发 |
+| AC18 | **0.11.0 最新合格 Init/Order/Exit/BUILD/Boot 基础真实回归通过**，0.11.1 不重复启用已废弃的 technicalInit/technicalDispose/额外 BusinessAppInit |
+| AC19 | 相同构建选定的 Element 定义在多个 Workflow 引用位点复用时，状态、结果与节点路径独立、确定性流程可复现；业务未处理错误由 Kernel 最小兜底退出 |
+| AC20 | clean-packed App 中真实 Package.Init→Workflow→Function；至少 2 份 JSON 数据共用 JsonReader、2 份 YAML 共用 YamlReader，Switch 与 start/end、子 Workflow/预算正反例非 Mock |
 
-L1 只定义 WHAT。TypeScript 接口/Lock IR、XState/Actor、Switch label schema、Reader 解析器、业务 Hook 异常规则和预算计数规则在 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 的 R9 候选统一说明。
+## 内容 Schema 与 BUILD 的范围
 
-## 严格边界
+0.11.0 已有 `ContentBlock.contentKind='workflow-definition'`、`schemaRef`、`ElementDefinition.content[]/functions[]/dependencies[]`。0.11.1 **为该内容块增加实际 Workflow 内容格式/机器 Schema**，而非改造 Element 根对象、增加一个 `ElementDefinition.nesting` 顶层字段。JSON/YAML Reader 只涉及业务文件数据格式，不要求 ElementDefinition 文件本身采用 YAML。
 
-- 保留 0.11.0 已有 Runtime Schema/Outcome/Ingress/Boot Trust/READY/Dispose 等校验，不新增 KDP/SDK 运行时业务校验；新图/引用/文件格式合法性由 BUILD/Package 生产者负责，业务异常由 Package 自己处理。
-- 不引入 0.11.2 Domain Intelligence、0.11.3 Semantic Interaction、0.11.4 外部授权 Host/Effect/任意文件读取、0.11.5 LLM、0.11.6 Durable Resume、0.11.7–0.11.9 反馈进化。
-- 不要求 0.10 接口兼容，不立刻合入 main 或发布。只在 `version/v0.11.x` 版本列车按 ADS 限定集成。
+**构建保证**：Workflow、Reader、Guard、Switch/Hook 引用与真实生成调用边必须纳入 0.11.0 的**完整组合 Package BUILD** 和每个 Package **直接声明 Extension** 的访问规则；不能用第二套 Lock/动态加载绕开。Runtime 保留必要可信安装 Pin/产物完整性，正常业务 Schema/异常逻辑由 Element/已选编译入口拥有；Kernel 不新增业务校验体系。
 
-## 当前证据与状态
+## 严格版本边界与状态
 
-- [Draft L1 PR #1607](https://github.com/kaicreator-mm/domain-harness/pull/1607)；
-- [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) / [Draft R9 PR #1611](https://github.com/kaicreator-mm/domain-harness/pull/1611)；[R9 详细合同](https://github.com/kaicreator-mm/domain-harness/blob/design/v0.11.1-xstate-legacy-study/docs/architecture/DomainHarness_v0.11.1_L2_ELEMENT_WORKFLOW_EXECUTION_CONTRACT_R9.md)；
-- [总控 #1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)。目前 L1/L2 **未完成异对话独立审核/Freeze，未创建 Native Task DAG，未实施 0.11.1 源码/CI/packed E2E**。
+0.11.1 不做 0.11.4 Host 授权/任意文件系统写读、0.11.5 LLM、0.11.6 Durable Resume、后续经验与进化机制；不做 0.10 兼容。L2 R10 详见 [#1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) / [架构 PR #1611](https://github.com/kaicreator-mm/domain-harness/pull/1611)；0.11.0 依赖 [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564)、[#1621](https://github.com/kaicreator-mm/domain-harness/pull/1621)。
 
-
-## 设计审查边界
-
-- L1 审查：逐项确认 F01–F10 / AC11–AC20 是否准确表达用户需要的可观察行为、是否不提前引入后续版本功能。
-- L2 审查：Init Element、Workflow nesting、Switch case 完备性、Reader JSON/YAML、start/end Hook、Budget/Actor 等实现细节在 [L2 R9 实施合同](https://github.com/kaicreator-mm/domain-harness/blob/design/v0.11.1-xstate-legacy-study/docs/architecture/DomainHarness_v0.11.1_L2_ELEMENT_WORKFLOW_EXECUTION_CONTRACT_R9.md) 提交独立审核。
-- 不重复 0.11.0 通过的基础实现验证；只有新功能与受影响边界需要增量新证据。L1/L2 的审核结论不得自行伪造。
+**当前状态**：0.11.0 新 Init/Exit 规范未审核/合并/实施；0.11.1 R10 L1/L2 为候选，独立审核/冻结、Native Task DAG、功能源码、CI 和 clean-packed E2E 均未完成。当前产品方向已澄清不意味着冻结。
+<!-- /DH_V0111_L1_R10_INIT_OWNED_WORKFLOW_20261121 -->
