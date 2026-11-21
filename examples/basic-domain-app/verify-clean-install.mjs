@@ -212,7 +212,7 @@ const packages = [
   {
     dir: 'packages/microkernel', name: '@kaicreator/domain-harness-microkernel',
     root: { types: './dist/index.d.ts', import: './dist/index.js' },
-    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', xstate: '5.33.2' },
+    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', xstate: '5.33.2', yaml: '2.9.1' },
   },
 ];
 
