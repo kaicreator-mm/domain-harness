@@ -35,6 +35,7 @@ import {
   type ValidationIssue,
 } from '@kaicreator/domain-harness-contracts';
 import { canonicalJson } from '@kaicreator/domain-harness-contracts';
+import { parseDocument } from 'yaml';
 import type {
   BuildInput,
   BuildResult,
@@ -615,11 +616,23 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
         } catch {
           throw refusal('DH_BUILD_SCHEMA_INVALID', 'Workflow Reader resource must be strict UTF-8');
         }
-        // YAML 原始字节仍由受信且已选的 Reader Element 处理，
-        // 不能被原 0.11.0 的一般 ContentBlock JSON 检查误判；JSON 可直接验证。
+        // JSON/YAML 都在 BUILD 中真实解析为可规范化的纯 JSON 数据；
+        // YAML 使用 core schema、唯一键和有限 alias，拒绝 tag/循环/恶意扩展。
         if (data.format === 'json') {
-          try { JSON.parse(utf8); } catch {
-            throw refusal('DH_BUILD_SCHEMA_INVALID', 'selected JSON Reader resource contains invalid JSON');
+          try { canonicalJson(JSON.parse(utf8)); } catch {
+            throw refusal('DH_BUILD_SCHEMA_INVALID', 'selected JSON Reader resource contains invalid JSON data');
+          }
+        } else {
+          try {
+            const document = parseDocument(utf8, {
+              schema: 'core', strict: true, uniqueKeys: true,
+              version: '1.2', logLevel: 'silent', intAsBigInt: false,
+            });
+            if (document.errors.length > 0 || document.warnings.length > 0) throw new Error('YAML parse rejected');
+            const parsed: unknown = document.toJS({ maxAliasCount: 32 });
+            canonicalJson(parsed);
+          } catch {
+            throw refusal('DH_BUILD_SCHEMA_INVALID', 'selected YAML Reader resource contains unsafe or invalid YAML data');
           }
         }
       }

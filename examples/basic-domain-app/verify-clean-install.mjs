@@ -207,12 +207,12 @@ const packages = [
   {
     dir: 'tooling/build', name: '@kaicreator/domain-harness-build',
     root: { types: './dist/index.d.ts', import: './dist/index.js' },
-    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', ajv: '8.17.1', typescript: '^5.8.3' },
+    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', ajv: '8.17.1', typescript: '^5.8.3', yaml: '2.9.1' },
   },
   {
     dir: 'packages/microkernel', name: '@kaicreator/domain-harness-microkernel',
     root: { types: './dist/index.d.ts', import: './dist/index.js' },
-    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0' },
+    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', xstate: '5.33.2' },
   },
 ];
 
@@ -252,6 +252,7 @@ try {
   record('consumer.install', { exit: install.status, signal: install.signal, registry });
   if (install.error || install.status !== 0) throw new Error(`external install failed\n${install.stdout}\n${install.stderr}`);
   npm(['ls', '--json'], consumerRoot, 'consumer.ls');
+  npm(['ls', 'xstate', 'yaml', '--json'], consumerRoot, 'consumer.workflow-runtime-ls');
   assertInstalledRealpaths(tarballMembers);
   cpSync(fileURLToPath(new URL('./consumer.mjs', import.meta.url)), join(consumerRoot, 'consumer.mjs'));
   const consumerEvidence = join(evidenceDir, 'consumer');
