@@ -771,7 +771,13 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
           required: ['name', 'version', 'integrity'],
           properties: {
             name: { enum: ['xstate', 'yaml'] },
-            version: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+
+            version: { type: 'string', pattern: SEMVER_PATTERN },
+            integrity: { type: 'string', pattern: '^sha512-[A-Za-z0-9+/]+={0,2}$' },
+          },
+        },
+      },
+      selectedWorkflows: {
+        type: 'array',
         items: {
           type: 'object', additionalProperties: false,
           required: ['ref', 'ownerPackageId', 'definitionDigest', 'definition'],
