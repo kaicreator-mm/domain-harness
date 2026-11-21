@@ -1,130 +1,77 @@
-# DomainHarness 0.11.1 — Task Execution PRD（L1 候选）
+# DomainHarness 0.11.1 — Task Execution（Product/L1 · WHAT）
 
-> 关联：主 Issue [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)、Product/L1 [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)。此文档属于待独立审核的 Product/L1 **候选**，不等于 L1 Freeze、L2 Freeze、Task Admission 或 Release。
+> Master [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563) · Product [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) · L2 [#1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)。本文件只说明 **0.11.1 重写应交付的能力、边界和验收结果**；具体实现方式全部在 L2 定义。本 PR 仍是 Product/L1 候选，不代表冻结或功能已完成。
 
 ```ini
-OUTPUT_LABEL=DH_V0111_TASK_EXECUTION_PRODUCT_L1_R1
+OUTPUT_LABEL=DH_V0111_PRODUCT_L1_WHAT_ONLY_R2
+STAGE=0.11.1_TASK_EXECUTION_REWRITE
 SOURCE_BRANCH=version/v0.11.x
 SOURCE_EXACT_HEAD=cc44f03ef87528ed6e27edee2dd311752bc6a2f9
 SOURCE_STAGE=0.11.0_REFACTORED_ACCEPTED_SCOPED
-SOURCE_STAGED_TREE=e21069d72cc7d47c35b9cdfe1cc942314064535a
-PRODUCT_STAGE=0.11.1_TASK_EXECUTION
-STATUS=AUTHORING_CANDIDATE_NOT_FROZEN
-TARGET_BRANCH=version/v0.11.x
-MAIN_AND_RELEASE=NO
-NODE_MINIMUM=22.12.0
+PRODUCT_L1_STATUS=AUTHORING_NOT_FROZEN
+IMPLEMENTATION_PLAN=SEE_L2_ISSUE_1608
+MAIN_MERGE=NO
+STANDALONE_RELEASE=NO
 ```
 
-## 1. 产品目标与严谨边界
+## 1. 版本定位
 
-本阶段在 **version/v0.11.x 当前已集成 0.11.0** 上新增“确定性多步骤任务”，不从旧 version/v0.11.0 / main / DIS dev 分支派生；0.11.0 原有四 Workspace、BUILD/Lock、Boot/唯一 KDP、DomainApp.invoke 和真实四包 Consumer 是唯一新能力基础。
+0.11.x 是整个 DomainHarness 产品的**新架构重新设计与重写**。0.11.0 已建立新版 Foundation；0.11.1 继续在该新版基础上，**重新实现 Task Execution 相关产品能力**，不是修补/移植旧 Task Runtime，不以旧代码、旧接口或所有历史功能等价为验收门槛。
 
-用户可将声明式 Workflow/State Model 作为选定的 Element Content，经 BUILD 固化选定函数与流程，再由已启动 DomainApp 执行一个有限、可解释的 Task。输出能明确区分 COMPLETE、ASK、WAIT、REJECT、UNKNOWN、FAILED，保留原因和步骤顺序。仅针对**选定 no-effect Function**；不得接入外部 Effect、Host Permit、LLM、无来源的领域判断、UI 组件、恢复/重放。
+**0.11.1 的成果**：一个已启动的 Domain App 能依据预先定义的 Workflow 与 State Machine，连续执行多步骤确定性任务，并能清楚说明任务完成、需要补充信息、需要等待、被拒绝、结果未知或执行失败。简单的一步 Function 仍可直接使用。
 
-0.11.2 负责 Knowledge/Rule/Recognizer/Intent 的领域语义扩展；0.11.3 负责跨多轮的正式交互；0.11.4 真实 Effect；0.11.5 模型；0.11.6 可恢复和终止运行中的耗时操作；0.11.7–0.11.9 经验反馈。ASK/WAIT 在 0.11.1 是**本次执行的最终答复**，而非已持久化等待或未来自动恢复。
+本阶段只涉及确定性任务执行；不引入模型自主决策、真实外部副作用、跨会话任务恢复或经验学习。这些按 #1563 规划在后续阶段解决。
 
-## 2. 当前真实架构基线（准确位置）
+## 2. 本版本必须实现的产品功能（WHAT）
 
-- Contracts：`packages/contracts/src/element-contracts.ts` 已定义 `workflow-definition` / `state-model` ContentKind，但尚未提供 Task/Workflow 结构化机器合同；`app-contracts.ts` 只定义 FunctionOutcome 与 DomainApp.invoke。
-- BUILD：`tooling/build/src/**` 生产选定函数、依赖和精确 Lock；`packages/contracts/src/app-lock.ts` 目前只有 selectedElements / selectedFunctions / ingress，不带已验证执行图。
-- KDP：`packages/microkernel/src/kdp.ts` 按 Lock 启动 DomainApp；`domain-app.ts` 只通过校验后的 ingress 执行 Function，拒绝无权限或 effects != none。
-- SDK：`packages/domain-harness/src/index.ts` 仅组合上述四包 public API，没有 TaskRunner。
-- Demo：`examples/basic-domain-app/`，完整四包 pack→外部 fresh install→Consumer 复用，避免另起平行 Demo。
+| 编号 | 本版本应具备的能力 | 用户/上层应用应看到的结果 |
+|---|---|---|
+| F01 | **Goal / Task**：定义一次任务目标和输入，并发起一次任务执行 | 能创建/执行一次明确的任务，并识别目标与任务身份 |
+| F02 | **Workflow**：支持多个步骤顺序执行与按条件分支 | 一次任务可以跨多个步骤完成，实际执行路径可解释 |
+| F03 | **State Machine**：任务具备可观测状态和合法变化 | 可以确定当前步骤、任务状态和最终结果，非法状态变化不会被接受 |
+| F04 | **Function 组合**：任务能够使用 Domain App 中已选择的业务 Function | 步骤实际消费前一步结果并继续执行，不是模拟流程或只返回预置文案 |
+| F05 | **交互需求表达**：流程可确定需要用户补充的信息或暂时等待外部条件 | 返回 ASK 或 WAIT，并说明缺少什么 / 等待什么；本版不承诺后续自动恢复 |
+| F06 | **结束与拒绝**：流程可正常完成或明确拒绝 | 能区分 COMPLETE 与 REJECT，并解释结果 |
+| F07 | **未知与失败**：知识/条件不足、执行出错可明确表达 | UNKNOWN / FAILED 不会被误当成成功，也不会执行错误的后续步骤 |
+| F08 | **有界执行**：循环和分支不会让任务无限运行 | 反复执行的任务在预定有限界内终止或报告未完成，不出现无界重试 |
+| F09 | **可观察结果**：输出任务路径、步骤结果与停止原因 | 调用方能判断执行过什么、执行到哪里、为什么停止；不泄露秘密 |
+| F10 | **新版基础能力保持**：任务执行与 0.11.0 的直接 Function 执行并存 | 新功能不会破坏已验证的 Domain App 装配、初始化、调用和释放 |
 
-原 #1602 与 PR #1603 R15 已通过限定独立审核，Woodpecker #2787 SUCCESS；0.11.0 的这份证据只为**未变部分**提供参考，绝不作为新增 Task Execution 的验收收据。
+以上是**功能与行为要求**，不规定采用何种数据结构、运行时对象、API 命名、算法、包路径、校验器、状态存储介质或测试框架。上述设计由 L2 #1608 负责。尤其不能在 L1 强制选定 `runTask` 方法名、`maxSteps` 字段名、特定 JSON Guard 操作符、Lock 的增量格式或 Task Coordinator 的源码归属。
 
-## 3. 关键合同（产品语义，L2 冻结最终字段名）
+## 3. 本阶段明确不交付
 
-### 3.1 Goal / TaskRun
+- **0.11.2 Domain Intelligence**：完整领域知识/规则/识别/判断系统与实际语义选择。
+- **0.11.3 Semantic Interaction**：多轮需求对话、自适应 UI、完整交互会话。
+- **0.11.4 Authorized Action**：真实状态修改、外部 Host/Effect/授权执行。
+- **0.11.5 Bounded Reasoning**：LLM 模型选择、模型推理和 Tool Loop。
+- **0.11.6 Durable Execution**：持久化 checkpoint、任务中断恢复、取消/超时语义。
+- **0.11.7–0.11.9 Feedback**：长期执行证据、Client 经验复用与 Server Meta 优化。
 
-- TaskDefinition：由 BUILD 已选定 Workflow 和 State Model 形成，不允许运行时将外来 JSON 当成新增可执行流程。标识含 app/lock 绑定、taskId、版本和 workflow digest。
-- Goal：已选定 taskId 和结构化 JSON input；引用当前已启动 DomainApp，输入不得在执行中被外部修改/Getter 或 Proxy 篡改而改变判定。
-- TaskRun：临时 in-memory 唯一 ID、只读状态快照、当前 Step、消耗步数、有限 Observation、最终 Result。运行 ID 用于本次观测；相同输入确定性仅指**决策、调用顺序和终态**，不要求随机 ID 相同。
-- 一个 TaskRun 从 CREATED→RUNNING，最后精确进入 COMPLETE / ASK / WAIT / REJECT / UNKNOWN / FAILED 之一；终态不可再执行、不可在失败后变成 COMPLETE。0.11.1 无 resume/cancel/checkpoint/retry。
-- 直接 `DomainApp.invoke(ingressId,input)` 保留，不强制所有简单 Function 改走 Task。
+既有 0.10.x 体系可作为参考材料，但不是本版必须迁移的代码或 ABI。0.11.1 不单独发行；最终集成到 `version/v0.11.x`，待整列车具备资格后才进入 main/Release。
 
-### 3.2 Workflow
+## 4. 功能验收 AC11–AC20（只看可观察效果）
 
-声明式有向图：唯一 startStepId、有限 steps、每一步唯一 ID、显式 next/branch/terminal。MVP 支持两种核心节点：
-
-1. **invoke**：引用 BUILD 已确认、Lock 中暴露且合法的 no-effect ingress；输入仅来自 Goal 的 JSON 投影或**已经完成且 SUCCEEDED 的前序 Step 输出**。不允许代码字符串、动态 import、任意 JS 函数、脚本 eval 或环境访问。
-2. **terminal**：COMPLETE / ASK / WAIT / REJECT 之一；携带固定 code/可解释 reason 和有限 JSON 输出映射或缺失需求描述。UNKNOWN / FAILED 由 Coordinator 依据无依据/不可执行结果产生，不得用 terminal COMPLETE 掩盖。
-
-条件路由 MVP 只读 **已校验的 FunctionOutcome** 与 JSON 定位字段，可支持 eq/ne/present 等有限比较，使用显式有序 branch 和**唯一 fallback**。不支持未经约束的表达式语言；不匹配/不可判断时 UNKNOWN。函数 UNKNOWN/FAILED 首先原样映射 Task UNKNOWN/FAILED，不允许普通 success branch 继续执行。
-
-### 3.3 State Model
-
-明确状态集合、初态、每条可允许转移和终态；TaskRun 由运行时控制转移，不是普通 Domain 内容可随意赋值。非法/遗漏转移在 BUILD 或执行前拒绝，执行中非法转移记录 FAILED，不允许静默修复状态。
-
-### 3.4 Lock 绑定
-
-- BUILD 验证 selected Element 的 `workflow-definition` 和 `state-model` 内容。有效绑定应产生规范化**不可变**的选定 Task graph / Content digest，并与 Lock closureDigest 绑定；内容 ref 应在 BUILD 验证真实字节与声明 digest，绝不从未封存路径在运行时补读。
-- 检查唯一 ID、图边目标存在、start 可达、所有可执行路径有明确处理、任务只引用**已选 ingress 且 effects=none** 的 Function。依赖 0.11.0 已有 FunctionRef、Target、Schema、Package；无需第二 Package Loader。
-- 有环 Workflow 不一定非法；但**必须有配置内强制有限的 maxSteps**，且 Coordinator 对每次 invoke/transition 严格计数，超限立即终止 UNKNOWN/FAILED。目标永不误入无限任务。静态无法确认可终止的图只在有确定硬预算时可执行。
-- 尚未支持的新必需语义/机器类型必须 fail-closed，不能以 optional 类型自动执行；无选定/损坏来源不得在 Boot 或 Runtime 自动推断替代图。
-
-## 4. 运行入口与 Coordinator
-
-推荐只在现有 DomainApp 中增加 `runTask(taskId, input)`（最终以 L2 合同决定）；不暴露 `new AgentRuntime()` 或外部可注入 `invoke` callback。Coordinator 在同一个 Microkernel 中复用同一 app 的调用 Gate：
-
-```text
-Boot(pin) → verify trusted Lock → KDP package init → Business App Init
-                                          ↓
-                               DomainApp READY/DEGRADED
-                                          ↓
-                        runTask(taskId, typed Goal input)
-                                          ↓
-                 selected sealed graph + step count + state
-                                          ↓
-                   step input projection + app.invoke(...)
-                                          ↓
-                  FunctionOutcome → Observation/Guard/Transition
-                                          ↓
-                      COMPLETE | ASK | WAIT | REJECT
-                      UNKNOWN | FAILED（有限终态）
-```
-
-执行中的状态必须能区分 App 不可调用、受抑制 ingress、输入/schema 错、Function UNKNOWN/FAILED、Guard 证据不足、预算耗尽与合法拒绝。Observation 至少提供 stepId、所选 ingress、结果 kind、转移结果和安全错误 code；错误日志禁止输出密码、Token、原始高敏业务输入。只把必要且已验证的 JSON 结果返回给调用方，内部 Lock/Host 不可变且不泄漏。
-
-严格澄清：**maxSteps 限制的是已获得控制权的步骤循环，不会中断永不 settle 的 Promise。** 0.11.1 不以“支持 timeout / cancel / durable recovery”宣传；这些进入 0.11.6。
-
-## 5. 产品验收（均需真实 POS/NEG）
-
-| AC | 真实可观察行为 |
+| AC | 判定标准 |
 |---|---|
-| AC11 | 四包外部 Consumer 的 2+ invoke 多步骤任务完成 COMPLETE，明确步骤顺序和结果 |
-| AC12 | 同一 Workflow 使用结构化 Guard 走两条不同 Branch，非选中分支零调用 |
-| AC13 | 缺用户输入为 ASK、需外部条件为 WAIT；都不执行后续 Function，不冒称可恢复 |
-| AC14 | 正式拒绝 REJECT；Function UNKNOWN→Task UNKNOWN、FAILED→Task FAILED，没有洗白 |
-| AC15 | 无效 Task/Step、丢失 Guard、未选入口、effects != none 必须拒绝且目标零调用 |
-| AC16 | 一个自环和一个多节点环必在 maxSteps 预算内停止；不静默重试 |
-| AC17 | App 未 READY、已 dispose、DEGRADED suppressed ingress 都不得绕过 gate |
-| AC18 | 0.11.0 直接 `invoke` 仍然可用，未改变已选 Package/Lock/Boot 语义 |
-| AC19 | 固定 Pin 与输入、确定性函数输出下步骤选择与最终结果相同；执行 ID 可不同 |
-| AC20 | 单一真实四包 pack/install 外部 Consumer 通过完整路径，包含必要拒绝反例 |
+| AC11 | 一个真实、至少两步的任务完成，结果来自实际业务 Function 调用 |
+| AC12 | 相同流程在两种有效输入下选择不同分支，未选分支不执行 |
+| AC13 | 缺必要信息时返回 ASK；条件暂不可满足时返回 WAIT；不会误报完成 |
+| AC14 | 明确拒绝、未知、执行失败能够分别返回 REJECT、UNKNOWN、FAILED |
+| AC15 | 无效流程、未选定/未授权的执行目标被拒绝，危险步骤零执行 |
+| AC16 | 存在循环的任务受到执行界限约束，不会无限继续或偷偷重试 |
+| AC17 | 应用尚不可运行、已释放或某入口受限时，任务不能绕过现有调用约束 |
+| AC18 | 原有新版的直接 Function 执行、启动和释放行为没有退化 |
+| AC19 | 固定流程、输入及确定性业务结果时，步骤选择和最终业务结果可复现 |
+| AC20 | 至少一个实际安装的新版 Domain App 展示完整 Task Execution 正反场景，而非纯 Mock |
 
-不可用旧 #2787 充当 AC11–AC20 的 PASS。验证采用一次等价本地检查 + 必要的 Woodpecker 同 HEAD CI + 跨对话独立 Review；源代码、测试代码 Typecheck、ESLint、真实 Demo 均纳入。
+所有 AC 必须以 0.11.1 新实现的真实证据为基础；0.11.0 已通过的限定测试可以复用，但**不能证明新增功能已合格**。每项 AC 的测试组织、源码变更范围和 CI 策略由 L2 与 Task 具体安排。
 
-## 6. 接口/职责建议（L2 才能冻结）
+## 5. L1 / L2 的责任分界与交付状态
 
-| 责任层 | 预计最小修改 |
-|---|---|
-| Contracts | Task/Goal/Workflow/State/RunResult 的独立 TypeScript 类型和机器验证；只输出可审的契约 |
-| BUILD | 选定 `workflow-definition`/ `state-model`、闭包绑定/Lock、非法图与 Effect 前置拒绝 |
-| KDP/Microkernel | 在当前 createDomainApp 中建立 Task Coordinator，并复用 `invoke` 权威入口 |
-| SDK | 只对已有 DomainApp 新增选定 Task 入口；不添加独立 Runtime |
-| Demo & Docs | 扩展现有 `examples/basic-domain-app/` 证明 AC11–AC20，中文业务路径和错误语义文档 |
+- **L1（本文件）**：确认版本价值、必须实现的 F01–F10、明确不做的范围、AC11–AC20。独立审核仅围绕“做什么、边界是否正确、如何判定完成”，不在此冻结实现细节。
+- **L2（#1608）**：选择 Task/Workflow/State 的机器契约、执行与校验算法、BUILD/Lock/Boot/KDP/SDK 的接入设计、错误/日志、写集/Task DAG、实现顺序和验证方案。L2 设计需满足本文件，不得因实现偏好扩大 L1。
+- **Task/Implementation**：基于 L2 冻结内容开发；修复和验证采用有限任务交付与必要的独立审核，不为每次小修复重新审批整个版本。
+- **阶段发布**：只按 #1563 的单一 0.11.x 版本列车集成，不单独 main/Tag/Release。
 
-单一版本分支 `version/v0.11.x`。0.11.1 是**内部阶段**，本轮不创建 main PR、Tag、npm 发布或独立 GitHub Release。
-
-## 7. ADS v4.19 实施与冻结
-
-1. 本 PR Product/L1 候选经另一 ChatGPT 对话**独立审核**后写回 #1605，明确 Exact HEAD、P0/P1/P2、AC/边界与是否 `ACCEPT_SCOPED_PRODUCT_L1`；待 Owner/Integrating checkpoint 才称 Frozen。
-2. 独立 L2 Issue 把选定 Task graph/数据合同、Lock 字段、Guard 真值表、状态转移、错误码、绑定的 public SDK 和 test fixtures 细化并经同样的最小必要复审。
-3. 物化与读回 GitHub Native Task DAG；建议 Contracts → BUILD 与 Coordinator 可在冻结后不冲突写集并行 → SDK/Demo Integrator。遵守单 Writer/Exact SHA，且不对每个小编译错误循环审批。
-4. 单批次修复+本地等价验证+必要 CI；独立 Reviewer 只审真实变化；一次受控合并到 `version/v0.11.x`，#1563 按 Source/Tree/CI/Review 记录限定 Stage-1 Closeout。
-5. 不重新运行未变化 0.11.0 全量验证；所有关键错误有可行动原因；源码和关键逻辑的注释、调用流程写中文。
-
-## 8. 明确不属于本次承诺
-
-不加入 0.10.x 兼容、外部 Effect、Hosted Tool、独立权限系统、LLM Provider、用户跨轮 UI、持久化/恢复/取消、多 Agent 协作、Client Experience Cache、Server Meta 学习或 DomainForge 建模。之后版本以 #1563 R4 Roadmap 为准。
+**当前状态**：Product/L1 候选修订中；L1 独立审核、L2 冻结、Native DAG、0.11.1 代码、CI/演示均未运行/完成。
