@@ -24,11 +24,11 @@ async function withInstall(
   await run(install);
 }
 
-test('T04-INT-1: build → boot → exactly one locked Business App Init → READY → direct invoke POS/NEG/UNKNOWN → inspect → dispose', { timeout: 120_000 }, async (t) => {
+test('T04-INT-1: build → boot → single Business Core.Init → READY → direct invoke POS/NEG/UNKNOWN → inspect → dispose', { timeout: 120_000 }, async (t) => {
   await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (install) => {
     const { lock } = install;
 
-    assert.equal(lock.businessAppInit.functionId, 'appInit');
+    assert.deepEqual(lock.coreOrder, ['kdp-kernel', 'sdk-core', 'orders-business']);
     assert.equal(lock.ingress.length, 2);
     assert.equal(lock.ingress[1]?.optional, true);
     assert.deepEqual(
@@ -40,7 +40,7 @@ test('T04-INT-1: build → boot → exactly one locked Business App Init → REA
         'sdk:primary:sdk-core',
       ],
     );
-    assert.equal(lock.technicalInitOrder[0], 'kdp-kernel', 'kernel Primary initializes first');
+    assert.equal(lock.coreOrder[0], 'kdp-kernel', 'KDP Core must be Order 0');
 
     const result = await boot(install.pin, install.context);
     assert.equal(result.status, 'BOOTED', JSON.stringify(result));
@@ -48,13 +48,13 @@ test('T04-INT-1: build → boot → exactly one locked Business App Init → REA
     const app = result.app;
     assert.equal(app.status, 'READY');
 
-    const technicalInitEvents = events().filter((event) => event['event'] === 'technical-init');
+    const packageInitEvents = events().filter((event) => event['event'] === 'package-init');
     assert.deepEqual(
-      technicalInitEvents.map((event) => event['package']),
-      lock.technicalInitOrder,
+      packageInitEvents.map((event) => event['package']),
+      ['kdp-kernel', 'sdk-core', 'orders-ext', 'orders-business'],
     );
     const businessInits = events().filter((event) => event['event'] === 'business-init');
-    assert.equal(businessInits.length, 1, 'exactly one locked Business App Init must run');
+    assert.equal(businessInits.length, 1, 'Business Core.Init must run exactly once');
     const initRule = businessInits[0]?.['rule'] as { readonly minOrderTotal?: number } | undefined;
     assert.equal(initRule?.['minOrderTotal'], 50, 'init read the REAL selected rule content');
 
@@ -81,15 +81,15 @@ test('T04-INT-1: build → boot → exactly one locked Business App Init → REA
     assert.deepEqual(inspection.suppressedIngress, []);
     assert.deepEqual(
       inspection.functions.map((fn) => fn.ref.functionId).sort(),
-      ['appInit', 'evaluate', 'optionalReport'],
+      ['evaluate', 'optionalReport'],
     );
 
     const disposed = await app.dispose();
     assert.deepEqual(disposed, { status: 'DISPOSED' });
-    const disposeEvents = events().filter((event) => event['event'] === 'technical-dispose');
+    const disposeEvents = events().filter((event) => event['event'] === 'package-exit');
     assert.deepEqual(
       disposeEvents.map((event) => event['package']),
-      lock.technicalDisposeOrder,
+      ['orders-business', 'orders-ext', 'sdk-core', 'kdp-kernel'],
     );
     const afterDispose = await app.invoke('evaluate', { total: 100, region: 'EU' });
     assert.equal(afterDispose.kind, 'FAILED');
@@ -168,7 +168,7 @@ test('T04-INT-5: unsupported effect profile is a typed BUILD refusal (DH_BUILD_E
   );
 });
 
-test('T04-INT-6: a Business App Init that suppresses a REQUIRED ingress is typed-refused (never silently accepted)', { timeout: 120_000 }, async (t) => {
+test('T04-INT-6: a Business Core.Init that suppresses a REQUIRED ingress is typed-refused (never silently accepted)', { timeout: 120_000 }, async (t) => {
   await withInstall(t, { rule: RULE_A, init: { status: 'DEGRADED_SUPPRESS_REQUIRED' } }, async (install) => {
     const result = await boot(install.pin, install.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
@@ -192,7 +192,7 @@ test('T04-INT-7: unsupported Boot target (env.nodeMajor 20) is a typed failure b
     assert.equal(result.code, 'DH_RUNTIME_UNSUPPORTED_PROFILE');
     assert.match(result.reason, /below the Lock target floor 22/);
     assert.equal(
-      events().some((event) => event['event'] === 'module-evaluated' || event['event'] === 'technical-init' || event['event'] === 'business-init'),
+      events().some((event) => event['event'] === 'module-evaluated' || event['event'] === 'package-init' || event['event'] === 'business-init'),
       false,
       'zero selected-package side effects: no package module was loaded or initialized',
     );
