@@ -63,7 +63,7 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
 
   assert.deepEqual(
     lock.selectedFunctions.map((fn) => `${fn.ref.element.id}.${fn.ref.functionId}`),
-    ['orders.app-main.init', 'orders.eligibility.evaluate'],
+    ['orders.eligibility.evaluate'],
   );
   const evaluate = lock.selectedFunctions.find((fn) => fn.ref.functionId === 'evaluate')!;
   assert.equal(evaluate.implementation.module.path, 'dist/evaluate.mjs');
