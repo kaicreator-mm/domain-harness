@@ -12,6 +12,7 @@ import type {
 } from './refs.js';
 import type { PackageLayer, PackageRole } from './package-manifest.js';
 import type { ResourceRef } from './element-contracts.js';
+import type { ReadonlyWorkflowStarter } from './workflow-contracts.js';
 
 export type AppStatus = 'READY' | 'DEGRADED' | 'BLOCKED' | 'FAILED';
 
@@ -50,6 +51,8 @@ export interface PackageInitContext extends AppInitContext {
   readonly packageId: string;
   readonly InitFrom?: readonly InitCaller[];
   readonly hostPorts: readonly import('./boot-contracts.js').HostPortBinding[];
+  /** 只允许启动同一 BUILD 钉住且当前 Package 已声明的 Workflow 根；没有则省略。 */
+  readonly workflows?: ReadonlyWorkflowStarter;
   /** 仅当前 Core 收到 Order 中下一 Core 的受控链接；不是公共 Package next() API。 */
   readonly nextCore?: PackageInitBinding;
 }

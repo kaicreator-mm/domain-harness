@@ -47,10 +47,11 @@ export interface WorkflowDataSource {
   readonly maxBytes: number;
 }
 
-/** T13 从被封存 ResourceRef 读出 UTF-8 后，作为普通 JSON 传给 Reader Element.Function。 */
+/** T13 从封存 ResourceRef 读出 UTF-8 后，同时提供原文与受信解析后的纯 JSON 值。 */
 export interface WorkflowReaderInput {
   readonly format: 'json' | 'yaml';
   readonly source: string;
+  readonly value: JsonValue;
 }
 
 export interface WorkflowElementHooks {
