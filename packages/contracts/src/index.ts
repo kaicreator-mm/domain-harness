@@ -2,6 +2,8 @@
 export * from './schema-versions.js';
 export type * from './base.js';
 export * from './element-contracts.js';
+export * from './workflow-contracts.js';
+export * from './workflow-validate.js';
 export * from './refs.js';
 export * from './package-manifest.js';
 export * from './app-descriptor.js';
