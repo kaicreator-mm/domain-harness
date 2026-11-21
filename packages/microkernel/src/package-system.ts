@@ -352,7 +352,7 @@ export class PackageSystem {
     try { raw = await (implementation as (input: unknown) => unknown)(input); } catch {
       console.error(`[KDP Function] code=DH_KDP_PACKAGE_LOAD_FAILED function=${ref.functionId} detail=redacted`);
       try { await this.runExit(); } catch { console.error('[KDP Exit] detail=redacted'); }
-      return { kind: 'FAILED', failure: { code: 'DH_KDP_PACKAGE_LOAD_FAILED', message: 'Function unhandled exception (redacted)' } };
+      throw new KdpLoadError('selected Function raised unhandled fatal exception (detail redacted)', 'DH_RUNTIME_NOT_READY');
     }
     const outcome = normalizeOutcome(raw, selected.outcomes);
     if (outcome.kind === 'SUCCEEDED' && !safeValidateJsonSubset(outcome.value, schemas.output))
