@@ -23,7 +23,7 @@
 
 **DH 自身基于 Domain Package 构成**：直接编写当前基础 Packages → 按实际合同验证与 Boot → 交付可安装/可复用 SDK；后续直接编写更新 Package 文件，以同一 SDK 能力构成新版 SDK 和真实 Consumer。不需要“编译器生成编译器”的工具自举，也不要求 Forge 或生成平台参与。真实 SDK/Consumer/权限/版本/资源与必要独审仍必须验证。
 
-**最新权威候选**：[R36 Package 文件/SDK 规范](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) / [R36 三名称与直接文件](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_AND_BOOTSTRAP_SEED.md) / [历史 BUILD 源码职责审计](../architecture/DomainHarness_v0.11.x_LEGACY_BUILD_OWNERSHIP_AUDIT.md)。以下 R4/R29 中“完整 BUILD 必须生成 Package”“自举只可选”等为历史讨论，不得覆盖 R36。0.11.0/0.11.1 原已受审且未变的安全源码结论继续限定复用，0.11.2–0.11.9 的 Product/L1/L2/Task/PR 均必须遵循新边界。
+**最新权威候选**：[R36 Package 文件/SDK 规范](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) / [R36 三名称与直接文件](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md) / [历史 BUILD 源码职责审计](../architecture/DomainHarness_v0.11.x_LEGACY_BUILD_OWNERSHIP_AUDIT.md)。以下 R4/R29 中“完整 BUILD 必须生成 Package”“自举只可选”等为历史讨论，不得覆盖 R36。0.11.0/0.11.1 原已受审且未变的安全源码结论继续限定复用，0.11.2–0.11.9 的 Product/L1/L2/Task/PR 均必须遵循新边界。
 <!-- /DH_V011X_R33_SDK_FORGE_OWNER_CORRECTION_20261122 -->
 
 <!-- DH_V011X_OWNER_CONFIRMED_FULL_REWRITE_STAGE_ROADMAP_20261121 -->
