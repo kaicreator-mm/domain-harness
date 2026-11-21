@@ -42,4 +42,21 @@ for(const dir of ['packages/contracts','tooling/build','packages/microkernel','p
  assert.deepEqual(Object.keys(m.exports),['.'],'包根之外不得保留兼容导出：'+dir);
  assert.equal(m.exports['.'].import,'./dist/index.js');
 }
-console.log('源码命名与公共包根质量检查通过');
+// R12/R14 实证：生产 TS 类型通过不代表测试 TS 通过；新的 Workspace 不能静默绕开测试编译。
+const monorepo = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
+assert.ok(Array.isArray(monorepo.workspaces) && monorepo.workspaces.length > 0, 'monorepo 缺少 workspaces');
+assert.ok(typeof monorepo.scripts?.test === 'string' && monorepo.scripts.test.includes('npm run test:typecheck --workspaces'),
+  '根 npm test 必须先执行全部 Workspace 的测试 Typecheck');
+for (const workspace of monorepo.workspaces) {
+  const pkg = JSON.parse(await readFile(new URL(workspace + '/package.json', root), 'utf8'));
+  assert.ok(typeof pkg.scripts?.['test:typecheck'] === 'string' &&
+    pkg.scripts['test:typecheck'].includes('tsc -p tsconfig.test.json'),
+    'Workspace 缺少测试 Typecheck 命令：' + workspace);
+  const testConfig = JSON.parse(await readFile(new URL(workspace + '/tsconfig.test.json', root), 'utf8'));
+  assert.equal(testConfig.compilerOptions?.noEmit, true,
+    '测试 Typecheck 不得输出产物：' + workspace);
+  assert.ok(Array.isArray(testConfig.include) && testConfig.include.some((path) => path.startsWith('tests/')),
+    '测试 Typecheck 未包含 tests 目录：' + workspace);
+}
+
+console.log('源码命名、公共包根与全 Workspace 测试类型检查结构通过');
