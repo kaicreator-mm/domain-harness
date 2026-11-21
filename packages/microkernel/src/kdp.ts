@@ -126,6 +126,34 @@ function validateInitResult(
   return { status: status as AppStatus, suppressed };
 }
 
+/** 所有 Business Core 的结果使用同一个 fail-closed 聚合入口；此逻辑也由状态矩阵单测直接覆盖。 */
+export function validateBusinessCoreResults(
+  rawInitResult: unknown,
+  ingress: readonly SealedIngress[],
+): { status: AppStatus; suppressed: readonly string[] } {
+  const results = Array.isArray(rawInitResult) ? rawInitResult : [rawInitResult];
+  if (results.length === 0) {
+    throw new KdpLoadError('No Business Core.Init returned an AppInitResult', 'DH_RUNTIME_NOT_READY');
+  }
+  const checked = results.map((result) => validateInitResult(result, ingress));
+  const invalid = checked.find((result): result is string => typeof result === 'string');
+  if (invalid !== undefined) {
+    throw new KdpLoadError(`Business Core.Init result refused: ${invalid}`, 'DH_RUNTIME_NOT_READY');
+  }
+  const valid = checked.filter((result): result is { status: AppStatus; suppressed: readonly string[] } =>
+    typeof result !== 'string');
+  if (valid.some((result) => result.status === 'FAILED')) {
+    throw new KdpLoadError('Business Core.Init reported status FAILED; no ingress, no retry', 'DH_RUNTIME_NOT_READY');
+  }
+  const suppressed = [...new Set(valid.flatMap((result) => result.suppressed))];
+  const status: AppStatus = valid.some((result) => result.status === 'BLOCKED') ? 'BLOCKED'
+    : valid.some((result) => result.status === 'DEGRADED') ? 'DEGRADED' : 'READY';
+  if (status === 'BLOCKED' && suppressed.length > 0) {
+    throw new KdpLoadError('Conflicting BLOCKED and DEGRADED Business Core results', 'DH_RUNTIME_NOT_READY');
+  }
+  return { status, suppressed };
+}
+
 /** KDP 复验可信安装后按 Lock 完成技术初始化、Hook、业务初始化；任一步失败必须撤销已完成的初始化。 */
 export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
   const trust = await verifyInstallTrust(context);
@@ -206,28 +234,7 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
       throw new KdpLoadError(error instanceof KdpLoadError ? error.message : 'Core.Init raised an unhandled error (detail redacted)', 'DH_RUNTIME_NOT_READY');
     }
 
-    // 多个 Business Core 的状态都必须有效。某个 Core 的 READY 不得遮蔽后续 FAILED/BLOCKED。
-    const results = Array.isArray(rawInitResult) ? rawInitResult : [rawInitResult];
-    if (results.length === 0) {
-      throw new KdpLoadError('No Business Core.Init returned an AppInitResult', 'DH_RUNTIME_NOT_READY');
-    }
-    const checked = results.map((result) => validateInitResult(result, lock.ingress));
-    const invalid = checked.find((result): result is string => typeof result === 'string');
-    if (invalid !== undefined) {
-      throw new KdpLoadError(`Business Core.Init result refused: ${invalid}`, 'DH_RUNTIME_NOT_READY');
-    }
-    const valid = checked.filter((result): result is { status: AppStatus; suppressed: readonly string[] } =>
-      typeof result !== 'string');
-    if (valid.some((result) => result.status === 'FAILED')) {
-      throw new KdpLoadError('Business Core.Init reported status FAILED; no ingress, no retry', 'DH_RUNTIME_NOT_READY');
-    }
-    const suppressed = [...new Set(valid.flatMap((result) => result.suppressed))];
-    const status: AppStatus = valid.some((result) => result.status === 'BLOCKED') ? 'BLOCKED'
-      : valid.some((result) => result.status === 'DEGRADED') ? 'DEGRADED' : 'READY';
-    if (status === 'BLOCKED' && suppressed.length > 0) {
-      throw new KdpLoadError('Conflicting BLOCKED and DEGRADED Business Core results', 'DH_RUNTIME_NOT_READY');
-    }
-    const validated = { status, suppressed };
+    const validated = validateBusinessCoreResults(rawInitResult, lock.ingress);
 
     // 只有 App Init 结果通过 READY/DEGRADED 等状态检查后才创建可对外使用的实例。
     const app = createDomainApp({

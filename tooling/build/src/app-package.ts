@@ -22,6 +22,14 @@ interface PackageJsonShape {
   readonly type?: unknown;
   readonly exports?: unknown;
   readonly scripts?: unknown;
+  readonly dependencies?: unknown;
+  readonly devDependencies?: unknown;
+  readonly optionalDependencies?: unknown;
+  readonly peerDependencies?: unknown;
+  readonly bundleDependencies?: unknown;
+  readonly bundledDependencies?: unknown;
+  readonly overrides?: unknown;
+  readonly workspaces?: unknown;
 }
 
 function parsePackageJson(bytes: Uint8Array, packageId: string): PackageJsonShape {
@@ -78,6 +86,18 @@ export function sealPackageManifest(
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `Package '${pkg.id}' has an executable npm lifecycle hook '${name}' outside BUILD verification`);
       }
+    }
+  }
+  // 组合 App 的 root 已精确列出每个 BUILD 所选 Package。
+  // 任意 Package 自行携带安装依赖（含 file/git/registry/peer/optional）都可能
+  // 在 npm install 时拉入未选定代码并执行其 postinstall，必须在 BUILD 拒绝。
+  for (const field of [
+    'dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies',
+    'bundleDependencies', 'bundledDependencies', 'overrides', 'workspaces',
+  ] as const) {
+    if (Object.prototype.hasOwnProperty.call(manifest, field)) {
+      throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+        `Package '${pkg.id}' declares install dependency field '${field}' outside the selected BUILD closure`);
     }
   }
   if (kdpArtifactPath !== undefined) {
@@ -205,11 +225,18 @@ export function composeAppPackage(
   if (runtimeDependencies['@kaicreator/domain-harness-microkernel'] === undefined) {
     throw refusal('DH_BUILD_TARGET_INVALID', 'composed App Package requires an exact microkernel runtime dependency');
   }
+  // 唯一可信的外部运行时依赖：DomainHarness 自己的确切 v0.11.0 发行版本。
+  // 不接受调用方自由追加 npm/git/file 包，更不能让未检查的包在安装时执行 hook。
+  const trustedRuntime = new Set([
+    '@kaicreator/domain-harness-microkernel',
+    '@kaicreator/domain-harness-contracts',
+  ]);
   const dependencies: Record<string, string> = {};
   for (const pkg of lock.selectedPackages) dependencies[pkg.packageId] = `file:./packages/${pkg.packageId}`;
   for (const [id, version] of Object.entries(runtimeDependencies)) {
-    if (!/^\d+\.\d+\.\d+$/u.test(version)) {
-      throw refusal('DH_BUILD_TARGET_INVALID', `runtime dependency '${id}' must use an exact x.y.z version`);
+    if (!trustedRuntime.has(id) || version !== '0.11.0') {
+      throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+        `runtime dependency '${id}' is not an explicitly trusted v0.11.0 runtime Package`);
     }
     if (dependencies[id] !== undefined && dependencies[id] !== version) {
       throw refusal('DH_BUILD_VERSION_CONFLICT', `runtime dependency '${id}' collides with a selected Package`);

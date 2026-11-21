@@ -498,3 +498,51 @@ test('R16 P1-SRC-01: BUILD refuses npm prepare scripts hidden in selected Packag
     })));
   expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
+
+test('R18 P1: selected Package cannot pull an unselected local package with postinstall at npm install time', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const localDir = scenario.ws.packageRoots['orders-business']!;
+  // An unselected package script is data only: BUILD must reject before materialize/install.
+  writeRaw(localDir, 'unselected/package.json', new TextEncoder().encode(JSON.stringify({
+    name: 'unselected-probe', version: '1.0.0', type: 'module',
+    scripts: { postinstall: 'node -e "process.exit(99)"' },
+  })));
+  writeRaw(localDir, 'package.json', new TextEncoder().encode(JSON.stringify({
+    name: 'orders-business', version: '1.0.0', type: 'module',
+    dependencies: { 'unselected-probe': 'file:./unselected' },
+  })));
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('R18 P1: selected Package cannot resolve external optional, peer, bundled, or dev install dependencies', (t) => {
+  for (const [field, value] of [
+    ['optionalDependencies', { unselected: 'git+ssh://example.invalid/test.git' }],
+    ['peerDependencies', { unselected: '^1.0.0' }],
+    ['bundleDependencies', ['unselected']],
+    ['devDependencies', { unselected: 'file:../unselected' }],
+    ['overrides', { unselected: 'file:../unselected' }],
+  ] as const) {
+    const scenario = standardCase();
+    t.after(scenario.ws.dispose);
+    const { input } = scenario.finalize();
+    writeRaw(scenario.ws.packageRoots['orders-ext']!, 'package.json', new TextEncoder().encode(JSON.stringify({
+      name: 'orders-ext', version: '1.0.0', type: 'module', [field]: value,
+    })));
+    expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  }
+});
+
+test('R18 P1: caller-supplied external or unpinned root runtime dependencies are rejected', (t) => {
+  for (const runtimeDependencies of [
+    { '@kaicreator/domain-harness-microkernel': '0.11.0', 'unselected-probe': '1.0.0' },
+    { '@kaicreator/domain-harness-microkernel': '0.11.0', 'unselected-probe': 'file:../probe' },
+    { '@kaicreator/domain-harness-microkernel': '0.11.1' },
+  ]) {
+    const scenario = standardCase();
+    t.after(scenario.ws.dispose);
+    const { input } = scenario.finalize();
+    expectRefusal(buildApp({ ...input, runtimeDependencies }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  }
+});

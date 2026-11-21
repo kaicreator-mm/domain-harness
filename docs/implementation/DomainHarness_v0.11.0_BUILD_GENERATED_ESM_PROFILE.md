@@ -31,3 +31,9 @@ Plain literal property reads, local functions, loops, conditionals, `Array.at(in
 The user-facing Package lifecycle still follows `Core.Order`, single-pass recursive Init, optional Exit and optional Package InitFrom; narrowing the generated-code profile does not change runtime scheduling.
 
 **Validation:** `tooling/build/tests/core/build-positive.test.ts`, `build-negatives.test.ts`, and the independent composed-App consumer cover the allowed alternatives, denied code paths and rejected package-install hooks. Acceptance is restricted to the actual exact-HEAD test and CI evidence.
+
+## npm installation boundary (v0.11.0)
+
+Each selected Package is bundled from BUILD-verified files. Selected `package.json` files must **not** declare their own `dependencies`, `optionalDependencies`, `devDependencies`, `peerDependencies`, bundled dependencies, workspaces or npm overrides: even a transitive local `file:` dependency could execute an unselected `postinstall` before Boot. All selected Extension Packages are placed explicitly in the composed root `file:./packages/<id>` dependency set.
+
+The only external runtime dependencies allowed by BUILD at v0.11.0 are the exact first-party `@kaicreator/domain-harness-microkernel@0.11.0` and optional `@kaicreator/domain-harness-contracts@0.11.0`; any additional caller-supplied root dependency or version is refused. These first-party modules are an explicitly trusted installation boundary, not arbitrary third-party code proved safe by JavaScript AST analysis. Installing the resulting package still requires the trusted runtime package source. BUILD does not execute `npm install`.

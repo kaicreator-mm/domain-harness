@@ -680,3 +680,27 @@ test('R16 P1-SRC-02: Business READY cannot conceal a missing trailing Core', asy
   assert.deepEqual(events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
     DISPOSE_ORDER, 'missing trailing Core must not block reverse cleanup');
 });
+
+test('R18 P2: multiple Business Core statuses cannot mask failure or degradation', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const { validateBusinessCoreResults } = await import('../../src/kdp.js');
+  const ingress = fixture.lock.ingress;
+  const optional = { status: 'DEGRADED', suppressedIngress: ['optional-report'] };
+  const matrix = [
+    { label: 'two READY', results: [{ status: 'READY' }, { status: 'READY' }], status: 'READY', suppressed: [] },
+    { label: 'READY plus BLOCKED', results: [{ status: 'READY' }, { status: 'BLOCKED' }], status: 'BLOCKED', suppressed: [] },
+    { label: 'READY plus DEGRADED', results: [{ status: 'READY' }, optional], status: 'DEGRADED', suppressed: ['optional-report'] },
+  ] as const;
+  for (const row of matrix) {
+    assert.deepEqual(validateBusinessCoreResults(row.results, ingress),
+      { status: row.status, suppressed: row.suppressed }, row.label);
+  }
+  assert.throws(() => validateBusinessCoreResults([{ status: 'READY' }, { status: 'FAILED' }], ingress),
+    /status FAILED/, 'FAILED from any Business Core cannot be masked');
+  assert.throws(() => validateBusinessCoreResults([{ status: 'BLOCKED' }, optional], ingress),
+    /Conflicting BLOCKED/, 'BLOCKED cannot expose DEGRADED ingress');
+  assert.throws(() => validateBusinessCoreResults([{ status: 'READY' }, {
+    status: 'DEGRADED', suppressedIngress: ['evaluate'],
+  }], ingress), /required ingress/, 'only optional ingress may be suppressed');
+});
