@@ -2,6 +2,8 @@
 
 > **最高优先级的 0.11.x 产品边界修正候选。** 本文件响应 Owner 关于 DomainHarness / DomainForge / 自举和所谓“BUILD”的明确裁决。待独立审核并合入版本列车后，它在**产品定位、构建责任归属和产品间依赖**方面优先于 0.11.0 的 B-01“从生成 Package 到应用组合都是 Harness BUILD”、R29 Roadmap、未合并 R31/R32 等旧表述。保留这些历史文档作为演化证据，**不因此撤销未改变的 v0.11.0/0.11.1 实码限定验收**；对真实 ABI/信任门的迁移需另行实施/验证。
 
+> **【R34 Owner 追加确定】** `0.11.x` 的完整产品目标是 **DomainHarness SDK**，其中 **Domain** 是有界领域语义/知识/规则，**Harness** 是该领域任务的受控执行与经验闭环，**SDK** 是通过公开 API、Boot、Domain Packages 和 Assembly 构成、可供其它 Domain App 使用的可复用交付物。为解决 SDK 自举的鸡蛋问题，**允许在 domain-harness 保留一个仅供本项目自身生产基础 Domain Packages 的临时 Seed Builder**；它属于开发期一次性工具，未来由 DomainForge 接替，不能变成 SDK 公共 Package 生产引擎。完整定义见 [R34 三名称与临时 Seed Builder](DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_AND_BOOTSTRAP_SEED.md)。DomainForge 的过时禁止所有 SDK import 规则已由 [Forge PR #217](https://github.com/kaicreator-mm/domain-forge/pull/217) 更新为“允许公开 SDK 依赖，拒绝私有模块”的候选；不得在其合入/验收前声明规则生效于 main。
+
 ```ini
 OUTPUT_LABEL=DH_V011X_R33_SDK_FORGE_SELF_HOSTING_OWNER_CORRECTION
 REPO=kaicreator-mm/domain-harness
@@ -24,7 +26,7 @@ CODE_STATUS=DESIGN_ONLY_NO_SOURCE_REFACTOR_CLAIM
 
 **DomainHarness 是“基于 Boot + Domain Package 构建的领域 Harness SDK”。** 它提供所有 Domain App 可以共享的最小协议、最小启动与装配、运行机制、标准 Element/Package 能力以及 SDK API。它是**生态基础设施**，但不是必须自带知识创作、Package 自动生产和业务代码生成的平台。它自身的可交付 SDK 也应由同一组 Domain Package 组成，不能永久享有另一条特权构建链。
 
-**DomainForge 是一个使用 DomainHarness SDK 的 Domain App。** 它把领域需求、来源、事实、知识、模型、人或 Agent 的创作结果变成经验证可交付的 **Domain Package**（具体的源码生成、内容编译和目标代码生成属于 Forge 的功能）。Forge 不是 Boot 的依赖、不是 DomainHarness 的内置构建引擎，也不要求所有业务开发必须在线运行 Forge：开发者已拥有合格 Domain Package 时可以直接用 DomainHarness SDK 装配运行。
+**DomainForge 是一个使用 DomainHarness 公开 SDK 的 Domain App；这种 SDK 产品依赖是 Owner 的现行要求，不是可选的未来方向。** 它把领域需求、来源、事实、知识、模型、人或 Agent 的创作结果变成经验证可交付的 **Domain Package**（具体的源码生成、内容编译和目标代码生成属于 Forge 的功能）。Forge 不是 Boot 的依赖、不是 DomainHarness 的内置构建引擎，也不要求所有业务开发必须在线运行 Forge：开发者已拥有合格 Domain Package 时可以直接用 DomainHarness SDK 装配运行。
 
 **Domain App 是由 Boot + 经过选定的 Domain Packages + 目标/部署适配配置组成的应用。** Domain Package 是同一种可组装产物，既可以提供 Business Domain，又可以提供标准 Reader、Kernel/SDK 基础能力、Client/Server/CLI 功能。差异来自**已选 Package、接口绑定、Target、Host adapter**，而不是针对“SDK App”“Forge App”分别创建第二套 Runtime 或 BUILD。
 
@@ -87,14 +89,14 @@ CODE_STATUS=DESIGN_ONLY_NO_SOURCE_REFACTOR_CLAIM
 
 当前 `kaicreator-mm/domain-forge@main` README 的 v0.0.3 R-005/#44 **明确禁止 Forge Core import 任何 DomainHarness 公共或内部编译/运行包**，并通过源码静态扫描验证。它当前把 Forge 定位为 `AuthoredCandidate` 生产者、通过公开 DAC 和未来 adapter 进行交接。这是**已存在的阶段性技术事实**，与 Owner 当前要求的“Forge 是运行在 DomainHarness SDK 上的 Domain App”**尚不一致**。
 
-- **不能直接把 Forge 当成已经由 DomainHarness Boot 启动的 App，也不能因为本规范就擅自篡改/否定 Forge 当前冻结版本的 CI/资格。**
+- **历史冻结 Core 与当前产品规则分离**：Forge 旧 R-005 的一切 Harness import 禁令现在已被 Owner 废止，新的 [Forge PR #217](https://github.com/kaicreator-mm/domain-forge/pull/217) 正在更改两套机械门禁为 **允许 `@kaicreator/domain-harness` 公开 SDK 依赖、禁止私有/深层实现依赖**。保留旧冻结文件作为历史证据，不据此宣布 Forge App Boot/E2E 已合格。
 - 本规范指定**未来整合目标**：Forge 作为 Host SDK 上的 Domain App，真正 Package 生产通过明确定义的公共接口/适配器与当前 Forge Core 对接；可保留 Forge 的纯作者核心库（无 runtime 依赖），但**外层 Forge Domain App** 必须真实使用 DomainHarness SDK/Boot/Package。现存 R-005 对“Forge Core”的禁止可继续成立；不可把它扩大成永久禁止所有 Forge 产品有 DomainHarness Domain App 外壳。
 - Forge 要从“只生产候选”升级为“可生成可交付 Domain Package”，需要在 DomainForge **自己的未来 Product/L2 版本和 DAC 交接合同**中确认产物/适用 Target/证据/权限与测试。不要在本仓库修改冻结 DAC/Forge 契约，不得把缺少这个交接权威当作已完成的自举证据。
 - 上游的 Domain Data / Claim / 权利/适用范围资格并不因为 Forge “运行在 Harness 上”就自动晋升；Harness SDK 的 Package 合法性也不因为 Forge 声称通过而自动合格。
 
 ## 5. 0.11.x 中从此必须维护的复用、版本责任
 
-- **0.11.0 Foundation（#1564）**：定义最小 SDK Boot + Package 架构与装配 API/规则，自举 Seed 的信任边界和 Source→Package→可交付 SDK App 的形状。保留已合格的 Element-First、Init/Exit、Core.Order、Direct Extension、T11/T14 真实运行证明；但撤回 B-01“全生产都在 DomainHarness BUILD”的产品归属。代码清理/重命名只能在单独有限任务中实施。
+- **0.11.0 Foundation（#1564）**：定义最小 SDK Boot + Package 架构与装配 API/规则，明确 Domain/Harness/SDK 三术语，以及**仅供 DomainHarness 自己自举使用的临时 Seed Domain Package Builder**（不进公共 SDK、不生产其它领域 Package、将来由 Forge 替换），形成 Source→基础 Domain Package→可交付 SDK App 的最小可证实形状。保留已合格的 Element-First、Init/Exit、Core.Order、Direct Extension、T11/T14 真实运行证明；但撤回 B-01“全生产都在 DomainHarness BUILD”的产品归属。代码清理/重命名只能在单独有限任务中实施。
 - **0.11.1 Task Execution（#1605，已 Scoped 接受）**：Workflow/XState/Task 是 SDK Package 可复用执行能力；不因本规范重写或重新审已接受源码。现有 `buildApp` 的演示调用只是其时的技术实现，不等于“BUILD 是整个平台”的产品定义。
 - **0.11.2 Domain Intelligence（#1612）**：Domain/Rule/Reader/Decision 的通用可复用能力作为**Standard Elements**；领域知识/业务规则仍由 Domain Package 携带，源创作/Package 生产属于 Forge。原先 #1644 的 Reader 解析职责设计，需要**重新以 SDK Package/Forge 生产分工为前提**审查，不得继续把“DomainHarness BUILD 复用 Reader 纯解析库”设为 Product 必须。
 - **0.11.3–0.11.6**：交互、授权 Effect、有界 LLM、Durable Task 都应作为 SDK 基础合同与可选标准/领域 Package 增量；禁止创造第二应用 Runtime、领域 Package 自动生产器或 Forge 替身。
