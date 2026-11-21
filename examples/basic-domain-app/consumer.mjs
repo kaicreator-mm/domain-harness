@@ -245,7 +245,10 @@ async function authoring(label, rule, options = {}) {
     ? await prepareWorkflowElements(dirs, rules, app, fn) : null;
   const definitions = {
     'basic.knowledge': knowledge, 'basic.rules': rules, 'basic.app': app,
-    ...(workflow ? { [workflow.child.id]: workflow.child } : {}),
+    ...(workflow ? {
+      [workflow.child.id]: workflow.child,
+      ...Object.fromEntries(workflow.dataElements.map((el) => [el.id, el])),
+    } : {}),
   };
   const definitionRefs = {};
   for (const [id, definition] of Object.entries(definitions)) {
@@ -353,8 +356,15 @@ async function authoring(label, rule, options = {}) {
           definitionRef: await artifactRef('rules-package', 'elements/lifecycle.json'), visibility: 'private' },
         { id: 'basic.knowledge', version: '1.0.0', definitionRef: definitionRefs['basic.knowledge'], visibility: 'public' },
         { id: 'basic.rules', version: '1.0.0', definitionRef: definitionRefs['basic.rules'], visibility: 'public' },
+        ...(workflow ? workflow.dataElements.map((el) => ({
+          id: el.id, version: el.version, definitionRef: definitionRefs[el.id], visibility: 'public',
+        })) : []),
       ],
-      exports: [{ elementId: 'basic.knowledge' }, { elementId: 'basic.rules' }, { interfaceId: 'rules.api' }],
+      exports: [
+        { elementId: 'basic.knowledge' }, { elementId: 'basic.rules' },
+        { interfaceId: 'rules.api' },
+        ...(workflow ? workflow.dataElements.map((el) => ({ elementId: el.id })) : []),
+      ],
       targetVariants: variant([
         ...lifeImplementations('rules-package'),
         implementation('basic.rules', 'evaluate', rulesEntryRef, 'evaluate', [ruleRef]),
