@@ -202,11 +202,30 @@ export function verifyGeneratedPackageImports(
       if (ts.isIdentifier(node) && OPAQUE_IDENTIFIERS.has(node.text)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `opaque code-loading identifier '${node.text}' in '${key}'`);
       }
+      if (ts.isElementAccessExpression(node) &&
+          !ts.isStringLiteral(node.argumentExpression) &&
+          !ts.isNumericLiteral(node.argumentExpression)) {
+        // 即便尚未调用，计算得出的属性也可能是 Function/createRequire 等动态加载器。
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `computed member access in '${key}' is not in the statically provable ESM subset`);
+      }
+      if (ts.isComputedPropertyName(node) && !ts.isStringLiteral(node.expression) &&
+          !ts.isNumericLiteral(node.expression)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `computed property declaration in '${key}' is not statically provable`);
+      }
       if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))) {
         const name = propertyName(node);
         if (name !== null && OPAQUE_MEMBERS.has(name)) {
           throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `opaque reflective member '${name}' in '${key}'`);
         }
+      }
+      // 已获授权的外部 Function 只可直接调用，不能把原始句柄装入对象、
+      // 赋值、透传或作为回调参数泄露给没有直接 Extension 声明的第三方。
+      if (ts.isIdentifier(node) && foreignHandles.has(node.text) &&
+          !ts.isImportSpecifier(node.parent) &&
+          !(ts.isCallExpression(node.parent) && node.parent.expression === node)) {
+        rejectHandle(node.text, 'a non-call use');
       }
       if (ts.isExportDeclaration(node)) {
         if (node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {

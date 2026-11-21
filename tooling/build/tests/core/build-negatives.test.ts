@@ -439,11 +439,35 @@ generatedLoaderCase('Reflect-based Function lookup is refused', `
 export async function init() { return Reflect.get(globalThis, 'Function')('return 1')(); }
 export function exit() {}
 `);
+
+generatedLoaderCase('computed global Function read followed by indirect invocation is refused', `
+const loader = globalThis['Fun' + 'ction'];
+export async function init() { return loader('return import("undeclared-package")')()(); }
+export function exit() {}
+`);
+generatedLoaderCase('computed process builtin read followed by indirect invocation is refused', `
+const loader = process['get' + 'BuiltinModule'];
+export async function init() { return loader('module').createRequire(import.meta.url)('undeclared-package'); }
+export function exit() {}
+`);
+generatedLoaderCase('computed destructuring property aliases cannot acquire a dynamic loader', `
+const { ['Fun' + 'ction']: loader } = globalThis;
+export async function init() { return loader('return import("undeclared-package")')()(); }
+export function exit() {}
+`);
+
 generatedLoaderCase('private named imports from a declared Extension are refused', `
 import { notExported } from 'orders-ext';
 export async function init() { return notExported(); }
 export function exit() {}
 `, 'DH_BUILD_EXPORT_MISSING');
+
+generatedLoaderCase('foreign Function handle cannot be returned inside a wrapper object', `
+import { init as extensionInit } from 'orders-ext';
+export async function init() { return { rawExtensionHandle: extensionInit }; }
+export function exit() {}
+`);
+
 generatedLoaderCase('namespace imports expose an unprovable raw Package handle', `
 import * as ext from 'orders-ext';
 export async function init() { return ext; }
