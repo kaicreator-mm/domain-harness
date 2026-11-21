@@ -60,6 +60,8 @@ SCOPE=DESIGN_AND_INCREMENTAL_EXTRACTION_NOT_IMPLEMENTED
 
 Catalog 初期采用仓库版本化 Markdown/清单即可（状态、ElementRef/Package、版本、消费范围、适用边界、证明链接），不建设标准 Element 注册服务、在线 Marketplace、新数据库或运行时发现协议。
 
+**初始资产清单与状态**：[0.11.x Standard Element Catalog](./DomainHarness_v0.11.x_STANDARD_ELEMENT_CATALOG.md)。每个候选如尚无独立标准 Package/Consumer 验证，就只能标 `CANDIDATE`；不能把 demo Reader、已存在 KDP/XState 引擎当作已发布的 Standard Element。
+
 ## 4. 单仓代码组织与下一轮有限提取
 
 建议在现有 Git monorepo 中渐进建立 `packages/standard-elements/`（或同等单一标准 Package 工作区），其中按 `readers/`、`workflow/`、`decision/`、`validation/` 整理。**目录只是源码管理，并不自动产生跨 Package 的调用权限。** 每个可选标准资产须明确 Package Manifest、ElementDefinition、FunctionRef、Target 实现及 BUILD 所选资源；必要时标准包可以拆为多个更小的普通 Package 供按需组合。新 workspaces/lockfile 变化与实际 Package 生成必须经过受影响构建测试，不因设计文件存在而宣称模块已可安装。
