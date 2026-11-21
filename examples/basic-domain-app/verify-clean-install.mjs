@@ -207,7 +207,7 @@ const packages = [
   {
     dir: 'tooling/build', name: '@kaicreator/domain-harness-build',
     root: { types: './dist/index.d.ts', import: './dist/index.js' },
-    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', ajv: '8.17.1' },
+    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', ajv: '8.17.1', typescript: '^5.8.3' },
   },
   {
     dir: 'packages/microkernel', name: '@kaicreator/domain-harness-microkernel',
