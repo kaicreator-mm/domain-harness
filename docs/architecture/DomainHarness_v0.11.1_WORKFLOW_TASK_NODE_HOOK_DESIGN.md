@@ -1,162 +1,157 @@
-# DomainHarness 0.11.1 — Workflow → Task 统一抽象、0.10 Node 源码追溯与 Task Hook 生命周期（L2 R5 候选）
+# DomainHarness v0.11.1 — Element 统一调用 / 分层 Workflow / 定义-组合-执行三分法（L2 R6 候选）
 
-> **定位：** 用户六点设计讨论的可审核 L2 候选。关联 [版本 #1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)、[HOW #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)、[总控 #1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)。0.10 历史研究基于 `version/v0.10.3@7d571858bd6524ffd13a7985227183dbecb2924a`；来源源码已阅读，未在本次运行 0.10 测试。不是 Frozen，也不是已实施成果。
+> 关联 [版本/L1 #1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)、[L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)、[总控 #1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)。**R6 覆盖本文件 R5「Task 是 Workflow 内定义、只能调用 Function」「一个 TaskRun 恰好一个 Actor」表述**，并保留 0.10 源码考古事实。仅为设计提议，非代码实现/Freeze。
 
 ```ini
-OUTPUT_LABEL=DH_V0111_WORKFLOW_TASK_NODE_HOOK_DESIGN_R5
-MODEL=WORKFLOW_CONTAINS_TASKS_AND_TRANSITIONS
-TASK=EXECUTABLE_UNIT_WITH_SELECTED_FUNCTION_AND_OPTIONAL_LIFECYCLE_HOOKS
-FUNCTION=EXECUTION_TARGET_NOT_TASK_SUBCLASS
-GUARD=BUSINESS_PREDICATE_FOR_WORKFLOW_TRANSITION
-TASKRUN=ONE_WORKFLOW_EXECUTION_ONE_KDP_XSTATE_ACTOR
-TASK_STEP_RECORD=NO_ACTOR_IN_V0111
-XSTATE_OWNER=ONLY_KDP_CORE
-EXISTING_KERNEL_SDK_RUNTIME_VALIDATORS=KEEP_UNCHANGED
-NEW_KERNEL_SDK_RUNTIME_BUSINESS_VALIDATORS=NO
-IMPLEMENTATION=NOT_STARTED
-STATUS=L2_R5_CANDIDATE_NOT_FROZEN
+OUTPUT_LABEL=DH_V0111_ELEMENT_FIRST_UNIFIED_CALLABLE_HIERARCHICAL_WORKFLOW_R6
+ELEMENT=VERSIONED_UNIQUE_DEFINITION
+FUNCTION=UNIFORM_ELEMENT_INVOCATION_SEMANTICS_NOT_CLOSED_SUBCLASS
+TASK=DOMAIN_ELEMENT_ROLE_NOT_WRAPPER_CLASS
+WORKFLOW=COMPOSITE_CALLABLE_ELEMENT
+NODE=WORKFLOW_LOCAL_REFERENCE_OCCURRENCE
+RUN=ONE_INVOCATION_INSTANCE_PER_REFERENCE_AND_VISIT
+WORKFLOW_RUN=ONE_XSTATE_MACHINE_ACTOR_PER_WORKFLOW_INVOCATION
+TASK_RUN=ELEMENT_INVOCATION_NOT_MANDATORY_XSTATE_ACTOR
+SUBWORKFLOW=CHILD_WORKFLOW_RUN_WITH_CHILD_ACTOR
+DATA_ELEMENT=READ_AND_RETURN_VIA_EFFECT_NONE_CALLABLE
+GUARD=PURE_READ_ONLY_ELEMENT_CALL_FOR_TRANSITION
+EXISTING_0110_VALIDATIONS=KEEP_UNCHANGED_NO_EXPANSION
+SOURCE=V0103_7d571858bd6524ffd13a7985227183dbecb2924a
+STATUS=L2_R6_CANDIDATE_NOT_FROZEN
 ```
 
-## 1. 六个问题的设计结论
+## 1. Owner 讨论的四个设计决定
 
-1. **0.11.1 统一到 Workflow 及其下的 Task**。领域工作流有 `tasks[]` 与 `transitions[]`，State Machine 是 KDP 将其编译后执行的机制；业务状态不是和 Task 平级的另一套调度协议。Terminal States（COMPLETE、ASK、WAIT、REJECT、UNKNOWN、FAILED）可以是机器终态而非伪造“没有实际工作的 Task”。
-2. **Task 是 Workflow 中一项有身份、有输入输出、有生命周期的执行节点**；最小实现一个 Task 对应零或一项已选 Function 调用（0.11.1 实际执行型 Task 需一项 Function；纯等待/终态通过状态表达）。Task 与 Workflow 不是新的顶层 Element 家族，而是已有 `workflow-definition` Content 的结构化数据；跨包实际可执行实现仍经已选 `FunctionRef`。
-3. **Function 不继承 Task**。FunctionContract 是 Element 的可调用能力，Task 是控制流中的调用位点：同一 Function 可以在多个 Task/Workflow 中复用，每个 Task 有独立的输入绑定、Guard、分支、Hook、运行实例。0.11.1 只实现 `FunctionTask` 这一种执行绑定模式（只是描述名，不必引入 TypeScript 子类）；`effects:'none'`，真实授权 Tool/Effect 在 0.11.4。**已存在的 v0.11.0 Function 直接调用不被 Task 包装或替换**。
-4. **Guard 推动 Workflow 转移，但不是唯一驱动力**。事件来自 Task Function 的结果、业务请求及状态演进；KDP 在给定当前状态和事件时按 BUILD 封存的 transition + guard 判定下一状态。Guard 负责业务资格谓词/规则函数的结果，默认不执行副作用；无事件或未满足的 Guard 不应让工作流自行凭空流转。禁止把 undefined/UNKNOWN 自动解释为 false/成功。
-5. **TaskRun = 一次 Workflow 执行实例；一个 TaskRun 对应一个 KDP XState Actor**。Task 定义是静态节点；每次进入 Task 产生 `TaskExecution/StepObservation`（含 stepId、attempt、result），**0.11.1 不为每个执行节点另建 Actor**。这样能保持一条确定性 TaskRun 的上下文、Actor 生命周期与最终结果一致；WAIT/ASK 本版结束 Actor 并返回任务结果，不实现 durable resume。
-6. **Lifecycle Hook 可以封装具体 Task 进入、结果整理和清理**，但 Kernel 控制 Actor 的终止/释放与最终向 SDK 返回结果，不允许业务 Hook 自行管理/停止 KDP Actor。Hook 的唯一职责是经 BUILD 已选 Function 实现业务侧扩展；不复制第二个 Hook 调度引擎，也不复用 `technicalInit` / `technicalDispose` 作为每次 Task 清理。
+1. **Task 与 Function 都是 Element 表达的领域角色；Workflow 也是 Element**。不要新增 Task/Function/Workflow 继承树。每个 Element 从调用者角度具备统一的 Function 式调用语义；其具体行为可为数据读取、规则求值、确定性计算或调用已选子 Element 组成的 Workflow。真正授权外部 Effect 在 0.11.4。
+2. **唯一的定义与多次引用严格区分**：一个版本化 `ElementRef(namespace,id,version,digest)` 指向唯一定义；Workflow 某个 `nodeId` 只是引用位点，可以在相同/不同 Workflow、多层级里重复指向同一 Element。每次运行产生独立 `runId/path/visit` 和输入/结果。**Node/引用位点不是自动生成另一个 ElementDefinition**。
+3. **Task → TaskRun 是定义 → 执行实例**（类似类/实例，但不使用动态类继承或共享可变类实例）。TaskRun 不必与 XState Actor 一一对应：若执行的 Element 是 Workflow（包括一个节点的 Workflow），这一次 WorkflowRun 有 XState Actor；若是普通数据/规则/计算 Element，则只是父 Workflow Actor 调用的一次 TaskRun/ElementInvocation，原则上不强制独立 Workflow Actor。
+4. **Workflow 递归组合**：Workflow Element 的 node 可引用普通 Element、Task Element 或另一个 Workflow Element。子 Workflow 引用自己的唯一定义，每次调用创建独立子 WorkflowRun 和子 Actor；父 Actor 按 onDone/onError 取得子结果并进入后续 Guard/Transition。即使同一子 Workflow 被不同节点两次引用，两次也是不同 Actor/运行实例。允许有限执行中的重复访问/循环，但 **BUILD 拒绝静态 Workflow 组合依赖成环（包括 A→B→A）**；不可把普通 Workflow 行为环和 Element 静态依赖环混淆。
 
-## 2. 0.10 历史 Node / State / Step / Run 源码调查
+## 2. 以 Element 的统一 Function 语义消除分类重复
 
-### 2.1 原来真正的名字不是 TaskNode
+0.11.0 [ElementDefinition](https://github.com/kaicreator-mm/domain-harness/blob/b8e5c2bc6eee8615bbc9aabcdb3afd4aa2baa6b2/packages/contracts/src/element-contracts.ts) 已有 `content[]`、`functions[]`（**零个或多个**）、`dependencies[]`；[FunctionContract/FunctionRef](https://github.com/kaicreator-mm/domain-harness/blob/b8e5c2bc6eee8615bbc9aabcdb3afd4aa2baa6b2/packages/contracts/src/refs.ts) 已有被选函数入口；[DomainApp.invoke](https://github.com/kaicreator-mm/domain-harness/blob/b8e5c2bc6eee8615bbc9aabcdb3afd4aa2baa6b2/packages/contracts/src/app-contracts.ts) 已提供直接调用。
 
-- [`loader/ast.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/loader/ast.ts)：使用 `WorkflowAst {initial,states}`、`StateAst {id,final,invoke?,done,error,events}`、`InvokeAst {kind,ref,input,timeoutMs,...}`；`StepKind = skill|tool|script|expr|workflow`。源码这个层次**没有名叫 `TaskNode` / `WorkflowNode` 的正式业务类型**。用户所记的 Node，最接近“一个有 `invoke` 与入/出路由的 Workflow State 节点”。
-- [基础工作流 YAML](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/tests/fixtures/basic-harness/workflows/main.yaml)：`generate` State 的 `invoke.skill` 执行后 `on.done → await_approval`；`await_approval` 无 invoke，通过外部 approve/reject 事件继续；`completed/failed` 为 `final:true`。
-- [`compiler/control-machine.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/compiler/control-machine.ts)：把 `StateAst` 编译成 XState v5 machine；通过 `initialTransition`、`transition(machine, snapshot, event)` 推进当前状态，`RouteSelection` 指明 done/error/event 的目标；它**不要求每个 Step/Task 都单独创建 Actor**，也不是在本条源码路径上长期维护 actor instance。
-- [`runner/run-coordinator.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/runner/run-coordinator.ts)：`createRootRun` 创建顶层 Run，`drive` 进入 State，`executeStep` 根据 `invoke` 执行，`done/error` 通过 RouteEvaluator + XState transition 进入后续 State；子 workflow 使用 frame stack/instanceId；`finishFinalState` 计算输出，`failRun` 结束错误。
-- [`runner/step-dispatcher.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/runner/step-dispatcher.ts)：按 `expr|script|tool|skill` 实际调用执行器，`workflow` 交由 Coordinator 协调；所有这些是**旧的执行方式区分**，并非新版需要兼容的 Task 子类。
-- [`runner/run-lifecycle.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/runner/run-lifecycle.ts) + [`contracts/runtime.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/contracts/runtime.ts)：完整旧 Run API `start/send/wait/resume/cancel/get/listRuns`、状态 `running/waiting/completed/failed/cancelled`，靠 SQLite/RunLifecycle 管理生命周期，包含 0.11.6 才考虑的持久化/恢复性质。
-- [`persistence/types.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/persistence/types.ts)：`StepIdentity {runId,workflowInstanceId,stateId,visit}`，每个 Step 有 started/completed/failed、output/error；这是旧版的**执行记录身份**，不等于新 Task Element 的类型。
-- [`workflow/contract.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/workflow/contract.ts) 和 [v0.7 XState Bridge](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/adapters/workflow-runtime-bridge.ts)：另一条历史链使用 DomainWorkflowState/Transition 和由 `createActor` 驱动的 XState bridge，不应与上述早期 RunLifecycle 路径混为同一执行引擎。
+**不应该把「每个 Element 就是 Function」机械理解为把每个 Element 的 `functions[]` 改成唯一 `function` 或强迫已有数据 Element 在 Stage0 立即具有外部 JS 导出。** 最小实现采用**统一的可调用视图**：
 
-### 2.2 旧版可借鉴之处与明确拒绝继承的复杂度
+- Element 是语义/版本身份和配置/知识的唯一封装，Function 是调用投影；一个 Element 可含多个具名入口，或具有经 BUILD 明确选定/生成的默认入口。
+- **数据 Element**：Function 式 `read(input) → SUCCEEDED(value)`；真实数据来源于 BUILD 选定的 ContentBlock/资源和适用范围，不默认加载所有未知 Content，也不在 KDP 新增业务验证。为没有显式 FunctionContract 的纯数据 Element，可由 BUILD 生成选定、只读、无外部 Effect 的 adapter/entry；本版不要求重写 0.11.0 的 Element Schema。缺乏唯一默认入口或内容选择歧义应在 BUILD 阶段拒绝。
+- **规则/Guard Element**：Function 式只读判定，返回成立、不成立或不确定（UNKNOWN 应保留）。Guard 是转换资格而非擅自驱动事件或更改状态；由当前状态、事件、前序结果触发评价。
+- **确定性 Task/业务 Element**：Function 式计算，使用自身已选实现（可有局部业务 Hook），返回 `SUCCEEDED/UNKNOWN/FAILED`；业务失败由 Package 自己处理。
+- **Workflow Element**：Function 式调用是 `invokeWorkflow(input)`，内部进入 KDP 的通用 Machine，依次调用所引用子 Element；顶层返回 Workflow Outcome。Workflow 并非与 Element 并列的第二套定义/注册体系。
 
-| 历史概念 | 新版映射 | 处理方式 |
+既有 `FunctionOutcome=SUCCEEDED|UNKNOWN|FAILED` 与 Workflow 层 `COMPLETE|REJECT|ASK|WAIT|UNKNOWN|FAILED` 不应强制合并为同一个枚举。可在 BUILD 固化的 Workflow/业务映射中由领域 Element 形成任务决议；KDP 执行转换而不是推断缺失值或任意把 UNKNOWN 当 FALSE。
+
+## 3. 三个互不混淆的身份
+
+```text
+A. 定义：ElementDefinition(id/version/digest)
+   e.g. Element CheckInventory@1#abc, Element OrderWorkflow@1#def
+               │
+B. 组合：WorkflowDefinition nodes[] + transitions[]
+   nodeId=verify-first  --> ElementRef CheckInventory@1#abc
+   nodeId=verify-final  --> ElementRef CheckInventory@1#abc  // 同一定义被引用第二次
+   nodeId=approval      --> ElementRef ApprovalWorkflow@1#ghi // 子 Workflow
+               │
+C. 运行：RunInstance(rootRunId, invocationPath, nodeId, visit)
+   root/verify-first/1  --> CheckInventory 的一次独立执行
+   root/approval/1      --> ApprovalWorkflow 的 WorkflowRun + 子 Actor
+   root/verify-final/1  --> CheckInventory 的另一次独立执行
+```
+
+- **定义身份**：已有 `ElementRef {namespace,id,version,digest}`，不可写入 `nodeId`、ActorRef 或随机 runId；由 BUILD/Lock 固定。
+- **组合身份**：`nodeId` 在单一 Workflow 定义内唯一，`ElementRef` 可重复，Node 允许携带该引用位置的输入投影/参数与已选入口，不能就地修改共享 Element 定义。
+- **运行身份**：`rootRunId + hierarchicalInvocationPath + visit` 能区分多次调用同一 Element、同一个 node 的有限循环、子 Workflow 的多层实例；无需新顶层领域定义。状态和临时输出按运行实例隔离，不写回 ElementDefinition。
+- **无环与有环是两个图**：Element 依赖/子 Workflow 静态包含图无环（BUILD）；Workflow 转换图可以有有界循环（KDP）；Domain 语义关系图允许互引。
+- **层级预算**：除了每次 Workflow 的有限 step budget，应有 BUILD 固化的最大嵌套层级/总执行预算；0.11.1 只做必要的有界顺序子 Workflow，不做泛化递归/无限扇出、Durable/跨进程 Actor。
+
+## 4. Actor 是执行机制，不是业务定义
+
+**XState Machine** 是基于选定 Workflow Element 编译/配置的状态机逻辑，可以被多个独立 Actor 运行；**XState Actor** 是此机器的一次具体运行对象，包含当前状态、context、事件邮箱、子 Actor、输出。Actor 不等于操作系统线程、不等于一个 ElementDefinition，也不等于全部 TaskRun。官方资料：
+- https://stately.ai/docs/xstate/v5/machines
+- https://stately.ai/docs/xstate/v5/actors
+- https://stately.ai/docs/xstate/v5/invoke
+- https://stately.ai/docs/xstate/v5/final-states
+
+**推荐最小映射**：
+
+| 执行对象 | 运行形态 | 是否有独立 Workflow Actor |
 |---|---|---|
-| `WorkflowAst` | `workflow-definition` Content 中的 Workflow | 重新定义合同，不复刻 YAML/ABI |
-| `StateAst` / “Node” | `Task` 执行节点 + KDP 生成的 State Machine State | 不把“等待/终态 State”强制写成工作 Task |
-| `InvokeAst kind` | `Task.function: FunctionRef` | 0.11.1 **仅一个 Function 执行类型** |
-| `RouteAst when` | 选定 Guard + 结构化 Transition | Guard 只评价资格，BUILD 固化歧义策略 |
-| `RunCoordinator / RunLifecycle` | KDP 通用 TaskRun Coordinator / Actor | 只要内存执行，不引入 SQLite/Resume |
-| `StepIdentity/StoredStep` | `TaskExecution` 轻量观察记录 | 本版不引入 Journal/CAS/durable replay |
-| `done/error/final` | Task 结果转事件、Workflow 转移和终态 | 保留语义，扩展 L1 必须的 ASK/WAIT/UNKNOWN/REJECT |
-| `technicalInit/technicalDispose` | 继续是 Package 技术生命周期 | **不与 Task Hook 共用触发时机** |
+| 纯数据/只读计算 Element 一次调用 | `TaskRun/ElementRun` 记录，父 Workflow 调用的 Function 式结果 | **不要求**；XState 内部 Promise actor 可用但不视作公开 Run 身份 |
+| 单节点 Workflow Element 一次调用 | `WorkflowRun`，内部调用一个普通 Element | **有**，一个 root/child Actor；可将它的单个节点执行观察为 TaskRun，但两种身份不同 |
+| 多节点 Workflow Element 一次调用 | `WorkflowRun` + 多个子节点调用记录 | **有**，一个该 WorkflowRun 的 Actor |
+| 子 Workflow Element 的一次调用 | `Child WorkflowRun`，有父路径与独立状态 | **有**，父 Workflow Actor 下的一次 child Actor；同一定义二次引用会创建两个不同 child Actors |
 
-**结论：** “Node” 是合适的内部编排视角，但根模型叫 `Workflow → Task` 更符合 0.11.1，且没有必要将每类旧 Invoke 都重新建一个 Task 子类。
+**因此**：`Task → TaskRun` 是“定义 → 调用实例”；`Workflow Definition → WorkflowRun Actor` 是“编排定义 → 状态机实例”。如果某 Task 自身通过 Workflow Element 来完成，TaskRun 可引用一个 Child WorkflowRun，但不能要求每个叶子任务都“Actor 一对一”。
 
-## 3. 最小 L2 数据模型草案（仅示意，不是已冻结 TypeScript ABI）
+XState v5 `invoke` 会在进入调用状态时启动子 Actor、离开时停止；`onDone/onError` 将子结果带回父节点。0.11.1 的 WAIT/ASK 是本次运行的显式终局，**不保留活 Actor 等待跨会话恢复**。父执行结束时子执行和局部资源应在业务 Hook 已 settle 后释放；未来 Durable/跨重启属 0.11.6。
+
+## 5. 最小示意合同（不是已冻结 TypeScript ABI）
 
 ```ts
-type TaskId = string;
-
-// 真实形态复用已有 Element ContentBlock 的 schema 和引用规则。
+// 在已存在 ElementDefinition 的 content 中声明。
+// 工作流本身就是一个 Element，入参/出参以 Function 式公开。
 interface WorkflowContent {
-  id: string;
-  initialTask: TaskId;
-  tasks: TaskDefinition[];
-  transitions: WorkflowTransition[];
-  maxSteps: number; // build-time bounded
+  initial: string; // workflow-local nodeId
+  nodes: readonly WorkflowNode[];
+  transitions: readonly WorkflowTransition[];
+  maxSteps: number; // BUILD 确定的预算
 }
 
-interface TaskDefinition {
-  id: TaskId;
-  execute: FunctionRef;                // selected Function: effects='none' in 0.11.1
-  inputFrom?: TaskInputMapping;         // previous output / workflow input -> Task input
-  lifecycle?: TaskLifecycleHookRefs;    // optional, all must be BUILD selected
+interface WorkflowNode {
+  nodeId: string;                 // 引用位置，非 Element 定义
+  target: ElementRef;             // Task、数据、Guard、Function 或子 Workflow Element
+  entry?: string;                 // 可选具名 Function；缺省仅当 BUILD 能唯一确定
+  input?: InputBinding;           // 仅修改本次调用参数
 }
-interface TaskLifecycleHookRefs {
-  onEnter?: FunctionRef;               // per Task invocation business setup
-  onResult?: FunctionRef;              // assemble/normalize domain-specific result
-  onFinally?: FunctionRef;             // local business resource cleanup, including errors
-}
+
 interface WorkflowTransition {
-  from: TaskId;
-  on: 'SUCCEEDED' | 'UNKNOWN' | 'FAILED'; // FunctionOutcome retained, or mapped task decision
-  guard?: FunctionRef;                   // selected pure business decision/predicate
-  to: TaskId | 'COMPLETE' | 'ASK' | 'WAIT' | 'REJECT' | 'UNKNOWN' | 'FAILED';
+  from: string;                   // workflow-local nodeId
+  on: string;                     // TASK_DONE / UNKNOWN / FAILED / ... 经构建固定
+  guard?: { element: ElementRef; entry?: string }; // 无副作用可调用 Element
+  to: string;                     // 另一 nodeId 或声明的 terminal
 }
 
-interface TaskRunSnapshot {
-  runId: string;
-  workflowId: string;
-  currentTaskId?: string;
-  result?: TaskRunOutcome;
-  steps: readonly TaskExecutionObservation[];
+interface ElementRun {
+  rootRunId: string;
+  element: ElementRef;
+  invocationPath: readonly string[];
+  visit: number;
+  input: unknown;
+  outcome?: unknown;
 }
 ```
 
-**类型说明**：
+重点不是把 `Task` 变成节点类：**节点只引用某个 Element**。如果想命名 `Task`，它是 Element 的领域角色，或该调用在 Workflow 中的语义；不是必须额外建立 `TaskDefinition`/ `FunctionTask` 对象，再重复 Element 身份。
 
-- 这是**最小说明模型**，真实 TS 类型/SchemaRef/ElementRef、摘要、JSON 结构应由 T11 设计并由 BUILD 验证；不要求 Task 成为 Element 的 TypeScript class 或新增开放的 Class Hierarchy。
-- `TaskRunOutcome` 的 `COMPLETE/ASK/WAIT/REJECT/UNKNOWN/FAILED` 是工作流层终局结果；`FunctionOutcome` 继续保持 0.11.0 已有的 `SUCCEEDED/UNKNOWN/FAILED`。如果业务 Function 返回“需要用户补充信息”等信息，经被选 Task `onResult`/领域映射形成对应工作流决议，KDP 只转移状态，不猜测含义。
-- 一个 Workflow 可多个 Task 依次或分支执行，也可经显式有限循环再次访问同一 Task；它不是 Element 静态依赖 DAG，后者必须无环。StepObservation 需要 `stepId+visit` 避免同节点重入混淆。
-- 特别注意 `FunctionRef` 为 Stage0 既有合同；Task 不是 Function 的基类。一个 Function 被多个不同 Workflow 的 Task 调用是合法设计。
+## 6. Hook 属于 Element 的定义；执行时按每个引用位置实例化
 
-## 4. Task Lifecycle Hook 与 TaskRun Actor 生命周期
+- 仍可保留最小业务 Hook `onEnter?`、`onResult?`、`onFinally?`；但其**声明和可用实现绑定在 Element/Package 的已选合同**，Node 只提供不同 invocation input/parameter，不能用 node override 另造第二份 ElementDefinition。
+- 进入某 Node 时，按当前调用实例触发 `onEnter → invoke Element → onResult → onFinally`；**先等待异步 Hook 结束，再把结果事件交给父 Workflow Guard/Transition**。失败路径也尽量执行 `onFinally` 一次；没有第二套 Kernel 业务异常解释器或自动重试。
+- Workflow 自身也作为可调用 Element，有其运行范围的 Hook；子 Workflow 的业务 Hook 在向父 Actor 报完成前执行，父节点的 Hook 在收到子 Workflow 的结果后处理。
+- KDP 拥有通用调用/Actor 生命周期、父子路由与最终结果传播；业务 Package 拥有 Hook 业务实现及自身资源清理。XState `actions` 默认并不 await 异步函数；要利用 `invoke/fromPromise` 或显式 await 的调用逻辑来保证顺序，不能把异步清理裸塞进同步 exit action。
+- **不混淆已有技术生命周期**：0.11.0 `technicalInit/technicalDispose` 对应 Package 的装载/销毁，不能在每个 Node 或 TaskRun 结束时执行；现有 Hook binding/seal 模式可复用，但 Stage0 未自动触发 Task 业务 Hook。
+- 0.11.0 已有运行时 Schema、Outcome、Boot Trust、ingress/生命周期等校验**保留，不删不迁不扩充**。新 Element 可调用视图、图引用、选定入口和 Hook 合法性在 BUILD/生产测试阶段解决。
 
-### 4.1 Task Hook 的执行顺序和业务归属
+## 7. 来自 0.10 的已证实机制
 
-```text
-WorkflowRun KDP Actor enters Task state
-  → onEnter?      (Package optional Function, business setup)
-  → execute       (mandatory selected Package Function)
-  → onResult?     (Package optional Function, result projection/domain decision)
-  → onFinally?    (Package optional Function, release local business resources)
-  → Function/Task decision event → Guard → KDP transition
-  → next Task or top-level final state
-```
+固定 `version/v0.10.3@7d571858bd6524ffd13a7985227183dbecb2924a`：
 
-发生业务错误时由具体 Package 在 `execute` 或 `onResult` 自己处理；`onFinally` 应尽可能覆盖成功/失败/ASK/WAIT 的当前 Task 退出路径。0.11.1 不建立通用重试器，`onFinally` 不承担擅自改写最终结果的权力。对可预见的失败，Package 应返回带原因的 UNKNOWN/FAILED；不可恢复的未捕获技术失败走既有最小 KDP/SDK 失败出口，保留先发生的主要故障信息。
+- [`loader/ast.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/loader/ast.ts)：`WorkflowAst` 包含 `StateAst`，其 `invoke` 可引用 expr/script/tool/skill/workflow；没有正式 `TaskNode` 基类。`StateAst` 可纯事件等待或 final，不能统统看成业务 Task。
+- [`run-coordinator.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/runner/run-coordinator.ts)：`activateChildWorkflow` 根据 `invoke.kind='workflow'` 创建 child frame 与分层 workflowInstanceId，并禁止活动路径递归、限制 childDepth；`finishChildFinalState` 将结果和完成事件归还父流程。**这证明历史上已经有子 Workflow 组合语义**，但原实现是 Run+frame 栈、SQLite 和 XState `transition`，不是与新版父子 Actor 同一运行机制。
+- [`compiler/control-machine.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/compiler/control-machine.ts)：旧 flat state machine 用 `initialTransition/transition`；0.11.1 可借鉴“编译状态 + 明确路由”，不是复制旧 ABI。
+- [`persistence/types.ts`](https://github.com/kaicreator-mm/domain-harness/blob/7d571858bd6524ffd13a7985227183dbecb2924a/packages/domain-harness/src/persistence/types.ts)：`StepIdentity {runId,workflowInstanceId,stateId,visit}` 展示同一个 State 定义会有多次独立 visit 的记录；0.11.1 借鉴身份分离，不引入本版持久 Journal/CAS。
+- [0.10 Workflow Source Study](DomainHarness_v0.11.1_V010_WORKFLOW_STATE_MACHINE_SOURCE_STUDY.md) 还辨认历史 v0.3/v0.7 XState adapter/bridge、v0.10 Standard 纯 Workflow Control Planner，避免声称所有旧执行方式都由一个 XState actor 驱动。
 
-**Task Hook ≠ XState action 字符串 ≠ Package Technical Init**：
-- Task Hook 仅为 BUILD 选定的 FunctionRef/HookBinding，由该业务 Package 提供真实实现；可以借用 0.11.0 的 `provides.hooks/contributesTo` 静态 binding 模式和已有密封表，但必须为 Task 调用补清晰的绑定和触发约定；不能将其理解为当前 Stage0 已自动调用 Task Hook。
-- `technicalInit/technicalDispose` 仍只在 Package 装载/销毁期间调用；每个 Task 退出不能 Dispose 整个 Package。
-- KDP Actor 本身的 stop/terminal/资源清理不交给具体业务 Hook；业务 Hook 不接触 ActorRef、Machine 内部句柄或 Host 未选权限。
-- KDP 只编排这些已选 Hook 的调用顺序，不解释其业务内容，也不增加 0.11.0 已有 runtime Schema/Outcome 校验之外的业务校验层。
+**历史研究是源码和测试静态阅读，不代表本轮运行旧环境测试 PASS。**
 
-### 4.2 Actor 如何结束、如何产生结果
+## 8. 0.11.1 Product/实现范围影响
 
-0.11.1 选择 **一个 TaskRun 对应一个 KDP XState Actor（每次调用新建）**。同一 Actor 持有本次 Workflow 的 Task 状态和已选输入输出；执行到顶部终态时，XState 自然完成，可通过 `subscribe({complete})` 和 `getSnapshot().output` 获得最终输出。业务 Task Hook 应在 Task 转到终态之前 settle/await 完成；**不要把异步 Hook 仅放在 XState 同步 `exit` action 里然后认为它会被等待**。KDP 再做最小订阅/引用清理，返回归一化 `TaskRunOutcome` 给 SDK。显式终止/技术异常按 XState `actor.stop()`/已存在 KDP 失败与清理路径处理；不把 `stop()` 误认为一次正常成功结算。XState v5 官方可核查：
-- https://stately.ai/docs/xstate/v5/final-states
-- https://stately.ai/docs/xstate/v5/actors
-- https://stately.ai/docs/xstate/v5/actions
+**L1 需要补入「多层组合、子 Workflow、同一 Element 多次引用/不同运行实例」**：这是 Owner 本轮明确要求，不应藏在 L2 HOW；可纳入现有 F02/F04 与 AC11/AC20，不必新增一堆 Fxx 编号。L1 不应含 Actor、XState、nodeId 或 FunctionRef 的实现细节。
 
-ASK/WAIT 在本版本也属于**本次执行的有意义返回**，当前 Actor 随本次调用结束、局部业务资源释放；未来 0.11.6 如需恢复，需要新的持久化身份、事件/一致性设计，但**不要求本版先做 Actor Snapshot Store**。
+T11–T14 保持四块、更新职责：
+- **T11 Contracts**：统一可调用 Element 语义及 roles、NodeReference/Run 身份、Workflow/Guard/Hook 数据合同。避免重写 0.11.0 已有 `ElementDefinition` 的多 Function/零 Function 合同。
+- **T12 BUILD/Lock**：同一 Element 的多引用、分层子 Workflow、静态组合无环、默认可调用入口、Guard/Outcome、Hook、全局/局部预算，在 BUILD 完成选定与封存。
+- **T13 KDP Core/XState**：每次 WorkflowRun 一个 Actor，子 WorkflowRun 为 child Actor，叶子调用以已有被选 Function/只读 Content adapter 执行；已选业务 Hook 在状态转移前 await 完成；最小错误/清理/输出。
+- **T14 SDK/真实 Demo**：多引用同一 Element、子 Workflow 多级组合、一个节点 Workflow、普通单 Function 仍直调、不同 Run 独立、ASK/WAIT、UNKNOWN、有限循环、Hook 清理、真实四包消费。
 
-### 4.3 最小生命周期示例
-
-```text
-TaskRun(run-42)
-  Actor.start()
-    Task(search-rule)
-      onEnter? -> execute selected readRule() -> onResult? -> onFinally?
-      SUCCEEDED => Guard(hasDecision)
-    Task(evaluate)
-      onEnter? -> execute selected evaluateRule() -> onResult? -> onFinally?
-      SUCCEEDED => COMPLETE
-  Actor reaches final
-  snapshot.output -> TaskRunOutcome(COMPLETE, result, observations)
-  detach subscription/terminate per normal final lifecycle
-  SDK returns result
-```
-
-异常分支和预算耗尽时依旧输出明确 FAILED/UNKNOWN，不运行未选 Function、不泄漏 Package 局部清理内容。本版仅支持 no-effect，真实 Effect 的授权、确认与补偿策略留到 0.11.4。
-
-## 5. 本轮与 #1608 的边界：哪些决议立即生效、哪些需要真正 Task 实现
-
-- **建议可固定的结构**：Workflow contains Tasks；Task references Function，Function not subtype；Guard controls transition；TaskRun=one Actor；业务 Task Hook 负责 Task 自身资源/结果处理，KDP 负责 Actor 终止和通用执行。
-- **尚未冻结的合同细节**：具体字段名、Task hook 触发顺序/异常处理细节、如何通过 Stage0 既有 HookBindings/FunctionRefs 接入以及 Outcome 到 Guard 的映射；必须在 T11/T12 L2/任务中明确，不能从“用户允许 Hook”推论已经自动具备实现。
-- **已确认不变的范围**：0.11.0 已有 Kernel/SDK 校验保留，不再增加 Runtime 业务校验；0.11.1 不包括 0.11.4 授权 Effect、0.11.6 Durable Resume、0.11.5 LLM，也不兼容旧 0.10 ABI。
-- **检查所需例子**：2+ Task 顺序、同一 Function 被两个 Task 复用、分支 Guard 真/假/UNKNOWN、Task onResult 的业务结果生成、onFinally 成功/失败路径执行一次、TaskRun 单 Actor final output/stop、已选 Function 的旧直接调用、BUILD 负例和有限循环。
-
-**本稿与历史研究均为 docs-only 设计候选，0.11.1 功能源码、CI/审核/合并事实仍为 NOT_RUN。**
+不提前做 0.11.4 真实外部 Effect、0.11.5 LLM 或 0.11.6 Durable Resume；不扩充 Kernel/SDK 运行时业务校验；不增加通用并发调度与无限递归。
