@@ -1,4 +1,6 @@
 # DomainHarness v0.11.0 — L2 Architecture Candidate（R2，R6 审后单轮修订，送独立 delta 审核）
+
+> **历史 L2 快照警示（B0-01–B0-08 修正，2026-11-21）**：此候选 L2 中的 `EntryRef` / `technicalInit` / `businessAppInit` / 直接 `ingress` / `suppressedIngress` 是旧方案，不得用于当前 0.11.0 实施或下游 ABI。现行基础合同以 [B0 Foundation](../specs/DomainHarness_v0.11.0_ELEMENT_FIRST_B0_FOUNDATION.md) 和 [#1624](https://github.com/kaicreator-mm/domain-harness/issues/1624) 为准；保留历史段落仅供变更追溯，旧版本 Scoped 审核不等于 B0 审核。未涉及的 Boot Pin/Core.Order/Extension/完整 BUILD 事实沿用最新源码。
 > **R27 实施增量决议（2026-11-21）**：将先前冻结的 Node24 target floor 调整为 Node.js >=22.12.0、Target `node22-esm/1`（Node24 Host 仍可执行 Node22 Lock）；该 Owner 当前指令覆盖历史 §8.4 中 node24-only 叙述，但不变更其它 L1/L2 设计。新增 R26 P1 启动失败清理、Manifest 生命周期与实际执行一致、Lock-selected ESM 预检、路径同构、稀疏 JSON 和 dispose 新入口保护；回读候选 PR 的精准 SHA/CI 后才提升相应代码资格。日志由 Host 使用现有 BootResult/FunctionOutcome 结构化字段记录，无全局 console transport。
 
 

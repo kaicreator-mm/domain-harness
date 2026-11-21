@@ -237,12 +237,12 @@ export const ILLEGAL_FIXTURES: readonly IllegalFixture[] = [
     })(),
   },
   {
-    name: 'descriptor-ingress-missing',
+    name: 'descriptor-extensions-missing',
     expectedCode: 'DH_BUILD_SCHEMA_INVALID',
     target: 'descriptor',
     value: (() => {
       const draft = cloneLegal(DOMAIN_APP_DESCRIPTOR_FIXTURE);
-      delete draft['ingress'];
+      delete draft['extensions'];
       return draft;
     })(),
   },

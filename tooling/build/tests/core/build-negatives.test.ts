@@ -5,10 +5,19 @@ import {
   DH_ELEMENT_SCHEMA_VERSION,
   type BuildErrorCode,
   type DomainAppDescriptor,
+  type DomainPackageManifest,
+  type ResourceRef,
 } from '@kaicreator/domain-harness-contracts';
 import { buildApp, type BuildResult } from '../../src/index.js';
 import { functionRefOf, writeRaw } from './fixtures.js';
 import { standardCase } from './standard-case.js';
+
+function withInitTarget(pkg: DomainPackageManifest, module: ResourceRef): DomainPackageManifest {
+  return { ...pkg, targetVariants: pkg.targetVariants.map((variant) => ({
+    ...variant, implementations: variant.implementations.map((binding) =>
+      binding.functionId === 'init' ? { ...binding, entry: { module, exportName: 'init' } } : binding),
+  })) };
+}
 
 function expectRefusal(result: BuildResult, code: BuildErrorCode): void {
   assert.equal(result.ok, false, 'BUILD must refuse this input');
@@ -77,18 +86,52 @@ refusalCase('DH_BUILD_VERSION_CONFLICT', (s) => {
   s.extraElementFileValues['orders.faq/faq-knowledge'] = { entries: [{ q: 'v2?', a: 'v2' }] };
 });
 
-refusalCase('DH_BUILD_EXPORT_MISSING', (s) => {
-  s.businessExports = [{ elementId: 'orders.app-main' }, { interfaceId: 'orders.api' }];
+// 新合同中没有默认 ingress，未导入的 Function 不要求公开。
+test('B0: private unimported Element is legal (no implicit direct ingress)', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  scenario.eligibilityVisibility = 'private';
+  const { input } = scenario.finalize();
+  assert.equal(buildApp(input).ok, true);
 });
 
-refusalCase('DH_BUILD_EXPORT_MISSING', (s) => {
-  s.eligibilityVisibility = 'private';
+test('B0-03: Hook provider cannot satisfy interface via a private Element', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const ext = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-ext') as DomainPackageManifest;
+  const packages = input.packages.map((pkg) => pkg === ext
+    ? { ...ext, elements: ext.elements.map((entry) => ({
+        ...entry, visibility: 'private' as const,
+      })) }
+    : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_EXPORT_MISSING');
 });
 
-refusalCase('DH_BUILD_EXPORT_MISSING', (s) => {
-  s.sdkImports = [functionRefOf(s.eligibility, 'evaluate')];
-  s.businessExports = [{ elementId: 'orders.app-main' }, { interfaceId: 'orders.api' }];
-  s.ingress = [];
+test('B0-03: Hook provider missing declared public Function export is rejected', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const ext = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-ext') as DomainPackageManifest;
+  const packages = input.packages.map((pkg) => pkg === ext
+    ? { ...ext, exports: ext.exports.filter((entry) => entry.functionId !== 'audit') }
+    : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_EXPORT_MISSING');
+});
+
+test('B0-03: direct Extension Function import must target an actually exported FunctionRef', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const ext = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-ext') as DomainPackageManifest;
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const providerRef = ext.contributesTo[0]!.function;
+  const packages = input.packages.map((pkg) => pkg === sdk
+    ? { ...sdk, imports: [providerRef] }
+    : pkg === ext
+      ? { ...ext, exports: ext.exports.filter((entry) => entry.functionId !== 'audit') }
+      : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_EXPORT_MISSING');
 });
 
 refusalCase('DH_BUILD_IMPLEMENTATION_MISSING', (s) => {
@@ -122,20 +165,14 @@ test('RV-1: BUILD refuses Hook schema resource with incorrect digest', (t) => {
   expectRefusal(buildApp(input), 'DH_BUILD_HOOK_TARGET_INVALID');
 });
 
-test('RV-3: duplicate ingress ID pointing to distinct Functions is refused before Lock creation', (t) => {
+test('B0-05: direct ingress cannot be reintroduced into the DomainApp descriptor', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input, refs } = scenario.finalize();
-  const descriptor: DomainAppDescriptor = {
-    ...(input.descriptor as DomainAppDescriptor),
-    ingress: [
-      { id: 'same', function: refs.evaluateRef },
-      { id: 'same', function: refs.initRef },
-    ],
+  const descriptor = { ...(input.descriptor as DomainAppDescriptor),
+    ingress: [{ id: 'old-direct-ingress', function: refs.evaluateRef }],
   };
-  const result = buildApp({ ...input, descriptor });
-  expectRefusal(result, 'DH_BUILD_SCHEMA_INVALID');
-  if (!result.ok) assert.match(result.path ?? '', /^ingress\[1\]\.id$/);
+  expectRefusal(buildApp({ ...input, descriptor }), 'DH_BUILD_SCHEMA_INVALID');
 });
 
 test('R27: BUILD rejects artifact paths Runtime would reject', (t) => {
@@ -152,16 +189,17 @@ test('R27: BUILD rejects artifact paths Runtime would reject', (t) => {
   }), 'DH_BUILD_RESOURCE_MISSING');
 });
 
-test('R27: lifecycle EntryRef must match pinned package artifact and named export', (t) => {
+test('B0-02: lifecycle ElementRef digest mismatch is refused before choosing a Target', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
   const packages = input.packages.map((raw) => {
-    const manifest = raw as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
-    if (manifest.id !== 'sdk-core') return manifest;
-    return { ...manifest, init: { ...manifest.init, exportName: 'wrongInit' } };
+    const pkg = raw as DomainPackageManifest;
+    return pkg.id === 'sdk-core'
+      ? { ...pkg, init: { ...pkg.init, digest: `sha256:${'0'.repeat(64)}` } }
+      : pkg;
   });
-  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_SCHEMA_INVALID');
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_REF_UNRESOLVED');
 });
 
 test('Exit Element is optional; Init-only Package can build', (t) => {
@@ -185,10 +223,7 @@ refusalCase('DH_BUILD_HOOK_CARDINALITY', (s) => {
     {
       ownerPackageId: 'sdk-core',
       hookId: 'audit',
-      entry: {
-        module: { packageId: 'aaa-ext', path: 'dist/aaa.mjs', digest: 'sha256:pending' },
-        exportName: 'audit',
-      },
+      function: functionRefOf(s.eligibility, 'evaluate'),
     },
   ];
 });
@@ -286,33 +321,97 @@ test('DH_BUILD_HOOK_TARGET_INVALID: contribution to an undeclared hook', (t) => 
   expectRefusal(buildApp(input), 'DH_BUILD_HOOK_TARGET_INVALID');
 });
 
-test('BUILD rejects undeclared final generated ESM import even when an indirect Package is selected', (t) => {
+test('B0: BUILD refuses a module import from undeclared Extension even when its Target is selected', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
-  const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
-    new TextEncoder().encode("import 'aaa-ext';\nexport function init() { return { status: 'READY' }; }\nexport function exit() {}\n"));
-  const packages = input.packages.map((pkg) =>
-    pkg === business ? {
-      ...business,
-      dependsOn: business.dependsOn.filter((dep) => dep.package !== 'aaa-ext'),
-      init: { module: source, exportName: 'init' },
-      exit: { module: source, exportName: 'exit' },
-    } : pkg);
-  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business')! as DomainPackageManifest;
+  const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/cases/undeclared.mjs',
+    new TextEncoder().encode("import 'aaa-ext';\nexport function init() { return { status: 'READY' }; }\n"));
+  const changed = withInitTarget({ ...business, dependsOn: business.dependsOn.filter((dep) => dep.package !== 'aaa-ext') }, source);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === business ? changed : pkg) }),
+    'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
-test('BUILD refuses a declared Init when the final artifact lacks the actual export', (t) => {
+test('B0-02: BUILD refuses a named Init export that is not callable', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
-  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/sdk.mjs',
-    new TextEncoder().encode("export function exit() {}\n"));
-  const packages = input.packages.map((pkg) =>
-    pkg === sdk ? { ...sdk, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' } } : pkg);
-  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_SCHEMA_INVALID');
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/not-callable.mjs',
+    new TextEncoder().encode('export const init = 42;\n'));
+  const altered = withInitTarget(sdk, module);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_IMPLEMENTATION_MISSING');
+});
+
+test('R2 P1-01: mutable ESM let init is refused even when initializer is a function', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/mutable-init.mjs',
+    new TextEncoder().encode("export let init = () => ({ status: 'READY' });\ninit = 42;\n"));
+  const altered = withInitTarget(sdk, module);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_IMPLEMENTATION_MISSING');
+});
+
+test('R2 P1-01: local function alias export with later reassignment is refused', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/alias-reassigned.mjs',
+    new TextEncoder().encode("function localInit() { return { status: 'READY' }; }\nlocalInit = 42;\nexport { localInit as init };\n"));
+  const altered = withInitTarget(sdk, module);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_IMPLEMENTATION_MISSING');
+});
+
+test('R2 P1-01: exported function with later assignment is not a proof of a callable Target', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/function-reassigned.mjs',
+    new TextEncoder().encode("export function init() { return { status: 'READY' }; }\ninit = 42;\n"));
+  const altered = withInitTarget(sdk, module);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_IMPLEMENTATION_MISSING');
+});
+
+test('B0-02: no Element owner means no legal Init despite a valid ESM export', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const altered = { ...sdk, elements: [] };
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_REF_UNRESOLVED');
+});
+
+test('B0-02: lifecycle Element owner must be the declaring Package, not another selected Core', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business') as DomainPackageManifest;
+  const altered = { ...sdk, init: business.init };
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_REF_UNRESOLVED');
+});
+
+test('B0-02: BUILD refuses declared Init Function whose Target module lacks named export', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core')! as DomainPackageManifest;
+  const source = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/missing-init.mjs',
+    new TextEncoder().encode("export function notInit() {}\n"));
+  const changed = withInitTarget(sdk, source);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? changed : pkg) }),
+    'DH_BUILD_IMPLEMENTATION_MISSING');
 });
 
 test('BUILD rejects duplicated Core.Order', (t) => {
@@ -344,30 +443,28 @@ test('BUILD rejects imports from an undeclared direct Extension', (t) => {
 
 
 
-test('BUILD refuses raw cross-Package reexports that could launder a transitive Extension handle', (t) => {
+test('B0: raw cross-Package re-export cannot launder a Function handle', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
-  const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
-    new TextEncoder().encode("export function init() {}\nexport function exit() {}\nexport { someRawHandle } from 'aaa-ext';\n"));
-  const packages = input.packages.map((pkg) => pkg === business ? {
-    ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
-  } : pkg);
-  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business')! as DomainPackageManifest;
+  const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/cases/reexport.mjs',
+    new TextEncoder().encode("export function init() {}\nexport { audit } from 'aaa-ext';\n"));
+  const changed = withInitTarget(business, source);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === business ? changed : pkg) }),
+    'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
-test('BUILD rejects unapproved Node module loader imports in generated Package code', (t) => {
+test('B0: unapproved Node module loaders are not accepted in selected Function Targets', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
-  const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
-    new TextEncoder().encode("import { createRequire } from 'node:module';\nexport function init() {}\nexport function exit() {}\n"));
-  const packages = input.packages.map((pkg) => pkg === business ? {
-    ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
-  } : pkg);
-  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business')! as DomainPackageManifest;
+  const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/cases/loader.mjs',
+    new TextEncoder().encode("import { createRequire } from 'node:module';\nexport function init() {}\n"));
+  const changed = withInitTarget(business, source);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === business ? changed : pkg) }),
+    'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
 test('BUILD forbids Function resource access to an undeclared transitive Package', (t) => {
@@ -377,10 +474,8 @@ test('BUILD forbids Function resource access to an undeclared transitive Package
   const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as {
     targetVariants: { implementations: { functionId: string; resources?: unknown[] }[] }[];
   };
-  const kdp = input.packages.find((pkg) => (pkg as { id: string }).id === 'kdp-kernel') as
-    import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
   const implementation = business.targetVariants[0]!.implementations.find((entry) => entry.functionId === 'evaluate')!;
-  implementation.resources = [kdp.init.module];
+  implementation.resources = [{ packageId: 'kdp-kernel', path: 'content/illegal.txt', digest: `sha256:${'0'.repeat(64)}` }];
   expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
@@ -394,16 +489,17 @@ test('BUILD forbids Element content references to an undeclared Package', (t) =>
 });
 
 function generatedLoaderCase(label: string, body: string, code: BuildErrorCode = 'DH_BUILD_DEPENDS_ON_UNSELECTED'): void {
-  test(`R11 P1-01: ${label}`, (t) => {
+  test(`B0 selected ESM proof: ${label}`, (t) => {
     const scenario = standardCase();
     t.after(scenario.ws.dispose);
     const { input } = scenario.finalize();
-    const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
-    const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs', new TextEncoder().encode(body));
-    const packages = input.packages.map((pkg) => pkg === business ? {
-      ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
-    } : pkg);
-    expectRefusal(buildApp({ ...input, packages }), code);
+    const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business')! as DomainPackageManifest;
+    const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/cases/guard.mjs',
+      new TextEncoder().encode(body));
+    const changed = withInitTarget(business, source);
+    expectRefusal(buildApp({ ...input,
+      packages: input.packages.map((pkg) => pkg === business ? changed : pkg),
+    }), code);
   });
 }
 
@@ -462,11 +558,11 @@ export async function init() { return notExported(); }
 export function exit() {}
 `, 'DH_BUILD_EXPORT_MISSING');
 
-generatedLoaderCase('foreign Function handle cannot be returned inside a wrapper object', `
+generatedLoaderCase('private Extension Init cannot be returned through a wrapper', `
 import { init as extensionInit } from 'orders-ext';
 export async function init() { return { rawExtensionHandle: extensionInit }; }
 export function exit() {}
-`);
+`, 'DH_BUILD_EXPORT_MISSING');
 
 generatedLoaderCase('namespace imports expose an unprovable raw Package handle', `
 import * as ext from 'orders-ext';
@@ -559,7 +655,12 @@ test('R20 P1: selected root binding.gyp triggers implicit node-gyp and is reject
   const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as
     import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
   const packages = input.packages.map((pkg) => pkg === business
-    ? { ...business, initResources: [...(business.initResources ?? []), binding] }
+    ? { ...business, targetVariants: business.targetVariants.map((variant) => ({
+        ...variant, implementations: variant.implementations.map((entry) =>
+          entry.functionId === 'init'
+            ? { ...entry, resources: [...(entry.resources ?? []), binding] }
+            : entry),
+      })) }
     : pkg);
   // No package.json scripts or dependencies. The file itself would cause implicit node-gyp.
   expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');

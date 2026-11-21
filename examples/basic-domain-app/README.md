@@ -20,7 +20,7 @@ import {
 } from '@kaicreator/domain-harness';
 ```
 
-The four actual npm tarballs supply the SDK, contracts, BUILD and KDP. Business Domain Packages are authored locally by the consumer and copied into its external installRoot; their selected implementations, the trusted installed record, Boot/KDP trust ladder, unique Business App Init, ingress invocation, inspection and disposal all execute in that new directory outside the repository. Legacy executable App APIs are intentionally not part of this example.
+The four actual npm tarballs supply the SDK, contracts, BUILD and KDP. Business Domain Packages are authored locally by the consumer and copied into its external installRoot; their selected implementations, the trusted installed record, Boot/KDP trust ladder, Package-owned Element.Init, pre-READY BUILD-selected Function execution, inspection and reverse Exit all execute in that new directory outside the repository. Legacy executable App APIs are intentionally not part of this example.
 
 ## Run the complete acceptance path
 

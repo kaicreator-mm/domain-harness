@@ -92,7 +92,6 @@ export interface ManifestOptions {
   order?: number;
   init: DomainPackageManifest['init'];
   exit?: DomainPackageManifest['exit'];
-  initResources?: DomainPackageManifest['initResources'];
 }
 
 export function manifest(id: string, version: string, options: ManifestOptions): DomainPackageManifest {
@@ -113,7 +112,6 @@ export function manifest(id: string, version: string, options: ManifestOptions):
     ...(options.order !== undefined ? { order: options.order } : {}),
     init: options.init,
     ...(options.exit ? { exit: options.exit } : {}),
-    ...(options.initResources ? { initResources: options.initResources } : {}),
   };
 }
 
@@ -122,7 +120,6 @@ export function descriptor(options: {
   target?: DomainAppDescriptor['target'];
   roots: DomainAppDescriptor['roots'];
   extensions?: DomainAppDescriptor['extensions'];
-  ingress?: DomainAppDescriptor['ingress'];
 }): DomainAppDescriptor {
   return {
     kind: 'DomainApp',
@@ -132,7 +129,6 @@ export function descriptor(options: {
     target: options.target ?? { runtime: 'node', module: 'esm', nodeMajor: 22 },
     roots: options.roots,
     extensions: options.extensions ?? [],
-    ingress: options.ingress ?? [],
   };
 }
 

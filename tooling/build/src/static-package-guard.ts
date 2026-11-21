@@ -74,11 +74,78 @@ function staticallyExportedNames(source: ts.SourceFile): Set<string> {
   return names;
 }
 
+/** Target 必须有可证明的稳定可调用绑定。只接受函数声明或 const 函数表达式，
+ * local export {fn as init} 必须追溯到同模块的可调用绑定。let/var 不足以证明
+ * 最终 ESM 导出类型；函数声明即使初始可调用，只要存在赋值/更新也必须拒绝。
+ * 动态/反射装载另由 verifyGeneratedPackageImports 继续 fail-closed。
+ */
+function staticallyCallableExportNames(source: ts.SourceFile): Set<string> {
+  const localCallable = new Set<string>();
+  const reassignableFunctions = new Set<string>();
+  const exported = new Map<string, string>();
+  for (const statement of source.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name) {
+      const name = statement.name.text;
+      localCallable.add(name);
+      reassignableFunctions.add(name);
+      if (hasExportModifier(statement)) exported.set(name, name);
+    }
+    if (ts.isVariableStatement(statement)) {
+      const stable = (statement.declarationList.flags & ts.NodeFlags.Const) !== 0;
+      if (!stable) continue;
+      for (const declaration of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || !declaration.initializer ||
+            (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer))) continue;
+        const name = declaration.name.text;
+        localCallable.add(name);
+        if (hasExportModifier(statement)) exported.set(name, name);
+      }
+    }
+  }
+  for (const statement of source.statements) {
+    if (!ts.isExportDeclaration(statement) || statement.moduleSpecifier ||
+        !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
+    for (const named of statement.exportClause.elements) {
+      const localName = named.propertyName?.text ?? named.name.text;
+      if (localCallable.has(localName)) exported.set(named.name.text, localName);
+    }
+  }
+  // JavaScript 函数声明的绑定仍可被赋值；必须在整个语法树扫描直接赋值、
+  // 复合赋值、解构赋值和 for-of/in 写入，不能仅以声明时可调用作最终证明。
+  // 作用域同名写入可能被保守拒绝，但不能把无法证明的目标误判为可调用。
+  const invalidated = new Set<string>();
+  const markTarget = (target: ts.Node): void => {
+    if (ts.isIdentifier(target)) {
+      if (reassignableFunctions.has(target.text)) invalidated.add(target.text);
+      return;
+    }
+    ts.forEachChild(target, markTarget);
+  };
+  const walkWrites = (node: ts.Node): void => {
+    if (ts.isBinaryExpression(node) &&
+        node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
+      markTarget(node.left);
+    }
+    if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+        (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)) {
+      markTarget(node.operand);
+    }
+    if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
+      if (!ts.isVariableDeclarationList(node.initializer)) markTarget(node.initializer);
+    }
+    ts.forEachChild(node, walkWrites);
+  };
+  walkWrites(source);
+  const names = new Set<string>();
+  for (const [publicName, localName] of exported) {
+    if (!invalidated.has(localName)) names.add(publicName);
+  }
+  return names;
+}
+
 function publicFunctionExportNames(pkg: DomainPackageManifest, module: ResourceRef): Set<string> {
   const names = new Set<string>();
-  if (pkg.init.module.packageId === module.packageId && pkg.init.module.path === module.path) {
-    names.add(pkg.init.exportName);
-  }
   for (const variant of pkg.targetVariants) {
     for (const implementation of variant.implementations) {
       if (implementation.entry.module.packageId !== module.packageId || implementation.entry.module.path !== module.path) continue;
@@ -288,25 +355,15 @@ export function verifyGeneratedPackageImports(
   for (const entry of entries) visit(entry);
 }
 
-/** BUILD 不能只相信 Manifest 中的 EntryRef：最终 artifact 必须真实导出可调用的 Init/Exit。 */
-export function verifyLifecycleExports(scope: ResourceScope, pkg: DomainPackageManifest, artifact: ResourceRef): void {
-  const source = ts.createSourceFile(
-    artifact.path,
-    new TextDecoder('utf-8', { fatal: true }).decode(scope.read(artifact.packageId, artifact.path)),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.JS,
-  );
-  const found = new Set<string>();
-  for (const statement of source.statements) {
-    if (!ts.isFunctionDeclaration(statement) || !statement.name) continue;
-    if (!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
-    found.add(statement.name.text);
-  }
-  for (const name of [pkg.init && 'init', pkg.exit && 'exit'].filter((item): item is string => !!item)) {
-    if (!found.has(name)) {
-      throw refusal('DH_BUILD_SCHEMA_INVALID',
-        `Package '${pkg.id}' declares ${name} Element but artifact '${artifact.path}' does not statically export a function named '${name}'`);
-    }
+/** 已选 Function Target 必须在真实封存 ESM 中拥有该具名静态导出。 */
+export function verifyImplementationExport(
+  scope: ResourceScope,
+  target: { readonly module: ResourceRef; readonly exportName: string },
+  identity: string,
+): void {
+  const source = parseModule(target.module, scope.verify(target.module));
+  if (!staticallyCallableExportNames(source).has(target.exportName)) {
+    throw refusal('DH_BUILD_IMPLEMENTATION_MISSING',
+      `selected Function '${identity}' Target '${target.module.packageId}/${target.module.path}' has no statically callable export '${target.exportName}'`);
   }
 }

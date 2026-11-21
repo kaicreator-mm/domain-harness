@@ -16,6 +16,7 @@ import type { ResourceRef } from './element-contracts.js';
 export type AppStatus = 'READY' | 'DEGRADED' | 'BLOCKED' | 'FAILED';
 
 export interface ReadonlyFunctionHandle {
+  readonly ref: FunctionRef;
   invoke(input: unknown): Promise<FunctionOutcome>;
 }
 
@@ -60,10 +61,9 @@ export interface PackageExitContext {
   readonly hostPorts: readonly import('./boot-contracts.js').HostPortBinding[];
 }
 
-/** Business Core.Init 声明应用启动状态；DEGRADED 只能显式压制已在 Lock 中标记 optional 的入口。 */
+/** Business Core.Init 独立报告 READY/DEGRADED/BLOCKED/FAILED；FunctionOutcome 与 App 状态互不冒充，无旧 ingress 压制表。 */
 export interface AppInitResult {
   readonly status: AppStatus;
-  readonly suppressedIngress?: readonly string[];
   readonly detail?: JsonValue;
 }
 
@@ -73,10 +73,9 @@ export type FunctionOutcome =
   | { readonly kind: 'UNKNOWN'; readonly unknownReason: { readonly code: string; readonly message: string } }
   | { readonly kind: 'FAILED'; readonly failure: { readonly code: string; readonly message: string } };
 
-/** 启动完成后只允许调用 Lock 中声明的 ingress，释放后必须拒绝再次调用。 */
+/** 公共 App 只包含状态、只读清单与 Exit；执行能力属于 Package.Init。 */
 export interface DomainApp {
   readonly status: AppStatus;
-  invoke(ingressId: string, input: unknown): Promise<FunctionOutcome>;
   inspect(): Promise<DomainAppInspection>;
   dispose(): Promise<{ readonly status: 'DISPOSED' }>;
 }
@@ -101,6 +100,4 @@ export interface DomainAppInspection {
     readonly outcomes: readonly FunctionOutcomeKind[];
     readonly effects: EffectIntent;
   }[];
-  readonly ingress: readonly { readonly id: string; readonly optional: boolean }[];
-  readonly suppressedIngress: readonly string[];
 }

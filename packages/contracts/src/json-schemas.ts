@@ -339,9 +339,8 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
       layer: { enum: ['kernel', 'sdk', 'business'] },
       role: { enum: ['primary', 'extension'] },
       order: { type: 'integer', minimum: 0 },
-      init: { $ref: '#/$defs/entryRef' },
-      exit: { $ref: '#/$defs/entryRef' },
-      initResources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
+      init: { $ref: '#/$defs/elementRef' },
+      exit: { $ref: '#/$defs/elementRef' },
       recordInitFrom: { const: true },
       description: { type: 'string', minLength: 1 },
       elements: {
@@ -409,11 +408,11 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['ownerPackageId', 'hookId', 'entry'],
+          required: ['ownerPackageId', 'hookId', 'function'],
           properties: {
             ownerPackageId: { type: 'string', minLength: 1 },
             hookId: { type: 'string', minLength: 1 },
-            entry: { $ref: '#/$defs/entryRef' },
+            function: { $ref: '#/$defs/functionRef' },
           },
         },
       },
@@ -444,7 +443,7 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
                   elementId: { type: 'string', minLength: 1 },
                   functionId: { type: 'string', minLength: 1 },
                   contractVersion: { type: 'string', minLength: 1 },
-                  entry: { $ref: '#/$defs/entryRef' },
+                  entry: { $ref: '#/$defs/implementationLocator' },
                   resources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
                 },
               },
@@ -457,7 +456,7 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
   {
     resourceRef: RESOURCE_REF_DEF,
     schemaRef: SCHEMA_REF_DEF,
-    entryRef: {
+    implementationLocator: {
       type: 'object',
       additionalProperties: false,
       required: ['module', 'exportName'],
@@ -505,23 +504,12 @@ const PACKAGE_REF_DEF: JsonObject = {
   },
 };
 
-const INGRESS_ENTRY_DEF: JsonObject = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['id', 'function'],
-  properties: {
-    id: { type: 'string', minLength: 1 },
-    function: { $ref: '#/$defs/functionRef' },
-    optional: { type: 'boolean' },
-  },
-};
-
 export const DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA: JsonObject = defsEnvelope(
   'app-descriptor.json',
   {
     type: 'object',
     additionalProperties: false,
-    required: ['kind', 'schemaVersion', 'id', 'version', 'target', 'roots', 'extensions', 'ingress'],
+    required: ['kind', 'schemaVersion', 'id', 'version', 'target', 'roots', 'extensions'],
     properties: {
       kind: { const: 'DomainApp' },
       schemaVersion: { const: DH_APP_SCHEMA_VERSION },
@@ -538,7 +526,6 @@ export const DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA: JsonObject = defsEnvelope(
         },
       },
       extensions: { type: 'array', items: { $ref: '#/$defs/packageRef' } },
-      ingress: { type: 'array', items: { $ref: '#/$defs/ingressEntry' } },
       config: { type: 'object', additionalProperties: {} },
     },
   },
@@ -547,11 +534,10 @@ export const DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA: JsonObject = defsEnvelope(
     functionRef: FUNCTION_REF_DEF,
     packageRef: PACKAGE_REF_DEF,
     targetSelector: TARGET_SELECTOR_DEF,
-    ingressEntry: INGRESS_ENTRY_DEF,
   },
 );
 
-const ENTRY_REF_DEF: JsonObject = {
+const IMPLEMENTATION_LOCATOR_DEF: JsonObject = {
   type: 'object',
   additionalProperties: false,
   required: ['module', 'exportName'],
@@ -577,7 +563,6 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
       'selectedFunctions',
       'hookBindings',
       'coreOrder',
-      'ingress',
       'resourceDigests',
       'excludedUnknownContent',
       'closureDigest',
@@ -611,7 +596,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['packageId', 'version', 'layer', 'role', 'artifact', 'init', 'initResources', 'dependsOn'],
+          required: ['packageId', 'version', 'layer', 'role', 'artifact', 'init', 'initFunction', 'initResources', 'imports', 'dependsOn'],
           properties: {
             packageId: { type: 'string', minLength: 1 },
             version: { type: 'string', pattern: SEMVER_PATTERN },
@@ -619,9 +604,12 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
             role: { enum: ['primary', 'extension'] },
             artifact: { $ref: '#/$defs/resourceRef' },
             order: { type: 'integer', minimum: 0 },
-            init: { $ref: '#/$defs/entryRef' },
-            exit: { $ref: '#/$defs/entryRef' },
+            init: { $ref: '#/$defs/elementRef' },
+            initFunction: { $ref: '#/$defs/functionRef' },
+            exit: { $ref: '#/$defs/elementRef' },
+            exitFunction: { $ref: '#/$defs/functionRef' },
             initResources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
+            imports: { type: 'array', items: { $ref: '#/$defs/functionRef' } },
             recordInitFrom: { const: true },
             dependsOn: { type: 'array', items: { type: 'string', minLength: 1 } },
           },
@@ -657,7 +645,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
               contains: { const: 'SUCCEEDED' },
             },
             effects: { enum: ['none', 'external', 'state'] },
-            implementation: { $ref: '#/$defs/entryRef' },
+            implementation: { $ref: '#/$defs/implementationLocator' },
             resources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
           },
         },
@@ -672,24 +660,11 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
             ownerPackageId: { type: 'string', minLength: 1 },
             hookId: { type: 'string', minLength: 1 },
             cardinality: { enum: ['single', 'multi'] },
-            providers: { type: 'array', items: { $ref: '#/$defs/entryRef' } },
+            providers: { type: 'array', items: { $ref: '#/$defs/functionRef' } },
           },
         },
       },
       coreOrder: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
-      ingress: {
-        type: 'array',
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['id', 'function', 'optional'],
-          properties: {
-            id: { type: 'string', minLength: 1 },
-            function: { $ref: '#/$defs/functionRef' },
-            optional: { type: 'boolean' },
-          },
-        },
-      },
       resourceDigests: {
         type: 'object',
         propertyNames: { type: 'string', minLength: 1 },
@@ -703,7 +678,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
     resourceRef: RESOURCE_REF_DEF,
     elementRef: ELEMENT_REF_DEF,
     functionRef: FUNCTION_REF_DEF,
-    entryRef: ENTRY_REF_DEF,
+    implementationLocator: IMPLEMENTATION_LOCATOR_DEF,
     resolvedTarget: RESOLVED_TARGET_DEF,
   },
 );

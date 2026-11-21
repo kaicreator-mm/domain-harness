@@ -19,7 +19,8 @@ export type ElementVisibility = 'public' | 'private';
 
 export const ELEMENT_VISIBILITIES = ['public', 'private'] as const;
 
-export interface EntryRef {
+/** BUILD Target 的私有 ESM 定位符，不是领域逻辑身份。 */
+export interface ImplementationLocator {
   readonly module: ResourceRef;
   readonly exportName: string;
 }
@@ -28,7 +29,7 @@ export interface ImplementationBinding {
   readonly elementId: string;
   readonly functionId: string;
   readonly contractVersion: string;
-  readonly entry: EntryRef;
+  readonly entry: ImplementationLocator;
   readonly resources?: readonly ResourceRef[];
 }
 

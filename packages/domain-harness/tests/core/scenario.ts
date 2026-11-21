@@ -37,7 +37,7 @@ const DESCRIPTOR_RELATIVE_PATH = 'descriptor/app.json';
 
 export interface T04Scenario {
   readonly rule: { readonly minOrderTotal: number; readonly regions: readonly string[] };
-  readonly init: { readonly status: 'READY' | 'DEGRADED' | 'DEGRADED_SUPPRESS_REQUIRED' };
+  readonly init: { readonly status: 'READY' | 'DEGRADED' | 'FAILED' };
   readonly withUnsupportedEffect?: boolean;
   readonly withUnsupportedTarget?: boolean;
 }
@@ -137,13 +137,8 @@ export async function exit(ctx) {
 `;
 }
 
-function businessEntryModuleSource(scenario: T04Scenario): string {
-  const initResult =
-    scenario.init.status === 'DEGRADED'
-      ? { status: 'DEGRADED', suppressedIngress: ['optional-report'] }
-      : scenario.init.status === 'DEGRADED_SUPPRESS_REQUIRED'
-        ? { status: 'DEGRADED', suppressedIngress: ['evaluate'] }
-        : { status: 'READY' };
+function businessEntryModuleSource(scenario: T04Scenario, selectedEvaluateKey = ''): string {
+  const initResult = { status: scenario.init.status };
   return `
 const events = (globalThis.__domainHarnessT04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'orders-business-entry' });
@@ -156,6 +151,13 @@ export async function init(initCtx) {
   }
   const bytes = await handle.read();
   RULE = JSON.parse(Buffer.from(bytes).toString('utf8'));
+  const handleOf = initCtx.functions.get(${JSON.stringify(selectedEvaluateKey)});
+  if (!handleOf) throw new Error('selected evaluate FunctionRef unavailable before READY');
+  const pos = await handleOf.invoke({ total: 100, region: 'US' });
+  const neg = await handleOf.invoke({ total: 10, region: 'US' });
+  const unknown = await handleOf.invoke({ total: 100, region: 'APAC' });
+  const bad = await handleOf.invoke({ total: 'invalid', region: 'EU' });
+  events.push({ event: 'init-selected-function', package: 'orders-business', pos, neg, unknown, bad });
   events.push({
     event: 'business-init',
     package: 'orders-business',
@@ -163,7 +165,7 @@ export async function init(initCtx) {
     hasActivationId: typeof initCtx.activationId === 'string' && initCtx.activationId.length > 0,
     lockDigest: initCtx.lockDigest,
     rule: RULE,
-    ingress: [...initCtx.functions.keys()],
+    selectedFunctionKeys: [...initCtx.functions.keys()],
   });
   return INIT_RESULT;
 }
@@ -338,8 +340,8 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       contractVersion: '1',
     });
     const evaluateRef = ref('evaluate');
-    const optionalReportRef = ref('optionalReport');
-    const dangerousRef = ref('dangerous');
+    await write(businessDir, 'dist/evaluate.mjs',
+      businessEntryModuleSource(scenario, canonicalJson(evaluateRef)));
     const evaluateModuleRef = {
       packageId: 'orders-business',
       path: 'dist/evaluate.mjs',
@@ -351,13 +353,60 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       digest: await fileBytesDigest(businessModule),
     };
 
+    const lifecycle: Record<string, ElementDefinition> = {};
+    const lifecycleEntry: Record<string, DomainPackageManifest['elements'][number]> = {};
+    const lifecycleRef: Record<string, FunctionRef['element']> = {};
+    for (const [id, dir] of [
+      ['kdp-kernel', kernelDir], ['sdk-core', sdkDir],
+      ['orders-business', businessDir], ['orders-ext', extDir],
+    ] as const) {
+      const definition: ElementDefinition = {
+        kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+        id: `orders.lifecycle_${id.replaceAll('-', '_')}`, version: '1.0.0',
+        description: 'Selected Package lifecycle Element',
+        content: [],
+        functions: ['init', 'exit'].map((name) => ({
+          id: name, contractVersion: '1',
+          inputSchemaRef: { inline: { type: 'object' } },
+          outputSchemaRef: { inline: { type: 'object' } },
+          outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
+        })),
+      };
+      lifecycle[id] = definition;
+      const bytes = canonicalJson(definition as unknown as JsonValue);
+      await write(dir, 'elements/lifecycle.json', bytes);
+      lifecycleEntry[id] = {
+        id: definition.id, version: definition.version,
+        definitionRef: { packageId: id, path: 'elements/lifecycle.json',
+          digest: await fileBytesDigest(join(dir, 'elements/lifecycle.json')) },
+        visibility: 'private' as const,
+      };
+      lifecycleRef[id] = {
+        namespace: 'orders', id: definition.id, version: '1.0.0', digest: contentDigestOf(definition as unknown as JsonValue),
+      };
+    }
+    const targetLife = (id: string, module: ResourceRef, initResources: readonly ResourceRef[] = []) =>
+      (lifecycle[id] as ElementDefinition).functions.map((fn) => ({
+        elementId: (lifecycle[id] as ElementDefinition).id,
+        functionId: fn.id, contractVersion: fn.contractVersion,
+        entry: { module, exportName: fn.id }, ...(fn.id === 'init' ? { resources: initResources } : {}),
+      }));
+    const kernelRef = {
+      packageId: 'kdp-kernel', path: 'dist/index.mjs', digest: await fileBytesDigest(kernelModule),
+    };
+    const sdkRef = {
+      packageId: 'sdk-core', path: 'dist/index.mjs', digest: await fileBytesDigest(sdkModule),
+    };
+    const extRef = {
+      packageId: 'orders-ext', path: 'dist/index.mjs', digest: await fileBytesDigest(extModule),
+    };
     const businessManifest = manifest('orders-business', '1.0.0', {
       layer: 'business',
       role: 'primary',
       order: 2,
       dependsOn: [{ package: 'orders-ext', version: '1.0.0', interface: 'ext.api' }],
-      initResources: [ruleRef],
       elements: [
+        lifecycleEntry['orders-business'],
         {
           id: 'orders.eligibility',
           version: '1.0.0',
@@ -366,12 +415,13 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         },
       ],
       exports: [{ elementId: 'orders.eligibility' }, { interfaceId: 'orders.api' }],
-      init: { module: businessModuleRef, exportName: 'init' },
-      exit: { module: businessModuleRef, exportName: 'exit' },
+      init: lifecycleRef['orders-business'],
+      exit: lifecycleRef['orders-business'],
       targetVariants: [
         {
           target: TARGET_SELECTOR,
           implementations: [
+            ...targetLife('orders-business', businessModuleRef, [ruleRef]),
             {
               elementId: 'orders.eligibility',
               functionId: 'evaluate',
@@ -404,8 +454,10 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       order: 1,
       dependsOn: [{ package: 'kdp-kernel', version: '1.0.0', interface: 'kernel.api' }],
       exports: [{ interfaceId: 'sdk.api' }],
-      init: { module: { packageId: 'sdk-core', path: 'dist/index.mjs', digest: await fileBytesDigest(sdkModule) }, exportName: 'init' },
-      exit: { module: { packageId: 'sdk-core', path: 'dist/index.mjs', digest: await fileBytesDigest(sdkModule) }, exportName: 'exit' },
+      init: lifecycleRef['sdk-core'],
+      exit: lifecycleRef['sdk-core'],
+      elements: [lifecycleEntry['sdk-core']],
+      targetVariants: [{ target: TARGET_SELECTOR, implementations: targetLife('sdk-core', sdkRef) }],
     });
 
     const kernelManifest = manifest('kdp-kernel', '1.0.0', {
@@ -413,16 +465,20 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       role: 'primary',
       order: 0,
       exports: [{ interfaceId: 'kernel.api' }],
-      init: { module: { packageId: 'kdp-kernel', path: 'dist/index.mjs', digest: await fileBytesDigest(kernelModule) }, exportName: 'init' },
-      exit: { module: { packageId: 'kdp-kernel', path: 'dist/index.mjs', digest: await fileBytesDigest(kernelModule) }, exportName: 'exit' },
+      init: lifecycleRef['kdp-kernel'],
+      exit: lifecycleRef['kdp-kernel'],
+      elements: [lifecycleEntry['kdp-kernel']],
+      targetVariants: [{ target: TARGET_SELECTOR, implementations: targetLife('kdp-kernel', kernelRef) }],
     });
 
     const extManifest = manifest('orders-ext', '1.0.0', {
       layer: 'business',
       role: 'extension',
       exports: [{ interfaceId: 'ext.api' }],
-      init: { module: { packageId: 'orders-ext', path: 'dist/index.mjs', digest: await fileBytesDigest(extModule) }, exportName: 'init' },
-      exit: { module: { packageId: 'orders-ext', path: 'dist/index.mjs', digest: await fileBytesDigest(extModule) }, exportName: 'exit' },
+      init: lifecycleRef['orders-ext'],
+      exit: lifecycleRef['orders-ext'],
+      elements: [lifecycleEntry['orders-ext']],
+      targetVariants: [{ target: TARGET_SELECTOR, implementations: targetLife('orders-ext', extRef) }],
     });
 
     const descriptor: DomainAppDescriptor = {
@@ -441,11 +497,6 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         ],
       },
       extensions: [{ package: 'orders-ext', version: '1.0.0' }],
-      ingress: [
-        { id: 'evaluate', function: evaluateRef },
-        { id: 'optional-report', function: optionalReportRef, optional: true },
-        ...(scenario.withUnsupportedEffect === true ? [{ id: 'dangerous', function: dangerousRef }] : []),
-      ],
       config: { region: 'EU', suite: 't04-final' },
     };
 

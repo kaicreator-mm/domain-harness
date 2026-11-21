@@ -83,7 +83,6 @@ export function installProcessExitHandoff(
     get status() {
       return app.status;
     },
-    invoke: (ingressId, input) => app.invoke(ingressId, input),
     inspect: () => app.inspect(),
     dispose: (): Promise<{ readonly status: 'DISPOSED' }> => {
       started = true;

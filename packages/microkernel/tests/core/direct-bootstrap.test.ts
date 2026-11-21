@@ -36,8 +36,9 @@ test('direct bootstrap on a consistent install boots READY (same trust ladder as
 test('direct bootstrap with a self-signed Lock is FAILED (closure digest vs trusted record)', async (t) => {
   await withFixture(t, async (fixture) => {
     const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
-    const ingress = lock['ingress'] as Array<Record<string, unknown>>;
-    ingress.push({ id: 'forged-ingress', function: (lock['ingress'] as Array<Record<string, unknown>>)[0]?.['function'], optional: false });
+    const selectedPackages = lock['selectedPackages'] as Array<Record<string, unknown>>;
+    // A syntactically valid, self-signed Lock mutation must still disagree with the trusted installed record.
+    selectedPackages[0]!['version'] = '9.9.9';
     delete lock['closureDigest'];
     lock['closureDigest'] = digestOf(lock);
     await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
@@ -56,7 +57,7 @@ test('direct bootstrap with forged KDP entry bytes is FAILED (entry bytes vs tru
   await withFixture(t, async (fixture) => {
     const forged = [
       'export async function bootstrap() {',
-      '  return { status: "BOOTED", app: { status: "READY", invoke: async () => ({ kind: "SUCCEEDED", value: 0 }), inspect: async () => ({}), dispose: async () => ({ status: "DISPOSED" }) } };',
+      '  return { status: "BOOTED", app: { status: "READY", inspect: async () => ({}), dispose: async () => ({ status: "DISPOSED" }) } };',
       '}',
       '',
     ].join('\n');
