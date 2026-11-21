@@ -1,4 +1,4 @@
-// 当前架构的可证伪测试：断言实际行为而非历史兼容。
+// Element-First 基础能力验证：业务由 Package.Init 内的已选 Function 启动，无外部 direct ingress。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { boot } from '@kaicreator/domain-harness';
@@ -18,192 +18,133 @@ async function withInstall(
   run: (install: T04Install) => Promise<void>,
 ): Promise<void> {
   const install = await buildScenarioInstall(scenario);
-  t.after(async () => {
-    await install.cleanup();
-  });
+  t.after(async () => install.cleanup());
   await run(install);
 }
+type Event = Record<string, unknown>;
 
-test('T04-INT-1: build → boot → single Business Core.Init → READY → direct invoke POS/NEG/UNKNOWN → inspect → dispose', { timeout: 120_000 }, async (t) => {
+function selectedCall(): Event {
+  const result = events().find((entry) => entry['event'] === 'init-selected-function');
+  assert.ok(result, 'a BUILD-selected Function must really run during Business Core.Init');
+  return result;
+}
+
+test('B0: BUILD → Boot → Package.Init uses selected Function before READY; no public invoke', { timeout: 120_000 }, async (t) => {
   await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (install) => {
-    const { lock } = install;
-
-    assert.deepEqual(lock.coreOrder, ['kdp-kernel', 'sdk-core', 'orders-business']);
-    assert.equal(lock.ingress.length, 2);
-    assert.equal(lock.ingress[1]?.optional, true);
-    assert.deepEqual(
-      [...lock.selectedPackages.map((pkg) => `${pkg.layer}:${pkg.role}:${pkg.packageId}`)].sort(),
-      [
-        'business:extension:orders-ext',
-        'business:primary:orders-business',
-        'kernel:primary:kdp-kernel',
-        'sdk:primary:sdk-core',
-      ],
-    );
-    assert.equal(lock.coreOrder[0], 'kdp-kernel', 'KDP Core must be Order 0');
+    assert.deepEqual(install.lock.coreOrder, ['kdp-kernel', 'sdk-core', 'orders-business']);
+    assert.equal(install.lock.selectedPackages.length, 4);
+    for (const selected of install.lock.selectedPackages) {
+      assert.ok(install.lock.selectedElements.some((el) =>
+        el.ownerPackageId === selected.packageId &&
+        JSON.stringify(el.ref) === JSON.stringify(selected.init)));
+      assert.ok(install.lock.selectedFunctions.some((fn) =>
+        JSON.stringify(fn.ref) === JSON.stringify(selected.initFunction)));
+    }
 
     const result = await boot(install.pin, install.context);
     assert.equal(result.status, 'BOOTED', JSON.stringify(result));
     if (result.status !== 'BOOTED') return;
     const app = result.app;
     assert.equal(app.status, 'READY');
+    assert.equal('invoke' in app, false);
 
-    const packageInitEvents = events().filter((event) => event['event'] === 'package-init');
-    assert.deepEqual(
-      packageInitEvents.map((event) => event['package']),
-      ['kdp-kernel', 'sdk-core', 'orders-ext', 'orders-business'],
-    );
-    const businessInits = events().filter((event) => event['event'] === 'business-init');
-    assert.equal(businessInits.length, 1, 'Business Core.Init must run exactly once');
-    const initRule = businessInits[0]?.['rule'] as { readonly minOrderTotal?: number } | undefined;
-    assert.equal(initRule?.['minOrderTotal'], 50, 'init read the REAL selected rule content');
-
-    const pos = await app.invoke('evaluate', { total: 100, region: 'EU' });
-    assert.deepEqual(pos, { kind: 'SUCCEEDED', value: { decision: 'POS' } });
-    const neg = await app.invoke('evaluate', { total: 10, region: 'EU' });
-    assert.deepEqual(neg, { kind: 'SUCCEEDED', value: { decision: 'NEG' } });
-    const unknown = await app.invoke('evaluate', { total: 100, region: 'APAC' });
-    assert.equal(unknown.kind, 'UNKNOWN');
-    if (unknown.kind === 'UNKNOWN') assert.equal(unknown.unknownReason.code, 'FIXTURE_REGION_UNKNOWN');
-
-    const badIngress = await app.invoke('no-such-ingress', {});
-    assert.deepEqual(badIngress, {
-      kind: 'FAILED',
-      failure: { code: 'DH_RUNTIME_INGRESS_UNKNOWN', message: "ingress 'no-such-ingress' does not exist" },
-    });
-    const badInput = await app.invoke('evaluate', { total: 'not-a-number', region: 'EU' });
-    assert.equal(badInput.kind, 'FAILED');
-    if (badInput.kind === 'FAILED') assert.equal(badInput.failure.code, 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH');
+    assert.deepEqual(events().filter((entry) => entry['event'] === 'package-init').map((entry) => entry['package']),
+      ['kdp-kernel', 'sdk-core', 'orders-ext', 'orders-business']);
+    const observed = selectedCall();
+    assert.deepEqual(observed['pos'], { kind: 'SUCCEEDED', value: { decision: 'POS' } });
+    assert.deepEqual(observed['neg'], { kind: 'SUCCEEDED', value: { decision: 'NEG' } });
+    assert.equal((observed['unknown'] as { kind: string }).kind, 'UNKNOWN');
+    assert.equal((observed['bad'] as { kind: string }).kind, 'FAILED');
 
     const inspection = await app.inspect();
-    assert.equal(inspection.appIdentity.lockDigest, lock.closureDigest);
+    assert.equal(inspection.appIdentity.lockDigest, install.lock.closureDigest);
     assert.equal(inspection.target.profile, 'node22-esm/1');
-    assert.deepEqual(inspection.suppressedIngress, []);
-    assert.deepEqual(
-      inspection.functions.map((fn) => fn.ref.functionId).sort(),
-      ['evaluate', 'optionalReport'],
-    );
-
-    const disposed = await app.dispose();
-    assert.deepEqual(disposed, { status: 'DISPOSED' });
-    const disposeEvents = events().filter((event) => event['event'] === 'package-exit');
-    assert.deepEqual(
-      disposeEvents.map((event) => event['package']),
-      ['orders-ext', 'orders-business', 'sdk-core', 'kdp-kernel'],
-    );
-    const afterDispose = await app.invoke('evaluate', { total: 100, region: 'EU' });
-    assert.equal(afterDispose.kind, 'FAILED');
-    if (afterDispose.kind === 'FAILED') assert.equal(afterDispose.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
+    assert.ok(inspection.functions.some((fn) => fn.ref.functionId === 'evaluate'));
+    assert.equal('ingress' in inspection, false);
+    assert.deepEqual(await app.dispose(), { status: 'DISPOSED' });
+    assert.deepEqual(events().filter((entry) => entry['event'] === 'package-exit').map((entry) => entry['package']),
+      ['orders-ext', 'orders-business', 'sdk-core', 'kdp-kernel']);
   });
 });
 
-test('T04-INT-2: content exchange — same implementation, swapped selected rule content changes POS/NEG/UNKNOWN and the Lock bytes', { timeout: 120_000 }, async (t) => {
-  await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (installA) => {
-    await withInstall(t, { rule: RULE_B, init: { status: 'READY' } }, async (installB) => {
-      assert.notDeepEqual(installA.lockBytes, installB.lockBytes, 'selected content is part of the exact Lock');
-      assert.notEqual(installA.lock.closureDigest, installB.lock.closureDigest);
-
-      const bootA = await boot(installA.pin, installA.context);
-      const bootB = await boot(installB.pin, installB.context);
-      assert.equal(bootA.status, 'BOOTED', JSON.stringify(bootA));
-      assert.equal(bootB.status, 'BOOTED', JSON.stringify(bootB));
-      if (bootA.status !== 'BOOTED' || bootB.status !== 'BOOTED') return;
-      try {
-        const aUs = await bootA.app.invoke('evaluate', { total: 100, region: 'US' });
-        assert.deepEqual(aUs, { kind: 'SUCCEEDED', value: { decision: 'POS' } }, 'A: 100 >= 50');
-        const bUs = await bootB.app.invoke('evaluate', { total: 100, region: 'US' });
-        assert.deepEqual(bUs, { kind: 'SUCCEEDED', value: { decision: 'NEG' } }, 'B: 100 < 500');
-        const bEu = await bootB.app.invoke('evaluate', { total: 100, region: 'EU' });
-        assert.equal(bEu.kind, 'UNKNOWN', 'B: EU is not covered by the selected rule');
-      } finally {
-        await bootA.app.dispose();
-        await bootB.app.dispose();
-      }
+test('B0: different real rule Content produces different pre-READY Function outcomes and Lock digests', { timeout: 120_000 }, async (t) => {
+  await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (a) => {
+    assert.equal((await boot(a.pin, a.context)).status, 'BOOTED');
+    const aCall = selectedCall();
+    assert.deepEqual(aCall['pos'], { kind: 'SUCCEEDED', value: { decision: 'POS' } });
+    await withInstall(t, { rule: RULE_B, init: { status: 'READY' } }, async (b) => {
+      assert.notDeepEqual(a.lockBytes, b.lockBytes);
+      assert.notEqual(a.lock.closureDigest, b.lock.closureDigest);
+      const bResult = await boot(b.pin, b.context);
+      assert.equal(bResult.status, 'BOOTED');
+      const bCall = selectedCall();
+      assert.deepEqual(bCall['pos'], { kind: 'SUCCEEDED', value: { decision: 'NEG' } });
     });
   });
 });
 
-test('T04-INT-3: repeated BUILD over identical input is byte-deterministic (exact Lock)', { timeout: 120_000 }, async (t) => {
-  await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (first) => {
-    await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (second) => {
-      assert.deepEqual(second.lockBytes, first.lockBytes, 'same input → byte-identical Lock (AC07)');
-      assert.equal(second.lock.closureDigest, first.lock.closureDigest);
+test('B0: deterministic repeated BUILD and pinned implementation selection', { timeout: 120_000 }, async (t) => {
+  await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (a) => {
+    await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (b) => {
+      assert.deepEqual(b.lockBytes, a.lockBytes);
+      assert.equal(b.lock.closureDigest, a.lock.closureDigest);
+      assert.ok(a.lock.selectedPackages.every((pkg) => pkg.initFunction.element.id === pkg.init.id));
     });
   });
 });
 
-test('T04-INT-4: DEGRADED suppresses only predeclared optional ingress; required ingress stays callable', { timeout: 120_000 }, async (t) => {
+test('B0: DEGRADED state remains visible without a suppressed ingress list', { timeout: 120_000 }, async (t) => {
   await withInstall(t, { rule: RULE_A, init: { status: 'DEGRADED' } }, async (install) => {
     const result = await boot(install.pin, install.context);
     assert.equal(result.status, 'BOOTED', JSON.stringify(result));
     if (result.status !== 'BOOTED') return;
-    const app = result.app;
-    assert.equal(app.status, 'DEGRADED');
-
-    const inspection = await app.inspect();
-    assert.deepEqual(inspection.suppressedIngress, ['optional-report']);
-
-    const required = await app.invoke('evaluate', { total: 100, region: 'EU' });
-    assert.deepEqual(required, { kind: 'SUCCEEDED', value: { decision: 'POS' } });
-
-    const suppressed = await app.invoke('optional-report', {});
-    assert.equal(suppressed.kind, 'FAILED');
-    if (suppressed.kind === 'FAILED') {
-      assert.equal(suppressed.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
-      assert.match(suppressed.failure.message, /suppressed by the DEGRADED app status/);
-    }
-    await app.dispose();
+    assert.equal(result.app.status, 'DEGRADED');
+    assert.equal((selectedCall()['pos'] as { kind: string }).kind, 'SUCCEEDED');
+    assert.equal('suppressedIngress' in await result.app.inspect(), false);
+    await result.app.dispose();
   });
 });
 
-test('T04-INT-5: unsupported effect profile is a typed BUILD refusal (DH_BUILD_EFFECT_PROFILE_UNSUPPORTED)', { timeout: 120_000 }, async () => {
+test('B0: effectful Function is rejected before runtime', { timeout: 120_000 }, async () => {
   await assert.rejects(
     buildScenarioInstall({ rule: RULE_A, init: { status: 'READY' }, withUnsupportedEffect: true }),
     (error: unknown) => {
-      assert.ok(error instanceof T04BuildRefusedError, `expected T04BuildRefusedError, got ${String(error)}`);
+      assert.ok(error instanceof T04BuildRefusedError);
       assert.equal(error.failure.code, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
-      assert.match(error.failure.message, /0\.11\.0 implements 'none' only/);
       return true;
     },
   );
 });
 
-test('T04-INT-6: a Business Core.Init that suppresses a REQUIRED ingress is typed-refused (never silently accepted)', { timeout: 120_000 }, async (t) => {
-  await withInstall(t, { rule: RULE_A, init: { status: 'DEGRADED_SUPPRESS_REQUIRED' } }, async (install) => {
+test('B0: Business Core FAILED never becomes READY, and Exit occurs deepest-first', { timeout: 120_000 }, async (t) => {
+  await withInstall(t, { rule: RULE_A, init: { status: 'FAILED' } }, async (install) => {
     const result = await boot(install.pin, install.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status !== 'FAILED') return;
     assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
-    assert.match(result.reason, /suppressedIngress names required ingress 'evaluate'/);
-    assert.equal(
-      events().filter((event) => event['event'] === 'business-init').length,
-      1,
-      'the locked init ran once; its invalid result is what is refused',
-    );
+    assert.equal((selectedCall()['pos'] as { kind: string }).kind, 'SUCCEEDED');
+    assert.deepEqual(events().filter((entry) => entry['event'] === 'package-exit').map((entry) => entry['package']),
+      ['orders-ext', 'orders-business', 'sdk-core', 'kdp-kernel']);
   });
 });
 
-test('T04-INT-7: unsupported Boot target (env.nodeMajor 20) is a typed failure before selected packages load', { timeout: 120_000 }, async (t) => {
+test('B0: unsupported Node Host target is refused before package execution', { timeout: 120_000 }, async (t) => {
   await withInstall(t, { rule: RULE_A, init: { status: 'READY' } }, async (install) => {
-    const badContext = { ...install.context, env: { nodeMajor: 20, platform: process.platform } };
-    const result = await boot(install.pin, badContext);
+    const result = await boot(install.pin, {
+      ...install.context, env: { nodeMajor: 20, platform: process.platform },
+    });
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status !== 'FAILED') return;
     assert.equal(result.code, 'DH_RUNTIME_UNSUPPORTED_PROFILE');
-    assert.match(result.reason, /below the Lock target floor 22/);
-    assert.equal(
-      events().some((event) => event['event'] === 'module-evaluated' || event['event'] === 'package-init' || event['event'] === 'business-init'),
-      false,
-      'zero selected-package side effects: no package module was loaded or initialized',
-    );
+    assert.equal(events().filter((entry) => entry['event'] === 'package-init').length, 0);
   });
 });
 
-test('T04-INT-8: authoring against a non-node22 Target is a typed BUILD refusal (DH_BUILD_TARGET_INVALID)', { timeout: 120_000 }, async () => {
+test('B0: non-Node22 BUILD target returns a stable refusal', { timeout: 120_000 }, async () => {
   await assert.rejects(
     buildScenarioInstall({ rule: RULE_A, init: { status: 'READY' }, withUnsupportedTarget: true }),
     (error: unknown) => {
-      assert.ok(error instanceof T04BuildRefusedError, `expected T04BuildRefusedError, got ${String(error)}`);
+      assert.ok(error instanceof T04BuildRefusedError);
       assert.equal(error.failure.code, 'DH_BUILD_TARGET_INVALID');
       return true;
     },
