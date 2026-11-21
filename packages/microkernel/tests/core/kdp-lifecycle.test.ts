@@ -558,3 +558,27 @@ test('parent Core Init entry is recorded before child Extension; child failure e
   assert.deepEqual(events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
     DISPOSE_ORDER, 'failed child still exits before entered parent, regardless of own Init return');
 });
+
+test('optional InitFrom absence creates no Package history but never disables independent reverse Exit', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const { PackageSystem } = await import('../../src/package-system.js');
+  const noHistoryLock = {
+    ...fixture.lock,
+    selectedPackages: fixture.lock.selectedPackages.map((pkg) => {
+      if (pkg.packageId !== 'fixture-business') return pkg;
+      const { recordInitFrom: ignored, ...withoutHistory } = pkg;
+      void ignored;
+      return withoutHistory;
+    }),
+  };
+  const packages = new PackageSystem(fixture.installRoot, noHistoryLock, []);
+  await packages.runInit(packageContext(fixture));
+  assert.equal(packages.initFrom('fixture-business'), undefined);
+  const business = events().find((event) => event['event'] === 'package-init' && event['package'] === 'fixture-business');
+  assert.ok(business !== undefined);
+  assert.equal(business['initFrom'], undefined);
+  await packages.runExit();
+  assert.deepEqual(events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
+    DISPOSE_ORDER, 'Exit must use the KDP enter log even when a Package never enables InitFrom');
+});

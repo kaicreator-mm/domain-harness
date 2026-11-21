@@ -10,6 +10,8 @@
 >
 > 生效规则：本文件在经审核并合入版本分支后，对下文“明确替代”的同范围旧设计具有优先级；不修改已经发生的历史审核/CI/Freeze 事实。本文件不是软件已经实现新合同的证明。
 
+> **Owner 2026-11-21 后续明确裁决（覆盖原 F-01/AC-S08 “InitFrom 必备”表述）**：`Package.Exit` 与 `Package.InitFrom` 都是 Package **自行选择使用**的能力。无 Exit 默认无操作；无 InitFrom 不建立历史数组，不能以它是否存在拒绝构建。若 Package 自行启用 InitFrom，其顺序/重复/激活隔离约束仍严格。KDP 为按实际 Init 进入顺序尝试可选 Exit 保留的最小技术记录，与 Package InitFrom 是不同用途的记录。0.11.1 Workflow 必须由适用 Package 的既有 Init Element **内部启动**，不是 READY 后增加第二个 AppInit/Router；Core.Order 仍是 0.11.0 BUILD/初始化链职责，0.11.1 不重新实现。
+
 ## 1. 目标、原则与术语
 
 本规范将 v0.11.0 已讨论的结构与生命周期规则合为一个单一合同：
@@ -68,7 +70,7 @@
 
 **I-05 — 重复初始化**：某个 Package 被多个依赖者调用时，Init Element 可以多次进入。**Package 自己决定**是否真正重做初始化、怎样实现幂等或缓存；KDP/Kernel 不做全局 Init 去重，也不得强制一个 Package 在一次应用激活中只执行一次。
 
-**I-06 — Business 入口**：若业务 Package 需要启动 Workflow 或业务功能，由其 Init Element 实现；禁止初始化链完成后再默认调用一套重叠的 Business App Init 形成第二轮启动。普通 Function 调用走合法公开入口，不能因为 Init 存在而自动要求所有请求经由 Init 转发。本节不引入 v0.11.1 Workflow 引擎。
+**I-06 — Workflow 启动归属**：如果 Package 声明启动业务 Workflow，该启动行为**就在本 Package 的现有 Init Element 内执行**，并遵守已构建的直接 Extension 调用与 Init 顺序；不得在 READY 后再添加一个同名 Init Router、重叠的 Business App Init 或第二轮启动。**0.11.1 的规范业务链为 Init → Workflow → Function**；普通 Element Function 依然作为 Workflow 内的具名选定能力调用，不将已有旧版直接 ingress 强加为新规范的必备入口。0.11.0 不提供 Workflow 执行引擎，不提前实现它。
 
 **I-07 — 无公开 next()**：不要求 Package 公共 API 提供 `next()`；Core 对下一 Core 的调用通过 BUILD 已确定的受控绑定完成。不得让 Package 运行时发现下一个 Core。
 
@@ -85,17 +87,17 @@
 
 示例表达依赖调用关系，不规定 Package 内部必须以该文本顺序书写业务代码；具体同层分支次序由 BUILD 固定。即使 C 自己对第二次 Init 做 no-op，调用仍然发生。
 
-## 5. Package.InitFrom（新增必备运行时数组）
+## 5. Package.InitFrom（可选的调用来源记录）
 
-**F-01 — 结构**：每个可运行 Package 的运行时实例必须具备名为 `InitFrom` 的数组；它记录该 Package 的 Init Element **每次被直接调用的调用者**，按实际进入顺序依次追加。
+**F-01 — 结构（可选）**：每个 Package **自行决定是否提供/使用**名为 `InitFrom` 的运行时数组；未选择时不必创建、维护或导出该数组，也不因此 BUILD 失败。若选择提供，它记录该 Package Init Element **每次被直接调用的调用者**，按实际进入顺序依次追加。
 
-**F-02 — 调用者身份**：Boot 启动 KDP 时记录 `Boot`；Package 调用其他 Package.Init 时记录 BUILD Lock 中唯一、稳定的调用方 Package 标识。Core 系统链接调用下一 Core 时仍记录真实调用者 Core。只记录**直接**调用者，不伪造完整祖先链。
+**F-02 — 调用者身份（仅对启用 InitFrom 的 Package）**：Boot 启动 KDP 时记录 `Boot`；Package 调用其他 Package.Init 时记录 BUILD Lock 中唯一、稳定的调用方 Package 标识。Core 系统链接调用下一 Core 时记录真实调用者 Core。只记录**直接**调用者，不伪造完整祖先链。
 
-**F-03 — 保留重复与失败**：每次真正进入 Init 调用入口**之前**写入一条；相同调用者重复调用必须重复追加；即使 Package 自己选择不执行初始化逻辑，或者 Init 后续抛出异常，也保留记录。不得用 Set、去重表或“第一次成功才记录”替代。
+**F-03 — 保留重复与失败（启用时）**：启用 InitFrom 的 Package 每次真正进入 Init 调用入口**之前**写入一条；相同调用者重复调用须重复追加，即使本 Package 选择不重做初始化或 Init 后续抛出异常亦保留记录，不得用 Set、去重表替代。**未启用者无此记录要求**。
 
-**F-04 — 激活隔离**：InitFrom 隶属于本次 App 激活的 Package 运行时实例；不同激活不得复用同一可变数组。BUILD Manifest 中不填写静态 InitFrom 调用历史，BUILD 只提供运行时实现所需绑定。
+**F-04 — 激活隔离（启用时）**：InitFrom 隶属于本次 App 激活的 Package 运行时实例；不同激活不得复用同一可变数组。BUILD Manifest 不填写静态调用历史；是否启用由 Package 声明/实现决定，BUILD 不因此强制所有 Package 创建它。
 
-**F-05 — 不产生授权**：InitFrom 只是以后扩展用的调用来源历史，不充当权限表、依赖声明、调度指令、Init 去重依据或 Exit 判定依据；不能根据 InitFrom 的存在来允许未声明 Extension 调用。
+**F-05 — 不产生授权**：若提供 InitFrom，它只是 Package 自行选择的调用来源历史，不充当权限表、依赖声明、调度指令、Init 去重依据或 Exit 判定依据；**KDP 为执行可选 Exit 所需的最小真实 Init 进入记录是独立的系统技术记录，不依赖 Package 是否启用了 InitFrom**。
 
 示例：
 
@@ -109,7 +111,7 @@
       { type: "Package", packageId: "A" }
     ]
 
-上例为概念性调用者结构；实际序列化形态可在 L2 编码时统一，但字段名 `InitFrom`、数组语义、顺序与重复保留均为规范要求。
+上例**仅表示主动选择 InitFrom 的 Package** 的行为；未启用的 Package 可以完全没有该数组。对启用者，数组语义、顺序与重复保留依然严格。
 
 ## 6. Exit：只在退出时逆序执行
 
@@ -117,7 +119,7 @@
 
 **E-02 — 次序**：KDP 维护最小实际 Init 进入记录，在退出时由**最深、最后进入**的 Init 调用向外逆序尝试相应 Package.Exit；由此自然得到先下层 Core、后上层 Core，且同层依赖调用遵守实际逆序。只按静态 Core.Order 逆序是不够的，尤其在共享依赖或 Init 中途失败时。
 
-**E-03 — 重入与次数**：不强制 Exit 由 Kernel 全局去重；对于已登记的 Init 进入事件，按逆序安排对应的退出尝试。Package 自己管理重复调用、已经部分初始化或资源未创建时的 no-op/幂等行为。缺少 Exit Element 时视为空操作。
+**E-03 — 重入与次数**：Exit Element 本身**完全由 Package 决定是否提供**，无 Exit 的 Package 没有实际 Exit 行为（等价 no-op），无需附加代码。对于已有 Exit 的 Package，KDP 按自己的实际 Init 进入技术记录安排退出尝试；是否对重复退出执行清理/no-op/拒绝由 Package 自治；**与是否启用 InitFrom 无关**。
 
 **E-04 — 异常中途退出**：如 Init 中途出现未被 Package 自己处理的异常，KDP 仅对实际进入过 Init 的 Package 执行逆序退出，不对从未启动的 Package 制造 Exit 调用。清理失败不得阻断其余 Package 的退出尝试。
 
@@ -149,7 +151,7 @@
 | AC-S05 | A→B→C 中 A 直接调用 C 被拒绝；B 合法封装自己的业务 API 仍可通过，原始 C 句柄透传被拒绝 |
 | AC-S06 | 生成阶段注入未声明调用或动态未知目标，最终 BUILD 失败；不只检查源 Manifest |
 | AC-S07 | 同一个 Extension 被多个 Package 调用时调用保留，不由 KDP 去重 |
-| AC-S08 | `InitFrom` 顺序、重复、Boot 身份、调用前写入和失败保留正确；激活间隔离 |
+| AC-S08 | 选择启用 `InitFrom` 的 Package 具备顺序、重复、调用前写入、失败保留与激活隔离；未启用的 Package 无需定义该数组且不影响 Init/可选 Exit 正常运行 |
 | AC-S09 | Init 正常递归返回不调用 Exit；应用正常退出时逆序 Exit |
 | AC-S10 | Init 中途失败只逆序清理已进入项；某个 Exit 抛错不阻断后续退出 |
 | AC-S11 | 无 Exit Element 等同 no-op；Package 内部可处理异常不强行退出，未处理异常进入 KDP 退出 |
@@ -160,13 +162,13 @@
 ## 9. 变更边界、实施状态与待编码细节
 
 - **这次仅固化设计**，不修改任何生产、测试、CI 或 BUILD 实现，不宣称新规范已满足 AC-S01–S14。
-- 未来 L2/实施需要将 `Core.Order`、Extension 显式声明、Init/Exit Element、`InitFrom` 运行时访问方式和 Lock 绑定编码为可运行接口；正式命名、JSON Schema、错误码及精确调用日志形式必须与本规范语义一致。
+- 未来 L2/实施需要将 `Core.Order`、Extension 显式声明、Init/可选 Exit Element、**可选的** `InitFrom` 运行时访问方式和 Lock 绑定编码为可运行接口；正式命名、JSON Schema、错误码及精确调用日志形式必须与本规范语义一致。
 - 必须通过单一 BUILD 对最终代码做真实静态校验；如果目标语言/模块机制无法静态证明合法，则限制该机制或拒绝 BUILD，不能降低要求。
 - 原 #1564/#1574 的历史 Freeze、已通过的限定 CI 与 Demo 不被倒改；但那些证据**不能**自动证明此新合同已经实现。以新增规范的后续代码增量审核、实际测试和最终统一 0.11.x Release 判断实际完成程度。
 - 0.11.1+ 的 Workflow、Task Loop、文件 Reader、Guard/Outcome、Hook/Actor 等各有版本范围；不因本规范而提前迁入 0.11.0。
 
 ## 10. 决议来源与明确排除的旧建议
 
-此规范汇总 DH_0.11.0 项目讨论中已经明确的用户决议：BUILD 包含 Package 生成与组合；仅直接 Extension；Core 必填唯一 Order 且 0 为 KDP；Core.Init 本层依赖先行、然后下一 Core；Extension.Init 只递归自己的直接依赖；Init 只有向下一轮；去重归 Package；Exit 在实际退出/未处理异常时由 KDP 从深到浅执行；InitFrom 按真实调用进入顺序记录，允许重复。
+此规范汇总 DH_0.11.0 项目讨论中已经明确的用户决议：BUILD 包含 Package 生成与组合；仅直接 Extension；Core 必填唯一 Order 且 0 为 KDP；Core.Init 本层依赖先行、然后下一 Core；Extension.Init 只递归自己的直接依赖；Init 只有向下一轮；去重归 Package；Exit 可选，退出时仅对提供 Exit 的 Package 从深到浅尝试；**InitFrom 由 Package 自行决定是否启用**，启用者按真实调用进入顺序记录，允许重复。
 
 **被明确排除**：运行时强制每 Package 只 Init 一次、额外逆向 Init、初始化递归返回即 Exit、公开 `next()` 是必要 API、KDP 再循环初始化所有 Core、以传递依赖替代 Extension 声明、将运行期旧静态依赖校验作为 BUILD 不完整的补丁、自动沿用 v0.10.x 兼容层。

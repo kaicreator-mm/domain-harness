@@ -241,7 +241,7 @@ async function authoring(label, rule, options = {}) {
       exit: { module: artifactRefs['rules-package'], exportName: 'exit' },
     }),
     manifest('app-business', {
-      layer: 'business', role: 'primary', order: 2, dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }], initResources: [ruleRef],
+      layer: 'business', role: 'primary', order: 2, recordInitFrom: true, dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }], initResources: [ruleRef],
       elements: [{ id: 'basic.app', version: '1.0.0', definitionRef: definitionRefs['basic.app'], visibility: 'public' }],
       imports: [refs.evaluate, refs.optionalReport], exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
       targetVariants: variant([

@@ -51,7 +51,7 @@ export interface HookBinding {
   readonly entry: EntryRef;
 }
 
-/** Package 清单统一承载 Element 归属、显式导入导出、Target 实现和配对技术生命周期。 */
+/** Package 清单统一承载 Element 归属、显式导入导出、Target 实现和统一 Init/可选 Exit 生命周期。 */
 export interface DomainPackageManifest {
   readonly kind: 'DomainPackage';
   readonly schemaVersion: typeof DH_PACKAGE_SCHEMA_VERSION;
@@ -73,6 +73,8 @@ export interface DomainPackageManifest {
   readonly init: EntryRef;
   /** Exit 缺省为无操作。 */
   readonly exit?: EntryRef;
+  /** Package 自行选择是否维护 InitFrom 历史；不影响 KDP 独立的 Exit 进入记录。 */
+  readonly recordInitFrom?: true;
   /** Init Element 可访问的封存资源。 */
   readonly initResources?: readonly ResourceRef[];
 }

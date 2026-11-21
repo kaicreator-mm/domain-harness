@@ -39,17 +39,17 @@ export type InitCaller =
   | { readonly type: 'Boot' }
   | { readonly type: 'Package'; readonly packageId: string };
 
-/** Package 统一 Init 的上下文，InitFrom 由 KDP 的统一入口维护，业务不得伪造。 */
+/** Package 统一 Init 的上下文，启用 InitFrom 的 Package 才接收历史，业务不得伪造。 */
 export interface PackageInitContext extends AppInitContext {
   readonly packageId: string;
-  readonly InitFrom: readonly InitCaller[];
+  readonly InitFrom?: readonly InitCaller[];
   readonly hostPorts: readonly import('./boot-contracts.js').HostPortBinding[];
 }
 
 /** Exit 仅在退出流程执行，调用历史属于本次应用激活。 */
 export interface PackageExitContext {
   readonly packageId: string;
-  readonly InitFrom: readonly InitCaller[];
+  readonly InitFrom?: readonly InitCaller[];
   readonly hostPorts: readonly import('./boot-contracts.js').HostPortBinding[];
 }
 

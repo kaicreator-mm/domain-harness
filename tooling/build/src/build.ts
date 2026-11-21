@@ -719,6 +719,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       init: manifest.init,
       ...(manifest.exit !== undefined ? { exit: manifest.exit } : {}),
       initResources: [...(manifest.initResources ?? [])],
+      ...(manifest.recordInitFrom === true ? { recordInitFrom: true as const } : {}),
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
   }

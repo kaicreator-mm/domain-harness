@@ -133,7 +133,8 @@ export class PackageSystem {
   }
 
   /** 获取本次激活中某个 Package 实际收到的 Init 调用来源，保留重复与先后顺序。 */
-  initFrom(packageId: string): readonly InitCaller[] {
+  initFrom(packageId: string): readonly InitCaller[] | undefined {
+    if (this.packageById(packageId)?.recordInitFrom !== true) return undefined;
     return (this.callerHistory.get(packageId) ?? []).map((caller) => ({ ...caller }));
   }
 
@@ -155,10 +156,13 @@ export class PackageSystem {
       seen.add(packageId);
       try {
         // 进入 Init 调用边界即记账；即使子 Extension 失败也必须为已进入的父 Package 安排 Exit。
-        const history = this.callerHistory.get(packageId) ?? [];
-        history.push(caller);
-        this.callerHistory.set(packageId, history);
+        // 独立的退出技术记录始终存在；Package 的 InitFrom 仅在主动选择时创建。
         this.initEvents.push(packageId);
+        if (pkg.recordInitFrom === true) {
+          const history = this.callerHistory.get(packageId) ?? [];
+          history.push(caller);
+          this.callerHistory.set(packageId, history);
+        }
         const extensions = pkg.dependsOn
           .map((id) => this.packageById(id))
           .filter((dep): dep is SelectedPackage => dep?.role === 'extension' && dep.layer === pkg.layer)
@@ -195,7 +199,9 @@ export class PackageSystem {
           // 每个 Package 拿到独立的配置和句柄快照，不能修改后来者的 Init 上下文。
           config: structuredClone(context.config),
           functions: visibleFunctions,
-          InitFrom: Object.freeze(history.map((entry) => Object.freeze({ ...entry }))),
+          ...(pkg.recordInitFrom === true
+            ? { InitFrom: Object.freeze((this.initFrom(packageId) ?? []).map((entry) => Object.freeze({ ...entry }))) }
+            : {}),
           hostPorts: kdpCore ? this.hostPorts : [],
           resources,
         };
@@ -241,7 +247,7 @@ export class PackageSystem {
         if (typeof fn !== 'function') throw new KdpLoadError(`Exit Element of '${packageId}' is not callable`);
         const exitContext: PackageExitContext = {
           packageId,
-          InitFrom: this.initFrom(packageId),
+          ...(pkg.recordInitFrom === true ? { InitFrom: this.initFrom(packageId) ?? [] } : {}),
           hostPorts: pkg.role === 'primary' && pkg.order === 0 ? this.hostPorts : [],
         };
         await (fn as (context: PackageExitContext) => unknown)(exitContext);

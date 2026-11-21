@@ -446,10 +446,10 @@ export async function buildFixtureInstall(
       kdpPrimaryDigest: kdpEntryDigest,
     },
     selectedPackages: [
-      { packageId: FIXTURE_KERNEL, version: '1.0.0', order: 0, layer: 'kernel', role: 'primary', artifact: kernelArtifact, init: { module: kernelArtifact, exportName: 'init' }, exit: { module: kernelArtifact, exportName: 'exit' }, initResources: [], dependsOn: [] },
-      { packageId: FIXTURE_SDK, version: '1.0.0', order: 1, layer: 'sdk', role: 'primary', artifact: sdkArtifact, init: { module: sdkArtifact, exportName: 'init' }, exit: { module: sdkArtifact, exportName: 'exit' }, initResources: [], dependsOn: [FIXTURE_KERNEL] },
-      { packageId: FIXTURE_BUSINESS, version: '1.0.0', order: 2, layer: 'business', role: 'primary', artifact: businessArtifact, init: { module: businessArtifact, exportName: 'init' }, exit: { module: businessArtifact, exportName: 'exit' }, initResources: [{ packageId: FIXTURE_BUSINESS, path: 'content/rules.json', digest: resourceDigests[`${FIXTURE_BUSINESS}/content/rules.json`]! }], dependsOn: [FIXTURE_SDK, FIXTURE_EXT] },
-      { packageId: FIXTURE_EXT, version: '1.0.0', layer: 'business', role: 'extension', artifact: extArtifact, init: { module: extArtifact, exportName: 'init' }, exit: { module: extArtifact, exportName: 'exit' }, initResources: [], dependsOn: [] },
+      { packageId: FIXTURE_KERNEL, version: '1.0.0', recordInitFrom: true, order: 0, layer: 'kernel', role: 'primary', artifact: kernelArtifact, init: { module: kernelArtifact, exportName: 'init' }, exit: { module: kernelArtifact, exportName: 'exit' }, initResources: [], dependsOn: [] },
+      { packageId: FIXTURE_SDK, version: '1.0.0', recordInitFrom: true, order: 1, layer: 'sdk', role: 'primary', artifact: sdkArtifact, init: { module: sdkArtifact, exportName: 'init' }, exit: { module: sdkArtifact, exportName: 'exit' }, initResources: [], dependsOn: [FIXTURE_KERNEL] },
+      { packageId: FIXTURE_BUSINESS, version: '1.0.0', recordInitFrom: true, order: 2, layer: 'business', role: 'primary', artifact: businessArtifact, init: { module: businessArtifact, exportName: 'init' }, exit: { module: businessArtifact, exportName: 'exit' }, initResources: [{ packageId: FIXTURE_BUSINESS, path: 'content/rules.json', digest: resourceDigests[`${FIXTURE_BUSINESS}/content/rules.json`]! }], dependsOn: [FIXTURE_SDK, FIXTURE_EXT] },
+      { packageId: FIXTURE_EXT, version: '1.0.0', recordInitFrom: true, layer: 'business', role: 'extension', artifact: extArtifact, init: { module: extArtifact, exportName: 'init' }, exit: { module: extArtifact, exportName: 'exit' }, initResources: [], dependsOn: [] },
     ],
     selectedElements: [
       {

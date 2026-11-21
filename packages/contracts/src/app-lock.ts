@@ -22,6 +22,8 @@ export interface SelectedPackage {
   readonly init: EntryRef;
   readonly exit?: EntryRef;
   readonly initResources: readonly ResourceRef[];
+  /** 可选的 Package.InitFrom 历史，不参与 Exit 记录或依赖授权。 */
+  readonly recordInitFrom?: true;
   /** 每个 Package 仅拥有其直接声明的 Extension/API 依赖。 */
   readonly dependsOn: readonly string[];
 }

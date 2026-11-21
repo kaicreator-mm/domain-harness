@@ -342,6 +342,7 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
       init: { $ref: '#/$defs/entryRef' },
       exit: { $ref: '#/$defs/entryRef' },
       initResources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
+      recordInitFrom: { const: true },
       description: { type: 'string', minLength: 1 },
       elements: {
         type: 'array',
@@ -622,6 +623,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
             init: { $ref: '#/$defs/entryRef' },
             exit: { $ref: '#/$defs/entryRef' },
             initResources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
+            recordInitFrom: { const: true },
             dependsOn: { type: 'array', items: { type: 'string', minLength: 1 } },
           },
         },
