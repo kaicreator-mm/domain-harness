@@ -190,8 +190,10 @@ test('T12 R4: actual packaged first-party verifier refuses altered xstate/yaml s
   assert.match(refused.stderr, /DH_TRUSTED_RUNTIME_INTEGRITY_MISMATCH/);
 
   write('package-lock.json', JSON.stringify(npmLock));
-  const forgedLock = structuredClone(app.lock);
-  forgedLock.trustedRuntimeIntegrity = [{ ...pins[0]!, integrity: 'sha512-FAKE' }, pins[1]!];
+  const forgedLock = {
+    ...structuredClone(app.lock),
+    trustedRuntimeIntegrity: [{ ...pins[0]!, integrity: 'sha512-FAKE' }, pins[1]!],
+  };
   write('dh-lock/app.lock.json', JSON.stringify(forgedLock));
   const refusedSealed = runVerifier();
   assert.notEqual(refusedSealed.status, 0, 'unmatched Lock archive bytes cannot be silently trusted');
