@@ -1,3 +1,7 @@
+<!-- DH_V0111_R17_P2_DISPOSITION_20261121 -->
+> **【R17 · R16 独审四项 P2 的产品消歧】**：R16 审核 `ACCEPT_SCOPED P0=0/P1=0/P2=4`（[PR Review #6005190842](https://github.com/kaicreator-mm/domain-harness/pull/1626#pullrequestreview-6005190842)），不等于 L1/L2 Freeze。当前统一 L1/L2 PR 为 **#1626**，旧 #1607/#1611 只是历史记录。T11 [#1627](https://github.com/kaicreator-mm/domain-harness/issues/1627) 已选型：`WorkflowRef(ElementRef,contentId)`、现有 Package.Init 的 `ReadonlyWorkflowStarter.start(ref,input)`、结果 `WorkflowOutcome`、Function 节点与已选 Reader ResourceRef。T12 [#1628](https://github.com/kaicreator-mm/domain-harness/issues/1628) 负责同一 BUILD 中封存 Reader 原始 UTF-8 字节，函数节点以 JSON `{format,source}` 调用真实 Reader Element，YAML 严格 JSON-compatible 值；不提供任意 Host filesystem；XState v5 与 YAML parser 采用**构建期验证后捆绑进入 first-party 已选安装字节闭包**，业务包不带未审核 npm 依赖。明确路由缺省拒绝、Unknown/Failed 禁止直接提升 COMPLETE；预留 start/Function/end 预算，失败不得抹去并须清理。此为技术选择与实施中接口约束，**未声称新功能运行通过**。
+<!-- /DH_V0111_R17_P2_DISPOSITION_20261121 -->
+
 <!-- DH_V0111_R16_CURRENT_MERGED_B0_20261121 -->
 ## 【LATEST · R16】唯一列车已完成 B0 Element-First Foundation，可开始 0.11.1 新能力
 
@@ -31,9 +35,10 @@ V0111_REVIEW_AND_FREEZE=PENDING
 OUTPUT_LABEL=DH_V0111_PRODUCT_L1_R16_MERGED_FOUNDATION
 MASTER=#1563
 VERSION=#1605
-L1_PR=#1607
+CURRENT_L1_L2_PR=#1626
 L2=#1608
-L2_PR=#1611
+HISTORICAL_L1_PR=#1607_DO_NOT_MERGE
+HISTORICAL_L2_PR=#1611_DO_NOT_MERGE
 V0110_NEW_SPEC=#1621_MERGED
 V0110_B0_FOUNDATION=#1625_MERGED
 V0110_TRAIN_HEAD=3bbeb0edaba3cbac762371e4b2632defa4255308
