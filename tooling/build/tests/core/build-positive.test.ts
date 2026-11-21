@@ -48,8 +48,8 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     ['kdp-kernel'],
   );
 
-  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'sdk-core')?.technicalLifecycle, true);
-  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'orders-business')?.technicalLifecycle, false);
+  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'sdk-core')?.init.exportName, 'init');
+  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'orders-business')?.init.exportName, 'init');
 
   assert.deepEqual(
     lock.selectedElements.map((element) => element.ref.id),
@@ -82,11 +82,10 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     },
   ]);
 
-  assert.deepEqual(lock.technicalInitOrder, ['aaa-ext', 'kdp-kernel', 'orders-ext', 'sdk-core', 'orders-business']);
-  assert.deepEqual(lock.technicalDisposeOrder, [...lock.technicalInitOrder].reverse());
+  assert.deepEqual(lock.coreOrder, ['kdp-kernel', 'sdk-core', 'orders-business']);
+  assert.deepEqual(lock.selectedPackages.filter((pkg) => pkg.role === 'primary').map((pkg) => pkg.order).sort(), [0, 1, 2]);
 
   assert.deepEqual(lock.ingress, [{ id: 'evaluate', function: refs.evaluateRef, optional: false }]);
-  assert.deepEqual(lock.businessAppInit, refs.initRef);
 
   assert.deepEqual(lock.excludedUnknownContent, ['orders.legacy-prompt-notes/prompt-note']);
   assert.deepEqual(
