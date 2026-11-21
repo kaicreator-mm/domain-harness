@@ -119,7 +119,7 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
         { label: 'COMPLETE', target: { nodeId: 'yaml-final' } },
         { label: 'UNKNOWN', target: { terminal: 'UNKNOWN' } },
         { label: 'FAILED', target: { terminal: 'FAILED' } },
-      ] },
+      ] } },
     node('yaml-final', sources['yaml-b'], yamlReader, { terminal: 'COMPLETE' }),
   ], 6, 1);
   app.content.push(content('parent-flow', parent));
