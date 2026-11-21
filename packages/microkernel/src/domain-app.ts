@@ -212,13 +212,13 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     });
   }
 
-  /** 首次调用立刻阻止后续 invoke；并发或重复 dispose 复用同一 Promise，技术销毁只执行一次。 */
+  /** 首次调用立刻阻止后续 invoke；并发或重复 dispose 复用同一 Promise，退出链只执行一次。 */
   function dispose(): Promise<{ readonly status: 'DISPOSED' }> {
     if (disposeFlight === null) {
       disposed = true;
       disposeFlight = (async () => {
         try {
-          await packages.runTechnicalDispose();
+          await packages.runExit();
           return { status: 'DISPOSED' } as const;
         } finally {
           disposed = true;
