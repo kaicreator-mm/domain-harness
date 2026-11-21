@@ -47,6 +47,7 @@ import { ResourceScope, digestOfBytes } from './resources.js';
 import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
 import { verifyGeneratedPackageImports, verifyImplementationExport } from './static-package-guard.js';
 import { composeAppPackage, sameAppPackageBytes, sealPackageManifest } from './app-package.js';
+import { TRUSTED_WORKFLOW_NPM_ARCHIVES } from './trusted-runtime.js';
 
 
 interface LoadedElement {
@@ -962,6 +963,8 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       ...(sealedWorkflows.size > 0
         ? { selectedWorkflows: [...sealedWorkflows.values()].sort((a, b) =>
             workflowKey(a.ref).localeCompare(workflowKey(b.ref))) } : {}),
+      ...(sealedWorkflows.size > 0
+        ? { trustedRuntimeIntegrity: TRUSTED_WORKFLOW_NPM_ARCHIVES.map((item) => ({ ...item })) } : {}),
       coreOrder,
       resourceDigests: scope.toLockMap(),
       excludedUnknownContent: [...excludedUnknownContent].sort(),
