@@ -1,4 +1,6 @@
 /** BUILD 的最终组合产物：完整文件闭包、安装定位信息与唯一 Boot 入口。 */
+import { lstatSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   DH_INSTALL_RECORD_SCHEMA_VERSION,
   DH_PIN_SCHEMA_VERSION,
@@ -100,6 +102,14 @@ export function sealPackageManifest(
         `Package '${pkg.id}' declares install dependency field '${field}' outside the selected BUILD closure`);
     }
   }
+  // npm 在无显式 install/preinstall 时，也会因根目录 binding.gyp 隐式执行 node-gyp rebuild。
+  // 这是 Boot 之前的原生代码执行，不在受控 ESM/Extension 静态证明闭包内。
+  // 对所选 Package 的磁盘根路径和最终封存文件闭包均 fail-closed。
+  const nativeBuildManifest = lstatSync(resolve(scope.rootOf(pkg.id), 'binding.gyp'), { throwIfNoEntry: false });
+  if (nativeBuildManifest || Object.prototype.hasOwnProperty.call(scope.toLockMap(), `${pkg.id}/binding.gyp`)) {
+    throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+      `Package '${pkg.id}' contains root binding.gyp which would trigger implicit npm node-gyp install code`);
+  }
   if (kdpArtifactPath !== undefined) {
     const exports = manifest.exports;
     const root = typeof exports === 'object' && exports !== null && !Array.isArray(exports)
@@ -190,6 +200,10 @@ export function composeAppPackage(
     const packageId = packageIds.find((id) => key.startsWith(`${id}/`));
     if (!packageId) throw refusal('DH_BUILD_RESOURCE_MISSING', `Lock resource '${key}' has no selected Package owner`);
     const path = key.slice(packageId.length + 1);
+    if (path === 'binding.gyp') {
+      throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+        `selected Package '${packageId}' seals root binding.gyp, an unverified implicit npm install execution path`);
+    }
     const bytes = scope.verify({ packageId, path, digest });
     add(`packages/${packageId}/${path}`, bytes);
   }

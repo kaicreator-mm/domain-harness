@@ -37,3 +37,7 @@ The user-facing Package lifecycle still follows `Core.Order`, single-pass recurs
 Each selected Package is bundled from BUILD-verified files. Selected `package.json` files must **not** declare their own `dependencies`, `optionalDependencies`, `devDependencies`, `peerDependencies`, bundled dependencies, workspaces or npm overrides: even a transitive local `file:` dependency could execute an unselected `postinstall` before Boot. All selected Extension Packages are placed explicitly in the composed root `file:./packages/<id>` dependency set.
 
 The only external runtime dependencies allowed by BUILD at v0.11.0 are the exact first-party `@kaicreator/domain-harness-microkernel@0.11.0` and optional `@kaicreator/domain-harness-contracts@0.11.0`; any additional caller-supplied root dependency or version is refused. These first-party modules are an explicitly trusted installation boundary, not arbitrary third-party code proved safe by JavaScript AST analysis. Installing the resulting package still requires the trusted runtime package source. BUILD does not execute `npm install`.
+
+### Implicit npm native-build hook
+
+Even when a selected Package has no explicit `scripts` or npm dependency fields, a root `binding.gyp` can cause npm to run an implicit `node-gyp rebuild` during installation. BUILD rejects root `binding.gyp` both in the Package input root and in the selected sealed file closure before it materializes the composed App; native addons are outside the supported generated ESM profile for v0.11.0. Ordinary non-root data resources are unaffected.

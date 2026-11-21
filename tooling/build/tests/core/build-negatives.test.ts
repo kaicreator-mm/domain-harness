@@ -546,3 +546,30 @@ test('R18 P1: caller-supplied external or unpinned root runtime dependencies are
     expectRefusal(buildApp({ ...input, runtimeDependencies }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
   }
 });
+
+test('R20 P1: selected root binding.gyp triggers implicit node-gyp and is rejected before npm install', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const businessDir = scenario.ws.packageRoots['orders-business']!;
+  const binding = writeRaw(businessDir, 'binding.gyp',
+    new TextEncoder().encode(JSON.stringify({
+      targets: [{ target_name: 'unsafe_native_build', sources: ['unreviewed-native.cc'] }],
+    })));
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as
+    import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const packages = input.packages.map((pkg) => pkg === business
+    ? { ...business, initResources: [...(business.initResources ?? []), binding] }
+    : pkg);
+  // No package.json scripts or dependencies. The file itself would cause implicit node-gyp.
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('R20 P1: even unselected root binding.gyp is rejected rather than available to npm packaging', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  writeRaw(scenario.ws.packageRoots['orders-ext']!, 'binding.gyp',
+    new TextEncoder().encode('{"targets":[]}'));
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
