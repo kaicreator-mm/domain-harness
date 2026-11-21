@@ -83,7 +83,7 @@ export function evaluate(input) {
 export function optionalReport() { return { kind: 'SUCCEEDED', value: 'optional-report-ok' }; }
 `;
 }
-function businessModule(withUnsupportedEffect, initThrows = false, initDegraded = false) {
+function businessModule(withUnsupportedEffect, initThrows = false, initDegraded = false, selectedEvaluateKey = '') {
   return `
 import { evaluate, initializeRule } from 'rules-package/rules';
 const events = (globalThis.__domainHarnessT05Events ??= []);
@@ -94,8 +94,16 @@ export async function init(ctx) {
   if (handle === undefined) throw new Error('selected rule resource is not sealed');
   const rule = JSON.parse(Buffer.from(await handle.read()).toString('utf8'));
   initializeRule(rule);
+  const selected = ctx.functions.get(${JSON.stringify(selectedEvaluateKey)});
+  if (!selected) throw new Error('selected FunctionRef unavailable during Package.Init');
+  const pos = await selected.invoke({ total: 100, region: 'US' });
+  const neg = await selected.invoke({ total: 10, region: 'US' });
+  const unknown = await selected.invoke({ total: 100, region: 'APAC' });
+  const invalid = await selected.invoke({ total: 'invalid', region: 'US' });
+  const eu = await selected.invoke({ total: 100, region: 'EU' });
+  events.push({ event: 'init-selected-function', package: 'app-business', pos, neg, unknown, invalid, eu });
   events.push({ event: 'business-init', package: 'app-business', minOrderTotal: rule.minOrderTotal });
-  return ${initDegraded ? "{ status: 'DEGRADED', suppressedIngress: ['optional-report'] }" : "{ status: 'READY' }"};
+  return ${initDegraded ? "{ status: 'DEGRADED' }" : "{ status: 'READY' }"};
 }
 export function submit(input) { return evaluate(input); }
 ${withUnsupportedEffect ? "export function dangerous() { return { kind: 'SUCCEEDED', value: 'must-not-run' }; }" : ''}
@@ -125,7 +133,10 @@ async function authoring(label, rule, options = {}) {
   }
   const artifacts = {};
   for (const id of Object.keys(dirs)) {
-    artifacts[id] = await write(dirs[id], 'dist/index.mjs', lifecycleModule(id));
+    artifacts[id] = await write(dirs[id], 'dist/index.mjs',
+      id === 'kernel-extension'
+        ? `${lifecycleModule(id)}\nexport function auditHook(value) { return value; }\n`
+        : lifecycleModule(id));
   }
   await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule());
   await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
@@ -224,10 +235,43 @@ async function authoring(label, rule, options = {}) {
   const artifactRef = async (packageId, path) => ({ packageId, path, digest: await fileDigest(join(dirs[packageId], path)) });
   const artifactRefs = {};
   for (const id of Object.keys(dirs)) artifactRefs[id] = await artifactRef(id, 'dist/index.mjs');
+  await write(dirs['app-business'], 'dist/app.mjs',
+    businessModule(options.unsupportedEffect === true, options.initThrows === true,
+      options.initDegraded === true, canonicalJson(refs.evaluate)));
   const rulesEntryRef = await artifactRef('rules-package', 'dist/rules.mjs');
   const businessEntryRef = await artifactRef('app-business', 'dist/app.mjs');
+  const lifecycleDefs = {};
+  const lifecycleRefs = {};
+  for (const id of Object.keys(dirs)) {
+    const definition = {
+      kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+      id: `basic.lifecycle_${id.replaceAll('-', '_')}`, version: '1.0.0',
+      description: 'Package-owned Init/Exit Element and optional Hook Provider.',
+      content: [],
+      functions: ['init', 'exit', ...(id === 'kernel-extension' ? ['auditHook'] : [])].map((name) => ({
+        id: name, contractVersion: '1',
+        inputSchemaRef: { inline: { type: 'object' } },
+        outputSchemaRef: { inline: { type: 'object' } },
+        outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'], effects: 'none',
+      })),
+    };
+    lifecycleDefs[id] = definition;
+    await write(dirs[id], 'elements/lifecycle.json', canonicalJson(definition));
+    lifecycleRefs[id] = {
+      namespace: 'basic', id: definition.id, version: '1.0.0',
+      digest: contentDigestOf(definition),
+    };
+  }
+  const lifeFunctionRef = (id, fnName) => ({
+    element: lifecycleRefs[id], functionId: fnName, contractVersion: '1',
+  });
   const target = { runtime: 'node', module: 'esm', nodeMajor: 22 };
   const variant = (implementations) => [{ target, implementations }];
+  const lifeImplementations = (id) =>
+    lifecycleDefs[id].functions.map((fn) => implementation(
+      lifecycleDefs[id].id, fn.id, artifactRefs[id], fn.id,
+      id === 'app-business' && fn.id === 'init' ? [ruleRef] : undefined,
+    ));
   const implementation = (elementId, functionId, module, exportName, resources) => ({
     elementId, functionId, contractVersion: '1', entry: { module, exportName }, ...(resources === undefined ? {} : { resources }),
   });
@@ -235,57 +279,73 @@ async function authoring(label, rule, options = {}) {
     manifest('kernel-primary', {
       layer: 'kernel', role: 'primary', order: 0, dependsOn: [{ package: 'kernel-extension', version: '1.0.0', interface: 'kernel.extension' }], exports: [{ interfaceId: 'kernel.api' }],
       provides: { hooks: [{ id: 'audit', interfaceSchemaRef: { inline: { type: 'object' } }, cardinality: 'single' }] },
-      init: { module: artifactRefs['kernel-primary'], exportName: 'init' },
-      exit: { module: artifactRefs['kernel-primary'], exportName: 'exit' },
+      init: lifecycleRefs['kernel-primary'],
+      elements: [{ id: lifecycleDefs['kernel-primary'].id, version: '1.0.0',
+        definitionRef: await artifactRef('kernel-primary', 'elements/lifecycle.json'), visibility: 'private' }],
+      targetVariants: variant(lifeImplementations('kernel-primary')),
+      exit: lifecycleRefs['kernel-primary'],
     }),
     manifest('kernel-extension', {
-      layer: 'kernel', role: 'extension', exports: [{ interfaceId: 'kernel.extension' }],
-      contributesTo: [{ ownerPackageId: 'kernel-primary', hookId: 'audit', entry: { module: artifactRefs['kernel-extension'], exportName: 'auditHook' } }],
-      init: { module: artifactRefs['kernel-extension'], exportName: 'init' },
-      exit: { module: artifactRefs['kernel-extension'], exportName: 'exit' },
+      layer: 'kernel', role: 'extension',
+      contributesTo: [{ ownerPackageId: 'kernel-primary', hookId: 'audit', function: lifeFunctionRef('kernel-extension', 'auditHook') }],
+      exports: [{ interfaceId: 'kernel.extension' }, { elementId: lifecycleDefs['kernel-extension'].id, functionId: 'auditHook' }],
+      init: lifecycleRefs['kernel-extension'],
+      elements: [{ id: lifecycleDefs['kernel-extension'].id, version: '1.0.0',
+        definitionRef: await artifactRef('kernel-extension', 'elements/lifecycle.json'), visibility: 'private' }],
+      targetVariants: variant(lifeImplementations('kernel-extension')),
+      exit: lifecycleRefs['kernel-extension'],
     }),
     manifest('sdk-primary', {
       layer: 'sdk', role: 'primary', order: 1, dependsOn: [{ package: 'kernel-primary', version: '1.0.0', interface: 'kernel.api' }, { package: 'sdk-extension', version: '1.0.0', interface: 'sdk.extension' }], exports: [{ interfaceId: 'sdk.api' }],
-      init: { module: artifactRefs['sdk-primary'], exportName: 'init' },
-      exit: { module: artifactRefs['sdk-primary'], exportName: 'exit' },
+      init: lifecycleRefs['sdk-primary'],
+      elements: [{ id: lifecycleDefs['sdk-primary'].id, version: '1.0.0',
+        definitionRef: await artifactRef('sdk-primary', 'elements/lifecycle.json'), visibility: 'private' }],
+      targetVariants: variant(lifeImplementations('sdk-primary')),
+      exit: lifecycleRefs['sdk-primary'],
     }),
     manifest('sdk-extension', {
       layer: 'sdk', role: 'extension', exports: [{ interfaceId: 'sdk.extension' }],
-      init: { module: artifactRefs['sdk-extension'], exportName: 'init' },
-      exit: { module: artifactRefs['sdk-extension'], exportName: 'exit' },
+      init: lifecycleRefs['sdk-extension'],
+      elements: [{ id: lifecycleDefs['sdk-extension'].id, version: '1.0.0',
+        definitionRef: await artifactRef('sdk-extension', 'elements/lifecycle.json'), visibility: 'private' }],
+      targetVariants: variant(lifeImplementations('sdk-extension')),
+      exit: lifecycleRefs['sdk-extension'],
     }),
     manifest('rules-package', {
       layer: 'business', role: 'extension',
       elements: [
+        { id: lifecycleDefs['rules-package'].id, version: '1.0.0',
+          definitionRef: await artifactRef('rules-package', 'elements/lifecycle.json'), visibility: 'private' },
         { id: 'basic.knowledge', version: '1.0.0', definitionRef: definitionRefs['basic.knowledge'], visibility: 'public' },
         { id: 'basic.rules', version: '1.0.0', definitionRef: definitionRefs['basic.rules'], visibility: 'public' },
       ],
       exports: [{ elementId: 'basic.knowledge' }, { elementId: 'basic.rules' }, { interfaceId: 'rules.api' }],
       targetVariants: variant([
+        ...lifeImplementations('rules-package'),
         implementation('basic.rules', 'evaluate', rulesEntryRef, 'evaluate', [ruleRef]),
         implementation('basic.rules', 'optionalReport', rulesEntryRef, 'optionalReport'),
         implementation('basic.rules', 'initializeRule', rulesEntryRef, 'initializeRule'),
       ]),
-      init: { module: artifactRefs['rules-package'], exportName: 'init' },
-      exit: { module: artifactRefs['rules-package'], exportName: 'exit' },
+      init: lifecycleRefs['rules-package'],
+      exit: lifecycleRefs['rules-package'],
     }),
     manifest('app-business', {
-      layer: 'business', role: 'primary', order: 2, recordInitFrom: true, dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }], initResources: [ruleRef],
-      elements: [{ id: 'basic.app', version: '1.0.0', definitionRef: definitionRefs['basic.app'], visibility: 'public' }],
+      layer: 'business', role: 'primary', order: 2, recordInitFrom: true, dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }],
+      elements: [
+        { id: lifecycleDefs['app-business'].id, version: '1.0.0',
+          definitionRef: await artifactRef('app-business', 'elements/lifecycle.json'), visibility: 'private' },
+        { id: 'basic.app', version: '1.0.0', definitionRef: definitionRefs['basic.app'], visibility: 'public' },
+      ],
       imports: [refs.evaluate, refs.optionalReport, refs.initializeRule], exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
       targetVariants: variant([
+        ...lifeImplementations('app-business'),
         implementation('basic.app', 'submit', businessEntryRef, 'submit', [ruleRef]),
         ...(options.unsupportedEffect === true ? [implementation('basic.app', 'dangerous', businessEntryRef, 'dangerous')] : []),
       ]),
-      init: { module: artifactRefs['app-business'], exportName: 'init' },
-      exit: { module: artifactRefs['app-business'], exportName: 'exit' },
+      init: lifecycleRefs['app-business'],
+      exit: lifecycleRefs['app-business'],
     }),
   ];
-  await write(dirs['kernel-extension'], 'dist/index.mjs', `${lifecycleModule('kernel-extension')}\nexport function auditHook(value) { return value; }\n`);
-  artifactRefs['kernel-extension'] = await artifactRef('kernel-extension', 'dist/index.mjs');
-  packages[1].contributesTo[0].entry.module = artifactRefs['kernel-extension'];
-  packages[1].init.module = artifactRefs['kernel-extension'];
-  packages[1].exit.module = artifactRefs['kernel-extension'];
 
   const descriptor = {
     kind: 'DomainApp', schemaVersion: DH_APP_SCHEMA_VERSION, id: `basic.clean.${label}`, version: '1.0.0',
@@ -301,11 +361,6 @@ async function authoring(label, rule, options = {}) {
       { package: 'kernel-extension', version: '1.0.0' },
       { package: 'sdk-extension', version: '1.0.0' },
       { package: 'rules-package', version: '1.0.0' },
-    ],
-    ingress: [
-      { id: 'submit', function: refs.submit },
-      { id: 'optional-report', function: refs.optionalReport, optional: true },
-      ...(options.unsupportedEffect === true ? [{ id: 'dangerous', function: refs.dangerous }] : []),
     ],
     config: { example: 'basic-domain-app' },
   };
