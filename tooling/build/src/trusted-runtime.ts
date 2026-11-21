@@ -38,6 +38,11 @@ import { dirname, join } from 'node:path';
 
 const appRoot = fileURLToPath(new URL('../', import.meta.url));
 const manifest = JSON.parse(await readFile(new URL('./trusted-runtime.json', import.meta.url), 'utf8'));
+const sealedLock = JSON.parse(await readFile(join(appRoot, 'dh-lock', 'app.lock.json'), 'utf8'));
+const equivalent = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+if (!equivalent(manifest.archives, sealedLock.trustedRuntimeIntegrity)) {
+  throw new Error('DH_TRUSTED_RUNTIME_LOCK_MISMATCH');
+}
 if (manifest.kind !== 'DomainHarnessTrustedRuntime' ||
     manifest.schemaVersion !== 'dh.runtime-integrity/0.11' ||
     !Array.isArray(manifest.archives) || manifest.archives.length !== 2) {
@@ -52,7 +57,10 @@ try {
 if (lock.lockfileVersion !== 3 || typeof lock.packages !== 'object' || !lock.packages) {
   throw new Error('DH_TRUSTED_RUNTIME_INSTALL_LOCK_INVALID');
 }
-for (const archive of manifest.archives) {
+for (const [index, archive] of manifest.archives.entries()) {
+  if (archive.name !== ['xstate', 'yaml'][index]) {
+    throw new Error('DH_TRUSTED_RUNTIME_PIN_NAME_MISMATCH');
+  }
   if (typeof archive.name !== 'string' || typeof archive.version !== 'string' ||
       typeof archive.integrity !== 'string' ||
       !/^sha512-[a-zA-Z0-9+/]+={0,2}$/.test(archive.integrity)) {
