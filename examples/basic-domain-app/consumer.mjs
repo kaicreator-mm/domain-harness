@@ -156,7 +156,7 @@ ${workflowRefJson ? `
 ` : ''}
 ${workflowCasesJson ? `
   events.push({ event: 'workflow-cases-begin' });
-  const caseRefs = ${workflowCasesJson};
+  const caseRefs = new Map(Object.entries(${workflowCasesJson}));
   const cases = [
     ['single', 'single-flow', {}, 'COMPLETE'],
     ['complete', 'decision-flow', { route: 'COMPLETE', session: 'A' }, 'COMPLETE'],
@@ -172,7 +172,9 @@ ${workflowCasesJson ? `
     ['ancestor-depth', 'depth-flow', {}, 'FAILED', 'DH_WORKFLOW_DEPTH_LIMIT'],
   ];
   for (const [name, refId, input, expectedStatus, expectedCode] of cases) {
-    const result = await ctx.workflows.start(caseRefs[refId], input);
+    const selectedRef = caseRefs.get(refId);
+    if (!selectedRef) throw new Error('T14 selected WorkflowRef missing from sealed fixture');
+    const result = await ctx.workflows.start(selectedRef, input);
     events.push({ event: 'workflow-case', name, outcome: result });
     if (result.status !== expectedStatus ||
         (expectedCode && result.reason?.code !== expectedCode)) {
