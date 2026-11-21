@@ -418,6 +418,11 @@ test('T01 repair P2-2: ExportEntry accepts {} and every optional-key combination
     version: '1.0.0',
     layer: 'kernel',
     role: 'primary',
+    order: 0,
+    init: {
+      module: { packageId: 'orders.kdp', path: 'dist/index.mjs', digest: `sha256:${'0'.repeat(64)}` },
+      exportName: 'init',
+    },
     elements: [],
     dependsOn: [],
     imports: [],

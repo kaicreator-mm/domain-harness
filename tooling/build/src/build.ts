@@ -3,6 +3,7 @@ import {
   DH_LOCK_SCHEMA_VERSION,
   NODE22_ESM_PROFILE,
   contentDigestOf,
+  isRelativeResourcePath,
   isUnknownContentKind,
   validateDomainDefinition,
   validateElementDefinition,
@@ -627,6 +628,9 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       throw refusal('DH_BUILD_SCHEMA_INVALID', `Extension '${manifest.id}' has invalid optional Order`);
     }
     const artifactPath = input.packageArtifacts[manifest.id];
+    if (!artifactPath || !isRelativeResourcePath(artifactPath)) {
+      throw refusal('DH_BUILD_RESOURCE_MISSING', `package '${manifest.id}' artifact path is not a canonical in-package path`);
+    }
     for (const [entry, name] of [[manifest.init, 'init'], [manifest.exit, 'exit']] as const) {
       if (!entry) continue;
       if (entry.module.packageId !== manifest.id || entry.module.path !== artifactPath || entry.exportName !== name) {

@@ -34,7 +34,7 @@ export function verifyGeneratedPackageImports(
       if (specifier.startsWith('node:')) return;
       if (specifier.startsWith('./') || specifier.startsWith('../')) {
         const relative = posix.normalize(posix.join(posix.dirname(ref.path), specifier));
-        if (!isRelativeResourcePath(relative) || !/\\.(?:mjs|js)$/u.test(relative)) {
+        if (!isRelativeResourcePath(relative) || !/\.(?:mjs|js)$/u.test(relative)) {
           throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
             `module '${key}' has unresolved or escaping relative import '${specifier}'`);
         }

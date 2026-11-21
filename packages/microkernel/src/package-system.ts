@@ -104,7 +104,7 @@ export class PackageSystem {
     for (const hook of this.lock.hookBindings) for (const provider of hook.providers) collect(provider.module);
     // 先核验所有生成的 ESM 模块，包括模块的相对导入闭包，防止 Node 加载时绕过 Pin。
     for (const [key, digest] of Object.entries(this.lock.resourceDigests)) {
-      if (!/\\.(?:mjs|js)$/u.test(key)) continue;
+      if (!/\.(?:mjs|js)$/u.test(key)) continue;
       const split = splitResourceKey(key);
       if (split === null) throw new KdpLoadError(`invalid executable key '${key}'`);
       collect({ packageId: split.packageId, path: split.path, digest });

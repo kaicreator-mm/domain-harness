@@ -199,7 +199,6 @@ export function standardCase(): StandardCase {
     eligibilityVisibility: 'public',
     businessExports: [
       { elementId: 'orders.eligibility', functionId: 'evaluate' },
-      { elementId: 'orders.app-main' },
       { interfaceId: 'orders.api' },
     ],
     sdkImports: [],

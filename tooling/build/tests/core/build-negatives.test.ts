@@ -335,9 +335,11 @@ test('BUILD rejects missing KDP Order 0', (t) => {
 
 test('BUILD rejects imports from an undeclared direct Extension', (t) => {
   const scenario = standardCase();
-  scenario.sdkImports = [functionRefOf(scenario.eligibility, 'evaluate')];
   t.after(scenario.ws.dispose);
-  expectRefusal(buildApp(scenario.finalize().input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  const { input, refs } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as { imports: unknown[] };
+  sdk.imports = [refs.evaluateRef];
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
 
