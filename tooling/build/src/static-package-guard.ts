@@ -25,8 +25,6 @@ const OPAQUE_MEMBERS = new Set([
   'getOwnPropertyDescriptors',
   'getPrototypeOf',
   'constructor',
-  'instantiate',
-  'evaluate',
 ]);
 
 function propertyName(node: ts.PropertyAccessExpression | ts.ElementAccessExpression): string | null {
