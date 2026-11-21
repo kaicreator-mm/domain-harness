@@ -692,6 +692,43 @@ async function runWorkflowE2E() {
   }
 }
 
+/** Actual production KDP ordering, not a mock SelectedWorkflowDriver. */
+async function runFatalWorkflowIntegration(fatalAt) {
+  const prepared = await authoring(`workflow-fatal-${fatalAt}`,
+    { minOrderTotal: 50, regions: ['EU', 'US'] },
+    { workflow: true, workflowFatalAt: fatalAt });
+  try {
+    const built = await buildApp(prepared.input);
+    assert.equal(built.ok, true, JSON.stringify(built));
+    if (!built.ok) throw new Error('T13 fatal Workflow fixture BUILD failed');
+    const install = await materialize(`workflow-fatal-${fatalAt}`, built);
+    globalThis.__domainHarnessT05Events = [];
+    const failed = await boot(install.pin, install.context);
+    assert.equal(failed.status, 'FAILED', `fatal ${fatalAt} must fail through real KDP`);
+    assert.equal(failed.code, 'DH_RUNTIME_NOT_READY');
+    const timeline = globalThis.__domainHarnessT05Events;
+    const hooks = timeline.filter((entry) => entry.event === 'workflow-hook').map((entry) => entry.kind);
+    assert.deepEqual(hooks, ['start', 'end'], 'fatal Hook/leaf must attempt end once');
+    const startIndex = timeline.findIndex((entry) => entry.event === 'workflow-hook' && entry.kind === 'start');
+    const endIndex = timeline.findIndex((entry) => entry.event === 'workflow-hook' && entry.kind === 'end');
+    const exitIndex = timeline.findIndex((entry) => entry.event === 'package-exit');
+    assert.ok(startIndex >= 0 && endIndex > startIndex && exitIndex > endIndex,
+      'production Workflow end MUST complete before first Package.Exit');
+    assert.equal(timeline.filter((entry) =>
+      entry.event === 'package-init' && entry.package === 'app-business').length, 1);
+    assert.equal(timeline.filter((entry) =>
+      entry.event === 'package-exit' && entry.package === 'app-business').length, 1,
+    'one reverse KDP Exit per entered business Package');
+    const unauthorized = timeline.find((entry) => entry.event === 'workflow-unauthorized');
+    assert.equal(unauthorized?.outcome?.reason?.code, 'DH_WORKFLOW_UNSELECTED');
+    await evidence(`t13.workflow-fatal-${fatalAt}.real-package-init-order`, {
+      status: 'PASS', startIndex, endIndex, exitIndex, exitedBusinessOnce: true,
+    });
+  } finally {
+    await rm(prepared.root, { recursive: true, force: true });
+  }
+}
+
 async function cloneInstall(source) {
   const installRoot = await mkdtemp(join(consumerRoot, 'negative-install-'));
   installRoots.add(installRoot);
@@ -725,6 +762,8 @@ async function main() {
   await evidence('content-exchange.lock-and-output', { status: 'PASS', a: a.install.lock.closureDigest, b: b.install.lock.closureDigest, observed: 'Init-selected Function returned A POS vs B NEG for total=100; B EU UNKNOWN' });
   const workflowAcceptance = await runWorkflowE2E();
   await evidence('t14.workflow.acceptance-matrix', { status: 'PASS', ...workflowAcceptance });
+  await runFatalWorkflowIntegration('start');
+  await runFatalWorkflowIntegration('leaf');
 
   await expectBuildRefusal('unsupported-effect', { unsupportedEffect: true }, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
   await expectBuildRefusal('unsupported-target', { unsupportedTarget: true }, 'DH_BUILD_TARGET_INVALID');
