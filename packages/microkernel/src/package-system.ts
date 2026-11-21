@@ -340,7 +340,7 @@ export class PackageSystem {
   /** 可在 App READY 之前执行的最小已选 Function 运行器；不依赖 DomainApp.invoke。 */
   async invokeSelectedFunction(ref: FunctionRef, input: unknown): Promise<FunctionOutcome> {
     const selected = this.functionByRef(ref);
-    if (!selected) return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_INGRESS_UNKNOWN', message: 'unselected FunctionRef' } };
+    if (!selected) return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_FUNCTION_UNSELECTED', message: 'unselected FunctionRef' } };
     if (selected.effects !== 'none') return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_UNSUPPORTED_PROFILE', message: 'effectful Function not supported' } };
     const schemas = await this.functionSchemas(selected);
     if (schemas === null) return { kind: 'UNKNOWN', unknownReason: { code: 'DH_RUNTIME_UNSUPPORTED_PROFILE', message: 'Function Schema unavailable' } };

@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { DH_ELEMENT_SCHEMA_VERSION, contentDigestOf } from '@kaicreator/domain-harness-contracts';
+import { DH_ELEMENT_SCHEMA_VERSION } from '@kaicreator/domain-harness-contracts';
 import { buildApp, type BuildResult } from '../../src/index.js';
 import { BuildRefusal } from '../../src/refusal.js';
 import { ResourceScope } from '../../src/resources.js';

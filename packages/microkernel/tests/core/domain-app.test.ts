@@ -52,7 +52,7 @@ test('B0-01: unknown FunctionRef refused, selected FunctionRef executable', asyn
   const genuine = selectedRef(fixture, 'evaluate');
   const outcome = await packages.invokeSelectedFunction({ ...genuine, functionId: 'unselected' }, {});
   assert.equal(outcome.kind, 'FAILED');
-  if (outcome.kind === 'FAILED') assert.equal(outcome.failure.code, 'DH_RUNTIME_INGRESS_UNKNOWN');
+  if (outcome.kind === 'FAILED') assert.equal(outcome.failure.code, 'DH_RUNTIME_FUNCTION_UNSELECTED');
 });
 
 test('B0-04: selected Function input JSON Schema checked before implementation', async (t) => {

@@ -79,11 +79,11 @@ test('T01: schemaVersion discriminators carry the frozen spellings (L2 §2.1)', 
 });
 
 test('T01: error catalog counts and spellings match the frozen directory (L2 §9.1)', () => {
-  assert.equal(BUILD_ERROR_CODES.length, 28, 'BUILD = 6+7+7+8');
+  assert.equal(BUILD_ERROR_CODES.length, 26, 'BUILD = 6+7+7+6 after removal of legacy second App Init');
   assert.equal(BOOT_ERROR_CODES.length, 5, 'Boot/KDP = 5');
-  assert.equal(RUNTIME_ERROR_CODES.length, 7, 'Runtime §7.4 six + UNSUPPORTED_PROFILE');
-  assert.equal(KNOWN_ERROR_CODES.length, 40);
-  assert.equal(new Set(KNOWN_ERROR_CODES).size, 40, 'all codes unique');
+  assert.equal(RUNTIME_ERROR_CODES.length, 6, 'Runtime no longer contains public ingress errors');
+  assert.equal(KNOWN_ERROR_CODES.length, 37);
+  assert.equal(new Set(KNOWN_ERROR_CODES).size, 37, 'all codes unique');
   assert.equal(Object.isFrozen(BUILD_ERROR_CODES), true);
   assert.equal(Object.isFrozen(BOOT_ERROR_CODES), true);
   assert.equal(Object.isFrozen(RUNTIME_ERROR_CODES), true);
@@ -95,6 +95,9 @@ test('T01: error catalog counts and spellings match the frozen directory (L2 §9
   assert.ok(BUILD_ERROR_CODES.includes('DH_BUILD_LOCK_NOT_REPRODUCIBLE'));
   assert.ok(BOOT_ERROR_CODES.includes('DH_BOOT_RECORD_INVALID'));
   assert.ok(RUNTIME_ERROR_CODES.includes('DH_RUNTIME_UNSUPPORTED_PROFILE'));
+  assert.ok(RUNTIME_ERROR_CODES.includes('DH_RUNTIME_FUNCTION_UNSELECTED'));
+  assert.equal(KNOWN_ERROR_CODES.some((code) => code.includes('INGRESS') || code.includes('APP_INIT_')), false,
+    'Element-First v0.11.0 has no legacy direct ingress or second App Init codes');
 });
 
 test('T01: frozen unknown-kind predicate decides recognition only (L2 §2.2)', () => {
