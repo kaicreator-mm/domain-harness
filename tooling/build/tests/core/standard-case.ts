@@ -211,7 +211,7 @@ export function standardCase(): StandardCase {
     ],
     kdpDependsOn: [],
     sdkLifecycle: 'paired',
-    descriptorTarget: TARGET_22,
+    descriptorTarget: { ...TARGET_22 },
     ingress: [],
     finalize,
   };
@@ -319,7 +319,7 @@ export function standardCase(): StandardCase {
       exports: case_.businessExports,
       targetVariants: [
         {
-          target: TARGET_22,
+          target: { ...TARGET_22 },
           implementations: [
             {
               elementId: 'orders.eligibility',

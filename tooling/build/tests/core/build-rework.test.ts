@@ -167,3 +167,21 @@ test('P2-9: secondary Core.Order zero is rejected at BUILD', (t) => {
   business.order = 0;
   expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_DUPLICATE');
 });
+
+test('regression: modifying one BUILD fixture Target never mutates subsequent fixture Targets', (t) => {
+  const first = standardCase();
+  const second = standardCase();
+  t.after(first.ws.dispose);
+  t.after(second.ws.dispose);
+  const firstInput = first.finalize().input;
+  const firstBusiness = firstInput.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as {
+    targetVariants: { target: { nodeMajor?: number } }[];
+  };
+  delete firstBusiness.targetVariants[0]!.target.nodeMajor;
+  const secondInput = second.finalize().input;
+  const secondBusiness = secondInput.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as {
+    targetVariants: { target: { nodeMajor?: number } }[];
+  };
+  assert.equal(secondBusiness.targetVariants[0]!.target.nodeMajor, 22);
+});
+
