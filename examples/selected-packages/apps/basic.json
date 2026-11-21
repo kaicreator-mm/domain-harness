@@ -1,0 +1,28 @@
+{
+  "kind": "DomainApp",
+  "schemaVersion": "dh.app/0.11",
+  "id": "r41.basic",
+  "version": "1.0.0",
+  "target": {
+    "runtime": "node",
+    "module": "esm",
+    "nodeMajor": 22
+  },
+  "roots": {
+    "kernelPrimary": {
+      "package": "r41-kdp",
+      "version": "1.0.0"
+    },
+    "cores": [
+      {
+        "package": "r41-sdk-base",
+        "version": "1.0.0"
+      },
+      {
+        "package": "r41-business",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "extensions": []
+}
