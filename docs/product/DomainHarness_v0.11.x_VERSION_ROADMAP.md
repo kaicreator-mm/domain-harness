@@ -91,3 +91,63 @@ NODE_MINIMUM=22.12.0
 - **不纳入本轮默认完成门**：跨平台所有 Target、通用多 Agent 协作、全平台知识图数据库、全面 DIS Full Conformance、Server 专用学习基础设施、所有下游旧业务迁移。实际需要时单独明确为 0.11.x 后续范围，不预设新的必须版本。
 
 <!-- /DH_V011X_OWNER_CONFIRMED_FULL_REWRITE_STAGE_ROADMAP_20261121 -->
+
+<!-- DH_V011X_ONE_ISSUE_PER_VERSION_HISTORICAL_MAPPING_R1_20261121 -->
+## 6. 每个阶段一个版本主 Issue（完整索引）
+
+**结构决定：** [总控 #1563](https://github.com/kaicreator-mm/domain-harness/issues/1563) 只负责任务索引和跨阶段进度；每个内部版本**只保留一个版本级入口**，其内部可链接 L1/L2/Task/PR，但不能再建第二版本总控。已存在的 0.11.0 #1564 和 0.11.1 #1605 继续使用；后者的 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 是附属技术设计，不是独立版本主 Issue。
+
+| 内部版本 | 唯一版本级 Issue | 交付主题 | 当前状态 |
+|---|---|---|---|
+| **0.11.0** | [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | Foundation | Stage-0 accepted; internal only |
+| **0.11.1** | [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) | Task Execution | Product/L2 design active; implementation not finished |
+| **0.11.2** | [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Domain Intelligence | Scope assigned, Product/L2/implementation pending |
+| **0.11.3** | [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | Semantic Interaction | Scope assigned, Product/L2/implementation pending |
+| **0.11.4** | [#1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | Authorized Action | Scope assigned, Product/L2/implementation pending |
+| **0.11.5** | [#1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | Bounded Reasoning | Scope assigned, Product/L2/implementation pending |
+| **0.11.6** | [#1616](https://github.com/kaicreator-mm/domain-harness/issues/1616) | Durable Execution | Scope assigned, Product/L2/implementation pending |
+| **0.11.7** | [#1617](https://github.com/kaicreator-mm/domain-harness/issues/1617) | Execution Evidence | Scope assigned, Product/L2/implementation pending |
+| **0.11.8** | [#1618](https://github.com/kaicreator-mm/domain-harness/issues/1618) | Client Experience | Scope assigned, Product/L2/implementation pending |
+| **0.11.9** | [#1619](https://github.com/kaicreator-mm/domain-harness/issues/1619) | Server Meta Evolution | Scope assigned, Product/L2/implementation pending |
+
+**执行规则**：各版本 Issue 包含目标/需求/独立可证伪 AC/非目标/历史参考、阶段 L1/L2/Native DAG/实现 PR/审核与实际 CI 的增量状态；阶段推进与正式 Release 是不同的资格。0.11.x 是**彻底重写**，不得用历史源码、旧 ABI、旧业务功能全等或旧版 CI 冒充新版能力已实现。0.11.0 成果仅在其已验收范围内复用。
+
+### F01–F19 全局功能盘点的主归属
+
+以下 **Fxx** 特指全局 [#1567](https://github.com/kaicreator-mm/domain-harness/issues/1567) 的历史功能 ID，**不是 0.11.1 #1605 的局部 F01–F10 产品编号**。一项功能可以跨阶段增强；表中仅列首要推进入口，后续必须去当前版本 Issue 检查其实际范围。
+
+| 全局历史功能 | 主要版本入口 | 说明 |
+|---|---|---|
+| F01–F06 | [0.11.0 #1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | Element/Package/BUILD/Boot/Function/Consumer 结构子项已纳入 Stage-0；领域语义、真实 Effect、复杂任务等不倒填为已完成 |
+| F07 | [0.11.5 #1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | 全面 Domain Harness/LLM；Task Loop 在 #1605、语义在 #1612，恢复/证据/经验跨 #1616–#1618 |
+| F08 | [0.11.2 #1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Knowledge Reader/Query 和适用性；不强制 SQLite |
+| F09–F10 | [0.11.3 #1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | 交互意图和选路；真实 Tool/Effect 在 #1614 |
+| F11 | [0.11.5 #1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | Provider/Harness；旧 Provider HTTP 通过不等于新 Provider/LLM E2E 完成 |
+| F12 | [0.11.9 #1619](https://github.com/kaicreator-mm/domain-harness/issues/1619) | 双层多级反馈总体闭环；确定性解析、精确经验、执行采集分别归 #1612/#1618/#1617 |
+| F13 | [0.11.2 #1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Forge 产物的消费边界；Forge/KG 生产和符号化验证不属本仓库重写 |
+| F14 | [0.11.4 #1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | Tool/Host/Effect 基础；高级传输按用例 |
+| F15 | [0.11.6 #1616](https://github.com/kaicreator-mm/domain-harness/issues/1616) | 真实必要的 Event、Callback、互操作；通用 Event Bus 非默认必做 |
+| F16–F17 | [0.11.0 #1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | 新 SDK/命名/一个真实消费者完成 Stage-0；后续复用场景，不强制重建旧多业务 App |
+| F18 | [0.11.9 #1619](https://github.com/kaicreator-mm/domain-harness/issues/1619) | DomainHarness 自举的小型 Consumer 仅可选；完整自举不能凭本规划自动成为发布门 |
+| F19 | [DIS Conformance #1499](https://github.com/kaicreator-mm/domain-harness/issues/1499) | **独立标准/资格线，不属于任一 0.11.n 的默认完整实现承诺**；新 SDK 仅执行其适用必要合同 |
+
+### v0.10 历史 44 项的归属对照（全部已映射，非迁移任务）
+
+来源：[历史 44 项 Crosswalk](https://github.com/kaicreator-mm/domain-harness/blob/main/docs/roadmap/DomainHarness_v0.10_HISTORICAL_CAPABILITY_CROSSWALK.md)。每项**只分配一个用于分析的主 Issue**；同一业务机制可能在新版本多个阶段渐进增强。将它们称作历史设计/反例参考，而不是“新版 44 项必须重做”。历史 ID 映射核对：44/44，重复 0，缺失 0。
+
+| 版本级 Issue | 历史能力 ID（参考索引，绝非完成证明） |
+|---|---|
+| 0.11.0 / [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | FR06, FR13, HF22, HF25, HF28, HF30, HF31, HF33, HF34, NEW-FUNCTION-01, NEW-FUNCTION-02, NEW-FUNCTION-03, NEW-FUNCTION-04 |
+| 0.11.1 / [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) | FR01 |
+| 0.11.2 / [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | FR02, FR05, FR11, HF24, FR08-P-SD1, NEW-FUNCTION-05 |
+| 0.11.3 / [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | FR10, FR15 |
+| 0.11.4 / [#1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | FR03, FR04, FR14, HF19, HF23, HF29, FR08-P-SD2, FR08-N-SD2 |
+| 0.11.5 / [#1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | FR07, FR08-N-SD1 |
+| 0.11.6 / [#1616](https://github.com/kaicreator-mm/domain-harness/issues/1616) | HF16, HF17, HF18, HF20, HF27, HF32 |
+| 0.11.7 / [#1617](https://github.com/kaicreator-mm/domain-harness/issues/1617) | HF26, NEW-FUNCTION-06 |
+| 0.11.8 / [#1618](https://github.com/kaicreator-mm/domain-harness/issues/1618) | FR08, FR12 |
+| 0.11.9 / [#1619](https://github.com/kaicreator-mm/domain-harness/issues/1619) | FR09, HF21 |
+
+**历史对照的约束**：对某历史条目若新架构没有真实消费价值，版本 Issue 可以明确 OUT / OPTIONAL / REPLACED，不必实施；必须保存不采纳的原因。v0.10 原来提供的 Kernel/Workflow/Model/Provider 的具体 API、存储/Actor 格式、测试与可执行源码不自动成为 0.11.x 公共接口。跨版本进展在主 Issue #1563 统一追踪，阶段内仅维护其版本 Issue。
+
+<!-- /DH_V011X_ONE_ISSUE_PER_VERSION_HISTORICAL_MAPPING_R1_20261121 -->
