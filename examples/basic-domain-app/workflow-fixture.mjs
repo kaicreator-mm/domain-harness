@@ -53,6 +53,8 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
     fn('yamlReader', schema, { type: 'object' }),
     fn('startWorkflow', { type: 'object' }, { type: 'object' }),
     fn('endWorkflow', { type: 'object' }, { type: 'object' }),
+    { ...fn('workflowDecision', { type: 'object' }, { type: 'object' }),
+      outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] },
   );
   const sources = {};
   for (const [id, format, source] of values) {
@@ -86,7 +88,7 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
   if (!ruleDependency || !Array.isArray(ruleDependency.functions)) {
     throw new Error('T14 fixture must preserve direct Element dependency on basic.rules');
   }
-  ruleDependency.functions.push('jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow');
+  ruleDependency.functions.push('jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow', 'workflowDecision');
   app.dependencies.push(...dataElements.map((el) => ({ element: el.id, version: el.version })));
   const jsonReader = ref(rules, 'jsonReader');
   const yamlReader = ref(rules, 'yamlReader');
@@ -122,13 +124,45 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
       ] } },
     node('yaml-final', sources['yaml-b'], yamlReader, { terminal: 'COMPLETE' }),
   ], 6, 1);
+  // 同一 Package.Init 启动的附加选定根：真实命名 Switch 终态、预算和祖先深度。
+  const namedSwitch = ['COMPLETE', 'ASK', 'WAIT', 'REJECT', 'UNKNOWN', 'FAILED']
+    .map((label) => ({ label, target: { terminal: label } }));
+  const additional = {
+    'single-flow': workflow('single-flow', 'single',
+      [node('single', sources['yaml-b'], yamlReader, { terminal: 'COMPLETE' })], 1, 0),
+    'decision-flow': workflow('decision-flow', 'decision', [{
+      id: 'decision', kind: 'function', function: ref(rules, 'workflowDecision'),
+      switch: { exits: namedSwitch },
+    }], 1, 0),
+    'budget-flow': workflow('budget-flow', 'budget-leaf',
+      [node('budget-leaf', sources['json-a'], jsonReader, { terminal: 'COMPLETE' }, hooks)], 2, 0),
+    'shared-budget-flow': workflow('shared-budget-flow', 'first', [
+      node('first', sources['json-a'], jsonReader, { nodeId: 'child' }),
+      { id: 'child', kind: 'workflow', workflow: childRef, switch: {
+        exits: [{ label: 'COMPLETE', target: { terminal: 'COMPLETE' } },
+          { label: 'UNKNOWN', target: { terminal: 'UNKNOWN' } },
+          { label: 'FAILED', target: { terminal: 'FAILED' } }],
+      } },
+    ], 1, 1),
+    'depth-flow': workflow('depth-flow', 'child', [{
+      id: 'child', kind: 'workflow', workflow: childRef,
+      switch: { exits: [
+        { label: 'COMPLETE', target: { terminal: 'COMPLETE' } },
+        { label: 'FAILED', target: { terminal: 'FAILED' } },
+      ] },
+    }], 6, 0),
+  };
   app.content.push(content('parent-flow', parent));
+  for (const [id, definition] of Object.entries(additional)) app.content.push(content(id, definition));
   app.dependencies.push({ element: child.id, version: child.version });
   const rootRef = {
     element: { namespace: 'basic', id: app.id, version: app.version, digest: contentDigestOf(app) },
     contentId: 'parent-flow',
   };
-  return { child, rootRef, sources, dataElements, readerRefs: [
-    jsonReader, yamlReader, hooks.start, hooks.end,
+  const caseRefs = Object.fromEntries(Object.keys(additional).map((contentId) => [
+    contentId, { element: rootRef.element, contentId },
+  ]));
+  return { child, rootRef, caseRefs, sources, dataElements, readerRefs: [
+    jsonReader, yamlReader, hooks.start, hooks.end, ref(rules, 'workflowDecision'),
   ] };
 }
