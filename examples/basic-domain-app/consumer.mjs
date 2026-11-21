@@ -18,6 +18,7 @@ import {
   validateDomainDefinition,
   validateElementDefinition,
 } from '@kaicreator/domain-harness';
+import { prepareWorkflowElements } from './workflow-fixture.mjs';
 
 const consumerRoot = process.cwd();
 const require = createRequire(import.meta.url);
@@ -69,7 +70,7 @@ export async function init(ctx) {
 export async function exit() { events.push({ event: 'package-exit', package: '${packageId}' }); }
 `;
 }
-function rulesModule() {
+function rulesModule(withWorkflow = false) {
   return `
 const events = (globalThis.__domainHarnessT05Events ??= []);
 events.push({ event: 'module-evaluated', package: 'rules-package-entry' });
@@ -81,9 +82,31 @@ export function evaluate(input) {
   return { kind: 'SUCCEEDED', value: { decision: input.total >= RULE.minOrderTotal ? 'POS' : 'NEG', via: 'rules-package/evaluate' } };
 }
 export function optionalReport() { return { kind: 'SUCCEEDED', value: 'optional-report-ok' }; }
+${withWorkflow ? `
+function workflowRead(input, expectedFormat) {
+  if (input?.format !== expectedFormat || typeof input?.source !== 'string' ||
+      input?.value === null || typeof input?.value !== 'object' || Array.isArray(input.value)) {
+    return { kind: 'UNKNOWN', unknownReason: { code: 'T14_READER_INVALID', message: 'data not selected as plain object' } };
+  }
+  events.push({ event: 'workflow-read', format: input.format, parsed: input.value });
+  return { kind: 'SUCCEEDED', value: input.value };
+}
+export function jsonReader(input) { return workflowRead(input, 'json'); }
+export function yamlReader(input) { return workflowRead(input, 'yaml'); }
+export async function startWorkflow() {
+  events.push({ event: 'workflow-hook', kind: 'start' });
+  await Promise.resolve();
+  return { kind: 'SUCCEEDED', value: {} };
+}
+export async function endWorkflow() {
+  await Promise.resolve();
+  events.push({ event: 'workflow-hook', kind: 'end' });
+  return { kind: 'SUCCEEDED', value: {} };
+}
+` : ''}
 `;
 }
-function businessModule(withUnsupportedEffect, initThrows = false, initDegraded = false, selectedEvaluateKey = '') {
+function businessModule(withUnsupportedEffect, initThrows = false, initDegraded = false, selectedEvaluateKey = '', workflowRefJson = '') {
   return `
 import { evaluate, initializeRule } from 'rules-package/rules';
 const events = (globalThis.__domainHarnessT05Events ??= []);
@@ -102,6 +125,12 @@ export async function init(ctx) {
   const invalid = await selected.invoke({ total: 'invalid', region: 'US' });
   const eu = await selected.invoke({ total: 100, region: 'EU' });
   events.push({ event: 'init-selected-function', package: 'app-business', pos, neg, unknown, invalid, eu });
+${workflowRefJson ? `
+  if (!ctx.workflows) throw new Error('BUILD-selected Workflow starter missing during Package.Init');
+  const outcome = await ctx.workflows.start(${workflowRefJson}, { origin: 'Package.Init' });
+  events.push({ event: 'workflow-outcome', outcome });
+  if (outcome.status !== 'COMPLETE') throw new Error('Selected Workflow rejected startup');
+` : ''}
   events.push({ event: 'business-init', package: 'app-business', minOrderTotal: rule.minOrderTotal });
   return ${initDegraded ? "{ status: 'DEGRADED' }" : "{ status: 'READY' }"};
 }
@@ -138,7 +167,7 @@ async function authoring(label, rule, options = {}) {
         ? `${lifecycleModule(id)}\nexport function auditHook(value) { return value; }\n`
         : lifecycleModule(id));
   }
-  await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule());
+  await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule(options.workflow === true));
   await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
   await write(dirs['kernel-primary'], 'dist/index.js', "export { bootstrap } from '@kaicreator/domain-harness-microkernel';\n");
   for (const id of Object.keys(dirs)) {
