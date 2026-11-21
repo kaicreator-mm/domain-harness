@@ -1,6 +1,6 @@
 # DomainHarness 0.11.0 — 从零重构过程与工程经验
 
-> 范围：仅限已确定的 0.11.0 Foundation 实现；记录当前重构的已证实结果与尚未通过的验证。对应 [Issue #1602](https://github.com/kaicreator-mm/domain-harness/issues/1602)、[PR #1603](https://github.com/kaicreator-mm/domain-harness/pull/1603)，由 [主 Issue #1563](https://github.com/kaicreator-mm/domain-harness/issues/1563) 统一管理。本文是工程经验，不代表源码验收已完成。
+> 范围：仅限已确定的 0.11.0 Foundation 实现；记录当前重构的已证实结果与尚未通过的验证。对应 [Issue #1602](https://github.com/kaicreator-mm/domain-harness/issues/1602)、[PR #1603](https://github.com/kaicreator-mm/domain-harness/pull/1603)，由 [主 Issue #1563](https://github.com/kaicreator-mm/domain-harness/issues/1563) 统一管理。本文是工程经验：版本分支的重构代码已获 ACCEPT_SCOPED 并完成合并；main、Release、正式 Full Conformance 不包含在此限定验收中。
 
 ## 目标与决策
 
@@ -24,7 +24,7 @@
 | R5 批量修复 | 逐项修 Ajv NodeNext 导入 `.js`、测试 `JsonValue` 边界、Schema registry 类型、Fixture 相对路径、未使用绑定、`globalThis.structuredClone`、`inspect()` Promise 返回、回滚 catch 注释、Unicode 码点计数、旧入口拒绝码 | 保留真实构建/拒绝行为，不通过弱化断言“修复” |
 | CI #2778/#2779（失败） | 批量修复后的两条 CI 仍失败，但 GitHub 状态仅显示 FAILURE，未取得真实首个失败步骤 | **不能宣称所有 R5 修复后的构建/测试/Demo 已通过** |
 | CI 去重 | 将临时推送分支的 Push 与 PR 两套完整验证改回单 PR 路径 | 只保留必要 CI，不因每次提交双倍 checkout/安装/执行测试 |
-| 当前 | PR #1603 仍为 Draft，版本主分支 `version/v0.11.x` 与 `main` 均未接收重构 | 整体源码质量 **REWORK / NOT_ACCEPTED** |
+| 当前（R15+Merge） | PR #1603 已合并至 `version/v0.11.x`，普通 merge commit `bc37d1ee00fcc364a277b7c1c6913d33d56e52ae` | 审核源码 `668eb7e6ed2ae5abe1d6bd0427a92c4548b499fe`；Woodpecker #2787 SUCCESS；R15 ACCEPT_SCOPED（P0=0/P1=0/P2=5）；merge Git tree 与审核 Git tree 完全一致；main 未变，Release 未创建 |
 
 ## 可复用的成功经验
 
@@ -46,15 +46,35 @@
 - **禁止把失败状态没有原始日志时的猜测变成改码依据**。优先一次性收集相同 HEAD 的第一失败步骤、原始输出和可独立检查的批量错误；在同一个 PR 中最小修复。
 - **禁止凭“删除了 2,000 多文件”认定架构更好**。还必须核查每层职责、命名、注释的真实性、正确公共出口及唯一 Demo 的完整闭环。
 
-## 重构完成门（目前未满足）
+## 重构完成门（版本分支重构代码已完成）
 
 - [x] 已建立单一重构 Issue 和 PR，并实际清除历史源码与兼容入口
 - [x] 已加入 TypeScript Skill、中文源码注释约束与源码命名检查
 - [x] 已集中定位和提交已知的 Contracts/build/lint/test/Demo 修复
-- [ ] 当前最终 Exact HEAD 干净安装、四包 BUILD、生产及测试 typecheck 全通过
-- [ ] 当前最终 Exact HEAD 的 ESLint、单元/集成测试与唯一四包独立 Demo 全通过
-- [ ] 结合当前真实源码做一次完整架构、质量、注释、公开出口、可维护性独立审核并解决其必要问题
-- [ ] 严格按验收边界合入 `version/v0.11.x`，保持 `main` 与正式 Release 未发布
+- [x] 最终审核 Exact HEAD 干净安装、四包 BUILD、生产及四包测试 Typecheck 全通过
+- [x] 最终审核 Exact HEAD 的 ESLint、单元/集成测试与唯一四包独立 Demo 全通过（167 PASS、0 FAIL、1 Windows symlink SKIP）
+- [x] R12 完整独立审核发现 4 项 P1，经 R13/R14 修复、R15 独立增量审核 FIX_VERIFIED，当前 P0=0/P1=0
+- [x] 经 Exact SHA/CI/Review/mergeability 检查合入 `version/v0.11.x`；仍保持 `main` 与正式 Release 未发布
+
+
+## R12–R15 质量审核与最终集成：可复用案例
+
+- **R12 完整独立审查**（旧源码 SHA `610b223deb6cde1ae19a14dc62a2f396da022e8e`）发现 P0=0、P1=4、P2=5。P1 分别涉及 Hook interfaceSchemaRef 缺少 BUILD 校验、Business App Init 获得全闭包资源、重复 ingress ID 的静默覆盖、仅一包执行测试类型检查。绿色 CI 本身未覆盖上述四项源码缺陷。
+- **R13 批量修复**（SHA `f40e983fa43d0de5c8032df220ba18fbc7be8972`）在同一 PR 中增加 Hook inline/ref Schema 校验及负例、App Init 资源声明白名单、ingress ID 前置去重、四包测试 Typecheck。#2786 CI 失败因新编译门发现旧测试 Fixture 直接写入 readonly 类型，不是四项产品功能回退。
+- **R14 一次性本地 Agent 有界交付**（最终 SHA `668eb7e6ed2ae5abe1d6bd0427a92c4548b499fe`）仅改 BUILD 两份测试文件：可变 Fixture 限于测试，JsonValue 不递归展开；修复 TS 收窄及局部数组类型，不放宽公共 readonly ABI。源码/测试类型检查、Lint、真实四 tarball Demo AC01–AC10 通过；167 PASS、0 FAIL、1 Windows symlink SKIP；Woodpecker [#2787](https://ci.kaicreator.com/repos/18/pipeline/2787/1) SUCCESS。
+- **R15 独立增量复审**：[PR Review #6001053778](https://github.com/kaicreator-mm/domain-harness/pull/1603#pullrequestreview-6001053778) 在同 SHA 逐项确认 RV-1～RV-4 `FIX_VERIFIED`；P0=0、P1=0、P2=5 沿用原非阻断发现。复用已通过的同 SHA CI，不重复审查历史上未变化模块。
+- **版本分支集成**：普通 Merge PR #1603 的 merge commit `bc37d1ee00fcc364a277b7c1c6913d33d56e52ae` 以已审核 HEAD 为第二父节点，合并后 Git tree 等于已审核源码 Git tree；main 未改，未创建 Release。
+
+### 仍未解决但非阻断的五项 P2（由 #1563 按需求取舍）
+
+RV-5：Domain semanticRelations / Element 定义尚未完全与选定闭包交叉核对；RV-6：组合 exports 同时含 Element/Function 时可能遗漏 Function 存在性验证；RV-7：非 JSON document 的 inline/ref 摘要归一规则不完全等价；RV-8：BUILD 中部分非规范 JSON 摘要异常未全部转为固定 BuildResult 拒绝；RV-9：descriptorDigest 的 BUILD canonical 与 KDP 原始字节比较存在语义差异。这些问题不能宣称已修复，但 R15 明确认定本轮为非阻断。
+
+### 减少重复交接的实践规则
+
+1. 当错误取证必须本地执行时，一次有限 Task 授权本地 Agent 完成日志诊断、必要修复、本地等价验证、Git 提交及少量 CI，不拆成连续诊断/修复往返。
+2. Writer 负责直接审查真实增量；独立 Reviewer 与 Writer 不同会话，只复核受影响的安全边界及原 P1；不对每个测试类型报错重新审计。
+3. 合并前核对 Exact HEAD、GitHub CI、独立结论、基分支与 mergeability。Git 树比对可证明合并没有改变受审源文件；文档后续更新须明确为 docs-only，不得把合并 SHA 误称为 CI 执行 SHA。
+4. 过程记录保留错误阶段原始失败事实，但当前状态与验收结论必须根据后续审核及时更新。
 
 **更新规则：** 新证据只追加事实、对应 SHA、失败与修复机制；不复制旧日志全文、不为微小问题另建 Issue、不提前把任何 NOT_RUN 改写为 PASS。
 
