@@ -4,7 +4,7 @@ import { appendFile, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DH_APP_SCHEMA_VERSION,
@@ -314,6 +314,15 @@ async function authoring(label, rule, options = {}) {
   return { root, dirs, input, descriptor, definitions, domainElements: [knowledge, rules, app], ruleRef, refs };
 }
 
+async function installComposedDependencies(label, installRoot) {
+  const install = spawnSync(process.execPath, [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund'], {
+    cwd: installRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, npm_config_registry: process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry },
+  });
+  await evidence(`${label}.composed-package-npm-install`, { exit: install.status, signal: install.signal });
+  assert.equal(install.status, 0, `${label}: composed App npm install failed\n${install.stdout}\n${install.stderr}`);
+}
+
 async function materialize(label, built) {
   const installRoot = await mkdtemp(join(consumerRoot, `install-${label}-`));
   installRoots.add(installRoot);
@@ -321,12 +330,7 @@ async function materialize(label, built) {
   await evidence(`${label}.composed-package-materialize`, {
     status: 'PASS', files: built.appPackage.files.length, packageDigest: built.appPackage.packageDigest,
   });
-  const install = spawnSync(process.execPath, [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund'], {
-    cwd: installRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, npm_config_registry: process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry },
-  });
-  await evidence(`${label}.composed-package-npm-install`, { exit: install.status, signal: install.signal });
-  assert.equal(install.status, 0, `${label}: composed App npm install failed\n${install.stdout}\n${install.stderr}`);
+  await installComposedDependencies(label, installRoot);
   if (label === 'rule-a') {
     const child = spawnSync(process.execPath, ['boot.mjs'], {
       cwd: installRoot, encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024, env: process.env,
@@ -481,7 +485,14 @@ async function runPositive(label, rule, expectedAtHundred) {
 async function cloneInstall(source) {
   const installRoot = await mkdtemp(join(consumerRoot, 'negative-install-'));
   installRoots.add(installRoot);
-  await cp(source.installRoot, installRoot, { recursive: true });
+  await cp(source.installRoot, installRoot, {
+    recursive: true,
+    filter: (path) => {
+      const rel = relative(source.installRoot, path);
+      return rel !== 'node_modules' && !rel.startsWith(`node_modules${process.platform === 'win32' ? '\\' : '/'}`) && rel !== 'package-lock.json';
+    },
+  });
+  await installComposedDependencies('negative-clone', installRoot);
   return { ...source, installRoot, context: { ...source.context, installRoot } };
 }
 
