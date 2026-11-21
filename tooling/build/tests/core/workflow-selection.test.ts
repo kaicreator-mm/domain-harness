@@ -8,10 +8,12 @@ import { spawnSync } from 'node:child_process';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import {
   DH_WORKFLOW_SCHEMA_VERSION,
+  DH_ELEMENT_SCHEMA_VERSION,
   DOMAIN_APP_LOCK_JSON_SCHEMA,
   DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA,
   contentDigestOf,
   type DomainPackageManifest,
+  type FunctionRef,
   type ElementDefinition,
   type JsonValue,
   type WorkflowDefinition,
@@ -34,6 +36,7 @@ function workflowCase(
     readonly badNodeFunction?: boolean;
     readonly workflowElementId?: string;
     readonly rawData?: Uint8Array;
+    readonly foreignOwner?: 'orders-ext' | 'aaa-ext';
   } = {},
 ) {
   const scenario = standardCase();
@@ -45,7 +48,25 @@ function workflowCase(
     digest: sha256OfBytes(bytes),
   };
   let workflow: WorkflowDefinition | undefined;
+  let selectedForeignRef: FunctionRef | undefined;
   scenario.beforeSeal = () => {
+    if (options.foreignOwner) {
+      // Exact deterministic lifecycle fixture authored by standardCase.finalize().
+      const foreignElement: ElementDefinition = {
+        kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+        id: `${options.foreignOwner}.lifecycle`, version: '1.0.0',
+        description: 'Package-owned lifecycle and selected Hook Functions.',
+        content: [],
+        functions: ['init', 'exit', 'audit'].map((id) => ({
+          id, contractVersion: '1',
+          inputSchemaRef: { inline: { type: 'object' } },
+          outputSchemaRef: { inline: { type: 'object' } },
+          outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const,
+          effects: 'none' as const,
+        })),
+      };
+      selectedForeignRef = functionRefOf(foreignElement, 'audit');
+    }
     const check = functionRefOf(scenario.eligibility as ElementDefinition, 'evaluate');
     workflow = {
       kind: 'Workflow',
@@ -56,7 +77,7 @@ function workflowCase(
       maxDescendantWorkflowDepth: 0,
       nodes: [{
         id: 'assess', kind: 'function',
-        function: options.badNodeFunction ? { ...check, functionId: 'missing' } : check,
+        function: options.badNodeFunction ? { ...check, functionId: 'missing' } : selectedForeignRef ?? check,
         ...(options.withData ? { data: {
           format: options.format ?? 'json', resource,
           maxBytes: options.dataMaxBytes ?? 4096,
@@ -94,7 +115,7 @@ function workflowCase(
       packages,
       runtimeDependencies: { ...input.runtimeDependencies, xstate: '5.33.2', yaml: '2.9.1' },
     },
-    ref, resource, workflow,
+    ref, resource, workflow, foreignRef: selectedForeignRef,
   };
 }
 
@@ -251,6 +272,49 @@ test('T12 R1: real JSON reader data is also sealed into the existing package', (
 test('T12 R1: malformed selected Workflow identity is rejected before Runtime', (t) => {
   const { input } = workflowCase(t, { workflowElementId: 'orders.missing' });
   rejected(buildApp(input), 'DH_BUILD_REF_UNRESOLVED');
+});
+
+test('T12 R4 P2: a selected WorkflowRoot cannot be started by unrelated Core Package', (t) => {
+  const { input, ref } = workflowCase(t);
+  const wrongCaller = {
+    ...input, packages: input.packages.map((pkg) => {
+      if (pkg.id === 'orders-business') return { ...pkg, workflowRoots: [] };
+      if (pkg.id === 'sdk-core') return { ...pkg, workflowRoots: [{
+        element: ref, contentId: 'business-flow',
+      }] };
+      return pkg;
+    }),
+  };
+  rejected(buildApp(wrongCaller), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('T12 R4 P2: selected cross-Extension workflow Function requires explicit FunctionRef import', (t) => {
+  const { input, foreignRef } = workflowCase(t, { foreignOwner: 'orders-ext' });
+  assert.ok(foreignRef);
+  rejected(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  const legal = {
+    ...input, packages: input.packages.map((pkg) =>
+      pkg.id === 'orders-business'
+        ? { ...pkg, imports: [...pkg.imports, foreignRef] }
+        : pkg),
+  };
+  accepted(buildApp(legal));
+});
+
+test('T12 R4 P2: private cross-owner Function never becomes callable from Workflow node', (t) => {
+  const { input, foreignRef } = workflowCase(t, { foreignOwner: 'aaa-ext' });
+  assert.ok(foreignRef);
+  const privateExtension = {
+    ...input, packages: input.packages.map((pkg) => {
+      if (pkg.id === 'orders-business') return { ...pkg, imports: [...pkg.imports, foreignRef] };
+      if (pkg.id === 'aaa-ext') return {
+        ...pkg, elements: pkg.elements.map((element) =>
+          element.id === 'aaa-ext.lifecycle' ? { ...element, visibility: 'private' as const } : element),
+      };
+      return pkg;
+    }),
+  };
+  rejected(buildApp(privateExtension), 'DH_BUILD_EXPORT_MISSING');
 });
 
 test('T12 R1: the existing BUILD rejects a selected workflow node without real FunctionRef', (t) => {
