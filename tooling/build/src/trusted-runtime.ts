@@ -92,7 +92,8 @@ const approvedOrigin = (resolvedUrl) => {
     const parsed = new URL(resolvedUrl);
     if (parsed.protocol === 'https:') return true;
     if (parsed.protocol !== 'http:') return false;
-    if (!['localhost', '127.0.0.1', '::1', 'host.docker.internal'].includes(parsed.hostname)) return false;
+    // WHATWG URL.hostname 保留 IPv6 地址外层方括号；这里只允许精确回环地址。
+    if (!['localhost', '127.0.0.1', '[::1]', 'host.docker.internal'].includes(parsed.hostname)) return false;
     const configured = process.env.npm_config_registry;
     if (!configured) return false;
     const registry = new URL(configured);
