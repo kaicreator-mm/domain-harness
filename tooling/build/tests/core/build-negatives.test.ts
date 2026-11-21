@@ -159,13 +159,16 @@ test('R27: lifecycle EntryRef must match pinned package artifact and named expor
   const packages = input.packages.map((raw) => {
     const manifest = raw as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
     if (manifest.id !== 'sdk-core') return manifest;
-    return { ...manifest, technicalInit: { ...manifest.technicalInit!, exportName: 'init' } };
+    return { ...manifest, init: { ...manifest.init, exportName: 'wrongInit' } };
   });
   expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_SCHEMA_INVALID');
 });
 
-refusalCase('DH_BUILD_LIFECYCLE_HALF', (s) => {
-  s.sdkLifecycle = 'init-only';
+test('Exit Element is optional; Init-only Package can build', (t) => {
+  const scenario = standardCase();
+  scenario.sdkLifecycle = 'init-only';
+  t.after(scenario.ws.dispose);
+  assert.equal(buildApp(scenario.finalize().input).ok, true);
 });
 
 refusalCase('DH_BUILD_DEPENDS_ON_UNSELECTED', (s) => {
@@ -283,34 +286,29 @@ test('DH_BUILD_HOOK_TARGET_INVALID: contribution to an undeclared hook', (t) => 
   expectRefusal(buildApp(input), 'DH_BUILD_HOOK_TARGET_INVALID');
 });
 
-test('DH_BUILD_APP_INIT_MISSING: businessAppInit resolves to no selected Function', (t) => {
+test('BUILD rejects duplicated Core.Order', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const appDescriptor = input.descriptor as { businessAppInit: { element: { id: string } } };
-  appDescriptor.businessAppInit.element.id = 'orders.ghost';
-  expectRefusal(buildApp(input), 'DH_BUILD_APP_INIT_MISSING');
+  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as { order: number };
+  sdk.order = 0;
+  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_DUPLICATE');
 });
 
-test('DH_BUILD_APP_INIT_MISSING: digest drift on the app-init element reference', (t) => {
+test('BUILD rejects missing KDP Order 0', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const appDescriptor = input.descriptor as {
-    businessAppInit: { element: { digest: string } };
-  };
-  appDescriptor.businessAppInit.element.digest = `sha256:${'f'.repeat(64)}`;
-  expectRefusal(buildApp(input), 'DH_BUILD_APP_INIT_MISSING');
+  const kdp = input.packages.find((pkg) => (pkg as { id: string }).id === 'kdp-kernel') as { order: number };
+  kdp.order = 9;
+  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_MISSING');
 });
 
-test('app-init function not exported by its owner is an export refusal', (t) => {
+test('BUILD rejects imports from an undeclared direct Extension', (t) => {
   const scenario = standardCase();
+  scenario.sdkImports = [functionRefOf(scenario.eligibility, 'evaluate')];
   t.after(scenario.ws.dispose);
-  const { input } = scenario.finalize();
-  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as {
-    exports: { elementId?: string; functionId?: string }[];
-  };
-  business.exports = business.exports.filter((entry) => entry.elementId !== 'orders.app-main');
-  expectRefusal(buildApp(input), 'DH_BUILD_EXPORT_MISSING');
+  expectRefusal(buildApp(scenario.finalize().input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
+
 
