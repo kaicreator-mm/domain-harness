@@ -46,7 +46,7 @@ function authoredInput(name: 'basic' | 'extended', source = SOURCE): BuildInput 
 function accepted(input: BuildInput): BuildSuccess {
   const outcome = buildApp(input);
   assert.equal(outcome.ok, true, outcome.ok ? '' : `${outcome.code}: ${outcome.message}`);
-  if (!outcome.ok) assert.fail(outcome.message);
+  // assert.equal 在 Node 类型中已把判别式收窄到 BuildSuccess。
   return outcome;
 }
 
