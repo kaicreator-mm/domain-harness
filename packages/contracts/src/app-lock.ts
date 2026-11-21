@@ -11,6 +11,7 @@ import type {
 import type { PackageLayer, PackageRole } from './package-manifest.js';
 import type { ResourceRef } from './element-contracts.js';
 import type { DH_LOCK_SCHEMA_VERSION } from './schema-versions.js';
+import type { WorkflowDefinition, WorkflowRef } from './workflow-contracts.js';
 
 export interface SelectedPackage {
   readonly packageId: string;
@@ -31,6 +32,8 @@ export interface SelectedPackage {
   readonly recordInitFrom?: true;
   /** 每个 Package 仅拥有其直接声明的 Extension/API 依赖。 */
   readonly dependsOn: readonly string[];
+  /** 同一 BUILD 验证并授权的业务 Workflow 启动点，旧 Package 不强制持有业务流程。 */
+  readonly workflowRoots?: readonly WorkflowRef[];
 }
 
 export interface SelectedElement {
@@ -60,6 +63,14 @@ export interface SealedHookBinding {
   readonly providers: readonly FunctionRef[];
 }
 
+/** 已在 BUILD 验证精确 Element/Content/Graph/资源访问，并封存入唯一 DomainAppLock。 */
+export interface SelectedWorkflow {
+  readonly ref: WorkflowRef;
+  readonly ownerPackageId: string;
+  readonly definitionDigest: ContentDigest;
+  readonly definition: WorkflowDefinition;
+}
+
 export interface BootstrapKdpRef {
   readonly kdpPackageId: string;
   readonly kdpPrimaryEntry: 'bootstrap';
@@ -85,6 +96,13 @@ export interface DomainAppLock {
   readonly selectedElements: readonly SelectedElement[];
   readonly selectedFunctions: readonly SelectedFunction[];
   readonly hookBindings: readonly SealedHookBinding[];
+  readonly selectedWorkflows?: readonly SelectedWorkflow[];
+  /** BUILD 已选定的可信 Workflow Runtime 依赖，通过 SHA-512 压缩包 SRI 固定实际安装字节。 */
+  readonly trustedRuntimeIntegrity?: readonly {
+    readonly name: 'xstate' | 'yaml';
+    readonly version: string;
+    readonly integrity: string;
+  }[];
   /** 已锁定 Core(Order 升序) 链；运行时只按此链递归调用。 */
   readonly coreOrder: readonly string[];
   readonly resourceDigests: Readonly<Record<string, ContentDigest>>;

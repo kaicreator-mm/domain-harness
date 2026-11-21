@@ -7,6 +7,11 @@ import {
   isUnknownContentKind,
   validateDomainDefinition,
   validateElementDefinition,
+  validateWorkflowDefinition,
+  WORKFLOW_DEFINITION_JSON_SCHEMA,
+  type WorkflowRef,
+  type WorkflowDefinition,
+  type SelectedWorkflow,
   type ContentBlock,
   type ContentDigest,
   type DomainAppDescriptor,
@@ -30,6 +35,7 @@ import {
   type ValidationIssue,
 } from '@kaicreator/domain-harness-contracts';
 import { canonicalJson } from '@kaicreator/domain-harness-contracts';
+import { parseDocument } from 'yaml';
 import type {
   BuildInput,
   BuildResult,
@@ -41,6 +47,7 @@ import { ResourceScope, digestOfBytes } from './resources.js';
 import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
 import { verifyGeneratedPackageImports, verifyImplementationExport } from './static-package-guard.js';
 import { composeAppPackage, sameAppPackageBytes, sealPackageManifest } from './app-package.js';
+import { TRUSTED_WORKFLOW_NPM_ARCHIVES } from './trusted-runtime.js';
 
 
 interface LoadedElement {
@@ -484,6 +491,171 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   }
 
+  // 0.11.1 T12：只在原 BUILD 中静态闭合 WorkflowRoots→子 Workflow→实际 Element.Function。
+  // 这不是第二套 Compiler/Lock：所有节点仍加入上面的 selectedFunctions，
+  // 资源仍经原 ResourceScope，封存后供同一个 KDP 执行，不允许运行期发现功能。
+  const sealedWorkflows = new Map<string, SelectedWorkflow>();
+  const visitingWorkflows = new Set<string>();
+  const selectedWorkflowRoots = new Map<string, readonly WorkflowRef[]>();
+  const workflowKey = (ref: WorkflowRef): string => canonicalJson(toJson(ref));
+  const workflowElement = (ref: WorkflowRef, caller: string): LoadedElement => {
+    const loaded = elements.get(`${ref.element.namespace}|${ref.element.id}|${ref.element.version}`);
+    if (!loaded || loaded.definitionDigest !== ref.element.digest) {
+      throw refusal('DH_BUILD_REF_UNRESOLVED',
+        `WorkflowRef '${ref.element.id}/${ref.contentId}' does not resolve to the exact selected Element`);
+    }
+    if (loaded.owner.id !== caller) {
+      if (!(dependsOnEdges.get(caller) ?? []).includes(loaded.owner.id) ||
+          selected.get(loaded.owner.id)?.role !== 'extension') {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Package '${caller}' invokes Workflow from undeclared direct Extension '${loaded.owner.id}'`);
+      }
+      if (!isExported(loaded.owner, loaded, undefined)) {
+        throw refusal('DH_BUILD_EXPORT_MISSING',
+          `Package '${caller}' invokes non-public Workflow Element '${loaded.def.id}'`);
+      }
+    }
+    return loaded;
+  };
+  const parseWorkflow = (loaded: LoadedElement, ref: WorkflowRef): WorkflowDefinition => {
+    const blocks = loaded.def.content.filter((block) => block.id === ref.contentId);
+    if (blocks.length !== 1 || blocks[0]!.contentKind !== 'workflow-definition') {
+      throw refusal('DH_BUILD_REF_UNRESOLVED',
+        `WorkflowRef '${loaded.def.id}/${ref.contentId}' requires exactly one workflow-definition ContentBlock`);
+    }
+    const block = blocks[0]!;
+    let raw: unknown = block.value;
+    if (block.ref) {
+      if (block.ref.packageId !== loaded.owner.id &&
+          (!(dependsOnEdges.get(loaded.owner.id) ?? []).includes(block.ref.packageId) ||
+           selected.get(block.ref.packageId)?.role !== 'extension')) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Workflow '${loaded.def.id}' content resource is outside directly selected Extensions`);
+      }
+      const bytes = scope.verify(block.ref);
+      try {
+        raw = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown;
+      } catch {
+        throw refusal('DH_BUILD_SCHEMA_INVALID',
+          `Workflow '${loaded.def.id}/${ref.contentId}' content must be valid UTF-8 JSON`);
+      }
+    }
+    const valid = validateWorkflowDefinition(raw);
+    if (!valid.ok) {
+      const issue = firstIssue(valid.issues);
+      throw new BuildRefusal(issue.code as BuildErrorCode, issue.message, issue.path);
+    }
+    const schema = schemas.compileContentSchema(
+      WORKFLOW_DEFINITION_JSON_SCHEMA, `${loaded.def.id}/${ref.contentId}/workflow-definition`);
+    if (!schema(raw)) {
+      throw refusal('DH_BUILD_SCHEMA_INVALID',
+        `Workflow '${loaded.def.id}/${ref.contentId}' violates versioned machine Schema`);
+    }
+    return raw as WorkflowDefinition;
+  };
+  const addWorkflowFunction = (
+    ref: FunctionRef, caller: DomainPackageManifest, path: string,
+  ): void => {
+    const resolved = resolveFunctionRef(ref, path);
+    requireExported(resolved, caller.id);
+    // 与普通 Package.imports 一样严格：引用一个跨包 Function 不能只因声明
+    // dependsOn 就自动获得它；必须把确切 FunctionRef 列入 Manifest.imports。
+    if (resolved.owner.id !== caller.id && !caller.imports.some((item) =>
+      canonicalJson(toJson(item)) === canonicalJson(toJson(ref)))) {
+      throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+        `Workflow '${caller.id}' must import exact FunctionRef '${ref.element.id}.${ref.functionId}'`);
+    }
+    addSelected(resolved);
+  };
+  const selectWorkflow = (ref: WorkflowRef, caller: string, stackDepth: number): void => {
+    if (stackDepth > 32) {
+      throw refusal('DH_BUILD_SCHEMA_INVALID', 'selected Workflow nesting exceeds bounded stack depth');
+    }
+    const loaded = workflowElement(ref, caller); // 每个调用点独立检查访问权限。
+    const key = workflowKey(ref);
+    if (visitingWorkflows.has(key)) {
+      throw refusal('DH_BUILD_ELEMENT_CYCLE',
+        `Workflow nesting recursively invokes active Workflow '${ref.element.id}/${ref.contentId}'`);
+    }
+    if (sealedWorkflows.has(key)) return;
+    visitingWorkflows.add(key);
+    const def = parseWorkflow(loaded, ref);
+    const owner = loaded.owner;
+    sealedWorkflows.set(key, {
+      ref, ownerPackageId: owner.id, definitionDigest: contentDigestOf(toJson(def)),
+      definition: def,
+    });
+    for (const node of def.nodes) {
+      if (node.kind === 'workflow') {
+        selectWorkflow(node.workflow, owner.id, stackDepth + 1);
+        continue;
+      }
+      addWorkflowFunction(node.function, owner, `workflow.${def.id}.nodes.${node.id}.function`);
+      if (node.hooks?.start) {
+        addWorkflowFunction(node.hooks.start, owner, `workflow.${def.id}.nodes.${node.id}.hooks.start`);
+      }
+      if (node.hooks?.end) {
+        addWorkflowFunction(node.hooks.end, owner, `workflow.${def.id}.nodes.${node.id}.hooks.end`);
+      }
+      if (node.data) {
+        const data = node.data;
+        const resourceOwner = data.resource.packageId;
+        if (resourceOwner !== owner.id &&
+            (!(dependsOnEdges.get(owner.id) ?? []).includes(resourceOwner) ||
+             selected.get(resourceOwner)?.role !== 'extension')) {
+          throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+            `Workflow Reader in '${owner.id}' requests resource from undeclared direct Extension '${resourceOwner}'`);
+        }
+        const bytes = scope.verify(data.resource);
+        if (bytes.byteLength > data.maxBytes) {
+          throw refusal('DH_BUILD_SCHEMA_INVALID',
+            `Workflow Reader resource '${resourceOwner}/${data.resource.path}' exceeds declared maxBytes`);
+        }
+        let utf8: string;
+        try {
+          utf8 = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        } catch {
+          throw refusal('DH_BUILD_SCHEMA_INVALID', 'Workflow Reader resource must be strict UTF-8');
+        }
+        // JSON/YAML 都在 BUILD 中真实解析为可规范化的纯 JSON 数据；
+        // YAML 使用 core schema、唯一键和有限 alias，拒绝 tag/循环/恶意扩展。
+        if (data.format === 'json') {
+          try { canonicalJson(JSON.parse(utf8)); } catch {
+            throw refusal('DH_BUILD_SCHEMA_INVALID', 'selected JSON Reader resource contains invalid JSON data');
+          }
+        } else {
+          try {
+            const document = parseDocument(utf8, {
+              schema: 'core', strict: true, uniqueKeys: true,
+              version: '1.2', logLevel: 'silent', intAsBigInt: false,
+            });
+            if (document.errors.length > 0 || document.warnings.length > 0) throw new Error('YAML parse rejected');
+            const parsed: unknown = document.toJS({ maxAliasCount: 32 });
+            canonicalJson(parsed);
+          } catch {
+            throw refusal('DH_BUILD_SCHEMA_INVALID', 'selected YAML Reader resource contains unsafe or invalid YAML data');
+          }
+        }
+      }
+    }
+    visitingWorkflows.delete(key);
+  };
+  for (const manifest of packagesSorted) {
+    if (!manifest.workflowRoots?.length) continue;
+    const roots = [...manifest.workflowRoots];
+    const unique = new Set<string>();
+    for (const ref of roots) {
+      const key = workflowKey(ref);
+      if (unique.has(key)) {
+        throw refusal('DH_BUILD_SCHEMA_INVALID',
+          `Package '${manifest.id}' declares duplicate selected WorkflowRoot '${ref.element.id}/${ref.contentId}'`);
+      }
+      unique.add(key);
+      selectWorkflow(ref, manifest.id, 0);
+    }
+    selectedWorkflowRoots.set(manifest.id, roots);
+  }
+
   // 第 4 段：只为真正选中的 Function 查找恰好一个目标实现，并封存实现字节与声明资源的摘要。
   const sealedFunctions: SelectedFunction[] = [];
   for (const resolved of [...selectedFunctions.values()].sort(compareResolvedFunction)) {
@@ -751,6 +923,8 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       ...(pair.exit ? { exit: manifest.exit!, exitFunction: toFunctionRef(pair.exit) } : {}),
       initResources: [...initSelected.resources],
       imports: [...manifest.imports],
+      ...(selectedWorkflowRoots.has(manifest.id)
+        ? { workflowRoots: selectedWorkflowRoots.get(manifest.id)! } : {}),
       ...(manifest.recordInitFrom === true ? { recordInitFrom: true as const } : {}),
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
@@ -786,6 +960,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       selectedElements: sealedElements,
       selectedFunctions: sealedFunctions,
       hookBindings: [...hookBindings].sort(compareHookBinding),
+      ...(sealedWorkflows.size > 0
+        ? { selectedWorkflows: [...sealedWorkflows.values()].sort((a, b) =>
+            workflowKey(a.ref).localeCompare(workflowKey(b.ref))) } : {}),
+      ...(sealedWorkflows.size > 0
+        ? { trustedRuntimeIntegrity: TRUSTED_WORKFLOW_NPM_ARCHIVES.map((item) => ({ ...item })) } : {}),
       coreOrder,
       resourceDigests: scope.toLockMap(),
       excludedUnknownContent: [...excludedUnknownContent].sort(),

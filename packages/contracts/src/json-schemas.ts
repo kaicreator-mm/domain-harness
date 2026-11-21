@@ -312,6 +312,116 @@ export const FUNCTION_REF_JSON_SCHEMA: JsonObject = defsEnvelope(
   },
 );
 
+/** v0.11.1：Workflow 只扩展 ContentBlock 的机器内容，不更改 ElementDefinition 根 Schema。 */
+const WORKFLOW_TARGET_DEF: JsonObject = {
+  oneOf: [
+    {
+      type: 'object', additionalProperties: false, required: ['nodeId'],
+      properties: { nodeId: { type: 'string', pattern: IDENTIFIER_PATTERN } },
+    },
+    {
+      type: 'object', additionalProperties: false, required: ['terminal'],
+      properties: { terminal: { enum: ['COMPLETE', 'REJECT', 'ASK', 'WAIT', 'UNKNOWN', 'FAILED'] } },
+    },
+  ],
+};
+const WORKFLOW_SWITCH_DEF: JsonObject = {
+  type: 'object', additionalProperties: false, required: ['exits'],
+  properties: {
+    exits: {
+      type: 'array', minItems: 1, maxItems: 256,
+      items: {
+        type: 'object', additionalProperties: false, required: ['label', 'target'],
+        properties: {
+          label: { type: 'string', pattern: IDENTIFIER_PATTERN },
+          target: { $ref: '#/$defs/workflowTarget' },
+        },
+      },
+    },
+  },
+};
+const WORKFLOW_REF_DEF: JsonObject = {
+  type: 'object', additionalProperties: false, required: ['element', 'contentId'],
+  properties: {
+    element: { $ref: '#/$defs/elementRef' },
+    contentId: { type: 'string', pattern: IDENTIFIER_PATTERN },
+  },
+};
+const WORKFLOW_DATA_DEF: JsonObject = {
+  type: 'object', additionalProperties: false, required: ['format', 'resource', 'maxBytes'],
+  properties: {
+    format: { enum: ['json', 'yaml'] },
+    resource: { $ref: '#/$defs/resourceRef' },
+    maxBytes: { type: 'integer', minimum: 1, maximum: 1048576 },
+  },
+};
+const WORKFLOW_HOOKS_DEF: JsonObject = {
+  type: 'object', additionalProperties: false, minProperties: 1,
+  properties: {
+    start: { $ref: '#/$defs/functionRef' },
+    end: { $ref: '#/$defs/functionRef' },
+  },
+};
+const WORKFLOW_NODE_DEF: JsonObject = {
+  oneOf: [
+    {
+      type: 'object', additionalProperties: false,
+      required: ['id', 'kind', 'function', 'switch'],
+      properties: {
+        id: { type: 'string', pattern: IDENTIFIER_PATTERN },
+        kind: { const: 'function' },
+        function: { $ref: '#/$defs/functionRef' },
+        data: { $ref: '#/$defs/workflowData' },
+        hooks: { $ref: '#/$defs/workflowHooks' },
+        switch: { $ref: '#/$defs/workflowSwitch' },
+      },
+    },
+    {
+      type: 'object', additionalProperties: false,
+      required: ['id', 'kind', 'workflow', 'switch'],
+      properties: {
+        id: { type: 'string', pattern: IDENTIFIER_PATTERN },
+        kind: { const: 'workflow' },
+        workflow: { $ref: '#/$defs/workflowRef' },
+        switch: { $ref: '#/$defs/workflowSwitch' },
+      },
+    },
+  ],
+};
+/**
+ * 根执行预算在整个 child Workflow 树共享。所有真实业务 Function/Reader/Guard
+ * 及可选 start/end 调用均计数；底层 Package.Init/Exit 不计数。
+ */
+const WORKFLOW_DEFINITION_DEF: JsonObject = {
+  type: 'object', additionalProperties: false,
+  required: ['kind', 'schemaVersion', 'id', 'entryNodeId', 'maxElementCalls',
+    'maxDescendantWorkflowDepth', 'nodes'],
+  properties: {
+    kind: { const: 'Workflow' },
+    schemaVersion: { const: DH_WORKFLOW_SCHEMA_VERSION },
+    id: { type: 'string', pattern: IDENTIFIER_PATTERN },
+    entryNodeId: { type: 'string', pattern: IDENTIFIER_PATTERN },
+    maxElementCalls: { type: 'integer', minimum: 1, maximum: 100000 },
+    maxDescendantWorkflowDepth: { type: 'integer', minimum: 0, maximum: 32 },
+    nodes: { type: 'array', minItems: 1, maxItems: 10000, items: { $ref: '#/$defs/workflowNode' } },
+  },
+};
+export const WORKFLOW_DEFINITION_JSON_SCHEMA: JsonObject = defsEnvelope(
+  'workflow-definition.json',
+  WORKFLOW_DEFINITION_DEF,
+  {
+    resourceRef: RESOURCE_REF_DEF,
+    elementRef: ELEMENT_REF_DEF,
+    functionRef: FUNCTION_REF_DEF,
+    workflowRef: WORKFLOW_REF_DEF,
+    workflowTarget: WORKFLOW_TARGET_DEF,
+    workflowSwitch: WORKFLOW_SWITCH_DEF,
+    workflowData: WORKFLOW_DATA_DEF,
+    workflowHooks: WORKFLOW_HOOKS_DEF,
+    workflowNode: WORKFLOW_NODE_DEF,
+  },
+);
+
 export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
   'package-manifest.json',
   {
@@ -417,6 +527,7 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
           },
         },
       },
+      workflowRoots: { type: 'array', items: { $ref: '#/$defs/workflowRef' } },
       targetVariants: {
         type: 'array',
         items: {
@@ -468,6 +579,7 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
     },
     elementRef: ELEMENT_REF_DEF,
     functionRef: FUNCTION_REF_DEF,
+    workflowRef: WORKFLOW_REF_DEF,
   },
 );
 
@@ -611,6 +723,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
             exitFunction: { $ref: '#/$defs/functionRef' },
             initResources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
             imports: { type: 'array', items: { $ref: '#/$defs/functionRef' } },
+            workflowRoots: { type: 'array', items: { $ref: '#/$defs/workflowRef' } },
             recordInitFrom: { const: true },
             dependsOn: { type: 'array', items: { type: 'string', minLength: 1 } },
           },
@@ -651,6 +764,31 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
           },
         },
       },
+      trustedRuntimeIntegrity: {
+        type: 'array', minItems: 2, maxItems: 2,
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['name', 'version', 'integrity'],
+          properties: {
+            name: { enum: ['xstate', 'yaml'] },
+            version: { type: 'string', pattern: SEMVER_PATTERN },
+            integrity: { type: 'string', pattern: '^sha512-[A-Za-z0-9+/]+={0,2}$' },
+          },
+        },
+      },
+      selectedWorkflows: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['ref', 'ownerPackageId', 'definitionDigest', 'definition'],
+          properties: {
+            ref: { $ref: '#/$defs/workflowRef' },
+            ownerPackageId: { type: 'string', minLength: 1 },
+            definitionDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+            definition: { $ref: '#/$defs/workflowDefinition' },
+          },
+        },
+      },
       hookBindings: {
         type: 'array',
         items: {
@@ -681,115 +819,13 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
     functionRef: FUNCTION_REF_DEF,
     implementationLocator: IMPLEMENTATION_LOCATOR_DEF,
     resolvedTarget: RESOLVED_TARGET_DEF,
-  },
-);
-
-/** v0.11.1：Workflow 只扩展 ContentBlock 的机器内容，不更改 ElementDefinition 根 Schema。 */
-const WORKFLOW_TARGET_DEF: JsonObject = {
-  oneOf: [
-    {
-      type: 'object', additionalProperties: false, required: ['nodeId'],
-      properties: { nodeId: { type: 'string', pattern: IDENTIFIER_PATTERN } },
-    },
-    {
-      type: 'object', additionalProperties: false, required: ['terminal'],
-      properties: { terminal: { enum: ['COMPLETE', 'REJECT', 'ASK', 'WAIT', 'UNKNOWN', 'FAILED'] } },
-    },
-  ],
-};
-const WORKFLOW_SWITCH_DEF: JsonObject = {
-  type: 'object', additionalProperties: false, required: ['exits'],
-  properties: {
-    exits: {
-      type: 'array', minItems: 1, maxItems: 256,
-      items: {
-        type: 'object', additionalProperties: false, required: ['label', 'target'],
-        properties: {
-          label: { type: 'string', pattern: IDENTIFIER_PATTERN },
-          target: { $ref: '#/$defs/workflowTarget' },
-        },
-      },
-    },
-  },
-};
-const WORKFLOW_REF_DEF: JsonObject = {
-  type: 'object', additionalProperties: false, required: ['element', 'contentId'],
-  properties: {
-    element: { $ref: '#/$defs/elementRef' },
-    contentId: { type: 'string', pattern: IDENTIFIER_PATTERN },
-  },
-};
-const WORKFLOW_DATA_DEF: JsonObject = {
-  type: 'object', additionalProperties: false, required: ['format', 'resource', 'maxBytes'],
-  properties: {
-    format: { enum: ['json', 'yaml'] },
-    resource: { $ref: '#/$defs/resourceRef' },
-    maxBytes: { type: 'integer', minimum: 1, maximum: 1048576 },
-  },
-};
-const WORKFLOW_HOOKS_DEF: JsonObject = {
-  type: 'object', additionalProperties: false, minProperties: 1,
-  properties: {
-    start: { $ref: '#/$defs/functionRef' },
-    end: { $ref: '#/$defs/functionRef' },
-  },
-};
-const WORKFLOW_NODE_DEF: JsonObject = {
-  oneOf: [
-    {
-      type: 'object', additionalProperties: false,
-      required: ['id', 'kind', 'function', 'switch'],
-      properties: {
-        id: { type: 'string', pattern: IDENTIFIER_PATTERN },
-        kind: { const: 'function' },
-        function: { $ref: '#/$defs/functionRef' },
-        data: { $ref: '#/$defs/workflowData' },
-        hooks: { $ref: '#/$defs/workflowHooks' },
-        switch: { $ref: '#/$defs/workflowSwitch' },
-      },
-    },
-    {
-      type: 'object', additionalProperties: false,
-      required: ['id', 'kind', 'workflow', 'switch'],
-      properties: {
-        id: { type: 'string', pattern: IDENTIFIER_PATTERN },
-        kind: { const: 'workflow' },
-        workflow: { $ref: '#/$defs/workflowRef' },
-        switch: { $ref: '#/$defs/workflowSwitch' },
-      },
-    },
-  ],
-};
-/**
- * 根执行预算在整个 child Workflow 树共享。所有真实业务 Function/Reader/Guard
- * 及可选 start/end 调用均计数；底层 Package.Init/Exit 不计数。
- */
-export const WORKFLOW_DEFINITION_JSON_SCHEMA: JsonObject = defsEnvelope(
-  'workflow-definition.json',
-  {
-    type: 'object', additionalProperties: false,
-    required: ['kind', 'schemaVersion', 'id', 'entryNodeId', 'maxElementCalls',
-      'maxDescendantWorkflowDepth', 'nodes'],
-    properties: {
-      kind: { const: 'Workflow' },
-      schemaVersion: { const: DH_WORKFLOW_SCHEMA_VERSION },
-      id: { type: 'string', pattern: IDENTIFIER_PATTERN },
-      entryNodeId: { type: 'string', pattern: IDENTIFIER_PATTERN },
-      maxElementCalls: { type: 'integer', minimum: 1, maximum: 100000 },
-      maxDescendantWorkflowDepth: { type: 'integer', minimum: 0, maximum: 32 },
-      nodes: { type: 'array', minItems: 1, maxItems: 10000, items: { $ref: '#/$defs/workflowNode' } },
-    },
-  },
-  {
-    resourceRef: RESOURCE_REF_DEF,
-    elementRef: ELEMENT_REF_DEF,
-    functionRef: FUNCTION_REF_DEF,
     workflowRef: WORKFLOW_REF_DEF,
+    workflowDefinition: WORKFLOW_DEFINITION_DEF,
+    workflowNode: WORKFLOW_NODE_DEF,
     workflowTarget: WORKFLOW_TARGET_DEF,
     workflowSwitch: WORKFLOW_SWITCH_DEF,
     workflowData: WORKFLOW_DATA_DEF,
     workflowHooks: WORKFLOW_HOOKS_DEF,
-    workflowNode: WORKFLOW_NODE_DEF,
   },
 );
 

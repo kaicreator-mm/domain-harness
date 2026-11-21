@@ -634,6 +634,8 @@ test('R18 P1: caller-supplied external or unpinned root runtime dependencies are
   for (const runtimeDependencies of [
     { '@kaicreator/domain-harness-microkernel': '0.11.0', 'unselected-probe': '1.0.0' },
     { '@kaicreator/domain-harness-microkernel': '0.11.0', 'unselected-probe': 'file:../probe' },
+    { '@kaicreator/domain-harness-microkernel': '0.11.0', xstate: '^5.0.0', yaml: '2.9.1' },
+    { '@kaicreator/domain-harness-microkernel': '0.11.0', xstate: '5.33.2', yaml: '^2.9.0' },
     { '@kaicreator/domain-harness-microkernel': '0.11.1' },
   ]) {
     const scenario = standardCase();
