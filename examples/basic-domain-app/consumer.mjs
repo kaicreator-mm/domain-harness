@@ -804,6 +804,46 @@ async function runWorkflowE2E() {
   }
 }
 
+/** 可选 Exit/InitFrom 走真正组合安装与 Package.Init，不改 KDP/Kernel 实现。 */
+async function runOptionalLifecycleWorkflowE2E() {
+  const prepared = await authoring('workflow-no-exit-no-initfrom',
+    { minOrderTotal: 50, regions: ['EU', 'US'] },
+    { workflow: true, omitBusinessExit: true, omitBusinessInitFrom: true });
+  try {
+    const built = await buildApp(prepared.input);
+    assert.equal(built.ok, true, JSON.stringify(built));
+    if (!built.ok) throw new Error('optional lifecycle Workflow did not BUILD');
+    const selectedBusiness = built.lock.selectedPackages.find((pkg) => pkg.packageId === 'app-business');
+    assert.ok(selectedBusiness, 'selected business Package must be present');
+    const installed = await materialize('workflow-no-exit-no-initfrom', built);
+    globalThis.__domainHarnessT05Events = [];
+    const booted = await boot(installed.pin, installed.context);
+    assert.equal(booted.status, 'BOOTED', JSON.stringify(booted));
+    if (booted.status !== 'BOOTED') throw new Error('optional lifecycle Workflow did not Boot');
+    assert.equal(booted.app.status, 'READY');
+    const timeline = globalThis.__domainHarnessT05Events;
+    const businessInit = timeline.find((entry) => entry.event === 'package-init' && entry.package === 'app-business');
+    assert.ok(businessInit, 'optional business Package.Init must actually execute');
+    assert.equal(businessInit.initFrom, undefined, 'InitFrom remains truly absent when not enabled');
+    assert.equal(timeline.filter((event) => event.event === 'workflow-outcome').length, 1);
+    assert.equal(timeline.find((event) => event.event === 'workflow-outcome')?.outcome?.status, 'COMPLETE');
+    assert.equal(timeline.filter((event) => event.event === 'workflow-case').length, 12,
+      'all selected Task execution scenarios still work without Package.Exit/InitFrom');
+    assert.deepEqual(await booted.app.dispose(), { status: 'DISPOSED' });
+    assert.equal(timeline.filter((event) => event.event === 'package-exit' && event.package === 'app-business').length,
+      0, 'missing Package.Exit must be a no-op even after all ElementRun.end Hooks');
+    assert.ok(timeline.filter((event) => event.event === 'package-exit').length > 0,
+      'other Packages retain their separately declared Exit behavior');
+    await evidence('t14.workflow.optional-exit-initfrom', {
+      status: 'PASS', booted: true, workflow: 'COMPLETE', businessExitCount: 0,
+      noInitFrom: true, otherPackageExitRetained: true,
+    });
+    return { booted: true, businessExitOmitted: true, initFromOmitted: true };
+  } finally {
+    await rm(prepared.root, { recursive: true, force: true });
+  }
+}
+
 /** Actual production KDP ordering, not a mock SelectedWorkflowDriver. */
 async function runFatalWorkflowIntegration(fatalAt) {
   const prepared = await authoring(`workflow-fatal-${fatalAt}`,
@@ -874,6 +914,7 @@ async function main() {
   await evidence('content-exchange.lock-and-output', { status: 'PASS', a: a.install.lock.closureDigest, b: b.install.lock.closureDigest, observed: 'Init-selected Function returned A POS vs B NEG for total=100; B EU UNKNOWN' });
   const workflowAcceptance = await runWorkflowE2E();
   await evidence('t14.workflow.acceptance-matrix', { status: 'PASS', ...workflowAcceptance });
+  const lifecycleAcceptance = await runOptionalLifecycleWorkflowE2E();
   await runFatalWorkflowIntegration('start');
   await runFatalWorkflowIntegration('leaf');
 
