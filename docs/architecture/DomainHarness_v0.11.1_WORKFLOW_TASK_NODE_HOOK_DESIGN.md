@@ -1,3 +1,6 @@
+<!-- DH_V0111_R7_GENERIC_ELEMENT_NESTING_AND_FILE_READER_20261121 -->
+> **2026-11-21 L2 R7 Owner 补充（覆盖 R6 对数据适配的模糊表述）：** 不只有 Workflow 可以引用下层 Element，**任何 Element 都允许通过版本化引用进行嵌套组合和依赖**；同一子 Element 定义可在不同父级中复用，组合位点与运行实例独立。**数据 Element 不必内联数据或自带 JS Function**；其 ContentBlock 可通过现有 `ref: ResourceRef` 指向固定格式的 Package 文件，依赖通用 `FileReader/JsonReader` Element 解析后形成 Function 式可调用结果。通用 Reader Element 是一次定义、多个数据 Element 复用的真正能力，不能每个数据 Element 另造一套 Reader。0.11.0 的 `ContentBlock.ref` 是**资源引用**而不是 `ElementRef`；二者分开建模。详见下方 **§2A**。L1 增量范围纳入文件承载的只读数据和通用读取复用；不开放任意动态文件/Host 文件系统权限。
+
 # DomainHarness v0.11.1 — Element 统一调用 / 分层 Workflow / 定义-组合-执行三分法（L2 R6 候选）
 
 > 关联 [版本/L1 #1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)、[L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)、[总控 #1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)。**R6 覆盖本文件 R5「Task 是 Workflow 内定义、只能调用 Function」「一个 TaskRun 恰好一个 Actor」表述**，并保留 0.10 源码考古事实。仅为设计提议，非代码实现/Freeze。
@@ -40,6 +43,58 @@ STATUS=L2_R6_CANDIDATE_NOT_FROZEN
 - **Workflow Element**：Function 式调用是 `invokeWorkflow(input)`，内部进入 KDP 的通用 Machine，依次调用所引用子 Element；顶层返回 Workflow Outcome。Workflow 并非与 Element 并列的第二套定义/注册体系。
 
 既有 `FunctionOutcome=SUCCEEDED|UNKNOWN|FAILED` 与 Workflow 层 `COMPLETE|REJECT|ASK|WAIT|UNKNOWN|FAILED` 不应强制合并为同一个枚举。可在 BUILD 固化的 Workflow/业务映射中由领域 Element 形成任务决议；KDP 执行转换而不是推断缺失值或任意把 UNKNOWN 当 FALSE。
+
+## 2A. Element 之间的嵌套与依赖：任何 Element 都可用，不局限 Workflow
+
+```text
+OrderWorkflow Element  ──composes──► ProductData Element ──depends-on──► JsonReader Element
+                     ├─composes──► PricingData Element ──depends-on──► JsonReader Element
+                     └─composes──► CheckPrice Element ──depends-on──► ProductData Element
+```
+
+- **嵌套/组合（`composes`）**：一个 Element 通过 `ElementRef` 声明它引用的下层 Element，形成可多级展开的共享定义图；引用位点可以有局部参数/作用域/输入输出映射，但**不是复制或内联重定义子 Element**。这不限于 Workflow：数据聚合、规则组合、任务组合也可以使用；只有具有 `workflow-definition` 的组合才由 KDP 按 XState Workflow 执行。
+- **依赖（`dependsOn`）**：一个 Element 使用另一个 Element 提供的具名能力，如 `ProductData` 依赖 `JsonReader.read`。依赖意味着 BUILD 要求被依赖者进入选定闭包、版本/摘要/入口与可用性可解析，但**不代表依赖本身会在运行时自动执行或创建子 Actor**。0.11.0 已有 `ElementDefinition.dependencies[]` 可作为起点。
+- **Workflow 转移（`transition`）**：状态事件和 Guard 决定运行时从当前引用位点转向另一位点；仅对 Workflow 的执行图有效。Transition 可以有构建期预算约束的环；静态的嵌套/依赖组合图不能通过 A→B→A 无限递归。
+- **静态图检查**：BUILD 分别解析 `composes` 和 `dependsOn`，并对其合并后的真正“构建/装配前置”关系做无环检查，禁止用交叉关系绕开依赖闭包；Domain 的普通语义关系另按语义模型处理，可以有循环。共享子节点使结构成为 **DAG 而非必须是一棵私有所有权树**；一个 Parent 是否能拥有子 Element 的可见性也由 BUILD/Package 声明处理。
+- **身份**：`ElementRef` 标识唯一版本化定义；组合边标识该父上下文内的引用位置；运行实例用 `rootRunId + path + visit`。一般静态非 Workflow Element 的数据/语义组合无需自动创建 Actor。
+
+### 通用文件 Reader Element 是可复用的能力，而不是每份数据的 JS 封装
+
+0.11.0 的源码已提供：
+- [`ContentBlock`](https://github.com/kaicreator-mm/domain-harness/blob/b8e5c2bc6eee8615bbc9aabcdb3afd4aa2baa6b2/packages/contracts/src/element-contracts.ts) 有 `value?: JsonValue` 或 `ref?: ResourceRef`；`contentKind='structured-data'` 已存在；`ResourceRef={packageId,path,digest}`。**ResourceRef 是原始文件身份，不是子 Element 身份**。
+- [`ElementDefinition.dependencies`](https://github.com/kaicreator-mm/domain-harness/blob/b8e5c2bc6eee8615bbc9aabcdb3afd4aa2baa6b2/packages/contracts/src/element-contracts.ts) 已能声明被依赖 Element 及 Function。
+- [`AppInitContext.resources`](https://github.com/kaicreator-mm/domain-harness/blob/b8e5c2bc6eee8615bbc9aabcdb3afd4aa2baa6b2/packages/contracts/src/app-contracts.ts) 为**已选只读资源句柄**，`read():Promise<Uint8Array>`；[PackageSystem.resourceHandle](https://github.com/kaicreator-mm/domain-harness/blob/b8e5c2bc6eee8615bbc9aabcdb3afd4aa2baa6b2/packages/microkernel/src/package-system.ts) 检查封存资源闭包和字节摘要。这是现有受信资源能力；**不能将其误认为已具备通用按格式读取/解析/Element 依赖调用的完整功能**。
+
+推荐的最小方案：
+
+```text
+Element JsonReader@1
+  callable: read(resource bytes) -> Parsed JSON
+  semantic role: pure/readonly (effects=none)
+  build-selected implementation: one generic parser
+
+Element ProductData@1
+  ContentBlock(kind=structured-data, ref=ResourceRef("data/products.json", sha256))
+  dependencies: [JsonReader@1 / read]
+  callable projection: read(...) -> ProductData value (uses selected JsonReader)
+  
+Element PricingData@1
+  ContentBlock(kind=structured-data, ref=ResourceRef("data/prices.json", sha256))
+  dependencies: [JsonReader@1 / read]
+  callable projection: read(...) -> PricingData value (same JsonReader definition)
+
+Workflow Checkout@1
+  nodes[] references ProductData, PricingData, PriceCalculator, ...
+```
+
+- **Reader 是通用 Element**：每种已支持固定格式可以有一个共享 Reader Element（0.11.1 先验证一种可复现格式，如 JSON）；它公开明确的只读/解析调用能力，文件来源与业务含义由上层数据 Element 声明，不能把业务 Schema/业务知识固化到 Reader。
+- **数据来源和执行手段解耦**：数据 Element 主要声明固定格式资源/适用范围/读取依赖，不需要在它自己定义里嵌入 JS Function。BUILD 选定 Reader 能力和需要的 Data read projection；统一的 Element 调用视图可以通过 BUILD 生成/绑定 adapter 来实现，不改旧 Stage0 `functions[]` 的零/多条既有语义。
+- **时机**：生产/BUILD 可以预解析固定文件并封存数据，或保留随包封存的原始文件，在 App 初始化/已选只读资源调用路径读/解析；真正运行时读取必须走**已选只读资源句柄或等价已经被封存的 Package 内权限**，不得凭参数字符串开放任意磁盘路径。
+- **错误归属**：格式合法性/解析器兼容性/资源闭包/依赖唯一性应在 BUILD/包生产和测试中检验；Package/Reader 处理读取与解析业务失败并返回明确 `UNKNOWN/FAILED`；KDP/SDK 仅保留 0.11.0 原有资源/摘要/Schema/启动校验，不扩建通用业务解析校验系统。
+- **边界**：0.11.1 的目标是**只读、固定格式、已选随 Package 封存的文件**；运行时任意文件路径、外部目录、动态文件修改、文件写入/网络读取属于后续 0.11.4 Host 授权/Effect，不被只读 Reader Element 绕开。
+- **最小测试**：两份不同固定文件数据 Element 共用同一个 Reader Element；第三个 Element 通过依赖使用其中一个数据 Element；一个复合非 Workflow Element 引用多个子 Element；重复引用不复制定义或互相串数据；缺失 Reader、静态组合环、未知文件格式、坏字节/摘要和非选资源被拒绝；原 Stage0 校验回归。
+
+> **0.11.1 仅确立可复用通用 Reader 的一个固定格式最小实现**，不建设覆盖所有格式、动态文件系统/外部 Host、多 Provider 的泛用 ETL/数据解析平台。新增格式后续通过新增独立 Reader Element 复用，而不是扩充 Kernel 专用代码。
 
 ## 3. 三个互不混淆的身份
 
