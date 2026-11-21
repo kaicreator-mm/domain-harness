@@ -9,6 +9,7 @@ when:
         - 'tooling/**'
         - 'scripts/**'
         - 'examples/basic-domain-app/**'
+        - 'examples/selected-packages/**'
         - '.agents/**'
         - 'package.json'
         - 'package-lock.json'
@@ -33,6 +34,7 @@ clone:
         - tooling
         - scripts
         - examples/basic-domain-app
+        - examples/selected-packages
         - .agents
 steps:
   - name: verify
