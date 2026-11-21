@@ -35,7 +35,15 @@ Domain App（宿主 / 业务入口，嵌入 DomainHarness SDK）
 
 这里的箭头是**分层职责与启动/依赖理解**，不是要求每层恰好只有一个 Package，也不是替换现有的 `Core.Order`、显式 Extension 依赖和唯一 Boot/KDP 调度规则。当前受审 Manifest 的 `PackageLayer='kernel'|'sdk'|'business'` 已具有三层逻辑身份；Package 内统一用相同 Manifest/Element/Function/Init/Exit 合同。
 
-**Kernel 与 SDK 是否合为一个物理 Domain Package：尚待源码与真实 Consumer 比较，不得预设合并。** 当前一个 Package 的 `layer` 只能属于三者之一，把 Kernel/SDK 合并成同一 Manifest 会改变现有层级身份和 Core/Extension 权限边界。优先保持独立逻辑 Package；如果需要减小分发复杂度，可在**同一个 SDK 安装/分发产物**中共同携带多个逻辑 Package，而不改变各自 Manifest 与权限。只有实证表明单个 Manifest 的收益超过信任、版本、替换与测试隔离成本，才能另作显式 L2 决议，并完成合同/回归的增量审核。
+### KDP 稳定内核 + 按 Domain App 选择 SDK 功能（Owner R39）
+
+**KDP 是 DomainHarness SDK 稳定且必须存在的最小 Kernel 部分**，属于 `layer='kernel'` 的 Kernel Domain Package，`Core.Order=0`；“稳定”指明确、版本化、固定选定的 Boot/KDP 基础合同，**不是永不升级**，也不代表所有 SDK 功能都必须固化进 KDP。Boot 继续是 Package 外最小可信引导，只有一个 Kernel/Package System。
+
+**SDK Domain Packages 是可以组合、按实际 Domain App 需求选定的功能层**。构建/组合某个 App 时，从已有且符合规范的 SDK Packages 中选择真正需要的功能/扩展及依赖，形成确定性的 Target/Package/Function/Resource/Lock/Pin 闭包；不应让每个 App 无条件携带全部可选 SDK 功能。SDK Package 的选择不是生成新的 Package，也不要求 DomainForge、生成器或第二 BUILD。
+
+**物理分发允许融合**：同一个 SDK 安装包、App bundle、可执行产物中，可以把 KDP 与本 App 已选的 SDK Package 代码及资源一起封装，甚至编译/链接为一个物理模块或二进制，前提是仍能证明原先每个**逻辑 Package 的身份、层级、Element/FunctionRef、显式依赖/导出权限、唯一 Core.Order/Init/Exit、已选 Target、摘要与可信安装**的等价语义；不允许物理融合后通过裸 import、全局调用或丢失 Lock 归属来绕过这些约束。未选 SDK 功能不进入闭包。
+
+这区分两种“合并”：**物理打包/静态链接融合是允许的分发优化**，不要求在运行时分别加载相同物理文件；**把 Kernel 与 SDK 改为同一个 `DomainPackageManifest` 或取消 `kernel|sdk|business` 逻辑边界不是当前要求**，在单一 `layer` 既有合同下仍需单独 L2 决议、正反例和增量审核。即使单一物理 artifact，也必须可审计地映射到多个已选逻辑 Package。
 
 ## 2. Domain Package 的文件构成
 
@@ -51,14 +59,14 @@ Domain App（宿主 / 业务入口，嵌入 DomainHarness SDK）
 ## 3. 构建 SDK/Domain App，不等于“生成 Package”
 
 ```text
-[手工/Agent 编写的 K / S / B Domain Packages 多文件]
+[已有/手工编写的 KDP + 可选 SDK + Business Domain Packages 多文件]
                          ↓
      SDK 组合所需 Package / 依赖 / Target / Lock / Pin
              （静态校验和确定性封存）
                          ↓
  Domain App 内嵌 DomainHarness SDK：Boot → KDP(0)
                          ↓
-      已选 Kernel → SDK → Business Domain Packages
+      已选 Kernel → 按 App 需要选择的 SDK → Business Packages
        （实际 Init 顺序依唯一 Core.Order/显式依赖）
                          ↓
            Domain App 的业务 Workflow/Function
