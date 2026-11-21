@@ -218,8 +218,8 @@ for (const [label, raw] of [
 
 test('T12 R1: selected Workflow refuses a composed package without exact trusted runtime dependencies', (t) => {
   const { input } = workflowCase(t, { format: 'yaml', withData: true });
-  const runtimeDependencies = { ...input.runtimeDependencies };
-  delete runtimeDependencies.xstate;
+  const { xstate: ignored, ...runtimeDependencies } = input.runtimeDependencies;
+  void ignored;
   rejected(buildApp({ ...input, runtimeDependencies }), 'DH_BUILD_TARGET_INVALID');
 });
 
