@@ -59,4 +59,51 @@ for (const workspace of monorepo.workspaces) {
     '测试 Typecheck 未包含 tests 目录：' + workspace);
 }
 
+// 非阻断代码体积审计：语法树只测可执行函数体，声明式 Schema 与独立测试不以文件行数判错。
+const sizeWarnings = [];
+function collectSizeWarnings(file, source, { production = true } = {}) {
+  const fileLines = source.split('\n').length;
+  const maxFileLines = production ? 500 : 600;
+  if (fileLines > maxFileLines) {
+    sizeWarnings.push(`文件 ${file}：${fileLines} 行，建议按职责检查（阈值 ${maxFileLines}）`);
+  }
+  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true,
+    file.endsWith('.mjs') ? ts.ScriptKind.JS : ts.ScriptKind.TS);
+  const limit = production ? 100 : 200;
+  function walk(node) {
+    if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) ||
+         ts.isConstructorDeclaration(node) || ts.isArrowFunction(node) ||
+         ts.isFunctionExpression(node)) && node.body) {
+      const lines = source.slice(node.body.getStart(ast), node.body.getEnd()).split('\n').length;
+      if (lines > limit) {
+        const name = node.name?.getText(ast) ??
+          (node.parent && ts.isVariableDeclaration(node.parent)
+            ? node.parent.name.getText(ast) : '匿名函数');
+        const firstLine = ast.getLineAndCharacterOfPosition(node.getStart(ast)).line + 1;
+        sizeWarnings.push(`函数 ${file}:${firstLine} ${name}：${lines} 行（阈值 ${limit}）`);
+      }
+    }
+    ts.forEachChild(node, walk);
+  }
+  walk(ast);
+}
+for (const dir of dirs) {
+  for (const file of await scan(dir)) {
+    collectSizeWarnings(file, await readFile(new URL(file, root), 'utf8'));
+  }
+}
+for (const dir of ['packages/contracts/tests','tooling/build/tests',
+    'packages/microkernel/tests','packages/domain-harness/tests']) {
+  for (const file of await scan(dir)) {
+    collectSizeWarnings(file, await readFile(new URL(file, root), 'utf8'), { production: false });
+  }
+}
+for (const file of ['examples/basic-domain-app/consumer.mjs',
+    'examples/basic-domain-app/verify-clean-install.mjs']) {
+  collectSizeWarnings(file, await readFile(new URL(file, root), 'utf8'), { production: false });
+}
+if (sizeWarnings.length > 0) {
+  console.warn(`代码体积维护性提示（${sizeWarnings.length} 项，非阻断）：\n` +
+    sizeWarnings.map((warning) => ' - ' + warning).join('\n'));
+}
 console.log('源码命名、公共包根与全 Workspace 测试类型检查结构通过');
