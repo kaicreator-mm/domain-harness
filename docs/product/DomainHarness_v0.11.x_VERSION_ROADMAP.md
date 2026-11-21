@@ -23,6 +23,10 @@
 
 **DH 自身基于 Domain Package 构成**：直接编写当前基础 Packages → 按实际合同验证与 Boot → 交付可安装/可复用 SDK；后续直接编写更新 Package 文件，以同一 SDK 能力构成新版 SDK 和真实 Consumer。不需要“编译器生成编译器”的工具自举，也不要求 Forge 或生成平台参与。真实 SDK/Consumer/权限/版本/资源与必要独审仍必须验证。
 
+**【R37 实践驱动的规范完善】**：当前 DIS/Domain Package 与 DomainHarness SDK 的细节**尚未完全明确**，不强求 0.11.x 启动前先冻结全部规范。每个版本以**实际 Package 多文件实例 + 真实 SDK Consumer + 正/反例**推进，识别规范 `CONFIRMED / PROPOSED / UNKNOWN / NOT_APPLICABLE` 范围，把必要、可复用的合同写回版本 Product/L2/Contracts/测试，再按实际改动进行独立增量审核。已明确且当前适用的安全/身份/权限/Target/Boot 义务保持执行；不把缺失的全域 DIS 形式资格当作本版已通过，也不因不影响当前任务的未知项停工。
+
+**【R37 验证工具与生成方式正交】**：Package 可以由我/人/Agent 直接编写，**允许额外按需实现轻量验证工具**，检查 Manifest/Element/Function/依赖/Target/资源摘要及实际安全负例。验证器检查文件是否满足**当前明确适用**的规范，不创造 Package、不决定谁可写 Package。可以将来复用于 Forge，但 Forge 仍 DEFERRED，**不要求现在写 Forge 或新增独立 Build/Assembly 平台，也不以验证工具存在为 Package 创建前置**。该工具的静态 PASS 不能替代真实 SDK Consumer、DIS Full Conformance 或新增独立权限证明。主要实施准则：[R37 活规范与直接 Package 文件](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)。
+
 **最新权威候选**：[R36 Package 文件/SDK 规范](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) / [R36 三名称与直接文件](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md) / [历史 BUILD 源码职责审计](../architecture/DomainHarness_v0.11.x_LEGACY_BUILD_OWNERSHIP_AUDIT.md)。以下 R4/R29 中“完整 BUILD 必须生成 Package”“自举只可选”等为历史讨论，不得覆盖 R36。0.11.0/0.11.1 原已受审且未变的安全源码结论继续限定复用，0.11.2–0.11.9 的 Product/L1/L2/Task/PR 均必须遵循新边界。
 <!-- /DH_V011X_R33_SDK_FORGE_OWNER_CORRECTION_20261122 -->
 
