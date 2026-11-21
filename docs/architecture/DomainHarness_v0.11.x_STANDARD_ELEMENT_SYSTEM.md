@@ -1,5 +1,8 @@
 # DomainHarness 0.11.x — Standard Element 体系与递增复用规范（R29）
 
+> **【R36 当前 Standard Element Package 生成方式】**：Standard Element 也是普通多文件 Domain Package 的内容；可以由 ChatGPT/开发者直接编写 ElementDefinition、Manifest、Function ESM、资源并按 DIS 适用 + v0.11.x 实际合同验证。**不需要 Seed Builder、生成器或额外 Package Assembly 生产阶段**；组合 App 只选择/校验使用的文件、依赖、Target 和 Boot。参见 [R36](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
+
+
 > **【R34 SDK 内 Standard Element 归属】** Standard Element 是扩展 DomainHarness **SDK 的普通可选 Domain Package**；它不承担 Forge 对新业务 Domain Packages 的生成/编译，不自动提供不受信 BUILD。Domain/Harness/SDK 的全名定义及 DH-only 临时 Seed Builder 仅服务自身初始基础 Package，见 [R34](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_AND_BOOTSTRAP_SEED.md)。
 
 
