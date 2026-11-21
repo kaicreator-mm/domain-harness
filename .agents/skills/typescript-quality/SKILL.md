@@ -10,6 +10,7 @@ description: DomainHarness 的 TypeScript 源码设计、重构、审查、中�
 - **架构**：仅 Contracts/BUILD/Microkernel/SDK 一套职责和公共入口。旧源码通过 Git 历史追溯，不在当前源码树中保留兼容或二次实现。
 - **命名**：领域含义命名 `Element`、`BuildInput`、`buildApp`；不得出现 `V10ScopedSubscriptionEvent`、`V011BuildInput`、`buildV011App`、`src/v011`、`./legacy`。npm 版本号和机器序列化 schemaVersion 不属于版本化标识符禁令。
 - **类型**：严格 TypeScript；`unknown` 收敛输入，尽量采用只读数据、判别联合、确定性错误码；不得通过 `any`、粗暴断言或默认成功掩盖未知条件。
+- **选型与复用**：先用 Node.js/JavaScript 原生能力和仓库现有可信依赖，再评估成熟、维护活跃、许可证合适且兼容 Node 22/ESM 的库；不自行实现通用解析器、加密、Schema 验证或状态机来替代合适的成熟方案。新依赖与自实现均遵循 [防回归手册 §1.1](../../../docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md) 的取舍和验证要求，避免不必要的依赖/框架。
 - **边界**：BUILD 负责编译与封存，Runtime 只读取 Pin/Lock 中选定资源；禁止运行期二次构建和未声明资源执行。
 - **注释**：全部新代码、改动代码的注释和 JSDoc 必须为中文。解释不变量、生命周期与失败理由；不能保留与当前实现不符的旧版本注释。编译器指令 `@ts-expect-error` 保持语法，说明文字使用中文。
 - **日志**：固定事件名、分级、有限状态；不得记录 Token、凭据、原始错误和未验证的用户字段。
