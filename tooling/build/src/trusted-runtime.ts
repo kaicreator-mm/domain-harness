@@ -103,6 +103,42 @@ for (const [index, archive] of manifest.archives.entries()) {
 console.log('DH_TRUSTED_RUNTIME_PREINSTALL_APPROVED');
 `;
 
+/**
+ * 唯一支持的 Workflow 运行时依赖安装入口：先用 npm 的 lock-only 原生能力解析元数据，
+ * BUILD 封存的校验器核对受限依赖/精确 SRI，再执行禁用全部安装脚本的 npm ci。
+ * 不以 npm install 的即时解析结果直接安装第三方代码。
+ */
+export const TRUSTED_RUNTIME_INSTALL_MODULE = `import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+const artifacts = process.argv.slice(2);
+if (artifacts.length !== 2 || artifacts.some((value) => !value.endsWith('.tgz'))) {
+  throw new Error('DH_TRUSTED_RUNTIME_FIRST_PARTY_TARBALLS_REQUIRED');
+}
+const cli = process.env.npm_execpath;
+const nativeNpm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const command = cli ? process.execPath : nativeNpm;
+const prefix = cli ? [cli] : [];
+const options = {
+  cwd: root, stdio: 'inherit',
+  env: { ...process.env, npm_config_ignore_scripts: 'true' },
+};
+function run(command, args) {
+  const result = spawnSync(command, args, options);
+  if (result.error || result.status !== 0) {
+    throw new Error('DH_TRUSTED_RUNTIME_INSTALL_FAILED:' + (result.error?.message ?? result.status));
+  }
+}
+const flags = ['--ignore-scripts', '--no-audit', '--no-fund'];
+run(command, [...prefix, 'install', '--package-lock-only', ...flags, ...artifacts]);
+run(process.execPath, [join(root, 'dh-install', 'verify-preinstall.mjs')]);
+run(command, [...prefix, 'ci', ...flags]);
+run(process.execPath, [join(root, 'dh-install', 'verify-runtime.mjs')]);
+console.log('DH_TRUSTED_RUNTIME_INSTALLED');
+`;
+
 /** 随 App 封装可执行的一方校验器，不依赖 npm 安装生命周期 Hook。 */
 export const TRUSTED_RUNTIME_VERIFY_MODULE = `import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
