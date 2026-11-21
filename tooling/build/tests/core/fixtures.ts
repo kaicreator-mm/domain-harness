@@ -122,7 +122,6 @@ export function descriptor(options: {
   target?: DomainAppDescriptor['target'];
   roots: DomainAppDescriptor['roots'];
   extensions?: DomainAppDescriptor['extensions'];
-  businessAppInit: FunctionRef;
   ingress?: DomainAppDescriptor['ingress'];
 }): DomainAppDescriptor {
   return {
@@ -133,7 +132,6 @@ export function descriptor(options: {
     target: options.target ?? { runtime: 'node', module: 'esm', nodeMajor: 22 },
     roots: options.roots,
     extensions: options.extensions ?? [],
-    businessAppInit: options.businessAppInit,
     ingress: options.ingress ?? [],
   };
 }
