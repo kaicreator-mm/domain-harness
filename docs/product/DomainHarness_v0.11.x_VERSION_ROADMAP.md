@@ -52,6 +52,18 @@ NODE_MINIMUM=22.12.0
 - **只有 0.11.0–0.11.9 全部必需能力通过一次最终组合验收**，才创建唯一正式 `main` PR、受控合并并形成正式 Tag/GitHub Release；不预先把版本阶段号等同正式 SemVer Tag。npm Publish 不是默认必需动作。
 - 本轮只固定版本阶段和目标，不因规划确认就自动启动 0.11.1 实施、创建 Task Issue 或宣称未来功能合格。各版本按实际开工时明确具体 PRD/AC 和验收责任，避免无限扩张。
 
+## 2.1 标准 Element 体系：所有阶段复用优先，逐步积累（R29 新增规范）
+
+**强制设计原则：** `0.11.1–0.11.9` 期间发现跨领域、语义稳定、可通过普通 Element/Function/Content 合同封装的公共能力时，优先提取为 **Standard Element**，后续版本以 BUILD 显式选定、直接 Extension/Import 复用为默认路径；不能每次编写新的通用 Reader、状态机规则、Guard/Validator/Selector。不是“所有功能都 Element 化”：Node 标准库/纯基础安全机制和 KDP/BUILD/Lock/Boot 权限与执行引擎继续留在 Engine 层。
+
+- **三层架构**：Contracts/BUILD/Lock/KDP primitives → **Standard Elements（可选普通 Package）** → **Domain Elements**。Standard 是资产资格，不是新 `ElementDefinition.kind`、额外 Runtime、全局注册中心或对 BUILD 权限的例外。
+- **从已接受的 0.11.1 开始提取**：demo `jsonReader/yamlReader` 目前并非独立标准包；真实 JSON/YAML 解析还在 `workflow-execution.ts`。优先归一到同一套真正可重复使用的 Reader Element，并把可信资源/UTF-8/大小/摘要授权保留在现有 BUILD/KDP；**不能保留两套有不同安全语义的解析器**。XState Actor 引擎继续在 KDP，只提取跨领域的声明式状态模型、具名 Transition/Guard 模板为标准 Element/Content，不创造第二 Workflow Runtime。
+- **实施责任**：v0.11.2 [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) 在新领域语义代码前优先消费/提取第一批 JSON/YAML Readers，按真实需要提取状态转换模板；后续各版每次先做最小 Catalog/复用检查。保留各版本唯一主 Issue 和原范围，不重开 0.11.1 已接受任务来要求重新全量测试。
+- **标准资格**：`CANDIDATE → STANDARD_ACCEPTED → DEPRECATED/REPLACED`，仅在具体版本、Function/Schema/权限、真实跨场景 clean-packed 调用、必要正反例及独立 Exact-SHA 审核后提升。只更新 Catalog 与本阶段必要代码，无人为数量目标、永久任务和行政 Gate。
+- **完整且优先适用的技术规范**：[Standard Element 体系与递增复用规范](../architecture/DomainHarness_v0.11.x_STANDARD_ELEMENT_SYSTEM.md)。所有后续版本 L1/L2、Task/PR 必须先复用已存在、语义适用的 Standard Element；若不使用，留下具体技术理由，不自动复制业务无关的解析器和流程组件。
+
+**当前真实状态**：v0.11.1 已按 R27 Product/L1/L2 `ACCEPT_SCOPED`、T11–T14 全部完成并合入；版本列车 `3145104258a4da5f8cc940482ff77322b97d6cf6`。本 R29 只是新增跨版本复用规范，**首批 Standard Element 源码提取仍为 CANDIDATE/NOT_IMPLEMENTED**；不将已接受的 T14 示例 Reader 谎称已发布的标准库。不单独对外发行 v0.11.1，整个 0.11.x 完成后统一 main/Release。
+
 ## 3. 版本正式划分：按照 Harness/Agent 纵向闭环逐步完善
 
 | 阶段 | 版本定位 | 本阶段主要交付 | 独立验收结果 |
