@@ -1,5 +1,8 @@
 # DomainHarness v0.11.0 · B0 Element-First Foundation 规范增量
 
+> **【R36 当前产品定义优先】**：本 B0 的有效工作对象是 ChatGPT/开发者也可直接编写的**多文件 Domain Package**，遵循 DIS 适用合同和 v0.11.x Element-First/Boot 安全约束。**Package 不是由 Build/Seed 工具赋予身份**；不要求开发生成器或单独 Assembly 流程。已有必要静态验证、摘要/Pin、Core.Order、Direct Extension 和 Boot 仍按实际 App 目标执行。详见 [R36](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
+
+
 > **【R34 明确完整产品语义】** 0.11.x 唯一目标是 Domain（有界语义/知识/规则）+ Harness（受控执行和经验闭环）+ SDK（可嵌入的 Boot/Domain Package 组合和公共 API）形成完整 **DomainHarness SDK**。可在 DH 仓库暂留仅自用基础 Package 的 Seed Builder，不将全业务生产纳入 SDK。见 [R34 三名称与自举](DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_AND_BOOTSTRAP_SEED.md)。
 
 
