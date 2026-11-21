@@ -286,6 +286,35 @@ test('DH_BUILD_HOOK_TARGET_INVALID: contribution to an undeclared hook', (t) => 
   expectRefusal(buildApp(input), 'DH_BUILD_HOOK_TARGET_INVALID');
 });
 
+test('BUILD rejects undeclared final generated ESM import even when an indirect Package is selected', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
+    new TextEncoder().encode("import 'aaa-ext';\\nexport function init() { return { status: 'READY' }; }\\nexport function exit() {}\\n"));
+  const packages = input.packages.map((pkg) =>
+    pkg === business ? {
+      ...business,
+      dependsOn: business.dependsOn.filter((dep) => dep.package !== 'aaa-ext'),
+      init: { module: source, exportName: 'init' },
+      exit: { module: source, exportName: 'exit' },
+    } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('BUILD refuses a declared Init when the final artifact lacks the actual export', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/sdk.mjs',
+    new TextEncoder().encode("export function exit() {}\\n"));
+  const packages = input.packages.map((pkg) =>
+    pkg === sdk ? { ...sdk, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' } } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_SCHEMA_INVALID');
+});
+
 test('BUILD rejects duplicated Core.Order', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
