@@ -66,7 +66,6 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
         packageId: 'rules-package', path: relativePath,
         digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
       },
-      expected: JSON.parse(JSON.stringify({ id, result: Number(id.endsWith('a') ? (format === 'json' ? 1 : 3) : (format === 'json' ? 2 : 4)) })),
     };
   }
   // Four separate public, zero-Function Data Elements expose the exact resource
@@ -83,6 +82,11 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
     }],
     functions: [],
   }));
+  const ruleDependency = app.dependencies.find((entry) => entry.element === 'basic.rules');
+  if (!ruleDependency || !Array.isArray(ruleDependency.functions)) {
+    throw new Error('T14 fixture must preserve direct Element dependency on basic.rules');
+  }
+  ruleDependency.functions.push('jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow');
   app.dependencies.push(...dataElements.map((el) => ({ element: el.id, version: el.version })));
   const jsonReader = ref(rules, 'jsonReader');
   const yamlReader = ref(rules, 'yamlReader');
