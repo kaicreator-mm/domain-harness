@@ -109,10 +109,20 @@ export async function endWorkflow() {
   events.push({ event: 'workflow-hook', kind: 'end' });
   return { kind: 'SUCCEEDED', value: {} };
 }
+export function workflowDecision(input) {
+  events.push({ event: 'workflow-decision', route: input?.route, session: input?.session });
+  if (input?.route === 'UNKNOWN') {
+    return { kind: 'UNKNOWN', unknownReason: { code: 'T14_BUSINESS_UNKNOWN', message: 'business fact not known' } };
+  }
+  if (input?.route === 'FAILED') {
+    return { kind: 'FAILED', failure: { code: 'T14_BUSINESS_FAILED', message: 'explicit business failure' } };
+  }
+  return { kind: 'SUCCEEDED', value: { route: input?.route, session: input?.session ?? null } };
+}
 ` : ''}
 `;
 }
-function businessModule(withUnsupportedEffect, initThrows = false, initDegraded = false, selectedEvaluateKey = '', workflowRefJson = '') {
+function businessModule(withUnsupportedEffect, initThrows = false, initDegraded = false, selectedEvaluateKey = '', workflowRefJson = '', workflowCasesJson = '') {
   return `
 import { evaluate, initializeRule } from 'rules-package/rules';
 const events = (globalThis.__domainHarnessT05Events ??= []);
@@ -143,6 +153,36 @@ ${workflowRefJson ? `
   const outcome = await ctx.workflows.start(${workflowRefJson}, { origin: 'Package.Init' });
   events.push({ event: 'workflow-outcome', outcome });
   if (outcome.status !== 'COMPLETE') throw new Error('Selected Workflow rejected startup');
+` : ''}
+${workflowCasesJson ? `
+  events.push({ event: 'workflow-cases-begin' });
+  const caseRefs = ${workflowCasesJson};
+  const cases = [
+    ['single', 'single-flow', {}, 'COMPLETE'],
+    ['complete', 'decision-flow', { route: 'COMPLETE', session: 'A' }, 'COMPLETE'],
+    ['ask', 'decision-flow', { route: 'ASK', session: 'B' }, 'ASK', 'DH_WORKFLOW_TERMINAL'],
+    ['wait', 'decision-flow', { route: 'WAIT', session: 'C' }, 'WAIT', 'DH_WORKFLOW_TERMINAL'],
+    ['reject', 'decision-flow', { route: 'REJECT', session: 'D' }, 'REJECT', 'DH_WORKFLOW_TERMINAL'],
+    ['unknown', 'decision-flow', { route: 'UNKNOWN', session: 'E' }, 'UNKNOWN', 'T14_BUSINESS_UNKNOWN'],
+    ['failed', 'decision-flow', { route: 'FAILED', session: 'F' }, 'FAILED', 'T14_BUSINESS_FAILED'],
+    ['unmatched', 'decision-flow', { route: 'UNDECLARED', session: 'G' }, 'FAILED', 'DH_WORKFLOW_ROUTE_UNMATCHED'],
+    ['repeat-ask', 'decision-flow', { route: 'ASK', session: 'H' }, 'ASK', 'DH_WORKFLOW_TERMINAL'],
+    ['reservation', 'budget-flow', {}, 'FAILED', 'DH_WORKFLOW_CALL_BUDGET'],
+    ['shared-budget', 'shared-budget-flow', {}, 'FAILED', 'DH_WORKFLOW_CALL_BUDGET'],
+    ['ancestor-depth', 'depth-flow', {}, 'FAILED', 'DH_WORKFLOW_DEPTH_LIMIT'],
+  ];
+  for (const [name, refId, input, expectedStatus, expectedCode] of cases) {
+    const result = await ctx.workflows.start(caseRefs[refId], input);
+    events.push({ event: 'workflow-case', name, outcome: result });
+    if (result.status !== expectedStatus ||
+        (expectedCode && result.reason?.code !== expectedCode)) {
+      throw new Error('T14 Workflow result failed to preserve named terminal/budget: ' + name +
+        ' (' + result.status + '/' + (result.reason?.code ?? 'none') + ')');
+    }
+    if (name === 'complete' && result.value?.session !== 'A') {
+      throw new Error('T14 reused decision node lost its own instance value');
+    }
+  }
 ` : ''}
   events.push({ event: 'business-init', package: 'app-business', minOrderTotal: rule.minOrderTotal });
   return ${initDegraded ? "{ status: 'DEGRADED' }" : "{ status: 'READY' }"};
@@ -289,7 +329,8 @@ async function authoring(label, rule, options = {}) {
   await write(dirs['app-business'], 'dist/app.mjs',
     businessModule(options.unsupportedEffect === true, options.initThrows === true,
       options.initDegraded === true, canonicalJson(refs.evaluate),
-      workflow ? canonicalJson(workflow.rootRef) : ''));
+      workflow ? canonicalJson(workflow.rootRef) : '',
+      workflow ? canonicalJson(workflow.caseRefs) : ''));
   const rulesEntryRef = await artifactRef('rules-package', 'dist/rules.mjs');
   const businessEntryRef = await artifactRef('app-business', 'dist/app.mjs');
   const lifecycleDefs = {};
@@ -384,14 +425,15 @@ async function authoring(label, rule, options = {}) {
         implementation('basic.rules', 'evaluate', rulesEntryRef, 'evaluate', [ruleRef]),
         implementation('basic.rules', 'optionalReport', rulesEntryRef, 'optionalReport'),
         implementation('basic.rules', 'initializeRule', rulesEntryRef, 'initializeRule'),
-        ...(workflow ? ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow']
+        ...(workflow ? ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow', 'workflowDecision']
           .map((functionId) => implementation('basic.rules', functionId, rulesEntryRef, functionId)) : []),
       ]),
       init: lifecycleRefs['rules-package'],
       exit: lifecycleRefs['rules-package'],
     }),
     manifest('app-business', {
-      layer: 'business', role: 'primary', order: 2, recordInitFrom: true, dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }],
+      layer: 'business', role: 'primary', order: 2,
+      ...(options.omitBusinessInitFrom === true ? {} : { recordInitFrom: true }), dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }],
       elements: [
         { id: lifecycleDefs['app-business'].id, version: '1.0.0',
           definitionRef: await artifactRef('app-business', 'elements/lifecycle.json'), visibility: 'private' },
@@ -401,7 +443,7 @@ async function authoring(label, rule, options = {}) {
       ],
       imports: [refs.evaluate, refs.optionalReport, refs.initializeRule,
         ...(workflow ? workflow.readerRefs : [])],
-      ...(workflow ? { workflowRoots: [workflow.rootRef] } : {}),
+      ...(workflow ? { workflowRoots: [workflow.rootRef, ...Object.values(workflow.caseRefs)] } : {}),
       exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
       targetVariants: variant([
         ...lifeImplementations('app-business'),
@@ -409,7 +451,7 @@ async function authoring(label, rule, options = {}) {
         ...(options.unsupportedEffect === true ? [implementation('basic.app', 'dangerous', businessEntryRef, 'dangerous')] : []),
       ]),
       init: lifecycleRefs['app-business'],
-      exit: lifecycleRefs['app-business'],
+      ...(options.omitBusinessExit === true ? {} : { exit: lifecycleRefs['app-business'] }),
     }),
   ];
 
