@@ -18,6 +18,8 @@ LEGACY_CODE_REUSE=NOT_REQUIRED
 
 > **2026-11-21 Owner R2 设计裁定（覆盖本文较早 HOW 建议）：** 通用 Workflow/State Machine 引擎和 XState Actor 归 **唯一 KDP Core**，作为 Kernel Primary 所拥有的通用能力 Element/FunctionContract；Domain/Business Element 仍声明具体流程、状态、Guard、业务 Function。0.11.0 **所有已有运行时校验保留、不删不迁**，0.11.1 不增加 Kernel/SDK 运行时业务校验；新增 Workflow 图校验在 BUILD。该裁定见 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 和 [跨版本责任文档](DomainHarness_v0.11.x_PACKAGE_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP.md)。下述 0.10 事实分析不受影响。
 
+> **2026-11-21 L2 R5 源码补充：** 用户提到的 0.10 “Node”，在早期 0.10.3 具体代码中是 `StateAst` 搭配 `InvokeAst`（并非正式 `TaskNode` 类），XState `compileControlMachine/transition`、`RunCoordinator`、`StepDispatcher` 和 `RunLifecycle` 分别负责状态、步骤与生命周期。0.11.1 建议采用 `Workflow → Task`，一个 TaskRun 对应一个 KDP Actor，Task 通过 selected Function 执行并使用可选业务生命周期 Hook；详见 [R5 研究与设计](DomainHarness_v0.11.1_WORKFLOW_TASK_NODE_HOOK_DESIGN.md) / [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)。**旧 v0.10 XState transition 路线不等于旧 Run 本身持有独立 Actor。**
+
 ## 1. 结论先行：0.10 不是单一 Workflow Engine
 
 在同一个 v0.10.3 历史源码树内能明确辨认下列**不同年代、不同层次**的实现。不可把“源码存在”误写成“当前已选应用实际调用”：
