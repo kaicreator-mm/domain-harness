@@ -152,13 +152,13 @@ function kernelModuleSource(scenario: FixtureScenario): string {
   return `
 const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_KERNEL}' });
-export async function technicalInit(ctx) {
-  events.push({ event: 'technical-init', package: '${FIXTURE_KERNEL}', hostPortCount: (ctx.hostPorts ?? []).length });
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: '${FIXTURE_KERNEL}', initFrom: ctx.InitFrom, hostPortCount: (ctx.hostPorts ?? []).length });
 }
-export async function technicalDispose(ctx) {
-  events.push({ event: 'technical-dispose', package: '${FIXTURE_KERNEL}' });
+export async function exit(ctx) {
+  events.push({ event: 'package-exit', package: '${FIXTURE_KERNEL}' });
   if (${JSON.stringify(scenario.kernelDisposeThrow ?? false)}) {
-    throw new Error('fixture kernel technicalDispose threw');
+    throw new Error('fixture kernel Exit threw');
   }
 }
 `;
@@ -168,14 +168,14 @@ function sdkModuleSource(scenario: FixtureScenario): string {
   return `
 const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_SDK}' });
-export async function technicalInit(ctx) {
-  events.push({ event: 'technical-init', package: '${FIXTURE_SDK}' });
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: '${FIXTURE_SDK}', initFrom: ctx.InitFrom });
   if (${JSON.stringify(scenario.sdkInitThrow ?? false)}) {
-    throw new Error('fixture sdk technicalInit threw');
+    throw new Error('fixture sdk Init threw');
   }
 }
-export async function technicalDispose(ctx) {
-  events.push({ event: 'technical-dispose', package: '${FIXTURE_SDK}' });
+export async function exit(ctx) {
+  events.push({ event: 'package-exit', package: '${FIXTURE_SDK}' });
 }
 `;
 }
@@ -186,13 +186,14 @@ const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_BUSINESS}' });
 const SCENARIO = ${JSON.stringify({ init: scenario.init, functions: scenario.functions, readResource: scenario.readResource ?? null })};
 ${behaviorDispatch()}
-export async function technicalInit(ctx) {
-  events.push({ event: 'technical-init', package: '${FIXTURE_BUSINESS}' });
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: '${FIXTURE_BUSINESS}', initFrom: ctx.InitFrom });
+  return businessAppInit(ctx);
 }
-export async function technicalDispose(ctx) {
-  events.push({ event: 'technical-dispose', package: '${FIXTURE_BUSINESS}' });
+export async function exit(ctx) {
+  events.push({ event: 'package-exit', package: '${FIXTURE_BUSINESS}' });
 }
-export async function businessAppInit(initCtx) {
+async function businessAppInit(initCtx) {
   events.push({
     event: 'business-init',
     package: '${FIXTURE_BUSINESS}',
@@ -227,11 +228,11 @@ function extensionModuleSource(): string {
   return `
 const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_EXT}' });
-export async function technicalInit(ctx) {
-  events.push({ event: 'technical-init', package: '${FIXTURE_EXT}' });
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: '${FIXTURE_EXT}', initFrom: ctx.InitFrom });
 }
-export async function technicalDispose(ctx) {
-  events.push({ event: 'technical-dispose', package: '${FIXTURE_EXT}' });
+export async function exit(ctx) {
+  events.push({ event: 'package-exit', package: '${FIXTURE_EXT}' });
 }
 `;
 }
@@ -300,14 +301,6 @@ function elementDefinition(optionalReportSchemaDigest: ContentDigest): ElementDe
         },
         outputSchemaRef: { inline: { type: 'string' } },
         outcomes: ['SUCCEEDED', 'UNKNOWN'],
-        effects: 'none',
-      },
-      {
-        id: 'appInit',
-        contractVersion: '1',
-        inputSchemaRef: { inline: { type: 'object' } },
-        outputSchemaRef: { inline: { type: 'object' } },
-        outcomes: ['SUCCEEDED'],
         effects: 'none',
       },
     ],
@@ -386,11 +379,6 @@ export async function buildFixtureInstall(
     functionId: 'optionalReport',
     contractVersion: '1',
   };
-  const appInitRef: FunctionRef = {
-    element: { namespace: 'orders', id: 'orders.eligibility', version: '1.0.0', digest: definitionDigest },
-    functionId: 'appInit',
-    contractVersion: '1',
-  };
   const elementRef = evaluateRef.element;
 
   const descriptor: DomainAppDescriptor = {
@@ -405,7 +393,6 @@ export async function buildFixtureInstall(
       businessPrimary: { package: FIXTURE_BUSINESS, version: '1.0.0' },
     },
     extensions: [{ package: FIXTURE_EXT, version: '1.0.0' }],
-    businessAppInit: appInitRef,
     ingress: [
       { id: 'evaluate', function: evaluateRef },
       { id: 'optional-report', function: optionalReportRef, optional: true },
@@ -459,10 +446,10 @@ export async function buildFixtureInstall(
       kdpPrimaryDigest: kdpEntryDigest,
     },
     selectedPackages: [
-      { packageId: FIXTURE_KERNEL, version: '1.0.0', technicalLifecycle: true, layer: 'kernel', role: 'primary', artifact: kernelArtifact, dependsOn: [] },
-      { packageId: FIXTURE_SDK, version: '1.0.0', technicalLifecycle: true, layer: 'sdk', role: 'primary', artifact: sdkArtifact, dependsOn: [FIXTURE_KERNEL] },
-      { packageId: FIXTURE_BUSINESS, version: '1.0.0', technicalLifecycle: true, layer: 'business', role: 'primary', artifact: businessArtifact, dependsOn: [FIXTURE_SDK] },
-      { packageId: FIXTURE_EXT, version: '1.0.0', technicalLifecycle: true, layer: 'business', role: 'extension', artifact: extArtifact, dependsOn: [FIXTURE_BUSINESS] },
+      { packageId: FIXTURE_KERNEL, version: '1.0.0', order: 0, layer: 'kernel', role: 'primary', artifact: kernelArtifact, init: { module: kernelArtifact, exportName: 'init' }, exit: { module: kernelArtifact, exportName: 'exit' }, initResources: [], dependsOn: [] },
+      { packageId: FIXTURE_SDK, version: '1.0.0', order: 1, layer: 'sdk', role: 'primary', artifact: sdkArtifact, init: { module: sdkArtifact, exportName: 'init' }, exit: { module: sdkArtifact, exportName: 'exit' }, initResources: [], dependsOn: [FIXTURE_KERNEL] },
+      { packageId: FIXTURE_BUSINESS, version: '1.0.0', order: 2, layer: 'business', role: 'primary', artifact: businessArtifact, init: { module: businessArtifact, exportName: 'init' }, exit: { module: businessArtifact, exportName: 'exit' }, initResources: [{ packageId: FIXTURE_BUSINESS, path: 'content/rules.json', digest: resourceDigests[`${FIXTURE_BUSINESS}/content/rules.json`]! }], dependsOn: [FIXTURE_SDK, FIXTURE_EXT] },
+      { packageId: FIXTURE_EXT, version: '1.0.0', layer: 'business', role: 'extension', artifact: extArtifact, init: { module: extArtifact, exportName: 'init' }, exit: { module: extArtifact, exportName: 'exit' }, initResources: [], dependsOn: [] },
     ],
     selectedElements: [
       {
@@ -473,7 +460,6 @@ export async function buildFixtureInstall(
         contractDigests: [
           digestOf(definition.functions[0]),
           digestOf(definition.functions[1]),
-          digestOf(definition.functions[2]),
         ],
       },
     ],
@@ -492,17 +478,6 @@ export async function buildFixtureInstall(
         implementation: { module: businessArtifact, exportName: 'optionalReport' },
         resources: [],
       },
-      {
-        ref: appInitRef,
-        outcomes: ['SUCCEEDED'],
-        effects: 'none',
-        implementation: { module: businessArtifact, exportName: 'businessAppInit' },
-        resources: [{
-          packageId: FIXTURE_BUSINESS,
-          path: 'content/rules.json',
-          digest: resourceDigests[`${FIXTURE_BUSINESS}/content/rules.json`]!,
-        }],
-      },
     ],
     hookBindings: [
       {
@@ -514,9 +489,7 @@ export async function buildFixtureInstall(
         ],
       },
     ],
-    technicalInitOrder: [FIXTURE_KERNEL, FIXTURE_SDK, FIXTURE_BUSINESS, FIXTURE_EXT],
-    technicalDisposeOrder: [FIXTURE_EXT, FIXTURE_BUSINESS, FIXTURE_SDK, FIXTURE_KERNEL],
-    businessAppInit: appInitRef,
+    coreOrder: [FIXTURE_KERNEL, FIXTURE_SDK, FIXTURE_BUSINESS],
     ingress: [
       { id: 'evaluate', function: evaluateRef, optional: false },
       { id: 'optional-report', function: optionalReportRef, optional: true },
