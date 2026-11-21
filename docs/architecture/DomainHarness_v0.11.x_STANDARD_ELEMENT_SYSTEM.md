@@ -3,7 +3,7 @@
 > **【R36 当前 Standard Element Package 生成方式】**：Standard Element 也是普通多文件 Domain Package 的内容；可以由 ChatGPT/开发者直接编写 ElementDefinition、Manifest、Function ESM、资源并按 DIS 适用 + v0.11.x 实际合同验证。**不需要 Seed Builder、生成器或额外 Package Assembly 生产阶段**；组合 App 只选择/校验使用的文件、依赖、Target 和 Boot。参见 [R36](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
 
 
-> **【R34 SDK 内 Standard Element 归属】** Standard Element 是扩展 DomainHarness **SDK 的普通可选 Domain Package**；它不承担 Forge 对新业务 Domain Packages 的生成/编译，不自动提供不受信 BUILD。Domain/Harness/SDK 的全名定义及 DH-only 临时 Seed Builder 仅服务自身初始基础 Package，见 [R34](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)。
+> **【R37 Standard Element 实践驱动规范】** Standard Element 是可直接编写的普通 Package Element；当前规范未明确处，应先在真实标准 Element + SDK Consumer + 反例中发现缺口，再按 Target/适用范围和受影响审核补入 Package/SDK 合同。可以提供轻量独立 Validator 验证 Manifest/Function/Export/Resource/Target，但**不要求 Seed Builder、自动生成器或专用 Assembly 服务**，也不等于当前启动 Forge。参见 [R37](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)。
 
 
 > **【R33 产品边界优先级】** 本 R29 的 Standard Element 复用原则有效，但其 “Contracts/BUILD/Lock/KDP primitives” 中的 BUILD 仅指 **DomainHarness SDK 对已有 Package 的装配/链接及必要验证**；不包含 Forge 的 Domain Package 生产。现有 `tooling/build` 的名称不是“BUILD 平台”的产品授权，R31/R32 把生成全部归 Harness 的说法已被纠正。权威产品定义：[DomainHarness SDK / DomainForge App / 自举规范](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
