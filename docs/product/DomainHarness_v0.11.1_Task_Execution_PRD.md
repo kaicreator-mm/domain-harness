@@ -6,7 +6,8 @@
 OUTPUT_LABEL=DH_V0111_PRODUCT_L1_WHAT_ONLY_R2
 STAGE=0.11.1_TASK_EXECUTION_REWRITE
 SOURCE_BRANCH=version/v0.11.x
-SOURCE_EXACT_HEAD=cc44f03ef87528ed6e27edee2dd311752bc6a2f9
+SOURCE_AUTHORING_BASE=cc44f03ef87528ed6e27edee2dd311752bc6a2f9
+LATEST_VERIFIED_TRAIN_HEAD=6fb636163d1ba65fe39ccffae1e1abaafbae7045
 SOURCE_STAGE=0.11.0_REFACTORED_ACCEPTED_SCOPED
 PRODUCT_L1_STATUS=AUTHORING_NOT_FROZEN
 IMPLEMENTATION_PLAN=SEE_L2_ISSUE_1608
@@ -16,7 +17,7 @@ STANDALONE_RELEASE=NO
 
 ## 1. 版本定位
 
-0.11.x 是整个 DomainHarness 产品的**新架构重新设计与重写**。0.11.0 已建立新版 Foundation；0.11.1 继续在该新版基础上，**重新实现 Task Execution 相关产品能力**，不是修补/移植旧 Task Runtime，不以旧代码、旧接口或所有历史功能等价为验收门槛。
+0.11.x 是整个 DomainHarness 产品的**新架构重新设计与重写**。0.11.0 已建立新版 Foundation（发起本 PR 时 HEAD 为 cc44f03…；随后 #1606 仅新增中文源码注释与维护文档，版本列车 HEAD 变为 6fb6361…，未改变程序执行逻辑）；0.11.1 继续在该新版基础上，**重新实现 Task Execution 相关产品能力**，不是修补/移植旧 Task Runtime，不以旧代码、旧接口或所有历史功能等价为验收门槛。
 
 **0.11.1 的成果**：一个已启动的 Domain App 能依据预先定义的 Workflow 与 State Machine，连续执行多步骤确定性任务，并能清楚说明任务完成、需要补充信息、需要等待、被拒绝、结果未知或执行失败。简单的一步 Function 仍可直接使用。
 
