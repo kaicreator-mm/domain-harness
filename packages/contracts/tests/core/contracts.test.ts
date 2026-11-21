@@ -273,6 +273,7 @@ test('T01: every exported JSON Schema document carries $schema/$id and compiles 
     'package-manifest',
     'app-descriptor',
     'app-lock',
+    'workflow-definition',
   ];
   assert.deepEqual(Object.keys(JSON_SCHEMAS).sort(), [...expectedDocs].sort());
   // 直接使用契约包导出的 Schema 注册表，保留每份文档的 JSON 类型。
