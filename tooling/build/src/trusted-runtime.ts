@@ -28,6 +28,81 @@ export function trustedWorkflowInstallManifest(): JsonValue {
   };
 }
 
+/**
+ * npm 在安装任何第三方可执行字节前只生成 lockfile 元数据，再运行此封存校验器。
+ * 先核对 BUILD 已批准的 SRI、依赖闭包和本地 Package，随后才允许 npm ci --ignore-scripts。
+ * 此阶段不能执行 npm install（下载/解包）或执行 Package 生命周期函数。
+ */
+export const TRUSTED_RUNTIME_PREINSTALL_MODULE = `import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+
+const appRoot = fileURLToPath(new URL('../', import.meta.url));
+const readJson = async (relative) => JSON.parse(await readFile(join(appRoot, relative), 'utf8'));
+const fail = (code) => { throw new Error(code); };
+const manifest = await readJson('dh-install/trusted-runtime.json');
+const sealedLock = await readJson('dh-lock/app.lock.json');
+const app = await readJson('package.json');
+const npmLock = await readJson('package-lock.json');
+const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+if (manifest.kind !== 'DomainHarnessTrustedRuntime' ||
+    manifest.schemaVersion !== 'dh.runtime-integrity/0.11' ||
+    !Array.isArray(manifest.archives) || manifest.archives.length !== 2 ||
+    !equal(manifest.archives, sealedLock.trustedRuntimeIntegrity)) {
+  fail('DH_TRUSTED_RUNTIME_LOCK_MISMATCH');
+}
+if (npmLock.lockfileVersion !== 3 || typeof npmLock.packages !== 'object' ||
+    !npmLock.packages || !npmLock.packages[''] ||
+    !equal(npmLock.packages[''].dependencies, app.dependencies)) {
+  fail('DH_TRUSTED_RUNTIME_INSTALL_LOCK_INVALID');
+}
+const owned = new Set((sealedLock.selectedPackages ?? []).map((pkg) => pkg.packageId));
+const allowedExternal = new Set([
+  '@kaicreator/domain-harness-microkernel',
+  '@kaicreator/domain-harness-contracts',
+  'xstate', 'yaml',
+]);
+const approved = new Set([...owned, ...allowedExternal]);
+const supplied = Object.keys(app.dependencies ?? {});
+if (supplied.some((id) => !approved.has(id)) ||
+    owned.size !== (sealedLock.selectedPackages ?? []).length ||
+    [...owned].some((id) => app.dependencies[id] !== 'file:./packages/' + id)) {
+  fail('DH_TRUSTED_RUNTIME_UNSELECTED_DEPENDENCY');
+}
+for (const [key, entry] of Object.entries(npmLock.packages)) {
+  if (key === '') continue;
+  if (key.startsWith('node_modules/')) {
+    const id = key.slice('node_modules/'.length);
+    if (!approved.has(id) || id.includes('/node_modules/')) {
+      fail('DH_TRUSTED_RUNTIME_UNSELECTED_DEPENDENCY');
+    }
+  } else if (key.startsWith('packages/')) {
+    if (!owned.has(key.slice('packages/'.length))) {
+      fail('DH_TRUSTED_RUNTIME_UNSELECTED_DEPENDENCY');
+    }
+  } else {
+    fail('DH_TRUSTED_RUNTIME_UNSELECTED_DEPENDENCY');
+  }
+  if (!entry || typeof entry !== 'object') fail('DH_TRUSTED_RUNTIME_INSTALL_LOCK_INVALID');
+}
+for (const [index, archive] of manifest.archives.entries()) {
+  if (archive.name !== ['xstate', 'yaml'][index] ||
+      app.dependencies[archive.name] !== archive.version ||
+      typeof archive.integrity !== 'string' ||
+      !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(archive.integrity)) {
+    fail('DH_TRUSTED_RUNTIME_PIN_INVALID');
+  }
+  const resolved = npmLock.packages['node_modules/' + archive.name];
+  if (!resolved || resolved.version !== archive.version ||
+      resolved.integrity !== archive.integrity ||
+      typeof resolved.resolved !== 'string' ||
+      !resolved.resolved.startsWith('https://')) {
+    fail('DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH');
+  }
+}
+console.log('DH_TRUSTED_RUNTIME_PREINSTALL_APPROVED');
+`;
+
 /** 随 App 封装可执行的一方校验器，不依赖 npm 安装生命周期 Hook。 */
 export const TRUSTED_RUNTIME_VERIFY_MODULE = `import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
