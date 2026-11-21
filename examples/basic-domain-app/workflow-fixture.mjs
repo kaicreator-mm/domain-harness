@@ -69,6 +69,21 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
       expected: JSON.parse(JSON.stringify({ id, result: Number(id.endsWith('a') ? (format === 'json' ? 1 : 3) : (format === 'json' ? 2 : 4)) })),
     };
   }
+  // Four separate public, zero-Function Data Elements expose the exact resource
+  // metadata used by the same two selected Reader Functions. YAML raw bytes remain
+  // ResourceRef data, never a general structured-data ContentBlock.ref JSON shortcut.
+  const dataElements = Object.entries(sources).map(([id, source]) => ({
+    kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+    id: `basic.data_${id.replaceAll('-', '_')}`, version: '1.0.0',
+    description: `Selected ${source.format} data Element ${id}`,
+    content: [{
+      id: 'source', contentKind: 'structured-data',
+      schemaRef: { inline: { type: 'object' } }, required: true,
+      value: { format: source.format, resource: source.resource, maxBytes: 4096 },
+    }],
+    functions: [],
+  }));
+  app.dependencies.push(...dataElements.map((el) => ({ element: el.id, version: el.version })));
   const jsonReader = ref(rules, 'jsonReader');
   const yamlReader = ref(rules, 'yamlReader');
   const hooks = { start: ref(rules, 'startWorkflow'), end: ref(rules, 'endWorkflow') };
@@ -82,7 +97,10 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
       ], 1, 0)),
     ],
     functions: [],
-    dependencies: [{ element: 'basic.rules', version: '1.0.0', functions: ['jsonReader'] }],
+    dependencies: [
+      { element: 'basic.rules', version: '1.0.0', functions: ['jsonReader'] },
+      { element: 'basic.data_json_b', version: '1.0.0' },
+    ],
   };
   const childRef = {
     element: {
@@ -106,7 +124,7 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
     element: { namespace: 'basic', id: app.id, version: app.version, digest: contentDigestOf(app) },
     contentId: 'parent-flow',
   };
-  return { child, rootRef, sources, readerRefs: [
+  return { child, rootRef, sources, dataElements, readerRefs: [
     jsonReader, yamlReader, hooks.start, hooks.end,
   ] };
 }
