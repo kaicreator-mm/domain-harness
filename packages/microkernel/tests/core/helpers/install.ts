@@ -25,6 +25,8 @@ const MICROKERNEL_DIST = fileURLToPath(new URL('../../../dist/', import.meta.url
 const CONTRACTS_DIST = fileURLToPath(
   new URL('../../../../contracts/dist/', import.meta.url),
 );
+const XSTATE_DIR = dirname(fileURLToPath(import.meta.resolve('xstate/package.json')));
+const YAML_DIR = dirname(fileURLToPath(import.meta.resolve('yaml/package.json')));
 
 export const KDP_PACKAGE_ID = 'fixture-kernel';
 export const TARGET: ResolvedTarget = {
@@ -359,6 +361,9 @@ export async function buildFixtureInstall(
     }),
   );
   await cp(CONTRACTS_DIST, join(contractsPackageDir, 'dist'), { recursive: true });
+  // 手工安装器也必须包含 Microkernel 的精确 XState/YAML 生产依赖。
+  await cp(XSTATE_DIR, join(installRoot, 'node_modules', 'xstate'), { recursive: true });
+  await cp(YAML_DIR, join(installRoot, 'node_modules', 'yaml'), { recursive: true });
 
   const kernelPath = await write(`node_modules/${FIXTURE_KERNEL}/dist/index.mjs`, kernelModuleSource(scenario));
   const sdkPath = await write(`node_modules/${FIXTURE_SDK}/dist/index.mjs`, sdkModuleSource(scenario));
