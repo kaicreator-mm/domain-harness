@@ -343,3 +343,29 @@ test('BUILD rejects imports from an undeclared direct Extension', (t) => {
 });
 
 
+
+test('BUILD refuses raw cross-Package reexports that could launder a transitive Extension handle', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
+    new TextEncoder().encode("export function init() {}\nexport function exit() {}\nexport { someRawHandle } from 'aaa-ext';\n"));
+  const packages = input.packages.map((pkg) => pkg === business ? {
+    ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
+  } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('BUILD rejects unapproved Node module loader imports in generated Package code', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
+    new TextEncoder().encode("import { createRequire } from 'node:module';\nexport function init() {}\nexport function exit() {}\n"));
+  const packages = input.packages.map((pkg) => pkg === business ? {
+    ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
+  } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});

@@ -25,13 +25,26 @@ export function verifyGeneratedPackageImports(
     const bytes = scope.verify(ref);
     const sourceText = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     const source = ts.createSourceFile(ref.path, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+    // BUILD 必须拒绝生成产物本身的语法错误，而不是推迟至 Node 首次 import。
+    if (source.parseDiagnostics.length > 0) {
+      throw refusal('DH_BUILD_SCHEMA_INVALID',
+        `generated module '${key}' contains a JavaScript syntax error (TS${source.parseDiagnostics[0]!.code})`);
+    }
     const consumer = selected.get(ref.packageId);
     if (!consumer) {
       throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `module '${key}' has no selected Package owner`);
     }
     const allowed = new Set(consumer.dependsOn.map((dep) => dep.package));
     const inspectModule = (specifier: string): void => {
-      if (specifier.startsWith('node:')) return;
+      // 不允许 Package 自己通过 Node 内置装载器/文件/进程能力重新发现其他 Package。
+      if (specifier.startsWith('node:')) {
+        const safeBuiltins = new Set(['node:buffer', 'node:crypto', 'node:path', 'node:url', 'node:util']);
+        if (!safeBuiltins.has(specifier)) {
+          throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+            `Package '${ref.packageId}' uses unapproved Node capability '${specifier}'`);
+        }
+        return;
+      }
       if (specifier.startsWith('./') || specifier.startsWith('../')) {
         const relative = posix.normalize(posix.join(posix.dirname(ref.path), specifier));
         if (!isRelativeResourcePath(relative) || !/\.(?:mjs|js)$/u.test(relative)) {
@@ -51,7 +64,14 @@ export function verifyGeneratedPackageImports(
     const walk = (node: ts.Node): void => {
       if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
         const module = node.moduleSpecifier;
-        if (module && ts.isStringLiteral(module)) inspectModule(module.text);
+        if (module && ts.isStringLiteral(module)) {
+          // export * from Dependency 会把祖孙 Extension 原始句柄透传给消费者。
+          if (ts.isExportDeclaration(node) && !module.text.startsWith('./') && !module.text.startsWith('../')) {
+            throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+              `Package '${ref.packageId}' reexports a foreign Package API from '${module.text}'`);
+          }
+          inspectModule(module.text);
+        }
       }
       if (ts.isCallExpression(node)) {
         if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
@@ -68,6 +88,11 @@ export function verifyGeneratedPackageImports(
       if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) &&
           ['Function', 'Worker'].includes(node.expression.text)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `opaque code constructor '${node.expression.text}' in '${key}'`);
+      }
+      if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) &&
+          node.expression.text === 'globalThis' && ['eval', 'Function', 'require'].includes(node.name.text)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `opaque dynamic code loader '${node.name.text}' in '${key}'`);
       }
       ts.forEachChild(node, walk);
     };

@@ -522,3 +522,18 @@ test('InitFrom preserves repeated callers, while KDP never deduplicates Init cal
   await packages.runExit();
   assert.equal(events().filter((e) => e['event'] === 'package-exit').length, INIT_ORDER.length * 2);
 });
+
+test('Init capability projection exposes only own or direct Extension ingress, never transitive/global handles', async (t) => {
+  await withScenario(t, { init: { status: 'READY' }, functions: {} }, async (_fixture, result) => {
+    assert.equal(result.status, 'BOOTED');
+    if (result.status !== 'BOOTED') return;
+    const packages = events().filter((event) => event['event'] === 'package-init');
+    for (const pkg of ['fixture-kernel', '@fixture/sdk', 'fixture-ext']) {
+      assert.deepEqual(packages.find((event) => event['package'] === pkg)?.['visibleFunctions'], [],
+        `unprivileged Package '${pkg}' must not receive unrelated business ingress handles`);
+    }
+    assert.deepEqual(packages.find((event) => event['package'] === 'fixture-business')?.['visibleFunctions'],
+      ['evaluate', 'optional-report'], 'Business Core receives its own selected ingress only');
+    await result.app.dispose();
+  });
+});

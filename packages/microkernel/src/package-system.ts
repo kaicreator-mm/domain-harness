@@ -177,11 +177,25 @@ export class PackageSystem {
           }
           return [key, this.resourceHandle(key)] as const;
         }));
+        // 已构建的直接依赖图仅用来分配 capability；不能向所有 Package 暴露全局 ingress。
+        const accessibleOwners = new Set([packageId, ...pkg.dependsOn]);
+        const visibleFunctions = new Map([...context.functions].filter(([ingressId]) => {
+          const ingress = this.lock.ingress.find((entry) => entry.id === ingressId);
+          if (!ingress) return false;
+          return this.lock.selectedElements.some((element) =>
+            element.ref.id === ingress.function.element.id &&
+            element.ref.digest === ingress.function.element.digest &&
+            accessibleOwners.has(element.ownerPackageId));
+        }));
+        const kdpCore = pkg.role === 'primary' && pkg.order === 0;
         const ownContext: PackageInitContext = {
           ...context,
           packageId,
-          InitFrom: Object.freeze(history.map((entry) => ({ ...entry }))),
-          hostPorts: this.hostPorts,
+          // 每个 Package 拿到独立的配置和句柄快照，不能修改后来者的 Init 上下文。
+          config: structuredClone(context.config),
+          functions: visibleFunctions,
+          InitFrom: Object.freeze(history.map((entry) => Object.freeze({ ...entry }))),
+          hostPorts: kdpCore ? this.hostPorts : [],
           resources,
         };
         try {
@@ -227,7 +241,7 @@ export class PackageSystem {
         const exitContext: PackageExitContext = {
           packageId,
           InitFrom: this.initFrom(packageId),
-          hostPorts: this.hostPorts,
+          hostPorts: pkg.role === 'primary' && pkg.order === 0 ? this.hostPorts : [],
         };
         await (fn as (context: PackageExitContext) => unknown)(exitContext);
       } catch (error) {

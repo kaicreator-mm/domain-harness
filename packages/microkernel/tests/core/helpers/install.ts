@@ -153,7 +153,7 @@ function kernelModuleSource(scenario: FixtureScenario): string {
 const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_KERNEL}' });
 export async function init(ctx) {
-  events.push({ event: 'package-init', package: '${FIXTURE_KERNEL}', initFrom: ctx.InitFrom, hostPortCount: (ctx.hostPorts ?? []).length });
+  events.push({ event: 'package-init', package: '${FIXTURE_KERNEL}', initFrom: ctx.InitFrom, hostPortCount: (ctx.hostPorts ?? []).length, visibleFunctions: [...ctx.functions.keys()] });
 }
 export async function exit(ctx) {
   events.push({ event: 'package-exit', package: '${FIXTURE_KERNEL}' });
@@ -169,7 +169,7 @@ function sdkModuleSource(scenario: FixtureScenario): string {
 const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_SDK}' });
 export async function init(ctx) {
-  events.push({ event: 'package-init', package: '${FIXTURE_SDK}', initFrom: ctx.InitFrom });
+  events.push({ event: 'package-init', package: '${FIXTURE_SDK}', initFrom: ctx.InitFrom, visibleFunctions: [...ctx.functions.keys()] });
   if (${JSON.stringify(scenario.sdkInitThrow ?? false)}) {
     throw new Error('fixture sdk Init threw');
   }
@@ -187,7 +187,7 @@ events.push({ event: 'module-evaluated', package: '${FIXTURE_BUSINESS}' });
 const SCENARIO = ${JSON.stringify({ init: scenario.init, functions: scenario.functions, readResource: scenario.readResource ?? null })};
 ${behaviorDispatch()}
 export async function init(ctx) {
-  events.push({ event: 'package-init', package: '${FIXTURE_BUSINESS}', initFrom: ctx.InitFrom });
+  events.push({ event: 'package-init', package: '${FIXTURE_BUSINESS}', initFrom: ctx.InitFrom, visibleFunctions: [...ctx.functions.keys()] });
   return businessAppInit(ctx);
 }
 export async function exit(ctx) {
@@ -229,7 +229,7 @@ function extensionModuleSource(): string {
 const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_EXT}' });
 export async function init(ctx) {
-  events.push({ event: 'package-init', package: '${FIXTURE_EXT}', initFrom: ctx.InitFrom });
+  events.push({ event: 'package-init', package: '${FIXTURE_EXT}', initFrom: ctx.InitFrom, visibleFunctions: [...ctx.functions.keys()] });
 }
 export async function exit(ctx) {
   events.push({ event: 'package-exit', package: '${FIXTURE_EXT}' });
