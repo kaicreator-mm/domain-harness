@@ -19,6 +19,7 @@ STATUS=PLAN_ONLY_SOURCE_UNCHANGED
 
 - **S：SDK 必需** = 没有 Forge、仅提供现成 Domain Packages 时，DomainHarness 仍必须能够调用公开组合 API，将它们装配成准确可信的可运行 App/SDK、Boot/KDP 激活，并阻止未授权依赖。这些能力应收敛于 `Package Assembly/Linking/Validation` SDK 实现，不要求用户另外部署“BUILD 服务”。
 - **F：Forge 生产职责** = 从需求、Domain Data/Claim/Element/Business 内容或代码草稿**生产**新 Package/实现/资源、生成模板、领域内容编译、根据目标产生多种源和业务逻辑、治理知识/版本等；由在 DomainHarness 上运行的 Forge App 提供，允许 Forge 纯作者 Core 保持独立，经明确的公开 Package 接口交接。
+- **T：DH 自举的临时种子生产（只服务本仓库）** = 仅生产 DomainHarness 自己 Boot/SDK/基础 Standard Domain Packages 所需的固定种子工件，可在工具链早期保留简单 Package Builder；不得纳入公共 SDK/通用业务 Package Compiler，必须有 Forge 生产同义包后的替换/退出计划。具体强约束见 [R34](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_AND_BOOTSTRAP_SEED.md)。
 - **X：不必要 / 应精简** = 由于误把 BUILD 设计成另一个产品而造成的额外分层、重复计算、全局硬编码、过度通用编译器/双 Runtime、无限期为所有目标生成全部模板的职责。X 表示**移除不必要机制**，不是删掉有证据要求的安全防线；实施时必须先有同等受信 SDK 装配/Host 守门和受影响负例。
 
 ## 2. 按真实文件逐一拆分
@@ -37,6 +38,8 @@ STATUS=PLAN_ONLY_SOURCE_UNCHANGED
 | `refusal.ts` | 统一拒绝错误类型与代码 | **S** | 移入 SDK Package 组合/校验错误表；Legacy `DH_BUILD_*` 错误码目前受证实，不为改名无谓破坏测试，实际迁移版本中可原子更名 |
 | `types.ts` | `BuildInput` 要求已有 `packages/roots/artifacts`；`BuildSuccess` 提供 Lock/AppPackage | **S** | 新 API 以**已有 Package、目标配置、可信验证和组合结果**为核心，不新增生成请求；公开 ABI 在有限版本升级中收敛，保留实际已接受可用性 |
 | `index.ts` | 导出 `buildApp`、`BuildRefusal`、各构建类型 | **S（保留 SDK facade） + X（历史概念名）** | 公共 SDK 对外提供装配/验证入口；以后不以单独的“BUILD 平台”作为业务产品卖点或永久自立运行时 |
+
+**临时种子位置与事实**：当前 `examples/basic-domain-app/consumer.mjs::authoring()` 已能为受限 Demo Consumer 写出固定 Package Manifest、Element 和资源；可以作为 `tooling/bootstrap-seed/` 或 `scripts/bootstrap/` 的最小实现参照。但这是示例验收作者工具，**尚不是**已被验证的完整 DH SDK 自举 Seed Builder。其新建、调用范围、固定输入、摘要与 Forge 交接需按 #1564 限定 Task 单独证明。不得要求 `buildApp` 因而增加通用 Package 代码生成器，亦不得在没有可运行 Forge 的时点提前删除该工具。
 
 **特别澄清**：`packages/contracts/src/*` 的 Element/Package/Function/Outcome/ResourceRef 合同 **属于 SDK 的公共 ABI**；Forge 是这些公共合同的消费者/Package 生产者，不能把基础 Package Schema 因“Forge 要生成”就全部抽离 Harness。类似地 `packages/microkernel/src/*` 的 Boot/KDP/Init/Exit/Workflow 是运行基础，绝不能为了抛弃 BUILD 一并迁入 Forge。`packages/domain-harness/src/index.ts` 是 facade，不是额外 Runtime；可继续导出最小装配/运行能力而非泛用 Package 生产接口。
 
