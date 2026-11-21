@@ -152,10 +152,13 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
   if (!configResult.ok) return configResult.result;
   const config = configResult.config;
 
+  // 执行顺序固定：校验所有已选可执行字节 → 技术初始化 → 封存 Hook → 入口绑定 → 唯一业务 App Init。
+  // 任何一步失败，都不得返回可调用 DomainApp。
   const packages = new PackageSystem(safeContext.installRoot, lock, safeContext.hostPorts);
 
   let initialized = false;
   try {
+    // 预先检查所有可执行产物，避免在前序 Package 已执行后才发现后序文件被篡改。
     await packages.verifySelectedArtifacts();
     await packages.runTechnicalInit();
     initialized = true;
@@ -172,6 +175,7 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
       }
       ingressImpls.set(entry.id, { fn: selected, impl: impl as (input: unknown) => unknown });
     }
+    // 业务 App Init 的 FunctionRef 只能来自 Lock，不能由业务模块自行注册第二个启动器。
     const initSelected = packages.functionByRef(lock.businessAppInit);
     if (initSelected === undefined) {
       throw new KdpLoadError('businessAppInit has no selected function in the Lock');
@@ -192,6 +196,8 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
         return [key, packages.resourceHandle(key)] as const;
       }),
     );
+    // App Init 的函数句柄在 DomainApp 建立前不能调用；此处先暴露受控占位句柄。
+    // 它们只通过应用的公开 ingress 调用，不是直接执行任意 ESM export。
     let appRef: { invoke(ingressId: string, input: unknown): Promise<FunctionOutcome> } | null = null;
     const functionHandles = new Map<string, ReadonlyFunctionHandle>();
     for (const entry of lock.ingress) {
@@ -230,6 +236,7 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
       throw new KdpLoadError('businessAppInit reported status FAILED; ordinary startup failure, no ingress, no retry (PRD K07)', 'DH_RUNTIME_NOT_READY');
     }
 
+    // 只有 App Init 结果通过 READY/DEGRADED 等状态检查后才创建可对外使用的实例。
     const app = createDomainApp({
       lock,
       packages,
@@ -246,6 +253,7 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     return { status: 'BOOTED', app };
   } catch (error) {
     let cleanupFailure = '';
+    // 完成技术初始化之后的异常必须清理已初始化 Package；记录清理异常但保留原始失败原因。
     if (initialized) {
       try {
         await packages.runTechnicalDispose();

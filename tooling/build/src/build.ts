@@ -112,6 +112,7 @@ export function buildApp(input: BuildInput): BuildResult {
 
 /** 依次建立包闭包、Element 所有权和依赖图，校验资源内容后生成确定性 Lock；所有步骤必须先于启动执行。 */
 function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
+  // 第 1 段：先验证 App、Domain 和 Manifest 的机器合同，再允许任何包进入候选池。
   const schemas = new SchemaChecker();
 
   schemas.validateDocument('descriptor', input.descriptor);
@@ -158,6 +159,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     profile: NODE22_ESM_PROFILE,
   };
 
+  // 第 2 段：从三层 Primary 与显式扩展出发，沿 dependsOn 扩展闭包。这里选择的是包，不是运行时调度。
   const selected = new Map<string, DomainPackageManifest>();
   const rootSlots: readonly (readonly [PackageLayer, keyof DomainAppDescriptor['roots']])[] = [
     ['kernel', 'kernelPrimary'],
@@ -260,6 +262,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   }
 
+  // 第 3 段：按真实文件字节验证 Element 定义及资源；同一 Element 的 ID/版本只能有一个 owner。
   const scope = new ResourceScope(input.packageRoots);
   const elements = new Map<string, LoadedElement>();
   const byLogicalId = new Map<string, Map<SemVer, LoadedElement>>();
@@ -326,6 +329,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   }
 
+  // Element.dependencies 是 BUILD 时静态 DAG；循环与未选定引用在封存前拒绝，不等于任务执行 Workflow。
   const elementDeps = new Map<string, readonly string[]>();
   for (const loaded of elements.values()) {
     const deps: string[] = [];
@@ -422,6 +426,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   };
 
+  // 公共入口由唯一 ID 映射至已选 FunctionRef；重复 ID 会被 Map 静默覆盖，所以必须在 BUILD 阶段拒绝。
   const ingressResolved: { entry: DomainAppDescriptor['ingress'][number]; resolved: ResolvedFunction }[] = [];
   const seenIngressIds = new Set<string>();
   for (const [index, entry] of descriptor.ingress.entries()) {
@@ -438,6 +443,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     ingressResolved.push({ entry, resolved });
   }
 
+  // App Init 是唯一业务启动函数，必须归 Business 层、被导出且精确匹配 Element digest/合同版本。
   const appInitCandidates: ResolvedFunction[] = [];
   for (const loaded of elements.values()) {
     const fn = loaded.def.functions.find(
@@ -495,6 +501,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   }
 
+  // 第 4 段：只为真正选中的 Function 查找恰好一个目标实现，并封存实现字节与声明资源的摘要。
   const sealedFunctions: SelectedFunction[] = [];
   for (const resolved of [...selectedFunctions.values()].sort(compareResolvedFunction)) {
     validateSelectedFunctionSchemas(schemas, scope, selected, resolved);
@@ -560,6 +567,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     });
   }
 
+  // Hook 先验证所有选中 owner 的接口 Schema，再把贡献者按稳定顺序封存；Hook 不是额外 Runtime。
   const hookBindings: SealedHookBinding[] = [];
   for (const owner of packagesSorted) {
     const declared = owner.provides?.hooks ?? [];
@@ -648,6 +656,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   }
 
+  // 第 5 段：依赖先于消费方初始化；dispose 反序。遇到包依赖环必须停止，而非任意排序。
   const initOrder = kahnTopologicalOrder(
     packagesSorted.map((manifest) => manifest.id),
     dependsOnEdges,
@@ -657,6 +666,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   }
   const disposeOrder = [...initOrder].reverse();
 
+  // 未知且 optional 的内容仅记排除证据，不混入已选 contentDigests；required 未知内容直接拒绝。
   const excludedUnknownContent: string[] = [];
   const sealedElements: SelectedElement[] = [];
   for (const loaded of [...elements.values()].sort(compareLoadedElement)) {
@@ -707,6 +717,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   const kdpDigest = digestOfBytes(kdpBytes);
   scope.record(input.kdpArtifact.packageId, input.kdpArtifact.path, kdpDigest);
 
+  // 第 6 段：同时封存描述符语义、KDP 入口字节、Package/Function/Hook 与资源闭包。
   const descriptorDigest = contentDigestOf(toJson(descriptor));
   const assemble = (): DomainAppLock => {
     const withoutDigest = {
@@ -741,6 +752,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       closureDigest: contentDigestOf(toJson(withoutDigest)),
     };
   };
+  // 两次按确定性顺序重建并对比规范 JSON；仅返回 Lock 字节，不安装模块，也不启动任意业务代码。
   const lock = assemble();
   const lockText = canonicalJson(toJson(lock));
   if (canonicalJson(toJson(assemble())) !== lockText) {

@@ -77,6 +77,10 @@ function validateRecordShape(raw: Record<string, unknown>): string | null {
   return null;
 }
 
+/**
+ * 读取受信安装器写入的记录并重算其自校验摘要。
+ * recordDigest 对去掉自身的规范 JSON 求值；非规范数字不能作为异常逃出 Boot。
+ */
 export async function readTrustedRecord(installRoot: unknown): Promise<TrustResult<InstalledRecord>> {
   if (typeof installRoot !== 'string' || installRoot.length === 0) {
     return {
@@ -148,6 +152,10 @@ export function verifyContextPaths(context: KdpBootstrapContext, record: Install
 }
 
 
+/**
+ * 在访问 KDP 之前检查 Lock 自摘要、安装记录绑定和关键结构。
+ * 此处固定的是已选计划；Package 文件字节验证由下游 KDP 再执行。
+ */
 export async function verifyLockAgainstRecord(installRoot: string, record: InstalledRecord): Promise<TrustResult<DomainAppLock>> {
   const lockPath = resolveInRoot(installRoot, record.lockPath);
   if (lockPath === null) {
@@ -349,6 +357,10 @@ export function normalizeBootstrapContext(context: unknown): TrustResult<Normali
   }
 }
 
+/**
+ * Boot 与 KDP 共用的可信安装核验入口：安装记录、路径、Lock、KDP 入口必须同源一致。
+ * KDP 复验并非重新 BUILD，而是防止安装内容在 Boot 与后续运行间出现未验证的变化。
+ */
 export async function verifyInstallTrust(
   context: unknown,
 ): Promise<TrustResult<{ record: InstalledRecord; lock: DomainAppLock; entryPath: string; context: NormalizedBootstrapContext }>> {

@@ -35,6 +35,11 @@ function snapshotReason(value: unknown): { code: string; message: string } | nul
   return typeof code === 'string' && typeof message === 'string' ? { code, message } : null;
 }
 
+/**
+ * 将不可信业务实现的返回值归一为 SUCCEEDED/UNKNOWN/FAILED 联合类型。
+ * kind 必须在合同声明范围内；非 JSON/不完整/带异常 Getter 的值不能向调用方冒充成功。
+ * 这里与输入/输出 Schema 校验分工：只检查 Outcome 形状，不代表业务值已通过 outputSchemaRef。
+ */
 export function normalizeOutcome(raw: unknown, declaredOutcomes: readonly string[]): FunctionOutcome {
   try {
     if (typeof raw === 'object' && raw !== null) {
@@ -111,6 +116,11 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
 
   const ingressById = new Map<string, SealedIngress>(lock.ingress.map((entry) => [entry.id, entry]));
 
+  /**
+   * SDK 运行期直达调用链：生命周期/入口状态 → Effect=none → 获取已选 Schema →
+   * 校验输入 → 执行已选实现 → Outcome 归一 → 校验成功值的输出 Schema。
+   * 缺少 Schema 时返回 UNKNOWN；非法输入/输出或实现异常返回 FAILED，不隐式重试。
+   */
   async function invoke(ingressId: string, input: unknown): Promise<FunctionOutcome> {
     if (disposed) {
       return failedOutcome('DH_RUNTIME_INGRESS_NOT_CALLABLE', 'app is disposed');
@@ -171,6 +181,7 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     return outcome;
   }
 
+  /** 按值投影已选元数据。不要把 lock.target、嵌套 ref 或 outcomes 数组直接返给 JS Consumer。 */
   function inspect(): Promise<DomainAppInspection> {
     return Promise.resolve<DomainAppInspection>({
       appIdentity: {
@@ -201,6 +212,7 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     });
   }
 
+  /** 首次调用立刻阻止后续 invoke；并发或重复 dispose 复用同一 Promise，技术销毁只执行一次。 */
   function dispose(): Promise<{ readonly status: 'DISPOSED' }> {
     if (disposeFlight === null) {
       disposed = true;
