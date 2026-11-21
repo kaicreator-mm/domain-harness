@@ -2,6 +2,7 @@
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { contentDigestOf, canonicalJson } from '@kaicreator/domain-harness-contracts';
+import { executeSelectedWorkflow } from './workflow-execution.js';
 import type {
   DomainAppLock,
   ElementDefinition,
@@ -19,6 +20,8 @@ import type {
   PackageInitContext,
   PackageExitContext,
   PackageInitBinding,
+  WorkflowRef,
+  JsonValue,
 } from '@kaicreator/domain-harness-contracts';
 import { resolvePackageFile, splitResourceKey } from './paths.js';
 import { bytesContentDigest } from './verify.js';
@@ -216,6 +219,48 @@ export class PackageSystem {
             invoke: (input: unknown): Promise<FunctionOutcome> => this.invokeSelectedFunction(selected.ref, input),
           }));
         }
+        // Workflow starter 完全是当前 Package.Init 的受限句柄，不增加第二业务入口。
+        // 仅已选根可由该 Package 发起；子 Workflow 只随 BUILD 固定的边进入。
+        const allowedWorkflowRoots = new Set((pkg.workflowRoots ?? []).map((ref) => canonicalJson(ref)));
+        const workflows = pkg.workflowRoots?.length ? Object.freeze({
+          start: async (ref: WorkflowRef, input: JsonValue) => {
+            if (!allowedWorkflowRoots.has(canonicalJson(ref))) {
+              return { status: 'FAILED' as const, reason: {
+                code: 'DH_WORKFLOW_UNSELECTED',
+                message: 'Package.Init may only start a BUILD-authorized Workflow root',
+              } };
+            }
+            const selected = this.lock.selectedWorkflows?.find((item) =>
+              canonicalJson(item.ref) === canonicalJson(ref));
+            if (!selected) {
+              return { status: 'FAILED' as const, reason: {
+                code: 'DH_WORKFLOW_UNSELECTED',
+                message: 'authorized Workflow root is not selected in Lock',
+              } };
+            }
+            return executeSelectedWorkflow(ref, input, {
+              select: (wanted) => this.lock.selectedWorkflows?.find((item) =>
+                canonicalJson(item.ref) === canonicalJson(wanted)),
+              invoke: async (call, value) => {
+                // BUILD 已静态选定节点/Hook。KDP 从不按代码入口或包名动态查找实现。
+                if (!this.functionByRef(call)) {
+                  return { kind: 'FAILED' as const, failure: {
+                    code: 'DH_RUNTIME_FUNCTION_UNSELECTED',
+                    message: 'Workflow FunctionRef is not selected',
+                  } };
+                }
+                return this.invokeSelectedFunction(call, value);
+              },
+              read: async (data) => {
+                const key = `${data.packageId}/${data.path}`;
+                if (this.lock.resourceDigests[key] !== data.digest) {
+                  throw new KdpLoadError('Workflow Reader resource does not match sealed Lock digest');
+                }
+                return this.resourceHandle(key).read();
+              },
+            });
+          },
+        }) : undefined;
         const kdpCore = pkg.role === 'primary' && pkg.order === 0;
         const ownContext: PackageInitContext = {
           ...context,
@@ -223,6 +268,7 @@ export class PackageSystem {
           // 每个 Package 拿到独立的配置和句柄快照，不能修改后来者的 Init 上下文。
           config: structuredClone(context.config),
           functions: visibleFunctions,
+          ...(workflows ? { workflows } : {}),
           ...(pkg.recordInitFrom === true
             ? { InitFrom: Object.freeze((this.initFrom(packageId) ?? []).map((entry) => Object.freeze({ ...entry }))) }
             : {}),
