@@ -1,8 +1,10 @@
-// 当前唯一 Domain App 验收：真实四包安装后验证构建、启动、调用及错误拒绝。
+// 当前唯一 Domain App 验收：真实 SDK 四包与单一组合 App 安装后验证构建、启动、调用及错误拒绝。
 import assert from 'node:assert/strict';
 import { appendFile, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { dirname, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DH_APP_SCHEMA_VERSION,
@@ -18,6 +20,14 @@ import {
 } from '@kaicreator/domain-harness';
 
 const consumerRoot = process.cwd();
+const require = createRequire(import.meta.url);
+const npmManifest = require.resolve('npm/package.json', {
+  paths: [dirname(process.execPath), resolve(dirname(process.execPath), '../lib/node_modules')],
+});
+const npmCli = process.env.npm_execpath ?? join(dirname(npmManifest), 'bin/npm-cli.js');
+const microkernelTarball = process.env.DH_T05_MICROKERNEL_TARBALL;
+const contractsTarball = process.env.DH_T05_CONTRACTS_TARBALL;
+assert.ok(microkernelTarball && contractsTarball, 'driver must provide exact local runtime tarballs for composed App installation');
 const evidenceDir = process.env.DH_T05_EVIDENCE ?? join(consumerRoot, 'evidence');
 const eventsPath = join(evidenceDir, 'consumer-events.ndjson');
 await mkdir(evidenceDir, { recursive: true });
@@ -52,8 +62,11 @@ function lifecycleModule(packageId) {
   return `
 const events = (globalThis.__domainHarnessT05Events ??= []);
 events.push({ event: 'module-evaluated', package: '${packageId}' });
-export async function technicalInit() { events.push({ event: 'technical-init', package: '${packageId}' }); }
-export async function technicalDispose() { events.push({ event: 'technical-dispose', package: '${packageId}' }); }
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: '${packageId}', initFrom: ctx.InitFrom });
+  ${packageId === 'app-business' ? "return (await import('./app.mjs')).init(ctx);" : 'return ctx.nextCore?.init();'}
+}
+export async function exit() { events.push({ event: 'package-exit', package: '${packageId}' }); }
 `;
 }
 function rulesModule() {
@@ -75,7 +88,7 @@ function businessModule(withUnsupportedEffect, initThrows = false, initDegraded 
 import { evaluate, initializeRule } from 'rules-package/rules';
 const events = (globalThis.__domainHarnessT05Events ??= []);
 events.push({ event: 'module-evaluated', package: 'app-business-entry' });
-export async function businessAppInit(ctx) {
+export async function init(ctx) {
   ${initThrows ? "throw new Error('demo intentionally failed Business App Init');" : ''}
   const handle = ctx.resources.get('rules-package/content/rules.json');
   if (handle === undefined) throw new Error('selected rule resource is not sealed');
@@ -116,10 +129,20 @@ async function authoring(label, rule, options = {}) {
   }
   await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule());
   await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
-  await write(dirs['rules-package'], 'package.json', JSON.stringify({
-    name: 'rules-package', version: '1.0.0', type: 'module', exports: { './rules': './dist/rules.mjs' },
-  }));
-  await write(dirs['app-business'], 'package.json', JSON.stringify({ name: 'app-business', version: '1.0.0', type: 'module' }));
+  await write(dirs['kernel-primary'], 'dist/index.js', "export { bootstrap } from '@kaicreator/domain-harness-microkernel';\n");
+  for (const id of Object.keys(dirs)) {
+    const exports = id === 'kernel-primary'
+      ? { '.': './dist/index.js' }
+      : id === 'rules-package'
+        ? { '.': './dist/index.mjs', './rules': './dist/rules.mjs' }
+        : { '.': './dist/index.mjs' };
+    await write(dirs[id], 'package.json', canonicalJson({
+      name: id, version: '1.0.0', type: 'module', exports,
+      ...(options.npmPreinstallScript === true && id === 'rules-package'
+        ? { scripts: { preinstall: 'node -e "require(\'node:fs\').writeFileSync(\'unexpected-hook.txt\',\'unsafe\')"' } }
+        : {}),
+    }));
+  }
   const ruleText = canonicalJson(rule);
   await write(dirs['rules-package'], 'content/rules.json', ruleText);
   const ruleRef = { packageId: 'rules-package', path: 'content/rules.json', digest: await fileDigest(join(dirs['rules-package'], 'content/rules.json')) };
@@ -137,9 +160,16 @@ async function authoring(label, rule, options = {}) {
   };
   const rules = {
     kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION, id: 'basic.rules', version: '1.0.0',
-    description: 'Two Functions consume the same selected structured rule.',
+    description: 'Public Functions consume and initialize the same selected structured rule.',
     content: [{ id: 'selected-rule', contentKind: 'rule', schemaRef: { inline: { type: 'object', required: ['minOrderTotal', 'regions'] } }, required: true, ref: ruleRef }],
-    functions: [fn('evaluate', evaluateInput, decisionSchema), fn('optionalReport', { type: 'object' }, { type: 'string' })],
+    functions: [
+      fn('evaluate', evaluateInput, decisionSchema),
+      fn('optionalReport', { type: 'object' }, { type: 'string' }),
+      fn('initializeRule', {
+        type: 'object', required: ['minOrderTotal', 'regions'],
+        properties: { minOrderTotal: { type: 'number' }, regions: { type: 'array' } },
+      }, { type: 'null' }),
+    ],
   };
   const app = {
     kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION, id: 'basic.app', version: '1.0.0',
@@ -147,11 +177,10 @@ async function authoring(label, rule, options = {}) {
     content: [{ id: 'channel', contentKind: 'structured-data', schemaRef: { inline: { type: 'object' } }, required: true, value: { channel: 'basic-example' } }],
     functions: [
       fn('submit', evaluateInput, decisionSchema),
-      fn('appInit', { type: 'object' }, { type: 'object' }),
       ...(options.unsupportedEffect === true ? [fn('dangerous', { type: 'object' }, { type: 'string' }, 'external')] : []),
     ],
     dependencies: [
-      { element: 'basic.rules', version: '1.0.0', functions: ['evaluate', 'optionalReport'] },
+      { element: 'basic.rules', version: '1.0.0', functions: ['evaluate', 'optionalReport', 'initializeRule'] },
       { element: 'basic.knowledge', version: '1.0.0' },
     ],
   };
@@ -160,7 +189,9 @@ async function authoring(label, rule, options = {}) {
     schemaRef: { inline: { type: 'object' } }, required: true, value: {},
   });
   if (options.elementCycle === true) {
-    knowledge.dependencies = [{ element: 'basic.app', version: '1.0.0' }];
+    // 构造同一 Package 内的真实 Element 环，避免先触发未声明跨包 Extension 拒绝。
+    knowledge.dependencies = [{ element: 'basic.rules', version: '1.0.0' }];
+    rules.dependencies = [{ element: 'basic.knowledge', version: '1.0.0' }];
   }
   if (options.inlineRule === true) {
     rules.content[0].value = globalThis.structuredClone(rule);
@@ -186,7 +217,8 @@ async function authoring(label, rule, options = {}) {
   const functionRef = (element, functionId) => ({ element: elementRef(element), functionId, contractVersion: '1' });
   const refs = {
     evaluate: functionRef('basic.rules', 'evaluate'), optionalReport: functionRef('basic.rules', 'optionalReport'),
-    submit: functionRef('basic.app', 'submit'), appInit: functionRef('basic.app', 'appInit'),
+    initializeRule: functionRef('basic.rules', 'initializeRule'),
+    submit: functionRef('basic.app', 'submit'),
     dangerous: functionRef('basic.app', 'dangerous'),
   };
   const artifactRef = async (packageId, path) => ({ packageId, path, digest: await fileDigest(join(dirs[packageId], path)) });
@@ -201,26 +233,26 @@ async function authoring(label, rule, options = {}) {
   });
   const packages = [
     manifest('kernel-primary', {
-      layer: 'kernel', role: 'primary', exports: [{ interfaceId: 'kernel.api' }],
+      layer: 'kernel', role: 'primary', order: 0, dependsOn: [{ package: 'kernel-extension', version: '1.0.0', interface: 'kernel.extension' }], exports: [{ interfaceId: 'kernel.api' }],
       provides: { hooks: [{ id: 'audit', interfaceSchemaRef: { inline: { type: 'object' } }, cardinality: 'single' }] },
-      technicalInit: { module: artifactRefs['kernel-primary'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['kernel-primary'], exportName: 'technicalDispose' },
+      init: { module: artifactRefs['kernel-primary'], exportName: 'init' },
+      exit: { module: artifactRefs['kernel-primary'], exportName: 'exit' },
     }),
     manifest('kernel-extension', {
-      layer: 'kernel', role: 'extension', dependsOn: [{ package: 'kernel-primary', version: '1.0.0', interface: 'kernel.api' }],
+      layer: 'kernel', role: 'extension', exports: [{ interfaceId: 'kernel.extension' }],
       contributesTo: [{ ownerPackageId: 'kernel-primary', hookId: 'audit', entry: { module: artifactRefs['kernel-extension'], exportName: 'auditHook' } }],
-      technicalInit: { module: artifactRefs['kernel-extension'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['kernel-extension'], exportName: 'technicalDispose' },
+      init: { module: artifactRefs['kernel-extension'], exportName: 'init' },
+      exit: { module: artifactRefs['kernel-extension'], exportName: 'exit' },
     }),
     manifest('sdk-primary', {
-      layer: 'sdk', role: 'primary', dependsOn: [{ package: 'kernel-primary', version: '1.0.0', interface: 'kernel.api' }], exports: [{ interfaceId: 'sdk.api' }],
-      technicalInit: { module: artifactRefs['sdk-primary'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['sdk-primary'], exportName: 'technicalDispose' },
+      layer: 'sdk', role: 'primary', order: 1, dependsOn: [{ package: 'kernel-primary', version: '1.0.0', interface: 'kernel.api' }, { package: 'sdk-extension', version: '1.0.0', interface: 'sdk.extension' }], exports: [{ interfaceId: 'sdk.api' }],
+      init: { module: artifactRefs['sdk-primary'], exportName: 'init' },
+      exit: { module: artifactRefs['sdk-primary'], exportName: 'exit' },
     }),
     manifest('sdk-extension', {
-      layer: 'sdk', role: 'extension', dependsOn: [{ package: 'sdk-primary', version: '1.0.0', interface: 'sdk.api' }],
-      technicalInit: { module: artifactRefs['sdk-extension'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['sdk-extension'], exportName: 'technicalDispose' },
+      layer: 'sdk', role: 'extension', exports: [{ interfaceId: 'sdk.extension' }],
+      init: { module: artifactRefs['sdk-extension'], exportName: 'init' },
+      exit: { module: artifactRefs['sdk-extension'], exportName: 'exit' },
     }),
     manifest('rules-package', {
       layer: 'business', role: 'extension',
@@ -232,43 +264,44 @@ async function authoring(label, rule, options = {}) {
       targetVariants: variant([
         implementation('basic.rules', 'evaluate', rulesEntryRef, 'evaluate', [ruleRef]),
         implementation('basic.rules', 'optionalReport', rulesEntryRef, 'optionalReport'),
+        implementation('basic.rules', 'initializeRule', rulesEntryRef, 'initializeRule'),
       ]),
-      technicalInit: { module: artifactRefs['rules-package'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['rules-package'], exportName: 'technicalDispose' },
+      init: { module: artifactRefs['rules-package'], exportName: 'init' },
+      exit: { module: artifactRefs['rules-package'], exportName: 'exit' },
     }),
     manifest('app-business', {
-      layer: 'business', role: 'primary', dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }],
+      layer: 'business', role: 'primary', order: 2, recordInitFrom: true, dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }], initResources: [ruleRef],
       elements: [{ id: 'basic.app', version: '1.0.0', definitionRef: definitionRefs['basic.app'], visibility: 'public' }],
-      imports: [refs.evaluate, refs.optionalReport], exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
+      imports: [refs.evaluate, refs.optionalReport, refs.initializeRule], exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
       targetVariants: variant([
         implementation('basic.app', 'submit', businessEntryRef, 'submit', [ruleRef]),
-        implementation('basic.app', 'appInit', businessEntryRef, 'businessAppInit', [ruleRef]),
         ...(options.unsupportedEffect === true ? [implementation('basic.app', 'dangerous', businessEntryRef, 'dangerous')] : []),
       ]),
-      technicalInit: { module: artifactRefs['app-business'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['app-business'], exportName: 'technicalDispose' },
+      init: { module: artifactRefs['app-business'], exportName: 'init' },
+      exit: { module: artifactRefs['app-business'], exportName: 'exit' },
     }),
   ];
   await write(dirs['kernel-extension'], 'dist/index.mjs', `${lifecycleModule('kernel-extension')}\nexport function auditHook(value) { return value; }\n`);
   artifactRefs['kernel-extension'] = await artifactRef('kernel-extension', 'dist/index.mjs');
   packages[1].contributesTo[0].entry.module = artifactRefs['kernel-extension'];
-  packages[1].technicalInit.module = artifactRefs['kernel-extension'];
-  packages[1].technicalDispose.module = artifactRefs['kernel-extension'];
+  packages[1].init.module = artifactRefs['kernel-extension'];
+  packages[1].exit.module = artifactRefs['kernel-extension'];
 
   const descriptor = {
     kind: 'DomainApp', schemaVersion: DH_APP_SCHEMA_VERSION, id: `basic.clean.${label}`, version: '1.0.0',
     target: options.unsupportedTarget === true ? { runtime: 'node', module: 'esm', nodeMajor: 20 } : target,
     roots: {
       kernelPrimary: { package: 'kernel-primary', version: '1.0.0' },
-      sdkPrimary: { package: 'sdk-primary', version: '1.0.0' },
-      businessPrimary: { package: 'app-business', version: '1.0.0' },
+      cores: [
+        { package: 'sdk-primary', version: '1.0.0' },
+        { package: 'app-business', version: '1.0.0' },
+      ],
     },
     extensions: [
       { package: 'kernel-extension', version: '1.0.0' },
       { package: 'sdk-extension', version: '1.0.0' },
       { package: 'rules-package', version: '1.0.0' },
     ],
-    businessAppInit: refs.appInit,
     ingress: [
       { id: 'submit', function: refs.submit },
       { id: 'optional-report', function: refs.optionalReport, optional: true },
@@ -278,40 +311,45 @@ async function authoring(label, rule, options = {}) {
   };
   const input = {
     descriptor, packages,
-    packageRoots: {
-      ...dirs,
-      '@kaicreator/domain-harness-microkernel': join(consumerRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel'),
-    },
+    packageRoots: dirs,
     packageArtifacts: Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
-    kdpArtifact: { packageId: '@kaicreator/domain-harness-microkernel', path: 'dist/index.js' },
+    kdpArtifact: { packageId: 'kernel-primary', path: 'dist/index.js' },
+    runtimeDependencies: { '@kaicreator/domain-harness-microkernel': '0.11.0' },
   };
   return { root, dirs, input, descriptor, definitions, domainElements: [knowledge, rules, app], ruleRef, refs };
 }
 
-async function materialize(label, prepared, built) {
+async function installComposedDependencies(label, installRoot) {
+  const install = spawnSync(process.execPath, [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund'], {
+    cwd: installRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, npm_config_registry: process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry },
+  });
+  await evidence(`${label}.composed-package-npm-install`, { exit: install.status, signal: install.signal });
+  assert.equal(install.status, 0, `${label}: composed App npm install failed\n${install.stdout}\n${install.stderr}`);
+}
+
+async function materialize(label, built) {
   const installRoot = await mkdtemp(join(consumerRoot, `install-${label}-`));
   installRoots.add(installRoot);
-  for (const id of Object.keys(prepared.dirs)) await cp(prepared.dirs[id], join(installRoot, 'node_modules', id), { recursive: true });
-  for (const id of ['@kaicreator/domain-harness-microkernel', '@kaicreator/domain-harness-contracts']) {
-    await cp(join(consumerRoot, 'node_modules', ...id.split('/')), join(installRoot, 'node_modules', ...id.split('/')), { recursive: true });
+  for (const file of built.appPackage.files) await write(installRoot, file.path, file.bytes);
+  await evidence(`${label}.composed-package-materialize`, {
+    status: 'PASS', files: built.appPackage.files.length, packageDigest: built.appPackage.packageDigest,
+  });
+  await installComposedDependencies(label, installRoot);
+  if (label === 'rule-a') {
+    const child = spawnSync(process.execPath, ['boot.mjs'], {
+      cwd: installRoot, encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024, env: process.env,
+    });
+    await evidence('composed-package-independent-boot', { exit: child.status, signal: child.signal });
+    assert.equal(child.status, 0, `composed App independent boot failed\n${child.stdout}\n${child.stderr}`);
+    assert.match(child.stdout, /"status":"BOOTED"/u);
+    assert.match(child.stdout, /"status":"DISPOSED"/u);
   }
-  await write(installRoot, 'descriptor/app.json', canonicalJson(prepared.descriptor));
-  const lockBytes = built.lockBytes;
-  await write(installRoot, 'dh-lock/app.lock.json', lockBytes);
   const lock = built.lock;
-  const recordBase = {
-    kind: 'DomainAppInstallRecord', schemaVersion: 'dh.install/0.11', appId: lock.appIdentity.id, appVersion: lock.appIdentity.version,
-    target: lock.target, lockPath: 'dh-lock/app.lock.json', lockDigest: lock.closureDigest,
-    kdpPackageId: '@kaicreator/domain-harness-microkernel', kdpPrimaryEntry: 'bootstrap', kdpPrimaryDigest: lock.bootstrapKdpPin.kdpPrimaryDigest,
-  };
-  const record = { ...recordBase, recordDigest: contentDigestOf(recordBase) };
-  await write(installRoot, 'dh-install/installed-record.json', JSON.stringify(record));
-  const pin = {
-    schemaVersion: 'dh.pin/0.11', target: lock.target, kdpPackageId: record.kdpPackageId, kdpPrimaryEntry: 'bootstrap',
-    kdpPrimaryDigest: record.kdpPrimaryDigest, lockDigest: record.lockDigest, lockPath: record.lockPath,
-  };
+  const lockBytes = built.lockBytes;
+  const pin = JSON.parse(await readFile(join(installRoot, 'dh-install/bootstrap-pin.json'), 'utf8'));
   const context = {
-    installRoot, descriptorPath: 'descriptor/app.json', lockPath: record.lockPath,
+    installRoot, descriptorPath: 'descriptor/app.json', lockPath: 'dh-lock/app.lock.json',
     hostPorts: [], env: { nodeMajor: 22, platform: process.platform },
   };
   return { installRoot, pin, context, lock, lockBytes };
@@ -356,7 +394,7 @@ async function runPositive(label, rule, expectedAtHundred) {
     };
     assert.deepEqual(validateDomainDefinition(domain), { ok: true });
     assert.equal(prepared.domainElements[0].functions.length, 0);
-    assert.equal(prepared.domainElements[2].functions.length, 2);
+    assert.equal(prepared.domainElements[2].functions.length, 1, 'business startup belongs to Package.Init and is not a second Function');
     assert.equal(new Set(prepared.domainElements.flatMap((element) => element.content.map((block) => block.contentKind))).size >= 2, true);
     assert.equal(contentDigestOf(rule), prepared.ruleRef.digest);
     assert.equal(validateDomainDefinition({ ...domain, schemaVersion: 'invalid' }).ok, false);
@@ -372,6 +410,10 @@ async function runPositive(label, rule, expectedAtHundred) {
     assert.equal(second.ok, true, JSON.stringify(second));
     if (!first.ok || !second.ok) throw new Error('positive BUILD failed');
     assert.deepEqual(second.lockBytes, first.lockBytes, 'identical inputs must produce byte-identical Lock');
+    assert.deepEqual(second.appPackage, first.appPackage, 'identical inputs must produce the complete byte-identical App Package');
+    assert.ok(first.appPackage.files.some((file) => file.path === 'boot.mjs'));
+    assert.ok(first.appPackage.files.some((file) => file.path === 'dh-install/installed-record.json'));
+    assert.ok(first.appPackage.files.some((file) => file.path === 'packages/kernel-primary/package.json'));
     assert.equal(second.lock.closureDigest, first.lock.closureDigest);
     assert.equal(first.lock.selectedPackages.filter((pkg) => pkg.role === 'primary').length, 3);
     assert.equal(first.lock.selectedPackages.filter((pkg) => pkg.role === 'extension').length, 3);
@@ -381,9 +423,12 @@ async function runPositive(label, rule, expectedAtHundred) {
     const knowledgeLock = first.lock.selectedElements.find((element) => element.ref.id === 'basic.knowledge');
     assert.equal(knowledgeLock.contentDigests.length, 1, 'only the required knowledge block may be selected');
     assert.equal(knowledgeLock.contentDigests.includes(contentDigestOf({ note: 'unknown optional content is explicitly excluded' })), false);
-    await evidence(`${label}.build-determinism`, { status: 'PASS', closureDigest: first.lock.closureDigest, hookBindings: 1, primary: 3, extension: 3 });
+    await evidence(`${label}.build-determinism`, {
+      status: 'PASS', closureDigest: first.lock.closureDigest, packageDigest: first.appPackage.packageDigest,
+      files: first.appPackage.files.length, hookBindings: 1, primary: 3, extension: 3,
+    });
 
-    const install = await materialize(label, prepared, first);
+    const install = await materialize(label, first);
     globalThis.__domainHarnessT05Events = [];
     const result = await boot(install.pin, install.context);
     assert.equal(result.status, 'BOOTED', JSON.stringify(result));
@@ -391,13 +436,14 @@ async function runPositive(label, rule, expectedAtHundred) {
     const app = result.app;
     assert.equal(app.status, 'READY');
     const runtimeEvents = globalThis.__domainHarnessT05Events;
-    const technical = runtimeEvents.filter((event) => event.event === 'technical-init').map((event) => event.package);
-    assert.deepEqual(technical, install.lock.technicalInitOrder);
+    const initialized = runtimeEvents.filter((event) => event.event === 'package-init').map((event) => event.package);
+    assert.deepEqual(install.lock.coreOrder, ['kernel-primary', 'sdk-primary', 'app-business']);
+    assert.deepEqual(initialized, ['kernel-extension', 'kernel-primary', 'sdk-extension', 'sdk-primary', 'rules-package', 'app-business']);
     const businessInitIndex = runtimeEvents.findIndex((event) => event.event === 'business-init');
-    const lastTechnicalIndex = runtimeEvents.map((event) => event.event).lastIndexOf('technical-init');
-    assert.ok(lastTechnicalIndex >= 0 && businessInitIndex > lastTechnicalIndex, 'the one Business App Init must run after every technical init');
+    const lastInitIndex = runtimeEvents.map((event) => event.event).lastIndexOf('package-init');
+    assert.ok(lastInitIndex >= 0 && businessInitIndex > lastInitIndex, 'Business Core.Init executes once after own Extension Init');
     assert.equal(runtimeEvents.filter((event) => event.event === 'business-init').length, 1);
-    await evidence(`${label}.boot-kdp-app-init`, { status: 'PASS', technicalInitOrder: technical, businessInitCount: 1 });
+    await evidence(`${label}.boot-kdp-app-init`, { status: 'PASS', initOrder: initialized, businessInitCount: 1 });
 
     const pos = await app.invoke('submit', { total: 100, region: 'US' });
     const neg = await app.invoke('submit', { total: 10, region: 'US' });
@@ -427,14 +473,14 @@ async function runPositive(label, rule, expectedAtHundred) {
     assert.equal(inspection.appIdentity.lockDigest, install.lock.closureDigest);
     assert.equal(inspection.target.profile, 'node22-esm/1');
     assert.deepEqual(await app.dispose(), { status: 'DISPOSED' });
-    const disposed = runtimeEvents.filter((event) => event.event === 'technical-dispose').map((event) => event.package);
-    assert.deepEqual(install.lock.technicalDisposeOrder, [...install.lock.technicalInitOrder].reverse());
-    assert.deepEqual(disposed, install.lock.technicalDisposeOrder);
-    assert.deepEqual(disposed, [...technical].reverse(), 'runtime disposal must be the exact reverse of technical init');
+    const disposed = runtimeEvents.filter((event) => event.event === 'package-exit').map((event) => event.package);
+    assert.deepEqual(disposed,
+      ['rules-package', 'app-business', 'sdk-extension', 'sdk-primary', 'kernel-extension', 'kernel-primary'],
+      'Exit follows actual recursive Init entry stack, deepest first');
     const afterDispose = await app.invoke('submit', { total: 100, region: 'EU' });
     assert.equal(afterDispose.kind, 'FAILED');
     assert.equal(afterDispose.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
-    await evidence(`${label}.inspect-dispose`, { status: 'PASS', technicalDisposeOrder: disposed, postDisposeCode: afterDispose.failure.code });
+    await evidence(`${label}.inspect-dispose`, { status: 'PASS', exitOrder: disposed, postDisposeCode: afterDispose.failure.code });
     return { prepared, install };
   } finally {
     await rm(prepared.root, { recursive: true, force: true });
@@ -444,7 +490,14 @@ async function runPositive(label, rule, expectedAtHundred) {
 async function cloneInstall(source) {
   const installRoot = await mkdtemp(join(consumerRoot, 'negative-install-'));
   installRoots.add(installRoot);
-  await cp(source.installRoot, installRoot, { recursive: true });
+  await cp(source.installRoot, installRoot, {
+    recursive: true,
+    filter: (path) => {
+      const rel = relative(source.installRoot, path);
+      return rel !== 'node_modules' && !rel.startsWith(`node_modules${process.platform === 'win32' ? '\\' : '/'}`) && rel !== 'package-lock.json';
+    },
+  });
+  await installComposedDependencies('negative-clone', installRoot);
   return { ...source, installRoot, context: { ...source.context, installRoot } };
 }
 
@@ -468,6 +521,8 @@ async function main() {
 
   await expectBuildRefusal('unsupported-effect', { unsupportedEffect: true }, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
   await expectBuildRefusal('unsupported-target', { unsupportedTarget: true }, 'DH_BUILD_TARGET_INVALID');
+  // 真正的消费端构建入口必须在 npm install/materialize 前拒绝恶意 Package 的 preinstall。
+  await expectBuildRefusal('untrusted-npm-install-hook', { npmPreinstallScript: true }, 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 
   const pkg = (prepared, id) => {
     const found = prepared.input.packages.find((candidate) => candidate.id === id);
@@ -485,9 +540,9 @@ async function main() {
     business.targetVariants[0].implementations =
       business.targetVariants[0].implementations.filter((binding) => binding.functionId !== 'submit');
   }, 'DH_BUILD_IMPLEMENTATION_MISSING');
-  await expectBuildMutationRefusal('duplicate-sdk-primary', (p) => {
+  await expectBuildMutationRefusal('unselected-core-primary', (p) => {
     pkg(p, 'sdk-extension').role = 'primary';
-  }, 'DH_BUILD_PRIMARY_DUPLICATE');
+  }, 'DH_BUILD_PRIMARY_MISSING');
   await expectBuildMutationRefusal('missing-kernel-primary', (p) => {
     pkg(p, 'kernel-primary').layer = 'sdk';
   }, 'DH_BUILD_PRIMARY_MISSING');
@@ -497,9 +552,9 @@ async function main() {
   await expectBuildMutationRefusal('hook-not-declared', (p) => {
     pkg(p, 'kernel-extension').contributesTo[0].hookId = 'not-an-audit-hook';
   }, 'DH_BUILD_HOOK_TARGET_INVALID');
-  await expectBuildMutationRefusal('missing-selected-app-init', (p) => {
-    p.input.descriptor.businessAppInit.functionId = 'nonexistent-init';
-  }, 'DH_BUILD_APP_INIT_MISSING');
+  await expectBuildMutationRefusal('missing-selected-package-init', (p) => {
+    pkg(p, 'app-business').init.exportName = 'nonexistentInit';
+  }, 'DH_BUILD_SCHEMA_INVALID');
   await expectBuildMutationRefusal('bad-resource-digest', (p) => {
     pkg(p, 'app-business').targetVariants[0].implementations[0].resources[0].digest = `sha256:${'0'.repeat(64)}`;
   }, 'DH_BUILD_RESOURCE_DIGEST_MISMATCH');
@@ -525,18 +580,20 @@ async function main() {
     const failedInitBuild = await buildApp(failedInitPrepared.input);
     assert.equal(failedInitBuild.ok, true, JSON.stringify(failedInitBuild));
     if (!failedInitBuild.ok) throw new Error('demo failed to BUILD the App Init failure fixture');
-    const failedInitInstall = await materialize('init-failure', failedInitPrepared, failedInitBuild);
+    const failedInitInstall = await materialize('init-failure', failedInitBuild);
     globalThis.__domainHarnessT05Events = [];
     const failedInit = await boot(failedInitInstall.pin, failedInitInstall.context);
     assert.equal(failedInit.status, 'FAILED', JSON.stringify(failedInit));
     assert.equal(failedInit.code, 'DH_RUNTIME_NOT_READY');
     assert.equal('app' in failedInit, false, 'failed App Init must not expose any App/ingress handle');
     const timeline = globalThis.__domainHarnessT05Events;
-    const initialized = timeline.filter((event) => event.event === 'technical-init').map((event) => event.package);
-    const disposed = timeline.filter((event) => event.event === 'technical-dispose').map((event) => event.package);
-    assert.ok(initialized.length > 0, 'failure fixture must actually initialize technical Packages');
-    assert.deepEqual(initialized, failedInitInstall.lock.technicalInitOrder);
-    assert.deepEqual(disposed, [...initialized].reverse(), 'failed App Init must roll back all technical Packages in reverse order');
+    const initialized = timeline.filter((event) => event.event === 'package-init').map((event) => event.package);
+    const disposed = timeline.filter((event) => event.event === 'package-exit').map((event) => event.package);
+    assert.ok(initialized.length > 0, 'failure fixture must actually initialize Packages');
+    assert.deepEqual(initialized, ['kernel-extension', 'kernel-primary', 'sdk-extension', 'sdk-primary', 'rules-package', 'app-business']);
+    assert.deepEqual(disposed,
+      ['rules-package', 'app-business', 'sdk-extension', 'sdk-primary', 'kernel-extension', 'kernel-primary'],
+      'failed Init must Exit all entered Packages from deepest to root');
     assert.equal(timeline.some((event) => event.event === 'business-init'), false);
     await evidence('negative.app-init-failure-rollback', { status: 'PASS', code: failedInit.code, initialized: initialized.length, disposed: disposed.length, exposedApp: false });
   } finally {
@@ -547,7 +604,7 @@ async function main() {
   try {
     const built = await buildApp(degradedPrepared.input);
     assert.equal(built.ok, true, JSON.stringify(built));
-    const install = await materialize('degraded-optional-ingress', degradedPrepared, built);
+    const install = await materialize('degraded-optional-ingress', built);
     globalThis.__domainHarnessT05Events = [];
     const booted = await boot(install.pin, install.context);
     assert.equal(booted.status, 'BOOTED', JSON.stringify(booted));
@@ -602,7 +659,7 @@ async function main() {
   await evidence('negative.record-digest-invalid', { status: 'PASS', code: refused.code, freshInstall: true });
 
   const kdpTamperInstall = await cloneInstall(a.install);
-  const kdpEntry = join(kdpTamperInstall.installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel', 'dist', 'index.js');
+  const kdpEntry = join(kdpTamperInstall.installRoot, 'node_modules', 'kernel-primary', 'dist', 'index.js');
   const originalKdp = await readFile(kdpEntry);
   await writeFile(kdpEntry, `${originalKdp.toString('utf8')}\n// post-install KDP tamper\n`);
   before = globalThis.__domainHarnessT05Events.length;
@@ -652,7 +709,7 @@ async function main() {
     },
     AC04: {
       status: 'PASS_E2E_WITH_UPSTREAM',
-      e2e: ['3 Primary + 3 Extension', 'one sealed Hook', 'deterministic technical init/dispose order'],
+      e2e: ['3 Primary + 3 Extension', 'one sealed Hook', 'deterministic Package Init/dispose order'],
       upstream: [upstream('T02', 'tooling/build/tests/*.test.ts (Primary/Hook cardinality negatives)')],
     },
     AC05: {
@@ -663,7 +720,7 @@ async function main() {
     },
     AC06: {
       status: 'PASS_E2E_WITH_UPSTREAM',
-      e2e: ['one App Init after all technical init', 'direct cross-package POS/NEG/UNKNOWN', 'same-code content exchange', 'App Init exception reverse cleanup and no exposed App handle'],
+      e2e: ['one App Init after all Package Init', 'direct cross-package POS/NEG/UNKNOWN', 'same-code content exchange', 'App Init exception reverse cleanup and no exposed App handle'],
       upstream: [upstream('T04', 'packages/domain-harness/tests/final-integration.test.ts (required-ingress suppression and DEGRADED negatives)')],
     },
     AC07: {
@@ -671,7 +728,7 @@ async function main() {
       e2e: ['exact repeated Lock bytes', 'JSON-preserving one-byte Lock tamper refusal'],
       upstream: [upstream('T02', 'tooling/build/tests/*.test.ts (remaining Target/version/resource digest negatives)')],
     },
-    AC08: { status: 'PASS_E2E', e2e: ['actual four-tarball external install + per-entry realpath and byte equality', 'legacy import fences', 'contracts'], upstream: [] },
+    AC08: { status: 'PASS_E2E', e2e: ['actual four-tarball SDK install + BUILD-composed App npm install + independent boot/dispose + per-entry realpath and byte equality', 'legacy import fences', 'contracts'], upstream: [] },
     AC09: { status: 'PASS_E2E', e2e: ['unsupported effect and target typed BUILD refusals', 'no unimplemented success path'], upstream: [] },
     AC10: { status: 'PASS_E2E', e2e: ['bilingual current-only author docs', 'executable canonical-source business-word scan (driver)'], upstream: [] },
   };

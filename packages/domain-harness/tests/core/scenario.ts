@@ -29,7 +29,8 @@ import type { BuildInput, BuildFailure } from '@kaicreator/domain-harness';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MICROKERNEL_DIR = join(HERE, '../../../microkernel');
 const CONTRACTS_DIR = join(HERE, '../../../contracts');
-const KDP_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
+const MICROKERNEL_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
+const KDP_PACKAGE_ID = 'kdp-kernel';
 const TARGET_SELECTOR = { runtime: 'node', module: 'esm', nodeMajor: 22 } as const;
 const LOCK_RELATIVE_PATH = 'dh-lock/app.lock.json';
 const DESCRIPTOR_RELATIVE_PATH = 'descriptor/app.json';
@@ -85,11 +86,12 @@ function kernelModuleSource(): string {
   return `
 const events = (globalThis.__domainHarnessT04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'kdp-kernel' });
-export async function technicalInit(ctx) {
-  events.push({ event: 'technical-init', package: 'kdp-kernel' });
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: 'kdp-kernel' });
+  return ctx.nextCore?.init();
 }
-export async function technicalDispose(ctx) {
-  events.push({ event: 'technical-dispose', package: 'kdp-kernel' });
+export async function exit(ctx) {
+  events.push({ event: 'package-exit', package: 'kdp-kernel' });
 }
 `;
 }
@@ -98,11 +100,12 @@ function sdkModuleSource(): string {
   return `
 const events = (globalThis.__domainHarnessT04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'sdk-core' });
-export async function technicalInit(ctx) {
-  events.push({ event: 'technical-init', package: 'sdk-core' });
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: 'sdk-core' });
+  return ctx.nextCore?.init();
 }
-export async function technicalDispose(ctx) {
-  events.push({ event: 'technical-dispose', package: 'sdk-core' });
+export async function exit(ctx) {
+  events.push({ event: 'package-exit', package: 'sdk-core' });
 }
 `;
 }
@@ -111,11 +114,11 @@ function extensionModuleSource(): string {
   return `
 const events = (globalThis.__domainHarnessT04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'orders-ext' });
-export async function technicalInit(ctx) {
-  events.push({ event: 'technical-init', package: 'orders-ext' });
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: 'orders-ext' });
 }
-export async function technicalDispose(ctx) {
-  events.push({ event: 'technical-dispose', package: 'orders-ext' });
+export async function exit(ctx) {
+  events.push({ event: 'package-exit', package: 'orders-ext' });
 }
 `;
 }
@@ -124,11 +127,12 @@ function businessArtifactModuleSource(): string {
   return `
 const events = (globalThis.__domainHarnessT04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'orders-business' });
-export async function technicalInit(ctx) {
-  events.push({ event: 'technical-init', package: 'orders-business' });
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: 'orders-business', initFrom: ctx.InitFrom });
+  return (await import('./evaluate.mjs')).init(ctx);
 }
-export async function technicalDispose(ctx) {
-  events.push({ event: 'technical-dispose', package: 'orders-business' });
+export async function exit(ctx) {
+  events.push({ event: 'package-exit', package: 'orders-business' });
 }
 `;
 }
@@ -145,7 +149,7 @@ const events = (globalThis.__domainHarnessT04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'orders-business-entry' });
 const INIT_RESULT = ${JSON.stringify(initResult)};
 let RULE = null;
-export async function businessAppInit(initCtx) {
+export async function init(initCtx) {
   const handle = initCtx.resources.get('orders-business/content/rules.json');
   if (handle === undefined) {
     throw new Error('selected rule content resource is not sealed in the Lock');
@@ -240,14 +244,6 @@ function businessElement(scenario: T04Scenario, ruleRef: ResourceRef): ElementDe
         outcomes: ['SUCCEEDED', 'UNKNOWN'],
         effects: 'none',
       },
-      {
-        id: 'appInit',
-        contractVersion: '1',
-        inputSchemaRef: { inline: { type: 'object' } },
-        outputSchemaRef: { inline: { type: 'object' } },
-        outcomes: ['SUCCEEDED'],
-        effects: 'none',
-      },
       ...(scenario.withUnsupportedEffect === true
         ? [{
             id: 'dangerous',
@@ -307,6 +303,21 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     const businessModule = await write(businessDir, 'dist/business.mjs', businessArtifactModuleSource());
     const evaluateModule = await write(businessDir, 'dist/evaluate.mjs', businessEntryModuleSource(scenario));
     const extModule = await write(extDir, 'dist/index.mjs', extensionModuleSource());
+    await write(
+      kernelDir,
+      'dist/index.js',
+      `export { bootstrap } from '${MICROKERNEL_PACKAGE_ID}';\n`,
+    );
+    for (const [dir, id, artifactPath] of [
+      [kernelDir, 'kdp-kernel', 'dist/index.js'],
+      [sdkDir, 'sdk-core', 'dist/index.mjs'],
+      [businessDir, 'orders-business', 'dist/business.mjs'],
+      [extDir, 'orders-ext', 'dist/index.mjs'],
+    ] as const) {
+      await write(dir, 'package.json', canonicalJson({
+        name: id, version: '1.0.0', type: 'module', exports: { '.': `./${artifactPath}` },
+      }));
+    }
     const ruleText = canonicalJson(scenario.rule as unknown as JsonValue);
     await write(businessDir, 'content/rules.json', ruleText);
 
@@ -328,7 +339,6 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     });
     const evaluateRef = ref('evaluate');
     const optionalReportRef = ref('optionalReport');
-    const appInitRef = ref('appInit');
     const dangerousRef = ref('dangerous');
     const evaluateModuleRef = {
       packageId: 'orders-business',
@@ -344,6 +354,9 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     const businessManifest = manifest('orders-business', '1.0.0', {
       layer: 'business',
       role: 'primary',
+      order: 2,
+      dependsOn: [{ package: 'orders-ext', version: '1.0.0', interface: 'ext.api' }],
+      initResources: [ruleRef],
       elements: [
         {
           id: 'orders.eligibility',
@@ -353,8 +366,8 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         },
       ],
       exports: [{ elementId: 'orders.eligibility' }, { interfaceId: 'orders.api' }],
-      technicalInit: { module: businessModuleRef, exportName: 'technicalInit' },
-      technicalDispose: { module: businessModuleRef, exportName: 'technicalDispose' },
+      init: { module: businessModuleRef, exportName: 'init' },
+      exit: { module: businessModuleRef, exportName: 'exit' },
       targetVariants: [
         {
           target: TARGET_SELECTOR,
@@ -372,13 +385,6 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
               contractVersion: '1',
               entry: { module: evaluateModuleRef, exportName: 'optionalReport' },
             },
-            {
-              elementId: 'orders.eligibility',
-              functionId: 'appInit',
-              contractVersion: '1',
-              entry: { module: evaluateModuleRef, exportName: 'businessAppInit' },
-              resources: [ruleRef],
-            },
             ...(scenario.withUnsupportedEffect === true
               ? [{
                   elementId: 'orders.eligibility',
@@ -395,26 +401,28 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     const sdkManifest = manifest('sdk-core', '1.0.0', {
       layer: 'sdk',
       role: 'primary',
+      order: 1,
       dependsOn: [{ package: 'kdp-kernel', version: '1.0.0', interface: 'kernel.api' }],
       exports: [{ interfaceId: 'sdk.api' }],
-      technicalInit: { module: { packageId: 'sdk-core', path: 'dist/index.mjs', digest: await fileBytesDigest(sdkModule) }, exportName: 'technicalInit' },
-      technicalDispose: { module: { packageId: 'sdk-core', path: 'dist/index.mjs', digest: await fileBytesDigest(sdkModule) }, exportName: 'technicalDispose' },
+      init: { module: { packageId: 'sdk-core', path: 'dist/index.mjs', digest: await fileBytesDigest(sdkModule) }, exportName: 'init' },
+      exit: { module: { packageId: 'sdk-core', path: 'dist/index.mjs', digest: await fileBytesDigest(sdkModule) }, exportName: 'exit' },
     });
 
     const kernelManifest = manifest('kdp-kernel', '1.0.0', {
       layer: 'kernel',
       role: 'primary',
+      order: 0,
       exports: [{ interfaceId: 'kernel.api' }],
-      technicalInit: { module: { packageId: 'kdp-kernel', path: 'dist/index.mjs', digest: await fileBytesDigest(kernelModule) }, exportName: 'technicalInit' },
-      technicalDispose: { module: { packageId: 'kdp-kernel', path: 'dist/index.mjs', digest: await fileBytesDigest(kernelModule) }, exportName: 'technicalDispose' },
+      init: { module: { packageId: 'kdp-kernel', path: 'dist/index.mjs', digest: await fileBytesDigest(kernelModule) }, exportName: 'init' },
+      exit: { module: { packageId: 'kdp-kernel', path: 'dist/index.mjs', digest: await fileBytesDigest(kernelModule) }, exportName: 'exit' },
     });
 
     const extManifest = manifest('orders-ext', '1.0.0', {
       layer: 'business',
       role: 'extension',
-      dependsOn: [{ package: 'orders-business', version: '1.0.0', interface: 'orders.api' }],
-      technicalInit: { module: { packageId: 'orders-ext', path: 'dist/index.mjs', digest: await fileBytesDigest(extModule) }, exportName: 'technicalInit' },
-      technicalDispose: { module: { packageId: 'orders-ext', path: 'dist/index.mjs', digest: await fileBytesDigest(extModule) }, exportName: 'technicalDispose' },
+      exports: [{ interfaceId: 'ext.api' }],
+      init: { module: { packageId: 'orders-ext', path: 'dist/index.mjs', digest: await fileBytesDigest(extModule) }, exportName: 'init' },
+      exit: { module: { packageId: 'orders-ext', path: 'dist/index.mjs', digest: await fileBytesDigest(extModule) }, exportName: 'exit' },
     });
 
     const descriptor: DomainAppDescriptor = {
@@ -427,11 +435,12 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         : TARGET_SELECTOR,
       roots: {
         kernelPrimary: { package: 'kdp-kernel', version: '1.0.0' },
-        sdkPrimary: { package: 'sdk-core', version: '1.0.0' },
-        businessPrimary: { package: 'orders-business', version: '1.0.0' },
+        cores: [
+          { package: 'sdk-core', version: '1.0.0' },
+          { package: 'orders-business', version: '1.0.0' },
+        ],
       },
       extensions: [{ package: 'orders-ext', version: '1.0.0' }],
-      businessAppInit: appInitRef,
       ingress: [
         { id: 'evaluate', function: evaluateRef },
         { id: 'optional-report', function: optionalReportRef, optional: true },
@@ -448,7 +457,7 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         'sdk-core': sdkDir,
         'kdp-kernel': kernelDir,
         'orders-ext': extDir,
-        [KDP_PACKAGE_ID]: MICROKERNEL_DIR,
+        [MICROKERNEL_PACKAGE_ID]: MICROKERNEL_DIR,
       },
       packageArtifacts: {
         'orders-business': 'dist/business.mjs',
@@ -457,6 +466,7 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         'orders-ext': 'dist/index.mjs',
       },
       kdpArtifact: { packageId: KDP_PACKAGE_ID, path: 'dist/index.js' },
+      runtimeDependencies: { [MICROKERNEL_PACKAGE_ID]: '0.11.0' },
     };
 
     const built = await buildApp(input);
@@ -473,12 +483,12 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     await copyPackage('kdp-kernel', kernelDir);
     await copyPackage('orders-ext', extDir);
 
-    const kdpInstallDir = join(installRoot, 'node_modules', KDP_PACKAGE_ID);
+    const kdpInstallDir = join(installRoot, 'node_modules', MICROKERNEL_PACKAGE_ID);
     await mkdir(kdpInstallDir, { recursive: true });
     await writeFile(
       join(kdpInstallDir, 'package.json'),
       JSON.stringify({
-        name: KDP_PACKAGE_ID,
+        name: MICROKERNEL_PACKAGE_ID,
         version: '0.11.0',
         type: 'module',
         exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },

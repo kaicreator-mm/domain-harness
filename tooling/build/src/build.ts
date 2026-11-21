@@ -3,6 +3,7 @@ import {
   DH_LOCK_SCHEMA_VERSION,
   NODE22_ESM_PROFILE,
   contentDigestOf,
+  isRelativeResourcePath,
   isUnknownContentKind,
   validateDomainDefinition,
   validateElementDefinition,
@@ -18,7 +19,6 @@ import {
   type FunctionContract,
   type FunctionRef,
   type JsonValue,
-  type PackageLayer,
   type ResolvedTarget,
   type ResourceRef,
   type SealedHookBinding,
@@ -41,6 +41,8 @@ import { BuildRefusal, refusal } from './refusal.js';
 import { SchemaChecker } from './schema-check.js';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
+import { verifyGeneratedPackageImports, verifyLifecycleExports } from './static-package-guard.js';
+import { composeAppPackage, sameAppPackageBytes, sealPackageManifest } from './app-package.js';
 
 
 interface LoadedElement {
@@ -57,8 +59,6 @@ interface ResolvedFunction {
   readonly fn: FunctionContract;
   readonly owner: DomainPackageManifest;
 }
-
-const PACKAGE_LAYERS: readonly PackageLayer[] = ['kernel', 'sdk', 'business'];
 
 function elementNamespace(id: string): string {
   const dot = id.indexOf('.');
@@ -159,15 +159,18 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     profile: NODE22_ESM_PROFILE,
   };
 
-  // 第 2 段：从三层 Primary 与显式扩展出发，沿 dependsOn 扩展闭包。这里选择的是包，不是运行时调度。
+  if (!isRelativeResourcePath(input.kdpArtifact.path)) {
+    throw refusal('DH_BUILD_RESOURCE_MISSING', 'KDP bootstrap artifact path is not a canonical in-package path');
+  }
+
+  // 第 2 段：从唯一 KDP 与 BUILD 选定的任意数量 Core 出发，沿 dependsOn 扩展闭包。
   const selected = new Map<string, DomainPackageManifest>();
-  const rootSlots: readonly (readonly [PackageLayer, keyof DomainAppDescriptor['roots']])[] = [
-    ['kernel', 'kernelPrimary'],
-    ['sdk', 'sdkPrimary'],
-    ['business', 'businessPrimary'],
-  ];
-  for (const [layer, slot] of rootSlots) {
-    const ref = descriptor.roots[slot];
+  const rootCoreIds = new Set<string>();
+  const selectCore = (
+    ref: DomainAppDescriptor['roots']['cores'][number],
+    slot: string,
+    requiredLayer?: 'kernel',
+  ): void => {
     const manifest = pool.get(ref.package);
     if (!manifest || manifest.version !== ref.version) {
       throw refusal(
@@ -179,19 +182,25 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     if (manifest.role !== 'primary') {
       throw refusal(
         'DH_BUILD_LAYER_ROLE_MISMATCH',
-        `roots.${slot} package '${ref.package}' declares role='${manifest.role}'; a root slot must reference a primary package`,
+        `roots.${slot} package '${ref.package}' declares role='${manifest.role}'; a Core root must reference a primary package`,
         `roots.${slot}`,
       );
     }
-    if (manifest.layer !== layer) {
+    if (requiredLayer !== undefined && manifest.layer !== requiredLayer) {
       throw refusal(
         'DH_BUILD_PRIMARY_MISSING',
-        `roots.${slot} package '${ref.package}' declares layer='${manifest.layer}', leaving layer '${layer}' without a primary`,
+        `roots.${slot} package '${ref.package}' declares layer='${manifest.layer}'; KDP must be the kernel Core`,
         `roots.${slot}`,
       );
     }
+    if (rootCoreIds.has(manifest.id)) {
+      throw refusal('DH_BUILD_PRIMARY_DUPLICATE', `Core '${manifest.id}' is selected by more than one root entry`);
+    }
+    rootCoreIds.add(manifest.id);
     selected.set(manifest.id, manifest);
-  }
+  };
+  selectCore(descriptor.roots.kernelPrimary, 'kernelPrimary', 'kernel');
+  descriptor.roots.cores.forEach((ref, index) => selectCore(ref, `cores[${index}]`));
   for (const [index, ref] of descriptor.extensions.entries()) {
     const manifest = pool.get(ref.package);
     if (!manifest || manifest.version !== ref.version) {
@@ -241,23 +250,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     dependsOnEdges.set(id, edges);
   }
 
-  const primaries = new Map<PackageLayer, string[]>();
   for (const manifest of selected.values()) {
-    if (manifest.role === 'primary') {
-      const list = primaries.get(manifest.layer) ?? [];
-      list.push(manifest.id);
-      primaries.set(manifest.layer, list);
-    }
-  }
-  for (const layer of PACKAGE_LAYERS) {
-    const list = (primaries.get(layer) ?? []).sort();
-    if (list.length === 0) {
-      throw refusal('DH_BUILD_PRIMARY_MISSING', `no primary package selected for layer '${layer}'`);
-    }
-    if (list.length > 1) {
+    if (manifest.role === 'primary' && !rootCoreIds.has(manifest.id)) {
       throw refusal(
-        'DH_BUILD_PRIMARY_DUPLICATE',
-        `layer '${layer}' has ${list.length} primary packages: ${list.join(', ')}`,
+        'DH_BUILD_PRIMARY_MISSING',
+        `selected Core '${manifest.id}' is not declared in descriptor roots; every Core must be BUILD-selected explicitly`,
       );
     }
   }
@@ -344,6 +341,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
           `element '${loaded.def.id}' depends on '${dep.element}@${dep.version}' which is not in the selected closure`,
         );
       }
+      if (resolved.owner.id !== loaded.owner.id &&
+          !(dependsOnEdges.get(loaded.owner.id) ?? []).includes(resolved.owner.id)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `element '${loaded.def.id}' references '${resolved.owner.id}' without declaring it as a direct Extension`);
+      }
       deps.push(resolved.key);
       for (const fnId of dep.functions ?? []) {
         const fn = resolved.def.functions.find((candidate) => candidate.id === fnId);
@@ -418,6 +420,10 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   };
   const requireExported = (resolved: ResolvedFunction, consumer: string | null): void => {
     if (consumer !== null && resolved.owner.id === consumer) return;
+    if (consumer !== null && !(dependsOnEdges.get(consumer) ?? []).includes(resolved.owner.id)) {
+      throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+        `package '${consumer}' imports '${resolved.owner.id}' without a direct Extension declaration`);
+    }
     if (!isExported(resolved.owner, resolved.element, resolved.fn)) {
       throw refusal(
         'DH_BUILD_EXPORT_MISSING',
@@ -443,41 +449,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     ingressResolved.push({ entry, resolved });
   }
 
-  // App Init 是唯一业务启动函数，必须归 Business 层、被导出且精确匹配 Element digest/合同版本。
-  const appInitCandidates: ResolvedFunction[] = [];
-  for (const loaded of elements.values()) {
-    const fn = loaded.def.functions.find(
-      (candidate) =>
-        candidate.id === descriptor.businessAppInit.functionId &&
-        candidate.contractVersion === descriptor.businessAppInit.contractVersion,
-    );
-    if (!fn || loaded.namespace !== descriptor.businessAppInit.element.namespace || loaded.def.id !== descriptor.businessAppInit.element.id) {
-      continue;
-    }
-    if (
-      loaded.def.version === descriptor.businessAppInit.element.version &&
-      loaded.definitionDigest === descriptor.businessAppInit.element.digest
-    ) {
-      appInitCandidates.push({ element: loaded, fn, owner: loaded.owner });
-    }
-  }
-  if (appInitCandidates.length === 0) {
-    throw refusal(
-      'DH_BUILD_APP_INIT_MISSING',
-      `businessAppInit '${descriptor.businessAppInit.element.id}.${descriptor.businessAppInit.functionId}' did not resolve to a selected Function`,
-    );
-  }
-  if (appInitCandidates.length > 1) {
-    throw refusal('DH_BUILD_APP_INIT_DUPLICATE', 'more than one App Init candidate matched the descriptor reference');
-  }
-  const appInit = appInitCandidates[0]!;
-  if (appInit.owner.layer !== 'business') {
-    throw refusal(
-      'DH_BUILD_LAYER_ROLE_MISMATCH',
-      `businessAppInit '${appInit.element.def.id}.${appInit.fn.id}' is owned by layer '${appInit.owner.layer}' package '${appInit.owner.id}', not the business layer`,
-    );
-  }
-  requireExported(appInit, null);
+  // Business Core 的 Init Element 是唯一业务启动入口，不再额外绑定 Business App Init Function。
 
   const importedFunctions = new Map<string, ResolvedFunction>();
   for (const manifest of packagesSorted) {
@@ -493,7 +465,6 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     selectedFunctions.set(`${resolved.element.key}|${resolved.fn.id}`, resolved);
   };
   for (const { resolved } of ingressResolved) addSelected(resolved);
-  addSelected(appInit);
   for (const resolved of importedFunctions.values()) addSelected(resolved);
   for (const loaded of elements.values()) {
     for (const fn of loaded.def.functions) {
@@ -557,7 +528,14 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       }
     }
     scope.verify(binding.entry.module);
-    for (const resource of binding.resources ?? []) scope.verify(resource);
+    for (const resource of binding.resources ?? []) {
+      if (resource.packageId !== implementor.id &&
+          !(dependsOnEdges.get(implementor.id) ?? []).includes(resource.packageId)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Function implementation in '${implementor.id}' uses resource from undeclared direct Extension '${resource.packageId}'`);
+      }
+      scope.verify(resource);
+    }
     sealedFunctions.push({
       ref: toFunctionRef(resolved),
       outcomes: [...resolved.fn.outcomes],
@@ -635,36 +613,56 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   }
 
+  // 统一 Init/Exit Element：Init 必需，Exit 可选；Core.Order 唯一且 Order 0 只能属于 KDP。
+  const coreOrders = new Map<number, string>();
   for (const manifest of packagesSorted) {
-    if ((manifest.technicalInit === undefined) !== (manifest.technicalDispose === undefined)) {
-      throw refusal(
-        'DH_BUILD_LIFECYCLE_HALF',
-        `package '${manifest.id}' declares only one of technicalInit / technicalDispose`,
-      );
+    if (manifest.role === 'primary') {
+      if (!Number.isSafeInteger(manifest.order) || manifest.order! < 0) {
+        throw refusal('DH_BUILD_SCHEMA_INVALID', `Core '${manifest.id}' requires a non-negative integer Order`);
+      }
+      const conflicting = coreOrders.get(manifest.order!);
+      if (conflicting) {
+        throw refusal('DH_BUILD_PRIMARY_DUPLICATE',
+          `Core.Order ${manifest.order} is duplicated by '${conflicting}' and '${manifest.id}'`);
+      }
+      coreOrders.set(manifest.order!, manifest.id);
+    } else if (manifest.order !== undefined && (!Number.isSafeInteger(manifest.order) || manifest.order < 0)) {
+      throw refusal('DH_BUILD_SCHEMA_INVALID', `Extension '${manifest.id}' has invalid optional Order`);
     }
-    for (const [entry, expectedExport] of [
-      [manifest.technicalInit, 'technicalInit'],
-      [manifest.technicalDispose, 'technicalDispose'],
-    ] as const) {
+    const artifactPath = input.packageArtifacts[manifest.id];
+    if (!artifactPath || !isRelativeResourcePath(artifactPath)) {
+      throw refusal('DH_BUILD_RESOURCE_MISSING', `package '${manifest.id}' artifact path is not a canonical in-package path`);
+    }
+    for (const [entry, name] of [[manifest.init, 'init'], [manifest.exit, 'exit']] as const) {
       if (!entry) continue;
-      const artifactPath = input.packageArtifacts[manifest.id];
-      if (entry.module.packageId !== manifest.id || entry.module.path !== artifactPath || entry.exportName !== expectedExport) {
+      if (entry.module.packageId !== manifest.id || entry.module.path !== artifactPath || entry.exportName !== name) {
         throw refusal('DH_BUILD_SCHEMA_INVALID',
-          `package '${manifest.id}' lifecycle '${expectedExport}' must use its selected package artifact and named export '${expectedExport}'`);
+          `package '${manifest.id}' ${name} Element must resolve to its own selected artifact export '${name}'`);
       }
       scope.verify(entry.module);
     }
+    for (const resource of manifest.initResources ?? []) {
+      if (resource.packageId !== manifest.id &&
+          !(dependsOnEdges.get(manifest.id) ?? []).includes(resource.packageId)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Package '${manifest.id}' Init refers to undeclared Extension resource '${resource.packageId}'`);
+      }
+      scope.verify(resource);
+    }
   }
-
-  // 第 5 段：依赖先于消费方初始化；dispose 反序。遇到包依赖环必须停止，而非任意排序。
-  const initOrder = kahnTopologicalOrder(
-    packagesSorted.map((manifest) => manifest.id),
-    dependsOnEdges,
-  );
-  if (initOrder === null) {
-    throw refusal('DH_BUILD_PACKAGE_CYCLE', 'package dependsOn closure carries a cycle');
+  const kdpId = descriptor.roots.kernelPrimary.package;
+  if (coreOrders.get(0) !== kdpId || input.kdpArtifact.packageId !== kdpId) {
+    throw refusal(
+      'DH_BUILD_PRIMARY_MISSING',
+      `Order 0 KDP '${kdpId}' must also own bootstrap artifact '${input.kdpArtifact.packageId}'`,
+    );
   }
-  const disposeOrder = [...initOrder].reverse();
+  const coreOrder = [...coreOrders].sort(([a], [b]) => a - b).map(([, id]) => id);
+  // Core 链与 Extension DAG 分开：核心间链接不需要伪装成 Extension 依赖。
+  const initGraphOrder = kahnTopologicalOrder(packagesSorted.map((p) => p.id), dependsOnEdges);
+  if (initGraphOrder === null) {
+    throw refusal('DH_BUILD_PACKAGE_CYCLE', 'Package direct dependency graph carries a cycle');
+  }
 
   // 未知且 optional 的内容仅记排除证据，不混入已选 contentDigests；required 未知内容直接拒绝。
   const excludedUnknownContent: string[] = [];
@@ -672,6 +670,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   for (const loaded of [...elements.values()].sort(compareLoadedElement)) {
     const contentDigests: ContentDigest[] = [];
     for (const block of loaded.def.content) {
+      if (block.ref && block.ref.packageId !== loaded.owner.id &&
+          !(dependsOnEdges.get(loaded.owner.id) ?? []).includes(block.ref.packageId)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Element '${loaded.def.id}' uses content from undeclared direct Extension '${block.ref.packageId}'`);
+      }
       if (isUnknownContentKind(block.contentKind)) {
         if (block.required) {
           throw refusal(
@@ -703,16 +706,28 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     const bytes = scope.read(manifest.id, artifactPath);
     const digest = digestOfBytes(bytes);
     scope.record(manifest.id, artifactPath, digest);
+    verifyLifecycleExports(scope, manifest, { packageId: manifest.id, path: artifactPath, digest });
+    sealPackageManifest(scope, manifest, manifest.id === kdpId ? input.kdpArtifact.path : undefined);
     sealedPackages.push({
       packageId: manifest.id,
       version: manifest.version,
       layer: manifest.layer,
       role: manifest.role,
       artifact: { packageId: manifest.id, path: artifactPath, digest },
-      technicalLifecycle: manifest.technicalInit !== undefined,
+      ...(manifest.order !== undefined ? { order: manifest.order } : {}),
+      init: manifest.init,
+      ...(manifest.exit !== undefined ? { exit: manifest.exit } : {}),
+      initResources: [...(manifest.initResources ?? [])],
+      ...(manifest.recordInitFrom === true ? { recordInitFrom: true as const } : {}),
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
   }
+  // 对最终选定的 ESM 模块字节做静态检查；依赖无法证明时 BUILD 拒绝。
+  verifyGeneratedPackageImports(scope, packagesSorted, [
+    ...sealedPackages.map((pkg) => pkg.artifact),
+    ...sealedFunctions.map((fn) => fn.implementation.module),
+    ...hookBindings.flatMap((hook) => hook.providers.map((entry) => entry.module)),
+  ]);
   const kdpBytes = scope.read(input.kdpArtifact.packageId, input.kdpArtifact.path);
   const kdpDigest = digestOfBytes(kdpBytes);
   scope.record(input.kdpArtifact.packageId, input.kdpArtifact.path, kdpDigest);
@@ -734,9 +749,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       selectedElements: sealedElements,
       selectedFunctions: sealedFunctions,
       hookBindings: [...hookBindings].sort(compareHookBinding),
-      technicalInitOrder: initOrder,
-      technicalDisposeOrder: disposeOrder,
-      businessAppInit: toFunctionRef(appInit),
+      coreOrder,
       ingress: ingressResolved
         .map(({ entry, resolved }): SealedIngress => ({
           id: entry.id,
@@ -758,7 +771,13 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   if (canonicalJson(toJson(assemble())) !== lockText) {
     throw refusal('DH_BUILD_LOCK_NOT_REPRODUCIBLE', 'double-build self-check produced divergent Lock bytes');
   }
-  return { lock, lockBytes: new TextEncoder().encode(lockText) };
+  const lockBytes = new TextEncoder().encode(lockText);
+  const appPackage = composeAppPackage(scope, descriptor, lock, lockBytes, input.runtimeDependencies);
+  const secondAppPackage = composeAppPackage(scope, descriptor, lock, lockBytes, input.runtimeDependencies);
+  if (!sameAppPackageBytes(appPackage, secondAppPackage)) {
+    throw refusal('DH_BUILD_LOCK_NOT_REPRODUCIBLE', 'double-build self-check produced divergent App Package bytes');
+  }
+  return { lock, lockBytes, appPackage };
 }
 
 

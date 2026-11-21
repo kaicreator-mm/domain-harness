@@ -6,6 +6,8 @@ export type {
   BuildSuccess,
   BuildFailure,
   KdpArtifactInput,
+  AppPackageFile,
+  ComposedAppPackage,
 } from './types.js';
 export { BuildRefusal } from './refusal.js';
 export { digestOfBytes } from './resources.js';

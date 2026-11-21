@@ -1,4 +1,5 @@
 // BUILD 正反例：只有符合当前契约的资源才能进入 Lock。
+import { canonicalJson } from '@kaicreator/domain-harness-contracts';
 import type {
   DomainAppDescriptor,
   DomainPackageManifest,
@@ -199,16 +200,19 @@ export function standardCase(): StandardCase {
     eligibilityVisibility: 'public',
     businessExports: [
       { elementId: 'orders.eligibility', functionId: 'evaluate' },
-      { elementId: 'orders.app-main' },
       { interfaceId: 'orders.api' },
     ],
     sdkImports: [],
     sdkHookCardinality: 'multi',
     aaaContributesTo: [],
-    businessDependsOn: [{ package: 'sdk-core', version: '1.0.0', interface: 'sdk.api' }],
+    businessDependsOn: [
+      { package: 'sdk-core', version: '1.0.0', interface: 'sdk.api' },
+      { package: 'orders-ext', version: '1.0.0', interface: 'orders.audit' },
+      { package: 'aaa-ext', version: '1.0.0', interface: 'aaa.audit' },
+    ],
     kdpDependsOn: [],
     sdkLifecycle: 'paired',
-    descriptorTarget: TARGET_22,
+    descriptorTarget: { ...TARGET_22 },
     ingress: [],
     finalize,
   };
@@ -219,7 +223,6 @@ export function standardCase(): StandardCase {
     const kdpDir = addPackage(ws, 'kdp-kernel');
     const aaaDir = addPackage(ws, 'aaa-ext');
     const extDir = addPackage(ws, 'orders-ext');
-    const mkDir = addPackage(ws, '@kaicreator/domain-harness-microkernel');
 
     const pending = (ref: { digest: string } | undefined): boolean => ref?.digest === 'sha256:pending';
     const faqFile = writeJson(businessDir, 'content/faq.json', {
@@ -274,13 +277,26 @@ export function standardCase(): StandardCase {
     const evaluateModule = writeRaw(businessDir, 'dist/evaluate.mjs', new TextEncoder().encode('export function evaluate() { return { decision: "POS" }; }\n'));
     const evaluateLegacyModule = writeRaw(businessDir, 'dist/evaluate-node20.mjs', new TextEncoder().encode('export function evaluate() { return { decision: "LEGACY" }; }\n'));
     const initModule = writeRaw(businessDir, 'dist/init.mjs', new TextEncoder().encode('export function init() { return "ready"; }\n'));
-    writeRaw(businessDir, 'dist/business.mjs', new TextEncoder().encode('export const artifact = "orders-business";\n'));
-    const sdkArtifact = writeRaw(sdkDir, 'dist/sdk.mjs', new TextEncoder().encode('export const artifact = "sdk-core";\nexport function technicalInit() {}\nexport function technicalDispose() {}\n'));
-    writeRaw(kdpDir, 'dist/kdp.mjs', new TextEncoder().encode('export const artifact = "kdp-kernel";\n'));
-    const aaaArtifact = writeRaw(aaaDir, 'dist/aaa.mjs', new TextEncoder().encode('export const artifact = "aaa-ext";\n'));
+    const businessArtifact = writeRaw(businessDir, 'dist/business.mjs', new TextEncoder().encode("export const artifact = \"orders-business\";\nexport function init() { return { status: \"READY\" }; }\nexport function exit() {}\n"));
+    const sdkArtifact = writeRaw(sdkDir, 'dist/sdk.mjs', new TextEncoder().encode("export const artifact = \"sdk-core\";\nexport function init() {}\nexport function exit() {}\n"));
+    const kdpArtifact = writeRaw(kdpDir, 'dist/kdp.mjs', new TextEncoder().encode("export const artifact = \"kdp-kernel\";\nexport function init() {}\nexport function exit() {}\n"));
+    const aaaArtifact = writeRaw(aaaDir, 'dist/aaa.mjs', new TextEncoder().encode("export const artifact = \"aaa-ext\";\nexport function init() {}\nexport function exit() {}\n"));
     const auditModule = writeRaw(extDir, 'dist/audit.mjs', new TextEncoder().encode('export function audit() {}\n'));
-    writeRaw(extDir, 'dist/ext.mjs', new TextEncoder().encode('export const artifact = "orders-ext";\n'));
-    writeRaw(mkDir, 'dist/index.js', new TextEncoder().encode('export async function bootstrap() { return { status: "BOOTED" }; }\n'));
+    const extArtifact = writeRaw(extDir, 'dist/ext.mjs', new TextEncoder().encode("export const artifact = \"orders-ext\";\nexport function init() {}\nexport function exit() {}\n"));
+    writeRaw(kdpDir, 'dist/index.js', new TextEncoder().encode('export async function bootstrap() { return { status: "BOOTED" }; }\n'));
+    for (const [dir, id, artifactPath] of [
+      [businessDir, 'orders-business', 'dist/business.mjs'],
+      [sdkDir, 'sdk-core', 'dist/sdk.mjs'],
+      [aaaDir, 'aaa-ext', 'dist/aaa.mjs'],
+      [extDir, 'orders-ext', 'dist/ext.mjs'],
+    ] as const) {
+      writeRaw(dir, 'package.json', new TextEncoder().encode(canonicalJson({
+        name: id, version: '1.0.0', type: 'module', exports: { '.': `./${artifactPath}` },
+      })));
+    }
+    writeRaw(kdpDir, 'package.json', new TextEncoder().encode(canonicalJson({
+      name: 'kdp-kernel', version: '1.0.0', type: 'module', exports: { '.': './dist/index.js' },
+    })));
 
     const aaaContributesTo = case_.aaaContributesTo.map((contribution) => ({
       ...contribution,
@@ -308,12 +324,15 @@ export function standardCase(): StandardCase {
     const businessManifest = manifest('orders-business', '1.0.0', {
       layer: 'business',
       role: 'primary',
+      order: 2,
+      init: { module: businessArtifact, exportName: 'init' },
+      exit: { module: businessArtifact, exportName: 'exit' },
       elements: entries,
       dependsOn: case_.businessDependsOn,
       exports: case_.businessExports,
       targetVariants: [
         {
-          target: TARGET_22,
+          target: { ...TARGET_22 },
           implementations: [
             {
               elementId: 'orders.eligibility',
@@ -348,6 +367,8 @@ export function standardCase(): StandardCase {
     const sdkManifest = manifest('sdk-core', '1.0.0', {
       layer: 'sdk',
       role: 'primary',
+      order: 1,
+      init: { module: sdkArtifact, exportName: 'init' },
       dependsOn: [{ package: 'kdp-kernel', version: '1.0.0', interface: 'kernel.api' }],
       imports: case_.sdkImports,
       exports: [{ interfaceId: 'sdk.api' }],
@@ -361,17 +382,15 @@ export function standardCase(): StandardCase {
         ],
       },
       targetVariants: [],
-      ...(case_.sdkLifecycle === 'paired'
-        ? {
-            technicalInit: { module: sdkArtifact, exportName: 'technicalInit' },
-            technicalDispose: { module: sdkArtifact, exportName: 'technicalDispose' },
-          }
-        : { technicalInit: { module: sdkArtifact, exportName: 'technicalInit' } }),
+      ...(case_.sdkLifecycle === 'paired' ? { exit: { module: sdkArtifact, exportName: 'exit' } } : {}),
     });
 
     const kdpManifest = manifest('kdp-kernel', '1.0.0', {
       layer: 'kernel',
       role: 'primary',
+      order: 0,
+      init: { module: kdpArtifact, exportName: 'init' },
+      exit: { module: kdpArtifact, exportName: 'exit' },
       dependsOn: case_.kdpDependsOn,
       exports: [{ interfaceId: 'kernel.api' }],
     });
@@ -379,12 +398,18 @@ export function standardCase(): StandardCase {
     const aaaManifest = manifest('aaa-ext', '1.0.0', {
       layer: 'business',
       role: 'extension',
+      init: { module: aaaArtifact, exportName: 'init' },
+      exit: { module: aaaArtifact, exportName: 'exit' },
+      exports: [{ interfaceId: 'aaa.audit' }],
       contributesTo: aaaContributesTo,
     });
 
     const extManifest = manifest('orders-ext', '1.0.0', {
       layer: 'business',
       role: 'extension',
+      init: { module: extArtifact, exportName: 'init' },
+      exit: { module: extArtifact, exportName: 'exit' },
+      exports: [{ interfaceId: 'orders.audit' }],
       contributesTo: [
         { ownerPackageId: 'sdk-core', hookId: 'audit', entry: { module: auditModule, exportName: 'audit' } },
       ],
@@ -394,14 +419,15 @@ export function standardCase(): StandardCase {
       target: case_.descriptorTarget,
       roots: {
         kernelPrimary: { package: 'kdp-kernel', version: '1.0.0' },
-        sdkPrimary: { package: 'sdk-core', version: '1.0.0' },
-        businessPrimary: { package: 'orders-business', version: '1.0.0' },
+        cores: [
+          { package: 'sdk-core', version: '1.0.0' },
+          { package: 'orders-business', version: '1.0.0' },
+        ],
       },
       extensions: [
         { package: 'orders-ext', version: '1.0.0' },
         { package: 'aaa-ext', version: '1.0.0' },
       ],
-      businessAppInit: initRef,
       ingress: case_.ingress.length > 0 ? case_.ingress : [{ id: 'evaluate', function: evaluateRef }],
     });
 
@@ -416,7 +442,8 @@ export function standardCase(): StandardCase {
         'aaa-ext': 'dist/aaa.mjs',
         'orders-ext': 'dist/ext.mjs',
       },
-      kdpArtifact: { packageId: '@kaicreator/domain-harness-microkernel', path: 'dist/index.js' },
+      kdpArtifact: { packageId: 'kdp-kernel', path: 'dist/index.js' },
+      runtimeDependencies: { '@kaicreator/domain-harness-microkernel': '0.11.0' },
     };
     return { input, refs: { evaluateRef, initRef } };
   }

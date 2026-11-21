@@ -24,7 +24,7 @@ export interface ReadonlyResourceHandle {
   read(): Promise<Uint8Array>;
 }
 
-/** App Init 只能访问被选中的只读资源与函数句柄，不授予 Host 或任意包的执行权限。 */
+/** Init 只能访问被选中的只读资源与函数句柄，不授予 Host 或任意包的执行权限。 */
 export interface AppInitContext {
   readonly appId: string;
   readonly activationId: string;
@@ -34,7 +34,33 @@ export interface AppInitContext {
   readonly resources: ReadonlyMap<string, ReadonlyResourceHandle>;
 }
 
-/** App Init 声明启动状态；DEGRADED 只能显式压制已在 Lock 中标记 optional 的入口。 */
+/** 逐次记录 Init Element 的真实直接调用来源，保留重复及失败进入事件。 */
+export type InitCaller =
+  | { readonly type: 'Boot' }
+  | { readonly type: 'Package'; readonly packageId: string };
+
+/** BUILD 封存的 Init 调用绑定；运行时不发现或选择其它 Package。 */
+export interface PackageInitBinding {
+  init(): Promise<unknown>;
+}
+
+/** Package 统一 Init 的上下文，启用 InitFrom 的 Package 才接收历史，业务不得伪造。 */
+export interface PackageInitContext extends AppInitContext {
+  readonly packageId: string;
+  readonly InitFrom?: readonly InitCaller[];
+  readonly hostPorts: readonly import('./boot-contracts.js').HostPortBinding[];
+  /** 仅当前 Core 收到 Order 中下一 Core 的受控链接；不是公共 Package next() API。 */
+  readonly nextCore?: PackageInitBinding;
+}
+
+/** Exit 仅在退出流程执行，调用历史属于本次应用激活。 */
+export interface PackageExitContext {
+  readonly packageId: string;
+  readonly InitFrom?: readonly InitCaller[];
+  readonly hostPorts: readonly import('./boot-contracts.js').HostPortBinding[];
+}
+
+/** Business Core.Init 声明应用启动状态；DEGRADED 只能显式压制已在 Lock 中标记 optional 的入口。 */
 export interface AppInitResult {
   readonly status: AppStatus;
   readonly suppressedIngress?: readonly string[];

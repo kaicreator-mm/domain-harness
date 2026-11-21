@@ -89,8 +89,10 @@ export interface ManifestOptions {
   provides?: DomainPackageManifest['provides'];
   contributesTo?: DomainPackageManifest['contributesTo'];
   targetVariants?: DomainPackageManifest['targetVariants'];
-  technicalInit?: DomainPackageManifest['technicalInit'];
-  technicalDispose?: DomainPackageManifest['technicalDispose'];
+  order?: number;
+  init: DomainPackageManifest['init'];
+  exit?: DomainPackageManifest['exit'];
+  initResources?: DomainPackageManifest['initResources'];
 }
 
 export function manifest(id: string, version: string, options: ManifestOptions): DomainPackageManifest {
@@ -108,8 +110,10 @@ export function manifest(id: string, version: string, options: ManifestOptions):
     ...(options.provides ? { provides: options.provides } : {}),
     contributesTo: options.contributesTo ?? [],
     targetVariants: options.targetVariants ?? [],
-    ...(options.technicalInit ? { technicalInit: options.technicalInit } : {}),
-    ...(options.technicalDispose ? { technicalDispose: options.technicalDispose } : {}),
+    ...(options.order !== undefined ? { order: options.order } : {}),
+    init: options.init,
+    ...(options.exit ? { exit: options.exit } : {}),
+    ...(options.initResources ? { initResources: options.initResources } : {}),
   };
 }
 
@@ -118,7 +122,6 @@ export function descriptor(options: {
   target?: DomainAppDescriptor['target'];
   roots: DomainAppDescriptor['roots'];
   extensions?: DomainAppDescriptor['extensions'];
-  businessAppInit: FunctionRef;
   ingress?: DomainAppDescriptor['ingress'];
 }): DomainAppDescriptor {
   return {
@@ -129,7 +132,6 @@ export function descriptor(options: {
     target: options.target ?? { runtime: 'node', module: 'esm', nodeMajor: 22 },
     roots: options.roots,
     extensions: options.extensions ?? [],
-    businessAppInit: options.businessAppInit,
     ingress: options.ingress ?? [],
   };
 }

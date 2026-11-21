@@ -45,6 +45,8 @@ export interface KdpBootstrapContext {
   readonly lockPath: string;
   readonly hostPorts?: readonly HostPortBinding[];
   readonly env: { readonly nodeMajor: number; readonly platform: string };
+  /** 显式启用 Node Host 的正常终止/未处理故障有界 Exit 交接。 */
+  readonly processLifecycle?: { readonly timeoutMs?: number };
 }
 
 export type KdpBootstrapResult =

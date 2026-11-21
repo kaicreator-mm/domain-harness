@@ -40,8 +40,8 @@ function readPin(pin: unknown): { pin: BootstrapPin; problems: string[] } {
     if (!isContentDigest(snapshot['kdpPrimaryDigest'])) problems.push('pin kdpPrimaryDigest must be sha256:<64 lowercase hex>');
     if (!isContentDigest(snapshot['lockDigest'])) problems.push('pin lockDigest must be sha256:<64 lowercase hex>');
     if (typeof snapshot['lockPath'] !== 'string' || snapshot['lockPath'].length === 0) problems.push('pin lockPath must be a non-empty string');
-  } catch (error) {
-    problems.push(`pin could not be read: ${(error as Error).message}`);
+  } catch {
+    problems.push('pin could not be read (detail redacted)');
   }
   return { pin: snapshot as unknown as BootstrapPin, problems };
 }
@@ -50,8 +50,8 @@ function checkPinAgainstRecord(pin: BootstrapPin, record: InstalledRecord): stri
   let pinTargetJson: string;
   try {
     pinTargetJson = canonicalJson(pin.target);
-  } catch (error) {
-    return `pin target is not plain serializable data: ${(error as Error).message}`;
+  } catch {
+    return 'pin target is not plain serializable data (detail redacted)';
   }
   if (pinTargetJson !== canonicalJson(record.target)) {
     return 'pin target does not equal the installed record target';
@@ -95,8 +95,8 @@ export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Pro
   let kdpModule: Record<string, unknown>;
   try {
     kdpModule = (await import(pathToFileURL(trust.value.entryPath).href)) as Record<string, unknown>;
-  } catch (error) {
-    return refused('DH_BOOT_KDP_ENTRY_INVALID', `pinned KDP entry failed to import: ${(error as Error).message}`);
+  } catch {
+    return refused('DH_BOOT_KDP_ENTRY_INVALID', 'pinned KDP entry failed to import (detail redacted)');
   }
   const bootstrap = kdpModule['bootstrap'];
   if (typeof bootstrap !== 'function') {

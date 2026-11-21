@@ -6,6 +6,7 @@ import { normalizeOutcome } from '../../src/domain-app.js';
 import {
   boot,
   buildFixtureInstall,
+  events,
   type FixtureScenario,
 } from './helpers/install.js';
 async function bootApp(t: import('node:test').TestContext, scenario: FixtureScenario): Promise<DomainApp> {
@@ -140,14 +141,26 @@ test('strict FunctionOutcome: garbage and undeclared kinds never propagate as SU
   await unknown.dispose();
 });
 
-test('implementation exceptions are ordinary FAILED outcomes, not crashes', async (t) => {
+test('unhandled implementation exceptions cause KDP Exit and block subsequent ingress', async (t) => {
   const app = await bootApp(t, {
     init: { status: 'READY' },
     functions: { evaluate: { behavior: 'throw' } },
   });
+  const logged: string[] = [];
+  t.mock.method(console, 'error', (message?: unknown) => {
+    logged.push(String(message));
+  });
   const outcome = await app.invoke('evaluate', { total: 1, region: 'EU' });
   assert.equal(outcome.kind, 'FAILED');
   assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
+  if (outcome.kind === 'FAILED') assert.doesNotMatch(outcome.failure.message, /TOKEN_SECRET_CANARY_8029/);
+  assert.equal(logged.some((line) => line.includes('TOKEN_SECRET_CANARY_8029')), false);
+  assert.deepEqual(
+    events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
+    ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-kernel'],
+  );
+  const after = await app.invoke('evaluate', { total: 1, region: 'EU' });
+  assert.equal(after.kind === 'FAILED' && after.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
   await app.dispose();
 });
 
@@ -181,7 +194,7 @@ test('inspect projects Lock facts only (B06), including DEGRADED suppression', a
   assert.equal(inspection.elements[0]?.ownerPackageId, 'fixture-business');
   assert.deepEqual(
     inspection.functions.map((fn) => fn.ref.functionId),
-    ['evaluate', 'optionalReport', 'appInit'],
+    ['evaluate', 'optionalReport'],
   );
   assert.deepEqual(
     inspection.ingress.map((entry) => [entry.id, entry.optional]),
@@ -226,7 +239,7 @@ test('invoke never rejects on Proxy/getter outcomes: typed FAILED instead', asyn
   );
   assert.match(
     outcomeResult.kind === 'FAILED' ? outcomeResult.failure.message : '',
-    /inspection threw/,
+    /result inspection raised an unhandled error/,
   );
   await evilOutcome.dispose();
 

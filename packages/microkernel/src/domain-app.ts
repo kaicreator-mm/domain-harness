@@ -87,10 +87,10 @@ export function normalizeOutcome(raw: unknown, declaredOutcomes: readonly string
       }
     }
     return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-FunctionOutcome value');
-  } catch (error) {
+  } catch {
     return failedOutcome(
       'DH_RUNTIME_UNSUPPORTED_PROFILE',
-      `implementation returned a value whose inspection threw: ${(error as Error).message}`,
+      'implementation result inspection raised an unhandled error (detail redacted)',
     );
   }
 }
@@ -153,7 +153,10 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     try {
       schemas = await packages.functionSchemas(selected);
     } catch (error) {
-      return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', (error as Error).message);
+      const reason = error instanceof KdpLoadError
+        ? error.message
+        : 'function schema lookup failed (detail redacted)';
+      return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', reason);
     }
     if (schemas === null) {
       return unknownOutcome(
@@ -168,8 +171,16 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     let raw: unknown;
     try {
       raw = await selected.impl(input);
-    } catch (error) {
-      return failedOutcome('DH_KDP_PACKAGE_LOAD_FAILED', `implementation for ingress '${ingressId}' threw: ${(error as Error).message}`);
+    } catch {
+      // Element 未处理异常：Kernel 最后兜底，尽最大努力执行 Exit，不继续开放业务调用。
+      const reason = `ingress '${ingressId}' raised unhandled implementation error (detail redacted)`;
+      console.error(`[KDP Unhandled] code=DH_KDP_PACKAGE_LOAD_FAILED phase=ingress ingress=${ingressId}`);
+      try {
+        await dispose();
+      } catch {
+        console.error('[KDP Unhandled Exit] code=DH_RUNTIME_EXIT_FAILED phase=exit detail=redacted');
+      }
+      return failedOutcome('DH_KDP_PACKAGE_LOAD_FAILED', reason);
     }
     const outcome = normalizeOutcome(raw, selected.outcomes);
     if (outcome.kind === 'SUCCEEDED' && !safeValidateJsonSubset(outcome.value, schemas.output)) {
@@ -212,13 +223,13 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     });
   }
 
-  /** 首次调用立刻阻止后续 invoke；并发或重复 dispose 复用同一 Promise，技术销毁只执行一次。 */
+  /** 首次调用立刻阻止后续 invoke；并发或重复 dispose 复用同一 Promise，退出链只执行一次。 */
   function dispose(): Promise<{ readonly status: 'DISPOSED' }> {
     if (disposeFlight === null) {
       disposed = true;
       disposeFlight = (async () => {
         try {
-          await packages.runTechnicalDispose();
+          await packages.runExit();
           return { status: 'DISPOSED' } as const;
         } finally {
           disposed = true;

@@ -11,6 +11,11 @@ import type {
   ResourceRef,
   SelectedFunction,
   SelectedPackage,
+  AppInitContext,
+  InitCaller,
+  PackageInitContext,
+  PackageExitContext,
+  PackageInitBinding,
 } from '@kaicreator/domain-harness-contracts';
 import { resolvePackageFile, splitResourceKey } from './paths.js';
 import { bytesContentDigest } from './verify.js';
@@ -24,11 +29,6 @@ export class KdpLoadError extends Error {
   }
 }
 
-export interface TechnicalLifecycleContext {
-  readonly packageId: string;
-  readonly hostPorts: readonly HostPortBinding[];
-}
-
 type ModuleExports = Record<string, unknown>;
 
 /** 唯一 Package 装配器负责预检已选代码字节、固定顺序初始化、函数句柄及逆序清理，不重新推导构建图。 */
@@ -37,6 +37,10 @@ export class PackageSystem {
   private readonly definitionCache = new Map<string, ElementDefinition | null>();
   private readonly schemaCache = new Map<string, { input: unknown; output: unknown } | null>();
   private sealedHookTable: ReadonlyMap<string, readonly unknown[]> | null = null;
+  /** 记录每次真实进入 Init 的 Package，不合并相同调用者。 */
+  private readonly initEvents: string[] = [];
+  private readonly callerHistory = new Map<string, InitCaller[]>();
+  private exited = false;
 
   constructor(
     private readonly installRoot: string,
@@ -53,8 +57,10 @@ export class PackageSystem {
     if (cached === undefined) {
       cached = import(pathToFileURL(absolutePath).href).then(
         (mod) => mod as ModuleExports,
-        (error: unknown) => {
-          throw new KdpLoadError(`${what} failed to import: ${(error as Error).message}`);
+        (error) => {
+          // 不转发任意 Package 的 import 失败文本；异常字符串可能含口令或私有路径。
+          void error;
+          throw new KdpLoadError(`${what} failed to import (untrusted module error redacted)`);
         },
       );
       this.moduleCache.set(absolutePath, cached);
@@ -99,6 +105,13 @@ export class PackageSystem {
     for (const pkg of this.lock.selectedPackages) collect(pkg.artifact);
     for (const fn of this.lock.selectedFunctions) collect(fn.implementation.module);
     for (const hook of this.lock.hookBindings) for (const provider of hook.providers) collect(provider.module);
+    // 先核验所有生成的 ESM 模块，包括模块的相对导入闭包，防止 Node 加载时绕过 Pin。
+    for (const [key, digest] of Object.entries(this.lock.resourceDigests)) {
+      if (!/\.(?:mjs|js)$/u.test(key) && !key.endsWith('/package.json')) continue;
+      const split = splitResourceKey(key);
+      if (split === null) throw new KdpLoadError(`invalid executable key '${key}'`);
+      collect({ packageId: split.packageId, path: split.path, digest });
+    }
     for (const [key, ref] of selected) {
       await this.readVerifiedBytes(ref.packageId, ref.path, ref.digest, `selected executable '${key}'`);
     }
@@ -122,75 +135,159 @@ export class PackageSystem {
     return exported;
   }
 
-  /**
-   * 依 Lock 的拓扑顺序运行技术初始化；当前步失败只逆序回滚已经成功的步骤。
-   * 回滚属于 best effort，不能覆盖第一处异常，也不能把失败看成 READY。
-   */
-  async runTechnicalInit(): Promise<void> {
-    const initialized: string[] = [];
-    try {
-      for (const packageId of this.lock.technicalInitOrder) {
-        const pkg = this.packageById(packageId);
-        if (pkg === undefined) {
-          throw new KdpLoadError(`technicalInitOrder references unselected package '${packageId}'`);
-        }
-        const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
-        const technicalInit = mod['technicalInit'];
-        if (pkg.technicalLifecycle) {
-          if (typeof technicalInit !== 'function') {
-            throw new KdpLoadError(`package '${packageId}' declared technicalInit but its artifact has no callable named export`);
-          }
-          const context: TechnicalLifecycleContext = { packageId, hostPorts: this.hostPorts };
-          await (technicalInit as (ctx: TechnicalLifecycleContext) => unknown)(context);
-        }
-        initialized.push(packageId);
-      }
-    } catch (error) {
-      for (const packageId of [...initialized].reverse()) {
-        try {
-          const pkg = this.packageById(packageId);
-          if (pkg === undefined) continue;
-          const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
-          if (!pkg.technicalLifecycle) continue;
-          const technicalDispose = mod['technicalDispose'];
-          if (typeof technicalDispose === 'function') {
-            const context: TechnicalLifecycleContext = { packageId, hostPorts: this.hostPorts };
-            await (technicalDispose as (ctx: TechnicalLifecycleContext) => unknown)(context);
-          }
-        } catch {
-          // 回滚仅尽力清理，保留最先发生的初始化失败，避免后续清理异常覆盖根因。
-        }
-      }
-      throw error;
-    }
+  /** 获取本次激活中某个 Package 实际收到的 Init 调用来源，保留重复与先后顺序。 */
+  initFrom(packageId: string): readonly InitCaller[] | undefined {
+    if (this.packageById(packageId)?.recordInitFrom !== true) return undefined;
+    return (this.callerHistory.get(packageId) ?? []).map((caller) => ({ ...caller }));
   }
 
-  /** 依 Lock 的逆序清理所有选定 Package；逐个收集失败，避免一个失败跳过其它清理。 */
-  async runTechnicalDispose(): Promise<void> {
+  /**
+   * 唯一 Init 轮次：Boot→Order 0→本层 Extension 递归→当前 Core→下一个 Core。
+   * Package 自行决定 Init 函数内部是否去重；KDP 只记录全部进入事件。
+   */
+  async runInit(context: AppInitContext): Promise<unknown> {
+    const seen = new Set<string>();
+    const businessResults: unknown[] = [];
+    const completedCores = new Set<string>();
+    const enter = async (
+      packageId: string,
+      caller: InitCaller,
+      layer: SelectedPackage['layer'],
+      nextCore?: PackageInitBinding,
+    ): Promise<void> => {
+      const pkg = this.packageById(packageId);
+      if (!pkg) throw new KdpLoadError(`Init references unselected Package '${packageId}'`);
+      if (pkg.layer !== layer && pkg.role !== 'extension') {
+        throw new KdpLoadError(`Core '${packageId}' is not in its declared Core.Order layer`);
+      }
+      // 每次调用都执行实际递归；seen 仅作递归调用栈环保护，不是 Init 去重。
+      if (seen.has(packageId)) throw new KdpLoadError(`recursive Init dependency cycle at '${packageId}'`);
+      seen.add(packageId);
+      try {
+        // 进入 Init 调用边界即记账；即使子 Extension 失败也必须为已进入的父 Package 安排 Exit。
+        // 独立的退出技术记录始终存在；Package 的 InitFrom 仅在主动选择时创建。
+        this.initEvents.push(packageId);
+        if (pkg.recordInitFrom === true) {
+          const history = this.callerHistory.get(packageId) ?? [];
+          history.push(caller);
+          this.callerHistory.set(packageId, history);
+        }
+        const extensions = pkg.dependsOn
+          .map((id) => this.packageById(id))
+          .filter((dep): dep is SelectedPackage => dep?.role === 'extension')
+          .sort((a, b) => a.packageId.localeCompare(b.packageId));
+        for (const dep of extensions) {
+          await enter(dep.packageId, { type: 'Package', packageId }, dep.layer);
+        }
+
+        const fn = await this.loadEntry(pkg.init, `Init Element of '${packageId}'`);
+        if (typeof fn !== 'function') {
+          throw new KdpLoadError(`Init Element of '${packageId}' is not a callable export`);
+        }
+        const resources = new Map(pkg.initResources.map((resource) => {
+          const key = `${resource.packageId}/${resource.path}`;
+          if (this.lock.resourceDigests[key] !== resource.digest) {
+            throw new KdpLoadError(`Init resource '${key}' is not sealed`, 'DH_BOOT_PIN_MISMATCH');
+          }
+          return [key, this.resourceHandle(key)] as const;
+        }));
+        // 已构建的直接依赖图仅用来分配 capability；不能向所有 Package 暴露全局 ingress。
+        const accessibleOwners = new Set([packageId, ...pkg.dependsOn]);
+        const visibleFunctions = new Map([...context.functions].filter(([ingressId]) => {
+          const ingress = this.lock.ingress.find((entry) => entry.id === ingressId);
+          if (!ingress) return false;
+          return this.lock.selectedElements.some((element) =>
+            element.ref.id === ingress.function.element.id &&
+            element.ref.digest === ingress.function.element.digest &&
+            accessibleOwners.has(element.ownerPackageId));
+        }));
+        const kdpCore = pkg.role === 'primary' && pkg.order === 0;
+        const ownContext: PackageInitContext = {
+          ...context,
+          packageId,
+          // 每个 Package 拿到独立的配置和句柄快照，不能修改后来者的 Init 上下文。
+          config: structuredClone(context.config),
+          functions: visibleFunctions,
+          ...(pkg.recordInitFrom === true
+            ? { InitFrom: Object.freeze((this.initFrom(packageId) ?? []).map((entry) => Object.freeze({ ...entry }))) }
+            : {}),
+          hostPorts: kdpCore ? this.hostPorts : [],
+          resources,
+          ...(nextCore !== undefined ? { nextCore } : {}),
+        };
+        try {
+          const result: unknown = await (fn as (context: PackageInitContext) => unknown)(ownContext);
+          if (pkg.role === 'primary' && pkg.layer === 'business') businessResults.push(result);
+        } catch (error) {
+          if (error instanceof KdpLoadError) throw error;
+          throw new KdpLoadError(`Package '${packageId}' Init Element raised unhandled error (detail redacted)`, 'DH_RUNTIME_NOT_READY');
+        }
+      } finally {
+        seen.delete(packageId);
+      }
+    };
+    const cores = this.lock.coreOrder;
+    if (!cores.length) throw new KdpLoadError('Lock has no Core.Order chain');
+    const rootId = cores[0]!;
+    if (this.lock.bootstrapKdpPin.kdpPackageId !== rootId) {
+      throw new KdpLoadError('Order 0 Core and bootstrap KDP Package identities differ', 'DH_BOOT_PIN_MISMATCH');
+    }
+    const coreBinding = (index: number, caller: InitCaller): PackageInitBinding => ({
+      init: async (): Promise<void> => {
+        const id = cores[index];
+        if (!id) return;
+        const core = this.packageById(id);
+        if (!core || core.role !== 'primary') throw new KdpLoadError(`Core.Order references invalid Core '${id}'`);
+        const next = cores[index + 1];
+        const nextCore = next === undefined
+          ? undefined
+          : coreBinding(index + 1, { type: 'Package', packageId: id });
+        // KDP 只提供 BUILD 封存的链接；当前 Core.Init 自己决定是否及何时调用下一跳。
+        await enter(id, caller, core.layer, nextCore);
+        completedCores.add(id);
+      },
+    });
+    await coreBinding(0, { type: 'Boot' }).init();
+    // Core 负责转交下一 Core；KDP 不补跑漏掉的 Core，但在对外标记 READY 前必须确认全链完成。
+    const missing = cores.filter((id) => !completedCores.has(id));
+    if (missing.length > 0) {
+      throw new KdpLoadError(
+        `Core.Order chain incomplete: missing Init for ${missing.join(', ')}`,
+        'DH_RUNTIME_NOT_READY',
+      );
+    }
+    return businessResults.length === 1 ? businessResults[0] : businessResults;
+  }
+
+  /**
+   * Exit 仅在退出/未处理异常时执行：从最后进入 Init 的 Package 开始逆序清理。
+   * 一次 Exit 抛错不能阻断其余清理；每一条 Init 进入记录都允许对应一次 Exit。
+   */
+  async runExit(): Promise<void> {
+    if (this.exited) return;
+    this.exited = true;
     const failures: string[] = [];
-    for (const packageId of this.lock.technicalDisposeOrder) {
+    for (const packageId of [...this.initEvents].reverse()) {
       try {
         const pkg = this.packageById(packageId);
-        if (pkg === undefined) {
-          throw new KdpLoadError(`technicalDisposeOrder references unselected package '${packageId}'`);
-        }
-        const mod = await this.loadArtifactModule(pkg.artifact, `selected package '${packageId}'`);
-        const technicalDispose = mod['technicalDispose'];
-        if (pkg.technicalLifecycle) {
-          if (typeof technicalDispose !== 'function') {
-            throw new KdpLoadError(`package '${packageId}' declared technicalDispose but its artifact has no callable named export`);
-          }
-          const context: TechnicalLifecycleContext = { packageId, hostPorts: this.hostPorts };
-          await (technicalDispose as (ctx: TechnicalLifecycleContext) => unknown)(context);
-        }
-      } catch (error) {
-        failures.push(`${packageId}: ${(error as Error).message}`);
+        if (!pkg) throw new KdpLoadError(`Exit references missing Package '${packageId}'`);
+        if (!pkg.exit) continue;
+        const fn = await this.loadEntry(pkg.exit, `Exit Element of '${packageId}'`);
+        if (typeof fn !== 'function') throw new KdpLoadError(`Exit Element of '${packageId}' is not callable`);
+        const exitContext: PackageExitContext = {
+          packageId,
+          ...(pkg.recordInitFrom === true ? { InitFrom: this.initFrom(packageId) ?? [] } : {}),
+          hostPorts: pkg.role === 'primary' && pkg.order === 0 ? this.hostPorts : [],
+        };
+        await (fn as (context: PackageExitContext) => unknown)(exitContext);
+      } catch {
+        const reason = `${packageId}: Exit Element raised unhandled error (detail redacted)`;
+        failures.push(reason);
+        console.error(`[KDP Exit] code=DH_RUNTIME_EXIT_FAILED phase=exit package=${packageId}`);
       }
     }
-    if (failures.length > 0) {
-      throw new KdpLoadError(
-        `technical dispose failed for ${failures.length} package(s): ${failures.join('; ')}`,
-      );
+    if (failures.length) {
+      throw new KdpLoadError(`Exit failed for ${failures.length} Init call(s): ${failures.join('; ')}`);
     }
   }
 

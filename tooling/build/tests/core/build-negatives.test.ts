@@ -159,13 +159,16 @@ test('R27: lifecycle EntryRef must match pinned package artifact and named expor
   const packages = input.packages.map((raw) => {
     const manifest = raw as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
     if (manifest.id !== 'sdk-core') return manifest;
-    return { ...manifest, technicalInit: { ...manifest.technicalInit!, exportName: 'init' } };
+    return { ...manifest, init: { ...manifest.init, exportName: 'wrongInit' } };
   });
   expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_SCHEMA_INVALID');
 });
 
-refusalCase('DH_BUILD_LIFECYCLE_HALF', (s) => {
-  s.sdkLifecycle = 'init-only';
+test('Exit Element is optional; Init-only Package can build', (t) => {
+  const scenario = standardCase();
+  scenario.sdkLifecycle = 'init-only';
+  t.after(scenario.ws.dispose);
+  assert.equal(buildApp(scenario.finalize().input).ok, true);
 });
 
 refusalCase('DH_BUILD_DEPENDS_ON_UNSELECTED', (s) => {
@@ -245,13 +248,13 @@ test('DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION: two compatible bindings for on
   expectRefusal(buildApp(input), 'DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION');
 });
 
-test('DH_BUILD_PRIMARY_DUPLICATE: extension claiming primary in an occupied layer', (t) => {
+test('DH_BUILD_PRIMARY_MISSING: a Primary introduced transitively but not selected as a root Core', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
   const aaa = input.packages.find((pkg) => (pkg as { id: string }).id === 'aaa-ext') as { role: string };
   aaa.role = 'primary';
-  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_DUPLICATE');
+  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_MISSING');
 });
 
 test('DH_BUILD_PRIMARY_MISSING: kernel root manifest declaring the sdk layer', (t) => {
@@ -283,34 +286,290 @@ test('DH_BUILD_HOOK_TARGET_INVALID: contribution to an undeclared hook', (t) => 
   expectRefusal(buildApp(input), 'DH_BUILD_HOOK_TARGET_INVALID');
 });
 
-test('DH_BUILD_APP_INIT_MISSING: businessAppInit resolves to no selected Function', (t) => {
+test('BUILD rejects undeclared final generated ESM import even when an indirect Package is selected', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const appDescriptor = input.descriptor as { businessAppInit: { element: { id: string } } };
-  appDescriptor.businessAppInit.element.id = 'orders.ghost';
-  expectRefusal(buildApp(input), 'DH_BUILD_APP_INIT_MISSING');
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
+    new TextEncoder().encode("import 'aaa-ext';\nexport function init() { return { status: 'READY' }; }\nexport function exit() {}\n"));
+  const packages = input.packages.map((pkg) =>
+    pkg === business ? {
+      ...business,
+      dependsOn: business.dependsOn.filter((dep) => dep.package !== 'aaa-ext'),
+      init: { module: source, exportName: 'init' },
+      exit: { module: source, exportName: 'exit' },
+    } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
-test('DH_BUILD_APP_INIT_MISSING: digest drift on the app-init element reference', (t) => {
+test('BUILD refuses a declared Init when the final artifact lacks the actual export', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const appDescriptor = input.descriptor as {
-    businessAppInit: { element: { digest: string } };
-  };
-  appDescriptor.businessAppInit.element.digest = `sha256:${'f'.repeat(64)}`;
-  expectRefusal(buildApp(input), 'DH_BUILD_APP_INIT_MISSING');
+  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/sdk.mjs',
+    new TextEncoder().encode("export function exit() {}\n"));
+  const packages = input.packages.map((pkg) =>
+    pkg === sdk ? { ...sdk, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' } } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_SCHEMA_INVALID');
 });
 
-test('app-init function not exported by its owner is an export refusal', (t) => {
+test('BUILD rejects duplicated Core.Order', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as { order: number };
+  sdk.order = 0;
+  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_DUPLICATE');
+});
+
+test('BUILD rejects missing KDP Order 0', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const kdp = input.packages.find((pkg) => (pkg as { id: string }).id === 'kdp-kernel') as { order: number };
+  kdp.order = 9;
+  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_MISSING');
+});
+
+test('BUILD rejects imports from an undeclared direct Extension', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input, refs } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as { imports: unknown[] };
+  sdk.imports = [refs.evaluateRef];
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+
+
+test('BUILD refuses raw cross-Package reexports that could launder a transitive Extension handle', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
+    new TextEncoder().encode("export function init() {}\nexport function exit() {}\nexport { someRawHandle } from 'aaa-ext';\n"));
+  const packages = input.packages.map((pkg) => pkg === business ? {
+    ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
+  } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('BUILD rejects unapproved Node module loader imports in generated Package code', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
+    new TextEncoder().encode("import { createRequire } from 'node:module';\nexport function init() {}\nexport function exit() {}\n"));
+  const packages = input.packages.map((pkg) => pkg === business ? {
+    ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
+  } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('BUILD forbids Function resource access to an undeclared transitive Package', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
   const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as {
-    exports: { elementId?: string; functionId?: string }[];
+    targetVariants: { implementations: { functionId: string; resources?: unknown[] }[] }[];
   };
-  business.exports = business.exports.filter((entry) => entry.elementId !== 'orders.app-main');
-  expectRefusal(buildApp(input), 'DH_BUILD_EXPORT_MISSING');
+  const kdp = input.packages.find((pkg) => (pkg as { id: string }).id === 'kdp-kernel') as
+    import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const implementation = business.targetVariants[0]!.implementations.find((entry) => entry.functionId === 'evaluate')!;
+  implementation.resources = [kdp.init.module];
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
+test('BUILD forbids Element content references to an undeclared Package', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  scenario.eligibility.content[1]!.ref = {
+    packageId: 'kdp-kernel', path: 'content/unauthorized.json', digest: `sha256:${'0'.repeat(64)}`,
+  };
+  expectRefusal(buildApp(scenario.finalize().input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+function generatedLoaderCase(label: string, body: string, code: BuildErrorCode = 'DH_BUILD_DEPENDS_ON_UNSELECTED'): void {
+  test(`R11 P1-01: ${label}`, (t) => {
+    const scenario = standardCase();
+    t.after(scenario.ws.dispose);
+    const { input } = scenario.finalize();
+    const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+    const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs', new TextEncoder().encode(body));
+    const packages = input.packages.map((pkg) => pkg === business ? {
+      ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
+    } : pkg);
+    expectRefusal(buildApp({ ...input, packages }), code);
+  });
+}
+
+generatedLoaderCase('computed global Function loader is refused', `
+const load = globalThis['Function']('return import("undeclared-package")');
+export async function init() { await load()(); }
+export function exit() {}
+`);
+generatedLoaderCase('aliased global Function loader is refused before invocation', `
+const F = globalThis.Function;
+export async function init() { return F('return import("undeclared-package")')(); }
+export function exit() {}
+`);
+generatedLoaderCase('bare Function alias cannot bypass identifier checks', `
+const F = Function;
+export async function init() { return F('return 1')(); }
+export function exit() {}
+`);
+generatedLoaderCase('process.getBuiltinModule and createRequire are refused', `
+export async function init() { return process.getBuiltinModule('module').createRequire(import.meta.url)('undeclared-package'); }
+export function exit() {}
+`);
+generatedLoaderCase('computed process builtin loader is refused', `
+export async function init() { return process['getBuiltinModule']('module'); }
+export function exit() {}
+`);
+generatedLoaderCase('nonliteral computed calls are not statically provable', `
+const table = {};
+export async function init() { return table[globalThis.name](); }
+export function exit() {}
+`);
+generatedLoaderCase('Reflect-based Function lookup is refused', `
+export async function init() { return Reflect.get(globalThis, 'Function')('return 1')(); }
+export function exit() {}
+`);
+
+generatedLoaderCase('computed global Function read followed by indirect invocation is refused', `
+const loader = globalThis['Fun' + 'ction'];
+export async function init() { return loader('return import("undeclared-package")')()(); }
+export function exit() {}
+`);
+generatedLoaderCase('computed process builtin read followed by indirect invocation is refused', `
+const loader = process['get' + 'BuiltinModule'];
+export async function init() { return loader('module').createRequire(import.meta.url)('undeclared-package'); }
+export function exit() {}
+`);
+generatedLoaderCase('computed destructuring property aliases cannot acquire a dynamic loader', `
+const { ['Fun' + 'ction']: loader } = globalThis;
+export async function init() { return loader('return import("undeclared-package")')()(); }
+export function exit() {}
+`);
+
+generatedLoaderCase('private named imports from a declared Extension are refused', `
+import { notExported } from 'orders-ext';
+export async function init() { return notExported(); }
+export function exit() {}
+`, 'DH_BUILD_EXPORT_MISSING');
+
+generatedLoaderCase('foreign Function handle cannot be returned inside a wrapper object', `
+import { init as extensionInit } from 'orders-ext';
+export async function init() { return { rawExtensionHandle: extensionInit }; }
+export function exit() {}
+`);
+
+generatedLoaderCase('namespace imports expose an unprovable raw Package handle', `
+import * as ext from 'orders-ext';
+export async function init() { return ext; }
+export function exit() {}
+`, 'DH_BUILD_EXPORT_MISSING');
+
+
+test('R16 P1-SRC-01: BUILD refuses npm preinstall scripts on selected Packages before composition', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const businessDir = scenario.ws.packageRoots['orders-business']!;
+  writeRaw(businessDir, 'package.json', new TextEncoder().encode(JSON.stringify({
+    name: 'orders-business', version: '1.0.0', type: 'module',
+    scripts: { preinstall: 'node -e "process.exit(99)"' },
+  })));
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('R16 P1-SRC-01: BUILD refuses npm prepare scripts hidden in selected Packages', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  writeRaw(scenario.ws.packageRoots['orders-ext']!, 'package.json',
+    new TextEncoder().encode(JSON.stringify({
+      name: 'orders-ext', version: '1.0.0', type: 'module',
+      scripts: { prepare: 'node -e "process.exit(99)"' },
+    })));
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('R18 P1: selected Package cannot pull an unselected local package with postinstall at npm install time', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const localDir = scenario.ws.packageRoots['orders-business']!;
+  // An unselected package script is data only: BUILD must reject before materialize/install.
+  writeRaw(localDir, 'unselected/package.json', new TextEncoder().encode(JSON.stringify({
+    name: 'unselected-probe', version: '1.0.0', type: 'module',
+    scripts: { postinstall: 'node -e "process.exit(99)"' },
+  })));
+  writeRaw(localDir, 'package.json', new TextEncoder().encode(JSON.stringify({
+    name: 'orders-business', version: '1.0.0', type: 'module',
+    dependencies: { 'unselected-probe': 'file:./unselected' },
+  })));
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('R18 P1: selected Package cannot resolve external optional, peer, bundled, or dev install dependencies', (t) => {
+  for (const [field, value] of [
+    ['optionalDependencies', { unselected: 'git+ssh://example.invalid/test.git' }],
+    ['peerDependencies', { unselected: '^1.0.0' }],
+    ['bundleDependencies', ['unselected']],
+    ['devDependencies', { unselected: 'file:../unselected' }],
+    ['overrides', { unselected: 'file:../unselected' }],
+  ] as const) {
+    const scenario = standardCase();
+    t.after(scenario.ws.dispose);
+    const { input } = scenario.finalize();
+    writeRaw(scenario.ws.packageRoots['orders-ext']!, 'package.json', new TextEncoder().encode(JSON.stringify({
+      name: 'orders-ext', version: '1.0.0', type: 'module', [field]: value,
+    })));
+    expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  }
+});
+
+test('R18 P1: caller-supplied external or unpinned root runtime dependencies are rejected', (t) => {
+  for (const runtimeDependencies of [
+    { '@kaicreator/domain-harness-microkernel': '0.11.0', 'unselected-probe': '1.0.0' },
+    { '@kaicreator/domain-harness-microkernel': '0.11.0', 'unselected-probe': 'file:../probe' },
+    { '@kaicreator/domain-harness-microkernel': '0.11.1' },
+  ]) {
+    const scenario = standardCase();
+    t.after(scenario.ws.dispose);
+    const { input } = scenario.finalize();
+    expectRefusal(buildApp({ ...input, runtimeDependencies }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  }
+});
+
+test('R20 P1: selected root binding.gyp triggers implicit node-gyp and is rejected before npm install', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const businessDir = scenario.ws.packageRoots['orders-business']!;
+  const binding = writeRaw(businessDir, 'binding.gyp',
+    new TextEncoder().encode(JSON.stringify({
+      targets: [{ target_name: 'unsafe_native_build', sources: ['unreviewed-native.cc'] }],
+    })));
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as
+    import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const packages = input.packages.map((pkg) => pkg === business
+    ? { ...business, initResources: [...(business.initResources ?? []), binding] }
+    : pkg);
+  // No package.json scripts or dependencies. The file itself would cause implicit node-gyp.
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('R20 P1: even unselected root binding.gyp is rejected rather than available to npm packaging', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  writeRaw(scenario.ws.packageRoots['orders-ext']!, 'binding.gyp',
+    new TextEncoder().encode('{"targets":[]}'));
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});

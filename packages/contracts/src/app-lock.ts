@@ -18,7 +18,13 @@ export interface SelectedPackage {
   readonly layer: PackageLayer;
   readonly role: PackageRole;
   readonly artifact: ResourceRef;
-  readonly technicalLifecycle: boolean;
+  readonly order?: number;
+  readonly init: EntryRef;
+  readonly exit?: EntryRef;
+  readonly initResources: readonly ResourceRef[];
+  /** 可选的 Package.InitFrom 历史，不参与 Exit 记录或依赖授权。 */
+  readonly recordInitFrom?: true;
+  /** 每个 Package 仅拥有其直接声明的 Extension/API 依赖。 */
   readonly dependsOn: readonly string[];
 }
 
@@ -64,7 +70,7 @@ export interface BootstrapKdpRef {
 /**
  * BUILD 产生的确定性快照；KDP 只校验、加载和执行，不重新求解依赖。
  * closureDigest 对排除自身后的规范 JSON 求摘要；安装记录与外部 Pin 应与它一致。
- * 技术初始化与销毁顺序都在此封存，运行期不得随意重新排序。
+ * Core 链及直接 Extension 边在 BUILD 时确定；Exit 根据真实 Init 进入顺序执行。
  */
 export interface DomainAppLock {
   readonly kind: 'DomainAppLock';
@@ -80,9 +86,8 @@ export interface DomainAppLock {
   readonly selectedElements: readonly SelectedElement[];
   readonly selectedFunctions: readonly SelectedFunction[];
   readonly hookBindings: readonly SealedHookBinding[];
-  readonly technicalInitOrder: readonly string[];
-  readonly technicalDisposeOrder: readonly string[];
-  readonly businessAppInit: FunctionRef;
+  /** 已锁定 Core(Order 升序) 链；运行时只按此链递归调用。 */
+  readonly coreOrder: readonly string[];
   readonly ingress: readonly SealedIngress[];
   readonly resourceDigests: Readonly<Record<string, ContentDigest>>;
   readonly excludedUnknownContent: readonly string[];

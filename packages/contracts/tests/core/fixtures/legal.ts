@@ -224,20 +224,12 @@ export const DOMAIN_APP_DESCRIPTOR_FIXTURE: DomainAppDescriptor = {
   target: APP_TARGET_SELECTOR,
   roots: {
     kernelPrimary: { package: 'kdp-basic', version: '1.0.0' },
-    sdkPrimary: { package: 'sdk-core', version: '1.0.0' },
-    businessPrimary: { package: 'orders-business', version: '1.0.0' },
+    cores: [
+      { package: 'sdk-core', version: '1.0.0' },
+      { package: 'orders-business', version: '1.0.0' },
+    ],
   },
   extensions: [],
-  businessAppInit: {
-    element: {
-      namespace: 'orders',
-      id: 'orders.app-main',
-      version: '1.0.0',
-      digest: contentDigestOf({ fixture: 'orders/app-main-definition', revision: 1 }),
-    },
-    functionId: 'init',
-    contractVersion: '1',
-  },
   ingress: [
     { id: 'evaluate', function: EVALUATE_FUNCTION_REF, optional: false },
   ],
@@ -256,7 +248,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
   },
   target: APP_TARGET,
   bootstrapKdpPin: {
-    kdpPackageId: '@kaicreator/domain-harness-microkernel',
+    kdpPackageId: 'kdp-basic',
     kdpPrimaryEntry: 'bootstrap',
     kdpPrimaryDigest: contentDigestOf({ fixture: 'kdp/bootstrap-entry', revision: 1 }),
   },
@@ -266,12 +258,14 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       version: '1.0.0',
       layer: 'kernel',
       role: 'primary',
-      technicalLifecycle: false,
+      order: 0,
       artifact: {
         packageId: 'kdp-basic',
         path: 'dist/kdp-basic.mjs',
         digest: contentDigestOf({ fixture: 'kdp-basic/artifact', revision: 1 }),
       },
+      init: { module: { packageId: 'kdp-basic', path: 'dist/kdp-basic.mjs', digest: contentDigestOf({ fixture: 'kdp-basic/artifact', revision: 1 }) }, exportName: 'init' },
+      initResources: [],
       dependsOn: [],
     },
     {
@@ -279,12 +273,14 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       version: '1.0.0',
       layer: 'sdk',
       role: 'primary',
-      technicalLifecycle: false,
+      order: 1,
       artifact: {
         packageId: 'sdk-core',
         path: 'dist/sdk-core.mjs',
         digest: contentDigestOf({ fixture: 'sdk-core/artifact', revision: 1 }),
       },
+      init: { module: { packageId: 'sdk-core', path: 'dist/sdk-core.mjs', digest: contentDigestOf({ fixture: 'sdk-core/artifact', revision: 1 }) }, exportName: 'init' },
+      initResources: [],
       dependsOn: ['kdp-basic'],
     },
     {
@@ -292,8 +288,10 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
       version: '1.0.0',
       layer: 'business',
       role: 'primary',
-      technicalLifecycle: false,
+      order: 2,
       artifact: ORDERS_BUSINESS_ARTIFACT,
+      init: { module: ORDERS_BUSINESS_ARTIFACT, exportName: 'init' },
+      initResources: [],
       dependsOn: ['sdk-core'],
     },
   ],
@@ -339,9 +337,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
     },
   ],
   hookBindings: [],
-  technicalInitOrder: ['kdp-basic', 'sdk-core', 'orders-business'],
-  technicalDisposeOrder: ['orders-business', 'sdk-core', 'kdp-basic'],
-  businessAppInit: DOMAIN_APP_DESCRIPTOR_FIXTURE.businessAppInit,
+  coreOrder: ['kdp-basic', 'sdk-core', 'orders-business'],
   ingress: [
     { id: 'evaluate', function: EVALUATE_FUNCTION_REF, optional: false },
   ],
