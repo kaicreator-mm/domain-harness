@@ -764,6 +764,146 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
           },
         },
       },
+      trustedRuntimeIntegrity: {
+        type: 'array', minItems: 2, maxItems: 2,
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['name', 'version', 'integrity'],
+          properties: {
+            name: { enum: ['xstate', 'yaml'] },
+            version: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['ref', 'ownerPackageId', 'definitionDigest', 'definition'],
+          properties: {
+            ref: { $ref: '#/$defs/workflowRef' },
+            ownerPackageId: { type: 'string', minLength: 1 },
+            definitionDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+            definition: { $ref: '#/$defs/workflowDefinition' },
+          },
+        },
+      },
+      hookBindings: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['ownerPackageId', 'hookId', 'cardinality', 'providers'],
+          properties: {
+            ownerPackageId: { type: 'string', minLength: 1 },
+            hookId: { type: 'string', minLength: 1 },
+            cardinality: { enum: ['single', 'multi'] },
+            providers: { type: 'array', items: { $ref: '#/$defs/functionRef' } },
+          },
+        },
+      },
+      coreOrder: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
+      resourceDigests: {
+        type: 'object',
+        propertyNames: { type: 'string', minLength: 1 },
+        additionalProperties: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+      },
+      excludedUnknownContent: { type: 'array', items: { type: 'string', minLength: 1 } },
+      closureDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+    },
+  },
+  {
+    resourceRef: RESOURCE_REF_DEF,
+    elementRef: ELEMENT_REF_DEF,
+    functionRef: FUNCTION_REF_DEF,
+    implementationLocator: IMPLEMENTATION_LOCATOR_DEF,
+    resolvedTarget: RESOLVED_TARGET_DEF,
+    workflowRef: WORKFLOW_REF_DEF,
+    workflowDefinition: WORKFLOW_DEFINITION_DEF,
+    workflowNode: WORKFLOW_NODE_DEF,
+    workflowTarget: WORKFLOW_TARGET_DEF,
+    workflowSwitch: WORKFLOW_SWITCH_DEF,
+    workflowData: WORKFLOW_DATA_DEF,
+    workflowHooks: WORKFLOW_HOOKS_DEF,
+  },
+);
+
+export const JSON_SCHEMAS: Readonly<Record<string, JsonObject>> = Object.freeze({
+  'domain': DOMAIN_DEFINITION_JSON_SCHEMA,
+  'element': ELEMENT_DEFINITION_JSON_SCHEMA,
+  'content-block': CONTENT_BLOCK_JSON_SCHEMA,
+  'function-contract': FUNCTION_CONTRACT_JSON_SCHEMA,
+  'element-ref': ELEMENT_REF_JSON_SCHEMA,
+  'function-ref': FUNCTION_REF_JSON_SCHEMA,
+  'package-manifest': DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA,
+  'app-descriptor': DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA,
+  'app-lock': DOMAIN_APP_LOCK_JSON_SCHEMA,
+  'workflow-definition': WORKFLOW_DEFINITION_JSON_SCHEMA,
+});
+ },
+            integrity: { type: 'string', pattern: '^sha512-[A-Za-z0-9+/]+={0,2}
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['ref', 'ownerPackageId', 'definitionDigest', 'definition'],
+          properties: {
+            ref: { $ref: '#/$defs/workflowRef' },
+            ownerPackageId: { type: 'string', minLength: 1 },
+            definitionDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+            definition: { $ref: '#/$defs/workflowDefinition' },
+          },
+        },
+      },
+      hookBindings: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['ownerPackageId', 'hookId', 'cardinality', 'providers'],
+          properties: {
+            ownerPackageId: { type: 'string', minLength: 1 },
+            hookId: { type: 'string', minLength: 1 },
+            cardinality: { enum: ['single', 'multi'] },
+            providers: { type: 'array', items: { $ref: '#/$defs/functionRef' } },
+          },
+        },
+      },
+      coreOrder: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
+      resourceDigests: {
+        type: 'object',
+        propertyNames: { type: 'string', minLength: 1 },
+        additionalProperties: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+      },
+      excludedUnknownContent: { type: 'array', items: { type: 'string', minLength: 1 } },
+      closureDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+    },
+  },
+  {
+    resourceRef: RESOURCE_REF_DEF,
+    elementRef: ELEMENT_REF_DEF,
+    functionRef: FUNCTION_REF_DEF,
+    implementationLocator: IMPLEMENTATION_LOCATOR_DEF,
+    resolvedTarget: RESOLVED_TARGET_DEF,
+    workflowRef: WORKFLOW_REF_DEF,
+    workflowDefinition: WORKFLOW_DEFINITION_DEF,
+    workflowNode: WORKFLOW_NODE_DEF,
+    workflowTarget: WORKFLOW_TARGET_DEF,
+    workflowSwitch: WORKFLOW_SWITCH_DEF,
+    workflowData: WORKFLOW_DATA_DEF,
+    workflowHooks: WORKFLOW_HOOKS_DEF,
+  },
+);
+
+export const JSON_SCHEMAS: Readonly<Record<string, JsonObject>> = Object.freeze({
+  'domain': DOMAIN_DEFINITION_JSON_SCHEMA,
+  'element': ELEMENT_DEFINITION_JSON_SCHEMA,
+  'content-block': CONTENT_BLOCK_JSON_SCHEMA,
+  'function-contract': FUNCTION_CONTRACT_JSON_SCHEMA,
+  'element-ref': ELEMENT_REF_JSON_SCHEMA,
+  'function-ref': FUNCTION_REF_JSON_SCHEMA,
+  'package-manifest': DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA,
+  'app-descriptor': DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA,
+  'app-lock': DOMAIN_APP_LOCK_JSON_SCHEMA,
+  'workflow-definition': WORKFLOW_DEFINITION_JSON_SCHEMA,
+});
+ },
+          },
+        },
+      },
       selectedWorkflows: {
         type: 'array',
         items: {
