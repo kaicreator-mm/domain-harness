@@ -87,8 +87,7 @@ function workflowCase(
 }
 
 function accepted(result: BuildResult): Extract<BuildResult, { ok: true }> {
-  assert.equal(result.ok, true, result.ok ? '' : `${result.code}: ${result.message}`);
-  if (!result.ok) throw new Error(result.message);
+  if (!result.ok) assert.fail(`${result.code}: ${result.message}`);
   return result;
 }
 
