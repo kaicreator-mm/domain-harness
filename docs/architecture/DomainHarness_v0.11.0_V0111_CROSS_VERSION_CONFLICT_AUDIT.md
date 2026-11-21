@@ -1,3 +1,5 @@
+> **冲突 X01–X10 已由 Owner 后续七项裁决在 [L2 R10](DomainHarness_v0.11.1_L2_INIT_OWNED_WORKFLOW_CONTRACT_R10.md) 中完成设计收口（2026-11-21）**：本报告仍保留首次发现时对旧 R9.1 的差异证据，不能再将这些“P1 阻塞”直接写成 R10 当前阻塞。最新明确：Package.Init 内启动 Workflow；删除旧技术双 Init；Core.Order 归 0.11.0；Package.Exit/InitFrom 可选；异常归 Element、KDP 兜底；业务 Init→Workflow→Function；Workflow 内容 Schema 沿用已有 ContentBlock/schemaRef 扩展点。**尚未完成的是 0.11.0 #1621 新规范的独立审核/实施，以及 R10 的审查、冻结与源码/CI，并非还缺 Owner 功能选择。**
+
 # DomainHarness v0.11.0 ↔ v0.11.1 · 源码与规范冲突审核
 
 ```ini
