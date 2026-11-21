@@ -448,12 +448,29 @@ async function authoring(label, rule, options = {}) {
 }
 
 async function installComposedDependencies(label, installRoot) {
-  const install = spawnSync(process.execPath, [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund'], {
+  const install = spawnSync(process.execPath, [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund', '--ignore-scripts'], {
     cwd: installRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, npm_config_registry: process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry },
   });
   await evidence(`${label}.composed-package-npm-install`, { exit: install.status, signal: install.signal });
   assert.equal(install.status, 0, `${label}: composed App npm install failed\n${install.stdout}\n${install.stderr}`);
+  // An admitted Workflow App seals the exact archive SRI pins in the same Lock
+  // and ships a first-party verifier; check the resulting external npm install
+  // before importing the KDP or any selected third-party executable bytes.
+  const trustScript = join(installRoot, 'dh-install', 'verify-runtime.mjs');
+  try {
+    await readFile(trustScript);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+    return;
+  }
+  const verified = spawnSync(process.execPath, [trustScript], {
+    cwd: installRoot, encoding: 'utf8', timeout: 15000,
+  });
+  assert.equal(verified.status, 0,
+    `${label}: trusted third-party runtime archive SRI verification failed: ${verified.stderr}`);
+  await evidence(`${label}.trusted-runtime-install-sri`, { status: 'PASS', sha512Verified: true });
+
 }
 
 async function materialize(label, built) {
