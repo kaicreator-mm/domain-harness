@@ -1,4 +1,6 @@
 <!-- DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
+
+> **Foundation B0 增量覆盖历史资格（#1624 / Draft #1625，2026-11-21）**：此前 0.11.0 Scoped 证据只针对旧入口合同。当前 Element-First 修订要求 Package.Init → 已选 Function 真调用；旧 READY 后直接 Function ingress、技术/业务双初始化、裸 EntryRef 全部退出公共模型。0.11.1 仅负责 Workflow 编排，不得为 0.11.0 的身份或执行漏洞建立兼容层。本增量须按最终 Exact HEAD 独审并合入 `version/v0.11.x` 才能晋升已修复，不得提前标注通过。
 > **0.11.0 源码质量最新状态（覆盖历史 REWORK）：** 先前的 REWORK 为真实历史，但已在 [Issue #1602](https://github.com/kaicreator-mm/domain-harness/issues/1602) / [PR #1603](https://github.com/kaicreator-mm/domain-harness/pull/1603) 通过 R12→R15 复审完成四模块重构，R15 `ACCEPT_SCOPED`（P0=0/P1=0、保留五项非阻断 P2），Woodpecker #2787 同 SHA SUCCESS，已合入 `version/v0.11.x`；后续 [PR #1606](https://github.com/kaicreator-mm/domain-harness/pull/1606) 补齐中文注释和调用流程文档并经 #2788 成功合入。**仅 0.11.0 Foundation/Stage-0 工程资格合格；main、统一 Release、0.11.1+ 和 Full Conformance 均不能据此晋升。**
 >
 > 后续开发默认遵循 [0.11.x 防回归工程手册](../engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)：先分析新增信任/权限/生命周期边界，再做必要正反例，提交前检验类型和测试，按 Exact SHA 独立增量审核，禁止重复无效 CI 和往返拆分本地 Agent 任务。

@@ -1,5 +1,7 @@
 # DomainHarness v0.11.0 — Package / Core / Extension / BUILD / Init / Exit 统一规范
 
+> **2026-11-21 Element-First 基础合同修正（#1624）**：本规范的 Init/Exit 均指`本 Package 拥有的已选 ElementRef`，而不是独立 EntryRef 或裸 ESM 导出。每个 Init/Exit Element 的唯一生命周期 Function/Target 必须在 BUILD 真实选定。0.11.0 Init 已可调用同 Package 或直接声明 Extension 的已选 Function，不依赖 READY 后 App.invoke；DomainAppDescriptor/DomainApp 不再定义业务直接 ingress。标准实现与调用流程见 [B0 基础合同](DomainHarness_v0.11.0_ELEMENT_FIRST_B0_FOUNDATION.md)；此裁决覆盖原候选中一切同名物理入口假设。
+
 > 文档类型：v0.11.0 Product/L2 修订规范（讨论决议整理，docs-only 候选）
 >
 > 仓库：`kaicreator-mm/domain-harness`；版本开发分支：`version/v0.11.x`

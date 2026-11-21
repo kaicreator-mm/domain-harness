@@ -1,4 +1,6 @@
 # DomainHarness v0.11.0 — Element-First Architecture Foundation
+
+> **重要：2026-11-21 后本文件的直接 ingress / 二次 businessAppInit / 裸 lifecycle 章节已经是历史候选，不再为当前 v0.11.0 规范。** 原文保留作为方案演化记录，不得据此恢复旧技术入口或兼容层。当前唯一有效增量为 [B0 Element-First Foundation 合同](../specs/DomainHarness_v0.11.0_ELEMENT_FIRST_B0_FOUNDATION.md) 和 [#1624](https://github.com/kaicreator-mm/domain-harness/issues/1624)：Package.Init/Exit 使用 ElementRef、运行前通过 FunctionRef+Target 选定，业务基础调用发生在 Init 中，Workflow 属于 0.11.1。原文 §6、§7 和历史 AC06/AR-09 中冲突的描述均被覆盖。
 ## Product Requirements Document · R2 · Owner Review Candidate
 
 > **R27 新增 Owner 执行变更（2026-11-21）**：本轮明确降低 v0.11.0 的 Node 最低支持版本到 Node.js **22.12.0**，同步 canonical Target `node22-esm/1`，兼容运行于 Node 24 及更高版本。旧正文中 `node24-esm/1` 与 `>=24` 文字仅为历史 R2 裁决，已由本条覆盖；须在 R27 最终 Exact-HEAD 审核/CI 成功后视为已实现，不倒填历史冻结资格。
