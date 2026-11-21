@@ -1,5 +1,8 @@
 # DomainHarness v0.11.0 — Package / Core / Extension / BUILD / Init / Exit 统一规范
 
+> **【R33 Owner 产品所有权修正；本规范中“BUILD 从生成 Package 到完整 App 组合”的旧表述只保留为历史记录】**：现行跨版本产品边界须以 [DomainHarness SDK / DomainForge Domain App / 自举](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) 为准。DomainHarness 是 Boot + Domain Packages 的领域 Harness SDK，负责已存在 Package 的最小装配/校验/加载/执行；DomainForge 是基于该 SDK 运行并生产 Domain Package 的 Domain App。原 B-01“单 Package 源码/资源生成必归 Harness BUILD”**不再是当前产品要求**，缺通用 Package 生产器不得强加给 SDK 0.11.0；真实源码重构仍按独立增量验证。原有 Core.Order、直接 Extension、ElementRef/FunctionRef、Init/Exit、可信资源/Pin、未知调用拒绝等基础约束继续有效。完整代码归属见 [R33 审计](../architecture/DomainHarness_v0.11.x_LEGACY_BUILD_OWNERSHIP_AUDIT.md)。
+
+
 > **2026-11-21 Element-First 基础合同修正（#1624）**：本规范的 Init/Exit 均指`本 Package 拥有的已选 ElementRef`，而不是独立 EntryRef 或裸 ESM 导出。每个 Init/Exit Element 的唯一生命周期 Function/Target 必须在 BUILD 真实选定。0.11.0 Init 已可调用同 Package 或直接声明 Extension 的已选 Function，不依赖 READY 后 App.invoke；DomainAppDescriptor/DomainApp 不再定义业务直接 ingress。标准实现与调用流程见 [B0 基础合同](DomainHarness_v0.11.0_ELEMENT_FIRST_B0_FOUNDATION.md)；此裁决覆盖原候选中一切同名物理入口假设。
 
 > 文档类型：v0.11.0 Product/L2 修订规范（讨论决议整理，docs-only 候选）
