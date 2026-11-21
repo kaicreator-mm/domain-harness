@@ -120,6 +120,97 @@ function workflowCase(
   };
 }
 
+/** 在真实 Extension 元数据中封存另一份 Workflow，用来测试跨 Owner 与子流程权限。 */
+function crossOwnerWorkflowCase(t: import('node:test').TestContext,
+  options: { privateRoot?: boolean; transitiveOnly?: boolean; nested?: boolean; authorizeNested?: boolean } = {},
+) {
+  const { input, workflow, foreignRef } = workflowCase(t, { foreignOwner: 'orders-ext' });
+  assert.ok(foreignRef);
+  const rootDir = input.packageRoots['orders-ext']!;
+  const nestedDir = input.packageRoots['aaa-ext']!;
+  const makeElement = (id: string, contentId: string, definition: WorkflowDefinition): ElementDefinition => ({
+    kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+    id, version: '1.0.0', description: '跨 Package 权限测试 Workflow。',
+    content: [{ id: contentId, contentKind: 'workflow-definition',
+      schemaRef: { inline: { type: 'object' } }, required: true,
+      value: definition as unknown as JsonValue }],
+    functions: [],
+  });
+  let nestedRef: { element: ReturnType<typeof elementRefOf>; contentId: string } | undefined;
+  let nestedEntry: DomainPackageManifest['elements'][number] | undefined;
+  if (options.nested) {
+    const aaaLifecycle: ElementDefinition = {
+      kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+      id: 'aaa-ext.lifecycle', version: '1.0.0',
+      description: 'Package-owned lifecycle and selected Hook Functions.',
+      content: [], functions: ['init', 'exit', 'audit'].map((id) => ({
+        id, contractVersion: '1', inputSchemaRef: { inline: { type: 'object' } },
+        outputSchemaRef: { inline: { type: 'object' } },
+        outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
+      })),
+    };
+    const childWorkflow: WorkflowDefinition = {
+      ...workflow, id: 'nested-external', entryNodeId: 'leaf', maxDescendantWorkflowDepth: 0,
+      nodes: [{ id: 'leaf', kind: 'function',
+        function: functionRefOf(aaaLifecycle, 'audit'),
+        switch: { exits: [
+          { label: 'SUCCEEDED', target: { terminal: 'COMPLETE' } },
+          { label: 'UNKNOWN', target: { terminal: 'UNKNOWN' } },
+          { label: 'FAILED', target: { terminal: 'FAILED' } },
+        ] } }],
+    };
+    const nested = makeElement('aaa-ext.nested-flow', 'child-flow', childWorkflow);
+    const file = writeRaw(nestedDir, 'definitions/nested-flow.json',
+      textEncoder.encode(JSON.stringify(nested)));
+    nestedRef = { element: elementRefOf(nested), contentId: 'child-flow' };
+    nestedEntry = { id: nested.id, version: nested.version, definitionRef: file, visibility: 'public' };
+  }
+  const parentWorkflow: WorkflowDefinition = options.nested
+    ? { ...workflow, id: 'cross-owner-parent', maxDescendantWorkflowDepth: 1,
+      nodes: [{ id: 'child', kind: 'workflow', workflow: nestedRef!,
+        switch: { exits: [
+          { label: 'COMPLETE', target: { terminal: 'COMPLETE' } },
+          { label: 'UNKNOWN', target: { terminal: 'UNKNOWN' } },
+          { label: 'FAILED', target: { terminal: 'FAILED' } },
+        ] } }] }
+    : { ...workflow, id: 'cross-owner-parent', nodes: [
+      { id: 'assess', kind: 'function', function: foreignRef, switch: workflow.nodes[0]!.switch },
+    ] };
+  const parent = makeElement('orders-ext.external-flow', 'external-flow', parentWorkflow);
+  const parentFile = writeRaw(rootDir, 'definitions/external-flow.json',
+    textEncoder.encode(JSON.stringify(parent)));
+  const parentEntry: DomainPackageManifest['elements'][number] = {
+    id: parent.id, version: parent.version, definitionRef: parentFile,
+    visibility: options.privateRoot ? 'private' : 'public',
+  };
+  const rootRef = { element: elementRefOf(parent), contentId: 'external-flow' };
+  const packages = input.packages.map((pkg) => {
+    if (pkg.id === 'orders-business') return {
+      ...pkg, workflowRoots: [rootRef],
+      dependsOn: options.transitiveOnly
+        ? pkg.dependsOn.filter((dep) => dep.package !== 'orders-ext')
+        : pkg.dependsOn,
+    };
+    if (pkg.id === 'orders-ext') return {
+      ...pkg, elements: [...pkg.elements, parentEntry],
+      exports: [...pkg.exports, { elementId: parent.id }],
+      dependsOn: options.authorizeNested
+        ? [...pkg.dependsOn, { package: 'aaa-ext', version: '1.0.0', interface: 'aaa.audit' }]
+        : pkg.dependsOn,
+    };
+    if (pkg.id === 'aaa-ext') return {
+      ...pkg,
+      elements: nestedEntry ? [...pkg.elements, nestedEntry] : pkg.elements,
+      exports: nestedEntry ? [...pkg.exports, { elementId: nestedEntry.id }] : pkg.exports,
+      dependsOn: options.transitiveOnly
+        ? [...pkg.dependsOn, { package: 'orders-ext', version: '1.0.0', interface: 'orders.audit' }]
+        : pkg.dependsOn,
+    };
+    return pkg;
+  });
+  return { ...input, packages, runtimeDependencies: { ...input.runtimeDependencies, xstate: '5.33.2', yaml: '2.9.1' } };
+}
+
 function accepted(result: BuildResult): Extract<BuildResult, { ok: true }> {
   if (!result.ok) assert.fail(`${result.code}: ${result.message}`);
   return result;
@@ -428,6 +519,27 @@ test('T12 R4 P2: private cross-owner Function never becomes callable from Workfl
     }),
   };
   rejected(buildApp(privateExtension), 'DH_BUILD_EXPORT_MISSING');
+});
+
+test('T12 R11 P2: directly declared public cross-owner WorkflowRoot is selected', (t) => {
+  accepted(buildApp(crossOwnerWorkflowCase(t)));
+});
+
+test('T12 R11 P2: direct Extension cannot export a private cross-owner WorkflowRoot', (t) => {
+  rejected(buildApp(crossOwnerWorkflowCase(t, { privateRoot: true })), 'DH_BUILD_EXPORT_MISSING');
+});
+
+test('T12 R11 P2: A→B→C transitive-only access cannot start a C WorkflowRoot', (t) => {
+  rejected(buildApp(crossOwnerWorkflowCase(t, { transitiveOnly: true })), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('T12 R11 P2: parent Workflow cannot invoke child Workflow from an undeclared Extension', (t) => {
+  rejected(buildApp(crossOwnerWorkflowCase(t, { nested: true })), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('T12 R11 P2: child Workflow from a directly declared public Extension is selected', (t) => {
+  const result = accepted(buildApp(crossOwnerWorkflowCase(t, { nested: true, authorizeNested: true })));
+  assert.equal(result.lock.selectedWorkflows?.length, 2);
 });
 
 test('T12 R1: the existing BUILD rejects a selected workflow node without real FunctionRef', (t) => {
