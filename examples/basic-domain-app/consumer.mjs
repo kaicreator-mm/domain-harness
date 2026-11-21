@@ -70,7 +70,7 @@ export async function init(ctx) {
 export async function exit() { events.push({ event: 'package-exit', package: '${packageId}' }); }
 `;
 }
-function rulesModule(withWorkflow = false) {
+function rulesModule(withWorkflow = false, workflowFatalAt = '') {
   return `
 const events = (globalThis.__domainHarnessT05Events ??= []);
 events.push({ event: 'module-evaluated', package: 'rules-package-entry' });
@@ -89,6 +89,9 @@ function workflowRead(input, expectedFormat) {
     return { kind: 'UNKNOWN', unknownReason: { code: 'T14_READER_INVALID', message: 'data not selected as plain object' } };
   }
   events.push({ event: 'workflow-read', format: input.format, parsed: input.value });
+  if (${JSON.stringify(workflowFatalAt)} === 'leaf' && input.value.id === 'json-a') {
+    throw new Error('T14 deliberate selected Function fatal');
+  }
   return { kind: 'SUCCEEDED', value: input.value };
 }
 export function jsonReader(input) { return workflowRead(input, 'json'); }
@@ -96,6 +99,9 @@ export function yamlReader(input) { return workflowRead(input, 'yaml'); }
 export async function startWorkflow() {
   events.push({ event: 'workflow-hook', kind: 'start' });
   await Promise.resolve();
+  if (${JSON.stringify(workflowFatalAt)} === 'start') {
+    throw new Error('T14 deliberate selected start Hook fatal');
+  }
   return { kind: 'SUCCEEDED', value: {} };
 }
 export async function endWorkflow() {
@@ -127,6 +133,13 @@ export async function init(ctx) {
   events.push({ event: 'init-selected-function', package: 'app-business', pos, neg, unknown, invalid, eu });
 ${workflowRefJson ? `
   if (!ctx.workflows) throw new Error('BUILD-selected Workflow starter missing during Package.Init');
+  const denied = await ctx.workflows.start({
+    ...${workflowRefJson}, contentId: 'unselected-workflow',
+  }, { origin: 'unauthorized-root' });
+  events.push({ event: 'workflow-unauthorized', outcome: denied });
+  if (denied.status !== 'FAILED' || denied.reason.code !== 'DH_WORKFLOW_UNSELECTED') {
+    throw new Error('Package.Init illegally started a Workflow not authorized by BUILD');
+  }
   const outcome = await ctx.workflows.start(${workflowRefJson}, { origin: 'Package.Init' });
   events.push({ event: 'workflow-outcome', outcome });
   if (outcome.status !== 'COMPLETE') throw new Error('Selected Workflow rejected startup');
@@ -167,7 +180,8 @@ async function authoring(label, rule, options = {}) {
         ? `${lifecycleModule(id)}\nexport function auditHook(value) { return value; }\n`
         : lifecycleModule(id));
   }
-  await write(dirs['rules-package'], 'dist/rules.mjs', rulesModule(options.workflow === true));
+  await write(dirs['rules-package'], 'dist/rules.mjs',
+    rulesModule(options.workflow === true, options.workflowFatalAt ?? ''));
   await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
   await write(dirs['kernel-primary'], 'dist/index.js', "export { bootstrap } from '@kaicreator/domain-harness-microkernel';\n");
   for (const id of Object.keys(dirs)) {
