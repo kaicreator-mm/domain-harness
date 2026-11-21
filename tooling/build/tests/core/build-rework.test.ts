@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { symlinkSync, writeFileSync } from 'node:fs';
 import { DH_ELEMENT_SCHEMA_VERSION, contentDigestOf } from '@kaicreator/domain-harness-contracts';
 import { buildApp, type BuildResult } from '../../src/index.js';
-import { functionRefOf, sha256OfBytes, writeJson } from './fixtures.js';
+import { sha256OfBytes } from './fixtures.js';
 import { standardCase } from './standard-case.js';
 
 function expectRefusal(result: BuildResult, code: string): void {
@@ -159,37 +159,11 @@ test('P2-7: target variant without nodeMajor is not selectable', (t) => {
   expectRefusal(buildApp(input), 'DH_BUILD_IMPLEMENTATION_MISSING');
 });
 
-test('P2-9: businessAppInit owned by a non-business layer is LAYER_ROLE_MISMATCH', (t) => {
+test('P2-9: secondary Core.Order zero is rejected at BUILD', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const sdkDir = scenario.ws.packageRoots['sdk-core']!;
-  const sdkInitElement = {
-    kind: 'Element',
-    schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
-    id: 'orders.sdk-init',
-    version: '1.0.0',
-    description: 'Init living on the sdk layer (must be refused).',
-    content: [],
-    functions: [
-      {
-        id: 'init',
-        contractVersion: '1',
-        inputSchemaRef: { inline: { type: 'object' } },
-        outputSchemaRef: { inline: { type: 'string' } },
-        outcomes: ['SUCCEEDED'],
-        effects: 'none',
-      },
-    ],
-  };
-  const definitionRef = writeJson(sdkDir, 'definitions/sdk-init.json', sdkInitElement as never);
-  const sdk = input.packages.find((pkg) => (pkg as { id: string }).id === 'sdk-core') as {
-    elements: unknown[];
-  };
-  sdk.elements = [{ id: 'orders.sdk-init', version: '1.0.0', definitionRef, visibility: 'public' }];
-  (input.descriptor as { businessAppInit: unknown }).businessAppInit = functionRefOf(
-    sdkInitElement as never,
-    'init',
-  );
-  expectRefusal(buildApp(input), 'DH_BUILD_LAYER_ROLE_MISMATCH');
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as { order: number };
+  business.order = 0;
+  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_DUPLICATE');
 });
