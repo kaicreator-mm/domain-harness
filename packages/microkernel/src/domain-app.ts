@@ -169,7 +169,15 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     try {
       raw = await selected.impl(input);
     } catch (error) {
-      return failedOutcome('DH_KDP_PACKAGE_LOAD_FAILED', `implementation for ingress '${ingressId}' threw: ${(error as Error).message}`);
+      // Element 未处理异常：Kernel 最后兜底，尽最大努力执行 Exit，不继续开放业务调用。
+      const reason = `implementation for ingress '${ingressId}' threw: ${(error as Error).message}`;
+      console.error(`[KDP Unhandled] ${reason}`);
+      try {
+        await dispose();
+      } catch (cleanupError) {
+        console.error(`[KDP Unhandled Exit] ${(cleanupError as Error).message}`);
+      }
+      return failedOutcome('DH_KDP_PACKAGE_LOAD_FAILED', reason);
     }
     const outcome = normalizeOutcome(raw, selected.outcomes);
     if (outcome.kind === 'SUCCEEDED' && !safeValidateJsonSubset(outcome.value, schemas.output)) {
