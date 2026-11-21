@@ -327,12 +327,13 @@ test('KDP manifest exports conditions: nested node/import resolve, unresolvable 
       name: KDP_PACKAGE_ID,
       version: '0.11.0',
       type: 'module',
-      exports: { '.': { browser: './dist/nowhere.js' } },
+      exports: { '.': { browser: './TOKEN_SECRET_CANARY_8029.js' } },
     });
     const unresolved = await boot(unresolvedPin, fixture.context);
     assertRefused(unresolved, 'DH_BOOT_KDP_ENTRY_INVALID');
     if (unresolved.status === 'REFUSED') {
       assert.match(unresolved.reason, /node\/import\/default/);
+      assert.doesNotMatch(unresolved.reason, /TOKEN_SECRET_CANARY_8029/);
     }
   });
 });

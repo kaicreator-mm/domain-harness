@@ -286,7 +286,7 @@ export async function resolveKdpEntryPath(
   const entry = resolveConditionalExports(dot);
   if (entry === null || !entry.startsWith('./')) {
     return invalid(
-      `KDP package '${kdpPackageId}' entry cannot be resolved from node/import/default conditions (got ${JSON.stringify(entry)})`,
+      `KDP package '${kdpPackageId}' entry cannot be resolved from node/import/default conditions (detail redacted)`,
     );
   }
   const resolved = resolvePackageFile(installRoot, kdpPackageId, entry.slice(2));
