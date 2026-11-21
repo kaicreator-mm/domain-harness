@@ -1,3 +1,5 @@
+> **2026-11-21 跨版本一致性审查发现 P1 设计冲突：** 本文 R9.1 关于“Package Init 仅作为 READY 后业务入口”“保留 `technicalInit/technicalDispose` 和独立 `businessAppInit`”“原有 KDP 运行时业务 Schema/异常映射全部不变”的文字，是按此前已实施的 0.11.0 旧合同撰写；与更新的 **v0.11.0 Package/Core/Init/Exit 规范候选 [PR #1621](https://github.com/kaicreator-mm/domain-harness/pull/1621)** 不一致。**不能直接将本文作为实施/Freeze 权威**。须先对照 [跨版本冲突矩阵](DomainHarness_v0.11.0_V0111_CROSS_VERSION_CONFLICT_AUDIT.md) 的 X01–X10 统一：Core.Order/KDP0、统一 Package.Init、InitFrom、Exit、直接 Extension、完整组合 BUILD、Element 自治错误。#1621 仍为 Draft/未实施，现有 0.11.0 Scoped CI 证明的仍是旧基线。本文 Workflow/Switch/Reader/业务 Hook/预算的新功能范围不因此自动失效，但其接线设计暂停冻结。
+
 # DomainHarness v0.11.1 — Element/Init/Workflow 执行合同 L2 R9.1
 
 > **定位：** 根据用户 2026-11-21 六项决定及随后对嵌套深度的明确调整，形成 **R9.1 当前单源**：根 Run 的总调用预算继续共享，但**嵌套深度改为每个 Workflow 自己定义的相对子树上限**。覆盖 R9 原始“所有 Workflow 共享最大嵌套深度”表述；本稿为 L2 供独立审核的候选，尚未 Freeze/实施。L1 [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) · L2 [#1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) · 历史源码研究 [PR #1611](https://github.com/kaicreator-mm/domain-harness/pull/1611)。
