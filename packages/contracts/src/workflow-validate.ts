@@ -154,7 +154,14 @@ export function validateWorkflowDefinition(value: unknown): ValidationResult {
       } else if ('terminal' in target && !('nodeId' in target)) {
         keys(target, ['terminal'], `${ep}.target`);
         if (!TERMINALS.has(target['terminal'] as string)) fail(`${ep}.target.terminal`, 'invalid Workflow terminal');
-        else terminalCount++;
+        else {
+          terminalCount++;
+          // 不允许未知、失败、拒绝、等待直接洗白成 COMPLETE；恢复须真实执行其它已选业务节点。
+          if (['UNKNOWN', 'FAILED', 'REJECT', 'ASK', 'WAIT'].includes(String(label)) &&
+              target['terminal'] === 'COMPLETE') {
+            fail(`${ep}.target.terminal`, 'non-success outcome cannot directly route to COMPLETE');
+          }
+        }
       } else fail(`${ep}.target`, 'exactly one nodeId or terminal is required');
     });
   });
