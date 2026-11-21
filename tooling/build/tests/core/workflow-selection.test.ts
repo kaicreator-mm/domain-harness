@@ -166,7 +166,7 @@ function crossOwnerWorkflowCase(t: import('node:test').TestContext,
     nestedEntry = { id: nested.id, version: nested.version, definitionRef: file, visibility: 'public' };
   }
   const parentWorkflow: WorkflowDefinition = options.nested
-    ? { ...workflow, id: 'cross-owner-parent', maxDescendantWorkflowDepth: 1,
+    ? { ...workflow, id: 'cross-owner-parent', entryNodeId: 'child', maxDescendantWorkflowDepth: 1,
       nodes: [{ id: 'child', kind: 'workflow', workflow: nestedRef!,
         switch: { exits: [
           { label: 'COMPLETE', target: { terminal: 'COMPLETE' } },
