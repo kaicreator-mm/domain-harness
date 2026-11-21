@@ -1,3 +1,26 @@
+<!-- DH_V0111_R11_MERGED_V0110_BASE_20261121 -->
+## 【LATEST · R11】0.11.0 已按新版 Init/Exit 规范实现；0.11.1 可转为增量设计
+
+```ini
+OUTPUT_LABEL=DH_V0111_R11_ACTUAL_V0110_BASELINE
+TRAIN=version/v0.11.x@da616929d6f794db0cd30183132231ba31d4eb05
+V0110_SPEC=#1621_MERGED
+V0110_IMPL=#1622_MERGED
+V0110_REVIEW=R21_ACCEPT_SCOPED_P0_0_P1_0_P2_0
+V0110_CI=WOODPECKER_2827_SUCCESS
+V0111_DESIGN_DELTA=R11_SOURCE_ALIGNED
+L1_L2_FREEZE=NO
+V0111_IMPL=NOT_STARTED
+DOC_PR_BRANCH_BEHIND=62
+```
+
+已验证 [0.11.0 新规范 PR #1621](https://github.com/kaicreator-mm/domain-harness/pull/1621) 和 [实现 PR #1622](https://github.com/kaicreator-mm/domain-harness/pull/1622) 已合入版本列车，原文中“#1621 仍是 Draft/未实施”的状态**现已过期**。最新 [R11 源码对照审计](https://github.com/kaicreator-mm/domain-harness/blob/design/v0.11.1-xstate-legacy-study/docs/architecture/DomainHarness_v0.11.1_R11_V0110_INTEGRATION_AUDIT.md) 中 A1–A8 为当前实施优先参考。
+
+**不重开功能范围**：保留 Init→Workflow→Function，单节点/子 Workflow、显式 Switch、JSON/YAML Reader、start/end、根业务调用预算与各 Workflow 局部深度。需要增量补齐的主要是：(1) 在 Package.Init **之前**装配 KDP 受限 Workflow 执行句柄，因为当前 Init 的 `context.functions` 只连到尚未 READY 的 `DomainApp.invoke`，无法在 Init 内执行 Function；(2) Package `init:EntryRef` 到需要的 Element/Workflow 已选身份/绑定的最小合同；(3) Workflow 专用 content Schema + BUILD 全闭包选择/导出/依赖权限/解析器和 XState 的安装信任；(4) Business Core.Init 返回 AppStatus 与业务 Workflow 终态明确分离，不猜测结果映射。
+
+**已经实现无需重做**：Core.Order KDP=0、直接 Extension、完整确定性组合 BUILD、Exit/InitFrom 各自可选、实际 Init 记录逆序退出、可信 Boot/Pin/已封存资源。0.11.1 只消费这些能力，XState 不参与 Core 初始化。
+<!-- /DH_V0111_R11_MERGED_V0110_BASE_20261121 -->
+
 <!-- DH_V0111_L1_R10_INIT_OWNED_WORKFLOW_PRD -->
 # DomainHarness v0.11.1 — Task Execution · Product/L1 R10（WHAT）
 
@@ -75,5 +98,5 @@ CODE=NOT_STARTED
 
 0.11.1 不做 0.11.4 Host 授权/任意文件系统写读、0.11.5 LLM、0.11.6 Durable Resume、后续经验与进化机制；不做 0.10 兼容。L2 R10 详见 [#1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) / [架构 PR #1611](https://github.com/kaicreator-mm/domain-harness/pull/1611)；0.11.0 依赖 [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564)、[#1621](https://github.com/kaicreator-mm/domain-harness/pull/1621)。
 
-**当前状态**：0.11.0 新 Init/Exit 规范未审核/合并/实施；0.11.1 R10 L1/L2 为候选，独立审核/冻结、Native Task DAG、功能源码、CI 和 clean-packed E2E 均未完成。当前产品方向已澄清不意味着冻结。
+**当前状态（R11 更新）**：0.11.0 新 Init/Exit 规范 #1621 与实现 #1622 已合并版本列车且通过限定源码/CI 验收；0.11.1 L1/L2 仍设计候选，未独立审核/冻结，Native Task DAG、Workflow 功能源码、CI 和 clean-packed E2E 未完成。Draft PR 分支相对最新版本列车落后 62 commits，正式审核前须对齐。
 <!-- /DH_V0111_L1_R10_INIT_OWNED_WORKFLOW_20261121 -->
