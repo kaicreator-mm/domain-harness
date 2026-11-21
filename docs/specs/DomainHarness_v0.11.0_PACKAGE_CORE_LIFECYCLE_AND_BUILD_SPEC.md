@@ -1,5 +1,8 @@
 # DomainHarness v0.11.0 — Package / Core / Extension / BUILD / Init / Exit 统一规范
 
+> **【R36 Owner 纠正，本文件中所有“必须先生成 Package / 必须经过 BUILD 平台才有 Package”的产品解释均被覆盖】**：Domain Package 是符合 DIS 适用约束 + 本 v0.11.x 当前 Element-First 合同的多文件集合，可由 ChatGPT/开发者直接编写 Manifest、Element、ESM 和资源；无专门生成器、Seed Builder 或独立 Package Assembly 工具前置。应用使用多个现成 Packages 时，仍须对真正使用的声明、直接 Extension、Core.Order、Function/Target、资源摘要/Boot 保持必要验证与拒绝，不能借“取消工具”降低本文件 B-02–B-04 的静态安全性质。后续所有步骤按 [R36](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) 解释；旧 B-01 的生成器化表述只保留为历史。
+
+
 > **【R34 0.11.x 产品终局与自举例外】** DomainHarness 是以 Boot + Domain Packages 组成、对外可复用的 **Domain（有界知识/规则）+ Harness（受控任务执行）+ SDK（公开开发接口/组装能力）**；最终整个 0.11.x 要交付可自举的领域 Harness SDK。允许 `domain-harness` 暂留一个**只生产自身基础 Domain Packages** 的简易 Seed Builder；最终 Forge 作为运行于 DomainHarness SDK 的 Domain App 接手 Package 生产。该种子工具不意味着扩大 SDK 的 BUILD 公共生产职责，也不豁免已审受信装配/Lock/Pin 权限。详细见 [R34](DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_AND_BOOTSTRAP_SEED.md)。
 
 
