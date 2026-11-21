@@ -21,7 +21,21 @@ DOMAINFORGE=DEFERRED_NOT_BLOCKING
 
 **Domain** 表示业务领域的知识、事实、规则、约束与适用范围；**Harness** 是使用所选 Domain 完成 Task、Workflow/状态/授权/反馈的执行支架；**SDK** 是使用相同 Boot、Domain Packages、Function/Element/Package Contract 和公开 API 来搭建不同领域应用的可复用开发工具包。
 
-**DomainHarness SDK** 本身不是独立的 Package 生成器。它可由 Boot + 若干基础/标准/领域 Domain Packages 组成，其余应用也复用这个相同模式。0.11.0–0.11.9 是交付这一个 SDK 的内部阶段，不是生产多个不同产品。
+**DomainHarness 从最初版本就是嵌入 Domain App 的 SDK**，不是独立运行的 Domain App、服务、生成器或另一套业务平台。Domain App 在自身进程/Host 内使用这套 SDK 及所选 Domain Packages；**SDK 产品身份**不能与 `layer='sdk'` 的单个 **SDK Domain Package** 混为一谈。0.11.0–0.11.9 只是在重写该嵌入式 SDK 的内部阶段。
+
+### 已明确的 Domain Package 层级（不是新候选架构）
+
+```text
+Domain App（宿主 / 业务入口，嵌入 DomainHarness SDK）
+  └── Boot（最小可信引导；不属于普通 Domain Package）
+        └── Kernel Domain Package（KDP 为 Core.Order=0）
+              └── SDK Domain Package（公共通用执行/能力）
+                    └── Business Domain Package（领域对象/规则/Workflow）
+```
+
+这里的箭头是**分层职责与启动/依赖理解**，不是要求每层恰好只有一个 Package，也不是替换现有的 `Core.Order`、显式 Extension 依赖和唯一 Boot/KDP 调度规则。当前受审 Manifest 的 `PackageLayer='kernel'|'sdk'|'business'` 已具有三层逻辑身份；Package 内统一用相同 Manifest/Element/Function/Init/Exit 合同。
+
+**Kernel 与 SDK 是否合为一个物理 Domain Package：尚待源码与真实 Consumer 比较，不得预设合并。** 当前一个 Package 的 `layer` 只能属于三者之一，把 Kernel/SDK 合并成同一 Manifest 会改变现有层级身份和 Core/Extension 权限边界。优先保持独立逻辑 Package；如果需要减小分发复杂度，可在**同一个 SDK 安装/分发产物**中共同携带多个逻辑 Package，而不改变各自 Manifest 与权限。只有实证表明单个 Manifest 的收益超过信任、版本、替换与测试隔离成本，才能另作显式 L2 决议，并完成合同/回归的增量审核。
 
 ## 2. Domain Package 的文件构成
 
@@ -37,16 +51,17 @@ DOMAINFORGE=DEFERRED_NOT_BLOCKING
 ## 3. 构建 SDK/Domain App，不等于“生成 Package”
 
 ```text
-[直接编写的 Package A 多个文件] ─┐
-[直接编写的 Package B 多个文件] ─┤
-[已有标准 Package 文件] ────────┤
-                                ↓
-          确定需要的 Package / 依赖 / Target
-                  （验证真实引用与权限）
-                                ↓
-            Boot → KDP → 已选 Packages
-                                ↓
-               DomainHarness SDK / Domain App
+[手工/Agent 编写的 K / S / B Domain Packages 多文件]
+                         ↓
+     SDK 组合所需 Package / 依赖 / Target / Lock / Pin
+             （静态校验和确定性封存）
+                         ↓
+ Domain App 内嵌 DomainHarness SDK：Boot → KDP(0)
+                         ↓
+      已选 Kernel → SDK → Business Domain Packages
+       （实际 Init 顺序依唯一 Core.Order/显式依赖）
+                         ↓
+           Domain App 的业务 Workflow/Function
 ```
 
 **确定选用的多个 Packages 是应用组合行为**，它可以由已有 manifest/配置和 SDK 代码完成。它不是“生成一个新的单 Package”的必要条件，更不要求开发专用 Assembly Service、Compiler 或 Build Pipeline。没有需要组合的新包时，也没有理由安排多余的 Assembly 工作。
