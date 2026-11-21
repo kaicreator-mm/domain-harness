@@ -16,6 +16,8 @@ DESIGN_STATUS=L2_CANDIDATE_NOT_FROZEN
 LEGACY_CODE_REUSE=NOT_REQUIRED
 ```
 
+> **2026-11-21 Owner R2 设计裁定（覆盖本文较早 HOW 建议）：** 通用 Workflow/State Machine 引擎和 XState Actor 归 **唯一 KDP Core**，作为 Kernel Primary 所拥有的通用能力 Element/FunctionContract；Domain/Business Element 仍声明具体流程、状态、Guard、业务 Function。0.11.0 **所有已有运行时校验保留、不删不迁**，0.11.1 不增加 Kernel/SDK 运行时业务校验；新增 Workflow 图校验在 BUILD。该裁定见 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 和 [跨版本责任文档](DomainHarness_v0.11.x_PACKAGE_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP.md)。下述 0.10 事实分析不受影响。
+
 ## 1. 结论先行：0.10 不是单一 Workflow Engine
 
 在同一个 v0.10.3 历史源码树内能明确辨认下列**不同年代、不同层次**的实现。不可把“源码存在”误写成“当前已选应用实际调用”：
@@ -112,33 +114,31 @@ Rich Business Agent 把 `initialState='ready'`、`states ready/closed`、`AGENT_
 
 XState v5 提供 `setup`、`createMachine`、`createActor`、guards/actions、actor invoke、`fromPromise`、snapshot、inspect 等。**v5 对应依赖在 L2 冻结后写入选定工作区、由 package-lock 精确锁版；不能把 v6 beta 自动视为稳定版。** 引入库不表示 0.11.1 必须支持 XState 的全部 statechart 功能。
 
-### 建议新链路（0.11.1 L2 候选）
+### 裁定的新链路（0.11.1 L2 KDP Core / Element-First）
 
 ```text
-Domain / Element
-    ├── ContentBlock(workflow-definition) = 领域流程
-    ├── ContentBlock(state-model) = 领域状态与事件合同
-    ├── ContentBlock(rule/constraint) = 可选 Guard 语义依赖
-    └── FunctionContract(...) = 可调用的任务步骤或任务入口
-        ↓
-Package Manifest: 归属、导出、依赖、Target 实现
-        ↓
-BUILD: 解析选定 Element/Function + 合同 + Workflow/StateGraph
-       → 校验引用、明确路由/边界、选定 XState Adapter 实现
-       → 生成 Lock / sealed machine data
-        ↓
-Boot / KDP: 用已有唯一启动/装配/生命周期路径激活选定 Package
-        ↓
-Selected Standard/Business Package 中的 Workflow Executor
-       → private XState v5 createMachine/createActor
-       → Domain Event → Guard → State Transition
-       → Selected Function → structured result → next Event
-       → TaskOutcome + minimal observations
-        ↓
-SDK: 暴露业务 Task Function / 只做薄转发，不持有 XState Actor
+Domain / Business Element:
+  Content(workflow-definition) + Content(state-model) + optional rule/constraint
+  FunctionContract(task steps / business guard)
+      ├─ selected Business/Standard Package owns definitions + implementations
+      └─ Kernel Primary owns generic Workflow/StateMachine capability Elements
+                         ↓
+BUILD: resolve/qualify workflow, states, guards, selected Function identities,
+       deterministic branches, finite execution budget
+       → seal selected graph and generic KDP capability binding into Lock
+                         ↓
+Boot / KDP: existing trusted install/init; ONE Kernel Primary
+                         ↓
+KDP Core: private XState v5 machine + actor + generic Task loop
+       → workflow event → state transition → selected domain Guard/Function
+       → output → next step/terminal
+                         ↓
+TaskOutcome + minimal observation → thin SDK/Domain App API
 ```
 
-**重要 L2 纠偏：Task Coordinator/XState Actor 的业务状态机逻辑优先属于选定的 Workflow/Business Package（或所选 Standard Package 实现），而非变成 KDP 固有的通用业务 Workflow Engine。** KDP 只做受信装配、已选 Function 入口、生命周期、最小失败退出及必要诊断；这样新领域不要求修改 Kernel 逻辑，也没有平行 Runtime。是否为 SDK 增加便捷 `runTask`，由 L2 确认其只是选定 Task Function 的薄入口，不新建第二份决策逻辑。
+**Kernel 是通用控制机制的唯一所有者，不是业务内容的作者。** KDP Primary 可以声明 WorkflowExecution/StateMachineExecution 能力 Element，其 FunctionContract 表达执行接口；各 Domain Element 的 `workflow-definition` 和 `state-model` 是具体语义定义；BUILD 将两者在选定 Package/Lock 中绑定。这样业务 Package 不重复装 XState Actor，而 Kernel 也不会硬编码某个业务流程或 Rule；SDK 只是薄转发层。
+
+XState v5 的 Machine/Actor/guard callback 为 KDP 私有实现，不进入 Element Public Contract、Lock 语义身份或 SDK API。KDP 仅拥有通用事件转移、步骤调度和有界循环；实际业务 Guard/Step 的业务判断与异常仍由已选 Package Function 承担。**运行时新增检查策略：现有 0.11.0 校验保留，不新增任何 KDP/SDK 业务 Schema / Workflow 定义二次校验。** 结构资格在 BUILD 处理。
 
 ### “声明式”和“确定性”应如何定义
 
@@ -147,25 +147,24 @@ SDK: 暴露业务 Task Function / 只做薄转发，不持有 XState Actor
 - **显式歧义策略**：有多个候选 Guard/Transition 时优先在 BUILD 检查并要求确定的选择规则；不能把旧 XState bridge 的 routeIndex 原封不动升为新版产品 ABI。
 - **不混淆图**：Element 静态依赖图在 BUILD 无环；Workflow 业务行为图可以有环，但必须有边界；Domain 语义关系图可循环，三者不能混作一个 DAG。
 
-## 7. Owner 本轮新增的责任/异常/安全边界（L2 必须落实）
+## 7. Owner 最终裁定：KDP 核心机制、Package 业务、已有校验保留
 
-**用户决议**：SDK 和生成后的 Package 不对“永无异常或绝对安全”对消费者作基础设施保证。Package 的结构合法性、依赖/权限/实现选择、代码质量与业务异常处理应在**生产 Package 前的生成/构建/测试/资格验证阶段**完成；交付后的调用按“已验证、已选定的 Package”这个**设计信任前提**执行。各 Package 内部自己处理业务异常并形成领域 Outcome；Kernel/SDK 只做最少的启动、异常退出/状态呈现、清理和日志，不替所有 Package 做业务容错、无限重试或安全沙箱。
+[跨 0.11.x 校验与异常责任文档](DomainHarness_v0.11.x_PACKAGE_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP.md) 已据 Owner 最新要求修订：
 
-### 工程上需明确区分“信任前提”和“数学保证”
-- 静态 BUILD + 单元/集成验证只能为符合指定合同的产物提供**限定的交付资格**，不能从物理上证明所有未来运行中都不会因资源故障/环境变化/外部数据产生异常。文档不得对外宣称绝对零异常或已证明绝对安全。
-- BUILD 前责任：类型、Schema、Workflow/State 契约、依赖、路由确定性、Guard 绑定、代码质量、反例测试、Package 自身异常策略及可执行产物确认。
-- Package 内责任：业务判断、状态机执行、Guard、不确定结果、业务可恢复/不可恢复异常的判断与处理，按合同返回结构化 TaskOutcome。
-- KDP/SDK 运行时责任：只保留当前已建立的受信安装/精确已选对象边界、Boot/Dispose 生命周期、最小必要不可调用拒绝、致命失败的退出/清理与不泄密日志；**不在 Kernel/SDK 新增第二套业务 Schema 重验证、Guard 解释器、业务异常吞噬或重试策略**。
-- 异常跨越 Package 边界：若 Package 内仍有未捕获的技术错误，KDP 应记录最小上下文并令当前调用/实例失败，不得悄悄变成成功或引发未受控继续执行；Process 级 exit code/退出动作由真正的 Host 调用方决定，不由 SDK 自行杀进程。
-- 当前 0.11.0 `packages/microkernel/src/domain-app.ts` 仍实际做运行时输入/输出 Schema 校验、Outcome 归一化和 Effect/profile 检查；这与“未来不重复业务校验”的目标**存在具体实现差异**。0.11.1 必须在 L2 的合同增量里界定哪些属于已冻结 Trust/Lifecycle/调用资格门、哪些应移动到 Package 预检/自身处理；不能凭这份文档直接删已接受的 0.11.0 校验或修改既有验收而宣称无回归。
-- 这是一条全 0.11.x 的设计规则，不能仅写在 0.11.1 工程 Issue 中而对其它阶段不生效；由 #1563/后续版本路线图承载长期权威，0.11.1 L2 实现时增量落地。
+- **KDP Core 统一持有 Workflow/State Machine Engine**（XState 私有实现、通用事件/状态/步骤调度与有界执行），也通过 Kernel 所有的 Element/FunctionContract 表达通用能力。
+- 业务 Workflow/State/Rule/Guard 是业务 Element Content，实际业务 Function 与异常处理归 Domain Package；核心不建立领域 Policy/Knowledge/Guard 决策平台。
+- **0.11.0 已经存在的 Kernel/SDK 运行时校验（Schema、Outcome、已选 ingress、Boot Trust、生命期）全部保留，不增加、不迁移、不删除。** 0.11.1 只在 BUILD/Package 资格阶段对新增 Workflow/StateMachine 定义进行必要验证。
+- 执行时 State Transition、Guard 调用和循环步数控制属于通用执行功能，不属于重新执行业务 Schema 校验；不实现无界重试、业务异常修复、未知洗白或绝对安全承诺。
+- Package 自身处理业务异常；Kernel/SDK 只做已有的最小失败出口、清理与日志；Host 拥有进程退出决策。
+
+本轮研究不修改旧 0.10 实现，也不重新运行历史测试；后续实现须以 0.11.0 已验收新版源码与新增反例为依据。
 
 ## 8. 0.11.1 应实现 / 借鉴 / 后延（非旧版功能 parity）
 
 | 能力 | 本版处理方式 | 原因 |
 |---|---|---|
 | 领域 Workflow/State/Guard Content | 重写为 Element-First 选定内容 | 本版基础 |
-| XState actor 状态转移 | 选定 Package 私有实现，v5 稳定版 | 采用成熟状态机而非自研通用解释器 |
+| XState actor 状态转移 | 唯一 KDP Core 私有实现，v5 稳定版；Kernel 能力也是 Element | 通用执行语义集中，业务定义仍由各 Element 提供 |
 | Business Step 调用/结果传播 | 已选 Function 的多步骤串行协调 | 本版 Task Execution 闭环 |
 | 有界循环 + 明确完成/拒绝/未知 | 本版实现 | 非无限执行、结果可解释 |
 | Workflow Router 领域多候选决策 | 仅必要确定性路由；完整领域选择 0.11.2 | 不将领域智能前置 |
@@ -177,11 +176,10 @@ SDK: 暴露业务 Task Function / 只做薄转发，不持有 XState Actor
 
 ## 9. L2 设计冻结前检查项
 
-- [ ] 由 Product #1605 确认本版范围；文档中历史“代码存在”和“已选运行路径”严格区分
-- [ ] 决定 Workflow Element/State Content/Guard Function 的唯一语义身份及 Package Owner
-- [ ] 设计 XState v5 engine-private Adapter；Machine/Actor 不泄漏到 Element public Schema/Lock 的逻辑身份
-- [ ] 选定 Package 内具体承载 Coordinator 的实现；KDP/SDK 保持薄，不建平行 Runtime
-- [ ] BUILD 校验覆盖状态/路由/选定 Function/预算/包构建前质量；限定哪些检查必须留在 Boot Trust 边界
-- [ ] 对 0.11.0 已实现 Runtime Schema/Outcome 校验给出明确、有回归测试的迁移/保留决定
-- [ ] 确定 TaskOutcome 的 business error 与 fatal exit 的界限，定义最小日志字段及密钥不泄露策略
-- [ ] L1/L2 冻结后再创建 Native Task DAG 和功能代码，不将本静态源码阅读当作 0.11.1 的测试收据
+- [ ] L1 #1605 的 F01–F10/AC11–AC20 与本设计精确对应；不增旧 ABI/Effect/Durable 范围
+- [ ] 选定 Kernel Primary 的 Workflow/StateMachine 通用能力 Element 与 Business Workflow/State Content 身份清楚，避免双重模型
+- [ ] XState v5 engine-private Adapter 与 Actor 在唯一 KDP Core；Package 不再自建通用 XState Runtime
+- [ ] BUILD 对新的 Workflow、状态、分支、选定 Function、预算做结构资格并封存，不新增运行时二次验证
+- [ ] 保留现有 0.11.0 DomainApp Schema/Outcome、Boot Trust、ingress、READY/dispose 等全部已验收行为
+- [ ] 业务 Guard/Function 与业务异常属于 Package；Kernel 只承担通用状态执行与最小失败日志/清理
+- [ ] L1/L2 审核冻结后再物化 GitHub Native DAG、实施代码和必要 CI，勿将历史源码阅读当作运行测试收据
