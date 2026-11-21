@@ -192,7 +192,7 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
   }
   const lock = parsed as unknown as DomainAppLock;
   if (!Array.isArray(lock.selectedPackages) || !lock.selectedPackages.every((candidate) =>
-    isRecord(candidate) && typeof candidate['technicalLifecycle'] === 'boolean' &&
+    isRecord(candidate) && isRecord(candidate['init']) &&
     isRecord(candidate['artifact']) && typeof candidate['packageId'] === 'string')) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock selectedPackages lacks required lifecycle declarations or artifact entries') };
   }
