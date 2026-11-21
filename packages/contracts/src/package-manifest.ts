@@ -67,6 +67,12 @@ export interface DomainPackageManifest {
   readonly provides?: CapabilityDeclaration;
   readonly contributesTo: readonly HookBinding[];
   readonly targetVariants: readonly TargetBinding[];
-  readonly technicalInit?: EntryRef;
-  readonly technicalDispose?: EntryRef;
+  /** Core 必填且唯一，Extension 可不指定；0 固定为 KDP。 */
+  readonly order?: number;
+  /** 每个可运行 Package 必须提供唯一 Init Element。 */
+  readonly init: EntryRef;
+  /** Exit 缺省为无操作。 */
+  readonly exit?: EntryRef;
+  /** Init Element 可访问的封存资源。 */
+  readonly initResources?: readonly ResourceRef[];
 }

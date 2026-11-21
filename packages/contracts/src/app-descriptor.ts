@@ -18,7 +18,7 @@ export interface IngressEntry {
 /**
  * BUILD 的声明式输入，不是运行期执行计划。
  * roots 指定三层 Primary，extensions 指定候选扩展；BUILD 继续追踪依赖闭包，
- * 对业务入口和唯一 App Init 解析具体 FunctionRef，最后写入不可隐式重选的 Lock。
+ * 业务启动由 Business Core 的 Init Element 负责，不另选独立 App Init。
  */
 export interface DomainAppDescriptor {
   readonly kind: 'DomainApp';
@@ -32,7 +32,6 @@ export interface DomainAppDescriptor {
     readonly businessPrimary: PackageRef;
   };
   readonly extensions: readonly PackageRef[];
-  readonly businessAppInit: FunctionRef;
   readonly ingress: readonly IngressEntry[];
   readonly config?: Readonly<Record<string, JsonValue>>;
 }
