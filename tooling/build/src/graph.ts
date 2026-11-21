@@ -24,6 +24,10 @@ export function satisfiesSemver(version: string, range: string): boolean {
   return vMaj === rMaj && vMin === rMin && vPat === rPat;
 }
 
+/**
+ * 对已选依赖图进行稳定 Kahn 拓扑排序；同一依赖集合按字典序处理就绪节点，
+ * 保证 Lock 构建复现性。返回 null 表示仍有依赖环，调用方必须拒绝。
+ */
 export function kahnTopologicalOrder(
   nodes: readonly string[],
   dependencies: ReadonlyMap<string, readonly string[]>,

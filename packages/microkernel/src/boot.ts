@@ -73,6 +73,8 @@ export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Pro
   if (!normalized.ok) return refused(normalized.failure.code, normalized.failure.reason);
   const safeContext = normalized.value;
 
+  // 安装信任阶梯：受信安装记录 → Pin 一致性 → Lock/字节核验 → 动态导入 KDP。
+  // 任何 REFUSED 都发生在加载 KDP 模块前，不能把“导入后再发现篡改”当作安全拒绝。
   const recordResult = await readTrustedRecord(safeContext.installRoot);
   if (!recordResult.ok) return refused(recordResult.failure.code, recordResult.failure.reason);
   const { value: record } = recordResult;
@@ -89,6 +91,7 @@ export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Pro
   const trust = await verifyInstallTrust(safeContext);
   if (!trust.ok) return refused(trust.failure.code, trust.failure.reason);
 
+  // 只有 verifyInstallTrust 全部通过后，才允许 ESM import 产生模块求值副作用。
   let kdpModule: Record<string, unknown>;
   try {
     kdpModule = (await import(pathToFileURL(trust.value.entryPath).href)) as Record<string, unknown>;

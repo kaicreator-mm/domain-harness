@@ -82,6 +82,10 @@ export class PackageSystem {
     return bytes;
   }
 
+  /**
+   * 先检查 Package 主模块、已选 Function 和 Hook Provider 的真实字节，
+   * 再允许任何模块被导入求值；相同资源出现冲突 digest 时直接拒绝。
+   */
   async verifySelectedArtifacts(): Promise<void> {
     const selected = new Map<string, ResourceRef>();
     const collect = (ref: ResourceRef): void => {
@@ -118,6 +122,10 @@ export class PackageSystem {
     return exported;
   }
 
+  /**
+   * 依 Lock 的拓扑顺序运行技术初始化；当前步失败只逆序回滚已经成功的步骤。
+   * 回滚属于 best effort，不能覆盖第一处异常，也不能把失败看成 READY。
+   */
   async runTechnicalInit(): Promise<void> {
     const initialized: string[] = [];
     try {
@@ -157,6 +165,7 @@ export class PackageSystem {
     }
   }
 
+  /** 依 Lock 的逆序清理所有选定 Package；逐个收集失败，避免一个失败跳过其它清理。 */
   async runTechnicalDispose(): Promise<void> {
     const failures: string[] = [];
     for (const packageId of this.lock.technicalDisposeOrder) {
@@ -185,6 +194,7 @@ export class PackageSystem {
     }
   }
 
+  /** Hook Provider 必须是被选定模块的可调用导出；这里只固定表，不调用 Provider 本身。 */
   async sealHooks(): Promise<ReadonlyMap<string, readonly unknown[]>> {
     const table = new Map<string, readonly unknown[]>();
     for (const binding of this.lock.hookBindings) {
@@ -244,6 +254,11 @@ export class PackageSystem {
     return found;
   }
 
+  /**
+   * 从 Lock 所属 Element 解析被选 Function 的输入/输出 Schema；
+   * 外部 Schema 文件须位于已封存资源闭包并通过字节摘要验证。
+   * 返回 null 表示资料不可用，上层转 UNKNOWN 而不是伪造成功。
+   */
   async functionSchemas(fn: SelectedFunction): Promise<{ input: unknown; output: unknown } | null> {
     const key = canonicalJson(fn.ref);
     const cached = this.schemaCache.get(key);
@@ -285,6 +300,7 @@ export class PackageSystem {
     }
   }
 
+  /** 句柄每次 read 仍做摘要验证；仅在 KDP 传入 AppInitContext 时按 SelectedFunction.resources 限权。 */
   resourceHandle(key: string): ReadonlyResourceHandle {
     const split = splitResourceKey(key);
     const packageId = split?.packageId ?? '';
