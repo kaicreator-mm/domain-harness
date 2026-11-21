@@ -87,11 +87,11 @@ function validateInitResult(
   ingress: readonly SealedIngress[],
 ): { status: AppStatus; suppressed: readonly string[] } | string {
   if (!isRecord(result) || typeof result['status'] !== 'string') {
-    return 'businessAppInit must return an AppInitResult object with a status';
+    return 'BusinessCore.Init must return an AppInitResult object with a status';
   }
   const status = result['status'];
   if (!APP_STATUSES.includes(status as AppStatus)) {
-    return `businessAppInit returned unknown status '${status}'`;
+    return `BusinessCore.Init returned unknown status '${status}'`;
   }
   const hasSuppressed = 'suppressedIngress' in result;
   const suppressedRaw = hasSuppressed ? result['suppressedIngress'] : undefined;
@@ -152,16 +152,13 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
   if (!configResult.ok) return configResult.result;
   const config = configResult.config;
 
-  // 执行顺序固定：校验所有已选可执行字节 → 技术初始化 → 封存 Hook → 入口绑定 → 唯一业务 App Init。
+  // 单轮启动：验证选定字节 → 封存 Hook/公开入口 → Core.Order 递归 Init；不再额外调用 Business App Init。
   // 任何一步失败，都不得返回可调用 DomainApp。
   const packages = new PackageSystem(safeContext.installRoot, lock, safeContext.hostPorts);
 
-  let initialized = false;
   try {
     // 预先检查所有可执行产物，避免在前序 Package 已执行后才发现后序文件被篡改。
     await packages.verifySelectedArtifacts();
-    await packages.runTechnicalInit();
-    initialized = true;
     await packages.sealHooks();
     const ingressImpls = new Map<string, { fn: NonNullable<ReturnType<PackageSystem['functionByRef']>>; impl: (input: unknown) => unknown }>();
     for (const entry of lock.ingress) {
@@ -175,27 +172,7 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
       }
       ingressImpls.set(entry.id, { fn: selected, impl: impl as (input: unknown) => unknown });
     }
-    // 业务 App Init 的 FunctionRef 只能来自 Lock，不能由业务模块自行注册第二个启动器。
-    const initSelected = packages.functionByRef(lock.businessAppInit);
-    if (initSelected === undefined) {
-      throw new KdpLoadError('businessAppInit has no selected function in the Lock');
-    }
-    const initExport = await packages.loadEntry(initSelected.implementation, 'businessAppInit implementation');
-    if (typeof initExport !== 'function') {
-      throw new KdpLoadError(`businessAppInit export '${initSelected.implementation.exportName}' is not a function`);
-    }
-    const initFn = initExport as (context: AppInitContext) => unknown;
-
-    // App Init 只获得其选定实现明确声明的资源，不暴露其余包产物与整个 Lock 闭包。
-    const resources = new Map<string, ReadonlyResourceHandle>(
-      initSelected.resources.map((ref) => {
-        const key = `${ref.packageId}/${ref.path}`;
-        if (lock.resourceDigests[key] !== ref.digest) {
-          throw new KdpLoadError(`App Init resource '${key}' is not sealed with the declared digest`, 'DH_BOOT_PIN_MISMATCH');
-        }
-        return [key, packages.resourceHandle(key)] as const;
-      }),
-    );
+    // 统一 Package.Init 内部自行选择所需资源，KDP 不创建第二个 Business App Init 回调。
     // App Init 的函数句柄在 DomainApp 建立前不能调用；此处先暴露受控占位句柄。
     // 它们只通过应用的公开 ingress 调用，不是直接执行任意 ESM export。
     let appRef: { invoke(ingressId: string, input: unknown): Promise<FunctionOutcome> } | null = null;
@@ -219,21 +196,21 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
       lockDigest: lock.closureDigest,
       config,
       functions: functionHandles,
-      resources,
+      resources: new Map<string, ReadonlyResourceHandle>(),
     };
     let rawInitResult: unknown;
     try {
-      rawInitResult = await initFn(initContext);
+      rawInitResult = await packages.runInit(initContext);
     } catch (error) {
-      throw new KdpLoadError(`businessAppInit threw: ${(error as Error).message}; ordinary startup failure, no retry (PRD K07)`, 'DH_RUNTIME_NOT_READY');
+      throw new KdpLoadError(`Core.Init failed: ${(error as Error).message}; ordinary startup failure, no retry`, 'DH_RUNTIME_NOT_READY');
     }
 
     const validated = validateInitResult(rawInitResult, lock.ingress);
     if (typeof validated === 'string') {
-      throw new KdpLoadError(`businessAppInit result refused: ${validated}`, 'DH_RUNTIME_NOT_READY');
+      throw new KdpLoadError(`Business Core.Init result refused: ${validated}`, 'DH_RUNTIME_NOT_READY');
     }
     if (validated.status === 'FAILED') {
-      throw new KdpLoadError('businessAppInit reported status FAILED; ordinary startup failure, no ingress, no retry (PRD K07)', 'DH_RUNTIME_NOT_READY');
+      throw new KdpLoadError('Business Core.Init reported status FAILED; ordinary startup failure, no ingress, no retry (PRD K07)', 'DH_RUNTIME_NOT_READY');
     }
 
     // 只有 App Init 结果通过 READY/DEGRADED 等状态检查后才创建可对外使用的实例。
@@ -253,13 +230,11 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     return { status: 'BOOTED', app };
   } catch (error) {
     let cleanupFailure = '';
-    // 完成技术初始化之后的异常必须清理已初始化 Package；记录清理异常但保留原始失败原因。
-    if (initialized) {
-      try {
-        await packages.runTechnicalDispose();
-      } catch (cleanupError) {
-        cleanupFailure = `; cleanup also failed: ${(cleanupError as Error).message}`;
-      }
+    // 即使 Init 在中间失败，也只逆序清理真正进入过的 Package。
+    try {
+      await packages.runExit();
+    } catch (cleanupError) {
+      cleanupFailure = `; cleanup also failed: ${(cleanupError as Error).message}`;
     }
     const loadError = error as KdpLoadError;
     return failed(loadError.code ?? 'DH_KDP_PACKAGE_LOAD_FAILED', `${(error as Error).message}${cleanupFailure}`);
