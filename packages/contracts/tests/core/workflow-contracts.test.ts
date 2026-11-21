@@ -61,6 +61,9 @@ const schema = ajv.compile(WORKFLOW_DEFINITION_JSON_SCHEMA as never);
 type MutableTestNode = {
   id: string;
   kind: string;
+  function?: unknown;
+  workflow?: unknown;
+  hooks?: unknown;
   switch?: { exits: Array<{ label: string; target: { nodeId?: string; terminal?: string } }> };
   data?: { format: string; resource: { packageId: string; path: string; digest: string }; maxBytes: number };
 };
