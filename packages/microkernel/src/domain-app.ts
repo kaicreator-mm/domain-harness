@@ -87,7 +87,7 @@ export function normalizeOutcome(raw: unknown, declaredOutcomes: readonly string
       }
     }
     return failedOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'implementation returned a non-FunctionOutcome value');
-  } catch (error) {
+  } catch (_error) {
     return failedOutcome(
       'DH_RUNTIME_UNSUPPORTED_PROFILE',
       'implementation result inspection raised an unhandled error (detail redacted)',
@@ -152,7 +152,7 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     let schemas: { input: unknown; output: unknown } | null;
     try {
       schemas = await packages.functionSchemas(selected);
-    } catch (error) {
+    } catch (_error) {
       return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'function schema lookup failed (detail redacted)');
     }
     if (schemas === null) {
@@ -168,7 +168,7 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     let raw: unknown;
     try {
       raw = await selected.impl(input);
-    } catch (error) {
+    } catch (_error) {
       // Element 未处理异常：Kernel 最后兜底，尽最大努力执行 Exit，不继续开放业务调用。
       const reason = `ingress '${ingressId}' raised unhandled implementation error (detail redacted)`;
       console.error(`[KDP Unhandled] code=DH_KDP_PACKAGE_LOAD_FAILED phase=ingress ingress=${ingressId}`);
