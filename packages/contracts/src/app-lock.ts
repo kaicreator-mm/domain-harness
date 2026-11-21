@@ -4,7 +4,7 @@ import type { EffectIntent, FunctionOutcomeKind } from './element-contracts.js';
 import type {
   ElementRef,
   ElementVisibility,
-  EntryRef,
+  ImplementationLocator,
   FunctionRef,
   ResolvedTarget,
 } from './refs.js';
@@ -19,8 +19,11 @@ export interface SelectedPackage {
   readonly role: PackageRole;
   readonly artifact: ResourceRef;
   readonly order?: number;
-  readonly init: EntryRef;
-  readonly exit?: EntryRef;
+  readonly init: ElementRef;
+  readonly initFunction: FunctionRef;
+  readonly exit?: ElementRef;
+  readonly exitFunction?: FunctionRef;
+  /** 只从 Init Function 被选中的 Target/Content 资源派生的封存资源。 */
   readonly initResources: readonly ResourceRef[];
   /** 可选的 Package.InitFrom 历史，不参与 Exit 记录或依赖授权。 */
   readonly recordInitFrom?: true;
@@ -44,7 +47,7 @@ export interface SelectedFunction {
   readonly ref: FunctionRef;
   readonly outcomes: readonly FunctionOutcomeKind[];
   readonly effects: EffectIntent;
-  readonly implementation: EntryRef;
+  readonly implementation: ImplementationLocator;
   readonly resources: readonly ResourceRef[];
 }
 
@@ -52,13 +55,7 @@ export interface SealedHookBinding {
   readonly ownerPackageId: string;
   readonly hookId: string;
   readonly cardinality: 'single' | 'multi';
-  readonly providers: readonly EntryRef[];
-}
-
-export interface SealedIngress {
-  readonly id: string;
-  readonly function: FunctionRef;
-  readonly optional: boolean;
+  readonly providers: readonly FunctionRef[];
 }
 
 export interface BootstrapKdpRef {
@@ -88,7 +85,6 @@ export interface DomainAppLock {
   readonly hookBindings: readonly SealedHookBinding[];
   /** 已锁定 Core(Order 升序) 链；运行时只按此链递归调用。 */
   readonly coreOrder: readonly string[];
-  readonly ingress: readonly SealedIngress[];
   readonly resourceDigests: Readonly<Record<string, ContentDigest>>;
   readonly excludedUnknownContent: readonly string[];
   readonly closureDigest: ContentDigest;
