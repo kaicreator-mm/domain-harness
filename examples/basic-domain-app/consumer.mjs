@@ -694,10 +694,10 @@ async function runWorkflowE2E() {
     if (!first.ok || !second.ok) throw new Error('T14 selected Workflow must pass real BUILD');
     assert.deepEqual(first.lockBytes, second.lockBytes, 'two actual Workflow BUILDs must yield exact Lock bytes');
     assert.deepEqual(first.appPackage, second.appPackage, 'two actual Workflow BUILDs must yield exact package bytes');
-    assert.equal(first.lock.selectedWorkflows?.length, 2, 'parent and child selected in one Lock');
+    assert.equal(first.lock.selectedWorkflows?.length, 7, 'parent, child and five independent acceptance roots share one sealed Lock');
     assert.equal(first.lock.selectedElements.filter((item) => item.ref.id.startsWith('basic.data_')).length, 4,
       'two JSON and two YAML Data Elements must be selected, not only files');
-    for (const fnName of ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow']) {
+    for (const fnName of ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow', 'workflowDecision']) {
       assert.equal(first.lock.selectedFunctions.filter((item) => item.ref.functionId === fnName).length, 1,
         `one selected FunctionRef for ${fnName}, reusable across distinct data Elements`);
     }
@@ -713,22 +713,25 @@ async function runWorkflowE2E() {
     if (booted.status !== 'BOOTED') throw new Error('T14 Workflow App failed real Boot');
     assert.equal(booted.app.status, 'READY');
     const timeline = globalThis.__domainHarnessT05Events;
-    const actualReaders = timeline.filter((item) => item.event === 'workflow-read');
+    const caseBegin = timeline.findIndex((item) => item.event === 'workflow-cases-begin');
+    assert.ok(caseBegin > 0, 'acceptance root cases must run after real parent/child XState Workflow');
+    const initialTimeline = timeline.slice(0, caseBegin);
+    const actualReaders = initialTimeline.filter((item) => item.event === 'workflow-read');
     assert.deepEqual(actualReaders.map((item) => [item.format, item.parsed.id, item.parsed.result]), [
       ['json', 'json-a', 1],
       ['yaml', 'yaml-a', 3],
       ['json', 'json-b', 2],
       ['yaml', 'yaml-b', 4],
     ], 'two JSON and two YAML values must actually drive the same Reader Functions through real XState actors');
-    const hooks = timeline.filter((item) => item.event === 'workflow-hook');
+    const hooks = initialTimeline.filter((item) => item.event === 'workflow-hook');
     assert.deepEqual(hooks.map((item) => item.kind), ['start', 'end']);
     const startIndex = timeline.findIndex((item) => item.event === 'workflow-hook' && item.kind === 'start');
     const endIndex = timeline.findIndex((item) => item.event === 'workflow-hook' && item.kind === 'end');
     assert.ok(startIndex >= 0 && startIndex < endIndex && endIndex < timeline.findIndex(
       (item) => item.event === 'workflow-read' && item.parsed.id === 'yaml-a'),
     'end must be awaited before the next Workflow Node');
-    const outcome = timeline.filter((item) => item.event === 'workflow-outcome');
-    assert.equal(outcome.length, 1, 'Package.Init must start exactly one root Workflow');
+    const outcome = initialTimeline.filter((item) => item.event === 'workflow-outcome');
+    assert.equal(outcome.length, 1, 'Package.Init must start exactly one main parent Workflow');
     assert.deepEqual(outcome[0].outcome, {
       status: 'COMPLETE', value: { id: 'yaml-b', result: 4 },
     });
@@ -737,8 +740,41 @@ async function runWorkflowE2E() {
     'Workflow children must never reenter Package.Init');
     assert.equal(typeof booted.app.invoke, 'undefined', 'Workflow does not reintroduce public ingress');
     await evidence('t14.workflow.clean-packed-actor', {
-      status: 'PASS', selectedWorkflows: 2, dataElements: 4, readerCalls: 4,
+      status: 'PASS', selectedWorkflows: 7, dataElements: 4, readerCalls: 4,
       hooks: 2, outcome: outcome[0].outcome, lockDigest: installed.lock.closureDigest,
+    });
+    const observedCases = timeline.filter((item) => item.event === 'workflow-case');
+    assert.deepEqual(observedCases.map((item) => [item.name, item.outcome.status]), [
+      ['single', 'COMPLETE'], ['complete', 'COMPLETE'], ['ask', 'ASK'], ['wait', 'WAIT'],
+      ['reject', 'REJECT'], ['unknown', 'UNKNOWN'], ['failed', 'FAILED'],
+      ['unmatched', 'FAILED'], ['repeat-ask', 'ASK'], ['reservation', 'FAILED'],
+      ['shared-budget', 'FAILED'], ['ancestor-depth', 'FAILED'],
+    ]);
+    const expectCode = (name, code) => {
+      const found = observedCases.find((item) => item.name === name);
+      assert.equal(found?.outcome?.reason?.code, code, name + ': no valid reason was preserved');
+    };
+    for (const name of ['ask', 'wait', 'reject', 'repeat-ask']) expectCode(name, 'DH_WORKFLOW_TERMINAL');
+    expectCode('unknown', 'T14_BUSINESS_UNKNOWN');
+    expectCode('failed', 'T14_BUSINESS_FAILED');
+    expectCode('unmatched', 'DH_WORKFLOW_ROUTE_UNMATCHED');
+    for (const name of ['reservation', 'shared-budget']) expectCode(name, 'DH_WORKFLOW_CALL_BUDGET');
+    expectCode('ancestor-depth', 'DH_WORKFLOW_DEPTH_LIMIT');
+    assert.deepEqual(timeline.filter((item) => item.event === 'workflow-decision').map((item) => item.session),
+      ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+      'repeated selected WorkflowRef must not share mutable input or stale Route state across independent runs');
+    assert.equal(timeline.filter((item) => item.event === 'workflow-hook').length, 2,
+      'insufficient leaf budget must refuse before start/end side effects');
+    assert.deepEqual(timeline.filter((item) => item.event === 'workflow-read').slice(4).map((item) => item.parsed.id),
+      ['yaml-b', 'json-a'],
+      'single node executes; nested call budget denies the child before any further Reader');
+    const businessEntry = timeline.find((item) => item.event === 'package-init' && item.package === 'app-business');
+    assert.ok(Array.isArray(businessEntry?.initFrom) && businessEntry.initFrom.length > 0,
+      'enabled InitFrom must provide caller records to Business Package.Init');
+    await evidence('t14.workflow.full-terminal-budget-matrix', {
+      status: 'PASS', caseCount: observedCases.length, outcomeKinds: [...new Set(observedCases.map((item) => item.outcome.status))],
+      unmatchedRejected: true, rootBudgetRejected: true, ancestorDepthRejected: true,
+      nodeReuseIsolated: true, initFromPresent: true,
     });
     await booted.app.dispose();
     assert.ok(timeline.findIndex((item) => item.event === 'package-exit') > timeline.findIndex(
@@ -760,6 +796,8 @@ async function runWorkflowE2E() {
       code: refused.code, executedTamperedReader: false,
     });
     return { dataElements: 4, distinctFiles: 4, readerFunctions: 2, childActors: 1,
+      selectedWorkflowDefinitions: 7, caseCount: observedCases.length, terminalMatrix: true,
+      rootBudgetRefusal: true, ancestorDepthRefusal: true, scopedNodeReuse: true,
       hookCalls: 2, cleanPacked: true, outcome: 'COMPLETE', tamperRejected: true };
   } finally {
     await rm(prepared.root, { recursive: true, force: true });
