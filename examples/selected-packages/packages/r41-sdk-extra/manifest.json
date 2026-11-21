@@ -1,0 +1,84 @@
+{
+  "kind": "DomainPackage",
+  "schemaVersion": "dh.package/0.11",
+  "id": "r41-sdk-extra",
+  "version": "1.0.0",
+  "layer": "sdk",
+  "role": "primary",
+  "order": 2,
+  "elements": [
+    {
+      "id": "r41.sdk_extra",
+      "version": "1.0.0",
+      "definitionRef": {
+        "packageId": "r41-sdk-extra",
+        "path": "definitions/lifecycle.json",
+        "digest": "sha256:f3e40dab83c946f9ef82b87f1d2a6a35097ef4ea43ca1e7e3a351424dfaafc6a"
+      },
+      "visibility": "public"
+    }
+  ],
+  "dependsOn": [
+    {
+      "package": "r41-sdk-base",
+      "version": "1.0.0",
+      "interface": "r41.sdk"
+    }
+  ],
+  "imports": [],
+  "exports": [
+    {
+      "interfaceId": "r41.extra"
+    }
+  ],
+  "contributesTo": [],
+  "targetVariants": [
+    {
+      "target": {
+        "runtime": "node",
+        "module": "esm",
+        "nodeMajor": 22
+      },
+      "implementations": [
+        {
+          "elementId": "r41.sdk_extra",
+          "functionId": "init",
+          "contractVersion": "1",
+          "entry": {
+            "module": {
+              "packageId": "r41-sdk-extra",
+              "path": "dist/index.mjs",
+              "digest": "sha256:23a3ad85fd47519ef7315e2ca60b8b05419628746d9d35321eae091e3b775072"
+            },
+            "exportName": "init"
+          }
+        },
+        {
+          "elementId": "r41.sdk_extra",
+          "functionId": "exit",
+          "contractVersion": "1",
+          "entry": {
+            "module": {
+              "packageId": "r41-sdk-extra",
+              "path": "dist/index.mjs",
+              "digest": "sha256:23a3ad85fd47519ef7315e2ca60b8b05419628746d9d35321eae091e3b775072"
+            },
+            "exportName": "exit"
+          }
+        }
+      ]
+    }
+  ],
+  "init": {
+    "namespace": "r41",
+    "id": "r41.sdk_extra",
+    "version": "1.0.0",
+    "digest": "sha256:386915a96705e5b96ff9495e48f92fe95f851ff7b4bed49fa1156e68ac78c4a5"
+  },
+  "exit": {
+    "namespace": "r41",
+    "id": "r41.sdk_extra",
+    "version": "1.0.0",
+    "digest": "sha256:386915a96705e5b96ff9495e48f92fe95f851ff7b4bed49fa1156e68ac78c4a5"
+  }
+}
