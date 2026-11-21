@@ -1,8 +1,11 @@
 /** v0.11.1 T12：复用现有 BUILD/Lock/Package 安装闭包的 Workflow 静态选定反例。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Ajv2020 } from 'ajv/dist/2020.js';
 import {
   DH_WORKFLOW_SCHEMA_VERSION,
+  DOMAIN_APP_LOCK_JSON_SCHEMA,
+  DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA,
   contentDigestOf,
   type DomainPackageManifest,
   type ElementDefinition,
@@ -26,11 +29,12 @@ function workflowCase(
     readonly sourcePackage?: string;
     readonly badNodeFunction?: boolean;
     readonly workflowElementId?: string;
+    readonly rawData?: Uint8Array;
   } = {},
 ) {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
-  const bytes = options.format === 'yaml' ? YAML_BYTES : JSON_BYTES;
+  const bytes = options.rawData ?? (options.format === 'yaml' ? YAML_BYTES : JSON_BYTES);
   const resource = {
     packageId: options.sourcePackage ?? 'orders-business',
     path: options.format === 'yaml' ? 'data/order.yml' : 'data/order.json',
@@ -64,8 +68,8 @@ function workflowCase(
     required: true, value: workflow as unknown as JsonValue,
   });
   const { input } = scenario.finalize();
-  if (options.withData && resource.packageId === 'orders-business') {
-    const onDisk = writeRaw(scenario.ws.packageRoots['orders-business']!, resource.path, bytes);
+  if (options.withData && scenario.ws.packageRoots[resource.packageId]) {
+    const onDisk = writeRaw(scenario.ws.packageRoots[resource.packageId]!, resource.path, bytes);
     assert.equal(onDisk.digest, resource.digest);
   }
   const ref = elementRefOf(scenario.appMain as ElementDefinition);
@@ -110,6 +114,40 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
   assert.ok(a.lock.selectedFunctions.some((selectedFunction) =>
     selectedFunction.ref.element.id === 'orders.eligibility' &&
     selectedFunction.ref.functionId === 'evaluate'));
+});
+
+test('T12 R1: expanded existing Manifest/Lock machine schemas accept actually selected Workflow closure', (t) => {
+  const { input } = workflowCase(t, { format: 'yaml', withData: true });
+  const built = accepted(buildApp(input));
+  const ajv = new Ajv2020({ strict: true, allErrors: true });
+  const checkLock = ajv.compile(DOMAIN_APP_LOCK_JSON_SCHEMA as never);
+  const checkManifest = ajv.compile(DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA as never);
+  assert.equal(checkLock(built.lock), true, JSON.stringify(checkLock.errors));
+  for (const pkg of input.packages) {
+    assert.equal(checkManifest(pkg), true, JSON.stringify(checkManifest.errors));
+  }
+});
+
+test('T12 R1: raw YAML data in a directly declared Extension is eligible but not transitive', (t) => {
+  const { input, resource } = workflowCase(t, {
+    format: 'yaml', withData: true, sourcePackage: 'orders-ext',
+  });
+  const built = accepted(buildApp(input));
+  assert.equal(built.lock.resourceDigests[`${resource.packageId}/${resource.path}`], resource.digest);
+});
+
+test('T12 R1: strict UTF-8 rejects malformed YAML bytes even if their digest matches', (t) => {
+  const { input } = workflowCase(t, {
+    format: 'yaml', withData: true, rawData: Uint8Array.from([0xc3, 0x28]),
+  });
+  rejected(buildApp(input), 'DH_BUILD_SCHEMA_INVALID');
+});
+
+test('T12 R1: selected JSON resource must actually parse before sealing', (t) => {
+  const { input } = workflowCase(t, {
+    format: 'json', withData: true, rawData: textEncoder.encode('{not json}'),
+  });
+  rejected(buildApp(input), 'DH_BUILD_SCHEMA_INVALID');
 });
 
 test('T12 R1: real YAML resource bytes are sealed without pretending a generic ContentBlock.ref is JSON', (t) => {
