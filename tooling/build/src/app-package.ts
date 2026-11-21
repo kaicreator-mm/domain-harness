@@ -16,6 +16,7 @@ import {
 } from '@kaicreator/domain-harness-contracts';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { refusal } from './refusal.js';
+import { TRUSTED_RUNTIME_MANIFEST_BYTES, TRUSTED_RUNTIME_VERIFY_MODULE, TRUSTED_WORKFLOW_NPM_ARCHIVES } from './trusted-runtime.js';
 import type { AppPackageFile, ComposedAppPackage } from './types.js';
 
 interface PackageJsonShape {
@@ -157,11 +158,12 @@ function encoded(value: JsonValue): Uint8Array {
   return new TextEncoder().encode(canonicalJson(value));
 }
 
-const BOOT_MODULE = `import { readFile } from 'node:fs/promises';
+const BOOT_MODULE = (verifyTrustedWorkflowRuntime: boolean): string => `import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { boot } from '@kaicreator/domain-harness-microkernel';
 const installRoot = fileURLToPath(new URL('.', import.meta.url));
 const pin = JSON.parse(await readFile(new URL('./dh-install/bootstrap-pin.json', import.meta.url), 'utf8'));
+${verifyTrustedWorkflowRuntime ? "await import('./dh-install/verify-runtime.mjs');" : ''}
+const { boot } = await import('@kaicreator/domain-harness-microkernel');
 const result = await boot(pin, {
   installRoot,
   descriptorPath: 'descriptor/app.json',
@@ -248,6 +250,17 @@ export function composeAppPackage(
     ['yaml', '2.9.1'],
   ]);
   const needsWorkflowRuntime = (lock.selectedWorkflows?.length ?? 0) > 0;
+  if (needsWorkflowRuntime) {
+    const pins = TRUSTED_WORKFLOW_NPM_ARCHIVES.map((item) => ({ ...item }));
+    if (canonicalJson(lock.trustedRuntimeIntegrity as unknown as JsonValue) !==
+        canonicalJson(pins as unknown as JsonValue)) {
+      throw refusal('DH_BUILD_LOCK_NOT_REPRODUCIBLE',
+        'selected Workflow npm dependency tarball SRI pins do not match the sealed first-party BUILD list');
+    }
+    add('dh-install/trusted-runtime.json', TRUSTED_RUNTIME_MANIFEST_BYTES);
+    add('dh-install/verify-runtime.mjs', new TextEncoder().encode(TRUSTED_RUNTIME_VERIFY_MODULE));
+  }
+
   if (needsWorkflowRuntime && (runtimeDependencies['xstate'] === undefined || runtimeDependencies['yaml'] === undefined)) {
     throw refusal('DH_BUILD_TARGET_INVALID', 'selected Workflow requires exact xstate and yaml runtime dependencies');
   }
@@ -271,7 +284,7 @@ export function composeAppPackage(
     scripts: { start: 'node ./boot.mjs' },
     dependencies,
   }));
-  add('boot.mjs', new TextEncoder().encode(BOOT_MODULE));
+  add('boot.mjs', new TextEncoder().encode(BOOT_MODULE(needsWorkflowRuntime)));
   files.sort((a, b) => a.path.localeCompare(b.path));
   const packageDigest: ContentDigest = contentDigestOf(files.map((file) => ({ path: file.path, digest: file.digest })));
   return { kind: 'DomainAppPackage', schemaVersion: 'dh.app-package/0.11', files, packageDigest };
