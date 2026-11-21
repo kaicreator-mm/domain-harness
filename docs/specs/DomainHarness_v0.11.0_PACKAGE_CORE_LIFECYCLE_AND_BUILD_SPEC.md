@@ -1,5 +1,8 @@
 # DomainHarness v0.11.0 — Package / Core / Extension / BUILD / Init / Exit 统一规范
 
+> **【R34 0.11.x 产品终局与自举例外】** DomainHarness 是以 Boot + Domain Packages 组成、对外可复用的 **Domain（有界知识/规则）+ Harness（受控任务执行）+ SDK（公开开发接口/组装能力）**；最终整个 0.11.x 要交付可自举的领域 Harness SDK。允许 `domain-harness` 暂留一个**只生产自身基础 Domain Packages** 的简易 Seed Builder；最终 Forge 作为运行于 DomainHarness SDK 的 Domain App 接手 Package 生产。该种子工具不意味着扩大 SDK 的 BUILD 公共生产职责，也不豁免已审受信装配/Lock/Pin 权限。详细见 [R34](DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_AND_BOOTSTRAP_SEED.md)。
+
+
 > **【R33 Owner 产品所有权修正；本规范中“BUILD 从生成 Package 到完整 App 组合”的旧表述只保留为历史记录】**：现行跨版本产品边界须以 [DomainHarness SDK / DomainForge Domain App / 自举](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) 为准。DomainHarness 是 Boot + Domain Packages 的领域 Harness SDK，负责已存在 Package 的最小装配/校验/加载/执行；DomainForge 是基于该 SDK 运行并生产 Domain Package 的 Domain App。原 B-01“单 Package 源码/资源生成必归 Harness BUILD”**不再是当前产品要求**，缺通用 Package 生产器不得强加给 SDK 0.11.0；真实源码重构仍按独立增量验证。原有 Core.Order、直接 Extension、ElementRef/FunctionRef、Init/Exit、可信资源/Pin、未知调用拒绝等基础约束继续有效。完整代码归属见 [R33 审计](../architecture/DomainHarness_v0.11.x_LEGACY_BUILD_OWNERSHIP_AUDIT.md)。
 
 
