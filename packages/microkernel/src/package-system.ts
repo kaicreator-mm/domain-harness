@@ -249,7 +249,7 @@ export class PackageSystem {
                     message: 'Workflow FunctionRef is not selected',
                   } };
                 }
-                return this.invokeSelectedFunction(call, value);
+                return this.invokeSelectedFunction(call, value, { deferExitUntilWorkflowFinally: true });
               },
               read: async (data) => {
                 const key = `${data.packageId}/${data.path}`;
@@ -384,7 +384,10 @@ export class PackageSystem {
   }
 
   /** 可在 App READY 之前执行的最小已选 Function 运行器；不依赖 DomainApp.invoke。 */
-  async invokeSelectedFunction(ref: FunctionRef, input: unknown): Promise<FunctionOutcome> {
+  async invokeSelectedFunction(
+    ref: FunctionRef, input: unknown,
+    options: { readonly deferExitUntilWorkflowFinally?: boolean } = {},
+  ): Promise<FunctionOutcome> {
     const selected = this.functionByRef(ref);
     if (!selected) return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_FUNCTION_UNSELECTED', message: 'unselected FunctionRef' } };
     if (selected.effects !== 'none') return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_UNSUPPORTED_PROFILE', message: 'effectful Function not supported' } };
@@ -397,7 +400,9 @@ export class PackageSystem {
     let raw: unknown;
     try { raw = await (implementation as (input: unknown) => unknown)(input); } catch {
       console.error(`[KDP Function] code=DH_KDP_PACKAGE_LOAD_FAILED function=${ref.functionId} detail=redacted`);
-      try { await this.runExit(); } catch { console.error('[KDP Exit] detail=redacted'); }
+      if (options.deferExitUntilWorkflowFinally !== true) {
+        try { await this.runExit(); } catch { console.error('[KDP Exit] detail=redacted'); }
+      }
       throw new KdpLoadError('selected Function raised unhandled fatal exception (detail redacted)', 'DH_RUNTIME_NOT_READY');
     }
     const outcome = normalizeOutcome(raw, selected.outcomes);
