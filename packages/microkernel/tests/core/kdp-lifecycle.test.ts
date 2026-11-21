@@ -26,7 +26,18 @@ async function withScenario(
   await run(fixture, result);
 }
 
-const INIT_ORDER = ['fixture-kernel', '@fixture/sdk', 'fixture-business', 'fixture-ext'];
+function packageContext(fixture: FixtureInstall) {
+  return {
+    appId: 'fixture.orders-app',
+    activationId: 'fixture-activation',
+    lockDigest: fixture.lock.closureDigest,
+    config: {},
+    functions: new Map(),
+    resources: new Map(),
+  };
+}
+
+const INIT_ORDER = ['fixture-kernel', '@fixture/sdk', 'fixture-ext', 'fixture-business'];
 const DISPOSE_ORDER = [...INIT_ORDER].reverse();
 
 test('KDP boots core + package system: init order, hook sealing, business init, READY', async (t) => {
@@ -42,9 +53,9 @@ test('KDP boots core + package system: init order, hook sealing, business init, 
       .filter((event) => event['event'] === 'module-evaluated')
       .map((event) => event['package']);
     const inits = events()
-      .filter((event) => event['event'] === 'technical-init')
+      .filter((event) => event['event'] === 'package-init')
       .map((event) => event['package']);
-    assert.deepEqual(evaluated.slice(0, INIT_ORDER.length), INIT_ORDER);
+    assert.deepEqual(new Set(evaluated), new Set([...INIT_ORDER, 'fixture-ext:hook']));
     assert.deepEqual(inits, INIT_ORDER);
 
     const hookEvalIndex = events().findIndex(
@@ -52,7 +63,7 @@ test('KDP boots core + package system: init order, hook sealing, business init, 
     );
     const businessInitIndex = events().findIndex((event) => event['event'] === 'business-init');
     assert.ok(hookEvalIndex > 0, 'hook provider module must be loaded by sealHooks');
-    assert.ok(businessInitIndex > hookEvalIndex, 'hooks sealed before businessAppInit runs');
+    assert.ok(businessInitIndex > hookEvalIndex, 'hooks sealed before Business Core.Init runs');
     assert.equal(events().some((event) => event['event'] === 'hook-provider-invoked'), false);
 
     const businessInit = events().find((event) => event['event'] === 'business-init');
@@ -68,12 +79,12 @@ test('KDP boots core + package system: init order, hook sealing, business init, 
     assert.deepEqual(
       events().filter((event) => event['event'] === 'business-init'),
       [businessInit],
-      'exactly one businessAppInit executed',
+      'exactly one Business Core.Init executed',
     );
   });
 });
 
-test('dispose runs technicalDispose in the strict reverse disposeOrder', async (t) => {
+test('dispose runs Exit in the strict reverse Init entry order', async (t) => {
   await withScenario(t, {
     init: { status: 'READY' },
     functions: {},
@@ -82,7 +93,7 @@ test('dispose runs technicalDispose in the strict reverse disposeOrder', async (
     if (result.status !== 'BOOTED') return;
     await result.app.dispose();
     const disposes = events()
-      .filter((event) => event['event'] === 'technical-dispose')
+      .filter((event) => event['event'] === 'package-exit')
       .map((event) => event['package']);
     assert.deepEqual(disposes, DISPOSE_ORDER);
     const count = events().length;
@@ -293,7 +304,7 @@ test('closure resource read: verified bytes on the happy path, digest mismatch o
   }
 });
 
-test('dispose is single-flight: concurrent and repeated calls never rerun technicalDispose', async (t) => {
+test('dispose is single-flight: concurrent and repeated calls never rerun Exit', async (t) => {
   await withScenario(t, { init: { status: 'READY' }, functions: {} }, async (_fixture, result) => {
     assert.equal(result.status, 'BOOTED');
     if (result.status !== 'BOOTED') return;
@@ -305,8 +316,8 @@ test('dispose is single-flight: concurrent and repeated calls never rerun techni
     assert.deepEqual(a, { status: 'DISPOSED' });
     assert.deepEqual(b, { status: 'DISPOSED' });
     assert.deepEqual(c, { status: 'DISPOSED' });
-    const disposes = events().filter((event) => event['event'] === 'technical-dispose');
-    assert.equal(disposes.length, DISPOSE_ORDER.length, 'technicalDispose ran exactly once per package');
+    const disposes = events().filter((event) => event['event'] === 'package-exit');
+    assert.equal(disposes.length, DISPOSE_ORDER.length, 'Exit ran exactly once per package');
   });
 
   const fixture = await buildFixtureInstall({
@@ -329,13 +340,13 @@ test('dispose is single-flight: concurrent and repeated calls never rerun techni
     () => null,
     (error: unknown) => (error as Error).message,
   );
-  assert.match(String(first), /fixture kernel technicalDispose threw/);
+  assert.match(String(first), /fixture kernel Exit threw/);
   assert.equal(first, second, 'repeated dispose returns the same rejection');
   assert.equal(events().length, countAfterFirst, 'no teardown reruns after the first attempt');
   const kernelDisposes = events().filter(
-    (event) => event['event'] === 'technical-dispose' && event['package'] === 'fixture-kernel',
+    (event) => event['event'] === 'package-exit' && event['package'] === 'fixture-kernel',
   );
-  assert.equal(kernelDisposes.length, 1, 'failing technicalDispose ran exactly once');
+  assert.equal(kernelDisposes.length, 1, 'failing Exit ran exactly once');
 
   const invokeOutcome = await result.app.invoke('evaluate', { total: 1, region: 'EU' });
   assert.equal(invokeOutcome.kind, 'FAILED');
@@ -350,7 +361,7 @@ test('dispose is single-flight: concurrent and repeated calls never rerun techni
   assert.equal(third, first, 'repeat dispose after failure returns the same rejection');
 });
 
-test('technical dispose is best-effort across all packages with an aggregate error', async (t) => {
+test('Package Exit is best-effort across all packages with an aggregate error', async (t) => {
   const fixture = await buildFixtureInstall({
     init: { status: 'READY' },
     functions: {},
@@ -366,9 +377,9 @@ test('technical dispose is best-effort across all packages with an aggregate err
     () => null,
     (error: unknown) => (error as Error).message,
   );
-  assert.match(String(message), /technical dispose failed for 1 package\(s\)/);
+  assert.match(String(message), /Package Exit failed for 1 package\(s\)/);
   assert.match(String(message), /fixture-kernel/);
-  const disposes = events().filter((event) => event['event'] === 'technical-dispose');
+  const disposes = events().filter((event) => event['event'] === 'package-exit');
   assert.deepEqual(
     disposes.map((event) => event['package']),
     DISPOSE_ORDER,
@@ -392,29 +403,20 @@ test('DEGRADED with duplicate suppressedIngress ids is refused', async (t) => {
   );
 });
 
-test('R27: Lock-declared lifecycle executes only when explicitly selected and callable', async (t) => {
+test('R27: missing selected Init Element export is rejected and InitFrom retains caller', async (t) => {
   const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
   t.after(async () => fixture.cleanup());
   const { PackageSystem } = await import('../../src/package-system.js');
-  const noLifecycle = {
+  const invalidLock = {
     ...fixture.lock,
-    selectedPackages: fixture.lock.selectedPackages.map((pkg) => ({ ...pkg, technicalLifecycle: false })),
+    selectedPackages: fixture.lock.selectedPackages.map((pkg) =>
+      pkg.packageId === '@fixture/sdk' ? { ...pkg, init: { ...pkg.init, exportName: 'missingInit' } } : pkg),
   };
-  await new PackageSystem(fixture.installRoot, noLifecycle, []).runTechnicalInit();
-  assert.equal(events().filter((e) => e['event'] === 'technical-init').length, 0,
-    'an undeclared export is never implicitly invoked');
-
-  const hookDigest = fixture.lock.resourceDigests['fixture-ext/dist/hook.mjs']!;
-  const badLifecycle = {
-    ...fixture.lock,
-    selectedPackages: fixture.lock.selectedPackages.map((pkg) => pkg.packageId === 'fixture-ext'
-      ? { ...pkg, artifact: { packageId: 'fixture-ext', path: 'dist/hook.mjs', digest: hookDigest } }
-      : pkg),
-  };
-  await assert.rejects(
-    new PackageSystem(fixture.installRoot, badLifecycle, []).runTechnicalInit(),
-    /declared technicalInit but its artifact has no callable named export/,
-  );
+  const packages = new PackageSystem(fixture.installRoot, invalidLock, []);
+  await assert.rejects(packages.runInit(packageContext(fixture)), /missingInit/);
+  assert.deepEqual(packages.initFrom('fixture-kernel'), [{ type: 'Boot' }]);
+  assert.deepEqual(packages.initFrom('@fixture/sdk'), [{ type: 'Package', packageId: 'fixture-kernel' }]);
+  await packages.runExit();
 });
 
 test('R27: post-initialization Business App Init failure rolls back every technical package', async (t) => {
@@ -423,8 +425,8 @@ test('R27: post-initialization Business App Init failure rolls back every techni
     t.after(async () => fixture.cleanup());
     const result = await boot(fixture.pin, fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
-    const inits = events().filter((e) => e['event'] === 'technical-init').map((e) => e['package']);
-    const disposes = events().filter((e) => e['event'] === 'technical-dispose').map((e) => e['package']);
+    const inits = events().filter((e) => e['event'] === 'package-init').map((e) => e['package']);
+    const disposes = events().filter((e) => e['event'] === 'package-exit').map((e) => e['package']);
     assert.deepEqual(inits, INIT_ORDER);
     assert.deepEqual(disposes, DISPOSE_ORDER, 'all previously initialized packages must be disposed');
   }
@@ -437,11 +439,11 @@ test('R27: a tampered selected Hook module is refused before any selected packag
   const result = await boot(fixture.pin, fixture.context);
   assert.equal(result.status, 'FAILED', JSON.stringify(result));
   if (result.status === 'FAILED') assert.equal(result.code, 'DH_BOOT_PIN_MISMATCH');
-  assert.equal(events().some((e) => e['event'] === 'technical-init'), false,
-    'selected module integrity must be checked before first technical init');
+  assert.equal(events().some((e) => e['event'] === 'package-init'), false,
+    'selected module integrity must be checked before first Package Init');
 });
 
-test('R31: rollback never invokes an undeclared technicalDispose export', async (t) => {
+test('R31: missing Exit Element is allowed; partial startup still closes remaining Packages', async (t) => {
   const fixture = await buildFixtureInstall({
     init: { status: 'READY' },
     functions: {},
@@ -449,20 +451,19 @@ test('R31: rollback never invokes an undeclared technicalDispose export', async 
   });
   t.after(async () => fixture.cleanup());
   const { PackageSystem } = await import('../../src/package-system.js');
-  const narrowedLock = {
+  const lock = {
     ...fixture.lock,
     selectedPackages: fixture.lock.selectedPackages.map((pkg) =>
-      pkg.packageId === 'fixture-kernel' ? { ...pkg, technicalLifecycle: false } : pkg),
+      pkg.packageId === 'fixture-kernel' ? { ...pkg, exit: undefined } : pkg),
   };
-  const packages = new PackageSystem(fixture.installRoot, narrowedLock, []);
-  await assert.rejects(packages.runTechnicalInit(), /fixture sdk technicalInit threw/);
-  const kernelDisposes = events().filter((event) =>
-    event['event'] === 'technical-dispose' && event['package'] === 'fixture-kernel');
-  assert.equal(kernelDisposes.length, 0,
-    'rollback must not execute technicalDispose for a package whose Lock lifecycle is false');
+  const packages = new PackageSystem(fixture.installRoot, lock, []);
+  await assert.rejects(packages.runInit(packageContext(fixture)), /fixture sdk Init threw/);
+  await packages.runExit();
+  assert.equal(events().some((e) => e['event'] === 'package-exit' && e['package'] === 'fixture-kernel'), false);
+  assert.equal(events().filter((e) => e['event'] === 'package-exit' && e['package'] === '@fixture/sdk').length, 1);
 });
 
-test('technicalInit failure: already-initialized packages are torn down in strict reverse order', async (t) => {
+test('Init failure: already-initialized packages are torn down in strict reverse order', async (t) => {
   const fixture = await buildFixtureInstall({
     init: { status: 'READY' },
     functions: {},
@@ -475,37 +476,45 @@ test('technicalInit failure: already-initialized packages are torn down in stric
   assert.equal(result.status, 'FAILED', JSON.stringify(result));
   if (result.status === 'FAILED') {
     assert.equal(result.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
-    assert.match(result.reason, /fixture sdk technicalInit threw/);
+    assert.match(result.reason, /fixture sdk Init threw/);
   }
 
   const inits = events()
-    .filter((event) => event['event'] === 'technical-init')
+    .filter((event) => event['event'] === 'package-init')
     .map((event) => event['package']);
   assert.deepEqual(inits, ['fixture-kernel', '@fixture/sdk']);
   const disposes = events()
-    .filter((event) => event['event'] === 'technical-dispose')
+    .filter((event) => event['event'] === 'package-exit')
     .map((event) => event['package']);
   assert.deepEqual(disposes, ['fixture-kernel'], 'reverse best-effort cleanup of initialized packages only');
   assert.equal(
     events().some((event) => event['event'] === 'business-init'),
     false,
-    'zero ingress when technical init fails',
+    'zero ingress when Package Init fails',
   );
 });
 
-test('runTechnicalDispose refuses unselected packages instead of silently continuing', async (t) => {
+test('Core chain containing unselected Core fails without inventing an Init call', async (t) => {
   const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
-  t.after(async () => {
-    await fixture.cleanup();
-  });
+  t.after(async () => fixture.cleanup());
   const { PackageSystem } = await import('../../src/package-system.js');
-  const tamperedLock = {
-    ...fixture.lock,
-    technicalDisposeOrder: ['fixture-ghost'],
-  };
-  const packages = new PackageSystem(fixture.installRoot, tamperedLock, []);
-  await assert.rejects(
-    packages.runTechnicalDispose(),
-    /technicalDisposeOrder references unselected package 'fixture-ghost'/,
-  );
+  const packages = new PackageSystem(fixture.installRoot, { ...fixture.lock, coreOrder: ['fixture-ghost'] }, []);
+  await assert.rejects(packages.runInit(packageContext(fixture)), /invalid Core/);
+  assert.equal(events().some((e) => e['event'] === 'package-init'), false);
+});
+
+test('InitFrom preserves repeated callers, while KDP never deduplicates Init calls', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const { PackageSystem } = await import('../../src/package-system.js');
+  const packages = new PackageSystem(fixture.installRoot, fixture.lock, []);
+  await packages.runInit(packageContext(fixture));
+  await packages.runInit(packageContext(fixture));
+  assert.deepEqual(packages.initFrom('fixture-kernel'), [{ type: 'Boot' }, { type: 'Boot' }]);
+  assert.deepEqual(packages.initFrom('fixture-ext'), [
+    { type: 'Package', packageId: 'fixture-business' },
+    { type: 'Package', packageId: 'fixture-business' },
+  ]);
+  await packages.runExit();
+  assert.equal(events().filter((e) => e['event'] === 'package-exit').length, INIT_ORDER.length * 2);
 });
