@@ -41,6 +41,7 @@ import { BuildRefusal, refusal } from './refusal.js';
 import { SchemaChecker } from './schema-check.js';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
+import { verifyGeneratedPackageImports } from './static-package-guard.js';
 
 
 interface LoadedElement {
@@ -344,6 +345,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
           `element '${loaded.def.id}' depends on '${dep.element}@${dep.version}' which is not in the selected closure`,
         );
       }
+      if (resolved.owner.id !== loaded.owner.id &&
+          !(dependsOnEdges.get(loaded.owner.id) ?? []).includes(resolved.owner.id)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `element '${loaded.def.id}' references '${resolved.owner.id}' without declaring it as a direct Extension`);
+      }
       deps.push(resolved.key);
       for (const fnId of dep.functions ?? []) {
         const fn = resolved.def.functions.find((candidate) => candidate.id === fnId);
@@ -418,6 +424,10 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   };
   const requireExported = (resolved: ResolvedFunction, consumer: string | null): void => {
     if (consumer !== null && resolved.owner.id === consumer) return;
+    if (consumer !== null && !(dependsOnEdges.get(consumer) ?? []).includes(resolved.owner.id)) {
+      throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+        `package '${consumer}' imports '${resolved.owner.id}' without a direct Extension declaration`);
+    }
     if (!isExported(resolved.owner, resolved.element, resolved.fn)) {
       throw refusal(
         'DH_BUILD_EXPORT_MISSING',
@@ -443,41 +453,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     ingressResolved.push({ entry, resolved });
   }
 
-  // App Init 是唯一业务启动函数，必须归 Business 层、被导出且精确匹配 Element digest/合同版本。
-  const appInitCandidates: ResolvedFunction[] = [];
-  for (const loaded of elements.values()) {
-    const fn = loaded.def.functions.find(
-      (candidate) =>
-        candidate.id === descriptor.businessAppInit.functionId &&
-        candidate.contractVersion === descriptor.businessAppInit.contractVersion,
-    );
-    if (!fn || loaded.namespace !== descriptor.businessAppInit.element.namespace || loaded.def.id !== descriptor.businessAppInit.element.id) {
-      continue;
-    }
-    if (
-      loaded.def.version === descriptor.businessAppInit.element.version &&
-      loaded.definitionDigest === descriptor.businessAppInit.element.digest
-    ) {
-      appInitCandidates.push({ element: loaded, fn, owner: loaded.owner });
-    }
-  }
-  if (appInitCandidates.length === 0) {
-    throw refusal(
-      'DH_BUILD_APP_INIT_MISSING',
-      `businessAppInit '${descriptor.businessAppInit.element.id}.${descriptor.businessAppInit.functionId}' did not resolve to a selected Function`,
-    );
-  }
-  if (appInitCandidates.length > 1) {
-    throw refusal('DH_BUILD_APP_INIT_DUPLICATE', 'more than one App Init candidate matched the descriptor reference');
-  }
-  const appInit = appInitCandidates[0]!;
-  if (appInit.owner.layer !== 'business') {
-    throw refusal(
-      'DH_BUILD_LAYER_ROLE_MISMATCH',
-      `businessAppInit '${appInit.element.def.id}.${appInit.fn.id}' is owned by layer '${appInit.owner.layer}' package '${appInit.owner.id}', not the business layer`,
-    );
-  }
-  requireExported(appInit, null);
+  // Business Core 的 Init Element 是唯一业务启动入口，不再额外绑定 Business App Init Function。
 
   const importedFunctions = new Map<string, ResolvedFunction>();
   for (const manifest of packagesSorted) {
@@ -493,7 +469,6 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     selectedFunctions.set(`${resolved.element.key}|${resolved.fn.id}`, resolved);
   };
   for (const { resolved } of ingressResolved) addSelected(resolved);
-  addSelected(appInit);
   for (const resolved of importedFunctions.values()) addSelected(resolved);
   for (const loaded of elements.values()) {
     for (const fn of loaded.def.functions) {
@@ -635,36 +610,50 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   }
 
+  // 统一 Init/Exit Element：Init 必需，Exit 可选；Core.Order 唯一且 Order 0 只能属于 KDP。
+  const coreOrders = new Map<number, string>();
   for (const manifest of packagesSorted) {
-    if ((manifest.technicalInit === undefined) !== (manifest.technicalDispose === undefined)) {
-      throw refusal(
-        'DH_BUILD_LIFECYCLE_HALF',
-        `package '${manifest.id}' declares only one of technicalInit / technicalDispose`,
-      );
+    if (manifest.role === 'primary') {
+      if (!Number.isSafeInteger(manifest.order) || manifest.order! < 0) {
+        throw refusal('DH_BUILD_SCHEMA_INVALID', `Core '${manifest.id}' requires a non-negative integer Order`);
+      }
+      const conflicting = coreOrders.get(manifest.order!);
+      if (conflicting) {
+        throw refusal('DH_BUILD_PRIMARY_DUPLICATE',
+          `Core.Order ${manifest.order} is duplicated by '${conflicting}' and '${manifest.id}'`);
+      }
+      coreOrders.set(manifest.order!, manifest.id);
+    } else if (manifest.order !== undefined && (!Number.isSafeInteger(manifest.order) || manifest.order < 0)) {
+      throw refusal('DH_BUILD_SCHEMA_INVALID', `Extension '${manifest.id}' has invalid optional Order`);
     }
-    for (const [entry, expectedExport] of [
-      [manifest.technicalInit, 'technicalInit'],
-      [manifest.technicalDispose, 'technicalDispose'],
-    ] as const) {
+    const artifactPath = input.packageArtifacts[manifest.id];
+    for (const [entry, name] of [[manifest.init, 'init'], [manifest.exit, 'exit']] as const) {
       if (!entry) continue;
-      const artifactPath = input.packageArtifacts[manifest.id];
-      if (entry.module.packageId !== manifest.id || entry.module.path !== artifactPath || entry.exportName !== expectedExport) {
+      if (entry.module.packageId !== manifest.id || entry.module.path !== artifactPath || entry.exportName !== name) {
         throw refusal('DH_BUILD_SCHEMA_INVALID',
-          `package '${manifest.id}' lifecycle '${expectedExport}' must use its selected package artifact and named export '${expectedExport}'`);
+          `package '${manifest.id}' ${name} Element must resolve to its own selected artifact export '${name}'`);
       }
       scope.verify(entry.module);
     }
+    for (const resource of manifest.initResources ?? []) {
+      if (resource.packageId !== manifest.id &&
+          !(dependsOnEdges.get(manifest.id) ?? []).includes(resource.packageId)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Package '${manifest.id}' Init refers to undeclared Extension resource '${resource.packageId}'`);
+      }
+      scope.verify(resource);
+    }
   }
-
-  // 第 5 段：依赖先于消费方初始化；dispose 反序。遇到包依赖环必须停止，而非任意排序。
-  const initOrder = kahnTopologicalOrder(
-    packagesSorted.map((manifest) => manifest.id),
-    dependsOnEdges,
-  );
-  if (initOrder === null) {
-    throw refusal('DH_BUILD_PACKAGE_CYCLE', 'package dependsOn closure carries a cycle');
+  const kdpId = descriptor.roots.kernelPrimary.package;
+  if (coreOrders.get(0) !== kdpId) {
+    throw refusal('DH_BUILD_PRIMARY_MISSING', `Order 0 must be selected KDP '${kdpId}'`);
   }
-  const disposeOrder = [...initOrder].reverse();
+  const coreOrder = [...coreOrders].sort(([a], [b]) => a - b).map(([, id]) => id);
+  // Core 链与 Extension DAG 分开：核心间链接不需要伪装成 Extension 依赖。
+  const initGraphOrder = kahnTopologicalOrder(packagesSorted.map((p) => p.id), dependsOnEdges);
+  if (initGraphOrder === null) {
+    throw refusal('DH_BUILD_PACKAGE_CYCLE', 'Package direct dependency graph carries a cycle');
+  }
 
   // 未知且 optional 的内容仅记排除证据，不混入已选 contentDigests；required 未知内容直接拒绝。
   const excludedUnknownContent: string[] = [];
@@ -709,10 +698,19 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       layer: manifest.layer,
       role: manifest.role,
       artifact: { packageId: manifest.id, path: artifactPath, digest },
-      technicalLifecycle: manifest.technicalInit !== undefined,
+      ...(manifest.order !== undefined ? { order: manifest.order } : {}),
+      init: manifest.init,
+      ...(manifest.exit !== undefined ? { exit: manifest.exit } : {}),
+      initResources: [...(manifest.initResources ?? [])],
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
   }
+  // 对最终选定的 ESM 模块字节做静态检查；依赖无法证明时 BUILD 拒绝。
+  verifyGeneratedPackageImports(scope, packagesSorted, [
+    ...sealedPackages.map((pkg) => pkg.artifact),
+    ...sealedFunctions.map((fn) => fn.implementation.module),
+    ...hookBindings.flatMap((hook) => hook.providers.map((entry) => entry.module)),
+  ]);
   const kdpBytes = scope.read(input.kdpArtifact.packageId, input.kdpArtifact.path);
   const kdpDigest = digestOfBytes(kdpBytes);
   scope.record(input.kdpArtifact.packageId, input.kdpArtifact.path, kdpDigest);
@@ -734,9 +732,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       selectedElements: sealedElements,
       selectedFunctions: sealedFunctions,
       hookBindings: [...hookBindings].sort(compareHookBinding),
-      technicalInitOrder: initOrder,
-      technicalDisposeOrder: disposeOrder,
-      businessAppInit: toFunctionRef(appInit),
+      coreOrder,
       ingress: ingressResolved
         .map(({ entry, resolved }): SealedIngress => ({
           id: entry.id,
