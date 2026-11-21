@@ -594,6 +594,90 @@ async function runPositive(label, rule, expectedAtHundred) {
   }
 }
 
+/** T14: full external tarball install → BUILD → Boot/KDP → Package.Init → real XState Workflow. */
+async function runWorkflowE2E() {
+  const prepared = await authoring('workflow-real-install', { minOrderTotal: 50, regions: ['EU', 'US'] },
+    { workflow: true });
+  try {
+    const first = await buildApp(prepared.input);
+    const second = await buildApp(prepared.input);
+    assert.equal(first.ok, true, JSON.stringify(first));
+    assert.equal(second.ok, true, JSON.stringify(second));
+    if (!first.ok || !second.ok) throw new Error('T14 selected Workflow must pass real BUILD');
+    assert.deepEqual(first.lockBytes, second.lockBytes, 'two actual Workflow BUILDs must yield exact Lock bytes');
+    assert.deepEqual(first.appPackage, second.appPackage, 'two actual Workflow BUILDs must yield exact package bytes');
+    assert.equal(first.lock.selectedWorkflows?.length, 2, 'parent and child selected in one Lock');
+    assert.equal(first.lock.selectedElements.filter((item) => item.ref.id.startsWith('basic.data_')).length, 4,
+      'two JSON and two YAML Data Elements must be selected, not only files');
+    for (const fnName of ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow']) {
+      assert.equal(first.lock.selectedFunctions.filter((item) => item.ref.functionId === fnName).length, 1,
+        `one selected FunctionRef for ${fnName}, reusable across distinct data Elements`);
+    }
+    const installed = await materialize('workflow-real-install', first);
+    for (const pkg of ['xstate', 'yaml']) {
+      const resolved = require.resolve(`${pkg}/package.json`, { paths: [installed.installRoot] });
+      assert.ok(resolved.startsWith(join(installed.installRoot, 'node_modules')),
+        `${pkg} must be installed in the exact composed consumer root`);
+    }
+    globalThis.__domainHarnessT05Events = [];
+    const booted = await boot(installed.pin, installed.context);
+    assert.equal(booted.status, 'BOOTED', JSON.stringify(booted));
+    if (booted.status !== 'BOOTED') throw new Error('T14 Workflow App failed real Boot');
+    assert.equal(booted.app.status, 'READY');
+    const timeline = globalThis.__domainHarnessT05Events;
+    const actualReaders = timeline.filter((item) => item.event === 'workflow-read');
+    assert.deepEqual(actualReaders.map((item) => [item.format, item.parsed.id, item.parsed.result]), [
+      ['json', 'json-a', 1],
+      ['yaml', 'yaml-a', 3],
+      ['json', 'json-b', 2],
+      ['yaml', 'yaml-b', 4],
+    ], 'two JSON and two YAML values must actually drive the same Reader Functions through real XState actors');
+    const hooks = timeline.filter((item) => item.event === 'workflow-hook');
+    assert.deepEqual(hooks.map((item) => item.kind), ['start', 'end']);
+    const startIndex = timeline.findIndex((item) => item.event === 'workflow-hook' && item.kind === 'start');
+    const endIndex = timeline.findIndex((item) => item.event === 'workflow-hook' && item.kind === 'end');
+    assert.ok(startIndex >= 0 && startIndex < endIndex && endIndex < timeline.findIndex(
+      (item) => item.event === 'workflow-read' && item.parsed.id === 'yaml-a'),
+    'end must be awaited before the next Workflow Node');
+    const outcome = timeline.filter((item) => item.event === 'workflow-outcome');
+    assert.equal(outcome.length, 1, 'Package.Init must start exactly one root Workflow');
+    assert.deepEqual(outcome[0].outcome, {
+      status: 'COMPLETE', value: { id: 'yaml-b', result: 4 },
+    });
+    assert.equal(timeline.filter((item) =>
+      item.event === 'package-init' && item.package === 'app-business').length, 1,
+    'Workflow children must never reenter Package.Init');
+    assert.equal(typeof booted.app.invoke, 'undefined', 'Workflow does not reintroduce public ingress');
+    await evidence('t14.workflow.clean-packed-actor', {
+      status: 'PASS', selectedWorkflows: 2, dataElements: 4, readerCalls: 4,
+      hooks: 2, outcome: outcome[0].outcome, lockDigest: installed.lock.closureDigest,
+    });
+    await booted.app.dispose();
+    assert.ok(timeline.findIndex((item) => item.event === 'package-exit') > timeline.findIndex(
+      (item) => item.event === 'workflow-outcome'),
+    'business Workflow end must not trigger Package.Exit');
+
+    // Tamper only an installed selected data resource. BUILD and signed Lock remain unchanged.
+    const tampered = await cloneInstall(installed);
+    const dataPath = join(tampered.installRoot, 'node_modules', 'rules-package',
+      'content', 'workflow-json-a.json');
+    await writeFile(dataPath, '{"id":"tampered","result":999}\n');
+    globalThis.__domainHarnessT05Events = [];
+    const refused = await boot(tampered.pin, tampered.context);
+    assert.notEqual(refused.status, 'BOOTED', 'tampered BUILD-selected Reader data must never reach READY');
+    assert.equal(globalThis.__domainHarnessT05Events.some((item) =>
+      item.event === 'workflow-read' && item.parsed.id === 'tampered'), false);
+    await evidence('t14.workflow.negative-resource-digest', {
+      status: 'PASS', resultStatus: refused.status,
+      code: refused.code, executedTamperedReader: false,
+    });
+    return { dataElements: 4, distinctFiles: 4, readerFunctions: 2, childActors: 1,
+      hookCalls: 2, cleanPacked: true, outcome: 'COMPLETE', tamperRejected: true };
+  } finally {
+    await rm(prepared.root, { recursive: true, force: true });
+  }
+}
+
 async function cloneInstall(source) {
   const installRoot = await mkdtemp(join(consumerRoot, 'negative-install-'));
   installRoots.add(installRoot);
@@ -625,6 +709,8 @@ async function main() {
   assert.notDeepEqual(a.install.lockBytes, b.install.lockBytes);
   assert.notEqual(a.install.lock.closureDigest, b.install.lock.closureDigest);
   await evidence('content-exchange.lock-and-output', { status: 'PASS', a: a.install.lock.closureDigest, b: b.install.lock.closureDigest, observed: 'Init-selected Function returned A POS vs B NEG for total=100; B EU UNKNOWN' });
+  const workflowAcceptance = await runWorkflowE2E();
+  await evidence('t14.workflow.acceptance-matrix', { status: 'PASS', ...workflowAcceptance });
 
   await expectBuildRefusal('unsupported-effect', { unsupportedEffect: true }, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
   await expectBuildRefusal('unsupported-target', { unsupportedTarget: true }, 'DH_BUILD_TARGET_INVALID');
@@ -833,6 +919,16 @@ async function main() {
     AC08: { status: 'PASS_E2E', e2e: ['actual four-tarball SDK install + BUILD-composed App npm install + independent boot/dispose + per-entry realpath and byte equality', 'legacy import fences', 'contracts'], upstream: [] },
     AC09: { status: 'PASS_E2E', e2e: ['unsupported effect and target typed BUILD refusals', 'no unimplemented success path'], upstream: [] },
     AC10: { status: 'PASS_E2E', e2e: ['bilingual current-only author docs', 'executable canonical-source business-word scan (driver)'], upstream: [] },
+    AC11: { status: 'PASS_E2E', evidence: 'T14 real Workflow Definition and selected graph' },
+    AC12: { status: 'PASS_E2E', evidence: 'T14 Boot→Package.Init→XState root/child WorkflowRun' },
+    AC13: { status: 'PASS_E2E', evidence: 'Four Data Elements and exact reusable selected JSON/YAML Reader Functions' },
+    AC14: { status: 'PASS_E2E', evidence: 'Strict named Switch and COMPLETE outcome at final YAML Reader' },
+    AC15: { status: 'PASS_E2E', evidence: 'Async start/end Hooks await exactly once and never call Package.Exit' },
+    AC16: { status: 'PASS_E2E', evidence: 'Package.Init once, no public ingress, independent boot before READY' },
+    AC17: { status: 'UPSTREAM_SCOPED', evidence: 'T13 focused unit negative root call budget/depth and UNKNOWN/FAILED guard' },
+    AC18: { status: 'PASS_E2E', evidence: 'Tampered selected data bytes rejected by Boot/KDP before Reader' },
+    AC19: { status: 'PASS_E2E', evidence: 'Two BUILDs produce byte-equal Lock and complete App Package' },
+    AC20: { status: 'PARTIAL', evidence: 'Full remaining T14 negative matrix and independent audit pending' },
   };
   const result = { status: 'PASS', ac, events: events.length, sdkEntry };
   await writeFile(join(evidenceDir, 'consumer-result.json'), `${JSON.stringify(result, null, 2)}\n`);
