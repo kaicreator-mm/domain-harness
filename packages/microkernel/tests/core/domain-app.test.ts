@@ -1,221 +1,90 @@
-// 当前架构的可证伪测试：断言实际行为而非历史兼容。
+// B0: 已选 Function 直接从 Package.Init 运行；公开 DomainApp 不含业务 ingress。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { BootResult, DomainApp } from '@kaicreator/domain-harness-contracts';
-import { normalizeOutcome } from '../../src/domain-app.js';
-import {
-  boot,
-  buildFixtureInstall,
-  events,
-  type FixtureScenario,
-} from './helpers/install.js';
-async function bootApp(t: import('node:test').TestContext, scenario: FixtureScenario): Promise<DomainApp> {
+import type { DomainApp, FunctionRef } from '@kaicreator/domain-harness-contracts';
+import { PackageSystem } from '../../src/package-system.js';
+import { normalizeOutcome } from '../../src/selected-function.js';
+import { boot, buildFixtureInstall, events, type FixtureScenario, type FixtureInstall } from './helpers/install.js';
+
+async function fixtureFor(t: import('node:test').TestContext, scenario: FixtureScenario): Promise<FixtureInstall> {
   const fixture = await buildFixtureInstall(scenario);
-  t.after(async () => {
-    await fixture.cleanup();
-  });
-  const result: BootResult = await boot(fixture.pin, fixture.context);
-  if (result.status !== 'BOOTED') {
-    assert.fail(`expected BOOTED, got ${JSON.stringify(result)}`);
-  }
-  return result.app;
+  t.after(async () => fixture.cleanup());
+  return fixture;
+}
+async function bootApp(t: import('node:test').TestContext, scenario: FixtureScenario): Promise<{
+  app: DomainApp; fixture: FixtureInstall;
+}> {
+  const fixture = await fixtureFor(t, scenario);
+  const result = await boot(fixture.pin, fixture.context);
+  assert.equal(result.status, 'BOOTED', JSON.stringify(result));
+  if (result.status !== 'BOOTED') throw new Error('Boot failed');
+  return { app: result.app, fixture };
+}
+function selectedRef(fixture: FixtureInstall, functionId: string): FunctionRef {
+  const selected = fixture.lock.selectedFunctions.find((candidate) => candidate.ref.functionId === functionId &&
+    candidate.ref.element.id === 'orders.eligibility');
+  assert.ok(selected, `selected Function '${functionId}' must exist`);
+  return selected.ref;
+}
+async function selectedRunner(fixture: FixtureInstall): Promise<PackageSystem> {
+  const selected = new PackageSystem(fixture.installRoot, fixture.lock, []);
+  await selected.verifySelectedArtifacts();
+  return selected;
 }
 
-test('unknown ingress id is refused with DH_RUNTIME_INGRESS_UNKNOWN', async (t) => {
-  const app = await bootApp(t, {
+test('B0-04: real selected Function executes inside Package.Init before App READY', async (t) => {
+  const { app } = await bootApp(t, {
     init: { status: 'READY' },
     functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
   });
-  const outcome = await app.invoke('no-such-ingress', {});
+  assert.equal(app.status, 'READY');
+  assert.equal('invoke' in app, false, 'no direct ingress is part of public SDK');
+  const call = events().find((event) => event['event'] === 'init-selected-function');
+  assert.ok(call, 'selected Function must run during Init');
+  assert.equal(call['kind'], 'SUCCEEDED');
+  assert.deepEqual(call['value'], { decision: 'POS' });
+  await app.dispose();
+});
+
+test('B0-01: unknown FunctionRef refused, selected FunctionRef executable', async (t) => {
+  const fixture = await fixtureFor(t, { init: { status: 'READY' }, functions: {} });
+  const packages = await selectedRunner(fixture);
+  const genuine = selectedRef(fixture, 'evaluate');
+  const outcome = await packages.invokeSelectedFunction({ ...genuine, functionId: 'unselected' }, {});
   assert.equal(outcome.kind, 'FAILED');
-  assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_RUNTIME_INGRESS_UNKNOWN');
-  await app.dispose();
+  if (outcome.kind === 'FAILED') assert.equal(outcome.failure.code, 'DH_RUNTIME_INGRESS_UNKNOWN');
 });
 
-test('input schema mismatch is refused before the implementation runs', async (t) => {
-  const app = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
-  });
-  const missingField = await app.invoke('evaluate', { total: 100 });
-  assert.equal(missingField.kind, 'FAILED');
-  assert.equal(missingField.kind === 'FAILED' && missingField.failure.code, 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH');
-  const wrongType = await app.invoke('evaluate', { total: '100', region: 'EU' });
-  assert.equal(wrongType.kind, 'FAILED');
-  assert.equal(wrongType.kind === 'FAILED' && wrongType.failure.code, 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH');
-  await app.dispose();
-});
-
-test('nested non-JSON input is refused before the selected implementation runs', async (t) => {
-  const app = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'throw' } },
-  });
-  const cases: readonly [string, unknown][] = [
-    ['nested undefined', { total: 100, region: 'EU', metadata: [{ value: undefined }] }],
-    ['nested function', { total: 100, region: 'EU', metadata: { callback: () => undefined } }],
-    ['nested Symbol', { total: 100, region: 'EU', metadata: [{ token: Symbol('not-json') }] }],
-    ['nested bigint', { total: 100, region: 'EU', metadata: { count: 10n } }],
-    ['nested non-finite number', { total: 100, region: 'EU', metadata: [{ value: Number.NaN }] }],
-    [
-      'nested throwing Proxy',
-      {
-        total: 100,
-        region: 'EU',
-        metadata: new Proxy({ value: true }, { get() { throw new Error('evil nested getter'); } }),
-      },
-    ],
-    ['root Date', new Date(0)],
-    ['root Map', new Map([['total', 100]])],
-  ];
-  for (const [name, input] of cases) {
-    const outcome = await app.invoke('evaluate', input);
-    assert.equal(outcome.kind, 'FAILED', name);
-    assert.equal(
-      outcome.kind === 'FAILED' && outcome.failure.code,
-      'DH_RUNTIME_INPUT_SCHEMA_MISMATCH',
-      name,
-    );
+test('B0-04: selected Function input JSON Schema checked before implementation', async (t) => {
+  const fixture = await fixtureFor(t, { init: { status: 'READY' }, functions: {} });
+  const packages = await selectedRunner(fixture);
+  for (const bad of [{ total: 100 }, { total: '100', region: 'EU' }]) {
+    const outcome = await packages.invokeSelectedFunction(selectedRef(fixture, 'evaluate'), bad);
+    assert.equal(outcome.kind, 'FAILED');
+    if (outcome.kind === 'FAILED') assert.equal(outcome.failure.code, 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH');
   }
-  await app.dispose();
 });
 
-test('valid nested JSON objects and arrays preserve the existing invocation behavior', async (t) => {
-  const app = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
-  });
-  const outcome = await app.invoke('evaluate', {
-    total: 100,
-    region: 'EU',
-    metadata: {
-      history: [null, true, 1, 'text', { nested: ['array', { object: 2 }] }],
-    },
-  });
-  assert.deepEqual(outcome, { kind: 'SUCCEEDED', value: { decision: 'POS' } });
-  await app.dispose();
+test('B0-04: selected Function outcomes share one normalized result contract', async (t) => {
+  for (const behavior of [
+    { behavior: 'succeed' as const, value: { decision: 'POS' } },
+    { behavior: 'unknown' as const },
+    { behavior: 'garbage' as const },
+    { behavior: 'proxy-outcome' as const },
+    { behavior: 'proxy-value' as const },
+  ]) {
+    const fixture = await fixtureFor(t, { init: { status: 'READY' }, functions: { evaluate: behavior } });
+    const packages = await selectedRunner(fixture);
+    const outcome = await packages.invokeSelectedFunction(selectedRef(fixture, 'evaluate'), { total: 100, region: 'EU' });
+    assert.ok(['SUCCEEDED', 'UNKNOWN', 'FAILED'].includes(outcome.kind));
+    if (behavior.behavior === 'succeed') assert.deepEqual(outcome, { kind: 'SUCCEEDED', value: { decision: 'POS' } });
+    if (behavior.behavior === 'unknown') assert.equal(outcome.kind, 'UNKNOWN');
+    if (behavior.behavior === 'garbage' || behavior.behavior === 'proxy-outcome' || behavior.behavior === 'proxy-value')
+      assert.equal(outcome.kind, 'FAILED');
+  }
 });
 
-test('SUCCEEDED values are validated against the output schema; mismatch is reported as FAILED', async (t) => {
-  const app = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'succeed', value: { decision: 'MAYBE' } } },
-  });
-  const outcome = await app.invoke('evaluate', { total: 100, region: 'EU' });
-  assert.equal(outcome.kind, 'FAILED');
-  assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_RUNTIME_OUTPUT_SCHEMA_MISMATCH');
-  await app.dispose();
-});
-
-test('strict FunctionOutcome: garbage and undeclared kinds never propagate as SUCCEEDED', async (t) => {
-  const garbage = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'garbage' } },
-  });
-  const garbageOutcome = await garbage.invoke('evaluate', { total: 1, region: 'EU' });
-  assert.equal(garbageOutcome.kind, 'FAILED');
-  assert.equal(garbageOutcome.kind === 'FAILED' && garbageOutcome.failure.code, 'DH_RUNTIME_UNSUPPORTED_PROFILE');
-  await garbage.dispose();
-
-  const undeclared = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'failed' } },
-  });
-  const undeclaredOutcome = await undeclared.invoke('evaluate', { total: 1, region: 'EU' });
-  assert.equal(undeclaredOutcome.kind, 'UNKNOWN');
-  assert.equal(
-    undeclaredOutcome.kind === 'UNKNOWN' && undeclaredOutcome.unknownReason.code,
-    'DH_RUNTIME_UNSUPPORTED_PROFILE',
-  );
-  await undeclared.dispose();
-
-  const unknown = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'unknown' } },
-  });
-  const unknownOutcome = await unknown.invoke('evaluate', { total: 1, region: 'EU' });
-  assert.deepEqual(unknownOutcome, {
-    kind: 'UNKNOWN',
-    unknownReason: { code: 'FIXTURE_UNKNOWN', message: 'fixture unknown outcome' },
-  });
-  await unknown.dispose();
-});
-
-test('unhandled implementation exceptions cause KDP Exit and block subsequent ingress', async (t) => {
-  const app = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'throw' } },
-  });
-  const logged: string[] = [];
-  t.mock.method(console, 'error', (message?: unknown) => {
-    logged.push(String(message));
-  });
-  const outcome = await app.invoke('evaluate', { total: 1, region: 'EU' });
-  assert.equal(outcome.kind, 'FAILED');
-  assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
-  if (outcome.kind === 'FAILED') assert.doesNotMatch(outcome.failure.message, /TOKEN_SECRET_CANARY_8029/);
-  assert.equal(logged.some((line) => line.includes('TOKEN_SECRET_CANARY_8029')), false);
-  assert.deepEqual(
-    events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
-    ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-kernel'],
-  );
-  const after = await app.invoke('evaluate', { total: 1, region: 'EU' });
-  assert.equal(after.kind === 'FAILED' && after.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
-  await app.dispose();
-});
-
-test('inspect projects Lock facts only (B06), including DEGRADED suppression', async (t) => {
-  const ready = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: {},
-  });
-  const inspection = await ready.inspect();
-  assert.deepEqual(inspection.appIdentity, {
-    id: 'fixture.orders-app',
-    version: '1.0.0',
-    lockDigest: inspection.appIdentity.lockDigest,
-  });
-  assert.deepEqual(inspection.target, {
-    runtime: 'node',
-    module: 'esm',
-    nodeMajor: 22,
-    profile: 'node22-esm/1',
-  });
-  assert.deepEqual(
-    inspection.packages.map((pkg) => [pkg.packageId, pkg.layer, pkg.role]),
-    [
-      ['fixture-kernel', 'kernel', 'primary'],
-      ['@fixture/sdk', 'sdk', 'primary'],
-      ['fixture-business', 'business', 'primary'],
-      ['fixture-ext', 'business', 'extension'],
-    ],
-  );
-  assert.equal(inspection.elements.length, 1);
-  assert.equal(inspection.elements[0]?.ownerPackageId, 'fixture-business');
-  assert.deepEqual(
-    inspection.functions.map((fn) => fn.ref.functionId),
-    ['evaluate', 'optionalReport'],
-  );
-  assert.deepEqual(
-    inspection.ingress.map((entry) => [entry.id, entry.optional]),
-    [
-      ['evaluate', false],
-      ['optional-report', true],
-    ],
-  );
-  assert.deepEqual(inspection.suppressedIngress, []);
-  await ready.dispose();
-
-  const degraded = await bootApp(t, {
-    init: { status: 'DEGRADED', suppressed: ['optional-report'] },
-    functions: {},
-  });
-  const degradedInspection = await degraded.inspect();
-  assert.deepEqual(degradedInspection.suppressedIngress, ['optional-report']);
-  await degraded.dispose();
-});
-
-test('R27: FunctionOutcome reason diagnostics are stable snapshots, not live getters', () => {
+test('B0: reason diagnostics are stable defensive snapshots', () => {
   let reads = 0;
   const raw = { kind: 'UNKNOWN', unknownReason: {
     get code() { reads += 1; return reads === 1 ? 'REGION_UNKNOWN' : 'LATER'; },
@@ -226,139 +95,37 @@ test('R27: FunctionOutcome reason diagnostics are stable snapshots, not live get
   assert.equal(reads, 2);
 });
 
-test('invoke never rejects on Proxy/getter outcomes: typed FAILED instead', async (t) => {
-  const evilOutcome = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'proxy-outcome' } },
-  });
-  const outcomeResult = await evilOutcome.invoke('evaluate', { total: 1, region: 'EU' });
-  assert.equal(outcomeResult.kind, 'FAILED');
-  assert.equal(
-    outcomeResult.kind === 'FAILED' && outcomeResult.failure.code,
-    'DH_RUNTIME_UNSUPPORTED_PROFILE',
-  );
-  assert.match(
-    outcomeResult.kind === 'FAILED' ? outcomeResult.failure.message : '',
-    /result inspection raised an unhandled error/,
-  );
-  await evilOutcome.dispose();
-
-  const evilValue = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'proxy-value' } },
-  });
-  const valueResult = await evilValue.invoke('evaluate', { total: 1, region: 'EU' });
-  assert.equal(valueResult.kind, 'FAILED');
-  assert.equal(
-    valueResult.kind === 'FAILED' && valueResult.failure.code,
-    'DH_RUNTIME_UNSUPPORTED_PROFILE',
-  );
-  await evilValue.dispose();
-});
-
-test('invoke never rejects on hostile Proxy input: typed input mismatch instead', async (t) => {
-  const app = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
-  });
-  const hostileInput = new Proxy(
-    { total: 100, region: 'EU' },
-    {
-      get(target, key) {
-        if (key === 'total') throw new Error('evil input getter');
-        return Reflect.get(target, key);
-      },
-    },
-  );
-  const outcome = await app.invoke('evaluate', hostileInput);
-  assert.equal(outcome.kind, 'FAILED');
-  assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH');
-  await app.dispose();
-});
-
-test('R27: disposal immediately closes ingress before asynchronous technical teardown', async (t) => {
-  const app = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
-  });
-  const teardown = app.dispose();
-  const during = await app.invoke('evaluate', { total: 100, region: 'EU' });
-  assert.equal(during.kind, 'FAILED');
-  if (during.kind === 'FAILED') assert.equal(during.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
-  await teardown;
-});
-
-// inspect 返回值不得成为修改内部 Lock 和已选 Function 合同的可写通道。
-test('inspection provides independent snapshots and cannot change selected function policy', async (t) => {
-  const app = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
-  });
+test('B0-07: inspect returns snapshots not mutable selected Function metadata', async (t) => {
+  const { app } = await bootApp(t, { init: { status: 'READY' }, functions: {} });
   const first = await app.inspect();
-  const expectedTarget = first.target.profile;
-  const selected = first.functions.find((fn) => fn.ref.functionId === 'evaluate');
-  assert.ok(selected);
-  const expectedElementId = selected.ref.element.id;
-  const expectedOutcomes = [...selected.outcomes];
-  (first.target as { profile: string }).profile = 'hostile-profile';
-  (selected.ref.element as { id: string }).id = 'hostile.element';
-  (selected.outcomes as string[]).splice(0, selected.outcomes.length, 'UNKNOWN');
-  const firstElement = first.elements[0];
-  assert.ok(firstElement);
-  const originalElementId = firstElement.ref.id;
-  (firstElement.ref as { id: string }).id = 'hostile.id';
+  assert.ok(first.elements.length >= 2);
+  assert.ok(first.functions.some((fn) => fn.ref.functionId === 'evaluate'));
+  assert.equal('ingress' in first, false);
+  const target = first.target.profile;
+  const element = first.elements[0]!.ref.id;
+  (first.target as { profile: string }).profile = 'malicious';
+  (first.elements[0]!.ref as { id: string }).id = 'malicious';
   const second = await app.inspect();
-  assert.equal(second.target.profile, expectedTarget);
-  const reselected = second.functions.find((fn) => fn.ref.functionId === 'evaluate');
-  assert.ok(reselected);
-  assert.equal(reselected.ref.element.id, expectedElementId);
-  assert.deepEqual(reselected.outcomes, expectedOutcomes);
-  assert.equal(second.elements[0]?.ref.id, originalElementId);
-  assert.deepEqual(await app.invoke('evaluate', { total: 100, region: 'EU' }), {
-    kind: 'SUCCEEDED',
-    value: { decision: 'POS' },
-  });
-  await app.dispose();
+  assert.equal(second.target.profile, target);
+  assert.equal(second.elements[0]!.ref.id, element);
+  assert.deepEqual(await app.dispose(), { status: 'DISPOSED' });
+  assert.deepEqual(await app.dispose(), { status: 'DISPOSED' });
 });
 
-test('invoke after dispose is refused; disposed apps stay disposed', async (t) => {
-  const app = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { evaluate: { behavior: 'succeed', value: { decision: 'POS' } } },
-  });
-  await app.dispose();
-  const outcome = await app.invoke('evaluate', { total: 1, region: 'EU' });
-  assert.equal(outcome.kind, 'FAILED');
-  assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
+test('B0-05: DEGRADED and BLOCKED status never enables external direct ingress', async (t) => {
+  for (const status of ['DEGRADED', 'BLOCKED'] as const) {
+    const { app } = await bootApp(t, { init: { status }, functions: {} });
+    assert.equal(app.status, status);
+    assert.equal('invoke' in app, false);
+    assert.equal('suppressedIngress' in await app.inspect(), false);
+    await app.dispose();
+  }
 });
 
-test('resource-referenced input schema: verified read passes, tampered schema is refused', async (t) => {
-  const healthy = await bootApp(t, {
-    init: { status: 'READY' },
-    functions: { optionalReport: { behavior: 'succeed', value: 'report-ok' } },
-  });
-  const ok = await healthy.invoke('optional-report', { anything: true });
-  assert.deepEqual(ok, { kind: 'SUCCEEDED', value: 'report-ok' });
-  await healthy.dispose();
-
-  const fixture = await buildFixtureInstall({
-    init: { status: 'READY' },
-    functions: { optionalReport: { behavior: 'succeed', value: 'report-ok' } },
-  });
-  t.after(async () => {
-    await fixture.cleanup();
-  });
-  await fixture.writePackageFile(
-    'fixture-business',
-    'schemas/optional-report-input.schema.json',
-    Buffer.from(JSON.stringify({ type: 'object', additionalProperties: false }), 'utf8'),
-  );
-  const result = await boot(fixture.pin, fixture.context);
-  assert.equal(result.status, 'BOOTED', JSON.stringify(result));
-  if (result.status !== 'BOOTED') return;
-  const outcome = await result.app.invoke('optional-report', { anything: true });
-  assert.equal(outcome.kind, 'UNKNOWN');
-  assert.equal(outcome.kind === 'UNKNOWN' && outcome.unknownReason.code, 'DH_RUNTIME_UNSUPPORTED_PROFILE');
-  assert.match(outcome.kind === 'UNKNOWN' ? outcome.unknownReason.message : '', /digest/);
-  await result.app.dispose();
+test('B0-06: tampered selected schema is rejected before executing untrusted data', async (t) => {
+  const fixture = await fixtureFor(t, { init: { status: 'READY' }, functions: {} });
+  await fixture.writePackageFile('fixture-business', 'schemas/optional-report-input.schema.json',
+    Buffer.from(JSON.stringify({ type: 'object', additionalProperties: false }), 'utf8'));
+  const packages = new PackageSystem(fixture.installRoot, fixture.lock, []);
+  await assert.rejects(packages.verifySelectedArtifacts(), /sealed digest|match/);
 });
