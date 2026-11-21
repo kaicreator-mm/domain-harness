@@ -241,14 +241,19 @@ async function authoring(label, rule, options = {}) {
     rules.content[0].ref = { ...ruleRef, path: 'content/no-such-rule.json' };
   }
 
-  const definitions = { 'basic.knowledge': knowledge, 'basic.rules': rules, 'basic.app': app };
+  const workflow = options.workflow === true
+    ? await prepareWorkflowElements(dirs, rules, app, fn) : null;
+  const definitions = {
+    'basic.knowledge': knowledge, 'basic.rules': rules, 'basic.app': app,
+    ...(workflow ? { [workflow.child.id]: workflow.child } : {}),
+  };
   const definitionRefs = {};
   for (const [id, definition] of Object.entries(definitions)) {
     const path = `elements/${id}.json`;
-    await write(dirs[id === 'basic.app' ? 'app-business' : 'rules-package'], path, canonicalJson(definition));
+    await write(dirs[(id === 'basic.app' || id === 'basic.workflow_child') ? 'app-business' : 'rules-package'], path, canonicalJson(definition));
     definitionRefs[id] = {
-      packageId: id === 'basic.app' ? 'app-business' : 'rules-package', path,
-      digest: await fileDigest(join(dirs[id === 'basic.app' ? 'app-business' : 'rules-package'], path)),
+      packageId: (id === 'basic.app' || id === 'basic.workflow_child') ? 'app-business' : 'rules-package', path,
+      digest: await fileDigest(join(dirs[(id === 'basic.app' || id === 'basic.workflow_child') ? 'app-business' : 'rules-package'], path)),
     };
   }
   const elementRef = (id) => ({
@@ -266,7 +271,8 @@ async function authoring(label, rule, options = {}) {
   for (const id of Object.keys(dirs)) artifactRefs[id] = await artifactRef(id, 'dist/index.mjs');
   await write(dirs['app-business'], 'dist/app.mjs',
     businessModule(options.unsupportedEffect === true, options.initThrows === true,
-      options.initDegraded === true, canonicalJson(refs.evaluate)));
+      options.initDegraded === true, canonicalJson(refs.evaluate),
+      workflow ? canonicalJson(workflow.rootRef) : ''));
   const rulesEntryRef = await artifactRef('rules-package', 'dist/rules.mjs');
   const businessEntryRef = await artifactRef('app-business', 'dist/app.mjs');
   const lifecycleDefs = {};
@@ -354,6 +360,8 @@ async function authoring(label, rule, options = {}) {
         implementation('basic.rules', 'evaluate', rulesEntryRef, 'evaluate', [ruleRef]),
         implementation('basic.rules', 'optionalReport', rulesEntryRef, 'optionalReport'),
         implementation('basic.rules', 'initializeRule', rulesEntryRef, 'initializeRule'),
+        ...(workflow ? ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow']
+          .map((functionId) => implementation('basic.rules', functionId, rulesEntryRef, functionId)) : []),
       ]),
       init: lifecycleRefs['rules-package'],
       exit: lifecycleRefs['rules-package'],
@@ -364,8 +372,13 @@ async function authoring(label, rule, options = {}) {
         { id: lifecycleDefs['app-business'].id, version: '1.0.0',
           definitionRef: await artifactRef('app-business', 'elements/lifecycle.json'), visibility: 'private' },
         { id: 'basic.app', version: '1.0.0', definitionRef: definitionRefs['basic.app'], visibility: 'public' },
+        ...(workflow ? [{ id: workflow.child.id, version: workflow.child.version,
+          definitionRef: definitionRefs[workflow.child.id], visibility: 'private' }] : []),
       ],
-      imports: [refs.evaluate, refs.optionalReport, refs.initializeRule], exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
+      imports: [refs.evaluate, refs.optionalReport, refs.initializeRule,
+        ...(workflow ? workflow.readerRefs : [])],
+      ...(workflow ? { workflowRoots: [workflow.rootRef] } : {}),
+      exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
       targetVariants: variant([
         ...lifeImplementations('app-business'),
         implementation('basic.app', 'submit', businessEntryRef, 'submit', [ruleRef]),
@@ -398,9 +411,16 @@ async function authoring(label, rule, options = {}) {
     packageRoots: dirs,
     packageArtifacts: Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
     kdpArtifact: { packageId: 'kernel-primary', path: 'dist/index.js' },
-    runtimeDependencies: { '@kaicreator/domain-harness-microkernel': '0.11.0' },
+    runtimeDependencies: {
+      '@kaicreator/domain-harness-microkernel': '0.11.0',
+      ...(workflow ? { xstate: '5.33.2', yaml: '2.9.1' } : {}),
+    },
   };
-  return { root, dirs, input, descriptor, definitions, domainElements: [knowledge, rules, app], ruleRef, refs };
+  return {
+    root, dirs, input, descriptor, definitions,
+    domainElements: [knowledge, rules, app, ...(workflow ? [workflow.child] : [])],
+    ruleRef, refs, workflow,
+  };
 }
 
 async function installComposedDependencies(label, installRoot) {
