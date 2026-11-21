@@ -74,6 +74,38 @@ function staticallyExportedNames(source: ts.SourceFile): Set<string> {
   return names;
 }
 
+/** Target 的静态可调用证据：仅接受具名 function 或显式函数表达式/箭头函数。
+ * 模块导出名存在不能证明可执行（例如 export const init = 42；class 也不能直接调用）。
+ * 仅本模块可证明的本地命名 re-export 被接受，未知的动态/跨模块函数值 fail-closed。
+ */
+function staticallyCallableExportNames(source: ts.SourceFile): Set<string> {
+  const localCallable = new Set<string>();
+  const publicCallable = new Set<string>();
+  for (const statement of source.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name) {
+      localCallable.add(statement.name.text);
+      if (hasExportModifier(statement)) publicCallable.add(statement.name.text);
+    }
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue;
+        if (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer)) continue;
+        localCallable.add(declaration.name.text);
+        if (hasExportModifier(statement)) publicCallable.add(declaration.name.text);
+      }
+    }
+  }
+  for (const statement of source.statements) {
+    if (!ts.isExportDeclaration(statement) || statement.moduleSpecifier ||
+        !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
+    for (const named of statement.exportClause.elements) {
+      const localName = named.propertyName?.text ?? named.name.text;
+      if (localCallable.has(localName)) publicCallable.add(named.name.text);
+    }
+  }
+  return publicCallable;
+}
+
 function publicFunctionExportNames(pkg: DomainPackageManifest, module: ResourceRef): Set<string> {
   const names = new Set<string>();
   for (const variant of pkg.targetVariants) {
@@ -291,12 +323,9 @@ export function verifyImplementationExport(
   target: { readonly module: ResourceRef; readonly exportName: string },
   identity: string,
 ): void {
-  const source = ts.createSourceFile(target.module.path,
-    new TextDecoder('utf-8', { fatal: true }).decode(scope.verify(target.module)),
-    ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
-  const found = staticallyExportedNames(source);
-  if (!found.has(target.exportName)) {
+  const source = parseModule(target.module, scope.verify(target.module));
+  if (!staticallyCallableExportNames(source).has(target.exportName)) {
     throw refusal('DH_BUILD_IMPLEMENTATION_MISSING',
-      `selected Function '${identity}' Target '${target.module.packageId}/${target.module.path}' lacks export '${target.exportName}'`);
+      `selected Function '${identity}' Target '${target.module.packageId}/${target.module.path}' has no statically callable export '${target.exportName}'`);
   }
 }

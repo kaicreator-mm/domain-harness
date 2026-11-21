@@ -333,6 +333,39 @@ test('B0: BUILD refuses a module import from undeclared Extension even when its 
     'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
+test('B0-02: BUILD refuses a named Init export that is not callable', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/not-callable.mjs',
+    new TextEncoder().encode('export const init = 42;\n'));
+  const altered = withInitTarget(sdk, module);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_IMPLEMENTATION_MISSING');
+});
+
+test('B0-02: no Element owner means no legal Init despite a valid ESM export', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const altered = { ...sdk, elements: [] };
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_REF_UNRESOLVED');
+});
+
+test('B0-02: lifecycle Element owner must be the declaring Package, not another selected Core', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const business = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-business') as DomainPackageManifest;
+  const altered = { ...sdk, init: business.init };
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_REF_UNRESOLVED');
+});
+
 test('B0-02: BUILD refuses declared Init Function whose Target module lacks named export', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
