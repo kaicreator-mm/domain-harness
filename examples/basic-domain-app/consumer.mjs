@@ -26,7 +26,8 @@ const npmManifest = require.resolve('npm/package.json', {
 });
 const npmCli = process.env.npm_execpath ?? join(dirname(npmManifest), 'bin/npm-cli.js');
 const microkernelTarball = process.env.DH_T05_MICROKERNEL_TARBALL;
-assert.ok(microkernelTarball, 'driver must provide the exact local microkernel tarball for composed App installation');
+const contractsTarball = process.env.DH_T05_CONTRACTS_TARBALL;
+assert.ok(microkernelTarball && contractsTarball, 'driver must provide exact local runtime tarballs for composed App installation');
 const evidenceDir = process.env.DH_T05_EVIDENCE ?? join(consumerRoot, 'evidence');
 const eventsPath = join(evidenceDir, 'consumer-events.ndjson');
 await mkdir(evidenceDir, { recursive: true });
@@ -320,7 +321,7 @@ async function materialize(label, built) {
   await evidence(`${label}.composed-package-materialize`, {
     status: 'PASS', files: built.appPackage.files.length, packageDigest: built.appPackage.packageDigest,
   });
-  const install = spawnSync(process.execPath, [npmCli, 'install', microkernelTarball, '--no-audit', '--no-fund'], {
+  const install = spawnSync(process.execPath, [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund'], {
     cwd: installRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, npm_config_registry: process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry },
   });
