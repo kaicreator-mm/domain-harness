@@ -20,6 +20,8 @@ LEGACY_CODE_REUSE=NOT_REQUIRED
 
 > **2026-11-21 L2 R5 源码补充：** 用户提到的 0.10 “Node”，在早期 0.10.3 具体代码中是 `StateAst` 搭配 `InvokeAst`（并非正式 `TaskNode` 类），XState `compileControlMachine/transition`、`RunCoordinator`、`StepDispatcher` 和 `RunLifecycle` 分别负责状态、步骤与生命周期。0.11.1 建议采用 `Workflow → Task`，一个 TaskRun 对应一个 KDP Actor，Task 通过 selected Function 执行并使用可选业务生命周期 Hook；详见 [R5 研究与设计](DomainHarness_v0.11.1_WORKFLOW_TASK_NODE_HOOK_DESIGN.md) / [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)。**旧 v0.10 XState transition 路线不等于旧 Run 本身持有独立 Actor。**
 
+> **2026-11-21 L2 R6 结构更新（覆盖本文 R5 的节点模型建议，历史源码事实不变）：** Workflow 本身是可调用 Element，Workflow 中每个 Node 仅是对另一个唯一 `ElementRef` 的引用位点；Task、Function、数据/规则都由 Element 的统一 Function 式调用语义投影表达，同一 Element 可在不同 Node/子 Workflow 中多次引用。一次引用产生 `TaskRun/ElementRun`，**只有 WorkflowRun（包含单节点 Workflow）在 KDP 中拥有对应 XState Machine Actor**；子 Workflow 调用生成 child WorkflowRun/Actor，普通叶子调用不必一对一创建 Workflow Actor。见 [R6 权威模型](DomainHarness_v0.11.1_WORKFLOW_TASK_NODE_HOOK_DESIGN.md) 和 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)。此前 R5 `TaskDefinition {execute: FunctionRef}` / 每 TaskRun 一个 Actor 的建议已被替代。
+
 ## 1. 结论先行：0.10 不是单一 Workflow Engine
 
 在同一个 v0.10.3 历史源码树内能明确辨认下列**不同年代、不同层次**的实现。不可把“源码存在”误写成“当前已选应用实际调用”：
