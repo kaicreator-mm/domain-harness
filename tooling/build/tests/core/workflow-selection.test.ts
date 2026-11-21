@@ -51,7 +51,7 @@ function workflowCase(
   let selectedForeignRef: FunctionRef | undefined;
   scenario.beforeSeal = () => {
     if (options.foreignOwner) {
-      // Exact deterministic lifecycle fixture authored by standardCase.finalize().
+      // 由 standardCase.finalize() 构造确定性的 Package 生命周期测试数据。
       const foreignElement: ElementDefinition = {
         kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
         id: `${options.foreignOwner}.lifecycle`, version: '1.0.0',
@@ -201,7 +201,7 @@ test('T12 R4: actual packaged first-party verifier refuses altered xstate/yaml s
     { cwd: root, encoding: 'utf8', timeout: 15000 });
   write('package-lock.json', JSON.stringify(npmLock));
   const valid = runVerifier();
-  assert.equal(valid.status, 0, valid.stderr, 'exact npm lock + installed versions are accepted');
+  assert.equal(valid.status, 0, `精确 npm Lock 与已安装版本必须通过校验：${valid.stderr}`);
 
   const bad = structuredClone(npmLock);
   bad.packages['node_modules/xstate']!.integrity = 'sha512-INVALID_ARCHIVE_BYTES';
