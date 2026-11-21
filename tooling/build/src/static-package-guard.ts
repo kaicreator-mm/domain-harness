@@ -26,9 +26,10 @@ export function verifyGeneratedPackageImports(
     const sourceText = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     const source = ts.createSourceFile(ref.path, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
     // BUILD 必须拒绝生成产物本身的语法错误，而不是推迟至 Node 首次 import。
-    if (source.parseDiagnostics.length > 0) {
+    const parseDiagnostics = (source as ts.SourceFile & { readonly parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics ?? [];
+    if (parseDiagnostics.length > 0) {
       throw refusal('DH_BUILD_SCHEMA_INVALID',
-        `generated module '${key}' contains a JavaScript syntax error (TS${source.parseDiagnostics[0]!.code})`);
+        `generated module '${key}' contains a JavaScript syntax error (TS${parseDiagnostics[0]!.code})`);
     }
     const consumer = selected.get(ref.packageId);
     if (!consumer) {
