@@ -1,5 +1,8 @@
 # DomainHarness v0.11.0 · B0 Element-First Foundation 规范增量
 
+> **【R33 产品边界修正】** 本 B0 验收中出现的 `BUILD` 仍是当时构建工具/校验/封存的实际实现与测试，不应解释为 DomainHarness 永久承担所有 Domain Package 的生产工作。当前 Owner 定义为 **DomainHarness = Boot + Domain Packages 的领域 Harness SDK，DomainForge = 由该 SDK 构建并负责生产 Domain Packages 的 Domain App**。基础 SDK 的 Assembly/Pin/安全验证继续有效；自举是 0.11.x 最终必须证明的目标但当前 NOT_IMPLEMENTED。见 [R33 规范](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
+
+
 **归属与优先级**：由 [Issue #1624](https://github.com/kaicreator-mm/domain-harness/issues/1624) 的 B0-01–B0-08 / AC-B01–AC-B07 约束此增量。0.11.x 是单一重构，不兼容旧 v0.10.x；本文在与历史 L2/PRD 候选发生冲突时优先。**本文记录目标和实现合同，不自证已验收。**
 
 ## 合同
