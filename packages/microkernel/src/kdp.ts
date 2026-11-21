@@ -233,7 +233,7 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     // 即使 Init 在中间失败，也只逆序清理真正进入过的 Package。
     try {
       await packages.runExit();
-    } catch (cleanupError) {
+    } catch (_cleanupError) {
       cleanupFailure = '; cleanup also failed (details redacted)';
     }
     const loadError = error instanceof KdpLoadError ? error : null;
