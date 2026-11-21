@@ -58,7 +58,20 @@ const task: WorkflowDefinition = {
 };
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 const schema = ajv.compile(WORKFLOW_DEFINITION_JSON_SCHEMA as never);
-const clone = (): Record<string, any> => structuredClone(task);
+type MutableTestNode = {
+  id: string;
+  kind: string;
+  switch?: { exits: Array<{ label: string; target: { nodeId?: string; terminal?: string } }> };
+  data?: { format: string; resource: { packageId: string; path: string; digest: string }; maxBytes: number };
+};
+type MutableTestWorkflow = {
+  id: string;
+  entryNodeId: string;
+  maxElementCalls: number;
+  nodes: MutableTestNode[];
+  nesting?: string;
+};
+const clone = (): MutableTestWorkflow => structuredClone(task) as unknown as MutableTestWorkflow;
 
 function denied(value: unknown, label: string): void {
   assert.equal(schema(value), false, `${label}: JSON Schema must reject`);
@@ -86,9 +99,9 @@ test('T11: a single Function node with terminal is legal; no dummy child require
 test('T11: closed-world machine schema rejects unknown root, invalid nesting and missing fields', () => {
   const root = clone(); root.nesting = 'Element';
   denied(root, 'root nesting is not a new Element subtype');
-  const tag = clone(); tag.nodes[1].kind = 'non-workflow-nesting';
+  const tag = clone(); tag.nodes[1]!.kind = 'non-workflow-nesting';
   denied(tag, 'nested type only workflow');
-  const node = clone(); delete node.nodes[0].switch;
+  const node = clone(); delete node.nodes[0]!.switch;
   denied(node, 'explicit switch mandatory');
   const zeroBudget = clone(); zeroBudget.maxElementCalls = 0;
   denied(zeroBudget, 'root budget positive');
@@ -96,10 +109,10 @@ test('T11: closed-world machine schema rejects unknown root, invalid nesting and
 
 test('T11: duplicate exits, dangling target, unreachable node and missing terminal fail', () => {
   const duplicate = clone();
-  duplicate.nodes[0].switch.exits.push({ label: 'APPROVED', target: { terminal: 'COMPLETE' } });
+  duplicate.nodes[0]!.switch!.exits.push({ label: 'APPROVED', target: { terminal: 'COMPLETE' } });
   assert.equal(validateWorkflowDefinition(duplicate).ok, false, 'duplicate exit fails semantic validator');
   const badTarget = clone();
-  badTarget.nodes[0].switch.exits[0].target = { nodeId: 'absent' };
+  badTarget.nodes[0]!.switch!.exits[0]!.target = { nodeId: 'absent' };
   assert.equal(validateWorkflowDefinition(badTarget).ok, false, 'unselected target fails before execution');
   const unreachable = clone();
   unreachable.nodes.push({
@@ -108,14 +121,14 @@ test('T11: duplicate exits, dangling target, unreachable node and missing termin
   });
   assert.equal(validateWorkflowDefinition(unreachable).ok, false);
   const terminal = clone();
-  terminal.nodes[1].switch.exits = [{ label: 'COMPLETE', target: { nodeId: 'assess' } }];
-  terminal.nodes[0].switch.exits = [{ label: 'APPROVED', target: { nodeId: 'child' } }];
+  terminal.nodes[1]!.switch!.exits = [{ label: 'COMPLETE', target: { nodeId: 'assess' } }];
+  terminal.nodes[0]!.switch!.exits = [{ label: 'APPROVED', target: { nodeId: 'child' } }];
   assert.equal(validateWorkflowDefinition(terminal).ok, false, 'infinite graph with no exit is illegal');
 });
 
 test('T11: sealed JSON/YAML Reader data requires bounded canonical ResourceRef', () => {
   const data = clone();
-  data.nodes[0].data = {
+  data.nodes[0]!.data = {
     format: 'yaml',
     resource: { packageId: 'orders', path: 'data/one.yml', digest: `sha256:${'b'.repeat(64)}` },
     maxBytes: 8192,
@@ -123,13 +136,13 @@ test('T11: sealed JSON/YAML Reader data requires bounded canonical ResourceRef',
   assert.equal(schema(data), true, JSON.stringify(schema.errors));
   assert.equal(validateWorkflowDefinition(data).ok, true);
   const bad = structuredClone(data);
-  bad.nodes[0].data.resource.path = '../private.yml';
+  bad.nodes[0]!.data!.resource.path = '../private.yml';
   denied(bad, 'no path traversal');
   const tooBig = structuredClone(data);
-  tooBig.nodes[0].data.maxBytes = 1048577;
+  tooBig.nodes[0]!.data!.maxBytes = 1048577;
   denied(tooBig, 'reader max bytes');
   const tag = structuredClone(data);
-  tag.nodes[0].data.format = 'exec';
+  tag.nodes[0]!.data!.format = 'exec';
   denied(tag, 'unsupported reader format');
 });
 
@@ -158,7 +171,9 @@ test('T11: reserve all selected start/leaf/end credits before first Hook side-ef
   assert.equal(hasWorkflowCallBudget(2, node), false);
   assert.equal(hasWorkflowCallBudget(3, node), true);
   assert.equal(hasWorkflowCallBudget(-1, node), false);
-  const plain = { ...node, hooks: undefined };
+  const plain: WorkflowFunctionNode = {
+    id: node.id, kind: 'function', function: node.function, switch: node.switch,
+  };
   assert.equal(requiredFunctionCallsForNode(plain), 1);
   assert.equal(withinWorkflowAncestorDepth([{ maxDescendantWorkflowDepth: 1 }]), true);
   assert.equal(withinWorkflowAncestorDepth([
