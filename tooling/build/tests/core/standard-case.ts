@@ -17,6 +17,7 @@ import {
   manifest,
   descriptor,
   functionRefOf,
+  elementRefOf,
   writeJson,
   writeRaw,
   writeCanonicalJson,
@@ -63,7 +64,6 @@ export interface StandardCase {
   kdpDependsOn: DomainPackageManifest['dependsOn'];
   sdkLifecycle: 'paired' | 'init-only';
   descriptorTarget: TargetSelector;
-  ingress: DomainAppDescriptor['ingress'];
   finalize(): { input: BuildInput; refs: StandardRefs };
 }
 
@@ -184,6 +184,12 @@ export function standardCase(): StandardCase {
         outcomes: ['SUCCEEDED', 'FAILED'],
         effects: 'none',
       },
+      {
+        id: 'exit', contractVersion: '1',
+        inputSchemaRef: { inline: { type: 'object' } },
+        outputSchemaRef: { inline: { type: 'object' } },
+        outcomes: ['SUCCEEDED', 'FAILED'], effects: 'none',
+      },
     ],
   };
 
@@ -213,7 +219,6 @@ export function standardCase(): StandardCase {
     kdpDependsOn: [],
     sdkLifecycle: 'paired',
     descriptorTarget: { ...TARGET_22 },
-    ingress: [],
     finalize,
   };
 
@@ -280,7 +285,7 @@ export function standardCase(): StandardCase {
     const businessArtifact = writeRaw(businessDir, 'dist/business.mjs', new TextEncoder().encode("export const artifact = \"orders-business\";\nexport function init() { return { status: \"READY\" }; }\nexport function exit() {}\n"));
     const sdkArtifact = writeRaw(sdkDir, 'dist/sdk.mjs', new TextEncoder().encode("export const artifact = \"sdk-core\";\nexport function init() {}\nexport function exit() {}\n"));
     const kdpArtifact = writeRaw(kdpDir, 'dist/kdp.mjs', new TextEncoder().encode("export const artifact = \"kdp-kernel\";\nexport function init() {}\nexport function exit() {}\n"));
-    const aaaArtifact = writeRaw(aaaDir, 'dist/aaa.mjs', new TextEncoder().encode("export const artifact = \"aaa-ext\";\nexport function init() {}\nexport function exit() {}\n"));
+    const aaaArtifact = writeRaw(aaaDir, 'dist/aaa.mjs', new TextEncoder().encode("export const artifact = \"aaa-ext\";\nexport function init() {}\nexport function exit() {}\nexport function audit() {}\n"));
     const auditModule = writeRaw(extDir, 'dist/audit.mjs', new TextEncoder().encode('export function audit() {}\n'));
     const extArtifact = writeRaw(extDir, 'dist/ext.mjs', new TextEncoder().encode("export const artifact = \"orders-ext\";\nexport function init() {}\nexport function exit() {}\n"));
     writeRaw(kdpDir, 'dist/index.js', new TextEncoder().encode('export async function bootstrap() { return { status: "BOOTED" }; }\n'));
@@ -298,12 +303,40 @@ export function standardCase(): StandardCase {
       name: 'kdp-kernel', version: '1.0.0', type: 'module', exports: { '.': './dist/index.js' },
     })));
 
+    // 同一个 Element/Function/Target identity 构建所有 Package 的生命周期合同。
+    const lifecycle = (packageId: string, dir: string, artifact: ReturnType<typeof writeRaw>,
+      other: readonly { id: string; module: ReturnType<typeof writeRaw> }[] = []) => {
+      const definition: ElementDefinition = {
+        kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+        id: `${packageId}.lifecycle`, version: '1.0.0',
+        description: 'Package-owned lifecycle and selected Hook Functions.',
+        content: [],
+        functions: ['init', 'exit', ...other.map((fn) => fn.id)].map((id) => ({
+          id, contractVersion: '1',
+          inputSchemaRef: { inline: { type: 'object' } },
+          outputSchemaRef: { inline: { type: 'object' } },
+          outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
+        })),
+      };
+      const definitionRef = writeJson(dir, 'definitions/lifecycle.json', definition as unknown as JsonValue);
+      const entry = { id: definition.id, version: definition.version, definitionRef, visibility: 'public' as const };
+      const implementations = definition.functions.map((fn) => ({
+        elementId: definition.id, functionId: fn.id, contractVersion: fn.contractVersion,
+        entry: { module: other.find((item) => item.id === fn.id)?.module ?? artifact, exportName: fn.id },
+      }));
+      return { definition, entry, ref: elementRefOf(definition),
+        variants: [{ target: { ...TARGET_22 }, implementations }] };
+    };
+    const sdkLife = lifecycle('sdk-core', sdkDir, sdkArtifact);
+    const kdpLife = lifecycle('kdp-kernel', kdpDir, kdpArtifact);
+    const aaaLife = lifecycle('aaa-ext', aaaDir, aaaArtifact,
+      [{ id: 'audit', module: aaaArtifact }]);
+    const extLife = lifecycle('orders-ext', extDir, extArtifact,
+      [{ id: 'audit', module: auditModule }]);
     const aaaContributesTo = case_.aaaContributesTo.map((contribution) => ({
-      ...contribution,
-      entry:
-        contribution.entry.module.digest === 'sha256:pending'
-          ? { ...contribution.entry, module: aaaArtifact }
-          : contribution.entry,
+      ownerPackageId: contribution.ownerPackageId,
+      hookId: contribution.hookId,
+      function: functionRefOf(aaaLife.definition, 'audit'),
     }));
 
     const evaluateRef = functionRefOf(eligibility, 'evaluate');
@@ -325,8 +358,8 @@ export function standardCase(): StandardCase {
       layer: 'business',
       role: 'primary',
       order: 2,
-      init: { module: businessArtifact, exportName: 'init' },
-      exit: { module: businessArtifact, exportName: 'exit' },
+      init: elementRefOf(appMain),
+      exit: elementRefOf(appMain),
       elements: entries,
       dependsOn: case_.businessDependsOn,
       exports: case_.businessExports,
@@ -345,7 +378,11 @@ export function standardCase(): StandardCase {
               elementId: 'orders.app-main',
               functionId: 'init',
               contractVersion: '1',
-              entry: { module: initModule, exportName: 'init' },
+              entry: { module: businessArtifact, exportName: 'init' },
+            },
+            {
+              elementId: 'orders.app-main', functionId: 'exit', contractVersion: '1',
+              entry: { module: businessArtifact, exportName: 'exit' },
             },
             ...extraImplementations,
           ],
@@ -368,8 +405,12 @@ export function standardCase(): StandardCase {
       layer: 'sdk',
       role: 'primary',
       order: 1,
-      init: { module: sdkArtifact, exportName: 'init' },
-      dependsOn: [{ package: 'kdp-kernel', version: '1.0.0', interface: 'kernel.api' }],
+      init: sdkLife.ref,
+      elements: [sdkLife.entry],
+      dependsOn: [
+        { package: 'kdp-kernel', version: '1.0.0', interface: 'kernel.api' },
+        { package: 'orders-ext', version: '1.0.0', interface: 'orders.audit' },
+      ],
       imports: case_.sdkImports,
       exports: [{ interfaceId: 'sdk.api' }],
       provides: {
@@ -381,16 +422,18 @@ export function standardCase(): StandardCase {
           },
         ],
       },
-      targetVariants: [],
-      ...(case_.sdkLifecycle === 'paired' ? { exit: { module: sdkArtifact, exportName: 'exit' } } : {}),
+      targetVariants: sdkLife.variants,
+      ...(case_.sdkLifecycle === 'paired' ? { exit: sdkLife.ref } : {}),
     });
 
     const kdpManifest = manifest('kdp-kernel', '1.0.0', {
       layer: 'kernel',
       role: 'primary',
       order: 0,
-      init: { module: kdpArtifact, exportName: 'init' },
-      exit: { module: kdpArtifact, exportName: 'exit' },
+      init: kdpLife.ref,
+      exit: kdpLife.ref,
+      elements: [kdpLife.entry],
+      targetVariants: kdpLife.variants,
       dependsOn: case_.kdpDependsOn,
       exports: [{ interfaceId: 'kernel.api' }],
     });
@@ -398,20 +441,24 @@ export function standardCase(): StandardCase {
     const aaaManifest = manifest('aaa-ext', '1.0.0', {
       layer: 'business',
       role: 'extension',
-      init: { module: aaaArtifact, exportName: 'init' },
-      exit: { module: aaaArtifact, exportName: 'exit' },
-      exports: [{ interfaceId: 'aaa.audit' }],
+      init: aaaLife.ref,
+      exit: aaaLife.ref,
+      elements: [aaaLife.entry],
+      targetVariants: aaaLife.variants,
+      exports: [{ interfaceId: 'aaa.audit' }, { elementId: aaaLife.definition.id, functionId: 'audit' }],
       contributesTo: aaaContributesTo,
     });
 
     const extManifest = manifest('orders-ext', '1.0.0', {
       layer: 'business',
       role: 'extension',
-      init: { module: extArtifact, exportName: 'init' },
-      exit: { module: extArtifact, exportName: 'exit' },
-      exports: [{ interfaceId: 'orders.audit' }],
+      init: extLife.ref,
+      exit: extLife.ref,
+      elements: [extLife.entry],
+      targetVariants: extLife.variants,
+      exports: [{ interfaceId: 'orders.audit' }, { elementId: extLife.definition.id, functionId: 'audit' }],
       contributesTo: [
-        { ownerPackageId: 'sdk-core', hookId: 'audit', entry: { module: auditModule, exportName: 'audit' } },
+        { ownerPackageId: 'sdk-core', hookId: 'audit', function: functionRefOf(extLife.definition, 'audit') },
       ],
     });
 
@@ -428,7 +475,6 @@ export function standardCase(): StandardCase {
         { package: 'orders-ext', version: '1.0.0' },
         { package: 'aaa-ext', version: '1.0.0' },
       ],
-      ingress: case_.ingress.length > 0 ? case_.ingress : [{ id: 'evaluate', function: evaluateRef }],
     });
 
     const input: BuildInput = {
