@@ -136,7 +136,12 @@ async function authoring(label, rule, options = {}) {
       : id === 'rules-package'
         ? { '.': './dist/index.mjs', './rules': './dist/rules.mjs' }
         : { '.': './dist/index.mjs' };
-    await write(dirs[id], 'package.json', canonicalJson({ name: id, version: '1.0.0', type: 'module', exports }));
+    await write(dirs[id], 'package.json', canonicalJson({
+      name: id, version: '1.0.0', type: 'module', exports,
+      ...(options.npmPreinstallScript === true && id === 'rules-package'
+        ? { scripts: { preinstall: 'node -e "require(\'node:fs\').writeFileSync(\'unexpected-hook.txt\',\'unsafe\')"' } }
+        : {}),
+    }));
   }
   const ruleText = canonicalJson(rule);
   await write(dirs['rules-package'], 'content/rules.json', ruleText);
@@ -516,6 +521,8 @@ async function main() {
 
   await expectBuildRefusal('unsupported-effect', { unsupportedEffect: true }, 'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED');
   await expectBuildRefusal('unsupported-target', { unsupportedTarget: true }, 'DH_BUILD_TARGET_INVALID');
+  // 真正的消费端构建入口必须在 npm install/materialize 前拒绝恶意 Package 的 preinstall。
+  await expectBuildRefusal('untrusted-npm-install-hook', { npmPreinstallScript: true }, 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 
   const pkg = (prepared, id) => {
     const found = prepared.input.packages.find((candidate) => candidate.id === id);

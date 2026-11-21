@@ -383,3 +383,28 @@ test('R16 P1-SRC-01: ordinary non-lifecycle scripts remain legal and do not chan
   const result = buildApp(input);
   assert.equal(result.ok, true, JSON.stringify(result));
 });
+
+test('R16 P2: local collection algorithms have a supported ESM form without unprovable computed member reads', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as
+    import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
+    new TextEncoder().encode(`
+const values = [2, 4, 6];
+const byKey = new Map([['first', 'READY']]);
+export function init() {
+  const i = 1;
+  const key = 'first';
+  return { status: byKey.get(key), detail: { value: values.at(i) } };
+}
+export function exit() {}
+`));
+  const packages = input.packages.map((pkg) => pkg === business
+    ? { ...business, init: { module: source, exportName: 'init' },
+      exit: { module: source, exportName: 'exit' } }
+    : pkg);
+  const result = buildApp({ ...input, packages });
+  assert.equal(result.ok, true, JSON.stringify(result));
+});
