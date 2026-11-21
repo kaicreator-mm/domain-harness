@@ -153,8 +153,8 @@ export async function init(initCtx) {
   RULE = JSON.parse(Buffer.from(bytes).toString('utf8'));
   const handleOf = initCtx.functions.get(${JSON.stringify(selectedEvaluateKey)});
   if (!handleOf) throw new Error('selected evaluate FunctionRef unavailable before READY');
-  const pos = await handleOf.invoke({ total: 100, region: 'EU' });
-  const neg = await handleOf.invoke({ total: 10, region: 'EU' });
+  const pos = await handleOf.invoke({ total: 100, region: 'US' });
+  const neg = await handleOf.invoke({ total: 10, region: 'US' });
   const unknown = await handleOf.invoke({ total: 100, region: 'APAC' });
   const bad = await handleOf.invoke({ total: 'invalid', region: 'EU' });
   events.push({ event: 'init-selected-function', package: 'orders-business', pos, neg, unknown, bad });

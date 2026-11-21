@@ -117,11 +117,6 @@ test('P2-1: resource ref pointing at a real directory is RESOURCE_MISSING', (t) 
   };
   manifest.elements.find((entry) => entry.id === 'orders.eligibility')!.definitionRef.digest =
     sha256OfBytes(defBytes);
-  const appDescriptor = input.descriptor as {
-    ingress: { function: { element: { digest: string } } }[];
-  };
-  const newDefinitionDigest = contentDigestOf(JSON.parse(Buffer.from(defBytes).toString('utf8')) as never);
-  for (const entry of appDescriptor.ingress) entry.function.element.digest = newDefinitionDigest;
   expectRefusal(buildApp(input), 'DH_BUILD_RESOURCE_MISSING');
 });
 

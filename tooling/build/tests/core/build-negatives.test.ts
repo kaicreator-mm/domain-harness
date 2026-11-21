@@ -86,17 +86,52 @@ refusalCase('DH_BUILD_VERSION_CONFLICT', (s) => {
   s.extraElementFileValues['orders.faq/faq-knowledge'] = { entries: [{ q: 'v2?', a: 'v2' }] };
 });
 
-refusalCase('DH_BUILD_EXPORT_MISSING', (s) => {
-  s.businessExports = [{ elementId: 'orders.app-main' }, { interfaceId: 'orders.api' }];
+// 新合同中没有默认 ingress，未导入的 Function 不要求公开。
+test('B0: private unimported Element is legal (no implicit direct ingress)', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  scenario.eligibilityVisibility = 'private';
+  const { input } = scenario.finalize();
+  assert.equal(buildApp(input).ok, true);
 });
 
-refusalCase('DH_BUILD_EXPORT_MISSING', (s) => {
-  s.eligibilityVisibility = 'private';
+test('B0-03: Hook provider cannot satisfy interface via a private Element', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const ext = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-ext') as DomainPackageManifest;
+  const packages = input.packages.map((pkg) => pkg === ext
+    ? { ...ext, elements: ext.elements.map((entry) => ({
+        ...entry, visibility: 'private' as const,
+      })) }
+    : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_EXPORT_MISSING');
 });
 
-refusalCase('DH_BUILD_EXPORT_MISSING', (s) => {
-  s.sdkImports = [functionRefOf(s.eligibility, 'evaluate')];
-  s.businessExports = [{ elementId: 'orders.app-main' }, { interfaceId: 'orders.api' }];
+test('B0-03: Hook provider missing declared public Function export is rejected', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const ext = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-ext') as DomainPackageManifest;
+  const packages = input.packages.map((pkg) => pkg === ext
+    ? { ...ext, exports: ext.exports.filter((entry) => entry.functionId !== 'audit') }
+    : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_EXPORT_MISSING');
+});
+
+test('B0-03: direct Extension Function import must target an actually exported FunctionRef', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const ext = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'orders-ext') as DomainPackageManifest;
+  const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
+  const providerRef = ext.contributesTo[0]!.function;
+  const packages = input.packages.map((pkg) => pkg === sdk
+    ? { ...sdk, imports: [providerRef] }
+    : pkg === ext
+      ? { ...ext, exports: ext.exports.filter((entry) => entry.functionId !== 'audit') }
+      : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_EXPORT_MISSING');
 });
 
 refusalCase('DH_BUILD_IMPLEMENTATION_MISSING', (s) => {
@@ -454,11 +489,11 @@ export async function init() { return notExported(); }
 export function exit() {}
 `, 'DH_BUILD_EXPORT_MISSING');
 
-generatedLoaderCase('foreign Function handle cannot be returned inside a wrapper object', `
+generatedLoaderCase('private Extension Init cannot be returned through a wrapper', `
 import { init as extensionInit } from 'orders-ext';
 export async function init() { return { rawExtensionHandle: extensionInit }; }
 export function exit() {}
-`);
+`, 'DH_BUILD_EXPORT_MISSING');
 
 generatedLoaderCase('namespace imports expose an unprovable raw Package handle', `
 import * as ext from 'orders-ext';

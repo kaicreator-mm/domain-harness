@@ -126,6 +126,11 @@ test('B0-06: tampered selected schema is rejected before executing untrusted dat
   const fixture = await fixtureFor(t, { init: { status: 'READY' }, functions: {} });
   await fixture.writePackageFile('fixture-business', 'schemas/optional-report-input.schema.json',
     Buffer.from(JSON.stringify({ type: 'object', additionalProperties: false }), 'utf8'));
-  const packages = new PackageSystem(fixture.installRoot, fixture.lock, []);
-  await assert.rejects(packages.verifySelectedArtifacts(), /sealed digest|match/);
+  const packages = await selectedRunner(fixture);
+  // KDP verifies executable bytes before loading; the schema is verified when the selected Function needs it.
+  // A tampered schema must fail before the Function's implementation can run.
+  await assert.rejects(
+    packages.invokeSelectedFunction(selectedRef(fixture, 'optionalReport'), { anything: true }),
+    /sealed digest|do not match/,
+  );
 });
