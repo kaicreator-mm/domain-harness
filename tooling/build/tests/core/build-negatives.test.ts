@@ -369,3 +369,26 @@ test('BUILD rejects unapproved Node module loader imports in generated Package c
   } : pkg);
   expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
+
+test('BUILD forbids Function resource access to an undeclared transitive Package', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as {
+    targetVariants: { implementations: { functionId: string; resources?: unknown[] }[] }[];
+  };
+  const kdp = input.packages.find((pkg) => (pkg as { id: string }).id === 'kdp-kernel') as
+    import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const implementation = business.targetVariants[0]!.implementations.find((entry) => entry.functionId === 'evaluate')!;
+  implementation.resources = [kdp.init.module];
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('BUILD forbids Element content references to an undeclared Package', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  scenario.eligibility.content[1]!.ref = {
+    packageId: 'kdp-kernel', path: 'content/unauthorized.json', digest: `sha256:${'0'.repeat(64)}`,
+  };
+  expectRefusal(buildApp(scenario.finalize().input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});

@@ -533,7 +533,14 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       }
     }
     scope.verify(binding.entry.module);
-    for (const resource of binding.resources ?? []) scope.verify(resource);
+    for (const resource of binding.resources ?? []) {
+      if (resource.packageId !== implementor.id &&
+          !(dependsOnEdges.get(implementor.id) ?? []).includes(resource.packageId)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Function implementation in '${implementor.id}' uses resource from undeclared direct Extension '${resource.packageId}'`);
+      }
+      scope.verify(resource);
+    }
     sealedFunctions.push({
       ref: toFunctionRef(resolved),
       outcomes: [...resolved.fn.outcomes],
@@ -665,6 +672,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   for (const loaded of [...elements.values()].sort(compareLoadedElement)) {
     const contentDigests: ContentDigest[] = [];
     for (const block of loaded.def.content) {
+      if (block.ref && block.ref.packageId !== loaded.owner.id &&
+          !(dependsOnEdges.get(loaded.owner.id) ?? []).includes(block.ref.packageId)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Element '${loaded.def.id}' uses content from undeclared direct Extension '${block.ref.packageId}'`);
+      }
       if (isUnknownContentKind(block.contentKind)) {
         if (block.required) {
           throw refusal(
