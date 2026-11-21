@@ -4,13 +4,14 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { contentDigestOf } from '@kaicreator/domain-harness-contracts';
+import { contentDigestOf, canonicalJson } from '@kaicreator/domain-harness-contracts';
 import type {
   BootstrapPin,
   ContentDigest,
   DomainAppDescriptor,
   DomainAppLock,
   ElementDefinition,
+  ElementRef,
   FunctionRef,
   InstalledRecord,
   KdpBootstrapContext,
@@ -51,7 +52,6 @@ export type FunctionBehavior =
 
 export interface FixtureInit {
   readonly status: 'READY' | 'DEGRADED' | 'BLOCKED' | 'FAILED';
-  readonly suppressed?: readonly string[];
   readonly throw?: boolean;
 }
 
@@ -185,7 +185,7 @@ export async function exit(ctx) {
 `;
 }
 
-function businessModuleSource(scenario: FixtureScenario): string {
+function businessModuleSource(scenario: FixtureScenario, evaluateRef?: FunctionRef): string {
   return `
 const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_BUSINESS}' });
@@ -199,6 +199,14 @@ export async function exit(ctx) {
   events.push({ event: 'package-exit', package: '${FIXTURE_BUSINESS}' });
 }
 async function businessAppInit(initCtx) {
+  const selectedRefKey = ${JSON.stringify(evaluateRef ? canonicalJson(evaluateRef) : '')};
+  if (selectedRefKey) {
+    const handle = initCtx.functions.get(selectedRefKey);
+    if (!handle) throw new Error('BUILD-selected FunctionRef unavailable during Init');
+    const result = await handle.invoke({ total: 100, region: 'EU' });
+    events.push({ event: 'init-selected-function', package: '${FIXTURE_BUSINESS}', kind: result.kind,
+      value: result.kind === 'SUCCEEDED' ? result.value : null });
+  }
   events.push({
     event: 'business-init',
     package: '${FIXTURE_BUSINESS}',
@@ -385,6 +393,8 @@ export async function buildFixtureInstall(
     contractVersion: '1',
   };
   const elementRef = evaluateRef.element;
+  // 让真实业务 Init（仍处于 NOT_READY）使用 KDP 的已选 FunctionRef 能力，不经过 DomainApp.invoke。
+  await write(`node_modules/${FIXTURE_BUSINESS}/dist/index.mjs`, businessModuleSource(scenario, evaluateRef));
 
   const descriptor: DomainAppDescriptor = {
     kind: 'DomainApp',
@@ -400,10 +410,6 @@ export async function buildFixtureInstall(
       ],
     },
     extensions: [{ package: FIXTURE_EXT, version: '1.0.0' }],
-    ingress: [
-      { id: 'evaluate', function: evaluateRef },
-      { id: 'optional-report', function: optionalReportRef, optional: true },
-    ],
     config: { region: 'EU', featureFlag: true },
   };
   const descriptorBytes = Buffer.from(JSON.stringify(descriptor), 'utf8');
@@ -425,6 +431,47 @@ export async function buildFixtureInstall(
   extArtifact.digest = await fileBytesDigest(extPath);
   const hookDigest = await fileBytesDigest(hookPath);
 
+  const lifeNames: readonly [string, string][] = [
+    [FIXTURE_KERNEL, 'kernel'], [FIXTURE_SDK, 'sdk'], [FIXTURE_BUSINESS, 'business'], [FIXTURE_EXT, 'extension'],
+  ];
+  const lifecycleDefs: Record<string, ElementDefinition> = {};
+  const lifecycleRefs: Record<string, ElementRef> = {};
+  for (const [id, name] of lifeNames) {
+    const definition: ElementDefinition = {
+      kind: 'Element', schemaVersion: 'dh.element/0.11', id: `fixture.${name}-lifecycle`,
+      version: '1.0.0', description: 'Package-owned selected lifecycle and Hook Function',
+      content: [], functions: ['init', 'exit', ...(id === FIXTURE_EXT ? ['telemetryHook'] : [])].map((fn) => ({
+        id: fn, contractVersion: '1',
+        inputSchemaRef: { inline: { type: 'object' } },
+        outputSchemaRef: { inline: { type: 'object' } },
+        outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const,
+        effects: 'none' as const,
+      })),
+    };
+    lifecycleDefs[id] = definition;
+    lifecycleRefs[id] = {
+      namespace: 'fixture', id: definition.id, version: definition.version, digest: digestOf(definition),
+    };
+    await write(`node_modules/${id}/elements/lifecycle.json`, JSON.stringify(definition));
+  }
+  const lifeFunction = (id: string, fn: string): FunctionRef => ({
+    element: lifecycleRefs[id]!, functionId: fn, contractVersion: '1',
+  });
+  const lifeSelected = (id: string, artifact: { packageId: string; path: string; digest: ContentDigest },
+    initResources: readonly { packageId: string; path: string; digest: ContentDigest }[] = []) =>
+    lifecycleDefs[id]!.functions.map((fn) => ({
+      ref: lifeFunction(id, fn.id), outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const,
+      effects: 'none' as const,
+      implementation: { module: id === FIXTURE_EXT && fn.id === 'telemetryHook'
+        ? { packageId: FIXTURE_EXT, path: 'dist/hook.mjs', digest: hookDigest }
+        : artifact, exportName: fn.id },
+      resources: fn.id === 'init' ? [...initResources] : [],
+    }));
+  const businessRuleResource = {
+    packageId: FIXTURE_BUSINESS, path: 'content/rules.json',
+    digest: await fileBytesDigest(join(installRoot, 'node_modules', FIXTURE_BUSINESS, 'content', 'rules.json')),
+  };
+
   const resourceDigests: Record<string, ContentDigest> = {
     [`${KDP_PACKAGE_ID}/package.json`]: await fileBytesDigest(join(kdpPackageDir, 'package.json')),
     [`${FIXTURE_KERNEL}/dist/index.mjs`]: kernelArtifact.digest,
@@ -437,6 +484,9 @@ export async function buildFixtureInstall(
     ),
     [`${FIXTURE_EXT}/dist/index.mjs`]: extArtifact.digest,
     [`${FIXTURE_EXT}/dist/hook.mjs`]: hookDigest,
+    ...Object.fromEntries(lifeNames.map(([id]) => [
+      `${id}/elements/lifecycle.json`, digestOf(Buffer.from(JSON.stringify(lifecycleDefs[id]!), 'utf8')),
+    ])),
   };
 
   const lockBase = {
@@ -454,54 +504,48 @@ export async function buildFixtureInstall(
       kdpPrimaryDigest: kdpEntryDigest,
     },
     selectedPackages: [
-      { packageId: FIXTURE_KERNEL, version: '1.0.0', recordInitFrom: true, order: 0, layer: 'kernel', role: 'primary', artifact: kernelArtifact, init: { module: kernelArtifact, exportName: 'init' }, exit: { module: kernelArtifact, exportName: 'exit' }, initResources: [], dependsOn: [] },
-      { packageId: FIXTURE_SDK, version: '1.0.0', recordInitFrom: true, order: 1, layer: 'sdk', role: 'primary', artifact: sdkArtifact, init: { module: sdkArtifact, exportName: 'init' }, exit: { module: sdkArtifact, exportName: 'exit' }, initResources: [], dependsOn: [FIXTURE_KERNEL] },
-      { packageId: FIXTURE_BUSINESS, version: '1.0.0', recordInitFrom: true, order: 2, layer: 'business', role: 'primary', artifact: businessArtifact, init: { module: businessArtifact, exportName: 'init' }, exit: { module: businessArtifact, exportName: 'exit' }, initResources: [{ packageId: FIXTURE_BUSINESS, path: 'content/rules.json', digest: resourceDigests[`${FIXTURE_BUSINESS}/content/rules.json`]! }], dependsOn: [FIXTURE_SDK, FIXTURE_EXT] },
-      { packageId: FIXTURE_EXT, version: '1.0.0', recordInitFrom: true, layer: 'business', role: 'extension', artifact: extArtifact, init: { module: extArtifact, exportName: 'init' }, exit: { module: extArtifact, exportName: 'exit' }, initResources: [], dependsOn: [] },
+      { packageId: FIXTURE_KERNEL, version: '1.0.0', recordInitFrom: true, order: 0, layer: 'kernel', role: 'primary', artifact: kernelArtifact,
+        init: lifecycleRefs[FIXTURE_KERNEL]!, initFunction: lifeFunction(FIXTURE_KERNEL, 'init'),
+        exit: lifecycleRefs[FIXTURE_KERNEL]!, exitFunction: lifeFunction(FIXTURE_KERNEL, 'exit'), initResources: [], dependsOn: [] },
+      { packageId: FIXTURE_SDK, version: '1.0.0', recordInitFrom: true, order: 1, layer: 'sdk', role: 'primary', artifact: sdkArtifact,
+        init: lifecycleRefs[FIXTURE_SDK]!, initFunction: lifeFunction(FIXTURE_SDK, 'init'),
+        exit: lifecycleRefs[FIXTURE_SDK]!, exitFunction: lifeFunction(FIXTURE_SDK, 'exit'), initResources: [], dependsOn: [FIXTURE_KERNEL] },
+      { packageId: FIXTURE_BUSINESS, version: '1.0.0', recordInitFrom: true, order: 2, layer: 'business', role: 'primary', artifact: businessArtifact,
+        init: lifecycleRefs[FIXTURE_BUSINESS]!, initFunction: lifeFunction(FIXTURE_BUSINESS, 'init'),
+        exit: lifecycleRefs[FIXTURE_BUSINESS]!, exitFunction: lifeFunction(FIXTURE_BUSINESS, 'exit'), initResources: [businessRuleResource], dependsOn: [FIXTURE_SDK, FIXTURE_EXT] },
+      { packageId: FIXTURE_EXT, version: '1.0.0', recordInitFrom: true, layer: 'business', role: 'extension', artifact: extArtifact,
+        init: lifecycleRefs[FIXTURE_EXT]!, initFunction: lifeFunction(FIXTURE_EXT, 'init'),
+        exit: lifecycleRefs[FIXTURE_EXT]!, exitFunction: lifeFunction(FIXTURE_EXT, 'exit'), initResources: [], dependsOn: [] },
     ],
     selectedElements: [
-      {
-        ref: elementRef,
-        ownerPackageId: FIXTURE_BUSINESS,
-        visibility: 'public',
+      { ref: elementRef, ownerPackageId: FIXTURE_BUSINESS, visibility: 'public',
         contentDigests: [digestOf({ minOrderTotal: 50, regions: ['EU'] })],
-        contractDigests: [
-          digestOf(definition.functions[0]),
-          digestOf(definition.functions[1]),
-        ],
-      },
+        contractDigests: [digestOf(definition.functions[0]), digestOf(definition.functions[1])] },
+      ...lifeNames.map(([id]) => ({
+        ref: lifecycleRefs[id]!, ownerPackageId: id, visibility: 'private' as const,
+        contentDigests: [],
+        contractDigests: lifecycleDefs[id]!.functions.map((fn) => digestOf(fn)),
+      })),
     ],
     selectedFunctions: [
       {
-        ref: evaluateRef,
-        outcomes: ['SUCCEEDED', 'UNKNOWN'],
-        effects: 'none',
-        implementation: { module: businessArtifact, exportName: 'evaluate' },
-        resources: [],
+        ref: evaluateRef, outcomes: ['SUCCEEDED', 'UNKNOWN'], effects: 'none',
+        implementation: { module: businessArtifact, exportName: 'evaluate' }, resources: [],
       },
       {
-        ref: optionalReportRef,
-        outcomes: ['SUCCEEDED', 'UNKNOWN'],
-        effects: 'none',
-        implementation: { module: businessArtifact, exportName: 'optionalReport' },
-        resources: [],
+        ref: optionalReportRef, outcomes: ['SUCCEEDED', 'UNKNOWN'], effects: 'none',
+        implementation: { module: businessArtifact, exportName: 'optionalReport' }, resources: [],
       },
+      ...lifeSelected(FIXTURE_KERNEL, kernelArtifact),
+      ...lifeSelected(FIXTURE_SDK, sdkArtifact),
+      ...lifeSelected(FIXTURE_BUSINESS, businessArtifact, [businessRuleResource]),
+      ...lifeSelected(FIXTURE_EXT, extArtifact),
     ],
-    hookBindings: [
-      {
-        ownerPackageId: FIXTURE_KERNEL,
-        hookId: 'telemetry',
-        cardinality: 'multi',
-        providers: [
-          { module: { packageId: FIXTURE_EXT, path: 'dist/hook.mjs', digest: hookDigest }, exportName: 'telemetryHook' },
-        ],
-      },
-    ],
+    hookBindings: [{
+      ownerPackageId: FIXTURE_KERNEL, hookId: 'telemetry', cardinality: 'multi',
+      providers: [lifeFunction(FIXTURE_EXT, 'telemetryHook')],
+    }],
     coreOrder: [FIXTURE_KERNEL, FIXTURE_SDK, FIXTURE_BUSINESS],
-    ingress: [
-      { id: 'evaluate', function: evaluateRef, optional: false },
-      { id: 'optional-report', function: optionalReportRef, optional: true },
-    ],
     resourceDigests,
     excludedUnknownContent: [],
   };
