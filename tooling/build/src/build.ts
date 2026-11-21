@@ -44,6 +44,7 @@ import { composeAppPackage, sameAppPackageBytes, sealPackageManifest } from './a
 import { TRUSTED_WORKFLOW_NPM_ARCHIVES } from './trusted-runtime.js';
 import { selectWorkflows, workflowKey } from './workflow-selection.js';
 import type { LoadedElement, ResolvedFunction } from './selection-types.js';
+import { selectPackageClosure } from './package-selection.js';
 
 
 function elementNamespace(id: string): string {
@@ -149,101 +150,8 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     throw refusal('DH_BUILD_RESOURCE_MISSING', 'KDP bootstrap artifact path is not a canonical in-package path');
   }
 
-  // 第 2 段：从唯一 KDP 与 BUILD 选定的任意数量 Core 出发，沿 dependsOn 扩展闭包。
-  const selected = new Map<string, DomainPackageManifest>();
-  const rootCoreIds = new Set<string>();
-  const selectCore = (
-    ref: DomainAppDescriptor['roots']['cores'][number],
-    slot: string,
-    requiredLayer?: 'kernel',
-  ): void => {
-    const manifest = pool.get(ref.package);
-    if (!manifest || manifest.version !== ref.version) {
-      throw refusal(
-        'DH_BUILD_REF_UNRESOLVED',
-        `descriptor roots.${slot} references '${ref.package}@${ref.version}' which is not in the package pool`,
-        `roots.${slot}`,
-      );
-    }
-    if (manifest.role !== 'primary') {
-      throw refusal(
-        'DH_BUILD_LAYER_ROLE_MISMATCH',
-        `roots.${slot} package '${ref.package}' declares role='${manifest.role}'; a Core root must reference a primary package`,
-        `roots.${slot}`,
-      );
-    }
-    if (requiredLayer !== undefined && manifest.layer !== requiredLayer) {
-      throw refusal(
-        'DH_BUILD_PRIMARY_MISSING',
-        `roots.${slot} package '${ref.package}' declares layer='${manifest.layer}'; KDP must be the kernel Core`,
-        `roots.${slot}`,
-      );
-    }
-    if (rootCoreIds.has(manifest.id)) {
-      throw refusal('DH_BUILD_PRIMARY_DUPLICATE', `Core '${manifest.id}' is selected by more than one root entry`);
-    }
-    rootCoreIds.add(manifest.id);
-    selected.set(manifest.id, manifest);
-  };
-  selectCore(descriptor.roots.kernelPrimary, 'kernelPrimary', 'kernel');
-  descriptor.roots.cores.forEach((ref, index) => selectCore(ref, `cores[${index}]`));
-  for (const [index, ref] of descriptor.extensions.entries()) {
-    const manifest = pool.get(ref.package);
-    if (!manifest || manifest.version !== ref.version) {
-      throw refusal(
-        'DH_BUILD_REF_UNRESOLVED',
-        `descriptor extensions[${index}] references '${ref.package}@${ref.version}' which is not in the package pool`,
-        `extensions[${index}]`,
-      );
-    }
-    selected.set(manifest.id, manifest);
-  }
-
-  const queue = [...selected.keys()].sort();
-  const dependsOnEdges = new Map<string, readonly string[]>();
-  while (queue.length > 0) {
-    const id = queue.shift()!;
-    const manifest = selected.get(id)!;
-    const edges: string[] = [];
-    for (const dep of manifest.dependsOn) {
-      const targetManifest = pool.get(dep.package);
-      if (!targetManifest || !satisfiesSemver(targetManifest.version, dep.version)) {
-        throw refusal(
-          'DH_BUILD_DEPENDS_ON_UNSELECTED',
-          `'${id}' depends on '${dep.package}@${dep.version}' which is not selected and cannot be resolved`,
-          'dependsOn',
-        );
-      }
-      const exportedInterfaces = new Set(
-        targetManifest.exports
-          .map((entry) => entry.interfaceId)
-          .filter((value): value is string => value !== undefined),
-      );
-      if (!exportedInterfaces.has(dep.interface)) {
-        throw refusal(
-          'DH_BUILD_EXPORT_MISSING',
-          `'${id}' depends on interface '${dep.interface}' which '${dep.package}' does not export`,
-          'dependsOn',
-        );
-      }
-      edges.push(dep.package);
-      if (!selected.has(dep.package)) {
-        selected.set(dep.package, targetManifest);
-        queue.push(dep.package);
-        queue.sort();
-      }
-    }
-    dependsOnEdges.set(id, edges);
-  }
-
-  for (const manifest of selected.values()) {
-    if (manifest.role === 'primary' && !rootCoreIds.has(manifest.id)) {
-      throw refusal(
-        'DH_BUILD_PRIMARY_MISSING',
-        `selected Core '${manifest.id}' is not declared in descriptor roots; every Core must be BUILD-selected explicitly`,
-      );
-    }
-  }
+  // 第 2 段：从稳定 KDP 与 App 实际选用的 SDK/Business Packages 确定封闭依赖图。
+  const { selected, dependsOnEdges } = selectPackageClosure(descriptor, pool);
 
   // 第 3 段：按真实文件字节验证 Element 定义及资源；同一 Element 的 ID/版本只能有一个 owner。
   const scope = new ResourceScope(input.packageRoots);
