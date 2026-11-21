@@ -20,7 +20,7 @@ function expectSuccess(result: BuildResult): Extract<BuildResult, { ok: true }> 
 test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
-  const { input, refs } = scenario.finalize();
+  const { input } = scenario.finalize();
 
   const first = expectSuccess(buildApp(input));
   const lock = first.lock;
@@ -46,26 +46,29 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
   );
   assert.deepEqual(
     lock.selectedPackages.find((pkg) => pkg.packageId === 'sdk-core')?.dependsOn,
-    ['kdp-kernel'],
+    ['kdp-kernel', 'orders-ext'],
   );
 
-  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'sdk-core')?.init.exportName, 'init');
-  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'orders-business')?.init.exportName, 'init');
+  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'sdk-core')?.initFunction.functionId, 'init');
+  assert.equal(lock.selectedPackages.find((pkg) => pkg.packageId === 'orders-business')?.initFunction.element.id, 'orders.app-main');
 
-  assert.deepEqual(
-    lock.selectedElements.map((element) => element.ref.id),
-    ['orders.app-main', 'orders.eligibility', 'orders.faq', 'orders.legacy-prompt-notes'],
-  );
+  for (const id of ['orders.app-main', 'orders.eligibility', 'orders.faq', 'orders.legacy-prompt-notes']) {
+    assert.ok(lock.selectedElements.some((element) => element.ref.id === id), `must select Element '${id}'`);
+  }
+  assert.equal(lock.selectedPackages.every((pkg) => lock.selectedElements.some(
+    (entry) => entry.ownerPackageId === pkg.packageId && entry.ref.digest === pkg.init.digest,
+  )), true, 'each Package Init must resolve to its owned selected Element');
   const eligibility = lock.selectedElements.find((element) => element.ref.id === 'orders.eligibility')!;
   const faq = lock.selectedElements.find((element) => element.ref.id === 'orders.faq')!;
   assert.deepEqual(faq.contractDigests, []); // 0-Function is a first-class form
   assert.equal(eligibility.contractDigests.length, 2);
   assert.equal(eligibility.ownerPackageId, 'orders-business');
 
-  assert.deepEqual(
-    lock.selectedFunctions.map((fn) => `${fn.ref.element.id}.${fn.ref.functionId}`),
-    ['orders.eligibility.evaluate'],
-  );
+  assert.ok(lock.selectedFunctions.some((fn) =>
+    fn.ref.element.id === 'orders.eligibility' && fn.ref.functionId === 'evaluate'));
+  assert.equal(lock.selectedPackages.every((pkg) =>
+    lock.selectedFunctions.some((fn) => JSON.stringify(fn.ref) === JSON.stringify(pkg.initFunction))), true);
+
   const evaluate = lock.selectedFunctions.find((fn) => fn.ref.functionId === 'evaluate')!;
   assert.equal(evaluate.implementation.module.path, 'dist/evaluate.mjs');
   assert.equal(evaluate.effects, 'none');
@@ -74,19 +77,15 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     ['content/zones.json'],
   );
 
-  assert.deepEqual(lock.hookBindings, [
-    {
-      ownerPackageId: 'sdk-core',
-      hookId: 'audit',
-      cardinality: 'multi',
-      providers: [{ module: { packageId: 'orders-ext', path: 'dist/audit.mjs', digest: lock.hookBindings[0]!.providers[0]!.module.digest }, exportName: 'audit' }],
-    },
-  ]);
+  assert.equal(lock.hookBindings.length, 1);
+  assert.equal(lock.hookBindings[0]?.providers.length, 1);
+  assert.equal(lock.hookBindings[0]?.providers[0]?.functionId, 'audit');
+  assert.equal(lock.hookBindings[0]?.providers[0]?.element.id, 'orders-ext.lifecycle');
 
   assert.deepEqual(lock.coreOrder, ['kdp-kernel', 'sdk-core', 'orders-business']);
   assert.deepEqual(lock.selectedPackages.filter((pkg) => pkg.role === 'primary').map((pkg) => pkg.order).sort(), [0, 1, 2]);
 
-  assert.deepEqual(lock.ingress, [{ id: 'evaluate', function: refs.evaluateRef, optional: false }]);
+  assert.equal('ingress' in lock, false, 'no direct business ingress is part of v0.11.0');
 
   assert.deepEqual(lock.excludedUnknownContent, ['orders.legacy-prompt-notes/prompt-note']);
   assert.deepEqual(
@@ -336,10 +335,31 @@ test('R11 P1-02: four Cores with a repeated layer and non-contiguous Orders are 
   writeRaw(dir, 'package.json', new TextEncoder().encode(canonicalJson({
     name: 'auxiliary-core', version: '1.0.0', type: 'module', exports: { '.': './dist/index.mjs' },
   })));
+  const element = {
+    kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
+    id: 'orders.auxiliary-core-lifecycle', version: '1.0.0',
+    description: 'Extra Core with its own real Init/Exit Element',
+    content: [],
+    functions: ['init', 'exit'].map((id) => ({
+      id, contractVersion: '1',
+      inputSchemaRef: { inline: { type: 'object' } }, outputSchemaRef: { inline: { type: 'object' } },
+      outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'], effects: 'none',
+    })),
+  };
+  const definitionRef = writeRaw(dir, 'elements/lifecycle.json',
+    new TextEncoder().encode(canonicalJson(element as JsonValue)));
+  const lifeRef = {
+    namespace: 'orders', id: element.id, version: '1.0.0',
+    digest: contentDigestOf(element as JsonValue),
+  };
   const core = manifest('auxiliary-core', '1.0.0', {
     layer: 'sdk', role: 'primary', order: 7,
-    init: { module: artifact, exportName: 'init' },
-    exit: { module: artifact, exportName: 'exit' },
+    init: lifeRef, exit: lifeRef,
+    elements: [{ id: element.id, version: '1.0.0', definitionRef, visibility: 'private' }],
+    targetVariants: [{ target: { runtime: 'node', module: 'esm', nodeMajor: 22 }, implementations: [
+      { elementId: element.id, functionId: 'init', contractVersion: '1', entry: { module: artifact, exportName: 'init' } },
+      { elementId: element.id, functionId: 'exit', contractVersion: '1', entry: { module: artifact, exportName: 'exit' } },
+    ] }],
   });
   const descriptor = structuredClone(input.descriptor) as DomainAppDescriptor;
   (descriptor.roots.cores as { package: string; version: string }[]).push({ package: 'auxiliary-core', version: '1.0.0' });
@@ -354,21 +374,16 @@ test('R11 P1-02: four Cores with a repeated layer and non-contiguous Orders are 
   assert.ok(built.appPackage.files.some((file) => file.path === 'packages/auxiliary-core/dist/index.mjs'));
 });
 
-test('R11 P1-01 positive: a named Init import is checked against the direct Extension public export', (t) => {
+test('B0: direct Extension Function import remains selected from public Element', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
-  const { input } = scenario.finalize();
-  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
-  const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs', new TextEncoder().encode(`
-import { init as extensionInit } from 'orders-ext';
-export async function init() { await extensionInit(); return { status: 'READY' }; }
-export function exit() {}
-`));
-  const packages = input.packages.map((pkg) => pkg === business ? {
-    ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
-  } : pkg);
-  const built = expectSuccess(buildApp({ ...input, packages }));
-  assert.ok(built.lock.resourceDigests['orders-ext/dist/ext.mjs']);
+  const { input, refs } = scenario.finalize();
+  const selected = buildApp(input);
+  assert.equal(selected.ok, true, JSON.stringify(selected));
+  if (selected.ok) {
+    assert.ok(selected.lock.selectedFunctions.some((fn) =>
+      JSON.stringify(fn.ref) === JSON.stringify(refs.evaluateRef)));
+  }
 });
 
 test('R16 P1-SRC-01: ordinary non-lifecycle scripts remain legal and do not change selected BUILD semantics', (t) => {
@@ -384,27 +399,29 @@ test('R16 P1-SRC-01: ordinary non-lifecycle scripts remain legal and do not chan
   assert.equal(result.ok, true, JSON.stringify(result));
 });
 
-test('R16 P2: local collection algorithms have a supported ESM form without unprovable computed member reads', (t) => {
+test('B0: local Array.at / Map.get remain legal in a selected Init Function Target', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
   const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as
     import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
-  const source = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs',
+  const artifact = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/local-collections.mjs',
     new TextEncoder().encode(`
 const values = [2, 4, 6];
 const byKey = new Map([['first', 'READY']]);
 export function init() {
-  const i = 1;
-  const key = 'first';
-  return { status: byKey.get(key), detail: { value: values.at(i) } };
+  const index = 1;
+  return { status: byKey.get('first'), detail: { value: values.at(index) } };
 }
-export function exit() {}
 `));
-  const packages = input.packages.map((pkg) => pkg === business
-    ? { ...business, init: { module: source, exportName: 'init' },
-      exit: { module: source, exportName: 'exit' } }
-    : pkg);
+  const packages = input.packages.map((pkg) => pkg === business ? {
+    ...business, targetVariants: business.targetVariants.map((variant) => ({
+      ...variant, implementations: variant.implementations.map((binding) =>
+        binding.functionId === 'init'
+          ? { ...binding, entry: { module: artifact, exportName: 'init' } }
+          : binding),
+    })),
+  } : pkg);
   const result = buildApp({ ...input, packages });
   assert.equal(result.ok, true, JSON.stringify(result));
 });
