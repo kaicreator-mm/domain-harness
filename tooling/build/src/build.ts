@@ -522,6 +522,29 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       );
     }
     const { manifest: implementor, binding } = candidates[0]!;
+    // BUILD 对真正的 Function 调用方证明权限；实现属于另一 Package，
+    // 不等于逻辑 Owner 或进口调用方自动获得了这个实现 Package 的访问权。
+    const directExtension = (callerId: string, providerId: string): boolean =>
+      callerId === providerId ||
+      ((dependsOnEdges.get(callerId) ?? []).includes(providerId) &&
+        selected.get(providerId)?.role === 'extension');
+    if (implementor.id !== resolved.owner.id && !directExtension(resolved.owner.id, implementor.id)) {
+      throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+        `Function '${resolved.element.def.id}.${resolved.fn.id}' owner '${resolved.owner.id}' does not declare implementation Extension '${implementor.id}' directly`);
+    }
+    // 对显式导入该 Function 的 Package 同样不能隐藏真实实现提供者。
+    for (const caller of packagesSorted) {
+      if (!caller.imports.some((ref) =>
+        ref.element.id === resolved.element.def.id &&
+        ref.element.version === resolved.element.def.version &&
+        ref.element.digest === resolved.element.definitionDigest &&
+        ref.functionId === resolved.fn.id &&
+        ref.contractVersion === resolved.fn.contractVersion)) continue;
+      if (!directExtension(caller.id, implementor.id)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Function importer '${caller.id}' lacks direct Extension declaration for implementation '${implementor.id}'`);
+      }
+    }
     if (binding.entry.module.packageId !== implementor.id) {
       throw refusal(
         'DH_BUILD_SCHEMA_INVALID',
@@ -542,10 +565,16 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     scope.verify(binding.entry.module);
     verifyImplementationExport(scope, binding.entry, `${resolved.element.def.id}.${resolved.fn.id}`);
     for (const resource of binding.resources ?? []) {
-      if (resource.packageId !== implementor.id &&
-          !(dependsOnEdges.get(implementor.id) ?? []).includes(resource.packageId)) {
+      if (!directExtension(implementor.id, resource.packageId)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `Function implementation in '${implementor.id}' uses resource from undeclared direct Extension '${resource.packageId}'`);
+      }
+      // SelectedFunction.resources are passed into Package.Init when it is the lifecycle
+      // callable. The logical Element owner must authorize every resource independently
+      // of the physical implementor; the implementor's own dependency is not transferable.
+      if (!directExtension(resolved.owner.id, resource.packageId)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Function '${resolved.element.def.id}.${resolved.fn.id}' owner '${resolved.owner.id}' lacks direct Extension authorization for resource '${resource.packageId}/${resource.path}'`);
       }
       scope.verify(resource);
     }
