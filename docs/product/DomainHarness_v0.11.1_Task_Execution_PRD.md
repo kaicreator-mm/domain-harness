@@ -1,3 +1,7 @@
+<!-- DH_V0111_PRODUCT_L1_OWNER_XSTATE_RESEARCH_BOUNDARY_20261121 -->
+> **Owner 最新决定：** 本版本必须先读清 0.10 Workflow/StateMachine 的源码逻辑并文档化；采用最新稳定 XState 与 Element-First 的具体实现属于 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)，不写成 L1 功能细节。[源码研究和责任边界文档 PR #1611](https://github.com/kaicreator-mm/domain-harness/pull/1611)。Package 业务异常由其自身处理；SDK/KDP 仅作最小退出/日志，不承诺绝对无异常/安全。**L1 F01–F10 / AC11–AC20 无变化，仍属待审核候选。**
+<!-- /DH_V0111_PRODUCT_L1_OWNER_XSTATE_RESEARCH_BOUNDARY_20261121 -->
+
 # DomainHarness 0.11.1 — Task Execution（Product/L1 · WHAT）
 
 > Master [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563) · Product [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) · L2 [#1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)。本文件只说明 **0.11.1 重写应交付的能力、边界和验收结果**；具体实现方式全部在 L2 定义。本 PR 仍是 Product/L1 候选，不代表冻结或功能已完成。
