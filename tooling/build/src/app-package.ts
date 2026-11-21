@@ -287,6 +287,8 @@ export function composeAppPackage(
     dependencies,
   }));
   add('boot.mjs', new TextEncoder().encode(BOOT_MODULE(needsWorkflowRuntime)));
+  // 不论调用方使用何种 npm 安装命令，组合包默认禁止在 Boot 之前执行依赖安装 Hook。
+  add('.npmrc', new TextEncoder().encode('ignore-scripts=true\naudit=false\nfund=false\n'));
   files.sort((a, b) => a.path.localeCompare(b.path));
   const packageDigest: ContentDigest = contentDigestOf(files.map((file) => ({ path: file.path, digest: file.digest })));
   return { kind: 'DomainAppPackage', schemaVersion: 'dh.app-package/0.11', files, packageDigest };
