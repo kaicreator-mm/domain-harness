@@ -113,6 +113,20 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
   const composedManifest = JSON.parse(Buffer.from(a.appPackage.files.find((file) => file.path === 'package.json')!.bytes).toString('utf8'));
   assert.equal(composedManifest.dependencies.xstate, '5.33.2');
   assert.equal(composedManifest.dependencies.yaml, '2.9.1');
+  assert.deepEqual(a.lock.trustedRuntimeIntegrity?.map((archive) => archive.name), ['xstate', 'yaml']);
+  const attestFile = a.appPackage.files.find((file) => file.path === 'dh-install/trusted-runtime.json');
+  const verifyFile = a.appPackage.files.find((file) => file.path === 'dh-install/verify-runtime.mjs');
+  assert.ok(attestFile && verifyFile, 'composed package must carry exact executable archive SRI attest + verifier');
+  const attest = JSON.parse(Buffer.from(attestFile.bytes).toString('utf8'));
+  assert.deepEqual(attest.archives, a.lock.trustedRuntimeIntegrity,
+    'trusted runtime byte pins must be sealed in both Lock and App Package');
+  assert.ok(attest.archives.every((item: { integrity: string }) => item.integrity.startsWith('sha512-')),
+    'third-party executable tarballs must be pinned by actual SHA-512 archive digest');
+  const bootModule = a.appPackage.files.find((file) => file.path === 'boot.mjs');
+  assert.ok(bootModule);
+  const bootSource = Buffer.from(bootModule.bytes).toString('utf8');
+  assert.ok(bootSource.indexOf('verify-runtime.mjs') < bootSource.indexOf("import('@kaicreator/domain-harness-microkernel')"),
+    'external trusted runtime attestation must run BEFORE dynamic KDP import');
   assert.equal(a.lock.selectedWorkflows?.length, 1);
   const selected = a.lock.selectedWorkflows![0]!;
   assert.deepEqual(selected.ref, { element: ref, contentId: 'business-flow' });
