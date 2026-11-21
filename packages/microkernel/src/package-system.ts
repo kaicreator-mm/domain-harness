@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { contentDigestOf, canonicalJson } from '@kaicreator/domain-harness-contracts';
-import { executeSelectedWorkflow } from './workflow-execution.js';
+import { startWorkflowRun } from './workflow-run.js';
 import type {
   DomainAppLock,
   ElementDefinition,
@@ -238,7 +238,7 @@ export class PackageSystem {
                 message: 'authorized Workflow root is not selected in Lock',
               } };
             }
-            return executeSelectedWorkflow(ref, input, {
+            return startWorkflowRun(ref, input, {
               select: (wanted) => this.lock.selectedWorkflows?.find((item) =>
                 canonicalJson(item.ref) === canonicalJson(wanted)),
               invoke: async (call, value) => {

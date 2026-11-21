@@ -1,9 +1,6 @@
 /**
- * v0.11.1 T13: pure, bounded Workflow node semantics shared by the KDP actor boundary.
- *
- * This is NOT a replacement for XState v5 actor lifecycle. The first-party XState
- * wrapper must own each WorkflowRun/child actor and drive this verified step logic.
- * It never discovers Function, Workflow or Resource beyond BUILD-selected Lock data.
+ * 有界 Workflow 节点语义，由唯一 KDP 的 XState Actor 边界复用。
+ * 不在此处发现 Lock 之外的 Function、Workflow 或 Resource。
  */
 import {
   canonicalJson,
@@ -13,6 +10,8 @@ import {
   selectWorkflowTarget,
   withinWorkflowAncestorDepth,
 } from '@kaicreator/domain-harness-contracts';
+import { parseDocument } from 'yaml';
+import { isPlainJsonValue } from './schema-subset.js';
 import type {
   FunctionOutcome,
   FunctionRef,
@@ -27,18 +26,27 @@ import type {
 } from '@kaicreator/domain-harness-contracts';
 
 export interface SelectedWorkflowDriver {
-  /** Caller authorization is already sealed in the sole BUILD Lock. */
+  /** 调用方授权已由唯一 BUILD Lock 封存。 */
   select(ref: WorkflowRef): SelectedWorkflow | undefined;
-  /** Reuses KDP's existing selected Function Schema/Outcome guard. */
+  /** 复用 KDP 已有的选定 Function Schema/Outcome 防线。 */
   invoke(ref: FunctionRef, input: JsonValue): Promise<FunctionOutcome>;
-  /** Reads an exact digest-verified ResourceRef, never an arbitrary path. */
+  /** 只读取摘要已验证的 ResourceRef，绝不接受任意路径。 */
   read(ref: ResourceRef): Promise<Uint8Array>;
 }
 
-interface RunBudget {
+export interface RunBudget {
   remainingCalls: number;
   remainingSteps: number;
 }
+
+export type WorkflowChildRunner = (
+  ref: WorkflowRef,
+  input: JsonValue,
+  driver: SelectedWorkflowDriver,
+  budget: RunBudget,
+  ancestors: readonly WorkflowDefinition[],
+  activeRefs: readonly string[],
+) => Promise<WorkflowOutcome>;
 
 function failed(code: string, message: string): WorkflowOutcome {
   return { status: 'FAILED', reason: { code, message } };
@@ -56,21 +64,17 @@ function terminal(
   original: WorkflowOutcome | FunctionOutcome,
 ): WorkflowOutcome {
   if (kind === 'COMPLETE') return { status: 'COMPLETE', value: current };
-  if ('status' in original && original.status === kind && original.status !== 'COMPLETE') {
+  if ('status' in original && original.status === kind) {
     return original;
   }
-  if ('kind' in original && original.kind === kind && original.kind !== 'SUCCEEDED') {
+  if ('kind' in original && original.kind === kind) {
     return { status: kind, reason: reasonOf(original) };
   }
   return { status: kind, reason: { code: 'DH_WORKFLOW_TERMINAL', message: 'explicit business terminal' } };
 }
 
-function callBudgetFailure(): WorkflowOutcome {
-  return failed('DH_WORKFLOW_CALL_BUDGET', 'root WorkflowRun has no remaining reserved Function calls');
-}
-
 function selectedKey(ref: WorkflowRef): string {
-  return canonicalJson(ref as unknown as JsonValue);
+  return canonicalJson(ref);
 }
 
 async function prepareDataInput(
@@ -84,10 +88,27 @@ async function prepareDataInput(
     throw new Error('DH_WORKFLOW_READER_SIZE_LIMIT');
   }
   const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  return { format: node.data.format, source };
+  try {
+    let parsed: unknown;
+    if (node.data.format === 'json') {
+      parsed = JSON.parse(source);
+    } else {
+      const document = parseDocument(source, {
+        schema: 'core', strict: true, uniqueKeys: true,
+        version: '1.2', logLevel: 'silent', intAsBigInt: false,
+      });
+      if (document.errors.length > 0 || document.warnings.length > 0) throw new Error('YAML parse rejected');
+      parsed = document.toJS({ maxAliasCount: 32 });
+    }
+    canonicalJson(parsed);
+    if (!isPlainJsonValue(parsed)) throw new Error('Reader value is not plain JSON');
+    return { format: node.data.format, source, value: parsed };
+  } catch {
+    throw new Error('DH_WORKFLOW_READER_INVALID');
+  }
 }
 
-/** Call once per real Function invocation; reservation must have succeeded first. */
+/** 每次真实 Function 调用只扣一次预算，调用前必须已经完成整叶预留。 */
 async function invoke(
   driver: SelectedWorkflowDriver,
   budget: RunBudget,
@@ -104,9 +125,8 @@ async function invoke(
 }
 
 /**
- * Invokes start → leaf → end. Once start is attempted end is always attempted
- * exactly once, including start/leaf UNKNOWN, FAILED and thrown fatal errors.
- * An unhandled fatal is rethrown for KDP's sole Exit fallback after end attempt.
+ * 调用 start → leaf → end。只要尝试过 start，就必须恰好尝试一次 end；
+ * 包括 UNKNOWN、FAILED 和致命异常。未处理致命异常在 end 后继续交给唯一 KDP 退出兜底。
  */
 async function invokeLeaf(
   node: WorkflowFunctionNode,
@@ -119,7 +139,7 @@ async function invokeLeaf(
       code: 'DH_WORKFLOW_CALL_BUDGET', message: 'insufficient budget before any leaf side effect',
     } };
   }
-  // The whole leaf is reserved logically; debit only Functions actually invoked.
+  // 逻辑上先预留整个叶节点，实际只扣除真正发生的 Function 调用。
   let outcome: FunctionOutcome = { kind: 'FAILED', failure: {
     code: 'DH_WORKFLOW_NO_FUNCTION', message: 'selected leaf did not execute',
   } };
@@ -151,14 +171,16 @@ async function invokeLeaf(
       }
     }
   }
-  if (fatal !== undefined) throw fatal;
+  if (fatal !== undefined) {
+    if (fatal instanceof Error) throw fatal;
+    throw new Error('DH_WORKFLOW_FATAL');
+  }
   return outcome;
 }
 
 /**
- * Deterministic selected-graph runner. XState v5's promise actor will call this
- * for a root; child calls must be wrapped by the actor adapter (not by a new
- * Package loader). The shared budget is passed unchanged through all children.
+ * 纯语义入口用于对照测试；生产 Package.Init 走 startWorkflowRun 的真实 Actor。
+ * 子 Workflow 可通过 runChild 交给独立 XState Actor，预算引用保持不变。
  */
 export async function executeSelectedWorkflow(
   rootRef: WorkflowRef,
@@ -174,13 +196,14 @@ export async function executeSelectedWorkflow(
   return executeDefinition(rootRef, input, driver, budget, [], []);
 }
 
-async function executeDefinition(
+export async function executeDefinition(
   ref: WorkflowRef,
   input: JsonValue,
   driver: SelectedWorkflowDriver,
   budget: RunBudget,
   ancestors: readonly WorkflowDefinition[],
   activeRefs: readonly string[],
+  runChild?: WorkflowChildRunner,
 ): Promise<WorkflowOutcome> {
   const entry = driver.select(ref);
   if (!entry) return failed('DH_WORKFLOW_UNSELECTED', 'child Workflow was not selected at BUILD');
@@ -204,7 +227,9 @@ async function executeDefinition(
     if (!node) return failed('DH_WORKFLOW_NODE_UNSELECTED', 'selected graph missing a node');
     let result: WorkflowOutcome | FunctionOutcome;
     if (node.kind === 'workflow') {
-      result = await executeDefinition(node.workflow, value, driver, budget, chain, [...activeRefs, key]);
+      result = runChild
+        ? await runChild(node.workflow, value, driver, budget, chain, [...activeRefs, key])
+        : await executeDefinition(node.workflow, value, driver, budget, chain, [...activeRefs, key]);
     } else {
       result = await invokeLeaf(node, value, driver, budget);
     }
@@ -228,7 +253,7 @@ async function executeDefinition(
       value = newValue;
       continue;
     }
-    // Reinforce T11's BUILD-time non-success→COMPLETE rejection at runtime.
+    // 在 Runtime 再次强化 T11 的非成功不得进入 COMPLETE 约束。
     if (target.terminal === 'COMPLETE' && ('kind' in result
       ? result.kind !== 'SUCCEEDED' : result.status !== 'COMPLETE')) {
       return failed('DH_WORKFLOW_INVALID_SUCCESS', 'non-success cannot become COMPLETE');
