@@ -1,5 +1,5 @@
 <!-- DH_V011X_OWNER_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP_20261121 -->
-> **跨 0.11.x Owner 补充决议（WHAT/HOW 归属）**：Package 生成前，由 Domain/Package 生产者和 BUILD/测试完成结构、依赖、Workflow/StateMachine 以及业务异常路径的质量验证；交付后的选定 Package 负责其业务异常与领域 Outcome。SDK/Kernel 不对绝对安全或永无异常作承诺，也不充当业务异常修复器；只保留必要 Boot Trust、技术装载/销毁、最小失败退出/清理及不泄密诊断。对已验收 0.11.0 的现有运行期业务 Schema/Outcome 校验，须通过后续 L2 增量与必要反例明确归属后再调整，不能直接悄悄删掉。详细说明：[Package 构建期信任与异常责任边界](../architecture/DomainHarness_v0.11.x_PACKAGE_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP.md)。本决议贯穿 0.11.1–0.11.9；不扩大 0.11.1 Product 的 WHAT 范围。
+> **0.11.x Owner 最新架构决定（覆盖旧候选）：** Workflow/State Machine 的**通用执行机制属于唯一 KDP Core**，内部可选用稳定 XState v5；Kernel Primary 通过自己的通用 Element/FunctionContract 表达机制，业务 Workflow/State/Guard 则作为 Business/Standard Element Content/Function 定义。BUILD 负责新流程的结构合法性与封存，Package 自行处理业务异常。**0.11.0 现有 Kernel/SDK 校验一律保留、不迁移、不删除；0.11.1 不再扩充 Kernel/SDK 运行时业务校验。** Kernel/SDK 保持原有 Boot Trust/生命周期/最小退出与日志，不承诺绝对安全或零异常。详情：[KDP/Element-First 设计 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 与 [质量信任和异常责任文档](../architecture/DomainHarness_v0.11.x_PACKAGE_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP.md)。该 Owner 决定不改变 0.11.1 L1 功能范围。
 <!-- /DH_V011X_OWNER_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP_20261121 -->
 
 <!-- DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
