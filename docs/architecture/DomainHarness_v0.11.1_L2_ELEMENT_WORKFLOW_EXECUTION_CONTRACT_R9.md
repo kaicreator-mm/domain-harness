@@ -1,3 +1,5 @@
+> **R9.1 已被 [L2 R10](DomainHarness_v0.11.1_L2_INIT_OWNED_WORKFLOW_CONTRACT_R10.md) 取代（2026-11-21）**：Package.Init 直接负责发起 Workflow；没有 READY 后独立 Business App Init/Router，也不继续保留 technicalInit/Dispose；Core.Order 属 0.11.0；Exit 与 InitFrom **分别可选**；正常业务入口 Init→Workflow→Function；Schema 采用 0.11.0 已有 `ContentBlock(contentKind='workflow-definition',schemaRef)`，不在 Element 根对象添加 nesting 字段；业务异常由 Element/Package 处理、KDP 只兜底。下方原 R9.1 全文为历史设计材料，**不能用于新任务实施或冻结**。
+
 > **2026-11-21 跨版本一致性审查发现 P1 设计冲突：** 本文 R9.1 关于“Package Init 仅作为 READY 后业务入口”“保留 `technicalInit/technicalDispose` 和独立 `businessAppInit`”“原有 KDP 运行时业务 Schema/异常映射全部不变”的文字，是按此前已实施的 0.11.0 旧合同撰写；与更新的 **v0.11.0 Package/Core/Init/Exit 规范候选 [PR #1621](https://github.com/kaicreator-mm/domain-harness/pull/1621)** 不一致。**不能直接将本文作为实施/Freeze 权威**。须先对照 [跨版本冲突矩阵](DomainHarness_v0.11.0_V0111_CROSS_VERSION_CONFLICT_AUDIT.md) 的 X01–X10 统一：Core.Order/KDP0、统一 Package.Init、InitFrom、Exit、直接 Extension、完整组合 BUILD、Element 自治错误。#1621 仍为 Draft/未实施，现有 0.11.0 Scoped CI 证明的仍是旧基线。本文 Workflow/Switch/Reader/业务 Hook/预算的新功能范围不因此自动失效，但其接线设计暂停冻结。
 
 # DomainHarness v0.11.1 — Element/Init/Workflow 执行合同 L2 R9.1
