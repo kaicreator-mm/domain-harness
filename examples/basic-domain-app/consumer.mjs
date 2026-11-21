@@ -52,8 +52,11 @@ function lifecycleModule(packageId) {
   return `
 const events = (globalThis.__domainHarnessT05Events ??= []);
 events.push({ event: 'module-evaluated', package: '${packageId}' });
-export async function technicalInit() { events.push({ event: 'technical-init', package: '${packageId}' }); }
-export async function technicalDispose() { events.push({ event: 'technical-dispose', package: '${packageId}' }); }
+export async function init(ctx) {
+  events.push({ event: 'package-init', package: '${packageId}', initFrom: ctx.InitFrom });
+  ${packageId === 'app-business' ? "return (await import('./app.mjs')).init(ctx);" : ''}
+}
+export async function exit() { events.push({ event: 'package-exit', package: '${packageId}' }); }
 `;
 }
 function rulesModule() {
@@ -75,7 +78,7 @@ function businessModule(withUnsupportedEffect, initThrows = false, initDegraded 
 import { evaluate, initializeRule } from 'rules-package/rules';
 const events = (globalThis.__domainHarnessT05Events ??= []);
 events.push({ event: 'module-evaluated', package: 'app-business-entry' });
-export async function businessAppInit(ctx) {
+export async function init(ctx) {
   ${initThrows ? "throw new Error('demo intentionally failed Business App Init');" : ''}
   const handle = ctx.resources.get('rules-package/content/rules.json');
   if (handle === undefined) throw new Error('selected rule resource is not sealed');
@@ -147,7 +150,6 @@ async function authoring(label, rule, options = {}) {
     content: [{ id: 'channel', contentKind: 'structured-data', schemaRef: { inline: { type: 'object' } }, required: true, value: { channel: 'basic-example' } }],
     functions: [
       fn('submit', evaluateInput, decisionSchema),
-      fn('appInit', { type: 'object' }, { type: 'object' }),
       ...(options.unsupportedEffect === true ? [fn('dangerous', { type: 'object' }, { type: 'string' }, 'external')] : []),
     ],
     dependencies: [
@@ -186,7 +188,7 @@ async function authoring(label, rule, options = {}) {
   const functionRef = (element, functionId) => ({ element: elementRef(element), functionId, contractVersion: '1' });
   const refs = {
     evaluate: functionRef('basic.rules', 'evaluate'), optionalReport: functionRef('basic.rules', 'optionalReport'),
-    submit: functionRef('basic.app', 'submit'), appInit: functionRef('basic.app', 'appInit'),
+    submit: functionRef('basic.app', 'submit'),
     dangerous: functionRef('basic.app', 'dangerous'),
   };
   const artifactRef = async (packageId, path) => ({ packageId, path, digest: await fileDigest(join(dirs[packageId], path)) });
@@ -201,26 +203,26 @@ async function authoring(label, rule, options = {}) {
   });
   const packages = [
     manifest('kernel-primary', {
-      layer: 'kernel', role: 'primary', exports: [{ interfaceId: 'kernel.api' }],
+      layer: 'kernel', role: 'primary', order: 0, dependsOn: [{ package: 'kernel-extension', version: '1.0.0', interface: 'kernel.extension' }], exports: [{ interfaceId: 'kernel.api' }],
       provides: { hooks: [{ id: 'audit', interfaceSchemaRef: { inline: { type: 'object' } }, cardinality: 'single' }] },
-      technicalInit: { module: artifactRefs['kernel-primary'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['kernel-primary'], exportName: 'technicalDispose' },
+      init: { module: artifactRefs['kernel-primary'], exportName: 'init' },
+      exit: { module: artifactRefs['kernel-primary'], exportName: 'exit' },
     }),
     manifest('kernel-extension', {
-      layer: 'kernel', role: 'extension', dependsOn: [{ package: 'kernel-primary', version: '1.0.0', interface: 'kernel.api' }],
+      layer: 'kernel', role: 'extension', exports: [{ interfaceId: 'kernel.extension' }],
       contributesTo: [{ ownerPackageId: 'kernel-primary', hookId: 'audit', entry: { module: artifactRefs['kernel-extension'], exportName: 'auditHook' } }],
-      technicalInit: { module: artifactRefs['kernel-extension'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['kernel-extension'], exportName: 'technicalDispose' },
+      init: { module: artifactRefs['kernel-extension'], exportName: 'init' },
+      exit: { module: artifactRefs['kernel-extension'], exportName: 'exit' },
     }),
     manifest('sdk-primary', {
-      layer: 'sdk', role: 'primary', dependsOn: [{ package: 'kernel-primary', version: '1.0.0', interface: 'kernel.api' }], exports: [{ interfaceId: 'sdk.api' }],
-      technicalInit: { module: artifactRefs['sdk-primary'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['sdk-primary'], exportName: 'technicalDispose' },
+      layer: 'sdk', role: 'primary', order: 1, dependsOn: [{ package: 'kernel-primary', version: '1.0.0', interface: 'kernel.api' }, { package: 'sdk-extension', version: '1.0.0', interface: 'sdk.extension' }], exports: [{ interfaceId: 'sdk.api' }],
+      init: { module: artifactRefs['sdk-primary'], exportName: 'init' },
+      exit: { module: artifactRefs['sdk-primary'], exportName: 'exit' },
     }),
     manifest('sdk-extension', {
-      layer: 'sdk', role: 'extension', dependsOn: [{ package: 'sdk-primary', version: '1.0.0', interface: 'sdk.api' }],
-      technicalInit: { module: artifactRefs['sdk-extension'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['sdk-extension'], exportName: 'technicalDispose' },
+      layer: 'sdk', role: 'extension', exports: [{ interfaceId: 'sdk.extension' }],
+      init: { module: artifactRefs['sdk-extension'], exportName: 'init' },
+      exit: { module: artifactRefs['sdk-extension'], exportName: 'exit' },
     }),
     manifest('rules-package', {
       layer: 'business', role: 'extension',
@@ -233,27 +235,26 @@ async function authoring(label, rule, options = {}) {
         implementation('basic.rules', 'evaluate', rulesEntryRef, 'evaluate', [ruleRef]),
         implementation('basic.rules', 'optionalReport', rulesEntryRef, 'optionalReport'),
       ]),
-      technicalInit: { module: artifactRefs['rules-package'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['rules-package'], exportName: 'technicalDispose' },
+      init: { module: artifactRefs['rules-package'], exportName: 'init' },
+      exit: { module: artifactRefs['rules-package'], exportName: 'exit' },
     }),
     manifest('app-business', {
-      layer: 'business', role: 'primary', dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }],
+      layer: 'business', role: 'primary', order: 2, dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }], initResources: [ruleRef],
       elements: [{ id: 'basic.app', version: '1.0.0', definitionRef: definitionRefs['basic.app'], visibility: 'public' }],
       imports: [refs.evaluate, refs.optionalReport], exports: [{ elementId: 'basic.app' }, { interfaceId: 'business.api' }],
       targetVariants: variant([
         implementation('basic.app', 'submit', businessEntryRef, 'submit', [ruleRef]),
-        implementation('basic.app', 'appInit', businessEntryRef, 'businessAppInit', [ruleRef]),
         ...(options.unsupportedEffect === true ? [implementation('basic.app', 'dangerous', businessEntryRef, 'dangerous')] : []),
       ]),
-      technicalInit: { module: artifactRefs['app-business'], exportName: 'technicalInit' },
-      technicalDispose: { module: artifactRefs['app-business'], exportName: 'technicalDispose' },
+      init: { module: artifactRefs['app-business'], exportName: 'init' },
+      exit: { module: artifactRefs['app-business'], exportName: 'exit' },
     }),
   ];
   await write(dirs['kernel-extension'], 'dist/index.mjs', `${lifecycleModule('kernel-extension')}\nexport function auditHook(value) { return value; }\n`);
   artifactRefs['kernel-extension'] = await artifactRef('kernel-extension', 'dist/index.mjs');
   packages[1].contributesTo[0].entry.module = artifactRefs['kernel-extension'];
-  packages[1].technicalInit.module = artifactRefs['kernel-extension'];
-  packages[1].technicalDispose.module = artifactRefs['kernel-extension'];
+  packages[1].init.module = artifactRefs['kernel-extension'];
+  packages[1].exit.module = artifactRefs['kernel-extension'];
 
   const descriptor = {
     kind: 'DomainApp', schemaVersion: DH_APP_SCHEMA_VERSION, id: `basic.clean.${label}`, version: '1.0.0',
@@ -268,7 +269,6 @@ async function authoring(label, rule, options = {}) {
       { package: 'sdk-extension', version: '1.0.0' },
       { package: 'rules-package', version: '1.0.0' },
     ],
-    businessAppInit: refs.appInit,
     ingress: [
       { id: 'submit', function: refs.submit },
       { id: 'optional-report', function: refs.optionalReport, optional: true },
@@ -391,13 +391,14 @@ async function runPositive(label, rule, expectedAtHundred) {
     const app = result.app;
     assert.equal(app.status, 'READY');
     const runtimeEvents = globalThis.__domainHarnessT05Events;
-    const technical = runtimeEvents.filter((event) => event.event === 'technical-init').map((event) => event.package);
-    assert.deepEqual(technical, install.lock.technicalInitOrder);
+    const initialized = runtimeEvents.filter((event) => event.event === 'package-init').map((event) => event.package);
+    assert.deepEqual(install.lock.coreOrder, ['kernel-primary', 'sdk-primary', 'app-business']);
+    assert.deepEqual(initialized, ['kernel-extension', 'kernel-primary', 'sdk-extension', 'sdk-primary', 'rules-package', 'app-business']);
     const businessInitIndex = runtimeEvents.findIndex((event) => event.event === 'business-init');
-    const lastTechnicalIndex = runtimeEvents.map((event) => event.event).lastIndexOf('technical-init');
-    assert.ok(lastTechnicalIndex >= 0 && businessInitIndex > lastTechnicalIndex, 'the one Business App Init must run after every technical init');
+    const lastInitIndex = runtimeEvents.map((event) => event.event).lastIndexOf('package-init');
+    assert.ok(lastInitIndex >= 0 && businessInitIndex > lastInitIndex, 'Business Core.Init executes once after own Extension Init');
     assert.equal(runtimeEvents.filter((event) => event.event === 'business-init').length, 1);
-    await evidence(`${label}.boot-kdp-app-init`, { status: 'PASS', technicalInitOrder: technical, businessInitCount: 1 });
+    await evidence(`${label}.boot-kdp-app-init`, { status: 'PASS', initOrder: initialized, businessInitCount: 1 });
 
     const pos = await app.invoke('submit', { total: 100, region: 'US' });
     const neg = await app.invoke('submit', { total: 10, region: 'US' });
@@ -427,14 +428,12 @@ async function runPositive(label, rule, expectedAtHundred) {
     assert.equal(inspection.appIdentity.lockDigest, install.lock.closureDigest);
     assert.equal(inspection.target.profile, 'node22-esm/1');
     assert.deepEqual(await app.dispose(), { status: 'DISPOSED' });
-    const disposed = runtimeEvents.filter((event) => event.event === 'technical-dispose').map((event) => event.package);
-    assert.deepEqual(install.lock.technicalDisposeOrder, [...install.lock.technicalInitOrder].reverse());
-    assert.deepEqual(disposed, install.lock.technicalDisposeOrder);
-    assert.deepEqual(disposed, [...technical].reverse(), 'runtime disposal must be the exact reverse of technical init');
+    const disposed = runtimeEvents.filter((event) => event.event === 'package-exit').map((event) => event.package);
+    assert.deepEqual(disposed, [...initialized].reverse(), 'Exit must run in reverse actual Init entry order');
     const afterDispose = await app.invoke('submit', { total: 100, region: 'EU' });
     assert.equal(afterDispose.kind, 'FAILED');
     assert.equal(afterDispose.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
-    await evidence(`${label}.inspect-dispose`, { status: 'PASS', technicalDisposeOrder: disposed, postDisposeCode: afterDispose.failure.code });
+    await evidence(`${label}.inspect-dispose`, { status: 'PASS', exitOrder: disposed, postDisposeCode: afterDispose.failure.code });
     return { prepared, install };
   } finally {
     await rm(prepared.root, { recursive: true, force: true });
@@ -497,9 +496,9 @@ async function main() {
   await expectBuildMutationRefusal('hook-not-declared', (p) => {
     pkg(p, 'kernel-extension').contributesTo[0].hookId = 'not-an-audit-hook';
   }, 'DH_BUILD_HOOK_TARGET_INVALID');
-  await expectBuildMutationRefusal('missing-selected-app-init', (p) => {
-    p.input.descriptor.businessAppInit.functionId = 'nonexistent-init';
-  }, 'DH_BUILD_APP_INIT_MISSING');
+  await expectBuildMutationRefusal('missing-selected-package-init', (p) => {
+    pkg(p, 'app-business').init.exportName = 'nonexistentInit';
+  }, 'DH_BUILD_SCHEMA_INVALID');
   await expectBuildMutationRefusal('bad-resource-digest', (p) => {
     pkg(p, 'app-business').targetVariants[0].implementations[0].resources[0].digest = `sha256:${'0'.repeat(64)}`;
   }, 'DH_BUILD_RESOURCE_DIGEST_MISMATCH');
@@ -532,11 +531,11 @@ async function main() {
     assert.equal(failedInit.code, 'DH_RUNTIME_NOT_READY');
     assert.equal('app' in failedInit, false, 'failed App Init must not expose any App/ingress handle');
     const timeline = globalThis.__domainHarnessT05Events;
-    const initialized = timeline.filter((event) => event.event === 'technical-init').map((event) => event.package);
-    const disposed = timeline.filter((event) => event.event === 'technical-dispose').map((event) => event.package);
-    assert.ok(initialized.length > 0, 'failure fixture must actually initialize technical Packages');
-    assert.deepEqual(initialized, failedInitInstall.lock.technicalInitOrder);
-    assert.deepEqual(disposed, [...initialized].reverse(), 'failed App Init must roll back all technical Packages in reverse order');
+    const initialized = timeline.filter((event) => event.event === 'package-init').map((event) => event.package);
+    const disposed = timeline.filter((event) => event.event === 'package-exit').map((event) => event.package);
+    assert.ok(initialized.length > 0, 'failure fixture must actually initialize Packages');
+    assert.deepEqual(initialized, ['kernel-extension', 'kernel-primary', 'sdk-extension', 'sdk-primary', 'rules-package', 'app-business']);
+    assert.deepEqual(disposed, [...initialized].reverse(), 'failed App Init must roll back all Packages in reverse order');
     assert.equal(timeline.some((event) => event.event === 'business-init'), false);
     await evidence('negative.app-init-failure-rollback', { status: 'PASS', code: failedInit.code, initialized: initialized.length, disposed: disposed.length, exposedApp: false });
   } finally {
@@ -652,7 +651,7 @@ async function main() {
     },
     AC04: {
       status: 'PASS_E2E_WITH_UPSTREAM',
-      e2e: ['3 Primary + 3 Extension', 'one sealed Hook', 'deterministic technical init/dispose order'],
+      e2e: ['3 Primary + 3 Extension', 'one sealed Hook', 'deterministic Package Init/dispose order'],
       upstream: [upstream('T02', 'tooling/build/tests/*.test.ts (Primary/Hook cardinality negatives)')],
     },
     AC05: {
@@ -663,7 +662,7 @@ async function main() {
     },
     AC06: {
       status: 'PASS_E2E_WITH_UPSTREAM',
-      e2e: ['one App Init after all technical init', 'direct cross-package POS/NEG/UNKNOWN', 'same-code content exchange', 'App Init exception reverse cleanup and no exposed App handle'],
+      e2e: ['one App Init after all Package Init', 'direct cross-package POS/NEG/UNKNOWN', 'same-code content exchange', 'App Init exception reverse cleanup and no exposed App handle'],
       upstream: [upstream('T04', 'packages/domain-harness/tests/final-integration.test.ts (required-ingress suppression and DEGRADED negatives)')],
     },
     AC07: {
