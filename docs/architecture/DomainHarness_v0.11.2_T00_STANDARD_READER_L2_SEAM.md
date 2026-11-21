@@ -1,5 +1,7 @@
 # DomainHarness v0.11.2 · T00 — Standard JSON/YAML Reader L2 实际接线决定（R31）
 
+> **架构定义前置：** [DomainHarness 产品组成与 BUILD 完整边界](./DomainHarness_v0.11.x_BUILD_AND_PRODUCT_BOUNDARY.md) 已明确完整 BUILD 覆盖从单个 Package 生成到完整应用 Package 的组合、验证和封存；当前 `buildApp()` 主要处理已生成 Package 的选择/校验/组合。Reader 标准化使用此**同一个 BUILD 信任边界**，不能通过新增 Reader 模块把 Package 的生成后代码排除在静态授权/资源验证之外，也不能把 BUILD 的静态预检理解为运行中调用任意 Reader 实现。
+
 > **设计候选，不能当成代码已经完成。** 本合同实现 [R29 Standard Element 规范](./DomainHarness_v0.11.x_STANDARD_ELEMENT_SYSTEM.md) 的第一项有限任务 [#1644](https://github.com/kaicreator-mm/domain-harness/issues/1644)，遵守 0.11.0/0.11.1 已接受的唯一 Element/Function、Package/Direct Extension、BUILD/Lock、KDP/Workflow/XState、可信安装。适用源码基线 `version/v0.11.x@43ce7feab7134e3f61f9b4686f7c8735ce4b1615`。本 R31 **必须先由独立审阅者审核接口和信任边界，再触碰源码**。
 
 ```ini
@@ -43,6 +45,8 @@ STANDARD_ACCEPTED=0
 | App 依赖安装与 SHA512 SRI 校验 | 原唯一 BUILD/Lock、`trusted-runtime.ts` | 自由 npm install、未声明第三方模块、把 `yaml` 暴露给任何未选业务代码 |
 
 **重要区分**：BUILD 对静态已选数据进行**预检**与 Runtime 的标准 Reader **解析**是不同生命周期步骤；允许二者调用同一受控 parser *implementation*；不能为“无重复”删掉 BUILD 正反例静态拒绝，也不能让 KDP 再私下解析并把结果注入 Reader。
+
+**BUILD 的具体执行限制（R32 补充）：** `tooling/build/src/types.ts::BuildInput` 目前接收已生成的 Package、PackageRoots/Artifacts；它的职责是验证这些产物并生成唯一 `DomainAppLock` 与 `ComposedAppPackage`，**不代表它已有通用 Package 源生成器**。R31 共享 parser 的“单一实现”应是**经过信任固定的纯格式解析源代码**供 BUILD 预检与标准 Reader 业务 Function 使用；BUILD 不能在预检时直接执行任意选定的业务 Element 或其模块初始代码，也不能让标准 Reader 的依赖包逃离 BUILD 最终静态代码检查。
 
 ## 3. 接口迁移是实际 Contract Delta，禁止静默兼容
 
