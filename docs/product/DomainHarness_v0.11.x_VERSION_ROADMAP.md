@@ -1,3 +1,7 @@
+<!-- DH_V011X_R13_DEVELOPMENT_PRINCIPLES_CURRENT -->
+> **【R13 · 0.11.x 全系列开发原则修订候选】**：0.11.0–0.11.9 是一次整体重构的内部实施阶段，**发现基础设计问题必须修改能力所属的原版本**，不得在后续版本用兼容桥/临时适配器掩盖；**后续已明确澄清的语义优先于早期未澄清的 Entry/旧技术形态**，但应审查并更新所属版本合同/受影响测试，不能倒签历史验收。当前基础修订建议把 Package.Init/Exit 的逻辑身份改为 `ElementRef`；模块地址/exportName 仅作为 BUILD 已选实现内部 locator，公共 `EntryRef` 概念不再必要。旧文献“可运行 Package 零 Element 但裸 Init 导出”“默认业务 Function 外部直接 ingress”若冲突，以新澄清为准。正式 Scope/反例见 [统一原则](../architecture/DOMAIN_HARNESS_V011X_SINGLE_REWRITE_OWNERSHIP_AND_CLARIFICATION_PRINCIPLES.md) 与 [0.11.0 修订清单 B0-01..08](../architecture/DomainHarness_v0.11.0_ELEMENT_IDENTITY_BASELINE_CORRECTION_R13.md)。**本次 docs-only，未实施/独审新基础改造；旧 Scoped 结果不自动覆盖新合同。**
+<!-- /DH_V011X_R13_DEVELOPMENT_PRINCIPLES_CURRENT -->
+
 <!-- DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
 > **0.11.0 源码质量最新状态（覆盖历史 REWORK）：** 先前的 REWORK 为真实历史，但已在 [Issue #1602](https://github.com/kaicreator-mm/domain-harness/issues/1602) / [PR #1603](https://github.com/kaicreator-mm/domain-harness/pull/1603) 通过 R12→R15 复审完成四模块重构，R15 `ACCEPT_SCOPED`（P0=0/P1=0、保留五项非阻断 P2），Woodpecker #2787 同 SHA SUCCESS，已合入 `version/v0.11.x`；后续 [PR #1606](https://github.com/kaicreator-mm/domain-harness/pull/1606) 补齐中文注释和调用流程文档并经 #2788 成功合入。**仅 0.11.0 Foundation/Stage-0 工程资格合格；main、统一 Release、0.11.1+ 和 Full Conformance 均不能据此晋升。**
 >
@@ -50,12 +54,24 @@ NODE_MINIMUM=22.12.0
 - **只有 0.11.0–0.11.9 全部必需能力通过一次最终组合验收**，才创建唯一正式 `main` PR、受控合并并形成正式 Tag/GitHub Release；不预先把版本阶段号等同正式 SemVer Tag。npm Publish 不是默认必需动作。
 - 本轮只固定版本阶段和目标，不因规划确认就自动启动 0.11.1 实施、创建 Task Issue 或宣称未来功能合格。各版本按实际开工时明确具体 PRD/AC 和验收责任，避免无限扩张。
 
+### 2.1 阶段归属和澄清优先（R13）
+
+**这里是 0.11.x 后续所有工程任务的版本选择依据：**
+
+1. 首先确认问题属于哪个基础概念/功能：**身份、Package 生命周期、BUILD、Boot/KDP、SDK 基础属于 0.11.0**；Workflow/Actor/Guard/Switch/Reader/业务 Hook 属于 0.11.1；领域语义、交互、Effect、LLM、Durable、Evidence、Client/Server 反馈依下表对应版本。
+2. 在后续版本发现前一版本的原始合同错误，**必须返回前一版本修改**，不允许为保持内部旧 ABI 而创建兼容桥。所有修改均在同一个 `version/v0.11.x` 最终架构里受控整合，不为 0.11.n 单独 Release。
+3. **明确澄清的设计高于未澄清技术形态**：例如 Element-First 的 Init/Exit 是真实 Element；旧 `EntryRef` 仅是一种模块导出定位，不是独立可调用领域对象。这个基本身份纠正归 0.11.0。
+4. 区分基本修正和新能力，防止反向过度实现：0.11.0 应具备 Init 内受限执行已选 Function 的**基础能力**，但 `WorkflowRun/XState`、JSON/YAML Reader、Switch 和 start/end 业务执行行为仍只归 0.11.1。
+5. 已通过的未变化范围复用历史证据；改动的类型、BUILD、KDP、SDK/fixtures、真实 packed Consumer 必须做有限增量验证。新澄清不得宣称已被历史 CI 自动覆盖。
+
+完整规范和全部 0.11.0 修订任务请分别读 [0.11.x 所有权/澄清原则](../architecture/DOMAIN_HARNESS_V011X_SINGLE_REWRITE_OWNERSHIP_AND_CLARIFICATION_PRINCIPLES.md) 与 [v0.11.0 ElementRef 修正清单](../architecture/DomainHarness_v0.11.0_ELEMENT_IDENTITY_BASELINE_CORRECTION_R13.md)。
+
 ## 3. 版本正式划分：按照 Harness/Agent 纵向闭环逐步完善
 
 | 阶段 | 版本定位 | 本阶段主要交付 | 独立验收结果 |
 |---|---|---|---|
 | **0.11.0 — Foundation** | 新架构能定义、装配、运行一个 Domain App（**已通过 Scoped 验收**） | Element/Content/Function；K/S/B Package；BUILD/AOT/Lock；Boot→唯一 KDP→App Init；clean public SDK；Selected no-effect Function | 四包安装的新 SDK Consumer 能构建、启动、执行实际已选 Knowledge/Rule 改变结果的 Function；AC01–AC10 Scoped PASS |
-| **0.11.1 — Task Execution** | 使用 Workflow + State Machine 实现**确定性 Task Execution Loop** | Goal/TaskRun、Workflow Step/Branch、Task/Domain 状态机合同、Guard、Bounded Coordinator/Observation/Outcome；选定 Function 的步骤执行 | 无 LLM/外部 Effect 的多步真实任务，能 COMPLETE、ASK/WAIT、REJECT/UNKNOWN，不能非法转移或无限循环；简单 Function 仍可直接调用 |
+| **0.11.1 — Task Execution** | 使用 Workflow + State Machine 实现**确定性 Task Execution Loop** | Goal/TaskRun、Workflow Step/Branch、Task/Domain 状态机合同、Guard、Bounded Coordinator/Observation/Outcome；选定 Function 的步骤执行 | 无 LLM/外部 Effect 的多步真实任务，能 COMPLETE、ASK/WAIT、REJECT/UNKNOWN，不能非法转移或无限循环；0.11.0 提供已选 Function 可调用基础；正常业务链为 Init→Workflow→Function（不以旧直达 ingress 为必需入口） |
 | **0.11.2 — Domain Intelligence** | 把 0.11.1 的结构性流程**领域语义化** | Domain concepts/objects、Knowledge/Rule/Recognizer/Validator/Decision、Intent/Applicability、必要最小 Reader/Query、领域策略选择和 UNKNOWN | 同一 Goal 在不同领域事实、版本、适用性条件下可选择正确的规则、流程与结果；知识不足或冲突时不编造结论 |
 | **0.11.3 — Semantic Interaction** | 领域语义驱动的**自适应交互**，而不是“动态表单引擎” | typed Intent/Requirement/Interaction model、基于任务现有事实连续澄清、交互类型与成熟 UI 组件适配（Form、Selector、Table、Wizard、Chat 等）、确认后继续 Workflow | 用户表达不完整需求时，系统根据理解选择合适确定性 UI 交互；反复补齐事实后得到有类型/可校验的意图，未经确认不得执行敏感操作 |
 | **0.11.4 — Authorized Action** | 从“理解并决策”升级为**可信真实行动** | Business State/CAS、声明式 Capability/Tool/Operation、KDP Permit/Host/Effect、Journal/Outcome、必要读回与失败分类 | 已授权真实操作后业务状态与 Host 结果一致；越权、错误权限或 UNKNOWN 不得虚报成功；不建立第二 Effect Authority |
