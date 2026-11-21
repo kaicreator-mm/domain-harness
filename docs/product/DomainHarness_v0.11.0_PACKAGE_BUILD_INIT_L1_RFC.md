@@ -1,6 +1,6 @@
 # DomainHarness v0.11.0 — Package / BUILD / Init 架构修订（L1 · Owner 审核候选 R1）
 
-> **状态：REVIEW_ONLY / NOT_FROZEN / NOT_IMPLEMENTED**。这是对旧 0.11.0 PRD 的拟议替换条款，不是已经通过的新 Product Freeze，也不修改现有软件。对照源码 \`version/v0.11.x@b8e5c2bc6eee8615bbc9aabcdb3afd4aa2baa6b2\`。
+> **状态：REVIEW_ONLY / NOT_FROZEN / NOT_IMPLEMENTED**。这是对旧 0.11.0 PRD 的拟议替换条款，不是已经通过的新 Product Freeze，也不修改现有软件。对照源码 `version/v0.11.x@b8e5c2bc6eee8615bbc9aabcdb3afd4aa2baa6b2`。
 >
 > Owner 讨论记录：[Package 统一 Init / 完整 BUILD / Core Order](https://github.com/kaicreator-mm/domain-harness/issues/1564#issuecomment-7056222988)、[只调用显式 Extension / Element 自治异常](https://github.com/kaicreator-mm/domain-harness/issues/1564#issuecomment-7056418761)。
 >
@@ -15,20 +15,20 @@ v0.11.x 完全重写。BUILD 负责**生成单 Package → 组合 Package → �
 - **Kernel、SDK、Business** 是默认的三层身份；不因 Init/Hook 创建第四层。每层的 Core 按构建封存的 Order 形成默认入口主链；Core **没有**独占 Extensions 初始化权。
 - **调用边界**：Package 只能调用自己的 Element，或自己**直接声明**的 Extension Package **明确公开**的内容。A 声明 B、B 声明 C，**不自动授权 A 直接调用 C**。某 Package 恰好包含在构建闭包并不等于可任意访问。
 - **初始化次数属于 Package**。规范规定必须进行哪些 Init 调用；实现如何处理重复调用（重复执行、内部幂等、按自身契约拒绝等），由目标 Package 自己决定。Kernel/SDK 不建立全局 exactly-once、visited、dedup 或跨 Package 业务回滚引擎。
-- **异常归属 Element**。Element/Package 自行处理其业务错误、异常、资源与恢复。Kernel/SDK 不承诺业务异常和安全保证；对于最终未被处理、已无法继续的故障，仅做最少诊断、关闭当前执行并交给 Host 退出（不自动替 Host 执行任意全局 \`process.exit\`）。
+- **异常归属 Element**。Element/Package 自行处理其业务错误、异常、资源与恢复。Kernel/SDK 不承诺业务异常和安全保证；对于最终未被处理、已无法继续的故障，仅做最少诊断、关闭当前执行并交给 Host 退出（不自动替 Host 执行任意全局 `process.exit`）。
 
 ## B. 0.11.0 新 Product 不变量（拟作为旧 P01/P02/P07/P08/Bxx/Kxx/Axx 的替换）
 
 | ID | 产品规则（WHAT） |
 |---|---|
-| L1-P01 | 每一个选定的**可执行** Package 必须恰有一个已选的 Init Element 入口；这个 Element 与其他 Element 共享同一身份/声明模型，而不是 \`technicalInit()\` 特殊函数 + 唯一 \`businessAppInit\` 双机制。无状态 Package 可采用无操作 Init，不额外建技术生命周期概念。 |
+| L1-P01 | 每一个选定的 Package 必须恰有一个已选的 Init Element 入口；这个 Element 与其他 Element 共享同一身份/声明模型，而不是 `technicalInit()` 特殊函数 + 唯一 `businessAppInit` 双机制。纯静态或无状态 Package 仍必须具有无操作 Init Element，不额外建技术生命周期概念。 |
 | L1-P02 | 每层一个 Core/Primary 作为层级入口及多个 Extension 的组合模型保留；**Core/Extension 在显式 Extension 调用、跨层调用及 Init 能力上对等**。仅 Core 必填 Order。 |
 | L1-P03 | Package 的 Extension 声明明确列出它可以调用的直接依赖 Package，且只对相应已公开的 Element/Function/Init 有效；不能调用未声明 Extension，不能借传递闭包越权。 |
 | L1-P04 | 每个 Init Element 的**必需 Init 调用关系**对 BUILD 可见且有可核查的构建表达；BUILD 必须拒绝依赖缺失、实际可达调用目标未声明、不可证明的动态跨包访问及循环依赖。BUILD 产物不能保留可绕过已确定调用绑定的未约束加载通道。 |
 | L1-P05 | **Core.Order 必需，Extension.Order 可选**。Core 的 Order 确定默认层级入口顺序，并且 BUILD 预先锁定；Order **不是** Package 调用权限或 Init 去重规则。Extension 可通过显式依赖在主链外递进调用，默认入口顺序不承诺所有嵌套调用的完成时间全局递增。 |
 | L1-P06 | BUILD 同时覆盖 Package 的生成、引用与实现选择、闭包/依赖/导出/Hook/Init/Order 验证及组合；输出可独立部署的**完整确定性组合 Package**。Lock、Pin、Manifest 等可以成为产物内部元数据，但**只产出 Lock 不代表 BUILD 已完成**。 |
 | L1-P07 | 相同、固定且合格的构建输入应产生确定性的组合产物；不需源仓库参与 RUNNING 的依赖发现、Function 替换、代码生成、重新构建或资格判定。 |
-| L1-P08 | **Boot 最小化**：按完整构建产物中已封存的入口启动 Kernel Core.Init。随后沿编译确定的默认 Core 主链及各 Package Init 显式声明关系递进；不重新解算图，也不由 Kernel 集中调用 \`technicalInitOrder\`。 |
+| L1-P08 | **Boot 最小化**：按完整构建产物中已封存的入口启动 Kernel Core.Init。随后沿编译确定的默认 Core 主链及各 Package Init 显式声明关系递进；不重新解算图，也不由 Kernel 集中调用 `technicalInitOrder`。 |
 | L1-P09 | **Hook** 由 BUILD 确定 Owner、Provider、接口和调用绑定；Package Init 激活该 Package 的已选 Hook，Owner 在自己明示的状态/事件触发点执行。禁止启动时无条件广播所有 Provider；不把 Hook 变成独立 Runtime 或未声明的跨包访问。 |
 | L1-P10 | Element/Package 承担正常业务错误处理、失败表达、清理、重复调用和资源生命周期。不能由 Kernel/SDK 将所有业务抛错自动转换为统一 FAILED、UNKNOWN 或执行全局回滚。业务结果类型如 SUCCEEDED/UNKNOWN/FAILED 仍可由**所属 Element 的合同**表达。 |
 | L1-P11 | RUNNING 不做 Package 依赖授权、图/Schema 的第二轮 BUILD 期验证或修复。若实际发生未声明调用、无法装载固定绑定、未处理致命异常：最小化记录、停止当前激活、走 Host 退出流程；不重试、自动选其他 Package 或伪报成功。 |
@@ -39,7 +39,7 @@ v0.11.x 完全重写。BUILD 负责**生成单 Package → 组合 Package → �
 
 Core 的跨层递进是**BUILD 生成的组合 Package 顶层入口链**（不是 Kernel 自行动态选择）；这是组合机制的边，不等于某个 Core 获得任意其他 Core 的直接调用权。普通 Package 中的直接跨包调用仍只能通过自己声明的 Extension。
 
-示意：\`Boot → KernelCore.Init → [编译主链] → SDKCore.Init → [编译主链] → BusinessCore.Init\`。同时 Kernel/SDK/Business 中任一 Package 可以调用自己显式声明的 Extension.Init；Extension 也可跨层声明其它 Extension。若希望 **Core A 的源码直接调用 Core B**，就必须进一步定义其合法声明方式；现阶段**不暗中为 Core 加特权例外**。
+示意：`Boot → KernelCore.Init → [编译主链] → SDKCore.Init → [编译主链] → BusinessCore.Init`。同时 Kernel/SDK/Business 中任一 Package 可以调用自己显式声明的 Extension.Init；Extension 也可跨层声明其它 Extension。若希望 **Core A 的源码直接调用 Core B**，就必须进一步定义其合法声明方式；现阶段**不暗中为 Core 加特权例外**。
 
 ### Order 的最低可验收语义
 
