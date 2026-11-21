@@ -8,7 +8,7 @@ ELEMENT_DEFINITION=UNIQUE_VERSIONED_REF_MULTIPLE_USE
 NESTING_DECLARATION=OPTIONAL_TYPE_DEFAULT_WORKFLOW
 NESTING_IMPLEMENTED_KINDS=WORKFLOW_ONLY
 WORKFLOW_MIN_NODES=1
-PACKAGE_CALL_ENTRY=INIT_ELEMENT
+PACKAGE_CALL_ENTRY=ONE_INIT_ELEMENT_PER_SELECTED_PACKAGE
 PACKAGE_INIT_STARTS=SELECTED_WORKFLOW_ON_EXPLICIT_ENTRY_INVOKE
 BOOT_TECHNICAL_INIT=SEPARATE_NOT_BUSINESS_WORKFLOW_START
 READER_FORMATS=JSON_YAML
@@ -48,9 +48,9 @@ External invocation of selected Package entry (or explicit App-owned startup req
   → Package Init returns Result to the invoking ingress
 ```
 
-- **每个参与新版调用的 Package 声明唯一 Init Element**，作为本 Package 的统一可调用入口。Kernel/SDK/Business 三层 Package 均在既有三层结构内按需要暴露已选 Function 能力；没有第四层、没有额外的技术启动引擎。该能力由 BUILD 在 Package/Lock 中选定，不能靠运行期猜测。
+- **每个参与 0.11.1 的选定 Package（Kernel/SDK/Business 三层均为 Package）声明唯一 Init Element**，并以它作为该 Package 的**新增 Workflow 调用统一入口**；该入口在 BUILD/Lock 精确选定，不能由运行期猜测。若某 Package 仅提供通用能力，也应通过该 Init Element 的已选入口及最小 Workflow（可仅一个节点）暴露本版新增调用，不另设一套 Workflow 执行机制。0.11.0 已有直接 Function ingress 按兼容回归边界暂时保留，不需要业务调用者在 0.11.1 全量迁移。
 - Init Element 可以提供 **多条已选、命名的 Workflow 入口**（按既有 Element 0..n Function 合同表达），在 BUILD 封存 `entryId -> Workflow ElementRef` 映射；调用时不得传入任意未选工作流 id 并动态加载。
-- **“Init Element 启动 Workflow”是它的业务入口被明确调用时启动**；不要自动把 Boot 或 Package `technicalInit` 变成一遍遍的业务执行。若应用要求启动后立刻运行某条业务 Workflow，须通过 App/业务方明确选择的 Init 入口发起，这次运行同样遵守既有 READY/Ingress gate 和预算，不在 Runtime 偷添独立自动运行规则。
+- **“Init Element 启动 Workflow”指业务调用进入已选 Package Init Element 时由它发起所选 Workflow**；不要自动把 Boot 或 Package `technicalInit` 变成一遍遍的业务执行。若应用要求启动后立刻运行某条业务 Workflow，须通过 App/业务方明确选择的 Init 入口发起，这次运行同样遵守既有 READY/Ingress gate 和预算，不在 Runtime 偷添独立自动运行规则。
 - 0.11.0 已验收 `DomainApp.invoke(ingressId,input)` 的直接 Function 入口仍可用；0.11.1 新的 Package Workflow 调用路径通过选定 Init Element 接到 ingress。不能为了新入口删除/破坏旧直接调用。现有 `businessAppInit` 是 App 级别业务就绪决议，不等于每个 Package 的业务 Init Element，不能互相替代。
 - 具体增量合同将由 T11/T12 冻结，推荐新增 `PackageInitEntryBinding(packageId,initElementRef,entryId,workflowRef)` 一类最小 Lock IR，不在此直接声称 Stage0 PackageManifest 已经提供该字段。
 
