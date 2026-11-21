@@ -41,7 +41,7 @@ import { BuildRefusal, refusal } from './refusal.js';
 import { SchemaChecker } from './schema-check.js';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
-import { verifyGeneratedPackageImports } from './static-package-guard.js';
+import { verifyGeneratedPackageImports, verifyLifecycleExports } from './static-package-guard.js';
 
 
 interface LoadedElement {
@@ -692,6 +692,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     const bytes = scope.read(manifest.id, artifactPath);
     const digest = digestOfBytes(bytes);
     scope.record(manifest.id, artifactPath, digest);
+    verifyLifecycleExports(scope, manifest, { packageId: manifest.id, path: artifactPath, digest });
     sealedPackages.push({
       packageId: manifest.id,
       version: manifest.version,
