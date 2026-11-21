@@ -21,6 +21,7 @@ STATUS=PLAN_ONLY_SOURCE_UNCHANGED
 
 - **S：SDK 必需** = 没有 Forge、仅提供现成 Domain Packages 时，DomainHarness 仍必须能够调用公开组合 API，将它们装配成准确可信的可运行 App/SDK、Boot/KDP 激活，并阻止未授权依赖。这些能力应收敛于 `Package Assembly/Linking/Validation` SDK 实现，不要求用户另外部署“BUILD 服务”。
 - **F：Forge 生产职责** = 从需求、Domain Data/Claim/Element/Business 内容或代码草稿**生产**新 Package/实现/资源、生成模板、领域内容编译、根据目标产生多种源和业务逻辑、治理知识/版本等；由在 DomainHarness 上运行的 Forge App 提供，允许 Forge 纯作者 Core 保持独立，经明确的公开 Package 接口交接。
+- **V：可选 Package 合规验证器（与作者方式正交）** = 只对**已存在的真实多文件 Package**检查当前已明确且适用的 Manifest/Element/Function/资源/依赖/Target/权限条件。可作为 DomainHarness 的小型测试、校验库或 CLI 逐步实现并复用现有逻辑，未来可以成为 Forge 的部分能力；**既不是 Package 生成器，也不是必经产品平台，不要求 Forge 当下可用**。先用实例和反例补全尚不明确的 DIS/SDK 规范，验证器 `PASS` 只针对覆盖的版本/Target/条件。详见 [R37](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)。
 - **D：直接编写 Domain Package 文件（不是工具）** = ChatGPT 或开发者直接创建/维护 DomainHarness 本身基础 Package Manifest、Element、资源与 Function 文件，按 DIS 适用条款和 0.11.x 当前规范检查。无需新建 Seed Builder；不应把 Package 生产方式作为身份/合规门槛。详见 [R36](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)。
 - **X：不必要 / 应精简** = 由于误把 BUILD 设计成另一个产品而造成的额外分层、重复计算、全局硬编码、过度通用编译器/双 Runtime、无限期为所有目标生成全部模板的职责。X 表示**移除不必要机制**，不是删掉有证据要求的安全防线；实施时必须先有同等受信 SDK 装配/Host 守门和受影响负例。
 
@@ -61,11 +62,11 @@ STATUS=PLAN_ONLY_SOURCE_UNCHANGED
 
 **步骤 A · R36 产品规范**：Domain Package 是多文件集合，不要求工具生成；应用可能需要选择多个现有 Packages，但这种“组合”不是单 Package 生产步骤。撤回旧 BUILD 平台、Seed Builder 生成器和强制独立 Assembly 流程的主张。
 
-**步骤 B · #1647 直接文件实施**：根据真实 DIS 适用 Package 规范和 0.11.x Element-First 合同，**由 ChatGPT/开发者直接创建/修正 DomainHarness 基础 Package 文件**。复用已有验证、现有 Boot 与实际 Consumer；只在必要时使用 `buildApp` 等历史已有代码确认目标 App 引用闭合，不据此要求先开发工具。
+**步骤 B · #1647 直接文件实施/逐项确立规范**：根据真实 DIS 适用 Package 规范和 0.11.x Element-First 合同，**由 ChatGPT/开发者直接创建/修正 DomainHarness 基础 Package 文件**。复用已有验证、现有 Boot 与实际 Consumer；只在必要时使用 `buildApp` 等历史已有代码确认目标 App 引用闭合，不据此要求先开发工具。
 
-**步骤 C · 0.11.x SDK 逐阶段开发**：继续 0.11.2–0.11.9 的 SDK 具体功能；有业务/标准 Package 就写文件、检查引用并运行。版本合格不依赖 Forge、Seed Builder、独立 Package Assembly 平台或复杂化 BUILD。
+**步骤 C · 0.11.x SDK 逐阶段开发**：继续 0.11.2–0.11.9 的真实 SDK 功能；以实际 Package/Consumer/负例记录 `CONFIRMED / PROPOSED / UNKNOWN / NOT_APPLICABLE` 并完善必要合同和类型/测试。**按需可建设 Validator** 检查已写出的文件，复用现有验证代码；它不生成 Package，不要求独立 Assembly 平台，也不成为 Forge 前置。已接受且未变的安全规则照旧保留。
 
-**步骤 D · Forge 将来开发**：只记录 [Forge #218](https://github.com/kaicreator-mm/domain-forge/issues/218)；它以后如何生产同规范的 Package 不在当前任务范围，也不会改变手写 Package 的资格。
+**步骤 D · Forge 将来开发**：只记录 [Forge #218](https://github.com/kaicreator-mm/domain-forge/issues/218)；它以后如何生产同规范 Package、是否复用/引入上述 Validator，均不在当前任务范围，也不会改变手写 Package 的资格。
 
 ## 5. 每版交付必须回答的问题（小型 Review Checklist）
 
