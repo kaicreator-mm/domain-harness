@@ -30,6 +30,10 @@ export interface SelectedElement {
   readonly contractDigests: readonly ContentDigest[];
 }
 
+/**
+ * 已选 Function 的运行期最小授权：实现入口、允许的 Outcome、Effect 意图及资源集合。
+ * KDP 只能按这里的 resources 向 App Init 发放只读句柄，不能把整个 resourceDigests 暴露给业务。
+ */
 export interface SelectedFunction {
   readonly ref: FunctionRef;
   readonly outcomes: readonly FunctionOutcomeKind[];
@@ -57,6 +61,11 @@ export interface BootstrapKdpRef {
   readonly kdpPrimaryDigest: ContentDigest;
 }
 
+/**
+ * BUILD 产生的确定性快照；KDP 只校验、加载和执行，不重新求解依赖。
+ * closureDigest 对排除自身后的规范 JSON 求摘要；安装记录与外部 Pin 应与它一致。
+ * 技术初始化与销毁顺序都在此封存，运行期不得随意重新排序。
+ */
 export interface DomainAppLock {
   readonly kind: 'DomainAppLock';
   readonly schemaVersion: typeof DH_LOCK_SCHEMA_VERSION;

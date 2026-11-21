@@ -34,6 +34,7 @@ export interface AppInitContext {
   readonly resources: ReadonlyMap<string, ReadonlyResourceHandle>;
 }
 
+/** App Init 声明启动状态；DEGRADED 只能显式压制已在 Lock 中标记 optional 的入口。 */
 export interface AppInitResult {
   readonly status: AppStatus;
   readonly suppressedIngress?: readonly string[];
@@ -54,6 +55,7 @@ export interface DomainApp {
   dispose(): Promise<{ readonly status: 'DISPOSED' }>;
 }
 
+/** 面向消费者的只读快照；实现必须复制嵌套引用，防止 JS 调用者修改内部 Lock。 */
 export interface DomainAppInspection {
   readonly appIdentity: { readonly id: string; readonly version: SemVer; readonly lockDigest: ContentDigest };
   readonly target: ResolvedTarget;

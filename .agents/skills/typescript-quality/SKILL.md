@@ -29,3 +29,16 @@ description: DomainHarness 的 TypeScript 源码设计、重构、审查、中�
 6. **真实 Node.js 包导出检查**：具备 `exports` 的包拒绝未公开路径时通常是 `ERR_PACKAGE_PATH_NOT_EXPORTED`，不能强行要求 `ERR_MODULE_NOT_FOUND` 或通过开放兼容出口来通过测试。
 7. **完整验证链**：`npm ci`、四包 build、源码与测试 typecheck、lint、必要单测、单一四 tarball clean-install Demo 对应不同关口。失败时记录首个真实失败和 NOT_RUN 的依赖项，禁止把前置失败变成虚假下游失败。
 8. **单独模块一次最终独审**：源码质量的 ACCEPT 只能由完整闭环与适当独立审核得出；CI 重复触发、历史 Demo 成功或删除文件数量都不足以授予资格。
+
+## 0.11.x 增量交付：从 0.11.0 R12/R15 复盘继承的强制工程做法
+
+先阅读 [增量交付质量防回归手册](../../../docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)。进入 0.11.1+ 实施前，在**原有 Task Issue** 简要列出当前改动的职责所有者、信任边界、资源/Effect 权限、状态副作用以及必测 POS/NEG/ERR；不要把这个步骤扩展成额外审批链。
+
+1. **先证伪，再提交**：新增 Schema/Hook/Function、资源授权、入口 ID、Pin/Lock、生命周期、对外 Snapshot 等边界，必须同时具备该边界的拒绝或 UNKNOWN 反例。输入未验证、重复 ID、越权资源、非规范 JSON/错误 Digest、恶意修改共享引用属于真实历史反例，不可只测 READY/SUCCEEDED。
+2. **防止类型/Fixture 旧路径回归**：修改 exports、ESM 构建产物或第三方依赖时，同改真实包根 Consumer 和测试 Fixture；测试非法值仅在 tests 局部构造，公共 ABI 继续 readonly。四包测试 Typecheck 已由 `npm test` 和 lint 静态结构闸门覆盖；不得删除步骤或手动跳过。
+3. **运行时不替 BUILD 选实现**：BUILD 校验所有被选 Schema 的 inline/ref、依赖/唯一性和 Resource Digest；App Init 权限来自 `SelectedFunction.resources`，不返回全 Lock；Boot 先拒绝再 import，App 失败保持清理/UNKNOWN/FAILED 语义。
+4. **提交前验证优先**：本地能执行等价检查时先验证受影响代码、测试和质量扫描；跨包/安装改动再用一次 `npm run verify`，不要先推 PR 跑多轮昂贵 CI。不要为每个 TypeScript 小修复单独安排独立审查。
+5. **失败时一批闭环**：真实 CI FAIL 从 GitHub Exact SHA 和 Drive Logs 取第一失败步骤，收集同批问题去重；需本地环境时单次委派 Agent 完成诊断、必要修复、验证和提交，限轮次停止。其它会话独立审核只复核新增/变更边界，合并前检查当前 HEAD、base、CI、Review。
+6. **P2 只在触及风险时带入**：RV-5～RV-9 为 0.11.0 已知未解决限制，不得静默写为 PASS；未触及的内容不额外阻断新功能。
+
+具体命令、反例证据和 Issue 输出字段均以防回归手册为准，避免在多个 Skill 中维护两份易漂移的完整清单。

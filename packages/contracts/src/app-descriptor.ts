@@ -8,12 +8,18 @@ export interface PackageRef {
   readonly version: SemVer;
 }
 
+/** 对外入口名必须唯一；其 FunctionRef 包括 Element 身份、摘要与合同版本，避免同名函数误绑定。 */
 export interface IngressEntry {
   readonly id: string;
   readonly function: FunctionRef;
   readonly optional?: boolean;
 }
 
+/**
+ * BUILD 的声明式输入，不是运行期执行计划。
+ * roots 指定三层 Primary，extensions 指定候选扩展；BUILD 继续追踪依赖闭包，
+ * 对业务入口和唯一 App Init 解析具体 FunctionRef，最后写入不可隐式重选的 Lock。
+ */
 export interface DomainAppDescriptor {
   readonly kind: 'DomainApp';
   readonly schemaVersion: typeof DH_APP_SCHEMA_VERSION;

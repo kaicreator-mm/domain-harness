@@ -1,6 +1,11 @@
 // 当前唯一 KDP：Boot 验证选定资源，初始化 Package 后才开放业务入口。
 import type { JsonValue } from '@kaicreator/domain-harness-contracts';
 
+/**
+ * KDP 仅实现 BUILD 接受的 Function JSON Schema 子集，不在运行期重新编译完整 Ajv。
+ * 新增关键字时必须同步调整 BUILD 的 assertRuntimeFunctionSchemaProfile 与两侧正反例，
+ * 否则可能出现 BUILD 接受但运行期误判的合同漂移。
+ */
 export function validateJsonSubset(instance: unknown, schema: unknown): boolean {
   if (
     instance === undefined ||

@@ -175,6 +175,10 @@ export class SchemaChecker {
     }
   }
 
+  /**
+   * 构建期使用 Ajv 证明 Function JSON Schema 合法；运行期只支持其约定的 Schema 子集。
+   * 先静态限制关键字，避免 BUILD 接受无法被 Microkernel 正确执行的函数合同。
+   */
   compileFunctionSchema(schema: unknown, refPath: string): ValidateFunction {
     assertRuntimeFunctionSchemaProfile(schema, refPath);
     try {

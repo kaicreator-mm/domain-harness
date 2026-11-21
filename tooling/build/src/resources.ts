@@ -26,6 +26,10 @@ export class ResourceScope {
     return root;
   }
 
+  /**
+   * 文件读取边界：POSIX 相对路径与 realpath 必须仍位于其所属 Package 根下。
+   * BUILD 读的是磁盘真实字节；外部来源若走符号链接逃逸也不得进入封存闭包。
+   */
   read(packageId: string, path: string): Uint8Array {
     if (!isRelativeResourcePath(path)) {
       throw refusal('DH_BUILD_RESOURCE_MISSING', `resource '${packageId}/${String(path)}' is not a canonical relative POSIX path`);
@@ -57,6 +61,7 @@ export class ResourceScope {
     }
   }
 
+  /** 校验声明摘要后才把资源登记到闭包；失败不返回“部分可信”的资源句柄。 */
   verify(ref: ResourceRef): Uint8Array {
     const bytes = this.read(ref.packageId, ref.path);
     const actual = digestOfBytes(bytes);
