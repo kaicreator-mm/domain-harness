@@ -212,7 +212,7 @@ const packages = [
   {
     dir: 'packages/microkernel', name: '@kaicreator/domain-harness-microkernel',
     root: { types: './dist/index.d.ts', import: './dist/index.js' },
-    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', xstate: '5.33.2' },
+    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', xstate: '5.33.2', yaml: '2.9.1' },
   },
 ];
 
@@ -244,7 +244,7 @@ try {
   npm(['init', '-y'], consumerRoot, 'consumer.init');
   const registry = process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry ?? 'https://registry.npmjs.org';
   const installEnv = { ...process.env, npm_config_registry: registry };
-  const install = spawnSync(process.execPath, [npmCli, 'install', ...tarballs, '--no-audit', '--no-fund'], {
+  const install = spawnSync(process.execPath, [npmCli, 'install', ...tarballs, '--no-audit', '--no-fund', '--ignore-scripts'], {
     cwd: consumerRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024, env: installEnv,
   });
   writeFileSync(join(evidenceDir, 'consumer.install.stdout.log'), install.stdout ?? '');
@@ -254,7 +254,9 @@ try {
   npm(['ls', '--json'], consumerRoot, 'consumer.ls');
   npm(['ls', 'xstate', 'yaml', '--json'], consumerRoot, 'consumer.workflow-runtime-ls');
   assertInstalledRealpaths(tarballMembers);
-  cpSync(fileURLToPath(new URL('./consumer.mjs', import.meta.url)), join(consumerRoot, 'consumer.mjs'));
+  for (const name of ['consumer.mjs', 'workflow-fixture.mjs']) {
+    cpSync(fileURLToPath(new URL(`./${name}`, import.meta.url)), join(consumerRoot, name));
+  }
   const consumerEvidence = join(evidenceDir, 'consumer');
   mkdirSync(consumerEvidence, { recursive: true });
   const child = spawnSync(process.execPath, ['consumer.mjs'], {
