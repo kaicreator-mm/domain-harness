@@ -1,3 +1,41 @@
+<!-- DH_V0111_R17_P2_EXACT_T11_T12_DECISIONS_20261121 -->
+## 【R17 · R16 审核四项 P2 的可执行合同与实施归属】
+
+```ini
+OUTPUT_LABEL=DH_V0111_R17_R16_P2_EXACT_DISPOSITION
+SOURCE_BASE=version/v0.11.x@3bbeb0edaba3cbac762371e4b2632defa4255308
+CURRENT_L1_L2_PR=#1626
+HISTORICAL_PRS=#1607_AND_#1611_DO_NOT_MERGE
+INDEPENDENT_REVIEW=#6005190842_ACCEPT_SCOPED_P0_0_P1_0_P2_4
+TASKS=T11_#1627;T12_#1628;T13_#1629;T14_#1630
+T11_SOURCE_BRANCH=feature/v0111-t11-workflow-contract-r1
+STATUS=CONTRACT_SELECTION_NOT_FUNCTIONAL_PASS
+```
+
+**P2-01（文档入口修正）**：本 R17 当前 L1/L2 PR 是 **#1626**，不沿用旧的 #1607/#1611 `L1_PR` / `L2_PR` 指针。后两者为历史 Draft，禁止从其过期代码基线创建 T11–T14。
+
+**P2-02（starter、Reader 资源传输；T11 固定契约，T12/T13 接线）**：
+- `WorkflowRef = {element:ElementRef,contentId:string}`，精确选中 Element 所有者的一个 `workflow-definition` ContentBlock。唯一正式业务入口仍是 Package.Init；T13 在已有 `PackageInitContext` 中注入只读 `workflows:ReadonlyWorkflowStarter`，签名 `start(ref:WorkflowRef,input:JsonValue):Promise<WorkflowOutcome>`；按当前 Package 的**自身或直接声明 Extension+公开**的已选 Workflow 授权。无全局可见 Map、无 READY 后第二入口、无用户指定任意 FunctionRef bypass。
+- 可读数据附于 **普通 Function 节点**：`WorkflowDataSource = {format:'json'|'yaml',resource:ResourceRef,maxBytes:1..1048576}`。节点的 `function:FunctionRef` 是被选 Reader Element；同一 FunctionRef 允许被多个不同数据节点复用。T12 逐项验证 ResourceRef 属于当前已选 Package/直接 Extension 的授权且字节 digest/路径/大小确定，Lock 钉住这份原始 UTF-8 数据。不强制 `ElementDefinition` 或一般 ContentBlock.ref 支持 YAML。
+- T13 的执行器以最小**已选节点资源句柄** `ReadonlyResourceHandle.read()` 或 BUILD 生成、摘要等价的预编译数据投影得到原始 UTF-8 字节，强制严格 UTF-8（不接受替换编码/格式推断）和 maxBytes 后，向该 Reader Function 的**已有** `ReadonlyFunctionHandle.invoke` 提交纯 JSON `WorkflowReaderInput = {format,source}`。此通道不存在任意 Host path、fs、network 或未声明资源放权；T12 必须封存可证明的节点资源权限表，T13 只按这张表取资源。Reader 输出是普通 `FunctionOutcome`，用其已存在 Schema/Outcome 机器合同校验，不添加第二个验证器。
+
+**P2-03（严格路由与 Hook 预算；T11/T13）**：
+- `WorkflowDefinition` 版本 `dh.workflow/0.11`，包含 `entryNodeId`、非空 `nodes[]`、`maxElementCalls`、`maxDescendantWorkflowDepth`。`WorkflowFunctionNode` 为普通 Element.Function；`WorkflowChildNode` 仅引用 WorkflowRef，子 Workflow Actor 是唯一被支持的嵌套类型。所有节点必须可达，每个节点拥有 `switch.exits:[{label,target:{nodeId}|{terminal}}]`，标签在同一 Switch 内唯一，不能按列表顺序形成优先级。
+- Function `SUCCEEDED` 且 `value.route` 为合法字符串时用该**显式标签**，否则无 route 字段用 `SUCCEEDED` 标签；`UNKNOWN`→`UNKNOWN`，`FAILED`→`FAILED`；子 Workflow 用其真实 `COMPLETE/REJECT/ASK/WAIT/UNKNOWN/FAILED` 状态作为 label。**显式 route 值非法、无匹配的 SUCCEEDED 或 COMPLETE 标签**必须 `FAILED(DH_WORKFLOW_ROUTE_UNMATCHED)`，不允许回退到成功。UNKNOWN/FAILED/ASK/WAIT/REJECT 如果没有出口则向上原样传播失败/非完成终态（保留 reason），不得被默认晋升 COMPLETE；不允许这些非成功标签的**直接 terminal COMPLETE**。恢复要经过一个实际执行、能产生新证据的节点。
+- 元素业务 Hook 最多 `start` 和 `end`。进入一个 Function leaf **之前**，根预算预留 `1 + start?1 + end?1` 次调用，预算不足直接拒绝且不得执行 start/业务；包括 Guard/Reader 的 Function 节点一样计数。start 一旦尝试，**end 应在 finally 中至多尝试一次并 await**，即使 start/leaf 失败；end 失败只能保留/升级为 FAILED，不能覆盖原先失败为 COMPLETE。根 WorkflowRun 共享实际调用预算；每个 Workflow 的相对子树深度在进入下一 child 前检查所有 active ancestors；根/子业务结束都不会触发 Package.Exit。
+- `ASK/WAIT` 仅本次有限业务终态，不是 durable checkpoint。Business Core.Init 仍需自行返回 `AppInitResult(READY/DEGRADED/BLOCKED/FAILED)`，KDP 不把 Workflow COMPLETE 直接当 READY。测试应含：最后一个 leaf 容量不足以涵盖 end→**在 start 前拒绝**；错误 Hook/标签/UNKNOWN 不能升格成功。
+
+**P2-04（YAML/XState 可信闭包；T12）**：
+- **固定选项**：使用成熟 XState v5 `createActor/fromPromise/toPromise` 语义和 `yaml` v2 的 `parseDocument`，**仅在开发 BUILD 阶段按确定的 package-lock/版本/完整性核验引入，并将所需 ESM 可执行代码捆绑为已检查、带摘要的 first-party microkernel/Reader Package 安装文件**。最终组合 App 不允许以新业务 Package npm 依赖、动态运行时 import、未验证 transitive 依赖或 npm install hook 来获取这些实现。真实实现依赖版本/许可通知/字节 SHA 在 T12 精确冻结，未核对之前不得写“已受信”。
+- YAML Reader：仅单文档 UTF-8、JSON-compatible 值；`parseDocument` 使用 YAML 1.2 core、`uniqueKeys:true`、`customTags:[]`，`toJS({maxAliasCount:0})` 并由源码 AST/节点检查拒绝所有 alias、非标准 Tag、非字符串 Map key、非有限数值以及超额 nesting/节点数量；拒绝不确定跨文件 include、脚本 Tag、外部 Host 读取。其解析结果仍经过 Reader Function 的声明 Schema 输出验证。JSON Reader 只 JSON.parse + 类型/深度限制。两个 Reader 都不能读取超过数据定义 `maxBytes<=1MiB` 的选定资源。
+- T12 必须用已有 `tooling/build/src/app-package.ts` / `static-package-guard.ts` 的原有闭包体系验证打包，拒绝无选定 npm 代码；不能仅“npm install yaml/xstate”就宣称安全/验收完成。
+
+参考官方接口：[Stately XState v5 actors](https://stately.ai/docs/xstate/v5/actors) 与 [eemeli/yaml parser options](https://github.com/eemeli/yaml/blob/main/docs/03_options.md)；以真实 T12 版本与本仓库 build 约束为准，不推定当前 v0.11.0 运行包已经具备它们。
+
+**P2 总体状态**：R16 独审是 `ACCEPT_SCOPED`，以上已定接口与执行边界仍须 T11/T12 Typecheck/Tests/E2E 和 Exact HEAD 审核才能认定为真实实现，不能凭文档签发最终 L1/L2 Freeze。B0 #1624 已完成的基础机制不重改。
+
+---
+
 <!-- DH_V0111_R16_SOURCE_BINDING_AND_TASK_HANDOFF_20261121 -->
 ## R16 · 已合并 Foundation 的实际接口与 T11–T14 接线规则（优先于旧 R10 历史说明）
 
