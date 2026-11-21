@@ -278,12 +278,12 @@ export function standardCase(): StandardCase {
     const evaluateModule = writeRaw(businessDir, 'dist/evaluate.mjs', new TextEncoder().encode('export function evaluate() { return { decision: "POS" }; }\n'));
     const evaluateLegacyModule = writeRaw(businessDir, 'dist/evaluate-node20.mjs', new TextEncoder().encode('export function evaluate() { return { decision: "LEGACY" }; }\n'));
     const initModule = writeRaw(businessDir, 'dist/init.mjs', new TextEncoder().encode('export function init() { return "ready"; }\n'));
-    const businessArtifact = writeRaw(businessDir, 'dist/business.mjs', new TextEncoder().encode('export const artifact = "orders-business";\\nexport function init() { return { status: "READY" }; }\\nexport function exit() {}\\n'));
-    const sdkArtifact = writeRaw(sdkDir, 'dist/sdk.mjs', new TextEncoder().encode('export const artifact = "sdk-core";\nexport function init() {}\nexport function exit() {}\n'));
-    const kdpArtifact = writeRaw(kdpDir, 'dist/kdp.mjs', new TextEncoder().encode('export const artifact = "kdp-kernel";\\nexport function init() {}\\nexport function exit() {}\\n'));
-    const aaaArtifact = writeRaw(aaaDir, 'dist/aaa.mjs', new TextEncoder().encode('export const artifact = "aaa-ext";\\nexport function init() {}\\nexport function exit() {}\\n'));
+    const businessArtifact = writeRaw(businessDir, 'dist/business.mjs', new TextEncoder().encode("export const artifact = \"orders-business\";\nexport function init() { return { status: \"READY\" }; }\nexport function exit() {}\n"));
+    const sdkArtifact = writeRaw(sdkDir, 'dist/sdk.mjs', new TextEncoder().encode("export const artifact = \"sdk-core\";\nexport function init() {}\nexport function exit() {}\n"));
+    const kdpArtifact = writeRaw(kdpDir, 'dist/kdp.mjs', new TextEncoder().encode("export const artifact = \"kdp-kernel\";\nexport function init() {}\nexport function exit() {}\n"));
+    const aaaArtifact = writeRaw(aaaDir, 'dist/aaa.mjs', new TextEncoder().encode("export const artifact = \"aaa-ext\";\nexport function init() {}\nexport function exit() {}\n"));
     const auditModule = writeRaw(extDir, 'dist/audit.mjs', new TextEncoder().encode('export function audit() {}\n'));
-    const extArtifact = writeRaw(extDir, 'dist/ext.mjs', new TextEncoder().encode('export const artifact = "orders-ext";\\nexport function init() {}\\nexport function exit() {}\\n'));
+    const extArtifact = writeRaw(extDir, 'dist/ext.mjs', new TextEncoder().encode("export const artifact = \"orders-ext\";\nexport function init() {}\nexport function exit() {}\n"));
     writeRaw(mkDir, 'dist/index.js', new TextEncoder().encode('export async function bootstrap() { return { status: "BOOTED" }; }\n'));
 
     const aaaContributesTo = case_.aaaContributesTo.map((contribution) => ({
