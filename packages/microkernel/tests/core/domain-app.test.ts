@@ -6,6 +6,7 @@ import { normalizeOutcome } from '../../src/domain-app.js';
 import {
   boot,
   buildFixtureInstall,
+  events,
   type FixtureScenario,
 } from './helpers/install.js';
 async function bootApp(t: import('node:test').TestContext, scenario: FixtureScenario): Promise<DomainApp> {
@@ -140,7 +141,7 @@ test('strict FunctionOutcome: garbage and undeclared kinds never propagate as SU
   await unknown.dispose();
 });
 
-test('implementation exceptions are ordinary FAILED outcomes, not crashes', async (t) => {
+test('unhandled implementation exceptions cause KDP Exit and block subsequent ingress', async (t) => {
   const app = await bootApp(t, {
     init: { status: 'READY' },
     functions: { evaluate: { behavior: 'throw' } },
@@ -148,6 +149,12 @@ test('implementation exceptions are ordinary FAILED outcomes, not crashes', asyn
   const outcome = await app.invoke('evaluate', { total: 1, region: 'EU' });
   assert.equal(outcome.kind, 'FAILED');
   assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
+  assert.deepEqual(
+    events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
+    ['fixture-business', 'fixture-ext', '@fixture/sdk', 'fixture-kernel'],
+  );
+  const after = await app.invoke('evaluate', { total: 1, region: 'EU' });
+  assert.equal(after.kind === 'FAILED' && after.failure.code, 'DH_RUNTIME_INGRESS_NOT_CALLABLE');
   await app.dispose();
 });
 
