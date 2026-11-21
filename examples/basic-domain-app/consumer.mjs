@@ -162,7 +162,9 @@ async function authoring(label, rule, options = {}) {
     schemaRef: { inline: { type: 'object' } }, required: true, value: {},
   });
   if (options.elementCycle === true) {
-    knowledge.dependencies = [{ element: 'basic.app', version: '1.0.0' }];
+    // 构造同一 Package 内的真实 Element 环，避免先触发未声明跨包 Extension 拒绝。
+    knowledge.dependencies = [{ element: 'basic.rules', version: '1.0.0' }];
+    rules.dependencies = [{ element: 'basic.knowledge', version: '1.0.0' }];
   }
   if (options.inlineRule === true) {
     rules.content[0].value = globalThis.structuredClone(rule);
