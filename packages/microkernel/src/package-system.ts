@@ -5,7 +5,10 @@ import { contentDigestOf, canonicalJson } from '@kaicreator/domain-harness-contr
 import type {
   DomainAppLock,
   ElementDefinition,
-  EntryRef,
+  ImplementationLocator,
+  FunctionOutcome,
+  FunctionRef,
+  ReadonlyFunctionHandle,
   HostPortBinding,
   ReadonlyResourceHandle,
   ResourceRef,
@@ -19,6 +22,7 @@ import type {
 } from '@kaicreator/domain-harness-contracts';
 import { resolvePackageFile, splitResourceKey } from './paths.js';
 import { bytesContentDigest } from './verify.js';
+import { normalizeOutcome, safeValidateJsonSubset } from './selected-function.js';
 
 export class KdpLoadError extends Error {
   readonly code: string;
@@ -104,7 +108,11 @@ export class PackageSystem {
     };
     for (const pkg of this.lock.selectedPackages) collect(pkg.artifact);
     for (const fn of this.lock.selectedFunctions) collect(fn.implementation.module);
-    for (const hook of this.lock.hookBindings) for (const provider of hook.providers) collect(provider.module);
+    for (const hook of this.lock.hookBindings) for (const provider of hook.providers) {
+      const selected = this.functionByRef(provider);
+      if (!selected) throw new KdpLoadError('Hook provider not selected');
+      collect(selected.implementation.module);
+    }
     // 先核验所有生成的 ESM 模块，包括模块的相对导入闭包，防止 Node 加载时绕过 Pin。
     for (const [key, digest] of Object.entries(this.lock.resourceDigests)) {
       if (!/\.(?:mjs|js)$/u.test(key) && !key.endsWith('/package.json')) continue;
@@ -126,7 +134,7 @@ export class PackageSystem {
     return this.importModule(absolute, what);
   }
 
-  async loadEntry(entry: EntryRef, what: string): Promise<unknown> {
+  async loadEntry(entry: ImplementationLocator, what: string): Promise<unknown> {
     const mod = await this.loadArtifactModule(entry.module, what);
     const exported = mod[entry.exportName];
     if (exported === undefined) {
@@ -180,27 +188,31 @@ export class PackageSystem {
           await enter(dep.packageId, { type: 'Package', packageId }, dep.layer);
         }
 
-        const fn = await this.loadEntry(pkg.init, `Init Element of '${packageId}'`);
+        const initFunction = this.functionByRef(pkg.initFunction);
+        if (!initFunction || canonicalJson(initFunction.ref.element) !== canonicalJson(pkg.init))
+          throw new KdpLoadError(`Package '${packageId}' Init Element/Function identity mismatch`);
+        const fn = await this.loadEntry(initFunction.implementation, `Init Element of '${packageId}'`);
         if (typeof fn !== 'function') {
           throw new KdpLoadError(`Init Element of '${packageId}' is not a callable export`);
         }
-        const resources = new Map(pkg.initResources.map((resource) => {
+        const resources = new Map(initFunction.resources.map((resource) => {
           const key = `${resource.packageId}/${resource.path}`;
           if (this.lock.resourceDigests[key] !== resource.digest) {
             throw new KdpLoadError(`Init resource '${key}' is not sealed`, 'DH_BOOT_PIN_MISMATCH');
           }
           return [key, this.resourceHandle(key)] as const;
         }));
-        // 已构建的直接依赖图仅用来分配 capability；不能向所有 Package 暴露全局 ingress。
-        const accessibleOwners = new Set([packageId, ...pkg.dependsOn]);
-        const visibleFunctions = new Map([...context.functions].filter(([ingressId]) => {
-          const ingress = this.lock.ingress.find((entry) => entry.id === ingressId);
-          if (!ingress) return false;
-          return this.lock.selectedElements.some((element) =>
-            element.ref.id === ingress.function.element.id &&
-            element.ref.digest === ingress.function.element.digest &&
-            accessibleOwners.has(element.ownerPackageId));
-        }));
+        const allowedOwners = new Set([packageId, ...pkg.dependsOn]);
+        const visibleFunctions = new Map<string, ReadonlyFunctionHandle>();
+        for (const selected of this.lock.selectedFunctions) {
+          const element = this.lock.selectedElements.find((candidate) =>
+            canonicalJson(candidate.ref) === canonicalJson(selected.ref.element));
+          if (!element || !allowedOwners.has(element.ownerPackageId)) continue;
+          visibleFunctions.set(canonicalJson(selected.ref), Object.freeze({
+            ref: structuredClone(selected.ref),
+            invoke: (input: unknown): Promise<FunctionOutcome> => this.invokeSelectedFunction(selected.ref, input),
+          }));
+        }
         const kdpCore = pkg.role === 'primary' && pkg.order === 0;
         const ownContext: PackageInitContext = {
           ...context,
@@ -272,7 +284,11 @@ export class PackageSystem {
         const pkg = this.packageById(packageId);
         if (!pkg) throw new KdpLoadError(`Exit references missing Package '${packageId}'`);
         if (!pkg.exit) continue;
-        const fn = await this.loadEntry(pkg.exit, `Exit Element of '${packageId}'`);
+        if (!pkg.exitFunction) throw new KdpLoadError(`Package '${packageId}' Exit missing FunctionRef`);
+        const selectedExit = this.functionByRef(pkg.exitFunction);
+        if (!selectedExit || canonicalJson(selectedExit.ref.element) !== canonicalJson(pkg.exit))
+          throw new KdpLoadError(`Package '${packageId}' Exit Element/Function mismatch`);
+        const fn = await this.loadEntry(selectedExit.implementation, `Exit Element of '${packageId}'`);
         if (typeof fn !== 'function') throw new KdpLoadError(`Exit Element of '${packageId}' is not callable`);
         const exitContext: PackageExitContext = {
           packageId,
@@ -297,15 +313,10 @@ export class PackageSystem {
     for (const binding of this.lock.hookBindings) {
       const providers: unknown[] = [];
       for (const provider of binding.providers) {
-        const exported = await this.loadEntry(
-          provider,
-          `hook '${binding.hookId}' provider in package '${provider.module.packageId}'`,
-        );
-        if (typeof exported !== 'function') {
-          throw new KdpLoadError(
-            `hook '${binding.hookId}' provider export '${provider.exportName}' is not a function`,
-          );
-        }
+        const selected = this.functionByRef(provider);
+        if (!selected) throw new KdpLoadError(`Hook '${binding.hookId}' missing selected FunctionRef`);
+        const exported = await this.loadEntry(selected.implementation, `Hook '${binding.hookId}' provider`);
+        if (typeof exported !== 'function') throw new KdpLoadError(`Hook '${binding.hookId}' is not callable`);
         providers.push(exported);
       }
       table.set(`${binding.ownerPackageId}#${binding.hookId}`, Object.freeze(providers));
@@ -321,6 +332,29 @@ export class PackageSystem {
   functionByRef(ref: SelectedFunction['ref']): SelectedFunction | undefined {
     const wanted = canonicalJson(ref);
     return this.lock.selectedFunctions.find((fn) => canonicalJson(fn.ref) === wanted);
+  }
+
+  /** 可在 App READY 之前执行的最小已选 Function 运行器；不依赖 DomainApp.invoke。 */
+  async invokeSelectedFunction(ref: FunctionRef, input: unknown): Promise<FunctionOutcome> {
+    const selected = this.functionByRef(ref);
+    if (!selected) return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_INGRESS_UNKNOWN', message: 'unselected FunctionRef' } };
+    if (selected.effects !== 'none') return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_UNSUPPORTED_PROFILE', message: 'effectful Function not supported' } };
+    const schemas = await this.functionSchemas(selected);
+    if (schemas === null) return { kind: 'UNKNOWN', unknownReason: { code: 'DH_RUNTIME_UNSUPPORTED_PROFILE', message: 'Function Schema unavailable' } };
+    if (!safeValidateJsonSubset(input, schemas.input))
+      return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_INPUT_SCHEMA_MISMATCH', message: 'Function input rejected by Schema' } };
+    const implementation = await this.loadEntry(selected.implementation, `Function '${ref.functionId}'`);
+    if (typeof implementation !== 'function') throw new KdpLoadError('selected Function implementation is not callable');
+    let raw: unknown;
+    try { raw = await (implementation as (input: unknown) => unknown)(input); } catch {
+      console.error(`[KDP Function] code=DH_KDP_PACKAGE_LOAD_FAILED function=${ref.functionId} detail=redacted`);
+      try { await this.runExit(); } catch { console.error('[KDP Exit] detail=redacted'); }
+      return { kind: 'FAILED', failure: { code: 'DH_KDP_PACKAGE_LOAD_FAILED', message: 'Function unhandled exception (redacted)' } };
+    }
+    const outcome = normalizeOutcome(raw, selected.outcomes);
+    if (outcome.kind === 'SUCCEEDED' && !safeValidateJsonSubset(outcome.value, schemas.output))
+      return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_OUTPUT_SCHEMA_MISMATCH', message: 'Function output rejected by Schema' } };
+    return outcome;
   }
 
   async findElementDefinition(definitionDigest: string): Promise<ElementDefinition | null> {
