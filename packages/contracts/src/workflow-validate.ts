@@ -19,7 +19,7 @@ function id(value: unknown): value is string {
 }
 
 function positiveBound(value: unknown, max: number, min = 1): boolean {
-  return Number.isSafeInteger(value) && typeof value === 'number' && value >= min && value <= max;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= min && value <= max;
 }
 
 export function validateWorkflowDefinition(value: unknown): ValidationResult {
