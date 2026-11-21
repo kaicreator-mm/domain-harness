@@ -1,3 +1,7 @@
+<!-- DH_V0111_PRODUCT_L1_R9_SIX_OWNER_DECISIONS_20261121 -->
+> **当前 L1 增量（覆盖此前 R3/R4 解释，F01–F10/AC11–AC20 编号不变）**：Element 嵌套类型显式，默认 Workflow 且 0.11.1 仅支持 Workflow，允许单节点；每个参与新版调用的 Package 通过 Init Element 暴露入口并启动已选 Workflow；数据 Reader 首期支持 JSON 和 YAML；分支采用有明确出口的 Switch，不按 Guard 优先级竞争；每个 Element 执行实例的业务生命周期 Hook 仅 start/end；所有父子 Workflow 共享全局调用预算和嵌套深度。本 L1 只规定这些**可观察行为**，业务 Init Element 与 Technical Init 的职责隔离、精确数据合同/启动时机、Switch/Hook/Actor 内部实现请以 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 和 [R9 合同](https://github.com/kaicreator-mm/domain-harness/blob/design/v0.11.1-xstate-legacy-study/docs/architecture/DomainHarness_v0.11.1_L2_ELEMENT_WORKFLOW_EXECUTION_CONTRACT_R9.md) 为候选依据。仍为 Draft/未冻结。
+<!-- /DH_V0111_PRODUCT_L1_R9_SIX_OWNER_DECISIONS_20261121 -->
+
 <!-- DH_V0111_PRODUCT_GENERIC_ELEMENT_NESTING_AND_FILE_DATA_L1_R4_20261121 -->
 > **本轮新增的 L1 WHAT（不增加 F/AC 编号）：** Element 除 Workflow 调用外还支持多层嵌套组合和显式能力依赖；同一个 Element 定义可被多个父 Element 复用且不复制定义。数据 Element 可以直接引用已选固定格式文件数据，不必为每份文件定制执行代码；通过一个可复用的通用文件读取 Element，多个数据 Element 能向调用者提供可观察的只读数据结果。最小验收采用一种固定格式（例如 JSON）和真实 Package 封存资源。具体 ElementRef/ResourceRef、Reader 选型、BUILD/Lock、解析和调用方式都留给 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)。不打开运行时任意磁盘路径/Host 文件系统权限，本版依旧不实现 0.11.4 外部授权 Effect。
 <!-- /DH_V0111_PRODUCT_GENERIC_ELEMENT_NESTING_AND_FILE_DATA_L1_R4_20261121 -->
@@ -39,15 +43,15 @@ STANDALONE_RELEASE=NO
 
 | 编号 | 本版本应具备的能力 | 用户/上层应用应看到的结果 |
 |---|---|---|
-| F01 | **Goal / Task**：定义一次任务目标和输入，并发起执行，区别可复用定义与每次执行实例 | 能创建/执行明确任务；同一任务定义可重复运行且各次结果独立 |
-| F02 | **Element 嵌套与 Workflow**：Element 可按定义多层组合、引用子 Element；Workflow 可组合多个步骤、条件分支和子 Workflow，同一子定义可复用 | 父子 Element/Workflow 的组合执行和多处引用均可工作，结果独立、路径可解释 |
-| F03 | **State Machine**：任务具备可观测状态和合法变化 | 可以确定当前步骤、任务状态和最终结果，非法状态变化不会被接受 |
-| F04 | **Element 复用、依赖与文件数据**：一个 Element 可以依赖其他 Element 的能力；数据 Element 可使用固定格式文件作为数据来源并复用通用读取 Element，不要求每份数据单独编写 Function 实现 | 多个数据 Element 复用读取能力，能返回真实文件数据并被其他 Element 依赖；同一定义的各次调用独立 |
+| F01 | **Goal/Package Entry**：以选定 Package Init Element 暴露并启动所选 Workflow，定义输入和每次运行身份 | 同一个入口能发起独立执行；应用 Boot/Technical Init 和业务 Workflow 启动分离 |
+| F02 | **Workflow 唯一嵌套类型**：Element 嵌套显式类型、默认 Workflow；本版只支持 Workflow，含单节点或多节点及多层子 Workflow | 单节点也能运行；多个子 Workflow 能共享定义、独立执行并回传结果 |
+| F03 | **Switch 式显式状态转换**：按业务结果/Guard 产生确定的命名出口，指向下一 Element 引用位置或终态 | 每个分支目标明确、不按优先级竞争；未知与失败有明确出口，路径可观察 |
+| F04 | **Element 依赖与 JSON/YAML 文件数据**：多个数据 Element 分别引用已选固定格式文件，复用通用 JSON Reader 或 YAML Reader Element，无须逐份手写 Function | 真实读取两种格式并被其他 Element 调用/依赖；引用位置与结果独立 |
 | F05 | **交互需求表达**：流程可确定需要用户补充的信息或暂时等待外部条件 | 返回 ASK 或 WAIT，并说明缺少什么 / 等待什么；本版不承诺后续自动恢复 |
 | F06 | **结束与拒绝**：流程可正常完成或明确拒绝 | 能区分 COMPLETE 与 REJECT，并解释结果 |
 | F07 | **未知与失败**：知识/条件不足、执行出错可明确表达 | UNKNOWN / FAILED 不会被误当成成功，也不会执行错误的后续步骤 |
-| F08 | **有界执行**：循环和分支不会让任务无限运行 | 反复执行的任务在预定有限界内终止或报告未完成，不出现无界重试 |
-| F09 | **可观察结果**：输出任务路径、步骤结果与停止原因 | 调用方能判断执行过什么、执行到哪里、为什么停止；不泄露秘密 |
+| F08 | **共享有界执行**：所有父子 Workflow 共用根运行总调用预算与最大嵌套深度 | 进入子 Workflow 不重置预算；循环和嵌套不会无限运行 |
+| F09 | **生命周期与可观察结果**：每次 Element 执行实例有 start/end 两个可选 Hook，输出路径、步骤结果及停止原因 | Hook 的业务收尾完成后才返回结果；不会泄露敏感数据 |
 | F10 | **新版基础能力保持**：任务执行与 0.11.0 的直接 Function 执行并存 | 新功能不会破坏已验证的 Domain App 装配、初始化、调用和释放 |
 
 以上是**功能与行为要求**，不规定采用何种数据结构、运行时对象、API 命名、算法、包路径、校验器、状态存储介质或测试框架。上述设计由 L2 #1608 负责。尤其不能在 L1 强制选定 `runTask` 方法名、`maxSteps` 字段名、特定 JSON Guard 操作符、Lock 的增量格式或 Task Coordinator 的源码归属。
@@ -67,16 +71,16 @@ STANDALONE_RELEASE=NO
 
 | AC | 判定标准 |
 |---|---|
-| AC11 | 一个真实多层 Element/Workflow 组合（含至少两步及一个子 Workflow）完成；非 Workflow Element 也能组合子 Element；单节点 Workflow 可正常完成 |
-| AC12 | 相同流程在两种有效输入下选择不同分支，未选分支不执行 |
+| AC11 | 通过 Package Init Element 发起一个真实多层 Workflow（至少两步和一个子 Workflow）；嵌套类型缺省为 Workflow，单节点 Workflow 也可完成 |
+| AC12 | 相同流程的两个有效结果命中两个不同的明确命名 Switch 出口；无 Guard 优先级竞争，未选分支不执行 |
 | AC13 | 缺必要信息时返回 ASK；条件暂不可满足时返回 WAIT；不会误报完成 |
 | AC14 | 明确拒绝、未知、执行失败能够分别返回 REJECT、UNKNOWN、FAILED |
 | AC15 | 无效流程、未选定/未授权的执行目标被拒绝，危险步骤零执行 |
-| AC16 | 存在循环的任务受到执行界限约束，不会无限继续或偷偷重试 |
+| AC16 | 父子 Workflow 和重复引用共用全局调用预算及最大深度，循环/过深嵌套受限，不会以子流程重置预算 |
 | AC17 | 应用尚不可运行、已释放或某入口受限时，任务不能绕过现有调用约束 |
 | AC18 | 原有新版的直接 Function 执行、启动和释放行为没有退化 |
 | AC19 | 固定流程、输入及确定性业务结果时，步骤选择和最终业务结果可复现 |
-| AC20 | 真实安装 Domain App 展示：多份数据 Element 从选定固定格式文件读取数据并复用同一通用 Reader Element，其他 Element 依赖数据 Element；多处引用、子 Workflow、结果独立及真实正反例，不是纯 Mock |
+| AC20 | 真实安装 App：Package Init Element 启动 Workflow；两份 JSON 数据复用 JsonReader、两份 YAML 数据复用 YamlReader；Switch 正反出口、start/end Hook 清理与父子 Workflow 结果/全局预算均有真实验证，不是 Mock |
 
 所有 AC 必须以 0.11.1 新实现的真实证据为基础；0.11.0 已通过的限定测试可以复用，但**不能证明新增功能已合格**。每项 AC 的测试组织、源码变更范围和 CI 策略由 L2 与 Task 具体安排。
 
