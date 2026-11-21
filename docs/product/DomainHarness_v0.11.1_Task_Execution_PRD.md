@@ -1,11 +1,13 @@
-# DomainHarness v0.11.1 — Task Execution Product PRD · L1 R9（WHAT）
+> **R9.1 深度规则变更：** 用户将此前「所有父子 Workflow 共用同一个最大嵌套深度」修改为「每个 Workflow 对自己的子树声明最大下级嵌套深度」。**根 Run 总 Element 调用次数仍共享**。子 Workflow 的深度声明可以比父更宽/更严，但不能越过任一活动祖先约束；具体相对计数及 BUILD 封存在 [L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)。此为 L1 行为收口，不新增 F/AC 编号。
+
+# DomainHarness v0.11.1 — Task Execution Product PRD · L1 R9.1（WHAT）
 
 > **审阅说明：** 本文件与 [Version/Product #1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) 的 R9 产品合同对齐。旧 R3/R4 中“非 Workflow 嵌套可执行”“JSON-only”“三个生命周期 Hook”“优先级路由”均被用户后续的 R9 决议覆盖。源代码与 HOW 按 [L2 R9 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608) 处理；这是 Draft 未冻结，不是新功能已实现。
 
-# DomainHarness v0.11.1 — Task Execution（Version/Product L1 WHAT · R9）
+# DomainHarness v0.11.1 — Task Execution（Version/Product L1 WHAT · R9.1）
 
 ```ini
-OUTPUT_LABEL=DH_V0111_PRODUCT_R9_SIX_OWNER_DECISIONS
+OUTPUT_LABEL=DH_V0111_PRODUCT_R9_1_LOCAL_NESTING_DEPTH
 MASTER=#1563
 VERSION_ISSUE=#1605
 PRODUCT_DRAFT_PR=#1607
@@ -18,7 +20,7 @@ ENTRY=INIT_ELEMENT_PER_SELECTED_PACKAGE
 FILE_READER=JSON_YAML
 ROUTING=EXPLICIT_SWITCH_EXITS_NO_PRIORITY
 HOOK=START_END
-BUDGET=SHARED_ROOT_COUNT_AND_DEPTH
+BUDGET=SHARED_ROOT_CALL_COUNT_AND_PER_WORKFLOW_RELATIVE_DEPTH
 STATUS=L1_CANDIDATE_NOT_FROZEN
 NATIVE_DAG=NOT_CREATED
 CODE=NOT_STARTED
@@ -42,7 +44,7 @@ RELEASE=NO
 | F05 | ASK/WAIT 明确表达需要用户信息/等待条件，本版返回当次结果、不承诺持久化恢复 |
 | F06 | COMPLETE/REJECT 明确区别业务完成和拒绝 |
 | F07 | UNKNOWN/FAILED 明确区别未知与失败，不自动洗成成功或 false |
-| F08 | 根/子 Workflow 共享**总调用次数与最大嵌套深度**预算，循环和子流程不能绕过 |
+| F08 | 根/子 Workflow 共享**总 Element 调用次数预算**；**每个 Workflow 单独决定其子树允许的最大嵌套深度**，所有活动祖先的约束共同生效；循环和子流程不能绕过 |
 | F09 | 每次 Element 调用的业务 Hook 只有 **start/end** 两个可选时机；最终结果包含路径和停止原因，业务收尾后才返回 |
 | F10 | 0.11.0 的 Boot/Pin/Lock、Init、Ingress/READY、直接 Function 调用和 Dispose 行为不得退化 |
 
@@ -55,7 +57,7 @@ RELEASE=NO
 | AC13 | ASK、WAIT 各给出明确停止原因，本版结束当前 Run，不伪造恢复 |
 | AC14 | REJECT、UNKNOWN、FAILED 各有真实执行结果，不报告 COMPLETE |
 | AC15 | BUILD 拒绝未知嵌套类型、失效依赖、非法出口目标及未选入口，危险执行零发生 |
-| AC16 | 同一根 Run 下子 Workflow、Reader/Guard 的实际 Element 调用共用预算；层级过深和受限循环正确终止 |
+| AC16 | 同一根 Run 下子 Workflow、Reader/Guard 的实际 Element 调用共用总预算；不同 Workflow 可声明不同本地最大下级嵌套深度，进入子 Workflow 前逐祖先检查，不能通过下层更宽松的设置突破父限制；循环正确终止 |
 | AC17 | App 未就绪、已 Dispose、Ingress 被禁用时 Package Init 不能绕过既有约束 |
 | AC18 | Stage0 的直接 Function、App businessAppInit 与 Package technicalInit/Dispose 回归无退化 |
 | AC19 | 相同被选定义、输入及确定性业务结果的执行路径可复现；重复引用同一 Element 的运行结果各自独立 |
