@@ -4,4 +4,4 @@
 
 最低 Node.js 22.12.0。运行 `npm ci && npm run verify`，执行完整的单一 Domain App Demo `examples/basic-domain-app`。
 
-[源码架构与完整调用流程](docs/architecture/DOMAIN_HARNESS_V0110_CODE_AND_CALL_FLOW.md) · [0.11.0 产品 PRD](docs/product/DomainHarness_v0.11.0_ELEMENT_FIRST_PRODUCT_PRD_CANDIDATE.md) · [L2](docs/architecture/DomainHarness_v0.11.0_L2_ARCHITECTURE_CANDIDATE.md) · [TypeScript Skill](.agents/skills/typescript-quality/SKILL.md) · [重构工程经验](docs/engineering/DOMAIN_HARNESS_V0110_REFACTOR_LESSONS.md)
+[源码架构与完整调用流程](docs/architecture/DOMAIN_HARNESS_V0110_CODE_AND_CALL_FLOW.md) · [0.11.0 产品 PRD](docs/product/DomainHarness_v0.11.0_ELEMENT_FIRST_PRODUCT_PRD_CANDIDATE.md) · [L2](docs/architecture/DomainHarness_v0.11.0_L2_ARCHITECTURE_CANDIDATE.md) · [TypeScript Skill](.agents/skills/typescript-quality/SKILL.md) · [重构工程经验](docs/engineering/DOMAIN_HARNESS_V0110_REFACTOR_LESSONS.md) · [后续版本防回归手册](docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)

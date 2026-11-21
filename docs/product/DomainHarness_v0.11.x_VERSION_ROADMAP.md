@@ -1,6 +1,8 @@
-<!-- DH_V0110_SOURCE_QUALITY_REWORK_OWNER_20261121 -->
-> **当前源码质量验收覆盖决议（Issue #1602）：** 虽然先前 0.11.0 Demo 的 AC01–AC10 获得 Scoped PASS，但 Owner 源码审核发现旧版代码、版本化包入口、英文历史注释、无关文件等重大问题。**0.11.0 源码架构/可维护性目前为 REWORK，不能按下文旧“已内部验收”的措辞提升代码质量资格。** 采用 [#1603](https://github.com/kaicreator-mm/domain-harness/pull/1603) 隔离重构，直到新版四包源码、类型、lint、真实单 Demo 通过且完整模块必要审核结束才可重新授予源码合格。后续阶段的规划与本次 0.11.0 重构是两个独立决策，本 PR 不实施未来阶段。
-<!-- /DH_V0110_SOURCE_QUALITY_REWORK_OWNER_20261121 -->
+<!-- DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
+> **0.11.0 源码质量最新状态（覆盖历史 REWORK）：** 先前的 REWORK 为真实历史，但已在 [Issue #1602](https://github.com/kaicreator-mm/domain-harness/issues/1602) / [PR #1603](https://github.com/kaicreator-mm/domain-harness/pull/1603) 通过 R12→R15 复审完成四模块重构，R15 `ACCEPT_SCOPED`（P0=0/P1=0、保留五项非阻断 P2），Woodpecker #2787 同 SHA SUCCESS，已合入 `version/v0.11.x`；后续 [PR #1606](https://github.com/kaicreator-mm/domain-harness/pull/1606) 补齐中文注释和调用流程文档并经 #2788 成功合入。**仅 0.11.0 Foundation/Stage-0 工程资格合格；main、统一 Release、0.11.1+ 和 Full Conformance 均不能据此晋升。**
+>
+> 后续开发默认遵循 [0.11.x 防回归工程手册](../engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)：先分析新增信任/权限/生命周期边界，再做必要正反例，提交前检验类型和测试，按 Exact SHA 独立增量审核，禁止重复无效 CI 和往返拆分本地 Agent 任务。
+<!-- /DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
 
 # DomainHarness 0.11.x — 完整重写与 Domain-Bounded Harness 版本路线图（R4 · Owner Confirmed）
 
