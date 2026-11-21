@@ -1,6 +1,6 @@
 /** BUILD 的源代码门禁：遍历最终 ESM 模块闭包，拒绝未声明的跨 Package 调用入口。 */
 import { posix } from 'node:path';
-import ts from 'typescript';
+import * as ts from 'typescript';
 import type { DomainPackageManifest, EntryRef, ResourceRef } from '@kaicreator/domain-harness-contracts';
 import { isRelativeResourcePath } from '@kaicreator/domain-harness-contracts';
 import { ResourceScope, digestOfBytes } from './resources.js';
