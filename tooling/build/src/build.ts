@@ -19,7 +19,6 @@ import {
   type FunctionContract,
   type FunctionRef,
   type JsonValue,
-  type PackageLayer,
   type ResolvedTarget,
   type ResourceRef,
   type SealedHookBinding,
@@ -43,6 +42,7 @@ import { SchemaChecker } from './schema-check.js';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
 import { verifyGeneratedPackageImports, verifyLifecycleExports } from './static-package-guard.js';
+import { composeAppPackage, sameAppPackageBytes, sealPackageManifest } from './app-package.js';
 
 
 interface LoadedElement {
@@ -59,8 +59,6 @@ interface ResolvedFunction {
   readonly fn: FunctionContract;
   readonly owner: DomainPackageManifest;
 }
-
-const PACKAGE_LAYERS: readonly PackageLayer[] = ['kernel', 'sdk', 'business'];
 
 function elementNamespace(id: string): string {
   const dot = id.indexOf('.');
@@ -161,15 +159,18 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     profile: NODE22_ESM_PROFILE,
   };
 
-  // 第 2 段：从三层 Primary 与显式扩展出发，沿 dependsOn 扩展闭包。这里选择的是包，不是运行时调度。
+  if (!isRelativeResourcePath(input.kdpArtifact.path)) {
+    throw refusal('DH_BUILD_RESOURCE_MISSING', 'KDP bootstrap artifact path is not a canonical in-package path');
+  }
+
+  // 第 2 段：从唯一 KDP 与 BUILD 选定的任意数量 Core 出发，沿 dependsOn 扩展闭包。
   const selected = new Map<string, DomainPackageManifest>();
-  const rootSlots: readonly (readonly [PackageLayer, keyof DomainAppDescriptor['roots']])[] = [
-    ['kernel', 'kernelPrimary'],
-    ['sdk', 'sdkPrimary'],
-    ['business', 'businessPrimary'],
-  ];
-  for (const [layer, slot] of rootSlots) {
-    const ref = descriptor.roots[slot];
+  const rootCoreIds = new Set<string>();
+  const selectCore = (
+    ref: DomainAppDescriptor['roots']['cores'][number],
+    slot: string,
+    requiredLayer?: 'kernel',
+  ): void => {
     const manifest = pool.get(ref.package);
     if (!manifest || manifest.version !== ref.version) {
       throw refusal(
@@ -181,19 +182,25 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     if (manifest.role !== 'primary') {
       throw refusal(
         'DH_BUILD_LAYER_ROLE_MISMATCH',
-        `roots.${slot} package '${ref.package}' declares role='${manifest.role}'; a root slot must reference a primary package`,
+        `roots.${slot} package '${ref.package}' declares role='${manifest.role}'; a Core root must reference a primary package`,
         `roots.${slot}`,
       );
     }
-    if (manifest.layer !== layer) {
+    if (requiredLayer !== undefined && manifest.layer !== requiredLayer) {
       throw refusal(
         'DH_BUILD_PRIMARY_MISSING',
-        `roots.${slot} package '${ref.package}' declares layer='${manifest.layer}', leaving layer '${layer}' without a primary`,
+        `roots.${slot} package '${ref.package}' declares layer='${manifest.layer}'; KDP must be the kernel Core`,
         `roots.${slot}`,
       );
     }
+    if (rootCoreIds.has(manifest.id)) {
+      throw refusal('DH_BUILD_PRIMARY_DUPLICATE', `Core '${manifest.id}' is selected by more than one root entry`);
+    }
+    rootCoreIds.add(manifest.id);
     selected.set(manifest.id, manifest);
-  }
+  };
+  selectCore(descriptor.roots.kernelPrimary, 'kernelPrimary', 'kernel');
+  descriptor.roots.cores.forEach((ref, index) => selectCore(ref, `cores[${index}]`));
   for (const [index, ref] of descriptor.extensions.entries()) {
     const manifest = pool.get(ref.package);
     if (!manifest || manifest.version !== ref.version) {
@@ -243,23 +250,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     dependsOnEdges.set(id, edges);
   }
 
-  const primaries = new Map<PackageLayer, string[]>();
   for (const manifest of selected.values()) {
-    if (manifest.role === 'primary') {
-      const list = primaries.get(manifest.layer) ?? [];
-      list.push(manifest.id);
-      primaries.set(manifest.layer, list);
-    }
-  }
-  for (const layer of PACKAGE_LAYERS) {
-    const list = (primaries.get(layer) ?? []).sort();
-    if (list.length === 0) {
-      throw refusal('DH_BUILD_PRIMARY_MISSING', `no primary package selected for layer '${layer}'`);
-    }
-    if (list.length > 1) {
+    if (manifest.role === 'primary' && !rootCoreIds.has(manifest.id)) {
       throw refusal(
-        'DH_BUILD_PRIMARY_DUPLICATE',
-        `layer '${layer}' has ${list.length} primary packages: ${list.join(', ')}`,
+        'DH_BUILD_PRIMARY_MISSING',
+        `selected Core '${manifest.id}' is not declared in descriptor roots; every Core must be BUILD-selected explicitly`,
       );
     }
   }
@@ -656,8 +651,11 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     }
   }
   const kdpId = descriptor.roots.kernelPrimary.package;
-  if (coreOrders.get(0) !== kdpId) {
-    throw refusal('DH_BUILD_PRIMARY_MISSING', `Order 0 must be selected KDP '${kdpId}'`);
+  if (coreOrders.get(0) !== kdpId || input.kdpArtifact.packageId !== kdpId) {
+    throw refusal(
+      'DH_BUILD_PRIMARY_MISSING',
+      `Order 0 KDP '${kdpId}' must also own bootstrap artifact '${input.kdpArtifact.packageId}'`,
+    );
   }
   const coreOrder = [...coreOrders].sort(([a], [b]) => a - b).map(([, id]) => id);
   // Core 链与 Extension DAG 分开：核心间链接不需要伪装成 Extension 依赖。
@@ -709,6 +707,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     const digest = digestOfBytes(bytes);
     scope.record(manifest.id, artifactPath, digest);
     verifyLifecycleExports(scope, manifest, { packageId: manifest.id, path: artifactPath, digest });
+    sealPackageManifest(scope, manifest, manifest.id === kdpId ? input.kdpArtifact.path : undefined);
     sealedPackages.push({
       packageId: manifest.id,
       version: manifest.version,
@@ -772,7 +771,13 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   if (canonicalJson(toJson(assemble())) !== lockText) {
     throw refusal('DH_BUILD_LOCK_NOT_REPRODUCIBLE', 'double-build self-check produced divergent Lock bytes');
   }
-  return { lock, lockBytes: new TextEncoder().encode(lockText) };
+  const lockBytes = new TextEncoder().encode(lockText);
+  const appPackage = composeAppPackage(scope, descriptor, lock, lockBytes, input.runtimeDependencies);
+  const secondAppPackage = composeAppPackage(scope, descriptor, lock, lockBytes, input.runtimeDependencies);
+  if (!sameAppPackageBytes(appPackage, secondAppPackage)) {
+    throw refusal('DH_BUILD_LOCK_NOT_REPRODUCIBLE', 'double-build self-check produced divergent App Package bytes');
+  }
+  return { lock, lockBytes, appPackage };
 }
 
 

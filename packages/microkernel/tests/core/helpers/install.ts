@@ -25,7 +25,7 @@ const CONTRACTS_DIST = fileURLToPath(
   new URL('../../../../contracts/dist/', import.meta.url),
 );
 
-export const KDP_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
+export const KDP_PACKAGE_ID = 'fixture-kernel';
 export const TARGET: ResolvedTarget = {
   runtime: 'node',
   module: 'esm',
@@ -154,6 +154,10 @@ const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_KERNEL}' });
 export async function init(ctx) {
   events.push({ event: 'package-init', package: '${FIXTURE_KERNEL}', initFrom: ctx.InitFrom, hostPortCount: (ctx.hostPorts ?? []).length, visibleFunctions: [...ctx.functions.keys()] });
+  return ctx.nextCore?.init();
+}
+export async function hold(ctx) {
+  events.push({ event: 'package-init', package: '${FIXTURE_KERNEL}', droppedNextCore: true });
 }
 export async function exit(ctx) {
   events.push({ event: 'package-exit', package: '${FIXTURE_KERNEL}' });
@@ -173,6 +177,7 @@ export async function init(ctx) {
   if (${JSON.stringify(scenario.sdkInitThrow ?? false)}) {
     throw new Error('fixture sdk Init threw TOKEN_SECRET_CANARY_8029');
   }
+  return ctx.nextCore?.init();
 }
 export async function exit(ctx) {
   events.push({ event: 'package-exit', package: '${FIXTURE_SDK}' });
@@ -229,7 +234,7 @@ function extensionModuleSource(): string {
 const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_EXT}' });
 export async function init(ctx) {
-  events.push({ event: 'package-init', package: '${FIXTURE_EXT}', initFrom: ctx.InitFrom, visibleFunctions: [...ctx.functions.keys()] });
+  events.push({ event: 'package-init', package: '${FIXTURE_EXT}', initFrom: ctx.InitFrom, visibleFunctions: [...ctx.functions.keys()], hasNextCore: ctx.nextCore !== undefined });
 }
 export async function exit(ctx) {
   events.push({ event: 'package-exit', package: '${FIXTURE_EXT}' });
@@ -389,8 +394,10 @@ export async function buildFixtureInstall(
     target: { runtime: 'node', module: 'esm', nodeMajor: 22 },
     roots: {
       kernelPrimary: { package: FIXTURE_KERNEL, version: '1.0.0' },
-      sdkPrimary: { package: FIXTURE_SDK, version: '1.0.0' },
-      businessPrimary: { package: FIXTURE_BUSINESS, version: '1.0.0' },
+      cores: [
+        { package: FIXTURE_SDK, version: '1.0.0' },
+        { package: FIXTURE_BUSINESS, version: '1.0.0' },
+      ],
     },
     extensions: [{ package: FIXTURE_EXT, version: '1.0.0' }],
     ingress: [
@@ -419,6 +426,7 @@ export async function buildFixtureInstall(
   const hookDigest = await fileBytesDigest(hookPath);
 
   const resourceDigests: Record<string, ContentDigest> = {
+    [`${KDP_PACKAGE_ID}/package.json`]: await fileBytesDigest(join(kdpPackageDir, 'package.json')),
     [`${FIXTURE_KERNEL}/dist/index.mjs`]: kernelArtifact.digest,
     [`${FIXTURE_SDK}/dist/index.mjs`]: sdkArtifact.digest,
     [`${FIXTURE_BUSINESS}/dist/index.mjs`]: businessArtifact.digest,

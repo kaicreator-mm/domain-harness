@@ -168,6 +168,16 @@ test('P2-9: secondary Core.Order zero is rejected at BUILD', (t) => {
   expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_DUPLICATE');
 });
 
+test('R11 P1-03: bootstrap artifact Package must be the Order 0 KDP Core', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  expectRefusal(buildApp({
+    ...input,
+    kdpArtifact: { ...input.kdpArtifact, packageId: '@kaicreator/domain-harness-microkernel' },
+  }), 'DH_BUILD_PRIMARY_MISSING');
+});
+
 test('regression: modifying one BUILD fixture Target never mutates subsequent fixture Targets', (t) => {
   const first = standardCase();
   const second = standardCase();

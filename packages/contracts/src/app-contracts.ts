@@ -39,11 +39,18 @@ export type InitCaller =
   | { readonly type: 'Boot' }
   | { readonly type: 'Package'; readonly packageId: string };
 
+/** BUILD 封存的 Init 调用绑定；运行时不发现或选择其它 Package。 */
+export interface PackageInitBinding {
+  init(): Promise<unknown>;
+}
+
 /** Package 统一 Init 的上下文，启用 InitFrom 的 Package 才接收历史，业务不得伪造。 */
 export interface PackageInitContext extends AppInitContext {
   readonly packageId: string;
   readonly InitFrom?: readonly InitCaller[];
   readonly hostPorts: readonly import('./boot-contracts.js').HostPortBinding[];
+  /** 仅当前 Core 收到 Order 中下一 Core 的受控链接；不是公共 Package next() API。 */
+  readonly nextCore?: PackageInitBinding;
 }
 
 /** Exit 仅在退出流程执行，调用历史属于本次应用激活。 */

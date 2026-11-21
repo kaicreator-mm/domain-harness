@@ -1,4 +1,5 @@
 // BUILD 正反例：只有符合当前契约的资源才能进入 Lock。
+import { canonicalJson } from '@kaicreator/domain-harness-contracts';
 import type {
   DomainAppDescriptor,
   DomainPackageManifest,
@@ -222,7 +223,6 @@ export function standardCase(): StandardCase {
     const kdpDir = addPackage(ws, 'kdp-kernel');
     const aaaDir = addPackage(ws, 'aaa-ext');
     const extDir = addPackage(ws, 'orders-ext');
-    const mkDir = addPackage(ws, '@kaicreator/domain-harness-microkernel');
 
     const pending = (ref: { digest: string } | undefined): boolean => ref?.digest === 'sha256:pending';
     const faqFile = writeJson(businessDir, 'content/faq.json', {
@@ -283,7 +283,20 @@ export function standardCase(): StandardCase {
     const aaaArtifact = writeRaw(aaaDir, 'dist/aaa.mjs', new TextEncoder().encode("export const artifact = \"aaa-ext\";\nexport function init() {}\nexport function exit() {}\n"));
     const auditModule = writeRaw(extDir, 'dist/audit.mjs', new TextEncoder().encode('export function audit() {}\n'));
     const extArtifact = writeRaw(extDir, 'dist/ext.mjs', new TextEncoder().encode("export const artifact = \"orders-ext\";\nexport function init() {}\nexport function exit() {}\n"));
-    writeRaw(mkDir, 'dist/index.js', new TextEncoder().encode('export async function bootstrap() { return { status: "BOOTED" }; }\n'));
+    writeRaw(kdpDir, 'dist/index.js', new TextEncoder().encode('export async function bootstrap() { return { status: "BOOTED" }; }\n'));
+    for (const [dir, id, artifactPath] of [
+      [businessDir, 'orders-business', 'dist/business.mjs'],
+      [sdkDir, 'sdk-core', 'dist/sdk.mjs'],
+      [aaaDir, 'aaa-ext', 'dist/aaa.mjs'],
+      [extDir, 'orders-ext', 'dist/ext.mjs'],
+    ] as const) {
+      writeRaw(dir, 'package.json', new TextEncoder().encode(canonicalJson({
+        name: id, version: '1.0.0', type: 'module', exports: { '.': `./${artifactPath}` },
+      })));
+    }
+    writeRaw(kdpDir, 'package.json', new TextEncoder().encode(canonicalJson({
+      name: 'kdp-kernel', version: '1.0.0', type: 'module', exports: { '.': './dist/index.js' },
+    })));
 
     const aaaContributesTo = case_.aaaContributesTo.map((contribution) => ({
       ...contribution,
@@ -406,8 +419,10 @@ export function standardCase(): StandardCase {
       target: case_.descriptorTarget,
       roots: {
         kernelPrimary: { package: 'kdp-kernel', version: '1.0.0' },
-        sdkPrimary: { package: 'sdk-core', version: '1.0.0' },
-        businessPrimary: { package: 'orders-business', version: '1.0.0' },
+        cores: [
+          { package: 'sdk-core', version: '1.0.0' },
+          { package: 'orders-business', version: '1.0.0' },
+        ],
       },
       extensions: [
         { package: 'orders-ext', version: '1.0.0' },
@@ -427,7 +442,8 @@ export function standardCase(): StandardCase {
         'aaa-ext': 'dist/aaa.mjs',
         'orders-ext': 'dist/ext.mjs',
       },
-      kdpArtifact: { packageId: '@kaicreator/domain-harness-microkernel', path: 'dist/index.js' },
+      kdpArtifact: { packageId: 'kdp-kernel', path: 'dist/index.js' },
+      runtimeDependencies: { '@kaicreator/domain-harness-microkernel': '0.11.0' },
     };
     return { input, refs: { evaluateRef, initRef } };
   }

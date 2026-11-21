@@ -17,8 +17,8 @@ export interface IngressEntry {
 
 /**
  * BUILD 的声明式输入，不是运行期执行计划。
- * roots 指定三层 Primary，extensions 指定候选扩展；BUILD 继续追踪依赖闭包，
- * 业务启动由 Business Core 的 Init Element 负责，不另选独立 App Init。
+ * kernelPrimary 指定唯一 Order=0 KDP，cores 指定其余 BUILD 选定 Core；
+ * extensions 指定候选扩展。Core 数量与名称不由 K/S/B 三层样例限制。
  */
 export interface DomainAppDescriptor {
   readonly kind: 'DomainApp';
@@ -28,8 +28,7 @@ export interface DomainAppDescriptor {
   readonly target: TargetSelector;
   readonly roots: {
     readonly kernelPrimary: PackageRef;
-    readonly sdkPrimary: PackageRef;
-    readonly businessPrimary: PackageRef;
+    readonly cores: readonly PackageRef[];
   };
   readonly extensions: readonly PackageRef[];
   readonly ingress: readonly IngressEntry[];

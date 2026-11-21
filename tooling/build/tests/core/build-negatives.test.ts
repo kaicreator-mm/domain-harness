@@ -248,13 +248,13 @@ test('DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION: two compatible bindings for on
   expectRefusal(buildApp(input), 'DH_BUILD_FUNCTION_AMBIGUOUS_IMPLEMENTATION');
 });
 
-test('DH_BUILD_PRIMARY_DUPLICATE: extension claiming primary in an occupied layer', (t) => {
+test('DH_BUILD_PRIMARY_MISSING: a Primary introduced transitively but not selected as a root Core', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
   const aaa = input.packages.find((pkg) => (pkg as { id: string }).id === 'aaa-ext') as { role: string };
   aaa.role = 'primary';
-  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_DUPLICATE');
+  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_MISSING');
 });
 
 test('DH_BUILD_PRIMARY_MISSING: kernel root manifest declaring the sdk layer', (t) => {
@@ -392,3 +392,60 @@ test('BUILD forbids Element content references to an undeclared Package', (t) =>
   };
   expectRefusal(buildApp(scenario.finalize().input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
+
+function generatedLoaderCase(label: string, body: string, code: BuildErrorCode = 'DH_BUILD_DEPENDS_ON_UNSELECTED'): void {
+  test(`R11 P1-01: ${label}`, (t) => {
+    const scenario = standardCase();
+    t.after(scenario.ws.dispose);
+    const { input } = scenario.finalize();
+    const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+    const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs', new TextEncoder().encode(body));
+    const packages = input.packages.map((pkg) => pkg === business ? {
+      ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
+    } : pkg);
+    expectRefusal(buildApp({ ...input, packages }), code);
+  });
+}
+
+generatedLoaderCase('computed global Function loader is refused', `
+const load = globalThis['Function']('return import("undeclared-package")');
+export async function init() { await load()(); }
+export function exit() {}
+`);
+generatedLoaderCase('aliased global Function loader is refused before invocation', `
+const F = globalThis.Function;
+export async function init() { return F('return import("undeclared-package")')(); }
+export function exit() {}
+`);
+generatedLoaderCase('bare Function alias cannot bypass identifier checks', `
+const F = Function;
+export async function init() { return F('return 1')(); }
+export function exit() {}
+`);
+generatedLoaderCase('process.getBuiltinModule and createRequire are refused', `
+export async function init() { return process.getBuiltinModule('module').createRequire(import.meta.url)('undeclared-package'); }
+export function exit() {}
+`);
+generatedLoaderCase('computed process builtin loader is refused', `
+export async function init() { return process['getBuiltinModule']('module'); }
+export function exit() {}
+`);
+generatedLoaderCase('nonliteral computed calls are not statically provable', `
+const table = {};
+export async function init() { return table[globalThis.name](); }
+export function exit() {}
+`);
+generatedLoaderCase('Reflect-based Function lookup is refused', `
+export async function init() { return Reflect.get(globalThis, 'Function')('return 1')(); }
+export function exit() {}
+`);
+generatedLoaderCase('private named imports from a declared Extension are refused', `
+import { notExported } from 'orders-ext';
+export async function init() { return notExported(); }
+export function exit() {}
+`, 'DH_BUILD_EXPORT_MISSING');
+generatedLoaderCase('namespace imports expose an unprovable raw Package handle', `
+import * as ext from 'orders-ext';
+export async function init() { return ext; }
+export function exit() {}
+`, 'DH_BUILD_EXPORT_MISSING');

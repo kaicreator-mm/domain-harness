@@ -15,6 +15,7 @@ import type {
   InitCaller,
   PackageInitContext,
   PackageExitContext,
+  PackageInitBinding,
 } from '@kaicreator/domain-harness-contracts';
 import { resolvePackageFile, splitResourceKey } from './paths.js';
 import { bytesContentDigest } from './verify.js';
@@ -56,8 +57,9 @@ export class PackageSystem {
     if (cached === undefined) {
       cached = import(pathToFileURL(absolutePath).href).then(
         (mod) => mod as ModuleExports,
-        (_error: unknown) => {
+        (error) => {
           // 不转发任意 Package 的 import 失败文本；异常字符串可能含口令或私有路径。
+          void error;
           throw new KdpLoadError(`${what} failed to import (untrusted module error redacted)`);
         },
       );
@@ -105,7 +107,7 @@ export class PackageSystem {
     for (const hook of this.lock.hookBindings) for (const provider of hook.providers) collect(provider.module);
     // 先核验所有生成的 ESM 模块，包括模块的相对导入闭包，防止 Node 加载时绕过 Pin。
     for (const [key, digest] of Object.entries(this.lock.resourceDigests)) {
-      if (!/\.(?:mjs|js)$/u.test(key)) continue;
+      if (!/\.(?:mjs|js)$/u.test(key) && !key.endsWith('/package.json')) continue;
       const split = splitResourceKey(key);
       if (split === null) throw new KdpLoadError(`invalid executable key '${key}'`);
       collect({ packageId: split.packageId, path: split.path, digest });
@@ -146,7 +148,12 @@ export class PackageSystem {
   async runInit(context: AppInitContext): Promise<unknown> {
     const seen = new Set<string>();
     let businessResult: unknown;
-    const enter = async (packageId: string, caller: InitCaller, layer: SelectedPackage['layer']): Promise<void> => {
+    const enter = async (
+      packageId: string,
+      caller: InitCaller,
+      layer: SelectedPackage['layer'],
+      nextCore?: PackageInitBinding,
+    ): Promise<void> => {
       const pkg = this.packageById(packageId);
       if (!pkg) throw new KdpLoadError(`Init references unselected Package '${packageId}'`);
       if (pkg.layer !== layer && pkg.role !== 'extension') {
@@ -205,11 +212,13 @@ export class PackageSystem {
             : {}),
           hostPorts: kdpCore ? this.hostPorts : [],
           resources,
+          ...(nextCore !== undefined ? { nextCore } : {}),
         };
         try {
           const result: unknown = await (fn as (context: PackageInitContext) => unknown)(ownContext);
           if (pkg.role === 'primary' && pkg.layer === 'business') businessResult = result;
-        } catch (_error) {
+        } catch (error) {
+          if (error instanceof KdpLoadError) throw error;
           throw new KdpLoadError(`Package '${packageId}' Init Element raised unhandled error (detail redacted)`, 'DH_RUNTIME_NOT_READY');
         }
       } finally {
@@ -218,16 +227,25 @@ export class PackageSystem {
     };
     const cores = this.lock.coreOrder;
     if (!cores.length) throw new KdpLoadError('Lock has no Core.Order chain');
-    const walkCore = async (index: number, caller: InitCaller): Promise<void> => {
-      const id = cores[index];
-      if (!id) return;
-      const core = this.packageById(id);
-      if (!core || core.role !== 'primary') throw new KdpLoadError(`Core.Order references invalid Core '${id}'`);
-      await enter(id, caller, core.layer);
-      const next = cores[index + 1];
-      if (next !== undefined) await walkCore(index + 1, { type: 'Package', packageId: id });
-    };
-    await walkCore(0, { type: 'Boot' });
+    const rootId = cores[0]!;
+    if (this.lock.bootstrapKdpPin.kdpPackageId !== rootId) {
+      throw new KdpLoadError('Order 0 Core and bootstrap KDP Package identities differ', 'DH_BOOT_PIN_MISMATCH');
+    }
+    const coreBinding = (index: number, caller: InitCaller): PackageInitBinding => ({
+      init: async (): Promise<void> => {
+        const id = cores[index];
+        if (!id) return;
+        const core = this.packageById(id);
+        if (!core || core.role !== 'primary') throw new KdpLoadError(`Core.Order references invalid Core '${id}'`);
+        const next = cores[index + 1];
+        const nextCore = next === undefined
+          ? undefined
+          : coreBinding(index + 1, { type: 'Package', packageId: id });
+        // KDP 只提供 BUILD 封存的链接；当前 Core.Init 自己决定是否及何时调用下一跳。
+        await enter(id, caller, core.layer, nextCore);
+      },
+    });
+    await coreBinding(0, { type: 'Boot' }).init();
     return businessResult;
   }
 
@@ -252,7 +270,7 @@ export class PackageSystem {
           hostPorts: pkg.role === 'primary' && pkg.order === 0 ? this.hostPorts : [],
         };
         await (fn as (context: PackageExitContext) => unknown)(exitContext);
-      } catch (_error) {
+      } catch {
         const reason = `${packageId}: Exit Element raised unhandled error (detail redacted)`;
         failures.push(reason);
         console.error(`[KDP Exit] code=DH_RUNTIME_EXIT_FAILED phase=exit package=${packageId}`);

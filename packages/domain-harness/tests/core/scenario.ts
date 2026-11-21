@@ -29,7 +29,8 @@ import type { BuildInput, BuildFailure } from '@kaicreator/domain-harness';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MICROKERNEL_DIR = join(HERE, '../../../microkernel');
 const CONTRACTS_DIR = join(HERE, '../../../contracts');
-const KDP_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
+const MICROKERNEL_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
+const KDP_PACKAGE_ID = 'kdp-kernel';
 const TARGET_SELECTOR = { runtime: 'node', module: 'esm', nodeMajor: 22 } as const;
 const LOCK_RELATIVE_PATH = 'dh-lock/app.lock.json';
 const DESCRIPTOR_RELATIVE_PATH = 'descriptor/app.json';
@@ -87,6 +88,7 @@ const events = (globalThis.__domainHarnessT04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'kdp-kernel' });
 export async function init(ctx) {
   events.push({ event: 'package-init', package: 'kdp-kernel' });
+  return ctx.nextCore?.init();
 }
 export async function exit(ctx) {
   events.push({ event: 'package-exit', package: 'kdp-kernel' });
@@ -100,6 +102,7 @@ const events = (globalThis.__domainHarnessT04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'sdk-core' });
 export async function init(ctx) {
   events.push({ event: 'package-init', package: 'sdk-core' });
+  return ctx.nextCore?.init();
 }
 export async function exit(ctx) {
   events.push({ event: 'package-exit', package: 'sdk-core' });
@@ -300,6 +303,21 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     const businessModule = await write(businessDir, 'dist/business.mjs', businessArtifactModuleSource());
     const evaluateModule = await write(businessDir, 'dist/evaluate.mjs', businessEntryModuleSource(scenario));
     const extModule = await write(extDir, 'dist/index.mjs', extensionModuleSource());
+    await write(
+      kernelDir,
+      'dist/index.js',
+      `export { bootstrap } from '${MICROKERNEL_PACKAGE_ID}';\n`,
+    );
+    for (const [dir, id, artifactPath] of [
+      [kernelDir, 'kdp-kernel', 'dist/index.js'],
+      [sdkDir, 'sdk-core', 'dist/index.mjs'],
+      [businessDir, 'orders-business', 'dist/business.mjs'],
+      [extDir, 'orders-ext', 'dist/index.mjs'],
+    ] as const) {
+      await write(dir, 'package.json', canonicalJson({
+        name: id, version: '1.0.0', type: 'module', exports: { '.': `./${artifactPath}` },
+      }));
+    }
     const ruleText = canonicalJson(scenario.rule as unknown as JsonValue);
     await write(businessDir, 'content/rules.json', ruleText);
 
@@ -417,8 +435,10 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         : TARGET_SELECTOR,
       roots: {
         kernelPrimary: { package: 'kdp-kernel', version: '1.0.0' },
-        sdkPrimary: { package: 'sdk-core', version: '1.0.0' },
-        businessPrimary: { package: 'orders-business', version: '1.0.0' },
+        cores: [
+          { package: 'sdk-core', version: '1.0.0' },
+          { package: 'orders-business', version: '1.0.0' },
+        ],
       },
       extensions: [{ package: 'orders-ext', version: '1.0.0' }],
       ingress: [
@@ -437,7 +457,7 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         'sdk-core': sdkDir,
         'kdp-kernel': kernelDir,
         'orders-ext': extDir,
-        [KDP_PACKAGE_ID]: MICROKERNEL_DIR,
+        [MICROKERNEL_PACKAGE_ID]: MICROKERNEL_DIR,
       },
       packageArtifacts: {
         'orders-business': 'dist/business.mjs',
@@ -446,6 +466,7 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         'orders-ext': 'dist/index.mjs',
       },
       kdpArtifact: { packageId: KDP_PACKAGE_ID, path: 'dist/index.js' },
+      runtimeDependencies: { [MICROKERNEL_PACKAGE_ID]: '0.11.0' },
     };
 
     const built = await buildApp(input);
@@ -462,12 +483,12 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     await copyPackage('kdp-kernel', kernelDir);
     await copyPackage('orders-ext', extDir);
 
-    const kdpInstallDir = join(installRoot, 'node_modules', KDP_PACKAGE_ID);
+    const kdpInstallDir = join(installRoot, 'node_modules', MICROKERNEL_PACKAGE_ID);
     await mkdir(kdpInstallDir, { recursive: true });
     await writeFile(
       join(kdpInstallDir, 'package.json'),
       JSON.stringify({
-        name: KDP_PACKAGE_ID,
+        name: MICROKERNEL_PACKAGE_ID,
         version: '0.11.0',
         type: 'module',
         exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },

@@ -152,6 +152,11 @@ export function verifyContextPaths(context: KdpBootstrapContext, record: Install
 }
 
 
+function findOrderZeroCore(lock: DomainAppLock): DomainAppLock['selectedPackages'][number] | undefined {
+  return lock.selectedPackages.find((candidate) =>
+    candidate.packageId === lock.coreOrder[0] && candidate.role === 'primary' && candidate.order === 0);
+}
+
 /**
  * 在访问 KDP 之前检查 Lock 自摘要、安装记录绑定和关键结构。
  * 此处固定的是已选计划；Package 文件字节验证由下游 KDP 再执行。
@@ -220,6 +225,10 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
   ) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock bootstrapKdpPin disagrees with the installed record') };
   }
+  const orderZero = findOrderZeroCore(lock);
+  if (!Array.isArray(lock.coreOrder) || lock.coreOrder[0] !== lock.bootstrapKdpPin.kdpPackageId || !orderZero) {
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Order 0 Core and bootstrap KDP Package identities differ') };
+  }
   return { ok: true, value: lock };
 }
 
@@ -287,7 +296,24 @@ export async function resolveKdpEntryPath(
   return { ok: true, value: resolved };
 }
 
-export async function verifyKdpEntryBytes(installRoot: string, record: InstalledRecord): Promise<TrustResult<string>> {
+export async function verifyKdpEntryBytes(
+  installRoot: string,
+  record: InstalledRecord,
+  lock: DomainAppLock,
+): Promise<TrustResult<string>> {
+  const manifestPath = resolvePackageFile(installRoot, record.kdpPackageId, 'package.json');
+  const manifestDigest = lock.resourceDigests[`${record.kdpPackageId}/package.json`];
+  if (manifestPath === null || manifestDigest === undefined) {
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'KDP package.json is not sealed in the Lock') };
+  }
+  try {
+    const bytes = await readFile(manifestPath);
+    if (bytesContentDigest(bytes) !== manifestDigest) {
+      return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'KDP package.json bytes do not match the sealed digest') };
+    }
+  } catch {
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'KDP package.json is not readable') };
+  }
   const entryResult = await resolveKdpEntryPath(installRoot, record.kdpPackageId);
   if (!entryResult.ok) return entryResult;
   const entryPath = entryResult.value;
@@ -309,6 +335,7 @@ export interface NormalizedBootstrapContext {
   readonly lockPath: string;
   readonly hostPorts: readonly HostPortBinding[];
   readonly env: { readonly nodeMajor: number; readonly platform: string };
+  readonly processLifecycle?: { readonly timeoutMs?: number };
 }
 
 export function normalizeBootstrapContext(context: unknown): TrustResult<NormalizedBootstrapContext> {
@@ -345,14 +372,27 @@ export function normalizeBootstrapContext(context: unknown): TrustResult<Normali
     const env = isRecord(envRaw) && typeof envRaw['nodeMajor'] === 'number' && typeof envRaw['platform'] === 'string'
       ? { nodeMajor: envRaw['nodeMajor'], platform: envRaw['platform'] }
       : { nodeMajor: 0, platform: 'unknown' };
+    const lifecycleRaw = context['processLifecycle'];
+    if (lifecycleRaw !== undefined &&
+        (!isRecord(lifecycleRaw) ||
+          (lifecycleRaw['timeoutMs'] !== undefined &&
+            (typeof lifecycleRaw['timeoutMs'] !== 'number' || !Number.isFinite(lifecycleRaw['timeoutMs']) || lifecycleRaw['timeoutMs'] <= 0)))) {
+      return {
+        ok: false,
+        failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'processLifecycle must contain a positive finite timeoutMs when provided'),
+      };
+    }
+    const processLifecycle = isRecord(lifecycleRaw)
+      ? { ...(typeof lifecycleRaw['timeoutMs'] === 'number' ? { timeoutMs: lifecycleRaw['timeoutMs'] } : {}) }
+      : undefined;
     return {
       ok: true,
-      value: { installRoot, descriptorPath, lockPath, hostPorts, env },
+      value: { installRoot, descriptorPath, lockPath, hostPorts, env, ...(processLifecycle ? { processLifecycle } : {}) },
     };
-  } catch (error) {
+  } catch {
     return {
       ok: false,
-      failure: trustFailure('DH_BOOT_RECORD_MISSING', `bootstrap context could not be read: ${(error as Error).message}`),
+      failure: trustFailure('DH_BOOT_RECORD_MISSING', 'bootstrap context could not be read (detail redacted)'),
     };
   }
 }
@@ -373,7 +413,7 @@ export async function verifyInstallTrust(
   const installRoot = normalized.value.installRoot;
   const lockResult = await verifyLockAgainstRecord(installRoot, recordResult.value);
   if (!lockResult.ok) return lockResult;
-  const entryResult = await verifyKdpEntryBytes(installRoot, recordResult.value);
+  const entryResult = await verifyKdpEntryBytes(installRoot, recordResult.value, lockResult.value);
   if (!entryResult.ok) return entryResult;
   return {
     ok: true,

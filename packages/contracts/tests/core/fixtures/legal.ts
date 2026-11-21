@@ -224,8 +224,10 @@ export const DOMAIN_APP_DESCRIPTOR_FIXTURE: DomainAppDescriptor = {
   target: APP_TARGET_SELECTOR,
   roots: {
     kernelPrimary: { package: 'kdp-basic', version: '1.0.0' },
-    sdkPrimary: { package: 'sdk-core', version: '1.0.0' },
-    businessPrimary: { package: 'orders-business', version: '1.0.0' },
+    cores: [
+      { package: 'sdk-core', version: '1.0.0' },
+      { package: 'orders-business', version: '1.0.0' },
+    ],
   },
   extensions: [],
   ingress: [
@@ -246,7 +248,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
   },
   target: APP_TARGET,
   bootstrapKdpPin: {
-    kdpPackageId: '@kaicreator/domain-harness-microkernel',
+    kdpPackageId: 'kdp-basic',
     kdpPrimaryEntry: 'bootstrap',
     kdpPrimaryDigest: contentDigestOf({ fixture: 'kdp/bootstrap-entry', revision: 1 }),
   },

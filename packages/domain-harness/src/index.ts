@@ -11,5 +11,8 @@ export type {
   BuildSuccess,
   BuildFailure,
   KdpArtifactInput,
+  AppPackageFile,
+  ComposedAppPackage,
 } from '@kaicreator/domain-harness-build';
-export { boot, bootstrap } from '@kaicreator/domain-harness-microkernel';
+export { boot, bootstrap, installProcessExitHandoff } from '@kaicreator/domain-harness-microkernel';
+export type { ProcessExitEvent, ProcessExitHost } from '@kaicreator/domain-harness-microkernel';

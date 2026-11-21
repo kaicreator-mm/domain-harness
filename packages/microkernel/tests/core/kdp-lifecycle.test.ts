@@ -340,7 +340,8 @@ test('dispose is single-flight: concurrent and repeated calls never rerun Exit',
     () => null,
     (error: unknown) => (error as Error).message,
   );
-  assert.match(String(first), /fixture kernel Exit threw/);
+  assert.match(String(first), /fixture-kernel/);
+  assert.doesNotMatch(String(first), /TOKEN_SECRET_CANARY_8029/);
   assert.equal(first, second, 'repeated dispose returns the same rejection');
   assert.equal(events().length, countAfterFirst, 'no teardown reruns after the first attempt');
   const kernelDisposes = events().filter(
@@ -373,12 +374,17 @@ test('Package Exit is best-effort across all packages with an aggregate error', 
   const result = await boot(fixture.pin, fixture.context);
   assert.equal(result.status, 'BOOTED');
   if (result.status !== 'BOOTED') return;
+  const logged: string[] = [];
+  t.mock.method(console, 'error', (message?: unknown) => {
+    logged.push(String(message));
+  });
   const message = await result.app.dispose().then(
     () => null,
     (error: unknown) => (error as Error).message,
   );
   assert.match(String(message), /Exit failed for 1 Init call\(s\)/);
   assert.match(String(message), /fixture-kernel/);
+  assert.equal(logged.some((line) => line.includes('TOKEN_SECRET_CANARY_8029')), false);
   const disposes = events().filter((event) => event['event'] === 'package-exit');
   assert.deepEqual(
     disposes.map((event) => event['package']),
@@ -503,7 +509,12 @@ test('Core chain containing unselected Core fails without inventing an Init call
   const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
   t.after(async () => fixture.cleanup());
   const { PackageSystem } = await import('../../src/package-system.js');
-  const packages = new PackageSystem(fixture.installRoot, { ...fixture.lock, coreOrder: ['fixture-ghost'] }, []);
+  const lock = {
+    ...fixture.lock,
+    coreOrder: ['fixture-ghost'],
+    bootstrapKdpPin: { ...fixture.lock.bootstrapKdpPin, kdpPackageId: 'fixture-ghost' },
+  };
+  const packages = new PackageSystem(fixture.installRoot, lock, []);
   await assert.rejects(packages.runInit(packageContext(fixture)), /invalid Core/);
   assert.equal(events().some((e) => e['event'] === 'package-init'), false);
 });
@@ -596,8 +607,53 @@ test('R11 P1-07: directly declared cross-layer Extension.Init is invoked instead
   const packages = new PackageSystem(fixture.installRoot, lock, []);
   await packages.runInit(packageContext(fixture));
   assert.deepEqual(events().filter((e) => e['event'] === 'package-init').map((e) => e['package']), INIT_ORDER);
+  assert.equal(events().find((e) => e['event'] === 'package-init' && e['package'] === 'fixture-ext')?.['hasNextCore'], false);
   assert.deepEqual(packages.initFrom('fixture-ext'),
     [{ type: 'Package', packageId: 'fixture-business' }], 'cross-layer direct caller must be preserved');
   await packages.runExit();
   assert.deepEqual(events().filter((e) => e['event'] === 'package-exit').map((e) => e['package']), DISPOSE_ORDER);
+});
+
+test('P2-01: a Core that drops its BUILD-bound nextCore link stops the chain without a KDP fallback loop', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const { PackageSystem } = await import('../../src/package-system.js');
+  const lock = {
+    ...fixture.lock,
+    selectedPackages: fixture.lock.selectedPackages.map((pkg) =>
+      pkg.packageId === 'fixture-kernel' ? { ...pkg, init: { ...pkg.init, exportName: 'hold' } } : pkg),
+  };
+  const packages = new PackageSystem(fixture.installRoot, lock, []);
+  const result = await packages.runInit(packageContext(fixture));
+  assert.equal(result, undefined);
+  assert.deepEqual(events().filter((e) => e['event'] === 'package-init').map((e) => e['package']), ['fixture-kernel']);
+  assert.equal(events().some((e) => e['event'] === 'package-init' && e['package'] === '@fixture/sdk'), false);
+  assert.equal(events().some((e) => e['event'] === 'business-init'), false);
+});
+
+test('P1-03: PackageSystem refuses a bootstrap identity different from Order 0 before Init', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const { PackageSystem } = await import('../../src/package-system.js');
+  const lock = {
+    ...fixture.lock,
+    bootstrapKdpPin: { ...fixture.lock.bootstrapKdpPin, kdpPackageId: 'different-kdp-package' },
+  };
+  const packages = new PackageSystem(fixture.installRoot, lock, []);
+  await assert.rejects(packages.runInit(packageContext(fixture)), /identities differ/);
+  assert.equal(events().some((e) => e['event'] === 'package-init'), false);
+});
+
+test('P1-05: Boot pin getter failures are refused without leaking secret exception text', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const hostile = new Proxy(fixture.pin, {
+    get(target, property) {
+      if (property === 'kdpPackageId') throw new Error('TOKEN_SECRET_CANARY_8029');
+      return Reflect.get(target, property);
+    },
+  });
+  const result = await boot(hostile, fixture.context);
+  assert.equal(result.status, 'REFUSED');
+  if (result.status === 'REFUSED') assert.doesNotMatch(result.reason, /TOKEN_SECRET_CANARY_8029/);
 });

@@ -531,11 +531,10 @@ export const DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA: JsonObject = defsEnvelope(
       roots: {
         type: 'object',
         additionalProperties: false,
-        required: ['kernelPrimary', 'sdkPrimary', 'businessPrimary'],
+        required: ['kernelPrimary', 'cores'],
         properties: {
           kernelPrimary: { $ref: '#/$defs/packageRef' },
-          sdkPrimary: { $ref: '#/$defs/packageRef' },
-          businessPrimary: { $ref: '#/$defs/packageRef' },
+          cores: { type: 'array', items: { $ref: '#/$defs/packageRef' } },
         },
       },
       extensions: { type: 'array', items: { $ref: '#/$defs/packageRef' } },

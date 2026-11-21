@@ -21,6 +21,7 @@ import { verifyInstallTrust } from './verify.js';
 import { isPlainJsonValue } from './schema-subset.js';
 import { PackageSystem, KdpLoadError } from './package-system.js';
 import { createDomainApp } from './domain-app.js';
+import { installProcessExitHandoff } from './process-exit.js';
 
 function sha256HexOf(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -226,14 +227,17 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
       suppressedIngress: validated.suppressed,
       initialStatus: validated.status,
     });
-    appRef = app;
-    return { status: 'BOOTED', app };
+    const exposedApp = safeContext.processLifecycle === undefined
+      ? app
+      : installProcessExitHandoff(app, process, safeContext.processLifecycle.timeoutMs);
+    appRef = exposedApp;
+    return { status: 'BOOTED', app: exposedApp };
   } catch (error) {
     let cleanupFailure = '';
     // 即使 Init 在中间失败，也只逆序清理真正进入过的 Package。
     try {
       await packages.runExit();
-    } catch (_cleanupError) {
+    } catch {
       cleanupFailure = '; cleanup also failed (details redacted)';
     }
     const loadError = error instanceof KdpLoadError ? error : null;

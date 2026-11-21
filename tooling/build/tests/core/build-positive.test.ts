@@ -5,10 +5,11 @@ import {
   DH_DOMAIN_SCHEMA_VERSION,
   canonicalJson,
   contentDigestOf,
+  type DomainAppDescriptor,
   type JsonValue,
 } from '@kaicreator/domain-harness-contracts';
 import { buildApp, type BuildResult } from '../../src/index.js';
-import { DH_ELEMENT_SCHEMA_VERSION, sha256OfBytes } from './fixtures.js';
+import { DH_ELEMENT_SCHEMA_VERSION, addPackage, manifest, sha256OfBytes, writeRaw } from './fixtures.js';
 import { standardCase } from './standard-case.js';
 
 function expectSuccess(result: BuildResult): Extract<BuildResult, { ok: true }> {
@@ -93,7 +94,7 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     [],
   );
 
-  assert.equal(lock.bootstrapKdpPin.kdpPackageId, '@kaicreator/domain-harness-microkernel');
+  assert.equal(lock.bootstrapKdpPin.kdpPackageId, 'kdp-kernel');
   assert.equal(lock.bootstrapKdpPin.kdpPrimaryEntry, 'bootstrap');
   assert.match(lock.bootstrapKdpPin.kdpPrimaryDigest, /^sha256:[0-9a-f]{64}$/u);
 
@@ -103,7 +104,8 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     'orders-business/docs/eligibility.md',
     'orders-business/definitions/eligibility-1.0.0-1.json',
     'orders-business/dist/business.mjs',
-    '@kaicreator/domain-harness-microkernel/dist/index.js',
+    'kdp-kernel/dist/index.js',
+    'kdp-kernel/package.json',
   ]) {
     assert.match(lock.resourceDigests[key] ?? '', /^sha256:[0-9a-f]{64}$/u, `resourceDigests['${key}']`);
   }
@@ -117,10 +119,12 @@ test('AC07: repeated BUILD over identical input is byte-identical and pool-order
   const first = expectSuccess(buildApp(input));
   const second = expectSuccess(buildApp(input));
   assert.deepEqual(Buffer.from(second.lockBytes), Buffer.from(first.lockBytes));
+  assert.deepEqual(second.appPackage, first.appPackage);
 
   const shuffled = { ...input, packages: [...input.packages].reverse() };
   const third = expectSuccess(buildApp(shuffled));
   assert.deepEqual(Buffer.from(third.lockBytes), Buffer.from(first.lockBytes));
+  assert.deepEqual(third.appPackage, first.appPackage);
 });
 
 test('AC07: closureDigest is the L2 §5.3 predecessor image and is mutation-sensitive', (t) => {
@@ -319,4 +323,50 @@ test('R11 P1-07: BUILD selects a declared Extension from a different layer witho
     assert.ok(chosen?.dependsOn.includes('aaa-ext'));
     assert.equal(built.lock.selectedPackages.find((pkg) => pkg.packageId === 'aaa-ext')?.layer, 'sdk');
   }
+});
+
+test('R11 P1-02: four Cores with a repeated layer and non-contiguous Orders are BUILD-selected', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const dir = addPackage(scenario.ws, 'auxiliary-core');
+  const artifact = writeRaw(dir, 'dist/index.mjs', new TextEncoder().encode(
+    'export async function init(ctx) { return ctx.nextCore?.init(); }\nexport async function exit() {}\n',
+  ));
+  writeRaw(dir, 'package.json', new TextEncoder().encode(canonicalJson({
+    name: 'auxiliary-core', version: '1.0.0', type: 'module', exports: { '.': './dist/index.mjs' },
+  })));
+  const core = manifest('auxiliary-core', '1.0.0', {
+    layer: 'sdk', role: 'primary', order: 7,
+    init: { module: artifact, exportName: 'init' },
+    exit: { module: artifact, exportName: 'exit' },
+  });
+  const descriptor = structuredClone(input.descriptor) as DomainAppDescriptor;
+  (descriptor.roots.cores as { package: string; version: string }[]).push({ package: 'auxiliary-core', version: '1.0.0' });
+  const built = expectSuccess(buildApp({
+    ...input,
+    descriptor,
+    packages: [...input.packages, core],
+    packageArtifacts: { ...input.packageArtifacts, 'auxiliary-core': 'dist/index.mjs' },
+  }));
+  assert.deepEqual(built.lock.coreOrder, ['kdp-kernel', 'sdk-core', 'orders-business', 'auxiliary-core']);
+  assert.deepEqual(built.lock.selectedPackages.filter((pkg) => pkg.role === 'primary').map((pkg) => pkg.order), [7, 0, 2, 1]);
+  assert.ok(built.appPackage.files.some((file) => file.path === 'packages/auxiliary-core/dist/index.mjs'));
+});
+
+test('R11 P1-01 positive: a named Init import is checked against the direct Extension public export', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const business = input.packages.find((pkg) => (pkg as { id: string }).id === 'orders-business') as import('@kaicreator/domain-harness-contracts').DomainPackageManifest;
+  const module = writeRaw(scenario.ws.packageRoots['orders-business']!, 'dist/business.mjs', new TextEncoder().encode(`
+import { init as extensionInit } from 'orders-ext';
+export async function init() { await extensionInit(); return { status: 'READY' }; }
+export function exit() {}
+`));
+  const packages = input.packages.map((pkg) => pkg === business ? {
+    ...business, init: { module, exportName: 'init' }, exit: { module, exportName: 'exit' },
+  } : pkg);
+  const built = expectSuccess(buildApp({ ...input, packages }));
+  assert.ok(built.lock.resourceDigests['orders-ext/dist/ext.mjs']);
 });

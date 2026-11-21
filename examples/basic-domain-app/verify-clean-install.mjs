@@ -1,4 +1,4 @@
-// 当前唯一 Domain App 验收：真实四包安装后验证构建、启动、调用及错误拒绝。
+// 当前唯一 Domain App 验收：真实 SDK 四包与 BUILD 组合 App 独立安装。
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -230,6 +230,7 @@ try {
   assert.equal(dirtyAfterBuild.trim(), '', `build must not change tracked source at ${head}`);
   const tarballs = [];
   const tarballMembers = new Map();
+  const tarballPathsByName = new Map();
   for (const pkg of packages) {
     const stdout = npm(['pack', join(repoRoot, pkg.dir), '--pack-destination', packDir, '--json'], repoRoot, `pack.${basename(pkg.dir)}`);
     const report = parsePackJson(stdout);
@@ -237,6 +238,7 @@ try {
     const path = join(packDir, report[0].filename);
     assert.ok(existsSync(path));
     tarballMembers.set(pkg.name, assertTarball(path, pkg));
+    tarballPathsByName.set(pkg.name, path);
     tarballs.push(path);
   }
   npm(['init', '-y'], consumerRoot, 'consumer.init');
@@ -256,7 +258,11 @@ try {
   mkdirSync(consumerEvidence, { recursive: true });
   const child = spawnSync(process.execPath, ['consumer.mjs'], {
     cwd: consumerRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, DH_T05_EVIDENCE: consumerEvidence },
+    env: {
+      ...process.env,
+      DH_T05_EVIDENCE: consumerEvidence,
+      DH_T05_MICROKERNEL_TARBALL: tarballPathsByName.get('@kaicreator/domain-harness-microkernel'),
+    },
   });
   writeFileSync(join(evidenceDir, 'consumer.stdout.log'), child.stdout ?? '');
   writeFileSync(join(evidenceDir, 'consumer.stderr.log'), child.stderr ?? '');

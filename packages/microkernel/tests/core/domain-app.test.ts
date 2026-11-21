@@ -146,10 +146,15 @@ test('unhandled implementation exceptions cause KDP Exit and block subsequent in
     init: { status: 'READY' },
     functions: { evaluate: { behavior: 'throw' } },
   });
+  const logged: string[] = [];
+  t.mock.method(console, 'error', (message?: unknown) => {
+    logged.push(String(message));
+  });
   const outcome = await app.invoke('evaluate', { total: 1, region: 'EU' });
   assert.equal(outcome.kind, 'FAILED');
   assert.equal(outcome.kind === 'FAILED' && outcome.failure.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
   if (outcome.kind === 'FAILED') assert.doesNotMatch(outcome.failure.message, /TOKEN_SECRET_CANARY_8029/);
+  assert.equal(logged.some((line) => line.includes('TOKEN_SECRET_CANARY_8029')), false);
   assert.deepEqual(
     events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
     ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-kernel'],
@@ -234,7 +239,7 @@ test('invoke never rejects on Proxy/getter outcomes: typed FAILED instead', asyn
   );
   assert.match(
     outcomeResult.kind === 'FAILED' ? outcomeResult.failure.message : '',
-    /inspection threw/,
+    /result inspection raised an unhandled error/,
   );
   await evilOutcome.dispose();
 
