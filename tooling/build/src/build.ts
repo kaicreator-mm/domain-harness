@@ -569,9 +569,9 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `Function implementation in '${implementor.id}' uses resource from undeclared direct Extension '${resource.packageId}'`);
       }
-      // SelectedFunction.resources are passed into Package.Init when it is the lifecycle
-      // callable. The logical Element owner must authorize every resource independently
-      // of the physical implementor; the implementor's own dependency is not transferable.
+      // 生命周期 Init 的资源句柄会直接授予逻辑 Element 所属 Package；
+      // 因此逻辑 Owner 必须独立声明资源的直系 Extension 授权，
+      // 不能把物理实现者拥有的权限隐式转赠给 Init 调用方。
       if (!directExtension(resolved.owner.id, resource.packageId)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `Function '${resolved.element.def.id}.${resolved.fn.id}' owner '${resolved.owner.id}' lacks direct Extension authorization for resource '${resource.packageId}/${resource.path}'`);

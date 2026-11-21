@@ -110,9 +110,9 @@ function staticallyCallableExportNames(source: ts.SourceFile): Set<string> {
       if (localCallable.has(localName)) exported.set(named.name.text, localName);
     }
   }
-  // Function declarations are writable JS bindings. Conservative full-AST write detection
-  // includes nested expressions, compound assignments, destructuring and for-of/in targets.
-  // Shadowed writes may be refused, but must never become a false callable proof.
+  // JavaScript 函数声明的绑定仍可被赋值；必须在整个语法树扫描直接赋值、
+  // 复合赋值、解构赋值和 for-of/in 写入，不能仅以声明时可调用作最终证明。
+  // 作用域同名写入可能被保守拒绝，但不能把无法证明的目标误判为可调用。
   const invalidated = new Set<string>();
   const markTarget = (target: ts.Node): void => {
     if (ts.isIdentifier(target)) {
