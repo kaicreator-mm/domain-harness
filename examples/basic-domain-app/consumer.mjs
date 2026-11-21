@@ -356,7 +356,7 @@ async function runPositive(label, rule, expectedAtHundred) {
     };
     assert.deepEqual(validateDomainDefinition(domain), { ok: true });
     assert.equal(prepared.domainElements[0].functions.length, 0);
-    assert.equal(prepared.domainElements[2].functions.length, 2);
+    assert.equal(prepared.domainElements[2].functions.length, 1, 'business startup belongs to Package.Init and is not a second Function');
     assert.equal(new Set(prepared.domainElements.flatMap((element) => element.content.map((block) => block.contentKind))).size >= 2, true);
     assert.equal(contentDigestOf(rule), prepared.ruleRef.digest);
     assert.equal(validateDomainDefinition({ ...domain, schemaVersion: 'invalid' }).ok, false);
