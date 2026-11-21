@@ -1,8 +1,9 @@
 /** v0.11.1 T12：复用现有 BUILD/Lock/Package 安装闭包的 Workflow 静态选定反例。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Ajv2020 } from 'ajv/dist/2020.js';
@@ -219,6 +220,118 @@ test('T12 R4: actual packaged first-party verifier refuses altered xstate/yaml s
   const refusedSealed = runVerifier();
   assert.notEqual(refusedSealed.status, 0, 'unmatched Lock archive bytes cannot be silently trusted');
   assert.match(refusedSealed.stderr, /DH_TRUSTED_RUNTIME_LOCK_MISMATCH/);
+});
+
+test('T12 R11 P1: BUILD seals a preinstall verifier and script-free lock-first installer', (t) => {
+  const { input } = workflowCase(t, { format: 'yaml', withData: true });
+  const built = accepted(buildApp(input));
+  const get = (path: string): Uint8Array => {
+    const file = built.appPackage.files.find((entry) => entry.path === path);
+    assert.ok(file, `缺少受控安装工件：${path}`);
+    return file.bytes;
+  };
+  const root = mkdtempSync(join(tmpdir(), 'dh-t12-preinstall-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const write = (path: string, bytes: Uint8Array | string): void => {
+    const destination = join(root, ...path.split('/'));
+    mkdirSync(join(destination, '..'), { recursive: true });
+    writeFileSync(destination, bytes);
+  };
+  const manifest = JSON.parse(Buffer.from(get('package.json')).toString('utf8')) as {
+    name: string; version: string; dependencies: Record<string, string>;
+  };
+  write('package.json', get('package.json'));
+  write('dh-lock/app.lock.json', built.lockBytes);
+  write('dh-install/trusted-runtime.json', get('dh-install/trusted-runtime.json'));
+  write('dh-install/verify-preinstall.mjs', get('dh-install/verify-preinstall.mjs'));
+  const installSource = Buffer.from(get('dh-install/install-runtime.mjs')).toString('utf8');
+  assert.match(installSource, /--package-lock-only/u);
+  assert.match(installSource, /--ignore-scripts/u);
+  assert.match(installSource, /'ci'/u);
+  const pins = built.lock.trustedRuntimeIntegrity!;
+  const packages: Record<string, unknown> = {
+    '': { name: manifest.name, version: manifest.version, dependencies: manifest.dependencies },
+  };
+  for (const pkg of built.lock.selectedPackages) {
+    packages[`packages/${pkg.packageId}`] = { name: pkg.packageId, version: pkg.version };
+    packages[`node_modules/${pkg.packageId}`] = { resolved: `packages/${pkg.packageId}`, link: true };
+  }
+  for (const name of ['@kaicreator/domain-harness-microkernel', '@kaicreator/domain-harness-contracts']) {
+    packages[`node_modules/${name}`] = { version: '0.11.0', resolved: 'file:trusted-first-party.tgz' };
+  }
+  for (const pin of pins) {
+    packages[`node_modules/${pin.name}`] = {
+      version: pin.version, integrity: pin.integrity,
+      resolved: `https://registry.npmjs.org/${pin.name}/-/${pin.name}-${pin.version}.tgz`,
+    };
+  }
+  const npmLock = { name: manifest.name, version: manifest.version, lockfileVersion: 3, requires: true, packages };
+  const run = () => spawnSync(process.execPath, [join(root, 'dh-install/verify-preinstall.mjs')],
+    { cwd: root, encoding: 'utf8', timeout: 15000 });
+  write('package-lock.json', JSON.stringify(npmLock));
+  const pass = run();
+  assert.equal(pass.status, 0, `已审核的 npm Lock 应通过：${pass.stderr}`);
+  const altered = structuredClone(npmLock);
+  (altered.packages['node_modules/xstate'] as { integrity: string }).integrity = 'sha512-UNAPPROVED';
+  write('package-lock.json', JSON.stringify(altered));
+  const refused = run();
+  assert.notEqual(refused.status, 0, '下载前必须拒绝与批准 SRI 不同的归档');
+  assert.match(refused.stderr, /DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH/u);
+  const extra = structuredClone(npmLock);
+  extra.packages['node_modules/unselected-module'] = { version: '1.0.0' };
+  write('package-lock.json', JSON.stringify(extra));
+  const noExtension = run();
+  assert.notEqual(noExtension.status, 0, '下载前必须拒绝未选择的传递依赖');
+  assert.match(noExtension.stderr, /DH_TRUSTED_RUNTIME_UNSELECTED_DEPENDENCY/u);
+});
+
+test('T12 R11 P1: real npm ci rejects a corrupted local tarball without executing install hooks', (t) => {
+  const npmCli = process.env['npm_execpath'];
+  assert.ok(npmCli, '本测试应通过 npm test 运行以取得实际 npm CLI 路径');
+  const root = mkdtempSync(join(tmpdir(), 'dh-t12-npm-integrity-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const source = join(root, 'probe-src');
+  const app = join(root, 'probe-app');
+  mkdirSync(source, { recursive: true });
+  mkdirSync(app, { recursive: true });
+  writeFileSync(join(source, 'package.json'), JSON.stringify({
+    name: 'dh-install-integrity-probe', version: '1.0.0',
+    scripts: { install: 'node install-marker.cjs' },
+  }));
+  writeFileSync(join(source, 'install-marker.cjs'), 'require("fs").writeFileSync("unexpected-script.txt", "ran");');
+  writeFileSync(join(source, 'index.js'), 'module.exports = 1;');
+  const pack = spawnSync(process.execPath,
+    [npmCli, 'pack', '--ignore-scripts', '--pack-destination', root, '--silent'],
+    { cwd: source, encoding: 'utf8', timeout: 60000, env: { ...process.env, npm_config_cache: join(root, 'pack-cache') } });
+  assert.equal(pack.status, 0, `无法创建隔离测试归档：${pack.stderr}`);
+  const tarball = join(root, pack.stdout.trim().split('\n').at(-1)!);
+  const sourceBytes = readFileSync(tarball);
+  const digest = 'sha512-' + createHash('sha512').update(sourceBytes).digest('base64');
+  const dependency = 'file:' + tarball;
+  writeFileSync(join(app, 'package.json'),
+    JSON.stringify({ name: 'dh-probe-app', version: '1.0.0', dependencies: { 'dh-install-integrity-probe': dependency } }));
+  const lock = {
+    name: 'dh-probe-app', version: '1.0.0', lockfileVersion: 3, requires: true,
+    packages: {
+      '': { name: 'dh-probe-app', version: '1.0.0', dependencies: { 'dh-install-integrity-probe': dependency } },
+      'node_modules/dh-install-integrity-probe': {
+        version: '1.0.0', resolved: dependency, integrity: digest,
+      },
+    },
+  };
+  writeFileSync(join(app, 'package-lock.json'), JSON.stringify(lock));
+  const ci = (cache: string) => spawnSync(process.execPath,
+    [npmCli, 'ci', '--ignore-scripts', '--offline', '--no-audit', '--no-fund'],
+    { cwd: app, encoding: 'utf8', timeout: 60000, env: { ...process.env, npm_config_cache: join(root, cache) } });
+  const positive = ci('good-cache');
+  assert.equal(positive.status, 0, `原始归档应可校验安装：${positive.stderr}`);
+  assert.equal(existsSync(join(app, 'node_modules/dh-install-integrity-probe/unexpected-script.txt')), false,
+    '即使归档自带安装 Hook，--ignore-scripts 也不得执行');
+  appendFileSync(tarball, Buffer.from('tampered archive payload'));
+  const negative = ci('bad-cache');
+  assert.notEqual(negative.status, 0, '与锁定 SHA-512 不符的真实归档必须在执行前拒绝');
+  assert.equal(existsSync(join(app, 'node_modules/dh-install-integrity-probe/unexpected-script.txt')), false,
+    '损坏的归档不得执行任何安装脚本');
 });
 
 test('T12 R1: expanded existing Manifest/Lock machine schemas accept actually selected Workflow closure', (t) => {
