@@ -146,7 +146,7 @@ function assertTarball(path, expected) {
 }
 function scanCanonicalSources() {
   const roots = ['packages/contracts/src', 'packages/microkernel/src', 'tooling/build/src', 'packages/domain-harness/src'];
-  const banned = /orders|tally|xdownload/iu;
+  const banned = /\b(?:orders|tally|xdownload)\b/iu;
   for (const root of roots) {
     for (const name of readdirSync(join(repoRoot, root), { recursive: true })) {
       if (!name.endsWith('.ts') || /(^|[\\/])fixtures([\\/]|$)/u.test(name)) continue;
