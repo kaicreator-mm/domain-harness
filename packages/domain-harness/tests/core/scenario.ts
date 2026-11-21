@@ -29,6 +29,8 @@ import type { BuildInput, BuildFailure } from '@kaicreator/domain-harness';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MICROKERNEL_DIR = join(HERE, '../../../microkernel');
 const CONTRACTS_DIR = join(HERE, '../../../contracts');
+const XSTATE_DIR = dirname(fileURLToPath(import.meta.resolve('xstate/package.json')));
+const YAML_DIR = dirname(fileURLToPath(import.meta.resolve('yaml/package.json')));
 const MICROKERNEL_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
 const KDP_PACKAGE_ID = 'kdp-kernel';
 const TARGET_SELECTOR = { runtime: 'node', module: 'esm', nodeMajor: 22 } as const;
@@ -559,6 +561,8 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       }),
     );
     await cp(join(CONTRACTS_DIR, 'dist'), join(contractsInstallDir, 'dist'), { recursive: true });
+    await copyPackage('xstate', XSTATE_DIR);
+    await copyPackage('yaml', YAML_DIR);
 
     await write(installRoot, DESCRIPTOR_RELATIVE_PATH, canonicalJson(descriptor as unknown as JsonValue));
     await mkdir(join(installRoot, 'dh-lock'), { recursive: true });

@@ -8,6 +8,7 @@ import type {
   TargetBinding,
 } from './refs.js';
 import type { DH_PACKAGE_SCHEMA_VERSION } from './schema-versions.js';
+import type { WorkflowRef } from './workflow-contracts.js';
 
 /** 三层职责是固定的，Capability 或 Hook 不构成第四个 Package 层。 */
 export type PackageLayer = 'kernel' | 'sdk' | 'business';
@@ -67,6 +68,8 @@ export interface DomainPackageManifest {
   readonly provides?: CapabilityDeclaration;
   readonly contributesTo: readonly HookBinding[];
   readonly targetVariants: readonly TargetBinding[];
+  /** 可选业务启动的 Workflow Element Content；只由 Package.Init 选择调用，不由 KDP 自动运行。 */
+  readonly workflowRoots?: readonly WorkflowRef[];
   /** Core 必填且唯一，Extension 可不指定；0 固定为 KDP。 */
   readonly order?: number;
   /** 每个可运行 Package 必须提供唯一 Init Element。 */
