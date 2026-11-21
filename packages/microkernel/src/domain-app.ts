@@ -90,7 +90,7 @@ export function normalizeOutcome(raw: unknown, declaredOutcomes: readonly string
   } catch (error) {
     return failedOutcome(
       'DH_RUNTIME_UNSUPPORTED_PROFILE',
-      `implementation returned a value whose inspection threw: ${(error as Error).message}`,
+      'implementation result inspection raised an unhandled error (detail redacted)',
     );
   }
 }
@@ -153,7 +153,7 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     try {
       schemas = await packages.functionSchemas(selected);
     } catch (error) {
-      return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', (error as Error).message);
+      return unknownOutcome('DH_RUNTIME_UNSUPPORTED_PROFILE', 'function schema lookup failed (detail redacted)');
     }
     if (schemas === null) {
       return unknownOutcome(
@@ -170,12 +170,12 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
       raw = await selected.impl(input);
     } catch (error) {
       // Element 未处理异常：Kernel 最后兜底，尽最大努力执行 Exit，不继续开放业务调用。
-      const reason = `implementation for ingress '${ingressId}' threw: ${(error as Error).message}`;
-      console.error(`[KDP Unhandled] ${reason}`);
+      const reason = `ingress '${ingressId}' raised unhandled implementation error (detail redacted)`;
+      console.error(`[KDP Unhandled] code=DH_KDP_PACKAGE_LOAD_FAILED phase=ingress ingress=${ingressId}`);
       try {
         await dispose();
-      } catch (cleanupError) {
-        console.error(`[KDP Unhandled Exit] ${(cleanupError as Error).message}`);
+      } catch (_cleanupError) {
+        console.error('[KDP Unhandled Exit] code=DH_RUNTIME_EXIT_FAILED phase=exit detail=redacted');
       }
       return failedOutcome('DH_KDP_PACKAGE_LOAD_FAILED', reason);
     }

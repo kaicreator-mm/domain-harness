@@ -56,8 +56,9 @@ export class PackageSystem {
     if (cached === undefined) {
       cached = import(pathToFileURL(absolutePath).href).then(
         (mod) => mod as ModuleExports,
-        (error: unknown) => {
-          throw new KdpLoadError(`${what} failed to import: ${(error as Error).message}`);
+        (_error: unknown) => {
+          // 不转发任意 Package 的 import 失败文本；异常字符串可能含口令或私有路径。
+          throw new KdpLoadError(`${what} failed to import (untrusted module error redacted)`);
         },
       );
       this.moduleCache.set(absolutePath, cached);
@@ -148,8 +149,8 @@ export class PackageSystem {
     const enter = async (packageId: string, caller: InitCaller, layer: SelectedPackage['layer']): Promise<void> => {
       const pkg = this.packageById(packageId);
       if (!pkg) throw new KdpLoadError(`Init references unselected Package '${packageId}'`);
-      if (pkg.layer !== layer) {
-        throw new KdpLoadError(`Package '${packageId}' is not an Extension in caller's layer`);
+      if (pkg.layer !== layer && pkg.role !== 'extension') {
+        throw new KdpLoadError(`Core '${packageId}' is not in its declared Core.Order layer`);
       }
       // 每次调用都执行实际递归；seen 仅作递归调用栈环保护，不是 Init 去重。
       if (seen.has(packageId)) throw new KdpLoadError(`recursive Init dependency cycle at '${packageId}'`);
@@ -165,10 +166,10 @@ export class PackageSystem {
         }
         const extensions = pkg.dependsOn
           .map((id) => this.packageById(id))
-          .filter((dep): dep is SelectedPackage => dep?.role === 'extension' && dep.layer === pkg.layer)
+          .filter((dep): dep is SelectedPackage => dep?.role === 'extension')
           .sort((a, b) => a.packageId.localeCompare(b.packageId));
         for (const dep of extensions) {
-          await enter(dep.packageId, { type: 'Package', packageId }, pkg.layer);
+          await enter(dep.packageId, { type: 'Package', packageId }, dep.layer);
         }
 
         const fn = await this.loadEntry(pkg.init, `Init Element of '${packageId}'`);
@@ -208,8 +209,8 @@ export class PackageSystem {
         try {
           const result: unknown = await (fn as (context: PackageInitContext) => unknown)(ownContext);
           if (pkg.role === 'primary' && pkg.layer === 'business') businessResult = result;
-        } catch (error) {
-          throw new KdpLoadError(`Package '${packageId}' Init Element threw: ${(error as Error).message}`, 'DH_RUNTIME_NOT_READY');
+        } catch (_error) {
+          throw new KdpLoadError(`Package '${packageId}' Init Element raised unhandled error (detail redacted)`, 'DH_RUNTIME_NOT_READY');
         }
       } finally {
         seen.delete(packageId);
@@ -251,10 +252,10 @@ export class PackageSystem {
           hostPorts: pkg.role === 'primary' && pkg.order === 0 ? this.hostPorts : [],
         };
         await (fn as (context: PackageExitContext) => unknown)(exitContext);
-      } catch (error) {
-        const reason = `${packageId}: ${(error as Error).message}`;
+      } catch (_error) {
+        const reason = `${packageId}: Exit Element raised unhandled error (detail redacted)`;
         failures.push(reason);
-        console.error(`[KDP Exit] ${reason}`);
+        console.error(`[KDP Exit] code=DH_RUNTIME_EXIT_FAILED phase=exit package=${packageId}`);
       }
     }
     if (failures.length) {

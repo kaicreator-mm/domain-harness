@@ -126,7 +126,7 @@ function behave(name) {
     case 'failed':
       return { kind: 'FAILED', failure: { code: 'FIXTURE_FAILED', message: 'fixture failed outcome' } };
     case 'throw':
-      throw new Error('fixture function threw');
+      throw new Error('fixture function threw TOKEN_SECRET_CANARY_8029');
     case 'garbage':
       return 42;
     case 'proxy-outcome': {
@@ -158,7 +158,7 @@ export async function init(ctx) {
 export async function exit(ctx) {
   events.push({ event: 'package-exit', package: '${FIXTURE_KERNEL}' });
   if (${JSON.stringify(scenario.kernelDisposeThrow ?? false)}) {
-    throw new Error('fixture kernel Exit threw');
+    throw new Error('fixture kernel Exit threw TOKEN_SECRET_CANARY_8029');
   }
 }
 `;
@@ -171,7 +171,7 @@ events.push({ event: 'module-evaluated', package: '${FIXTURE_SDK}' });
 export async function init(ctx) {
   events.push({ event: 'package-init', package: '${FIXTURE_SDK}', initFrom: ctx.InitFrom, visibleFunctions: [...ctx.functions.keys()] });
   if (${JSON.stringify(scenario.sdkInitThrow ?? false)}) {
-    throw new Error('fixture sdk Init threw');
+    throw new Error('fixture sdk Init threw TOKEN_SECRET_CANARY_8029');
   }
 }
 export async function exit(ctx) {

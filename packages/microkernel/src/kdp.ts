@@ -202,7 +202,7 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     try {
       rawInitResult = await packages.runInit(initContext);
     } catch (error) {
-      throw new KdpLoadError(`Core.Init failed: ${(error as Error).message}; ordinary startup failure, no retry`, 'DH_RUNTIME_NOT_READY');
+      throw new KdpLoadError(error instanceof KdpLoadError ? error.message : 'Core.Init raised an unhandled error (detail redacted)', 'DH_RUNTIME_NOT_READY');
     }
 
     const validated = validateInitResult(rawInitResult, lock.ingress);
@@ -234,9 +234,9 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     try {
       await packages.runExit();
     } catch (cleanupError) {
-      cleanupFailure = `; cleanup also failed: ${(cleanupError as Error).message}`;
+      cleanupFailure = '; cleanup also failed (details redacted)';
     }
-    const loadError = error as KdpLoadError;
-    return failed(loadError.code ?? 'DH_KDP_PACKAGE_LOAD_FAILED', `${(error as Error).message}${cleanupFailure}`);
+    const loadError = error instanceof KdpLoadError ? error : null;
+    return failed(loadError?.code ?? 'DH_KDP_PACKAGE_LOAD_FAILED', `${loadError?.message ?? 'Unexpected KDP failure (detail redacted)'}${cleanupFailure}`);
   }
 }

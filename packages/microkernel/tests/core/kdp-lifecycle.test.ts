@@ -461,7 +461,7 @@ test('R31: missing Exit Element is allowed; partial startup still closes remaini
     }),
   };
   const packages = new PackageSystem(fixture.installRoot, lock, []);
-  await assert.rejects(packages.runInit(packageContext(fixture)), /fixture sdk Init threw/);
+  await assert.rejects(packages.runInit(packageContext(fixture)), /Init Element raised unhandled error/);
   await packages.runExit();
   assert.equal(events().some((e) => e['event'] === 'package-exit' && e['package'] === 'fixture-kernel'), false);
   assert.equal(events().filter((e) => e['event'] === 'package-exit' && e['package'] === '@fixture/sdk').length, 1);
@@ -480,7 +480,8 @@ test('Init failure: already-initialized packages are torn down in strict reverse
   assert.equal(result.status, 'FAILED', JSON.stringify(result));
   if (result.status === 'FAILED') {
     assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
-    assert.match(result.reason, /fixture sdk Init threw/);
+    assert.match(result.reason, /Init Element raised unhandled error/);
+    assert.doesNotMatch(result.reason, /TOKEN_SECRET_CANARY_8029/);
   }
 
   const inits = events()
@@ -581,4 +582,22 @@ test('optional InitFrom absence creates no Package history but never disables in
   await packages.runExit();
   assert.deepEqual(events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
     DISPOSE_ORDER, 'Exit must use the KDP enter log even when a Package never enables InitFrom');
+});
+
+test('R11 P1-07: directly declared cross-layer Extension.Init is invoked instead of silently skipped', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const { PackageSystem } = await import('../../src/package-system.js');
+  const lock = {
+    ...fixture.lock,
+    selectedPackages: fixture.lock.selectedPackages.map((pkg) =>
+      pkg.packageId === 'fixture-ext' ? { ...pkg, layer: 'sdk' as const } : pkg),
+  };
+  const packages = new PackageSystem(fixture.installRoot, lock, []);
+  await packages.runInit(packageContext(fixture));
+  assert.deepEqual(events().filter((e) => e['event'] === 'package-init').map((e) => e['package']), INIT_ORDER);
+  assert.deepEqual(packages.initFrom('fixture-ext'),
+    [{ type: 'Package', packageId: 'fixture-business' }], 'cross-layer direct caller must be preserved');
+  await packages.runExit();
+  assert.deepEqual(events().filter((e) => e['event'] === 'package-exit').map((e) => e['package']), DISPOSE_ORDER);
 });

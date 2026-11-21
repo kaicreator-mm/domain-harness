@@ -305,3 +305,18 @@ test('P2-8: authoring schemas sharing an $id across separate BUILD runs do not c
   } as never);
   expectSuccess(buildApp(second.finalize().input));
 });
+
+test('R11 P1-07: BUILD selects a declared Extension from a different layer without dropping dependency', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const ext = input.packages.find((pkg) => (pkg as { id: string }).id === 'aaa-ext') as { layer: string };
+  ext.layer = 'sdk';
+  const built = buildApp(input);
+  assert.equal(built.ok, true, JSON.stringify(built));
+  if (built.ok) {
+    const chosen = built.lock.selectedPackages.find((pkg) => pkg.packageId === 'orders-business');
+    assert.ok(chosen?.dependsOn.includes('aaa-ext'));
+    assert.equal(built.lock.selectedPackages.find((pkg) => pkg.packageId === 'aaa-ext')?.layer, 'sdk');
+  }
+});
