@@ -97,6 +97,12 @@ export interface DomainAppLock {
   readonly selectedFunctions: readonly SelectedFunction[];
   readonly hookBindings: readonly SealedHookBinding[];
   readonly selectedWorkflows?: readonly SelectedWorkflow[];
+  /** SHA-512 tarball SRI pins for BUILD-selected trusted Workflow runtime dependencies. */
+  readonly trustedRuntimeIntegrity?: readonly {
+    readonly name: 'xstate' | 'yaml';
+    readonly version: string;
+    readonly integrity: string;
+  }[];
   /** 已锁定 Core(Order 升序) 链；运行时只按此链递归调用。 */
   readonly coreOrder: readonly string[];
   readonly resourceDigests: Readonly<Record<string, ContentDigest>>;
