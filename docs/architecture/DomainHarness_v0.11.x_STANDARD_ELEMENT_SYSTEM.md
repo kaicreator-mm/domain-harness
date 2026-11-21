@@ -1,5 +1,8 @@
 # DomainHarness 0.11.x — Standard Element 体系与递增复用规范（R29）
 
+> **【R33 产品边界优先级】** 本 R29 的 Standard Element 复用原则有效，但其 “Contracts/BUILD/Lock/KDP primitives” 中的 BUILD 仅指 **DomainHarness SDK 对已有 Package 的装配/链接及必要验证**；不包含 Forge 的 Domain Package 生产。现有 `tooling/build` 的名称不是“BUILD 平台”的产品授权，R31/R32 把生成全部归 Harness 的说法已被纠正。权威产品定义：[DomainHarness SDK / DomainForge App / 自举规范](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
+
+
 > **规范候选，非已实施声明。** 本规范是在 0.11.0 Element-First、0.11.1 Task + Execution Loop 已合入 `version/v0.11.x` 的基础上提出的跨内部阶段复用原则。所有新增源码、BUILD/Lock 合同变化仍需对应版本的有限 Task、真实 Consumer 和独立 Exact-SHA 审核；不因本文件落地而自动提升源码资格。
 
 ```ini
