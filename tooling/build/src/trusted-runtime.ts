@@ -1,9 +1,7 @@
 /**
- * Audited npm tarball byte pins for the two first-party-approved 0.11.1 Workflow dependencies.
- * These are the exact sha512 SRI digests from the reviewed monorepo package-lock.json.
- * All third-party executable bytes must be installed through an integrity-checking npm
- * client and independently validated against this BUILD-sealed manifest before App Boot.
- * Neither business Packages nor their manifests can change these pins.
+ * 固定经审核的两个 Workflow 依赖 npm 压缩包字节，SHA-512 SRI 来自单仓已审查的锁文件。
+ * 所有第三方可执行依赖必须通过校验完整性的 npm 客户端安装；
+ * App Boot 前还必须按 BUILD 封存的清单独立核对，业务 Package 无权改变这些固定值。
  */
 import { canonicalJson, type JsonValue } from '@kaicreator/domain-harness-contracts';
 
@@ -19,9 +17,8 @@ export const TRUSTED_WORKFLOW_NPM_ARCHIVES = Object.freeze([
 ] as const);
 
 /**
- * A trusted dependency is installed only when the actual npm install lock records
- * the audited exact version AND the tarball SRI. The payload is inside the
- * composed AppPackage byte digest; DomainAppLock separately binds the same pins.
+ * 只有安装锁文件同时记录已审核的精确版本与压缩包 SRI，才能视为可信依赖。
+ * 组合 AppPackage 的字节摘要覆盖此清单，唯一 DomainAppLock 另行绑定相同固定值。
  */
 export function trustedWorkflowInstallManifest(): JsonValue {
   return {
@@ -31,7 +28,7 @@ export function trustedWorkflowInstallManifest(): JsonValue {
   };
 }
 
-/** Executable first-party verification is packaged with the App; it uses no npm hooks. */
+/** 随 App 封装可执行的一方校验器，不依赖 npm 安装生命周期 Hook。 */
 export const TRUSTED_RUNTIME_VERIFY_MODULE = `import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -81,7 +78,7 @@ for (const [index, archive] of manifest.archives.entries()) {
 export const verified = true;
 `;
 
-/** For BUILD tests: exact immutable binary archive evidence can be checked without registry access. */
+/** BUILD 测试可离线比较不可变的压缩包摘要证据，不依赖 npm Registry 网络访问。 */
 export const TRUSTED_RUNTIME_MANIFEST_BYTES = new TextEncoder().encode(
   canonicalJson(trustedWorkflowInstallManifest()),
 );
