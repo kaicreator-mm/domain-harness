@@ -149,6 +149,49 @@ test('T11: sealed JSON/YAML Reader data requires bounded canonical ResourceRef',
   denied(tag, 'unsupported reader format');
 });
 
+test('T11 R18 P2: FunctionRef.functionId and ResourceRef.packageId use original nonempty-string schema, not Node IDs', () => {
+  const legal = clone();
+  legal.nodes[0]!.function = { ...fn, functionId: 'read data' };
+  legal.nodes[0]!.data = {
+    format: 'json',
+    resource: { packageId: 'orders archive', path: 'data/one.json', digest: `sha256:${'b'.repeat(64)}` },
+    maxBytes: 1024,
+  };
+  assert.equal(schema(legal), true, JSON.stringify(schema.errors));
+  assert.deepEqual(validateWorkflowDefinition(legal), { ok: true },
+    'Workflow validation must not narrow v0.11.0 FunctionRef/ResourceRef contracts');
+
+  const emptyFunction = structuredClone(legal);
+  emptyFunction.nodes[0]!.function = { ...fn, functionId: '' };
+  denied(emptyFunction, 'empty FunctionRef.functionId invalid in both representations');
+
+  const emptyPackage = structuredClone(legal);
+  emptyPackage.nodes[0]!.data!.resource.packageId = '';
+  denied(emptyPackage, 'empty ResourceRef.packageId invalid in both representations');
+});
+
+test('T11 R18 P1: large reachable graph validates with indexed adjacency and no repeated edge rescans', () => {
+  const graph = clone();
+  const size = 4000;
+  graph.entryNodeId = 'n0';
+  graph.nodes = Array.from({ length: size }, (_, index) => ({
+    id: `n${index}`,
+    kind: 'function',
+    function: fn,
+    switch: {
+      exits: index + 1 === size
+        ? [{ label: 'SUCCEEDED', target: { terminal: 'COMPLETE' } }]
+        : Array.from({ length: 8 }, (_, labelIndex) => ({
+          label: `branch-${labelIndex}`,
+          target: { nodeId: `n${index + 1}` },
+        })),
+    },
+  }));
+  // 不对执行时间作脆弱断言；此规模对 O(V×E) 老算法需要约 1.28 亿次
+  // 边扫描，而按邻接表实现只扫描约 3.2 万条边。
+  assert.deepEqual(validateWorkflowDefinition(graph), { ok: true });
+});
+
 test('T11: UNKNOWN/FAILED/WAIT direct success laundering is a semantic rejection', () => {
   const wrong = clone();
   wrong.nodes[0]!.switch!.exits[2]!.target = { terminal: 'COMPLETE' };
