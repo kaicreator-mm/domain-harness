@@ -624,8 +624,8 @@ test('P2-01: a Core that drops its BUILD-bound nextCore link stops the chain wit
       pkg.packageId === 'fixture-kernel' ? { ...pkg, init: { ...pkg.init, exportName: 'hold' } } : pkg),
   };
   const packages = new PackageSystem(fixture.installRoot, lock, []);
-  const result = await packages.runInit(packageContext(fixture));
-  assert.equal(result, undefined);
+  await assert.rejects(packages.runInit(packageContext(fixture)),
+    /Core.Order chain incomplete/);
   assert.deepEqual(events().filter((e) => e['event'] === 'package-init').map((e) => e['package']), ['fixture-kernel']);
   assert.equal(events().some((e) => e['event'] === 'package-init' && e['package'] === '@fixture/sdk'), false);
   assert.equal(events().some((e) => e['event'] === 'business-init'), false);
@@ -656,4 +656,27 @@ test('P1-05: Boot pin getter failures are refused without leaking secret excepti
   const result = await boot(hostile, fixture.context);
   assert.equal(result.status, 'REFUSED');
   if (result.status === 'REFUSED') assert.doesNotMatch(result.reason, /TOKEN_SECRET_CANARY_8029/);
+});
+
+
+test('R16 P1-SRC-02: Business READY cannot conceal a missing trailing Core', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const { PackageSystem } = await import('../../src/package-system.js');
+  const existing = fixture.lock.selectedPackages.find((pkg) => pkg.packageId === '@fixture/sdk')!;
+  const lock = {
+    ...fixture.lock,
+    coreOrder: ['fixture-kernel', '@fixture/sdk', 'fixture-business', 'trailing-sdk-core'],
+    selectedPackages: [...fixture.lock.selectedPackages,
+      { ...existing, packageId: 'trailing-sdk-core', order: 7 }],
+  };
+  const packages = new PackageSystem(fixture.installRoot, lock, []);
+  // Business Init can return READY without a nextCore transfer: this may not boot.
+  await assert.rejects(packages.runInit(packageContext(fixture)), /Core.Order chain incomplete:.*trailing-sdk-core/);
+  assert.equal(events().filter((event) => event['event'] === 'business-init').length, 1);
+  assert.equal(events().filter((event) => event['event'] === 'package-init' &&
+    event['package'] === '@fixture/sdk').length, 1);
+  await packages.runExit();
+  assert.deepEqual(events().filter((event) => event['event'] === 'package-exit').map((event) => event['package']),
+    DISPOSE_ORDER, 'missing trailing Core must not block reverse cleanup');
 });

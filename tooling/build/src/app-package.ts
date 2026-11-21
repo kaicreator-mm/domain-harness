@@ -21,6 +21,7 @@ interface PackageJsonShape {
   readonly version?: unknown;
   readonly type?: unknown;
   readonly exports?: unknown;
+  readonly scripts?: unknown;
 }
 
 function parsePackageJson(bytes: Uint8Array, packageId: string): PackageJsonShape {
@@ -61,6 +62,23 @@ export function sealPackageManifest(
       'DH_BUILD_SCHEMA_INVALID',
       `Package '${pkg.id}' package.json name/version/type must match its selected ESM manifest`,
     );
+  }
+  // BUILD 的静态边界也包含安装阶段： npm lifecycle hooks 会在 Boot 之前执行，
+  // 不能通过封存 package.json 却不检查 scripts 的方式绕过直接 Extension 声明。
+  const installHooks = [
+    'preinstall', 'install', 'postinstall', 'prepublish', 'prepare', 'preprepare',
+    'postprepare', 'prepack', 'postpack', 'prepublishOnly', 'postpublish',
+  ];
+  if (manifest.scripts !== undefined) {
+    if (typeof manifest.scripts !== 'object' || manifest.scripts === null || Array.isArray(manifest.scripts)) {
+      throw refusal('DH_BUILD_SCHEMA_INVALID', `Package '${pkg.id}' package.json scripts must be a plain script map`);
+    }
+    for (const name of installHooks) {
+      if (Object.prototype.hasOwnProperty.call(manifest.scripts, name)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `Package '${pkg.id}' has an executable npm lifecycle hook '${name}' outside BUILD verification`);
+      }
+    }
   }
   if (kdpArtifactPath !== undefined) {
     const exports = manifest.exports;

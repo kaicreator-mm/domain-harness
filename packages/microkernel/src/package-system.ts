@@ -147,7 +147,8 @@ export class PackageSystem {
    */
   async runInit(context: AppInitContext): Promise<unknown> {
     const seen = new Set<string>();
-    let businessResult: unknown;
+    const businessResults: unknown[] = [];
+    const completedCores = new Set<string>();
     const enter = async (
       packageId: string,
       caller: InitCaller,
@@ -216,7 +217,7 @@ export class PackageSystem {
         };
         try {
           const result: unknown = await (fn as (context: PackageInitContext) => unknown)(ownContext);
-          if (pkg.role === 'primary' && pkg.layer === 'business') businessResult = result;
+          if (pkg.role === 'primary' && pkg.layer === 'business') businessResults.push(result);
         } catch (error) {
           if (error instanceof KdpLoadError) throw error;
           throw new KdpLoadError(`Package '${packageId}' Init Element raised unhandled error (detail redacted)`, 'DH_RUNTIME_NOT_READY');
@@ -243,10 +244,19 @@ export class PackageSystem {
           : coreBinding(index + 1, { type: 'Package', packageId: id });
         // KDP 只提供 BUILD 封存的链接；当前 Core.Init 自己决定是否及何时调用下一跳。
         await enter(id, caller, core.layer, nextCore);
+        completedCores.add(id);
       },
     });
     await coreBinding(0, { type: 'Boot' }).init();
-    return businessResult;
+    // Core 负责转交下一 Core；KDP 不补跑漏掉的 Core，但在对外标记 READY 前必须确认全链完成。
+    const missing = cores.filter((id) => !completedCores.has(id));
+    if (missing.length > 0) {
+      throw new KdpLoadError(
+        `Core.Order chain incomplete: missing Init for ${missing.join(', ')}`,
+        'DH_RUNTIME_NOT_READY',
+      );
+    }
+    return businessResults.length === 1 ? businessResults[0] : businessResults;
   }
 
   /**

@@ -370,3 +370,16 @@ export function exit() {}
   const built = expectSuccess(buildApp({ ...input, packages }));
   assert.ok(built.lock.resourceDigests['orders-ext/dist/ext.mjs']);
 });
+
+test('R16 P1-SRC-01: ordinary non-lifecycle scripts remain legal and do not change selected BUILD semantics', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  writeRaw(scenario.ws.packageRoots['orders-business']!, 'package.json',
+    new TextEncoder().encode(JSON.stringify({
+      name: 'orders-business', version: '1.0.0', type: 'module',
+      scripts: { test: 'node --test', build: 'tsc' },
+    })));
+  const result = buildApp(input);
+  assert.equal(result.ok, true, JSON.stringify(result));
+});

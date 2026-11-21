@@ -473,3 +473,28 @@ import * as ext from 'orders-ext';
 export async function init() { return ext; }
 export function exit() {}
 `, 'DH_BUILD_EXPORT_MISSING');
+
+
+test('R16 P1-SRC-01: BUILD refuses npm preinstall scripts on selected Packages before composition', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const businessDir = scenario.ws.packageRoots['orders-business']!;
+  writeRaw(businessDir, 'package.json', new TextEncoder().encode(JSON.stringify({
+    name: 'orders-business', version: '1.0.0', type: 'module',
+    scripts: { preinstall: 'node -e "process.exit(99)"' },
+  })));
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('R16 P1-SRC-01: BUILD refuses npm prepare scripts hidden in selected Packages', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  writeRaw(scenario.ws.packageRoots['orders-ext']!, 'package.json',
+    new TextEncoder().encode(JSON.stringify({
+      name: 'orders-ext', version: '1.0.0', type: 'module',
+      scripts: { prepare: 'node -e "process.exit(99)"' },
+    })));
+  expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
