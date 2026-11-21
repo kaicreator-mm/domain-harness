@@ -244,7 +244,7 @@ try {
   npm(['init', '-y'], consumerRoot, 'consumer.init');
   const registry = process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry ?? 'https://registry.npmjs.org';
   const installEnv = { ...process.env, npm_config_registry: registry };
-  const install = spawnSync(process.execPath, [npmCli, 'install', ...tarballs, '--no-audit', '--no-fund'], {
+  const install = spawnSync(process.execPath, [npmCli, 'install', ...tarballs, '--no-audit', '--no-fund', '--ignore-scripts'], {
     cwd: consumerRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024, env: installEnv,
   });
   writeFileSync(join(evidenceDir, 'consumer.install.stdout.log'), install.stdout ?? '');
