@@ -24,9 +24,21 @@ FORGE=DEFERRED_UNTIL_SDK_COMPLETE_NOT_A_BLOCKER
 |---|---|
 | **Domain** | 有界领域事实、知识、对象、业务规则、适用范围与版本/来源语义，说明要处理哪个领域以及什么条件有效 |
 | **Harness** | 在已选 Domain 上组织任务、状态、工作流、受限行动、反馈/经验的可控执行系统 |
-| **SDK** | 公开可复用的 Package/Element/Function 合同、最小 Boot/KDP、运行及应用组合 API，可被不同领域应用嵌入；DomainHarness SDK **自身**亦是同类 Domain Packages 的组成 |
+| **SDK** | **始终嵌入 Domain App** 的 DomainHarness SDK 产品：公开 Package/Element/Function 合同、最小 Boot/KDP、运行及应用组合 API；它复用 Kernel/SDK Domain Packages，并在 Domain App 中执行所选 Business Domain Packages。**SDK 产品**不等于某一个 `layer='sdk'` 的 Package |
 
 0.11.0–0.11.9 是同一个 DomainHarness SDK 完全重写的内部迭代。它不是 Domain Package 自动生成平台或大型 BUILD 工具产品。
+
+### 既定产品定位与分层（Owner R38 回归早期定义）
+
+```text
+Domain App（嵌入 DomainHarness SDK；不是另一个 DomainHarness 平台）
+  └─ Boot（Package 外的最小技术引导）
+       └─ Kernel Domain Packages（唯一 KDP Core.Order=0）
+            └─ SDK Domain Packages
+                 └─ Business Domain Packages（Domain App 选用）
+```
+
+此图描述**既定三层职责**（Boot + Kernel / SDK / Business Domain Packages），不是新增架构，也不要求一层仅一个 Package。统一 Element/Manifest/Function Contract、真实 Core.Order、直接 Extension、Target/Lock/Pin/Boot 继续适用，具体依赖和 Init 执行次序只能由已选 Core.Order/显式依赖确定，不能靠图中的缩进猜测。**Kernel 与 SDK 是逻辑上已明确的两个 Package 层**；是否在同一 npm/distribution artifact 中随 SDK 一起发布，与是否合成同一个 `DomainPackageManifest` 是两回事。后者目前与 `PackageLayer='kernel'|'sdk'|'business'` 的单层身份不一致，任何改变须由真实 Package/Consumer 比较、L2 决议及受影响测试证明，不能在 R37 文档中先行认定合并。优先保留逻辑分离、统一 SDK 分发，并避免第二 Kernel 或 BUILD。
 
 ## 2. Domain Package 具体是什么
 
@@ -56,7 +68,7 @@ ChatGPT / 开发者直接编写一组 Package 文件
        ↓
 必要的引用/权限/完整性与启动检查（可复用现有代码，无专用生产阶段）
        ↓
-一个 DomainHarness SDK 实例或普通 Domain App
+嵌入 Domain App 的 DomainHarness SDK（Boot + 已选 K/S/B Domain Packages）
 ```
 
 **不能因取消必经 Assembly 阶段而取消安全保证**：仍要能证明每个 Core.Order、直接 Extension、公开 Function、Target 实现、资源路径/摘要及实际 Boot/KDP 的合法性。现有 `tooling/build/src/build.ts::buildApp` 主要读取已有 Package 文件/Artifacts、做验证/应用组合及封存，属于当前代码实现路径，**不是将来每个 Domain Package 的生成必要条件**。如交付目标/受信安装需要 Lock/Pin、可复现 Package 文件闭包，它们只是**具体 Target/应用实例所需的确定性与安全证据**，不应因此扩大一项独立的产品 BUILD。
