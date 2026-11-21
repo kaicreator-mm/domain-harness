@@ -1,5 +1,14 @@
 # DomainHarness v0.11.0 · B0 Element-First Foundation 规范增量
 
+> **【R36 当前产品定义优先】**：本 B0 的有效工作对象是 ChatGPT/开发者也可直接编写的**多文件 Domain Package**，遵循 DIS 适用合同和 v0.11.x Element-First/Boot 安全约束。**Package 不是由 Build/Seed 工具赋予身份**；不要求开发生成器或单独 Assembly 流程。已有必要静态验证、摘要/Pin、Core.Order、Direct Extension 和 Boot 仍按实际 App 目标执行。详见 [R36](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
+
+
+> **【R37 实践演进】** 0.11.x 唯一目标是 Domain（有界语义/知识/规则）+ Harness（受控执行与反馈）+ SDK（可嵌入的 Boot/Domain Packages/公共 API）构成 **DomainHarness SDK**。可由 ChatGPT/开发者直接创建实际 Package 文件，不需要 Seed Builder。DIS/SDK 尚未明确的细节应由真实 Package/Consumer 和正反例逐步明确；可以按需写检查文件/引用/安全条件的 Validator，**验证器不生成 Package，也不强制其存在**。见 [R37 活规范与直接文件](DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)。
+
+
+> **【R33 产品边界修正】** 本 B0 验收中出现的 `BUILD` 仍是当时构建工具/校验/封存的实际实现与测试，不应解释为 DomainHarness 永久承担所有 Domain Package 的生产工作。当前 Owner 定义为 **DomainHarness = Boot + Domain Packages 的领域 Harness SDK，DomainForge = 由该 SDK 构建并负责生产 Domain Packages 的 Domain App**。基础 SDK 的 Assembly/Pin/安全验证继续有效；自举是 0.11.x 最终必须证明的目标但当前 NOT_IMPLEMENTED。见 [R33 规范](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
+
+
 **归属与优先级**：由 [Issue #1624](https://github.com/kaicreator-mm/domain-harness/issues/1624) 的 B0-01–B0-08 / AC-B01–AC-B07 约束此增量。0.11.x 是单一重构，不兼容旧 v0.10.x；本文在与历史 L2/PRD 候选发生冲突时优先。**本文记录目标和实现合同，不自证已验收。**
 
 ## 合同

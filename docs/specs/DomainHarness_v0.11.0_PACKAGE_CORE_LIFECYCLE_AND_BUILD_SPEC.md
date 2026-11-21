@@ -1,5 +1,14 @@
 # DomainHarness v0.11.0 — Package / Core / Extension / BUILD / Init / Exit 统一规范
 
+> **【R36 Owner 纠正，本文件中所有“必须先生成 Package / 必须经过 BUILD 平台才有 Package”的产品解释均被覆盖】**：Domain Package 是符合 DIS 适用约束 + 本 v0.11.x 当前 Element-First 合同的多文件集合，可由 ChatGPT/开发者直接编写 Manifest、Element、ESM 和资源；无专门生成器、Seed Builder 或独立 Package Assembly 工具前置。应用使用多个现成 Packages 时，仍须对真正使用的声明、直接 Extension、Core.Order、Function/Target、资源摘要/Boot 保持必要验证与拒绝，不能借“取消工具”降低本文件 B-02–B-04 的静态安全性质。后续所有步骤按 [R36](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) 解释；旧 B-01 的生成器化表述只保留为历史。
+
+
+> **【R37 0.11.x 活规范与可选验证】** 当前 Package/SDK 规范未完全明确，应根据 **真实多文件 Package、SDK Consumer、正反例** 在 0.11.x 中逐项澄清；已明确且适用的 DIS/Element-First、权限、Target、资源摘要和 Boot 义务继续有效。**不要求 Seed Builder 或特定生成过程**；可以根据实际问题增量编写轻量 Validator 以检查 Package 的规范符合性，**Validator 与 Package 作者/生产方式正交**，未来可复用于 Forge 但不需现在开发 Forge。不得把局部验证 PASS 视作整个 DIS Full Conformance。详见 [R37](DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)。
+
+
+> **【R33 Owner 产品所有权修正；本规范中“BUILD 从生成 Package 到完整 App 组合”的旧表述只保留为历史记录】**：现行跨版本产品边界须以 [DomainHarness SDK / DomainForge Domain App / 自举](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) 为准。DomainHarness 是 Boot + Domain Packages 的领域 Harness SDK，负责已存在 Package 的最小装配/校验/加载/执行；DomainForge 是基于该 SDK 运行并生产 Domain Package 的 Domain App。原 B-01“单 Package 源码/资源生成必归 Harness BUILD”**不再是当前产品要求**，缺通用 Package 生产器不得强加给 SDK 0.11.0；真实源码重构仍按独立增量验证。原有 Core.Order、直接 Extension、ElementRef/FunctionRef、Init/Exit、可信资源/Pin、未知调用拒绝等基础约束继续有效。完整代码归属见 [R33 审计](../architecture/DomainHarness_v0.11.x_LEGACY_BUILD_OWNERSHIP_AUDIT.md)。
+
+
 > **2026-11-21 Element-First 基础合同修正（#1624）**：本规范的 Init/Exit 均指`本 Package 拥有的已选 ElementRef`，而不是独立 EntryRef 或裸 ESM 导出。每个 Init/Exit Element 的唯一生命周期 Function/Target 必须在 BUILD 真实选定。0.11.0 Init 已可调用同 Package 或直接声明 Extension 的已选 Function，不依赖 READY 后 App.invoke；DomainAppDescriptor/DomainApp 不再定义业务直接 ingress。标准实现与调用流程见 [B0 基础合同](DomainHarness_v0.11.0_ELEMENT_FIRST_B0_FOUNDATION.md)；此裁决覆盖原候选中一切同名物理入口假设。
 
 > 文档类型：v0.11.0 Product/L2 修订规范（讨论决议整理，docs-only 候选）
