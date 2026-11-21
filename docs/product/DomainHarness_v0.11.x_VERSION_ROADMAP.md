@@ -6,7 +6,9 @@
 > 后续开发默认遵循 [0.11.x 防回归工程手册](../engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)：先分析新增信任/权限/生命周期边界，再做必要正反例，提交前检验类型和测试，按 Exact SHA 独立增量审核，禁止重复无效 CI 和往返拆分本地 Agent 任务。
 <!-- /DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
 
-# DomainHarness 0.11.x — 完整重写与 Domain-Bounded Harness 版本路线图（R4 · Owner Confirmed）
+# DomainHarness 0.11.x — 完整重写与 Domain-Bounded Harness 版本路线图（R4 Owner 基线 + R29 当前状态）
+
+> **【R29 当前进度，覆盖下文 R4/R1 当时的阶段状态】**：0.11.0 #1564 与 0.11.1 #1605/#1608 已完成限定资格，0.11.1 T11–T14 功能与最终 Product/L1/L2 R27 已受审、实现及两份文档均合入 `version/v0.11.x@3145104258a4da5f8cc940482ff77322b97d6cf6`。0.11.2 #1612 开始标准 Element 提取/领域语义设计，0.11.2–0.11.9 尚未交付。下方早期 R4/R1 的状态快照仅用来说明路线图决策的历史来源，不可覆盖本段当前状态；完整源真相见 #1563 R28 记录。
 
 <!-- DH_V011X_OWNER_CONFIRMED_FULL_REWRITE_STAGE_ROADMAP_20261121 -->
 
@@ -22,8 +24,8 @@ V010_COMPATIBILITY=NONE
 V010_FEATURE_PARITY=NOT_REQUIRED
 V010_SOURCE_MIGRATION=NOT_REQUIRED
 LEGACY_PUBLIC_ABI=NOT_EXPORTED_BY_NEW_011X
-CURRENT_STAGE=0.11.0_INTERNAL_ACCEPTED
-FUTURE_STAGES=0.11.1_TO_0.11.9_PLANNED_NOT_IMPLEMENTED_NOT_L1_L2_FROZEN
+CURRENT_STAGE=R4_HISTORICAL_SNAPSHOT_0.11.0_INTERNAL_ACCEPTED
+FUTURE_STAGES=R4_HISTORICAL_SNAPSHOT_0.11.1_TO_0.11.9_PLANNED_NOT_IMPLEMENTED
 DEVELOPMENT_TRAIN=version/v0.11.x
 MAIN_MERGE=ONLY_AFTER_WHOLE_011X_ACCEPTANCE
 RELEASE=ONLY_ONCE_AFTER_WHOLE_011X_ACCEPTANCE
@@ -50,7 +52,7 @@ NODE_MINIMUM=22.12.0
 - **`version/v0.11.x`：唯一后续阶段集成分支**；每个阶段沿最新已验收 HEAD 开发、做最小 Product/L2 增量与必要 Task DAG、实际源码和 scoped validation，受控合入并记录阶段快照。
 - **`0.11.0…0.11.9` 是内部渐进阶段，不分别对外发行。** 每阶段验收可独立复现，前阶段已合格且未变化的证明只复用，不重复跑全套 CI 或做完整 Release Qualification。
 - **只有 0.11.0–0.11.9 全部必需能力通过一次最终组合验收**，才创建唯一正式 `main` PR、受控合并并形成正式 Tag/GitHub Release；不预先把版本阶段号等同正式 SemVer Tag。npm Publish 不是默认必需动作。
-- 本轮只固定版本阶段和目标，不因规划确认就自动启动 0.11.1 实施、创建 Task Issue 或宣称未来功能合格。各版本按实际开工时明确具体 PRD/AC 和验收责任，避免无限扩张。
+- **【R4 当时的计划性约束，非当前进度】** 此段最初只固定版本阶段和目标，不因规划确认就自动启动实施；现在 0.11.1 已完成限定交付，后续阶段继续在实际开工时明确具体 PRD/AC 和验收责任，避免无限扩张。
 
 ## 2.1 标准 Element 体系：所有阶段复用优先，逐步积累（R29 新增规范）
 
@@ -100,8 +102,8 @@ NODE_MINIMUM=22.12.0
 ## 5. 分阶段交付与源真相
 
 - **0.11.0 的事实不变**：已完成 Element-First 基线和唯一 Demo `examples/v011-basic-app`，#1597 / PR #1601，Woodpecker #2759；AC01–AC10 是 Scoped PASS，不能凭旧版测试或本规划提升任何 Full Conformance。
-- **0.11.1–0.11.9 规划已确定，源码尚未实现**：每阶段开工前明确本阶段最小 Product/L1 delta、必须 L2 合同、任务 DAG、真实 Consumer 场景、验收负例，并只验证实际改动；它们不是因为分配版本号就自动获得 L1/L2 Freeze 或开发许可。
-- **下一步**：维护 0.11.0 已接受基线；按 Owner 后续推进指令再启动 0.11.1。不要将文档更新触发为长期持续本地 Agent 任务。
+- **【R29 当前状态】0.11.1 已完成限定交付；0.11.2–0.11.9 仍处于规划/实施待验收阶段**：后续每阶段明确最小 Product/L1 delta、必要 L2、任务 DAG、真实 Consumer/负例，且只验证实际改动；不得因分配版本号自动获得 L1/L2 资格。
+- **【R29 下一步】** 继承已接受的 0.11.0/0.11.1 基线，在 0.11.2 #1612 下按 #1644 优先提取真正可复用的标准 Reader Element；不得由文档更新触发长期本地 Agent 任务。
 - **不纳入本轮默认完成门**：跨平台所有 Target、通用多 Agent 协作、全平台知识图数据库、全面 DIS Full Conformance、Server 专用学习基础设施、所有下游旧业务迁移。实际需要时单独明确为 0.11.x 后续范围，不预设新的必须版本。
 
 <!-- /DH_V011X_OWNER_CONFIRMED_FULL_REWRITE_STAGE_ROADMAP_20261121 -->
@@ -114,7 +116,7 @@ NODE_MINIMUM=22.12.0
 | 内部版本 | 唯一版本级 Issue | 交付主题 | 当前状态 |
 |---|---|---|---|
 | **0.11.0** | [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | Foundation | Stage-0 accepted; internal only |
-| **0.11.1** | [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) | Task Execution | Product/L2 design active; implementation not finished |
+| **0.11.1** | [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) | Task Execution | R27 Product/L1/L2 ACCEPT_SCOPED，T11–T14 合入，#1605/#1608 已关闭；内部阶段完成 |
 | **0.11.2** | [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Domain Intelligence | Scope assigned, Product/L2/implementation pending |
 | **0.11.3** | [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | Semantic Interaction | Scope assigned, Product/L2/implementation pending |
 | **0.11.4** | [#1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | Authorized Action | Scope assigned, Product/L2/implementation pending |
