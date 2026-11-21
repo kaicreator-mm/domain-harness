@@ -448,11 +448,26 @@ async function authoring(label, rule, options = {}) {
 }
 
 async function installComposedDependencies(label, installRoot) {
-  const install = spawnSync(process.execPath, [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund', '--ignore-scripts'], {
+  // Workflow App 优先通过 BUILD 封存的受控安装器：先只解析 Lock，再验 SRI，最后 npm ci。
+  const installer = join(installRoot, 'dh-install', 'install-runtime.mjs');
+  let isWorkflowInstaller = false;
+  try {
+    await readFile(installer);
+    isWorkflowInstaller = true;
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  const installArgs = isWorkflowInstaller
+    ? [installer, microkernelTarball, contractsTarball]
+    : [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund', '--ignore-scripts'];
+  const install = spawnSync(process.execPath, installArgs, {
     cwd: installRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, npm_config_registry: process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry },
   });
-  await evidence(`${label}.composed-package-npm-install`, { exit: install.status, signal: install.signal });
+  await evidence(`${label}.composed-package-npm-install`, {
+    exit: install.status, signal: install.signal,
+    method: isWorkflowInstaller ? 'sealed-lock-first-ci' : 'legacy-non-workflow',
+  });
   assert.equal(install.status, 0, `${label}: composed App npm install failed\n${install.stdout}\n${install.stderr}`);
   // An admitted Workflow App seals the exact archive SRI pins in the same Lock
   // and ships a first-party verifier; check the resulting external npm install
