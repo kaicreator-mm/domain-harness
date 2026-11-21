@@ -97,7 +97,7 @@ export interface DomainAppLock {
   readonly selectedFunctions: readonly SelectedFunction[];
   readonly hookBindings: readonly SealedHookBinding[];
   readonly selectedWorkflows?: readonly SelectedWorkflow[];
-  /** SHA-512 tarball SRI pins for BUILD-selected trusted Workflow runtime dependencies. */
+  /** BUILD 已选定的可信 Workflow Runtime 依赖，通过 SHA-512 压缩包 SRI 固定实际安装字节。 */
   readonly trustedRuntimeIntegrity?: readonly {
     readonly name: 'xstate' | 'yaml';
     readonly version: string;
