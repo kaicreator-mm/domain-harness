@@ -1,3 +1,7 @@
+<!-- DH_V011X_OWNER_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP_20261121 -->
+> **跨 0.11.x Owner 补充决议（WHAT/HOW 归属）**：Package 生成前，由 Domain/Package 生产者和 BUILD/测试完成结构、依赖、Workflow/StateMachine 以及业务异常路径的质量验证；交付后的选定 Package 负责其业务异常与领域 Outcome。SDK/Kernel 不对绝对安全或永无异常作承诺，也不充当业务异常修复器；只保留必要 Boot Trust、技术装载/销毁、最小失败退出/清理及不泄密诊断。对已验收 0.11.0 的现有运行期业务 Schema/Outcome 校验，须通过后续 L2 增量与必要反例明确归属后再调整，不能直接悄悄删掉。详细说明：[Package 构建期信任与异常责任边界](../architecture/DomainHarness_v0.11.x_PACKAGE_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP.md)。本决议贯穿 0.11.1–0.11.9；不扩大 0.11.1 Product 的 WHAT 范围。
+<!-- /DH_V011X_OWNER_BUILD_TIME_TRUST_AND_ERROR_OWNERSHIP_20261121 -->
+
 <!-- DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
 > **0.11.0 源码质量最新状态（覆盖历史 REWORK）：** 先前的 REWORK 为真实历史，但已在 [Issue #1602](https://github.com/kaicreator-mm/domain-harness/issues/1602) / [PR #1603](https://github.com/kaicreator-mm/domain-harness/pull/1603) 通过 R12→R15 复审完成四模块重构，R15 `ACCEPT_SCOPED`（P0=0/P1=0、保留五项非阻断 P2），Woodpecker #2787 同 SHA SUCCESS，已合入 `version/v0.11.x`；后续 [PR #1606](https://github.com/kaicreator-mm/domain-harness/pull/1606) 补齐中文注释和调用流程文档并经 #2788 成功合入。**仅 0.11.0 Foundation/Stage-0 工程资格合格；main、统一 Release、0.11.1+ 和 Full Conformance 均不能据此晋升。**
 >
