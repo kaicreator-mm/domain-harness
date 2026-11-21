@@ -683,6 +683,115 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
   },
 );
 
+/** v0.11.1：Workflow 只扩展 ContentBlock 的机器内容，不更改 ElementDefinition 根 Schema。 */
+const WORKFLOW_TARGET_DEF: JsonObject = {
+  oneOf: [
+    {
+      type: 'object', additionalProperties: false, required: ['nodeId'],
+      properties: { nodeId: { type: 'string', pattern: IDENTIFIER_PATTERN } },
+    },
+    {
+      type: 'object', additionalProperties: false, required: ['terminal'],
+      properties: { terminal: { enum: ['COMPLETE', 'REJECT', 'ASK', 'WAIT', 'UNKNOWN', 'FAILED'] } },
+    },
+  ],
+};
+const WORKFLOW_SWITCH_DEF: JsonObject = {
+  type: 'object', additionalProperties: false, required: ['exits'],
+  properties: {
+    exits: {
+      type: 'array', minItems: 1, maxItems: 256,
+      items: {
+        type: 'object', additionalProperties: false, required: ['label', 'target'],
+        properties: {
+          label: { type: 'string', pattern: IDENTIFIER_PATTERN },
+          target: { $ref: '#/$defs/workflowTarget' },
+        },
+      },
+    },
+  },
+};
+const WORKFLOW_REF_DEF: JsonObject = {
+  type: 'object', additionalProperties: false, required: ['element', 'contentId'],
+  properties: {
+    element: { $ref: '#/$defs/elementRef' },
+    contentId: { type: 'string', pattern: IDENTIFIER_PATTERN },
+  },
+};
+const WORKFLOW_DATA_DEF: JsonObject = {
+  type: 'object', additionalProperties: false, required: ['format', 'resource', 'maxBytes'],
+  properties: {
+    format: { enum: ['json', 'yaml'] },
+    resource: { $ref: '#/$defs/resourceRef' },
+    maxBytes: { type: 'integer', minimum: 1, maximum: 1048576 },
+  },
+};
+const WORKFLOW_HOOKS_DEF: JsonObject = {
+  type: 'object', additionalProperties: false, minProperties: 1,
+  properties: {
+    start: { $ref: '#/$defs/functionRef' },
+    end: { $ref: '#/$defs/functionRef' },
+  },
+};
+const WORKFLOW_NODE_DEF: JsonObject = {
+  oneOf: [
+    {
+      type: 'object', additionalProperties: false,
+      required: ['id', 'kind', 'function', 'switch'],
+      properties: {
+        id: { type: 'string', pattern: IDENTIFIER_PATTERN },
+        kind: { const: 'function' },
+        function: { $ref: '#/$defs/functionRef' },
+        data: { $ref: '#/$defs/workflowData' },
+        hooks: { $ref: '#/$defs/workflowHooks' },
+        switch: { $ref: '#/$defs/workflowSwitch' },
+      },
+    },
+    {
+      type: 'object', additionalProperties: false,
+      required: ['id', 'kind', 'workflow', 'switch'],
+      properties: {
+        id: { type: 'string', pattern: IDENTIFIER_PATTERN },
+        kind: { const: 'workflow' },
+        workflow: { $ref: '#/$defs/workflowRef' },
+        switch: { $ref: '#/$defs/workflowSwitch' },
+      },
+    },
+  ],
+};
+/**
+ * 根执行预算在整个 child Workflow 树共享。所有真实业务 Function/Reader/Guard
+ * 及可选 start/end 调用均计数；底层 Package.Init/Exit 不计数。
+ */
+export const WORKFLOW_DEFINITION_JSON_SCHEMA: JsonObject = defsEnvelope(
+  'workflow-definition.json',
+  {
+    type: 'object', additionalProperties: false,
+    required: ['kind', 'schemaVersion', 'id', 'entryNodeId', 'maxElementCalls',
+      'maxDescendantWorkflowDepth', 'nodes'],
+    properties: {
+      kind: { const: 'Workflow' },
+      schemaVersion: { const: 'dh.workflow/0.11' },
+      id: { type: 'string', pattern: IDENTIFIER_PATTERN },
+      entryNodeId: { type: 'string', pattern: IDENTIFIER_PATTERN },
+      maxElementCalls: { type: 'integer', minimum: 1, maximum: 100000 },
+      maxDescendantWorkflowDepth: { type: 'integer', minimum: 0, maximum: 32 },
+      nodes: { type: 'array', minItems: 1, maxItems: 10000, items: { $ref: '#/$defs/workflowNode' } },
+    },
+  },
+  {
+    resourceRef: RESOURCE_REF_DEF,
+    elementRef: ELEMENT_REF_DEF,
+    functionRef: FUNCTION_REF_DEF,
+    workflowRef: WORKFLOW_REF_DEF,
+    workflowTarget: WORKFLOW_TARGET_DEF,
+    workflowSwitch: WORKFLOW_SWITCH_DEF,
+    workflowData: WORKFLOW_DATA_DEF,
+    workflowHooks: WORKFLOW_HOOKS_DEF,
+    workflowNode: WORKFLOW_NODE_DEF,
+  },
+);
+
 export const JSON_SCHEMAS: Readonly<Record<string, JsonObject>> = Object.freeze({
   'domain': DOMAIN_DEFINITION_JSON_SCHEMA,
   'element': ELEMENT_DEFINITION_JSON_SCHEMA,
@@ -693,4 +802,5 @@ export const JSON_SCHEMAS: Readonly<Record<string, JsonObject>> = Object.freeze(
   'package-manifest': DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA,
   'app-descriptor': DOMAIN_APP_DESCRIPTOR_JSON_SCHEMA,
   'app-lock': DOMAIN_APP_LOCK_JSON_SCHEMA,
+  'workflow-definition': WORKFLOW_DEFINITION_JSON_SCHEMA,
 });
