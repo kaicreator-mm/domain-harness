@@ -110,6 +110,29 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
   }
 });
 
+test('R2 P1-01: const function and immutable local function alias both remain callable Targets', (t) => {
+  for (const source of [
+    "export const init = () => ({ status: 'READY' });\n",
+    "const stable = () => ({ status: 'READY' });\nexport { stable as init };\n",
+    "function stable() { return { status: 'READY' }; }\nexport { stable as init };\n",
+  ]) {
+    const scenario = standardCase();
+    t.after(scenario.ws.dispose);
+    const { input } = scenario.finalize();
+    const sdk = input.packages.find((pkg) => pkg.id === 'sdk-core')!;
+    const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/callable-alias.mjs',
+      new TextEncoder().encode(source));
+    const altered = { ...sdk, targetVariants: sdk.targetVariants.map((variant) => ({
+      ...variant, implementations: variant.implementations.map((binding) =>
+        binding.functionId === 'init'
+          ? { ...binding, entry: { module, exportName: 'init' } }
+          : binding),
+    })) };
+    const result = buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) });
+    assert.equal(result.ok, true, result.ok ? '' : result.message);
+  }
+});
+
 test('AC07: repeated BUILD over identical input is byte-identical and pool-order insensitive', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);

@@ -345,6 +345,42 @@ test('B0-02: BUILD refuses a named Init export that is not callable', (t) => {
     'DH_BUILD_IMPLEMENTATION_MISSING');
 });
 
+test('R2 P1-01: mutable ESM let init is refused even when initializer is a function', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => pkg.id === 'sdk-core')!;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/mutable-init.mjs',
+    new TextEncoder().encode("export let init = () => ({ status: 'READY' });\ninit = 42;\n"));
+  const altered = withInitTarget(sdk, module);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_IMPLEMENTATION_MISSING');
+});
+
+test('R2 P1-01: local function alias export with later reassignment is refused', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => pkg.id === 'sdk-core')!;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/alias-reassigned.mjs',
+    new TextEncoder().encode("function localInit() { return { status: 'READY' }; }\nlocalInit = 42;\nexport { localInit as init };\n"));
+  const altered = withInitTarget(sdk, module);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_IMPLEMENTATION_MISSING');
+});
+
+test('R2 P1-01: exported function with later assignment is not a proof of a callable Target', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const sdk = input.packages.find((pkg) => pkg.id === 'sdk-core')!;
+  const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/function-reassigned.mjs',
+    new TextEncoder().encode("export function init() { return { status: 'READY' }; }\ninit = 42;\n"));
+  const altered = withInitTarget(sdk, module);
+  expectRefusal(buildApp({ ...input, packages: input.packages.map((pkg) => pkg === sdk ? altered : pkg) }),
+    'DH_BUILD_IMPLEMENTATION_MISSING');
+});
+
 test('B0-02: no Element owner means no legal Init despite a valid ESM export', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);

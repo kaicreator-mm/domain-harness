@@ -74,24 +74,31 @@ function staticallyExportedNames(source: ts.SourceFile): Set<string> {
   return names;
 }
 
-/** Target 的静态可调用证据：仅接受具名 function 或显式函数表达式/箭头函数。
- * 模块导出名存在不能证明可执行（例如 export const init = 42；class 也不能直接调用）。
- * 仅本模块可证明的本地命名 re-export 被接受，未知的动态/跨模块函数值 fail-closed。
+/** Target 必须有可证明的稳定可调用绑定。只接受函数声明或 const 函数表达式，
+ * local export {fn as init} 必须追溯到同模块的可调用绑定。let/var 不足以证明
+ * 最终 ESM 导出类型；函数声明即使初始可调用，只要存在赋值/更新也必须拒绝。
+ * 动态/反射装载另由 verifyGeneratedPackageImports 继续 fail-closed。
  */
 function staticallyCallableExportNames(source: ts.SourceFile): Set<string> {
   const localCallable = new Set<string>();
-  const publicCallable = new Set<string>();
+  const reassignableFunctions = new Set<string>();
+  const exported = new Map<string, string>();
   for (const statement of source.statements) {
     if (ts.isFunctionDeclaration(statement) && statement.name) {
-      localCallable.add(statement.name.text);
-      if (hasExportModifier(statement)) publicCallable.add(statement.name.text);
+      const name = statement.name.text;
+      localCallable.add(name);
+      reassignableFunctions.add(name);
+      if (hasExportModifier(statement)) exported.set(name, name);
     }
     if (ts.isVariableStatement(statement)) {
+      const stable = (statement.declarationList.flags & ts.NodeFlags.Const) !== 0;
+      if (!stable) continue;
       for (const declaration of statement.declarationList.declarations) {
-        if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue;
-        if (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer)) continue;
-        localCallable.add(declaration.name.text);
-        if (hasExportModifier(statement)) publicCallable.add(declaration.name.text);
+        if (!ts.isIdentifier(declaration.name) || !declaration.initializer ||
+            (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer))) continue;
+        const name = declaration.name.text;
+        localCallable.add(name);
+        if (hasExportModifier(statement)) exported.set(name, name);
       }
     }
   }
@@ -100,10 +107,41 @@ function staticallyCallableExportNames(source: ts.SourceFile): Set<string> {
         !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
     for (const named of statement.exportClause.elements) {
       const localName = named.propertyName?.text ?? named.name.text;
-      if (localCallable.has(localName)) publicCallable.add(named.name.text);
+      if (localCallable.has(localName)) exported.set(named.name.text, localName);
     }
   }
-  return publicCallable;
+  // Function declarations are writable JS bindings. Conservative full-AST write detection
+  // includes nested expressions, compound assignments, destructuring and for-of/in targets.
+  // Shadowed writes may be refused, but must never become a false callable proof.
+  const invalidated = new Set<string>();
+  const markTarget = (target: ts.Node): void => {
+    if (ts.isIdentifier(target)) {
+      if (reassignableFunctions.has(target.text)) invalidated.add(target.text);
+      return;
+    }
+    ts.forEachChild(target, markTarget);
+  };
+  const walkWrites = (node: ts.Node): void => {
+    if (ts.isBinaryExpression(node) &&
+        node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
+      markTarget(node.left);
+    }
+    if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+        (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)) {
+      markTarget(node.operand);
+    }
+    if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
+      if (!ts.isVariableDeclarationList(node.initializer)) markTarget(node.initializer);
+    }
+    ts.forEachChild(node, walkWrites);
+  };
+  walkWrites(source);
+  const names = new Set<string>();
+  for (const [publicName, localName] of exported) {
+    if (!invalidated.has(localName)) names.add(publicName);
+  }
+  return names;
 }
 
 function publicFunctionExportNames(pkg: DomainPackageManifest, module: ResourceRef): Set<string> {

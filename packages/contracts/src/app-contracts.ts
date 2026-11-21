@@ -61,7 +61,7 @@ export interface PackageExitContext {
   readonly hostPorts: readonly import('./boot-contracts.js').HostPortBinding[];
 }
 
-/** Business Core.Init 声明应用启动状态；DEGRADED 只能显式压制已在 Lock 中标记 optional 的入口。 */
+/** Business Core.Init 独立报告 READY/DEGRADED/BLOCKED/FAILED；FunctionOutcome 与 App 状态互不冒充，无旧 ingress 压制表。 */
 export interface AppInitResult {
   readonly status: AppStatus;
   readonly detail?: JsonValue;
