@@ -149,6 +149,15 @@ test('T11: sealed JSON/YAML Reader data requires bounded canonical ResourceRef',
   denied(tag, 'unsupported reader format');
 });
 
+test('T11: UNKNOWN/FAILED/WAIT direct success laundering is a semantic rejection', () => {
+  const wrong = clone();
+  wrong.nodes[0]!.switch!.exits[2]!.target = { terminal: 'COMPLETE' };
+  assert.equal(validateWorkflowDefinition(wrong).ok, false);
+  const waiting = clone();
+  waiting.nodes[1]!.switch!.exits[2]!.target = { terminal: 'COMPLETE' };
+  assert.equal(validateWorkflowDefinition(waiting).ok, false);
+});
+
 test('T11: output labels are strict and missing business labels never fall back to SUCCEEDED', () => {
   const exits = [
     { label: 'APPROVED', target: { terminal: 'COMPLETE' as const } },
