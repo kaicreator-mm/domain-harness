@@ -38,7 +38,16 @@ Domain App（嵌入 DomainHarness SDK；不是另一个 DomainHarness 平台）
                  └─ Business Domain Packages（Domain App 选用）
 ```
 
-此图描述**既定三层职责**（Boot + Kernel / SDK / Business Domain Packages），不是新增架构，也不要求一层仅一个 Package。统一 Element/Manifest/Function Contract、真实 Core.Order、直接 Extension、Target/Lock/Pin/Boot 继续适用，具体依赖和 Init 执行次序只能由已选 Core.Order/显式依赖确定，不能靠图中的缩进猜测。**Kernel 与 SDK 是逻辑上已明确的两个 Package 层**；是否在同一 npm/distribution artifact 中随 SDK 一起发布，与是否合成同一个 `DomainPackageManifest` 是两回事。后者目前与 `PackageLayer='kernel'|'sdk'|'business'` 的单层身份不一致，任何改变须由真实 Package/Consumer 比较、L2 决议及受影响测试证明，不能在 R37 文档中先行认定合并。优先保留逻辑分离、统一 SDK 分发，并避免第二 Kernel 或 BUILD。
+此图描述**既定三层职责**（Boot + Kernel / SDK / Business Domain Packages），不是新增架构，也不要求一层仅一个 Package。统一 Element/Manifest/Function Contract、真实 Core.Order、直接 Extension、Target/Lock/Pin/Boot 继续适用，实际 Init 顺序由已选 Core.Order/显式依赖确定，不能靠图中的缩进猜测。
+
+### R39 · 稳定 KDP、可选择 SDK 功能、可融合分发
+
+- **KDP 是嵌入式 DomainHarness SDK 稳定的 Kernel 基础**：由 Boot 以 `Core.Order=0` 引导，职责仅为最小不可缺少的受信机制；稳定指固定、受控、可版本升级的基础合同，不等于全部 SDK 能力内置进 KDP。
+- **SDK Domain Packages 是按每个 Domain App 的需求选择的功能**：既有 Package 可由 ChatGPT/人工/Agent/未来 Forge 编写；针对 App 选择合适的 SDK Package、可选功能与必要扩展，BUILD/组合阶段封闭直接依赖、FunctionRef/Target、资源及 Lock/Pin。不同 App 可选择不同 SDK 功能集合，不因功能未选而强制打包。
+- **KDP 与选定 SDK Packages 可在分发时物理合并**：同一安装包/Bundle 或单个可执行 artifact，甚至静态链接为一个物理模块，均属允许的交付实现选项；不强制多文件动态加载。必须保持原有逻辑 Package ID、`kernel|sdk|business` 层级、选中/公开授权、唯一 Core.Order、Init/Exit、Target、摘要/Pin 与可审计闭包的等价保证，不能由合并产生运行期重新选择或越权调用。
+- **物理融合不等于取消逻辑 Package 边界**：现行 `DomainPackageManifest.layer` 只有一个层值。若要把 Kernel 与 SDK 真正合成同一逻辑 Manifest，则是另一项基础合同变化，必须另行 L2 决议及受影响验证，**不是**实现物理分发融合的前置条件，也不是 0.11.x 的默认目标。
+
+这里的 BUILD/组合是面向 Domain App **选择和验证已有 Packages**，不是生成 Package。Forge 当前暂停，不能成为 SDK 构建 App 的前置条件。
 
 ## 2. Domain Package 具体是什么
 
