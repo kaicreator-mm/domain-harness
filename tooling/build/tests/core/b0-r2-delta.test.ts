@@ -17,8 +17,10 @@ function externalLifecycleInit(t: import('node:test').TestContext, options: Exte
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const owner = input.packages.find((pkg) => pkg.id === 'orders-business')!;
-  const implementor = input.packages.find((pkg) => pkg.id === 'orders-ext')!;
+  // BuildInput 接受原始未知 Package 输入，合法测试夹具需显式声明 Manifest 类型。
+  const packages = input.packages as readonly DomainPackageManifest[];
+  const owner = packages.find((pkg) => pkg.id === 'orders-business')!;
+  const implementor = packages.find((pkg) => pkg.id === 'orders-ext')!;
   const impl = writeRaw(scenario.ws.packageRoots['orders-ext']!, 'dist/r2-selected-init.mjs',
     new TextEncoder().encode('export function init() { return { status: "READY" }; }\n'));
   const resourcePackage = options.resourceFromThird ? 'aaa-ext' : 'orders-ext';

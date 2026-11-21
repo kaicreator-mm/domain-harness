@@ -6,6 +6,7 @@ import {
   canonicalJson,
   contentDigestOf,
   type DomainAppDescriptor,
+  type DomainPackageManifest,
   type JsonValue,
 } from '@kaicreator/domain-harness-contracts';
 import { buildApp, type BuildResult } from '../../src/index.js';
@@ -119,7 +120,7 @@ test('R2 P1-01: const function and immutable local function alias both remain ca
     const scenario = standardCase();
     t.after(scenario.ws.dispose);
     const { input } = scenario.finalize();
-    const sdk = input.packages.find((pkg) => pkg.id === 'sdk-core')!;
+    const sdk = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core') as DomainPackageManifest;
     const module = writeRaw(scenario.ws.packageRoots['sdk-core']!, 'dist/cases/callable-alias.mjs',
       new TextEncoder().encode(source));
     const altered = { ...sdk, targetVariants: sdk.targetVariants.map((variant) => ({
