@@ -239,18 +239,24 @@ export function composeAppPackage(
   if (runtimeDependencies['@kaicreator/domain-harness-microkernel'] === undefined) {
     throw refusal('DH_BUILD_TARGET_INVALID', 'composed App Package requires an exact microkernel runtime dependency');
   }
-  // 唯一可信的外部运行时依赖：DomainHarness 自己的确切 v0.11.0 发行版本。
+  // 唯一可信的外部运行时：DomainHarness 与经审定的精确 Workflow 依赖版本。
   // 不接受调用方自由追加 npm/git/file 包，更不能让未检查的包在安装时执行 hook。
-  const trustedRuntime = new Set([
-    '@kaicreator/domain-harness-microkernel',
-    '@kaicreator/domain-harness-contracts',
+  const trustedRuntime = new Map<string, string>([
+    ['@kaicreator/domain-harness-microkernel', '0.11.0'],
+    ['@kaicreator/domain-harness-contracts', '0.11.0'],
+    ['xstate', '5.33.2'],
+    ['yaml', '2.9.1'],
   ]);
+  const needsWorkflowRuntime = (lock.selectedWorkflows?.length ?? 0) > 0;
+  if (needsWorkflowRuntime && (runtimeDependencies['xstate'] === undefined || runtimeDependencies['yaml'] === undefined)) {
+    throw refusal('DH_BUILD_TARGET_INVALID', 'selected Workflow requires exact xstate and yaml runtime dependencies');
+  }
   const dependencies: Record<string, string> = {};
   for (const pkg of lock.selectedPackages) dependencies[pkg.packageId] = `file:./packages/${pkg.packageId}`;
   for (const [id, version] of Object.entries(runtimeDependencies)) {
-    if (!trustedRuntime.has(id) || version !== '0.11.0') {
+    if (trustedRuntime.get(id) !== version) {
       throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
-        `runtime dependency '${id}' is not an explicitly trusted v0.11.0 runtime Package`);
+        `runtime dependency '${id}' is not an explicitly trusted exact runtime Package`);
     }
     if (dependencies[id] !== undefined && dependencies[id] !== version) {
       throw refusal('DH_BUILD_VERSION_CONFLICT', `runtime dependency '${id}' collides with a selected Package`);
