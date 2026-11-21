@@ -21,7 +21,7 @@ STATUS=PLAN_ONLY_SOURCE_UNCHANGED
 
 - **S：SDK 必需** = 没有 Forge、仅提供现成 Domain Packages 时，DomainHarness 仍必须能够调用公开组合 API，将它们装配成准确可信的可运行 App/SDK、Boot/KDP 激活，并阻止未授权依赖。这些能力应收敛于 `Package Assembly/Linking/Validation` SDK 实现，不要求用户另外部署“BUILD 服务”。
 - **F：Forge 生产职责** = 从需求、Domain Data/Claim/Element/Business 内容或代码草稿**生产**新 Package/实现/资源、生成模板、领域内容编译、根据目标产生多种源和业务逻辑、治理知识/版本等；由在 DomainHarness 上运行的 Forge App 提供，允许 Forge 纯作者 Core 保持独立，经明确的公开 Package 接口交接。
-- **D：直接编写 Domain Package 文件（不是工具）** = ChatGPT 或开发者直接创建/维护 DomainHarness 本身基础 Package Manifest、Element、资源与 Function 文件，按 DIS 适用条款和 0.11.x 当前规范检查。无需新建 Seed Builder；不应把 Package 生产方式作为身份/合规门槛。详见 [R36](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_AND_BOOTSTRAP_SEED.md)。
+- **D：直接编写 Domain Package 文件（不是工具）** = ChatGPT 或开发者直接创建/维护 DomainHarness 本身基础 Package Manifest、Element、资源与 Function 文件，按 DIS 适用条款和 0.11.x 当前规范检查。无需新建 Seed Builder；不应把 Package 生产方式作为身份/合规门槛。详见 [R36](../specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)。
 - **X：不必要 / 应精简** = 由于误把 BUILD 设计成另一个产品而造成的额外分层、重复计算、全局硬编码、过度通用编译器/双 Runtime、无限期为所有目标生成全部模板的职责。X 表示**移除不必要机制**，不是删掉有证据要求的安全防线；实施时必须先有同等受信 SDK 装配/Host 守门和受影响负例。
 
 ## 2. 按真实文件逐一拆分
