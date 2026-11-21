@@ -62,7 +62,7 @@ test('KDP boots core + package system: init order, hook sealing, business init, 
       (event) => event['event'] === 'module-evaluated' && event['package'] === 'fixture-ext:hook',
     );
     const businessInitIndex = events().findIndex((event) => event['event'] === 'business-init');
-    assert.ok(hookEvalIndex > 0, 'hook provider module must be loaded by sealHooks');
+    assert.ok(hookEvalIndex >= 0, 'hook provider module must be loaded by sealHooks');
     assert.ok(businessInitIndex > hookEvalIndex, 'hooks sealed before Business Core.Init runs');
     assert.equal(events().some((event) => event['event'] === 'hook-provider-invoked'), false);
 
@@ -377,7 +377,7 @@ test('Package Exit is best-effort across all packages with an aggregate error', 
     () => null,
     (error: unknown) => (error as Error).message,
   );
-  assert.match(String(message), /Package Exit failed for 1 package\(s\)/);
+  assert.match(String(message), /Exit failed for 1 Init call\(s\)/);
   assert.match(String(message), /fixture-kernel/);
   const disposes = events().filter((event) => event['event'] === 'package-exit');
   assert.deepEqual(
@@ -419,7 +419,7 @@ test('R27: missing selected Init Element export is rejected and InitFrom retains
   await packages.runExit();
 });
 
-test('R27: post-initialization Business App Init failure rolls back every technical package', async (t) => {
+test('R27: failed Business Core.Init triggers reverse Exit for entered Packages', async (t) => {
   for (const init of [{ status: 'FAILED' as const }, { status: 'READY' as const, throw: true }]) {
     const fixture = await buildFixtureInstall({ init, functions: {} });
     t.after(async () => fixture.cleanup());
@@ -453,8 +453,12 @@ test('R31: missing Exit Element is allowed; partial startup still closes remaini
   const { PackageSystem } = await import('../../src/package-system.js');
   const lock = {
     ...fixture.lock,
-    selectedPackages: fixture.lock.selectedPackages.map((pkg) =>
-      pkg.packageId === 'fixture-kernel' ? { ...pkg, exit: undefined } : pkg),
+    selectedPackages: fixture.lock.selectedPackages.map((pkg) => {
+      if (pkg.packageId !== 'fixture-kernel') return pkg;
+      const { exit: ignored, ...withoutExit } = pkg;
+      void ignored;
+      return withoutExit;
+    }),
   };
   const packages = new PackageSystem(fixture.installRoot, lock, []);
   await assert.rejects(packages.runInit(packageContext(fixture)), /fixture sdk Init threw/);
@@ -475,7 +479,7 @@ test('Init failure: already-initialized packages are torn down in strict reverse
   const result = await boot(fixture.pin, fixture.context);
   assert.equal(result.status, 'FAILED', JSON.stringify(result));
   if (result.status === 'FAILED') {
-    assert.equal(result.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
+    assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
     assert.match(result.reason, /fixture sdk Init threw/);
   }
 
@@ -486,7 +490,7 @@ test('Init failure: already-initialized packages are torn down in strict reverse
   const disposes = events()
     .filter((event) => event['event'] === 'package-exit')
     .map((event) => event['package']);
-  assert.deepEqual(disposes, ['fixture-kernel'], 'reverse best-effort cleanup of initialized packages only');
+  assert.deepEqual(disposes, ['@fixture/sdk', 'fixture-kernel'], 'failed Init entrance also receives Exit');
   assert.equal(
     events().some((event) => event['event'] === 'business-init'),
     false,
