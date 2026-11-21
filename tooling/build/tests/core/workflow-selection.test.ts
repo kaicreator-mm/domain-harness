@@ -1,6 +1,10 @@
 /** v0.11.1 T12：复用现有 BUILD/Lock/Package 安装闭包的 Workflow 静态选定反例。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import {
   DH_WORKFLOW_SCHEMA_VERSION,
@@ -138,6 +142,60 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
   assert.ok(a.lock.selectedFunctions.some((selectedFunction) =>
     selectedFunction.ref.element.id === 'orders.eligibility' &&
     selectedFunction.ref.functionId === 'evaluate'));
+});
+
+test('T12 R4: actual packaged first-party verifier refuses altered xstate/yaml sha512 before Boot', (t) => {
+  const { input } = workflowCase(t, { format: 'yaml', withData: true });
+  const app = accepted(buildApp(input));
+  const get = (path: string): Uint8Array => {
+    const file = app.appPackage.files.find((item) => item.path === path);
+    assert.ok(file, `composed App omitted '${path}'`);
+    return file.bytes;
+  };
+  const root = mkdtempSync(join(tmpdir(), 'dh-t12-trust-integrity-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const write = (path: string, bytes: Uint8Array | string): void => {
+    const location = join(root, ...path.split('/'));
+    mkdirSync(join(location, '..'), { recursive: true });
+    writeFileSync(location, bytes);
+  };
+  write('dh-install/trusted-runtime.json', get('dh-install/trusted-runtime.json'));
+  write('dh-install/verify-runtime.mjs', get('dh-install/verify-runtime.mjs'));
+  write('dh-lock/app.lock.json', app.lockBytes);
+  const pins = app.lock.trustedRuntimeIntegrity!;
+  for (const pin of pins) {
+    write(`node_modules/${pin.name}/package.json`,
+      JSON.stringify({ name: pin.name, version: pin.version, type: 'module' }));
+  }
+  const npmLock = {
+    name: 't12-trust-verified', version: '1.0.0', lockfileVersion: 3,
+    packages: Object.fromEntries(pins.map((pin) => [
+      `node_modules/${pin.name}`,
+      { version: pin.version, integrity: pin.integrity, resolved:
+        `https://registry.npmjs.org/${pin.name}/-/${pin.name}-${pin.version}.tgz` },
+    ])),
+  };
+  const runVerifier = () => spawnSync(process.execPath,
+    [join(root, 'dh-install', 'verify-runtime.mjs')],
+    { cwd: root, encoding: 'utf8', timeout: 15000 });
+  write('package-lock.json', JSON.stringify(npmLock));
+  const valid = runVerifier();
+  assert.equal(valid.status, 0, valid.stderr, 'exact npm lock + installed versions are accepted');
+
+  const bad = structuredClone(npmLock);
+  bad.packages['node_modules/xstate']!.integrity = 'sha512-INVALID_ARCHIVE_BYTES';
+  write('package-lock.json', JSON.stringify(bad));
+  const refused = runVerifier();
+  assert.notEqual(refused.status, 0, 'tampered third-party npm tarball SRI MUST fail');
+  assert.match(refused.stderr, /DH_TRUSTED_RUNTIME_INTEGRITY_MISMATCH/);
+
+  write('package-lock.json', JSON.stringify(npmLock));
+  const forgedLock = structuredClone(app.lock);
+  forgedLock.trustedRuntimeIntegrity = [{ ...pins[0]!, integrity: 'sha512-FAKE' }, pins[1]!];
+  write('dh-lock/app.lock.json', JSON.stringify(forgedLock));
+  const refusedSealed = runVerifier();
+  assert.notEqual(refusedSealed.status, 0, 'unmatched Lock archive bytes cannot be silently trusted');
+  assert.match(refusedSealed.stderr, /DH_TRUSTED_RUNTIME_LOCK_MISMATCH/);
 });
 
 test('T12 R1: expanded existing Manifest/Lock machine schemas accept actually selected Workflow closure', (t) => {
