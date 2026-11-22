@@ -78,3 +78,21 @@ test('R60 W02: writes refuse invalid values, wrong format, dangerous keys and by
     'DH_STD_FILE_SIZE', 'read must limit UTF-8 bytes before parsing');
   assert.equal(module.readYaml({ format: 'yaml', source: '__proto__: 1\n' }).kind, 'FAILED');
 });
+
+
+test('R70: File Writer bounds input bytes and node cost before serialization', async () => {
+  const module = await import(modulePath);
+  const big = Object.fromEntries(
+    Array.from({ length: 32769 }, (_, i) => ['key' + i, i]));
+  for (const format of ['json', 'yaml'] as const) {
+    const write = format === 'json' ? module.writeJson : module.writeYaml;
+    const outcome = write({ format, value: big });
+    assert.equal(outcome.kind, 'FAILED');
+    assert.equal(outcome.failure.code, 'DH_STD_FILE_SIZE');
+  }
+  const data = { nested: [1, true, null, { message: 'ok' }] };
+  const encoded = module.writeYaml({ format:'yaml', value:data });
+  assert.equal(encoded.kind, 'SUCCEEDED');
+  assert.deepEqual(module.readYaml({ format:'yaml', source:encoded.value }),
+    { kind:'SUCCEEDED', value:data });
+});

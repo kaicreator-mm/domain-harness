@@ -7,17 +7,37 @@ export async function init() {}
 export function exit() {}
 
 // Validate the JsonValue boundary without reimplementing either format parser.
-function isJsonValue(value, ancestors = new WeakSet(), depth = 0) {
+function isJsonValue(value, ancestors = new WeakSet(), depth = 0,
+  budget = { bytes: 0, nodes: 0, exceeded: false }) {
+  if (++budget.nodes > 32768) { budget.exceeded = true; return false; }
   if (depth > 64) return false;
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
+  // Bound traversal before calling native JSON or library YAML serialization.
+  // Escaping can grow the output, so the actual final UTF-8 limit is also checked.
+  const charge = (bytes) => {
+    budget.bytes += bytes + 16;
+    if (budget.bytes > LIMIT_BYTES) { budget.exceeded = true; return false; }
+    return true;
+  };
+  if (value === null || typeof value === 'boolean') return charge(5);
+  if (typeof value === 'string') return charge(Buffer.byteLength(value, 'utf8'));
+  if (typeof value === 'number') return Number.isFinite(value) && charge(32);
   if (typeof value !== 'object' || ancestors.has(value)) return false;
   if (!Array.isArray(value) && Object.prototype.toString.call(value) !== '[object Object]') return false;
+  if (Array.isArray(value) && value.length > 32768) {
+    budget.exceeded = true;
+    return false;
+  }
   ancestors.add(value);
   try {
-    if (Array.isArray(value)) return value.every((item) => isJsonValue(item, ancestors, depth + 1));
+    if (Array.isArray(value)) {
+      return value.every((item, index) =>
+        Object.prototype.hasOwnProperty.call(value, index) &&
+        isJsonValue(item, ancestors, depth + 1, budget)) &&
+        Object.keys(value).length === value.length;
+    }
     return Object.entries(value).every(([key, child]) =>
-      !DENIED_KEYS.has(key) && isJsonValue(child, ancestors, depth + 1));
+      !DENIED_KEYS.has(key) && charge(Buffer.byteLength(key, 'utf8')) &&
+      isJsonValue(child, ancestors, depth + 1, budget));
   } finally {
     ancestors.delete(value);
   }
@@ -54,7 +74,11 @@ function write(input, format) {
   if (!input || input.format !== format ||
       !Object.prototype.hasOwnProperty.call(input, 'value')) return unknown();
   try {
-    if (!isJsonValue(input.value)) throw new Error('not a safe JsonValue');
+    const budget = { bytes: 0, nodes: 0, exceeded: false };
+    if (!isJsonValue(input.value, new WeakSet(), 0, budget)) {
+      return invalid(budget.exceeded ? 'DH_STD_FILE_SIZE' : 'DH_STD_FILE_INVALID',
+        'invalid or oversized selected file value');
+    }
     const source = format === 'json'
       ? JSON.stringify(input.value, null, 2) + '\n'
       : stringify(input.value, {
