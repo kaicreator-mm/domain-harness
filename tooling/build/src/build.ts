@@ -145,12 +145,12 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
     profile: NODE22_ESM_PROFILE,
   };
 
-  if (!isRelativeResourcePath(input.kdpArtifact.path)) {
-    throw refusal('DH_BUILD_RESOURCE_MISSING', 'KDP bootstrap artifact path is not a canonical in-package path');
-  }
+  // KDP Host 入口仅能从受选 KDP.Init Function 的 Target 推导，
+  // 不再接受独立 kdpArtifact/bootstrap 作为第二真相源。
 
   // 第 2 段：从稳定 KDP 与 App 实际选用的 SDK/Business Packages 确定封闭依赖图。
   const { selected, dependsOnEdges } = selectPackageClosure(descriptor, pool);
+  const kdpId = descriptor.roots.kernelPrimary.package;
 
   // 第 3 段：按真实文件字节验证 Element 定义及资源；同一 Element 的 ID/版本只能有一个 owner。
   const scope = new ResourceScope(input.packageRoots);
@@ -389,8 +389,18 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
   // 第 4 段：只为真正选中的 Function 查找恰好一个目标实现，并封存实现字节与声明资源的摘要。
   const sealedFunctions: SelectedFunction[] = [];
   for (const resolved of [...selectedFunctions.values()].sort(compareResolvedFunction)) {
-    validateSelectedFunctionSchemas(schemas, scope, selected, resolved);
-    if (resolved.fn.effects !== 'none') {
+    const hostAbi = resolved.fn.invocationAbi === 'kdp-host-init/1';
+    if (hostAbi) {
+      if (resolved.owner.id !== kdpId || resolved.owner.role !== 'primary' ||
+          resolved.owner.layer !== 'kernel' || resolved.owner.order !== 0 ||
+          resolved.fn.id !== 'init' || resolved.fn.contractVersion !== '1') {
+        throw refusal('DH_BUILD_SCHEMA_INVALID', 'kdp-host-init/1 is only permitted on the unique Order 0 Kernel Init');
+      }
+    } else if (resolved.owner.id === kdpId && resolved.fn.id === 'init') {
+      throw refusal('DH_BUILD_SCHEMA_INVALID', 'Order 0 KDP.Init requires the special kdp-host-init/1 ABI');
+    }
+    if (!hostAbi) validateSelectedFunctionSchemas(schemas, scope, selected, resolved);
+    if (!hostAbi && resolved.fn.effects !== 'none') {
       throw refusal(
         'DH_BUILD_EFFECT_PROFILE_UNSUPPORTED',
         `selected function '${resolved.element.def.id}.${resolved.fn.id}' declares effects '${resolved.fn.effects as EffectIntent}'; 0.11.0 implements 'none' only`,
@@ -424,6 +434,14 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
       );
     }
     const { manifest: implementor, binding } = candidates[0]!;
+    if (hostAbi) {
+      if (binding.invocationAbi !== 'kdp-host-init/1' || implementor.id !== kdpId) {
+        throw refusal('DH_BUILD_SCHEMA_INVALID', 'Host ABI Function must use the KDP-owned matching Host Target');
+      }
+    } else if (binding.invocationAbi !== undefined) {
+      throw refusal('DH_BUILD_SCHEMA_INVALID', 'ordinary Function cannot claim the privileged Host ABI');
+    }
+    // 只检查必要的 Target/Owner 授权；生成期负责实际源码正确性。
     // BUILD 对真正的 Function 调用方证明权限；实现属于另一 Package，
     // 不等于逻辑 Owner 或进口调用方自动获得了这个实现 Package 的访问权。
     const directExtension = (callerId: string, providerId: string): boolean =>
@@ -479,10 +497,15 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
       }
       scope.verify(resource);
     }
-    sealedFunctions.push({
+    sealedFunctions.push(hostAbi ? {
       ref: toFunctionRef(resolved),
-      outcomes: [...resolved.fn.outcomes],
-      effects: resolved.fn.effects,
+      invocationAbi: 'kdp-host-init/1',
+      implementation: binding.entry,
+      resources: [...(binding.resources ?? [])],
+    } : {
+      ref: toFunctionRef(resolved),
+      outcomes: [...resolved.fn.outcomes!],
+      effects: resolved.fn.effects!,
       implementation: binding.entry,
       resources: [...(binding.resources ?? [])],
     });
@@ -579,12 +602,17 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
     }
     // 物理入口只来自已选 Target，实现所在模块不必是 Package artifact。
   }
-  const kdpId = descriptor.roots.kernelPrimary.package;
-  if (coreOrders.get(0) !== kdpId || input.kdpArtifact.packageId !== kdpId) {
-    throw refusal(
-      'DH_BUILD_PRIMARY_MISSING',
-      `Order 0 KDP '${kdpId}' must also own bootstrap artifact '${input.kdpArtifact.packageId}'`,
-    );
+  if (coreOrders.get(0) !== kdpId) {
+    throw refusal('DH_BUILD_PRIMARY_MISSING', `Order 0 KDP '${kdpId}' must own the unique selected Host Init`);
+  }
+  const kdpLifecycle = lifecycle.get(kdpId);
+  const kdpInitRef = kdpLifecycle ? toFunctionRef(kdpLifecycle.init) : undefined;
+  const selectedHostInit = sealedFunctions.find((fn) =>
+    kdpInitRef && canonicalJson(toJson(fn.ref)) === canonicalJson(toJson(kdpInitRef)));
+  if (!kdpInitRef || !selectedHostInit ||
+      selectedHostInit.invocationAbi !== 'kdp-host-init/1' ||
+      selectedHostInit.implementation.module.packageId !== kdpId) {
+    throw refusal('DH_BUILD_PRIMARY_MISSING', 'KDP selected Init must uniquely bind Host ABI, FunctionRef and Target');
   }
   const coreOrder = [...coreOrders].sort(([a], [b]) => a - b).map(([, id]) => id);
   // Core 链与 Extension DAG 分开：核心间链接不需要伪装成 Extension 依赖。
@@ -646,7 +674,8 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
     const digest = digestOfBytes(bytes);
     scope.record(manifest.id, artifactPath, digest);
     // 已选 Target 的真实命名导出在 sealedFunctions 构造时逐个检验。
-    sealPackageManifest(scope, manifest, manifest.id === kdpId ? input.kdpArtifact.path : undefined);
+    sealPackageManifest(scope, manifest,
+      manifest.id === kdpId ? selectedHostInit.implementation.module.path : undefined);
     // 只读取已验证的 Package npm 元数据，外部依赖不得绕过 BUILD 已准入的精确范围。
     // 未经 BUILD 校验的第三方库不得扩大运行时依赖范围。
     const npmManifest = JSON.parse(Buffer.from(scope.read(manifest.id, 'package.json')).toString('utf8')) as {
@@ -694,9 +723,7 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
     }
     scope.verify(ref);
   }
-  const kdpBytes = scope.read(input.kdpArtifact.packageId, input.kdpArtifact.path);
-  const kdpDigest = digestOfBytes(kdpBytes);
-  scope.record(input.kdpArtifact.packageId, input.kdpArtifact.path, kdpDigest);
+  // 真正 KDP Init Target 的字节已在 selected Function 实现中封存，无第二 bootstrap 物理资源。
 
   // 第 6 段：同时封存描述符语义、KDP 入口字节、Package/Function/Hook 与资源闭包。
   const descriptorDigest = contentDigestOf(toJson(descriptor));
@@ -707,9 +734,10 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
       appIdentity: { id: descriptor.id, version: descriptor.version, descriptorDigest },
       target,
       bootstrapKdpPin: {
-        kdpPackageId: input.kdpArtifact.packageId,
-        kdpPrimaryEntry: 'bootstrap' as const,
-        kdpPrimaryDigest: kdpDigest,
+        kdpPackageId: kdpId,
+        kdpInitFunction: kdpInitRef,
+        invocationAbi: 'kdp-host-init/1' as const,
+        kdpInitModule: selectedHostInit.implementation.module,
       },
       selectedPackages: sealedPackages,
       selectedElements: sealedElements,
@@ -753,6 +781,7 @@ function validateSelectedFunctionSchemas(
   resolved: ResolvedFunction,
 ): void {
   const functionPath = `${resolved.element.def.id}.${resolved.fn.id}`;
+  if (resolved.fn.invocationAbi === 'kdp-host-init/1') return;
   for (const channel of ['inputSchemaRef', 'outputSchemaRef'] as const) {
     const ref = resolved.fn[channel];
     const refPath = `${functionPath}.${channel}`;

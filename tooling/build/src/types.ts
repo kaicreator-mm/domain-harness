@@ -35,18 +35,12 @@ export interface BuildSuccess {
 
 export type BuildResult = BuildSuccess | BuildFailure;
 
-export interface KdpArtifactInput {
-  readonly packageId: string;
-  readonly path: string;
-}
-
 export interface BuildInput {
   readonly descriptor: unknown;
   readonly domains?: readonly unknown[];
   readonly packages: readonly unknown[];
   readonly packageRoots: Readonly<Record<string, string>>;
   readonly packageArtifacts: Readonly<Record<string, string>>;
-  readonly kdpArtifact: KdpArtifactInput;
   /** 生成方已经验证的额外静态依赖资源；App 组合只核对其受选归属与真实字节摘要。 */
   readonly generatedResources?: readonly ResourceRef[];
 }

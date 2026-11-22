@@ -232,8 +232,9 @@ export function composeAppPackage(
     lockPath: 'dh-lock/app.lock.json',
     lockDigest: lock.closureDigest,
     kdpPackageId: lock.bootstrapKdpPin.kdpPackageId,
-    kdpPrimaryEntry: 'bootstrap',
-    kdpPrimaryDigest: lock.bootstrapKdpPin.kdpPrimaryDigest,
+    kdpInitFunction: lock.bootstrapKdpPin.kdpInitFunction,
+    invocationAbi: lock.bootstrapKdpPin.invocationAbi,
+    kdpInitModule: lock.bootstrapKdpPin.kdpInitModule,
   };
   const record = { ...recordBase, recordDigest: contentDigestOf(recordBase as unknown as JsonValue) };
   add('dh-install/installed-record.json', encoded(record as unknown as JsonValue));
@@ -241,8 +242,9 @@ export function composeAppPackage(
     schemaVersion: DH_PIN_SCHEMA_VERSION,
     target: lock.target,
     kdpPackageId: lock.bootstrapKdpPin.kdpPackageId,
-    kdpPrimaryEntry: 'bootstrap',
-    kdpPrimaryDigest: lock.bootstrapKdpPin.kdpPrimaryDigest,
+    kdpInitFunction: lock.bootstrapKdpPin.kdpInitFunction,
+    invocationAbi: lock.bootstrapKdpPin.invocationAbi,
+    kdpInitModule: lock.bootstrapKdpPin.kdpInitModule,
     lockDigest: lock.closureDigest,
     lockPath: 'dh-lock/app.lock.json',
   };
