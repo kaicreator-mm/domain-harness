@@ -114,7 +114,6 @@ function workflowCase(
     input: {
       ...input,
       packages,
-      runtimeDependencies: { ...input.runtimeDependencies, xstate: '5.33.2', yaml: '2.9.1' },
     },
     ref, resource, workflow, foreignRef: selectedForeignRef,
   };
@@ -208,7 +207,7 @@ function crossOwnerWorkflowCase(t: import('node:test').TestContext,
     };
     return pkg;
   });
-  return { ...input, packages, runtimeDependencies: { ...input.runtimeDependencies, xstate: '5.33.2', yaml: '2.9.1' } };
+  return { ...input, packages };
 }
 
 function accepted(result: BuildResult): Extract<BuildResult, { ok: true }> {
@@ -617,11 +616,20 @@ for (const [label, raw] of [
   });
 }
 
-test('T12 R1: selected Workflow refuses a composed package without exact trusted runtime dependencies', (t) => {
+test('R55: selected Workflow is delivered through the sole SDK, not caller-supplied npm dependencies', (t) => {
   const { input } = workflowCase(t, { format: 'yaml', withData: true });
-  const { xstate: ignored, ...runtimeDependencies } = input.runtimeDependencies;
-  void ignored;
-  rejected(buildApp({ ...input, runtimeDependencies }), 'DH_BUILD_TARGET_INVALID');
+  const built = accepted(buildApp(input));
+  const manifest = built.appPackage.files.find((entry) => entry.path === 'package.json');
+  assert.ok(manifest);
+  const app = JSON.parse(Buffer.from(manifest.bytes).toString('utf8')) as {
+    dependencies: Record<string, string>;
+  };
+  assert.equal(app.dependencies['@kaicreator/domain-harness'], '0.11.0');
+  assert.equal(app.dependencies['@kaicreator/domain-harness-microkernel'], undefined);
+  assert.equal(app.dependencies['@kaicreator/domain-harness-contracts'], undefined);
+  assert.equal(app.dependencies.xstate, undefined);
+  assert.equal(app.dependencies.yaml, undefined);
+  assert.ok(built.appPackage.files.some((entry) => entry.path === 'dh-install/trusted-runtime.json'));
 });
 
 test('T12 R1: a Package without Workflow is still valid and has no synthetic Task', (t) => {  const scenario = standardCase();

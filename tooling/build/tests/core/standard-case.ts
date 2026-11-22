@@ -493,7 +493,6 @@ export function standardCase(): StandardCase {
         'orders-ext': 'dist/ext.mjs',
       },
       kdpArtifact: { packageId: 'kdp-kernel', path: 'dist/index.js' },
-      runtimeDependencies: { '@kaicreator/domain-harness-microkernel': '0.11.0' },
     };
     return { input, refs: { evaluateRef, initRef } };
   }

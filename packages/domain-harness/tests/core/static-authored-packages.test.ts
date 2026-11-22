@@ -39,7 +39,6 @@ function authoredInput(name: 'basic' | 'extended', source = SOURCE): BuildInput 
       [id, join(source, 'packages', id)])),
     packageArtifacts: Object.fromEntries(IDS.map((id) => [id, 'dist/index.mjs'])),
     kdpArtifact: { packageId: KDP, path: 'dist/bootstrap.js' },
-    runtimeDependencies: { [MICROKERNEL]: '0.11.0' },
   };
 }
 

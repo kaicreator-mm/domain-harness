@@ -317,6 +317,7 @@ assert.equal(typeof BuildRefusal, 'function');
     env: {
       ...process.env,
       DH_T05_EVIDENCE: consumerEvidence,
+      DH_T05_SDK_TARBALL: tarballPathsByName.get('@kaicreator/domain-harness'),
       DH_T05_MICROKERNEL_TARBALL: tarballPathsByName.get('@kaicreator/domain-harness-microkernel'),
       DH_T05_CONTRACTS_TARBALL: tarballPathsByName.get('@kaicreator/domain-harness-contracts'),
     },

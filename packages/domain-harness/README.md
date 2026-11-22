@@ -28,3 +28,10 @@ import { buildApp } from '@kaicreator/domain-harness/composition';
 ## 阅读入口
 
 [源码逻辑与完整调用流程](../../docs/architecture/DOMAIN_HARNESS_V0110_CODE_AND_CALL_FLOW.md) · [Package/SDK 分层](../../docs/specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)
+
+## R55：Domain App 运行入口和受信任代码边界
+
+- 由 SDK 内置 Package 组合 API 输出的 Domain App 只声明 `@kaicreator/domain-harness` 这一项 SDK **直接运行时依赖**；`boot.mjs` 从公开 `@kaicreator/domain-harness/runtime` 调用 Boot。Microkernel、Contracts 和特定 Workflow 实现由 SDK 的受审 npm 传递闭包承接。
+- `BuildInput` 不再要求 Consumer 输入内部 npm `runtimeDependencies`；用户提供的 Package 文件、Descriptor、KDP Artifact 和 Target 均须经现有静态验收及 Lock/Pin 封存。
+- 当前只承诺 **受信任、受控的 Node ESM Package**。BUILD 对常见全局网络及进程访问执行有限 AST 拒绝，但它既不是完整的 JavaScript 沙箱，也不能证明任意原生代码没有外部副作用。`effects: 'none'` 不等于已运行在强隔离环境中；不可信代码的执行隔离必须由另行设计且明确授权的 Runtime/Host 边界承担。
+- 公开 `composition-types.ts` 与唯一内部组合算法的原始类型文件在每次 SDK 构建前必须**字节完全一致**，不同步即构建失败；不得制造两套自由演进的合同。
