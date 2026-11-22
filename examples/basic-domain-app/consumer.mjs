@@ -293,24 +293,28 @@ async function authoring(label, rule, options = {}) {
   if (standardRoot) {
     await cp(resolve(dirname(fileURLToPath(import.meta.url)), '../selected-packages/packages/r60-standard-readers'),
       standardRoot, { recursive: true });
-    if (options.workflowFatalAt === 'leaf') {
-      // 仅在故障注入临时副本中修改 ESM，并同步 Target 的真实摘要。
-      const modulePath = join(standardRoot, 'dist/index.mjs');
-      const original = await readFile(modulePath, 'utf8');
-      const marker = "    const events = (globalThis.__domainHarnessT05Events ??= []);";
-      assert.ok(original.includes(marker), 'Standard Reader failure-injection seam absent');
-      const modified = original.replace(marker,
-        "    if (parsed?.id === 'json-a') throw new Error('T14 deliberate selected Function fatal');" +
-        String.fromCharCode(10) + marker);
-      await writeFile(modulePath, modified);
-      const manifestPath = join(standardRoot, 'manifest.json');
-      const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-      const digest = await fileDigest(modulePath);
-      for (const variant of manifest.targetVariants) {
-        for (const binding of variant.implementations) binding.entry.module.digest = digest;
-      }
-      await writeFile(manifestPath, canonicalJson(manifest));
+    // 生产 Standard Reader 源不携带 Demo 全局日志或故障注入；
+    // 唯有隔离 E2E 的临时测试副本加入观测，并同步真实 Target 摘要。
+    const modulePath = join(standardRoot, 'dist/index.mjs');
+    const original = await readFile(modulePath, 'utf8');
+    const marker = "    return { kind: 'SUCCEEDED', value: parsed };";
+    assert.ok(original.includes(marker), 'Standard Reader success seam absent');
+    const instrumentation = [
+      ...(options.workflowFatalAt === 'leaf'
+        ? ["    if (parsed?.id === 'json-a') throw new Error('T14 deliberate selected Function fatal');"]
+        : []),
+      "    const events = (globalThis.__domainHarnessT05Events ??= []);",
+      "    events.push({ event: 'workflow-read', format: expected, parsed });",
+    ].join(String.fromCharCode(10));
+    await writeFile(modulePath, original.replace(marker, instrumentation +
+      String.fromCharCode(10) + marker));
+    const manifestPath = join(standardRoot, 'manifest.json');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    const digest = await fileDigest(modulePath);
+    for (const variant of manifest.targetVariants) {
+      for (const binding of variant.implementations) binding.entry.module.digest = digest;
     }
+    await writeFile(manifestPath, canonicalJson(manifest));
   }
   const standardDefinition = standardRoot
     ? JSON.parse(await readFile(join(standardRoot, 'definitions/reader.json'), 'utf8')) : null;

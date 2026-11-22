@@ -37,8 +37,6 @@ function read(input, expected) {
       parsed = document.toJS({ maxAliasCount: 32 });
     }
     if (!plain(parsed)) throw new Error('not JSON-compatible');
-    const events = (globalThis.__domainHarnessT05Events ??= []);
-    events.push({ event: 'workflow-read', format: expected, parsed });
     return { kind: 'SUCCEEDED', value: parsed };
   } catch {
     return { kind: 'FAILED', failure: { code: 'DH_STD_READER_INVALID', message: 'invalid selected format data' } };
