@@ -49,6 +49,8 @@ Domain App（宿主 / 业务入口，嵌入 DomainHarness SDK）
 
 > **Owner R49 最终约束，覆盖 R47/R48 中所有“暂时不做单 App 多语言、未来可能支持单 App 多运行时”的表述。** 这是**长期架构不变量**，不是 0.11.x 暂时简化：DomainHarness 不计划在一个 Domain Package 内或一个 Domain App 内支持混合编程语言/运行时；多语言仅由 **DIS 与 Domain Package 规范层**允许分别描述、校验和交付不同语言的**独立 Package/Domain App**，不能解释为同一 App 混合装载它们。
 
+**标准归属**：DIS/Package 跨语言规范候选的详细条款由 [DIE DIS R49 PR #156](https://github.com/kaicreator-mm/domain-intelligence-engineering/pull/156) 承接（[DIS-LANG-01..06](https://github.com/kaicreator-mm/domain-intelligence-engineering/blob/docs/dis-r49-package-app-one-language-runtime/dis/research/candidates/DIS-0.2.0/PACKAGE_LANGUAGE_RUNTIME_BOUNDARY_R49.zh-CN.md)）；此处只规定 DomainHarness v0.11.x 如何遵循 Owner 的单语言/单运行时架构，不成为第二套标准权威。上述 DIE PR 仍是 DIS v0.2.0 **候选**，不修改冻结的 DIS 0.1.0 或声称完成多语言运行时实现。
+
 **统一边界（Owner 已决议，规范层原则）：**
 
 1. **每个 Domain Package 固定一种编程语言和一种运行时。** 构建/封存时绑定，整个 Package 的执行实现（Init、Exit、Functions 等）必须一致；禁止一个 Manifest 用 `targetVariants` 把 Node、Python、Rust 等不同语言/运行时组合为“同一个 Package 的不同实现”。`targetVariants` 只可在**相同语言和运行时**内描述适配 Target（如平台版本），不改变 Package 的语言/运行时身份。
