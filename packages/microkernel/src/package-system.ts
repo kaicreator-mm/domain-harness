@@ -50,6 +50,7 @@ export class PackageSystem {
   private exited = false;
   /** Host-only KDP Init 只能把当前激活转交给下一 Core 一次，不影响 Package 自主重复 Init。 */
   private kernelHostEntered = false;
+  private kernelHostContinuationStarted = false;
 
   constructor(
     private readonly installRoot: string,
@@ -163,15 +164,38 @@ export class PackageSystem {
   }
 
   /**
-   * 当真正受选的 KDP Host Init 已经进入时，仅继续它的直接 Extension 和下一 Core。
-   * KDP 的 Init Element 不再经普通 Package 执行器二次加载；只登记一次真实进入，
-   * 并让 KDP.Exit 成为最末尾的退出动作。非 KDP 的重复 Init 仍由 Package 自行决定。
+   * KDP Host Init 一旦已被 Boot 真正调用，就立即登记真实进入历史。
+   * 必须在进一步检查其它 Function/Hook/资源之前登记，保证后续任一失败都能尝试 KDP.Exit。
+   * 这不是普通 Package.Init 去重器，不能用于吞掉 Extension 的多次调用。
    */
-  async runRemainingCoresAfterKernelEntered(context: AppInitContext): Promise<unknown> {
+  recordSelectedKernelHostEntry(): void {
     if (this.kernelHostEntered) {
       throw new KdpLoadError('KDP Host Init has already entered this activation', 'DH_RUNTIME_NOT_READY');
     }
+    const rootId = this.lock.coreOrder[0];
+    if (!rootId || this.lock.bootstrapKdpPin.kdpPackageId !== rootId) {
+      throw new KdpLoadError('Host KDP identity does not match the selected Core.Order 0', 'DH_BOOT_PIN_MISMATCH');
+    }
     this.kernelHostEntered = true;
+    this.initEvents.push(rootId);
+    if (this.packageById(rootId)?.recordInitFrom === true) {
+      const history = this.callerHistory.get(rootId) ?? [];
+      history.push({ type: 'Boot' });
+      this.callerHistory.set(rootId, history);
+    }
+  }
+
+  /**
+   * 已进入的 Host Kernel 后半段：只执行其直系 Extension，然后进入下一个 Core。
+   * 若调用者尚未先登记，则此方法先登记（供已有可信应用内调度复用）；
+   * 真正 Host 激活入口必须提前在最初可清理边界登记。
+   */
+  async runRemainingCoresAfterKernelEntered(context: AppInitContext): Promise<unknown> {
+    if (this.kernelHostContinuationStarted) {
+      throw new KdpLoadError('KDP Host continuation has already entered this activation', 'DH_RUNTIME_NOT_READY');
+    }
+    if (!this.kernelHostEntered) this.recordSelectedKernelHostEntry();
+    this.kernelHostContinuationStarted = true;
     return this.runInitFrom(context, true);
   }
 
@@ -338,12 +362,9 @@ export class PackageSystem {
       if (!selectedInit || canonicalJson(selectedInit.ref.element) !== canonicalJson(kernel.init)) {
         throw new KdpLoadError('Host KDP Init Element/Function identity mismatch', 'DH_BOOT_PIN_MISMATCH');
       }
-      // 已由 Boot 实际调用的 Host Init 在这里登记，不能再次导入、执行普通 KDP.Init。
-      this.initEvents.push(rootId);
-      if (kernel.recordInitFrom === true) {
-        const history = this.callerHistory.get(rootId) ?? [];
-        history.push({ type: 'Boot' });
-        this.callerHistory.set(rootId, history);
+      // Kernel 进入事件已经由 Host 激活前沿登记，不能在此重复写入。
+      if (!this.kernelHostEntered) {
+        throw new KdpLoadError('Selected Kernel Host Init is missing its entered record', 'DH_RUNTIME_NOT_READY');
       }
       const directExtensions = kernel.dependsOn
         .map((id) => this.packageById(id))
