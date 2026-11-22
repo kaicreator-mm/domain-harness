@@ -25,7 +25,7 @@ test('R60 W02: YAML aliases, duplicate keys, invalid JSON and wrong format fail 
   ]) {
     const outcome = module.readYaml({format:'yaml',source});
     assert.equal(outcome.kind, 'FAILED', 'unsafe YAML must not reach business logic');
-    assert.equal(outcome.failure.code, 'DH_STD_READER_INVALID');
+    assert.equal(outcome.failure.code, 'DH_STD_FILE_INVALID');
   }
   const jsonBad = module.readJson({format:'json',source:'{"x":'});
   assert.equal(jsonBad.kind, 'FAILED');
@@ -33,7 +33,7 @@ test('R60 W02: YAML aliases, duplicate keys, invalid JSON and wrong format fail 
   assert.equal(wrong.kind, 'UNKNOWN');
   const tooLarge = module.readJson({format:'json',source:'x'.repeat(1048577)});
   assert.equal(tooLarge.kind, 'FAILED');
-  assert.equal(tooLarge.failure.code, 'DH_STD_READER_SIZE');
+  assert.equal(tooLarge.failure.code, 'DH_STD_FILE_SIZE');
 });
 
 test('R60 W02: separate Standard File Element outputs support scalar, array and null JsonValues', async () => {

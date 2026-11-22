@@ -12,8 +12,7 @@ function isJsonValue(value, ancestors = new WeakSet(), depth = 0) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);
   if (typeof value !== 'object' || ancestors.has(value)) return false;
-  if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype &&
-      Object.getPrototypeOf(value) !== null) return false;
+  if (!Array.isArray(value) && Object.prototype.toString.call(value) !== '[object Object]') return false;
   ancestors.add(value);
   try {
     if (Array.isArray(value)) return value.every((item) => isJsonValue(item, ancestors, depth + 1));
