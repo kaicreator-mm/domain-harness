@@ -347,7 +347,30 @@ export async function buildFixtureInstall(
       exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
     }),
   );
-  await cp(MICROKERNEL_DIST, join(kdpPackageDir, 'dist'), { recursive: true });
+  // KDP Package 是真正的 Host 选定目标，而非把 Microkernel 拷到 KDP 包下假装拥有 Init。
+  const microkernelPackageDir = join(installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel');
+  await mkdir(microkernelPackageDir, { recursive: true });
+  await writeFile(join(microkernelPackageDir, 'package.json'), JSON.stringify({
+    name: '@kaicreator/domain-harness-microkernel',
+    version: '0.11.0', type: 'module',
+    exports: { '.': { import: './dist/index.js' } },
+  }));
+  await cp(MICROKERNEL_DIST, join(microkernelPackageDir, 'dist'), { recursive: true });
+  // 夹具中的普通 Kernel Init 兼容分支仅服务旧生命周期单元测试，
+  // 真正 Boot 通过同一受选 Host target 调用受限 KDP Init（没有下一 Core 句柄）。
+  await write(`node_modules/${KDP_PACKAGE_ID}/dist/index.js`, [
+    "import { activateSelectedKdpHostInit } from '@kaicreator/domain-harness-microkernel';",
+    'const events = (globalThis.__domainHarnessEvents ??= []);',
+    'export async function init(context) {',
+    '  if (context?.nextCore && typeof context.nextCore.init === "function") {',
+    '    events.push({ event: "package-init", package: "fixture-kernel", hostPortCount: (context.hostPorts ?? []).length });',
+    '    return context.nextCore.init();',
+    '  }',
+    '  events.push({ event: "host-init", package: "fixture-kernel" });',
+    '  return activateSelectedKdpHostInit(context);',
+    '}',
+    '',
+  ].join('\n'));
 
   const contractsPackageDir = join(installRoot, 'node_modules', '@kaicreator/domain-harness-contracts');
   await mkdir(contractsPackageDir, { recursive: true });
@@ -445,13 +468,16 @@ export async function buildFixtureInstall(
     const definition: ElementDefinition = {
       kind: 'Element', schemaVersion: 'dh.element/0.11', id: `fixture.${name}-lifecycle`,
       version: '1.0.0', description: 'Package-owned selected lifecycle and Hook Function',
-      content: [], functions: ['init', 'exit', ...(id === FIXTURE_EXT ? ['telemetryHook'] : [])].map((fn) => ({
-        id: fn, contractVersion: '1',
-        inputSchemaRef: { inline: { type: 'object' } },
-        outputSchemaRef: { inline: { type: 'object' } },
-        outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const,
-        effects: 'none' as const,
-      })),
+      content: [], functions: ['init', 'exit', ...(id === FIXTURE_EXT ? ['telemetryHook'] : [])].map((fn) =>
+        id === FIXTURE_KERNEL && fn === 'init'
+          ? { id: 'init' as const, contractVersion: '1' as const, invocationAbi: 'kdp-host-init/1' as const }
+          : {
+              id: fn, contractVersion: '1',
+              inputSchemaRef: { inline: { type: 'object' } },
+              outputSchemaRef: { inline: { type: 'object' } },
+              outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const,
+              effects: 'none' as const,
+            }),
     };
     lifecycleDefs[id] = definition;
     lifecycleRefs[id] = {
@@ -462,14 +488,18 @@ export async function buildFixtureInstall(
   const lifeFunction = (id: string, fn: string): FunctionRef => ({
     element: lifecycleRefs[id]!, functionId: fn, contractVersion: '1',
   });
+  const kdpEntry = { packageId: KDP_PACKAGE_ID, path: 'dist/index.js', digest: kdpEntryDigest };
   const lifeSelected = (id: string, artifact: { packageId: string; path: string; digest: ContentDigest },
     initResources: readonly { packageId: string; path: string; digest: ContentDigest }[] = []) =>
     lifecycleDefs[id]!.functions.map((fn) => ({
-      ref: lifeFunction(id, fn.id), outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const,
-      effects: 'none' as const,
-      implementation: { module: id === FIXTURE_EXT && fn.id === 'telemetryHook'
-        ? { packageId: FIXTURE_EXT, path: 'dist/hook.mjs', digest: hookDigest }
-        : artifact, exportName: fn.id },
+      ref: lifeFunction(id, fn.id),
+      ...(id === FIXTURE_KERNEL && fn.id === 'init'
+        ? { invocationAbi: 'kdp-host-init/1' as const }
+        : { outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const }),
+      implementation: { module: id === FIXTURE_KERNEL && fn.id === 'init' ? kdpEntry
+        : id === FIXTURE_EXT && fn.id === 'telemetryHook'
+          ? { packageId: FIXTURE_EXT, path: 'dist/hook.mjs', digest: hookDigest }
+          : artifact, exportName: fn.id },
       resources: fn.id === 'init' ? [...initResources] : [],
     }));
   const businessRuleResource = {
@@ -480,6 +510,7 @@ export async function buildFixtureInstall(
   const resourceDigests: Record<string, ContentDigest> = {
     [`${KDP_PACKAGE_ID}/package.json`]: await fileBytesDigest(join(kdpPackageDir, 'package.json')),
     [`${FIXTURE_KERNEL}/dist/index.mjs`]: kernelArtifact.digest,
+    [`${KDP_PACKAGE_ID}/dist/index.js`]: kdpEntryDigest,
     [`${FIXTURE_SDK}/dist/index.mjs`]: sdkArtifact.digest,
     [`${FIXTURE_BUSINESS}/dist/index.mjs`]: businessArtifact.digest,
     [`${FIXTURE_BUSINESS}/elements/orders.eligibility.json`]: bytesDigest(Buffer.from(definitionText, 'utf8')),
@@ -505,8 +536,9 @@ export async function buildFixtureInstall(
     target: TARGET,
     bootstrapKdpPin: {
       kdpPackageId: KDP_PACKAGE_ID,
-      kdpPrimaryEntry: 'bootstrap',
-      kdpPrimaryDigest: kdpEntryDigest,
+      kdpInitFunction: lifeFunction(FIXTURE_KERNEL, 'init'),
+      invocationAbi: 'kdp-host-init/1' as const,
+      kdpInitModule: { packageId: KDP_PACKAGE_ID, path: 'dist/index.js', digest: kdpEntryDigest },
     },
     selectedPackages: [
       { packageId: FIXTURE_KERNEL, version: '1.0.0', recordInitFrom: true, order: 0, layer: 'kernel', role: 'primary', artifact: kernelArtifact,
@@ -571,8 +603,9 @@ export async function buildFixtureInstall(
     lockPath: LOCK_RELATIVE_PATH,
     lockDigest: closureDigest,
     kdpPackageId: KDP_PACKAGE_ID,
-    kdpPrimaryEntry: 'bootstrap',
-    kdpPrimaryDigest: lockBase.bootstrapKdpPin.kdpPrimaryDigest,
+    kdpInitFunction: lockBase.bootstrapKdpPin.kdpInitFunction,
+    invocationAbi: 'kdp-host-init/1',
+    kdpInitModule: lockBase.bootstrapKdpPin.kdpInitModule,
   };
   const record: InstalledRecord = {
     ...(recordBase as unknown as InstalledRecord),
@@ -584,8 +617,9 @@ export async function buildFixtureInstall(
     schemaVersion: 'dh.pin/0.11',
     target: TARGET,
     kdpPackageId: KDP_PACKAGE_ID,
-    kdpPrimaryEntry: 'bootstrap',
-    kdpPrimaryDigest: record.kdpPrimaryDigest,
+    kdpInitFunction: lockBase.bootstrapKdpPin.kdpInitFunction,
+    invocationAbi: 'kdp-host-init/1',
+    kdpInitModule: lockBase.bootstrapKdpPin.kdpInitModule,
     lockDigest: closureDigest,
     lockPath: LOCK_RELATIVE_PATH,
   };
