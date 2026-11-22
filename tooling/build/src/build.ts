@@ -84,10 +84,18 @@ function firstIssue(issues: readonly ValidationIssue[]): ValidationIssue {
 }
 
 
+/** 生成期静态验证专用注入点；SDK 发行版不携带其实现。 */
+export type GenerationSourceCheck = (
+  scope: ResourceScope,
+  manifests: readonly DomainPackageManifest[],
+  artifacts: readonly ResourceRef[],
+  functions: readonly SelectedFunction[],
+) => void;
+
 /** App 组合：验证选定关系与资源封存一致性；源码正确性由生成期的独立验证工具负责。 */
-export function composeApp(input: BuildInput): BuildResult {
+export function composeApp(input: BuildInput, generationCheck?: GenerationSourceCheck): BuildResult {
   try {
-    return { ok: true, ...runBuild(input) };
+    return { ok: true, ...runBuild(input, generationCheck) };
   } catch (error) {
     if (error instanceof BuildRefusal) {
       return {
@@ -102,7 +110,7 @@ export function composeApp(input: BuildInput): BuildResult {
 }
 
 /** 依次建立包闭包、Element 所有权和依赖图，校验资源内容后生成确定性 Lock；所有步骤必须先于启动执行。 */
-function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
+function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): Omit<BuildSuccess, 'ok'> {
   // 第 1 段：先验证 App、Domain 和 Manifest 的机器合同，再允许任何包进入候选池。
   const schemas = new SchemaChecker();
 
@@ -670,7 +678,26 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
   }
-  // 生成期源码静态验证不得在 SDK 组合入口重做；此处仅封存已选字节。
+  // 已验证生成者可以注入静态源码检查，检查产生的传递闭包直接封入 Lock。
+  // 发行 SDK 仅接受已提供的正确性结果，不自行引入 JS Parser/第二生成期验证器。
+  const selectedArtifacts = [
+    ...sealedPackages.map((pkg) => pkg.artifact),
+    ...sealedFunctions.map((fn) => fn.implementation.module),
+    ...hookBindings.flatMap((hook) => hook.providers.map((ref) => {
+      const selected = sealedFunctions.find((fn) => canonicalJson(toJson(fn.ref)) === canonicalJson(toJson(ref)));
+      if (!selected) throw refusal('DH_BUILD_IMPLEMENTATION_MISSING', 'Hook provider implementation missing');
+      return selected.implementation.module;
+    })),
+  ];
+  generationCheck?.(scope, packagesSorted, selectedArtifacts, sealedFunctions);
+  // 若生成者已提交静态闭包资源，SDK 仅对选定 Package 内字节及摘要作封存一致性检查。
+  const allowedResourceOwners = new Set(packagesSorted.map((pkg) => pkg.id));
+  for (const ref of input.generatedResources ?? []) {
+    if (!allowedResourceOwners.has(ref.packageId)) {
+      throw refusal('DH_BUILD_RESOURCE_MISSING', 'generated resource owner is not selected in this App');
+    }
+    scope.verify(ref);
+  }
   const kdpBytes = scope.read(input.kdpArtifact.packageId, input.kdpArtifact.path);
   const kdpDigest = digestOfBytes(kdpBytes);
   scope.record(input.kdpArtifact.packageId, input.kdpArtifact.path, kdpDigest);
