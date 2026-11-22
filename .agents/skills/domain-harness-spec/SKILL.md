@@ -20,7 +20,7 @@ description: 为 DomainHarness v0.11.x 的架构、设计、Package/Element、KD
 | 架构重构、Boot、KDP、PackageSystem/Actor 所有权 | [architecture.md](../../../docs/specs/domain-harness/architecture.md) |
 | 编写 Package、Element、Standard Element 或拆分职责 | [element-package.md](../../../docs/specs/domain-harness/element-package.md) |
 | Core.Order、Init/Exit、Workflow、Outcome、Hook、预算 | [lifecycle-workflow.md](../../../docs/specs/domain-harness/lifecycle-workflow.md) |
-| BUILD、受信安装、Pin/Lock、ResourceRef/Effect、npm 依赖 | [composition-trust.md](../../../docs/specs/domain-harness/composition-trust.md) |
+| Package/Element 生成期质量、App 组合与封存、受信安装、Pin/Lock、ResourceRef/Effect、npm 依赖 | [composition-trust.md](../../../docs/specs/domain-harness/composition-trust.md) |
 | ID/Namespace/Schema/Digest/版本或改名 | [identity-naming.md](../../../docs/specs/domain-harness/identity-naming.md) |
 | TypeScript 质量、日志、配置、测试、CI/独审 | [engineering-quality.md](../../../docs/specs/domain-harness/engineering-quality.md) |
 | 当前是否合格、迁移状态、历史证据、规范改动 | [status-and-decisions.md](../../../docs/specs/domain-harness/status-and-decisions.md) |
