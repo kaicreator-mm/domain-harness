@@ -4,6 +4,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
   DH_INSTALL_RECORD_SCHEMA_VERSION,
+  DH_LOCK_SCHEMA_VERSION,
   contentDigestOf,
   canonicalJson,
   isContentDigest,
@@ -204,11 +205,26 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
   if (closureDigest !== record.lockDigest) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock closureDigest does not equal the installed record lockDigest') };
   }
+  if (parsed['kind'] !== 'DomainAppLock' || parsed['schemaVersion'] !== DH_LOCK_SCHEMA_VERSION) {
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH',
+      `Lock machine contract must use '${DH_LOCK_SCHEMA_VERSION}', no legacy Lock format is accepted`) };
+  }
   const lock = parsed as unknown as DomainAppLock;
-  if (!Array.isArray(lock.selectedPackages) || !lock.selectedPackages.every((candidate) =>
-    isRecord(candidate) && isRecord(candidate['init']) &&
-    isRecord(candidate['artifact']) && typeof candidate['packageId'] === 'string')) {
-    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock selectedPackages lacks required lifecycle declarations or artifact entries') };
+  if (!Array.isArray(lock.coreOrder) || !Array.isArray(lock.selectedPackages) ||
+      !lock.selectedPackages.every((candidate) =>
+        isRecord(candidate) && isRecord(candidate['init']) &&
+        isRecord(candidate['initFunction']) && isRecord(candidate['artifact']) &&
+        typeof candidate['packageId'] === 'string')) {
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH',
+      'Lock coreOrder or selectedPackages lacks required selected lifecycle identities') };
+  }
+  if (!Array.isArray(lock.selectedFunctions) || !lock.selectedFunctions.every((candidate) =>
+      isRecord(candidate) && isRecord(candidate['ref']) &&
+      isRecord(candidate['implementation']) && isRecord(candidate['implementation']['module'])) ||
+      !Array.isArray(lock.selectedElements) || !lock.selectedElements.every((candidate) =>
+        isRecord(candidate) && isRecord(candidate['ref']))) {
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH',
+      'Lock selectedFunctions/selectedElements has malformed machine identities') };
   }
   if (!isRecord(lock.target) || typeof lock.target['profile'] !== 'string') {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock target is malformed (expected an object with a profile string)') };
@@ -217,6 +233,7 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
     !isRecord(lock.bootstrapKdpPin) ||
     typeof lock.bootstrapKdpPin['kdpPackageId'] !== 'string' ||
     !isRecord(lock.bootstrapKdpPin['kdpInitFunction']) ||
+    !isRecord(lock.bootstrapKdpPin['kdpInitFunction']['element']) ||
     lock.bootstrapKdpPin['invocationAbi'] !== 'kdp-host-init/1' ||
     !isRecord(lock.bootstrapKdpPin['kdpInitModule'])
   ) {
@@ -239,7 +256,7 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock bootstrapKdpPin disagrees with the installed record') };
   }
   const orderZero = findOrderZeroCore(lock);
-  if (!Array.isArray(lock.coreOrder) || lock.coreOrder[0] !== lock.bootstrapKdpPin.kdpPackageId || !orderZero) {
+  if (lock.coreOrder[0] !== lock.bootstrapKdpPin.kdpPackageId || !orderZero) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Order 0 Core and selected KDP Package identities differ') };
   }
   // 可信安装的闭包必须指向同一张机器选定关系图；不能让 Pin 另造 Host Function。
@@ -250,6 +267,7 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
   const selectedElement = lock.selectedElements?.find((candidate) =>
     canonicalJson(candidate.ref) === canonicalJson(initRef.element));
   if (!Array.isArray(matching) || matching.length !== 1 ||
+      lock.selectedFunctions.filter((fn) => fn.invocationAbi === 'kdp-host-init/1').length !== 1 ||
       initRef.functionId !== 'init' || initRef.contractVersion !== '1' ||
       canonicalJson(orderZero.init) !== canonicalJson(initRef.element) ||
       canonicalJson(orderZero.initFunction) !== canonicalJson(initRef) ||
