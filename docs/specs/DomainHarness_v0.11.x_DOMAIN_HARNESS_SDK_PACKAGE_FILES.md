@@ -1,5 +1,7 @@
 # DomainHarness v0.11.x — Domain、Harness、SDK、Package 实例驱动规范（R37）
 
+> **规范入口说明（R88）**：当前 DomainHarness 基础规则的唯一维护入口是 [统一规范](./DOMAIN_HARNESS_CANONICAL_SPEC.md)；本文件保留为历史决议/详细解释/实例或实现证据。如果二者存在冲突，以统一规范中标注的最新 Owner 决议和状态为准，不把本文件旧候选当现行强制 ABI。
+
 > **Owner R36 修正 R34/R35 的工具化假设**：Domain Package 只是符合 DIS 适用 Package 规范与当前 Element-First 合同的一组文件，完全可以由 ChatGPT 在仓库中直接编写。**Seed Builder 不再是需要开发的工具，Package Assembly 也不是创建 Package 的必要环节**。细节见 [R36 产品与 Package 权威规范](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
 
 ```ini

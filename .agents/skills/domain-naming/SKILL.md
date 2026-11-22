@@ -5,7 +5,7 @@ description: DomainHarness 新增或修改持久的 Package、Element、Function
 
 # DomainHarness 统一命名 Skill（R87）
 
-必读 [命名规范](../../../docs/specs/DomainHarness_v0.11.x_NAMING_STANDARD.md) 和 [Element/Package 组织规范](../../../docs/specs/DomainHarness_v0.11.x_ELEMENT_PACKAGE_ORGANIZATION_STANDARD.md)。本 Skill 使用 npm package name 约定与 Google TypeScript/官方 typescript-eslint 规则，不创建第二套业务命名标准。
+**唯一权威入口：[DomainHarness Canonical Spec](../../../docs/specs/DOMAIN_HARNESS_CANONICAL_SPEC.md) §7**。原 [命名规范 R87](../../../docs/specs/DomainHarness_v0.11.x_NAMING_STANDARD.md) 用于来源、例子和迁移分析。 和 [Element/Package 组织规范](../../../docs/specs/DomainHarness_v0.11.x_ELEMENT_PACKAGE_ORGANIZATION_STANDARD.md)。本 Skill 使用 npm package name 约定与 Google TypeScript/官方 typescript-eslint 规则，不创建第二套业务命名标准。
 
 ## 稳定结构
 

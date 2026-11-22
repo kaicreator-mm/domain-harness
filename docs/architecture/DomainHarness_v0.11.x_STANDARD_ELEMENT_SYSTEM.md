@@ -1,5 +1,7 @@
 # DomainHarness 0.11.x — Standard Element 体系与递增复用规范（R29）
 
+> **规范入口说明（R88）**：当前 DomainHarness 基础规则的唯一维护入口是 [统一规范](../specs/DOMAIN_HARNESS_CANONICAL_SPEC.md)；本文件保留为历史决议/详细解释/实例或实现证据。如果二者存在冲突，以统一规范中标注的最新 Owner 决议和状态为准，不把本文件旧候选当现行强制 ABI。
+
 > **【CURRENT · R74 已受审并合入 v0.11.x】** 0.11.1 [#1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 的普通 Standard File `dh.std.file.json` / `dh.std.file.yaml` 已经通过 [R72 独立 ACCEPT_SCOPED P0=0/P1=0/P2=1](https://github.com/kaicreator-mm/domain-harness/pull/1663#pullrequestreview-6012506153) 和同 SHA [CI #2979 SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2979/1)，[PR #1663](https://github.com/kaicreator-mm/domain-harness/pull/1663) squash 合入 `version/v0.11.x@9f53c6e17d7a854fb57b2e1232702af15e6defe8`。**仅在当前 Node22 ESM Target、已选 Package/FunctionRef/Lock/权限闭包内，两者为 `STANDARD_ACCEPTED`；** 不是正式 npm 发布或任意语言/目标的通用承诺。KDP 只承担资源授权、原始字节、UTF-8 和 Lock，格式语义由普通 File Element 提供。旧 R69/R70 的待审叙述属于 HISTORICAL，不可当最新状态。
 
 > **【R36 当前 Standard Element Package 生成方式】**：Standard Element 也是普通多文件 Domain Package 的内容；可以由 ChatGPT/开发者直接编写 ElementDefinition、Manifest、Function ESM、资源并按 DIS 适用 + v0.11.x 实际合同验证。**不需要 Seed Builder、生成器或额外 Package Assembly 生产阶段**；组合 App 只选择/校验使用的文件、依赖、Target 和 Boot。参见 [R36](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。

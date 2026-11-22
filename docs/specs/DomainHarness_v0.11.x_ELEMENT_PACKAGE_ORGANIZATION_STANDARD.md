@@ -1,5 +1,7 @@
 # DomainHarness — Element 封装、Package 内部组织与职责边界规范
 
+> **规范入口说明（R88）**：当前 DomainHarness 基础规则的唯一维护入口是 [统一规范](./DOMAIN_HARNESS_CANONICAL_SPEC.md)；本文件保留为历史决议/详细解释/实例或实现证据。如果二者存在冲突，以统一规范中标注的最新 Owner 决议和状态为准，不把本文件旧候选当现行强制 ABI。
+
 > **状态**：R87 · 从已存在的 Product/Issue 讨论归纳的 **Foundation 设计合同候选**，待 #1668 Owner/L2 确认并经真正实现验证；**不是**新 DIS 标准 Full Conformance、不是对当前 Schema/运行时已实现的断言。
 >
 > **责任归属**：0.11.0 Foundation / 跨 v0.11.x 的共同结构；不属于 0.11.2 的 Domain Intelligence 产品功能。既有 v0.11.1 审核、CI 和历史 Reference App 收据保持真实有效，不能被本规范追认新架构 PASS。

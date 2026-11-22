@@ -1,5 +1,7 @@
 # DomainHarness 0.11.x — 统一命名规范（R87：包名与变量名体系）
 
+> **规范入口说明（R88）**：当前 DomainHarness 基础规则的唯一维护入口是 [统一规范](./DOMAIN_HARNESS_CANONICAL_SPEC.md)；本文件保留为历史决议/详细解释/实例或实现证据。如果二者存在冲突，以统一规范中标注的最新 Owner 决议和状态为准，不把本文件旧候选当现行强制 ABI。
+
 > **当前效力**：新的 Foundation **命名设计合同候选，待 #1668 Owner/L2 确认后落实机器 Schema 与代码**；已确认禁止新持久业务名字包含迭代 R41/R60、v011、Issue/CI 等无语义编号。旧 Reference App/stages.json/审核 SHA/Digest 不变。  
 > **一项关键修正**：上一版 R86 将 `ElementDefinition.id` 规定为 `dh.kernel.lifecycle` 等点分路径，**不符合 Owner 本轮“Element 按变量命名”的要求，已被 R87 取代**。现在统一为：**Package ID 像 npm 包名（kebab-case），Element ID 像 TypeScript 变量（camelCase），Namespace 单独储存**。在机器 ABI 转换前不得声称当前 BUILD 已接受此新格式。
 >

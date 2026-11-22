@@ -1,5 +1,7 @@
 # DomainHarness v0.11.0 — Package / Core / Extension / BUILD / Init / Exit 统一规范
 
+> **规范入口说明（R88）**：当前 DomainHarness 基础规则的唯一维护入口是 [统一规范](./DOMAIN_HARNESS_CANONICAL_SPEC.md)；本文件保留为历史决议/详细解释/实例或实现证据。如果二者存在冲突，以统一规范中标注的最新 Owner 决议和状态为准，不把本文件旧候选当现行强制 ABI。
+
 > **【R36 Owner 纠正，本文件中所有“必须先生成 Package / 必须经过 BUILD 平台才有 Package”的产品解释均被覆盖】**：Domain Package 是符合 DIS 适用约束 + 本 v0.11.x 当前 Element-First 合同的多文件集合，可由 ChatGPT/开发者直接编写 Manifest、Element、ESM 和资源；无专门生成器、Seed Builder 或独立 Package Assembly 工具前置。应用使用多个现成 Packages 时，仍须对真正使用的声明、直接 Extension、Core.Order、Function/Target、资源摘要/Boot 保持必要验证与拒绝，不能借“取消工具”降低本文件 B-02–B-04 的静态安全性质。后续所有步骤按 [R36](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md) 解释；旧 B-01 的生成器化表述只保留为历史。
 
 

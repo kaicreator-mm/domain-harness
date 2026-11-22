@@ -2,6 +2,8 @@
 
 当前使用 v0.11.x 单一内部版本列车；v0.11.1 已完成 scoped 验收，整个 0.11.x 尚未正式 Release。旧版本源码仅通过 Git 历史参考，不保留兼容入口。
 
+
+**唯一基础架构与工程规范**：[DomainHarness Canonical Spec](docs/specs/DOMAIN_HARNESS_CANONICAL_SPEC.md)。所有 0.11.x 相关开发、Agent、L1/L2、PR 与 Review **首先读取该文件**；其它旧规范、Issue/PRD/L2 是历史来源或特定范围补充，不得用旧候选覆盖 Canonical Spec。**MIGRATION_REQUIRED 表示规范方向已明确但尚未改源码，不得声明已验收**。
 1. 修改 TypeScript 前必读 [TypeScript 编码质量 Skill](.agents/skills/typescript-quality/SKILL.md)；创建/修改任何持久标识时必读 [DomainHarness 统一命名 Skill](.agents/skills/domain-naming/SKILL.md)、[命名规范](docs/specs/DomainHarness_v0.11.x_NAMING_STANDARD.md) 和 [Element/Package 组织规范](docs/specs/DomainHarness_v0.11.x_ELEMENT_PACKAGE_ORGANIZATION_STANDARD.md)。
 2. 源码放入 `src/`，公共 TS 标识符和路径不得携带版本号；代码注释和 JSDoc 必须为中文。
 3. 不另建重复 Runtime、Kernel、BUILD 或私有 SDK。现有四 Workspace 的物理布局不等于已经完成所有基础设施的 Package + Element 所有权；严格自举一致性审计见 [Foundation Issue #1668](https://github.com/kaicreator-mm/domain-harness/issues/1668) 与 [Boot/KDP 候选设计](docs/architecture/DomainHarness_v0.11.x_ELEMENT_FIRST_BOOTSTRAP_OWNERSHIP_REVIEW.md)，Owner/L2 通过前不擅改已验收代码。
