@@ -45,3 +45,6 @@ The driver:
 Set `DH_T05_NPM_REGISTRY` to select the registry/cache used for third-party transitive installation. Set `DH_T05_EVIDENCE` to choose the evidence directory. No `npm publish` occurs.
 
 The AC01–AC10 result distinguishes assertions executed here from focused upstream BUILD/contracts/runtime tests reused by this acceptance path. It is candidate validation, not an npm release or a claim of compatibility with older executable App ABIs.
+
+
+> v0.11.1 R69: `dh.std.file.json` / `dh.std.file.yaml` 提供独立读写格式函数。Workflow 在本演示仅选定 Read Function；Write 是纯序列化，落盘不属于未授权的 Element Effect。

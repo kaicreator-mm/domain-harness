@@ -82,7 +82,7 @@ NODE_MINIMUM=22.12.0
 **强制设计原则：** `0.11.1–0.11.9` 期间发现跨领域、语义稳定、可通过普通 Element/Function/Content 合同封装的公共能力时，优先提取为 **Standard Element**，后续版本以 BUILD 显式选定、直接 Extension/Import 复用为默认路径；不能每次编写新的通用 Reader、状态机规则、Guard/Validator/Selector。不是“所有功能都 Element 化”：Node 标准库/纯基础安全机制和 KDP/BUILD/Lock/Boot 权限与执行引擎继续留在 Engine 层。
 
 - **三层架构**：Contracts/BUILD/Lock/KDP primitives → **Standard Elements（可选普通 Package）** → **Domain Elements**。Standard 是资产资格，不是新 `ElementDefinition.kind`、额外 Runtime、全局注册中心或对 BUILD 权限的例外。
-- **从已接受的 0.11.1 开始提取**：demo `jsonReader/yamlReader` 目前并非独立标准包；真实 JSON/YAML 解析还在 `workflow-execution.ts`。优先归一到同一套真正可重复使用的 Reader Element，并把可信资源/UTF-8/大小/摘要授权保留在现有 BUILD/KDP；**不能保留两套有不同安全语义的解析器**。XState Actor 引擎继续在 KDP，只提取跨领域的声明式状态模型、具名 Transition/Guard 模板为标准 Element/Content，不创造第二 Workflow Runtime。
+- **从已接受的 0.11.1 开始提取**：demo `readJson/readYaml` 目前并非独立标准包；真实 JSON/YAML 解析还在 `workflow-execution.ts`。优先归一到同一套真正可重复使用的 Reader Element，并把可信资源/UTF-8/大小/摘要授权保留在现有 BUILD/KDP；**不能保留两套有不同安全语义的解析器**。XState Actor 引擎继续在 KDP，只提取跨领域的声明式状态模型、具名 Transition/Guard 模板为标准 Element/Content，不创造第二 Workflow Runtime。
 - **实施责任**：v0.11.1 [#1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 在收尾时负责真实提取并跨域验证首批 JSON/YAML Readers，v0.11.2 #1612 仅在新领域语义代码中消费，按真实需要提取状态转换模板；后续各版每次先做最小 Catalog/复用检查。保留各版本唯一主 Issue 和原范围，不重开 0.11.1 已接受任务来要求重新全量测试。
 - **标准资格**：`CANDIDATE → STANDARD_ACCEPTED → DEPRECATED/REPLACED`，仅在具体版本、Function/Schema/权限、真实跨场景 clean-packed 调用、必要正反例及独立 Exact-SHA 审核后提升。只更新 Catalog 与本阶段必要代码，无人为数量目标、永久任务和行政 Gate。
 - **完整且优先适用的技术规范**：[Standard Element 体系与递增复用规范](../architecture/DomainHarness_v0.11.x_STANDARD_ELEMENT_SYSTEM.md)。所有后续版本 L1/L2、Task/PR 必须先复用已存在、语义适用的 Standard Element；若不使用，留下具体技术理由，不自动复制业务无关的解析器和流程组件。
@@ -190,3 +190,6 @@ NODE_MINIMUM=22.12.0
 **历史对照的约束**：对某历史条目若新架构没有真实消费价值，版本 Issue 可以明确 OUT / OPTIONAL / REPLACED，不必实施；必须保存不采纳的原因。v0.10 原来提供的 Kernel/Workflow/Model/Provider 的具体 API、存储/Actor 格式、测试与可执行源码不自动成为 0.11.x 公共接口。跨版本进展在主 Issue #1563 统一追踪，阶段内仅维护其版本 Issue。
 
 <!-- /DH_V011X_ONE_ISSUE_PER_VERSION_HISTORICAL_MAPPING_R1_20261121 -->
+
+
+> **R69（0.11.1 R60 W02 更新）**：原仅 Reader 的目标已变更为两个双向格式 Element `dh.std.file.json` / `dh.std.file.yaml`，使用 Node 内置 JSON + pinned `yaml@2.9.1`。Write 是纯序列化输出，实际持久化须单独授权，避免引入越权 Host fs；此为 #1656 同版工作，不转移到 0.11.2。是否合格仍取决于新 Exact-SHA CI 与独立审核。

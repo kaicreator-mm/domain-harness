@@ -82,12 +82,12 @@ export async function prepareWorkflowElements(dirs, rules, app, fn, standardRead
   }
   ruleDependency.functions.push('startWorkflow', 'endWorkflow', 'workflowDecision');
   app.dependencies.push({ element: standardReader.json.id, version: standardReader.json.version,
-    functions: ['jsonReader'] });
+    functions: ['readJson'] });
   app.dependencies.push({ element: standardReader.yaml.id, version: standardReader.yaml.version,
-    functions: ['yamlReader'] });
+    functions: ['readYaml'] });
   app.dependencies.push(...dataElements.map((el) => ({ element: el.id, version: el.version })));
-  const jsonReader = ref(standardReader.json, 'jsonReader');
-  const yamlReader = ref(standardReader.yaml, 'yamlReader');
+  const readJson = ref(standardReader.json, 'readJson');
+  const readYaml = ref(standardReader.yaml, 'readYaml');
   const hooks = { start: ref(rules, 'startWorkflow'), end: ref(rules, 'endWorkflow') };
   const child = {
     kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
@@ -95,12 +95,12 @@ export async function prepareWorkflowElements(dirs, rules, app, fn, standardRead
     description: 'Selected child Workflow content for real actor nesting.',
     content: [
       content('child-flow', workflow('child-flow', 'json-child', [
-        node('json-child', sources['json-b'], jsonReader, { terminal: 'COMPLETE' }),
+        node('json-child', sources['json-b'], readJson, { terminal: 'COMPLETE' }),
       ], 1, 0)),
     ],
     functions: [],
     dependencies: [
-      { element: standardReader.json.id, version: standardReader.json.version, functions: ['jsonReader'] },
+      { element: standardReader.json.id, version: standardReader.json.version, functions: ['readJson'] },
       { element: 'basic.data_json_b', version: '1.0.0' },
     ],
   };
@@ -110,30 +110,30 @@ export async function prepareWorkflowElements(dirs, rules, app, fn, standardRead
     }, contentId: 'child-flow',
   };
   const parent = workflow('parent-flow', 'json-parent', [
-    node('json-parent', sources['json-a'], jsonReader, { nodeId: 'yaml-parent' }, hooks),
-    node('yaml-parent', sources['yaml-a'], yamlReader, { nodeId: 'child-node' }),
+    node('json-parent', sources['json-a'], readJson, { nodeId: 'yaml-parent' }, hooks),
+    node('yaml-parent', sources['yaml-a'], readYaml, { nodeId: 'child-node' }),
     { id: 'child-node', kind: 'workflow', workflow: childRef,
       switch: { exits: [
         { label: 'COMPLETE', target: { nodeId: 'yaml-final' } },
         { label: 'UNKNOWN', target: { terminal: 'UNKNOWN' } },
         { label: 'FAILED', target: { terminal: 'FAILED' } },
       ] } },
-    node('yaml-final', sources['yaml-b'], yamlReader, { terminal: 'COMPLETE' }),
+    node('yaml-final', sources['yaml-b'], readYaml, { terminal: 'COMPLETE' }),
   ], 6, 1);
   // 同一 Package.Init 启动的附加选定根：真实命名 Switch 终态、预算和祖先深度。
   const namedSwitch = ['COMPLETE', 'ASK', 'WAIT', 'REJECT', 'UNKNOWN', 'FAILED']
     .map((label) => ({ label, target: { terminal: label } }));
   const additional = {
     'single-flow': workflow('single-flow', 'single',
-      [node('single', sources['yaml-b'], yamlReader, { terminal: 'COMPLETE' })], 1, 0),
+      [node('single', sources['yaml-b'], readYaml, { terminal: 'COMPLETE' })], 1, 0),
     'decision-flow': workflow('decision-flow', 'decision', [{
       id: 'decision', kind: 'function', function: ref(rules, 'workflowDecision'),
       switch: { exits: namedSwitch },
     }], 1, 0),
     'budget-flow': workflow('budget-flow', 'budget-leaf',
-      [node('budget-leaf', sources['json-a'], jsonReader, { terminal: 'COMPLETE' }, hooks)], 2, 0),
+      [node('budget-leaf', sources['json-a'], readJson, { terminal: 'COMPLETE' }, hooks)], 2, 0),
     'shared-budget-flow': workflow('shared-budget-flow', 'first', [
-      node('first', sources['json-a'], jsonReader, { nodeId: 'child' }),
+      node('first', sources['json-a'], readJson, { nodeId: 'child' }),
       { id: 'child', kind: 'workflow', workflow: childRef, switch: {
         exits: [{ label: 'COMPLETE', target: { terminal: 'COMPLETE' } },
           { label: 'UNKNOWN', target: { terminal: 'UNKNOWN' } },
@@ -159,6 +159,6 @@ export async function prepareWorkflowElements(dirs, rules, app, fn, standardRead
     contentId, { element: rootRef.element, contentId },
   ]));
   return { child, rootRef, caseRefs, sources, dataElements, readerRefs: [
-    jsonReader, yamlReader, hooks.start, hooks.end, ref(rules, 'workflowDecision'),
+    readJson, readYaml, hooks.start, hooks.end, ref(rules, 'workflowDecision'),
   ] };
 }

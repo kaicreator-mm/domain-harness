@@ -44,12 +44,12 @@ SCOPE=DESIGN_AND_INCREMENTAL_EXTRACTION_NOT_IMPLEMENTED
 
 | 候选公共资产 | v0.11.1 实际来源 | 目标 Standard Element | 执行边界 |
 |---|---|---|---|
-| **JsonReader** | `workflow-fixture.mjs` 中的 demo `jsonReader`；实际 `JSON.parse` 在 `workflow-execution.ts::prepareDataInput` | `dh.std.reader.json`：声明纯输入/输出/失败语义的通用已选 Reader Function | BUILD/KDP 仍负责固定资源授权、摘要、大小与严格 UTF-8；可复用解析必须有**单一**实现归属，不能 KDP 与 Element 各自解释不同的 JSON |
-| **YamlReader** | demo `yamlReader`；实际 `yaml.parseDocument`、JSON-compatible 检查在 `workflow-execution.ts` | `dh.std.reader.yaml`：安全、版本化 YAML→JsonValue Reader | 保留 YAML 1.2 core/uniqueKeys、别名/Tag/节点成本边界及清晰 UNKNOWN/FAILED；不能向业务暴露任意 fs/network |
+| **JsonReader** | `workflow-fixture.mjs` 中的 demo `readJson`；实际 `JSON.parse` 在 `workflow-execution.ts::prepareDataInput` | `dh.std.file.json`：声明纯输入/输出/失败语义的通用已选 File.Read Function | BUILD/KDP 仍负责固定资源授权、摘要、大小与严格 UTF-8；可复用解析必须有**单一**实现归属，不能 KDP 与 Element 各自解释不同的 JSON |
+| **YamlReader** | demo `readYaml`；实际 `yaml.parseDocument`、JSON-compatible 检查在 `workflow-execution.ts` | `dh.std.file.yaml`：安全、版本化 YAML↔JsonValue File Element | 保留 YAML 1.2 core/uniqueKeys、别名/Tag/节点成本边界及清晰 UNKNOWN/FAILED；不能向业务暴露任意 fs/network |
 | **通用状态模型与转换策略** | `workflow-contracts.ts` 中 `WorkflowDefinition` / `state-model` ContentKind；`workflow-run.ts` 中 XState Actor、`workflow-execution.ts` 中路由和预算 | `dh.std.workflow.transition`（候选）：声明式状态模型/纯 Guard/具名 Transition/合法终态模板，可以被不同领域 Workflow 选用 | **XState Actor、子 Workflow 调度、Hook、计数/深度、授权/预算继续由唯一 KDP 执行；不能把 XState 引擎包装为第二个可调用 Workflow Runtime Element** |
 | **具名 Switch、Outcome 公共合同** | T11 合同 + T13 KDP 语义 | 优先复用已有 Contracts；有跨领域业务规则时才提取 `dh.std.decision.selector` 等 Function Element | 通用路由/拒绝语义属于 Engine，不因为提取公共 Element 而复制一个自由选路框架 |
 
-**重要现状判断：** T14 已证实“多个 JSON/YAML Data Elements 复用同一 Reader FunctionRef”，但这些 Reader 目前仍由 demo 中的 `basic.rules` 提供；这**不等于**仓库已有可独立依赖、独立版本化的标准 `JsonReader/YamlReader` Package。状态机同理：复用底层 XState 并不等于已有独立的 Standard StateMachine Element。必须通过后续有限提取、实际消费和独立验收才能将候选标为 `STANDARD_ACCEPTED`。
+**重要现状判断：** T14 已证实“多个 JSON/YAML Data Elements 复用同一 File.Read FunctionRef”，但这些 Reader 目前仍由 demo 中的 `basic.rules` 提供；这**不等于**仓库已有可独立依赖、独立版本化的标准 `JsonReader/YamlReader` Package。状态机同理：复用底层 XState 并不等于已有独立的 Standard StateMachine Element。必须通过后续有限提取、实际消费和独立验收才能将候选标为 `STANDARD_ACCEPTED`。
 
 ## 3. Element 标准化条件：最小、可证伪、不搞行政审批
 
@@ -102,3 +102,8 @@ Catalog 初期采用仓库版本化 Markdown/清单即可（状态、ElementRef/
 - [v0.11.1 Product #1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)、[L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)：R27 `ACCEPT_SCOPED`，T11–T14 原始 Source/E2E 合入 `version/v0.11.x@3145104258a4da5f8cc940482ff77322b97d6cf6`。当前标准 Reader 与 StateMachine Asset 的**提取实施 NOT_STARTED**。
 - Parser 现状：`packages/microkernel/src/workflow-execution.ts`；Demo Reader 现状：`examples/basic-domain-app/workflow-fixture.mjs` 与 `consumer.mjs`；XState runtime：`packages/microkernel/src/workflow-run.ts`。
 - 执行边界：0.11.0 Foundation、0.11.1 Task 既有已接受资格复用；新抽取只对改动的代码/实际 Consumer 做独立 Review/必要 CI；不把文档规划、候选 Catalog、Mock 结果升级为 `STANDARD_ACCEPTED` 或正式 Release。
+
+
+## R69 · 标准文件格式 Element 的双向接口（归属 v0.11.1 #1656）
+
+标准 ID 为 `dh.std.file.json`、`dh.std.file.yaml`。每个普通 Element 各自同时声明 Read 与 Write FunctionContract；Read 接受已锁定来源的格式及 UTF-8 source，Write 接受 JsonValue 并输出确定性 UTF-8 source。**Write 的语义是序列化，不是任意 Host 文件系统 I/O**：无独立授权的 sink、路径、事务/原子写协议时，禁止偷偷添加 fs.writeFile；外部持久化须另受 Effect/资源授权。本版本只使用 Node 原生 JSON 与已精确锁定 `yaml@2.9.1`，不创建手写解析器/序列化器、第二 KDP 或外部 BUILD。两个 Consumer 的合法直接导入、私有/未声明调用及读写安全反例均应作为同 HEAD 审核范围；在审核前保持候选状态。

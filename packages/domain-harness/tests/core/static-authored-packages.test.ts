@@ -21,7 +21,7 @@ const XSTATE_DIR = dirname(fileURLToPath(import.meta.resolve('xstate/package.jso
 const YAML_DIR = dirname(fileURLToPath(import.meta.resolve('yaml/package.json')));
 const IDS = ['r41-kdp', 'r41-sdk-base', 'r41-sdk-extra', 'r41-business'] as const;
 const KDP = 'r41-kdp';
-const STANDARD_READER = 'r60-standard-readers';
+const STANDARD_READER = 'r60-standard-files';
 const MICROKERNEL = '@kaicreator/domain-harness-microkernel';
 const CONTRACTS = '@kaicreator/domain-harness-contracts';
 const LOCK_PATH = 'dh-lock/app.lock.json';
@@ -198,11 +198,15 @@ async function r60OtherDomain(t: import('node:test').TestContext): Promise<strin
   const oldModule = readFileSync(modulePath, 'utf8');
   const oldReturn = "  return { status: 'READY' };";
   assert.ok(oldModule.includes(oldReturn), 'second Domain must preserve real business Init body');
-  const moduleText = `import { jsonReader } from 'r60-standard-readers';\n` +
+  const moduleText = `import { readJson, writeJson } from 'r60-standard-files';\n` +
     oldModule.replace(oldReturn, `
-  const readerResult = jsonReader({ format: 'json', source: '{"customer":"r41"}' });
+  const readerResult = readJson({ format: 'json', source: '{"customer":"r41"}' });
   if (readerResult.kind !== 'SUCCEEDED' || readerResult.value.customer !== 'r41') {
     throw new Error('R60 failed to execute selected reader');
+  }
+  const written = writeJson({ format: 'json', value: readerResult.value });
+  if (written.kind !== 'SUCCEEDED' || JSON.parse(written.value).customer !== 'r41') {
+    throw new Error('R60 failed to serialize selected JSON file data');
   }
   globalThis.__dhR41Events.push({ phase: 'standard-reader', packageId: 'r41-business' });
   return { status: 'READY' };`);
@@ -210,18 +214,18 @@ async function r60OtherDomain(t: import('node:test').TestContext): Promise<strin
   const digest: `sha256:${string}` = `sha256:${createHash('sha256').update(moduleText).digest('hex')}`;
   const manifestPath = join(businessDir, 'manifest.json');
   const manifest = readJson(manifestPath) as DomainPackageManifest;
-  const definition = readJson(join(source, 'packages', STANDARD_READER, 'definitions/json-reader.json')) as
+  const definition = readJson(join(source, 'packages', STANDARD_READER, 'definitions/json-file.json')) as
     import('@kaicreator/domain-harness-contracts').ElementDefinition;
   const readerRef = {
     element: { namespace: definition.id.split('.')[0]!, id: definition.id, version: definition.version,
       digest: contentDigestOf(definition as unknown as JsonValue) },
-    functionId: 'jsonReader', contractVersion: '1',
+    functionId: 'readJson', contractVersion: '1',
   };
   const updated: DomainPackageManifest = {
     ...manifest,
     dependsOn: [...manifest.dependsOn,
-      { package: STANDARD_READER, version: '1.0.0', interface: 'r60.readers.api' }],
-    imports: [...manifest.imports, readerRef],
+      { package: STANDARD_READER, version: '1.0.0', interface: 'r60.files.api' }],
+    imports: [...manifest.imports, readerRef, { ...readerRef, functionId: 'writeJson' }],
     targetVariants: manifest.targetVariants.map((variant) => ({
       ...variant, implementations: variant.implementations.map((fn) => ({
         ...fn, entry: { ...fn.entry, module: { ...fn.entry.module, digest } },
@@ -245,8 +249,11 @@ test('R60 W02: second domain r41 App boots and actually invokes same ordinary St
   const built = accepted(input);
   assert.ok(built.lock.selectedPackages.some((pkg) => pkg.packageId === STANDARD_READER));
   const selected = built.lock.selectedFunctions.find((fn) =>
-    fn.ref.element.id === 'dh.std.reader.json' && fn.ref.functionId === 'jsonReader');
-  assert.ok(selected, 'cross-domain exact Reader FunctionRef selected by BUILD');
+    fn.ref.element.id === 'dh.std.file.json' && fn.ref.functionId === 'readJson');
+  assert.ok(selected, 'cross-domain exact File.Read FunctionRef selected by BUILD');
+  assert.ok(built.lock.selectedFunctions.some((fn) =>
+    fn.ref.element.id === 'dh.std.file.json' && fn.ref.functionId === 'writeJson'),
+  'cross-domain exact File.Write FunctionRef selected by BUILD');
   const result = await installAuthoredApp('extended', t, source, true);
   assert.equal(result.app.status, 'BOOTED', JSON.stringify(result.app));
   if (result.app.status !== 'BOOTED') return;
@@ -263,14 +270,19 @@ test('R60 W02: another Domain cannot import unselected or undeclared Standard Re
   const selectedPool = input.packages as readonly DomainPackageManifest[];
   const unimported = buildApp({ ...input, packages: selectedPool.map((pkg) =>
     pkg.id === 'r41-business' ? { ...pkg, imports: [] } : pkg) });
-  assert.equal(unimported.ok, false, 'a public Reader still requires an exact manifest import');
+  assert.equal(unimported.ok, false, 'a public File Function still requires an exact manifest import');
+  const missingWrite = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+    pkg.id === 'r41-business'
+      ? { ...pkg, imports: pkg.imports.filter((item) => item.functionId !== 'writeJson') }
+      : pkg) });
+  assert.equal(missingWrite.ok, false, 'selected File.Write cannot bypass exact FunctionRef import');
   const unselected = buildApp({ ...input, packages: selectedPool.filter((pkg) =>
     pkg.id !== STANDARD_READER) });
   assert.equal(unselected.ok, false, 'omitting a selected Standard Package cannot silently grant access');
 
   const staleDigest = buildApp({ ...input, packages: selectedPool.map((pkg) =>
     pkg.id === 'r41-business' ? {
-      ...pkg, imports: pkg.imports.map((item) => item.functionId === 'jsonReader'
+      ...pkg, imports: pkg.imports.map((item) => item.functionId === 'readJson'
         ? { ...item, element: { ...item.element, digest: `sha256:${'0'.repeat(64)}` as `sha256:${string}` } } : item),
     } : pkg) });
   assert.equal(staleDigest.ok, false, 'wrong Standard Element digest is not an authorized FunctionRef');
@@ -279,7 +291,7 @@ test('R60 W02: another Domain cannot import unselected or undeclared Standard Re
   const manifestFile = join(privateSource, 'packages', STANDARD_READER, 'manifest.json');
   const original = readJson(manifestFile) as DomainPackageManifest;
   const privatized = { ...original,
-    elements: original.elements.map((item) => item.id === 'dh.std.reader.json'
+    elements: original.elements.map((item) => item.id === 'dh.std.file.json'
       ? { ...item, visibility: 'private' as const } : item),
   };
   writeFileSync(manifestFile, canonicalJson(privatized as unknown as JsonValue));

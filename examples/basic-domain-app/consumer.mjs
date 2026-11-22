@@ -288,10 +288,10 @@ async function authoring(label, rule, options = {}) {
   }
 
   // 从仓库中直接拷贝真实手写的多文件 Standard Reader Domain Package。
-  const standardPkgId = 'r60-standard-readers';
+  const standardPkgId = 'r60-standard-files';
   const standardRoot = options.workflow === true ? join(root, standardPkgId) : null;
   if (standardRoot) {
-    await cp(resolve(dirname(fileURLToPath(import.meta.url)), '../selected-packages/packages/r60-standard-readers'),
+    await cp(resolve(dirname(fileURLToPath(import.meta.url)), '../selected-packages/packages/r60-standard-files'),
       standardRoot, { recursive: true });
     // 生产 Standard Reader 源不携带 Demo 全局日志或故障注入；
     // 唯有隔离 E2E 的临时测试副本加入观测，并同步真实 Target 摘要。
@@ -318,8 +318,8 @@ async function authoring(label, rule, options = {}) {
   }
   const standardDefinition = standardRoot
     ? {
-        json: JSON.parse(await readFile(join(standardRoot, 'definitions/json-reader.json'), 'utf8')),
-        yaml: JSON.parse(await readFile(join(standardRoot, 'definitions/yaml-reader.json'), 'utf8')),
+        json: JSON.parse(await readFile(join(standardRoot, 'definitions/json-file.json'), 'utf8')),
+        yaml: JSON.parse(await readFile(join(standardRoot, 'definitions/yaml-file.json'), 'utf8')),
       } : null;
   const standardManifest = standardRoot
     ? JSON.parse(await readFile(join(standardRoot, 'manifest.json'), 'utf8')) : null;
@@ -462,7 +462,7 @@ async function authoring(label, rule, options = {}) {
     manifest('app-business', {
       layer: 'business', role: 'primary', order: 2,
       ...(options.omitBusinessInitFrom === true ? {} : { recordInitFrom: true }), dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' },
-        ...(workflow ? [{ package: standardPkgId, version: '1.0.0', interface: 'r60.readers.api' }] : [])],
+        ...(workflow ? [{ package: standardPkgId, version: '1.0.0', interface: 'r60.files.api' }] : [])],
       elements: [
         { id: lifecycleDefs['app-business'].id, version: '1.0.0',
           definitionRef: await artifactRef('app-business', 'elements/lifecycle.json'), visibility: 'private' },
@@ -727,7 +727,7 @@ async function runWorkflowE2E() {
     assert.equal(first.lock.selectedWorkflows?.length, 7, 'parent, child and five independent acceptance roots share one sealed Lock');
     assert.equal(first.lock.selectedElements.filter((item) => item.ref.id.startsWith('basic.data_')).length, 4,
       'two JSON and two YAML Data Elements must be selected, not only files');
-    for (const fnName of ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow', 'workflowDecision']) {
+    for (const fnName of ['readJson', 'readYaml', 'startWorkflow', 'endWorkflow', 'workflowDecision']) {
       assert.equal(first.lock.selectedFunctions.filter((item) => item.ref.functionId === fnName).length, 1,
         `one selected FunctionRef for ${fnName}, reusable across distinct data Elements`);
     }

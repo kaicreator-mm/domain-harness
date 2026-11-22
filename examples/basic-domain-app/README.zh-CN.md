@@ -45,3 +45,6 @@ node examples/basic-domain-app/verify-clean-install.mjs
 通过 `DH_T05_NPM_REGISTRY` 选择第三方传递依赖的 registry/缓存，通过 `DH_T05_EVIDENCE` 指定证据目录。全程不执行 `npm publish`。
 
 AC01–AC10 结果区分本路径实际执行的断言与复用的上游 contracts/BUILD/runtime 焦点证据。本结果属于候选验证，不代表 npm 正式发布，也不声明与旧可执行 App ABI 兼容。
+
+
+> v0.11.1 R69: `dh.std.file.json` / `dh.std.file.yaml` 提供独立读写格式函数。Workflow 在本演示仅选定 Read Function；Write 是纯序列化，落盘不属于未授权的 Element Effect。
