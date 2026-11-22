@@ -1,6 +1,6 @@
 # DomainHarness v0.11.x · Kernel Package 真正自举与统一身份迁移 L2 接线方案
 
-> **归口**：Foundation Issue [#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)，不是 v0.11.2 功能。**状态：PROPOSED_L2 / OWNER + 非 Writer 审核未完成**。本文件是具体实施细节，不是第二套规范。权威规范以 [目录](../specs/domain-harness/README.md)、[核心](../specs/domain-harness/core.md)、[架构](../specs/domain-harness/architecture.md)、[对象](../specs/domain-harness/element-package.md)、[生命周期](../specs/domain-harness/lifecycle-workflow.md)、[身份](../specs/domain-harness/identity-naming.md) 和 [信任](../specs/domain-harness/composition-trust.md) 为准。
+> **归口**：Foundation Issue [#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)，不是 v0.11.2 功能。**状态：R107 ACCEPT_L2_SCOPED（设计范围 P0/P1=0）；源码实施与验收未完成**。本文件是具体实施细节，不是第二套规范。权威规范以 [目录](../specs/domain-harness/README.md)、[核心](../specs/domain-harness/core.md)、[架构](../specs/domain-harness/architecture.md)、[对象](../specs/domain-harness/element-package.md)、[生命周期](../specs/domain-harness/lifecycle-workflow.md)、[身份](../specs/domain-harness/identity-naming.md) 和 [信任](../specs/domain-harness/composition-trust.md) 为准。
 
 ## A1. 真实所有权审计
 
@@ -51,7 +51,7 @@ KDP 反向按真实已进入列表尝试 Exit（KDP Exit 最后）
 5. **Effect 和 SDK**：HostPort、FunctionRef、资源仍来自选定 Lock；不能因将 Kernel 源码移至 KDP 包而自动开放文件/网络权限，所有 Business 无隐式内核能力。
 6. **物理发行**：可把 KDP Kernel 实现源码编译或 bundle 为 KDP 所有的 ESM Target，依赖显式版本和可信 SRI 封存；新 KDP 的 Build 静态准入与 Runtime Loader 应针对可信 Kernel Profile 严格定义，不允许借此将任意未声明或恶意 Business Source 排除在校验外。
 
-### A2.1 KDP Init Host ABI：待独审的具体候选（不是已实现合同）
+### A2.1 KDP Init Host ABI：R107 已接受的具体实施合同（源码未实现）
 
 **约束**：不新增第二种 Element 根类型，也不允许 Host 通过普通 `DomainApp.invoke` 或不受选的公共 `bootstrap` 绕过 Pin。唯一合法 Host 入口仍是 `boot(pin, context)`，其中 `pin` 只定位**唯一已选**的 KDP Init Function，而不是自由指定一个 JavaScript export。
 
@@ -59,9 +59,9 @@ KDP 反向按真实已进入列表尝试 Exit（KDP Exit 最后）
 2. **特殊 Host ABI 而非第二 Init**：受信 Boot 对此**唯一** FunctionRef 使用 `KdpHostInit(context: KdpBootstrapContext): Promise<KdpBootstrapResult>` 调用约定，返回 `BOOTED|FAILED`；`REFUSED` 只由导入前的 Boot 前置检查产生。KDP Init 负责构建 `DomainApp`，该对象是 Host 进程内句柄，**不是 JSON Content、普通 `FunctionOutcome` 或可由 Business 通过 `ReadonlyFunctionHandle.invoke` 调用的函数结果**。普通 Package.Init 继续接受受限 `PackageInitContext`、返回其 `AppInitResult`；二者由唯一 KDP 身份和 BUILD/Lock 中的 Init 绑定明确区分，不能把 KDP Host ABI 自动开放给任意 Package。
 3. **校验时序提案**：`readTrustedRecord → pin/record 一致 → Lock 签定/摘要/Target → selected KDP package/init FunctionRef/Target 映射 → KDP ESM 导入闭包真实字节验证 → import + 调用`。相同原始字节须绑定 Pin、SelectedFunction.implementation、ResourceDigests；若 KDP 首次模块求值之前有未验证的静态依赖或宿主级副作用，仍是拒绝，不能通过“随后由 KDP 自检”补票。真实文件的并发替换只能在明确受控安装快照/威胁模型中作有限承诺。
 4. **不递归 Init 的责任边界**：KDP.Init 进入时由 KDP 创建一次激活的 PackageSystem/Exit 历史，并将 KDP 自身的进入事件记录**恰好一次**；内部调用“从已进入的 Kernel 继续”流程，先处理 KDP 声明的直接 Extension.Init，再按 Core.Order 进入下一个 Core，不能重新从 `coreOrder[0]` 执行 KDP.Init。Extension 的多次调用仍由各 Package 自治；有环直接失败。Kernel Init 早期失败（包括尚未完整构造 PackageSystem）仍必须尽可能执行已进入的 KDP.Exit，保留首个错误，清理失败只附加脱敏诊断。
-5. **兼容和静态 Profile**：此为尚未发布的 0.11.x 内部 ABI 迁移，不维持旧 `bootstrap` 兼容入口；`kdp-host-init/1` 如需机器标识，只能绑定唯一受选 KDP Init，而不是新建公共可调用 Function 类别。Target 导入闭包的 Node 内建模块与受限 SDK 可信依赖须有显式 Kernel Profile 的封存/准入规则；不得直接豁免 Business 的静态 ESM/Effect 检查。
+5. **兼容和静态 Profile**：此为尚未发布的 0.11.x 内部 ABI 迁移，不维持旧 `bootstrap` 兼容入口；`kdp-host-init/1` 是**必需的机器判别字段**，只能绑定唯一受选 KDP Init，而不是新建公共可调用 Function 类别。Target 导入闭包的 Node 内建模块与受限 SDK 可信依赖须有显式 Kernel Profile 的封存/准入规则；不得直接豁免 Business 的静态 ESM/Effect 检查。
 
-**此小节的独立审查问题**：`KdpBootstrapResult` 含 Host 进程对象、与一般 `FunctionContract.outputSchemaRef` 的 JSON 结果约束不同，必须确认上述特殊的受信 Init ABI 是否只靠唯一 KDP 选定身份就可无歧义表达，或者是否必须在现有 Binding/Lock 增加**一个有限的 invocationAbi 字段**。没有此决定不允许开始 L2-1 源码修改。
+**R107 已裁决**：必须采用特殊 `invocationAbi:'kdp-host-init/1'` 的机器判别联合，禁止只凭唯一 FunctionRef 推断 Host ABI。其具体字段、选定 Lock/Pin/Record 一致性和禁止 JSON FunctionOutcome 假冒 Host Result 以 R103-P1-01 为准。
 
 ## A3. 作者期 Composition 不是 Domain App Runtime 的第二入口
 
@@ -75,7 +75,7 @@ KDP 反向按真实已进入列表尝试 Exit（KDP Exit 最后）
 - **先以独立 L2 测试决定身份唯一键**，再统一更改 `ElementDefinition`、Schema、`elementNamespace()`、ElementRef、FunctionRef、Manifest、Target/Lock/Pin、Catalog、Consumer 与实际安装验证。新对象的所有真实摘要重新计算；不能靠全局字符串替换更改历史被审证据。
 - 旧 r41/r60、点分 ID 和 R72/R81/R83/R84 仍在**历史原 Commit/Receipt**。新 Foundation Baseline 用新 Source SHA/CI/Review/锁摘要独立归档；不需要为未发布的 0.11.x 保留旧 Runtime ABI。
 
-### A4.1 Namespace 与目标绑定的最小一致性方案（待独审）
+### A4.1 Namespace 与目标绑定：R107 已接受的复合键合同（源码未实现）
 
 现行 `ElementRef` 已有独立的 `namespace/id/version/digest`；缺口主要在 `ElementDefinition.id`、`ElementEntry.id` 与 `ImplementationBinding.elementId` 没有完整显式命名空间，BUILD 仍从点分 ID 推导。新规范不应只在 Definition 上加一个字段，却继续使用模糊的 Target 绑定。
 
@@ -89,9 +89,9 @@ KDP 反向按真实已进入列表尝试 Exit（KDP Exit 最后）
 | 阶段 | 修改目标 | 必要的客观证明 |
 |---|---|---|
 | **L2-0 冻结** | 本文 A1–A4 + 当前规范 §A/§2–§7；先审 Trust/特殊 KDP Init 返回 ABI | Owner/非 Writer 设计审查签收，P0/P1=0 |
-| **L2-1 Kernel 自举** | 唯一 Boot → KDP-owned 真正 Init；无重入/重复 App Init | 未验证入口绝不执行、Core.Order 0 单次进入、Extension 权限/顺序、真实逆序 Exit、故障清理 |
-| **L2-2 Composition 归属** | 唯一已安装 SDK 作者期 Package/Element | 未启动新 App 也能 `buildApp`；静态拒绝未选/未授权调用；无第二 BUILD |
-| **L2-3 身份迁移** | Manifest/Schema/Lock/Pin/Definition/Target/标准/业务 Consumer | 新旧身份互不混用、错 Owner/错 Digest/未选 Target 拒绝，新的全链 SHA/Receipt |
+| **L2-1 Contracts/BUILD/身份** | 新 SchemaVersion、Namespace 复合键、唯一 Host invocationAbi、Trusted Closure、Lock/Pin/Record 静态封存及拒绝 | 同 Namespace 错 Owner/Digest、错 ABI、旧点分或裸 ID、动态导入、错误封存全部 BUILD/Schema fail-closed；不得以旧样例可执行冒充新 ABI PASS |
+| **L2-2 Kernel 自举** | 唯一 Boot → 真实 KDP.Init；导入前整个 KDP 模块闭包核验；单次 Init/Exit | 未验证入口或传递依赖绝不执行、Core.Order 0 单次进入、Extension 权限/顺序、逆序 Exit、提前失败 |
+| **L2-3 Composition 归属** | 唯一 SDK 作者期 Package/Element、与运行期权限隔离 | 未启动新 App 也能 `buildApp`；静态拒绝候选 Init/越权；无第二 BUILD |
 | **L2-4 综合归档** | 已有 v0.11.1 Task/Workflow/Standard JSON/YAML/Reference App 增量复验 | Node >=22.12，必要 POS/NEG/UNKNOWN/失败/Exit/真实 clean-install，非 Writer Exact-SHA 审核，旧 StageIndex 永不重写 |
 
 **不能作为完成的证据**：单纯 Markdown、空 KDP.Init 壳、仅 TypeScript 编译通过、未实际受选的演示 Resource、重用旧 SHA 的 CI SUCCESS、作者自己声称的“独立审核”。
@@ -167,3 +167,20 @@ NOT_ENTERED
 `Init entered` 只决定“有必要尝试 Exit”，`Init succeeded/failed` 只记操作结果，`Core completed` 指声明的 Extension/后续 Core 已执行且满足结果；三者不得复用同一个状态标记。失败后只对进入过的节点逆序 Exit，不得伪造成功。旧历史 R72/R81/R83/R84 Source/CI/StageIndex 不覆盖，新 Foundation 受审结果另写新 SHA/Digest/Receipt。
 
 **R103 当前处置**：以上为 R102 五个 P1 的 L2 设计修订和两个 P2 的明确处理方案，**不是**已完成生产源码重构或独立 L2 `ACCEPT`；#1668 A5 再次限定独立审核 P0/P1=0 与 Owner 签收前，不进入受信机器 ABI 生产实现。
+
+## R109. R107 两个 P2 的实施前冻结补充
+
+> [R107 独审 ACCEPT_L2_SCOPED](https://github.com/kaicreator-mm/domain-harness/issues/1668#issuecomment-7083916540) 指出两个非阻断 P2。下面对它们作**精确实施裁决**，不把规范设计审查结果当作当前 Runtime PASS。实施阶段允许小切片 Draft，但每一项机器 ABI 完成验收必须在能够安装的**原子组合 HEAD**完成。
+
+### R109-P2-01：Node22 KDP 加载图可证明的有限子集
+
+- 选定 KDP 的所有同步 `import`、`export … from` 和静态 ESM 边必须递归扫描，实际 Node 22 ESM 条件导出解析与 Lock 中每条目标、`package.json`、SHA256/SRI 一致；Boot 的解析与验算发生在**任何选定 KDP 模块 import 前**。
+- **KDP 选定代码禁止所有动态 `import()`，包括字面量参数**：运行前验证必须能完全列举执行闭包，不能假装字面量延迟 import 已经安全。CJS `require`、`createRequire`、`module.require`、`eval`、运行时 Hook loader、ESM↔CJS 桥接也禁止由选定 KDP 使用。受信、预先安装的 SDK TCB 依赖里由内部 Bundler 产生的 CJS 辅助调用按 SDK 自己的安装版本/SRI 证明，不转化为任意选定 Package 的特权。
+- Node builtin 仅准许确定的 `node:` 名称 allowlist；裸 builtin alias、用户新增 Node Loader/自定义 conditions/不一致 exports 分支、外部 symlink、绝对路径、未钉住的相对/bare 引用一律拒绝。Target 使用锁定的 `node22-esm/1` 与标准 `node,import,default` 条件集合；不能在 BUILD/Runtime 分别用不同加载条件而忽略差异。
+- 必须加入可观测 NEG：将 KDP 二级相对 JS、`package.json` exports、间接 `require` 尝试或字面量 `import()` 目标改写，验证构建阶段或 Boot 在导入任何 KDP 前拒绝，顶层副作用计数保持 0。拒绝行为不自动声称能阻止有权限的本地进程 TOCTOU。
+
+### R109-P2-02：源文档统一和作者期 Init
+
+- A2.1 中原“是否需要 invocationAbi”的未决候选已被 R103/R107 的**必需判别字段**取代；A5 正式实施顺序已调整为 Contracts/Schema/BUILD/Lock/Pin → Boot/KDP → 作者期 Composition → 新消费者。冲突时以 R103/R109 为准，禁止 Agent 选择过时的 Boot-first 表格顺序。
+- **作者期 dh-authoring Package 具有真实普通 Init Element，但绝不在作者期由 Composition 调用**。SDK 已安装并通过自身发布/版本来源选定后，由静态 facade 仅调用该 Package `composition.buildApp` 的特权作者期 Function；此时不能调用待创建 App 或 SDK Authoring Package 的 Init/Exit。将 Authoring Profile 明示为独立调用约束，不给 Runtime `PackageInitContext`、Effect 或 HostPort 隐式提升；不能把“没有 Init”当作普通 DomainPackage 合同例外。
+- 真实迁移顺序需要保留各阶段独立可复现的 FAIL/PASS 收据；禁止同一提交同时保留两套新旧运行时 ABI 的兼容路径。旧历史 SHA 仅用于审计，非新版本可执行对象。
