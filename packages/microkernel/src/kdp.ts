@@ -96,8 +96,22 @@ export function validateBusinessCoreResults(raw: unknown): { status: AppStatus }
   return { status: statuses.includes('BLOCKED') ? 'BLOCKED' :
     statuses.includes('DEGRADED') ? 'DEGRADED' : 'READY' };
 }
-/** KDP 复验可信安装后按 Lock 完成技术初始化、Hook、业务初始化；任一步失败必须撤销已完成的初始化。 */
+/**
+ * 单一 KDP Host Init 专用的启动后半段：调用者已经是由 Boot 选定并导入的
+ * KDP Package.Init，故这里只登记其一次真实进入并递归其余 Core，而不再调用 Kernel.Init。
+ * 真正的 Host ABI/Pin/Lock 机器身份将由下一原子合同迁移绑定，不以此函数名授权。
+ */
+export async function activateSelectedKdpHostInit(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
+  return activateKernel(context, true);
+}
+
+/** 迁移阶段旧入口：保留既有回归用例；最终 Host ABI 切换将删除此路径。 */
 export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
+  return activateKernel(context, false);
+}
+
+/** 唯一启动逻辑的内部实现。入口是否已经由 Host 调用 KDP Init 由受信接线决定。 */
+async function activateKernel(context: KdpBootstrapContext, kernelAlreadyEntered: boolean): Promise<KdpBootstrapResult> {
   const trust = await verifyInstallTrust(context);
   if (!trust.ok) return failed(trust.failure.code, trust.failure.reason);
   const { lock } = trust.value;
@@ -141,7 +155,9 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     };
     let rawInitResult: unknown;
     try {
-      rawInitResult = await packages.runInit(initContext);
+      rawInitResult = kernelAlreadyEntered
+        ? await packages.runRemainingCoresAfterKernelEntered(initContext)
+        : await packages.runInit(initContext);
     } catch (error) {
       throw new KdpLoadError(error instanceof KdpLoadError ? error.message : 'Core.Init raised an unhandled error (detail redacted)', 'DH_RUNTIME_NOT_READY');
     }
