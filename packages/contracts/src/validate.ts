@@ -232,6 +232,17 @@ function checkFunctionContract(value: unknown, path: string, sink: IssueSink): v
     sink(path, SCHEMA_INVALID, 'expected a function contract object');
     return;
   }
+  if ('invocationAbi' in value) {
+    checkClosedKeys(value, ['id', 'contractVersion', 'invocationAbi', 'description'], sink, path);
+    if (value['id'] !== 'init' || value['contractVersion'] !== '1' ||
+        value['invocationAbi'] !== 'kdp-host-init/1') {
+      sink(path, SCHEMA_INVALID, 'only the unique KDP Init may use kdp-host-init/1 machine ABI');
+    }
+    if ('description' in value && !isNonEmptyString(value['description'])) {
+      sink(`${path}.description`, SCHEMA_INVALID, 'description must be non-empty');
+    }
+    return;
+  }
   checkClosedKeys(
     value,
     [

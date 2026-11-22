@@ -29,6 +29,8 @@ export interface ImplementationBinding {
   readonly elementId: string;
   readonly functionId: string;
   readonly contractVersion: string;
+  /** 仅由唯一 KDP Host Init 实现声明，普通 Function 禁止设置。 */
+  readonly invocationAbi?: 'kdp-host-init/1';
   readonly entry: ImplementationLocator;
   readonly resources?: readonly ResourceRef[];
 }

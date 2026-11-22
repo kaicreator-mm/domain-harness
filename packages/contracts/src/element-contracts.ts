@@ -71,10 +71,11 @@ export type FunctionOutcomeKind = 'SUCCEEDED' | 'UNKNOWN' | 'FAILED';
 
 export type EffectIntent = 'none' | 'external' | 'state';
 
-/** Function 只声明语义、输入输出和 Effect 意图；具体实现由 BUILD 按 Target 选定。 */
-export interface FunctionContract {
+/** 常规领域 Function 使用 JSON 入/出 Schema 和 FunctionOutcome，不能冒充 Host 调用约定。 */
+export interface StandardFunctionContract {
   readonly id: string;
   readonly contractVersion: string;
+  readonly invocationAbi?: never;
   readonly description?: string;
   readonly inputSchemaRef: SchemaRef;
   readonly outputSchemaRef: SchemaRef;
@@ -82,6 +83,21 @@ export interface FunctionContract {
   readonly effects: EffectIntent;
   readonly applicability?: ApplicabilityRule;
 }
+
+/** 唯一 KDP.Init 的非 JSON Host 调用 ABI；没有普通 Function 的 Outcome/Effect/Schema。 */
+export interface KdpHostInitFunctionContract {
+  readonly id: 'init';
+  readonly contractVersion: '1';
+  readonly invocationAbi: 'kdp-host-init/1';
+  readonly inputSchemaRef?: never;
+  readonly outputSchemaRef?: never;
+  readonly outcomes?: never;
+  readonly effects?: never;
+  readonly description?: string;
+  readonly applicability?: never;
+}
+
+export type FunctionContract = StandardFunctionContract | KdpHostInitFunctionContract;
 
 
 export interface ElementDependency {

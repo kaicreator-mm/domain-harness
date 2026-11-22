@@ -107,7 +107,7 @@ const CONTENT_BLOCK_DEF: JsonObject = {
   ],
 };
 
-const FUNCTION_CONTRACT_DEF: JsonObject = {
+const STANDARD_FUNCTION_CONTRACT_DEF: JsonObject = {
   type: 'object',
   additionalProperties: false,
   required: ['id', 'contractVersion', 'inputSchemaRef', 'outputSchemaRef', 'outcomes', 'effects'],
@@ -126,6 +126,21 @@ const FUNCTION_CONTRACT_DEF: JsonObject = {
     effects: { enum: ['none', 'external', 'state'] },
     applicability: APPLICABILITY_DEF,
   },
+};
+const KDP_HOST_INIT_FUNCTION_CONTRACT_DEF: JsonObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id', 'contractVersion', 'invocationAbi'],
+  properties: {
+    id: { const: 'init' },
+    contractVersion: { const: '1' },
+    invocationAbi: { const: 'kdp-host-init/1' },
+    description: { type: 'string', minLength: 1 },
+  },
+};
+/** Host 分支没有 JSON Schema/FunctionOutcome/Effect；普通分支禁止 invocationAbi。 */
+const FUNCTION_CONTRACT_DEF: JsonObject = {
+  oneOf: [STANDARD_FUNCTION_CONTRACT_DEF, KDP_HOST_INIT_FUNCTION_CONTRACT_DEF],
 };
 
 const ELEMENT_DEFINITION_DEF: JsonObject = {
@@ -555,6 +570,7 @@ export const DOMAIN_PACKAGE_MANIFEST_JSON_SCHEMA: JsonObject = defsEnvelope(
                   elementId: { type: 'string', minLength: 1 },
                   functionId: { type: 'string', minLength: 1 },
                   contractVersion: { type: 'string', minLength: 1 },
+                  invocationAbi: { const: 'kdp-host-init/1' },
                   entry: { $ref: '#/$defs/implementationLocator' },
                   resources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
                 },
@@ -697,11 +713,12 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
       bootstrapKdpPin: {
         type: 'object',
         additionalProperties: false,
-        required: ['kdpPackageId', 'kdpPrimaryEntry', 'kdpPrimaryDigest'],
+        required: ['kdpPackageId', 'kdpInitFunction', 'invocationAbi', 'kdpInitModule'],
         properties: {
           kdpPackageId: { type: 'string', minLength: 1 },
-          kdpPrimaryEntry: { const: 'bootstrap' },
-          kdpPrimaryDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+          kdpInitFunction: { $ref: '#/$defs/functionRef' },
+          invocationAbi: { const: 'kdp-host-init/1' },
+          kdpInitModule: { $ref: '#/$defs/resourceRef' },
         },
       },
       selectedPackages: {
@@ -749,19 +766,33 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['ref', 'outcomes', 'effects', 'implementation', 'resources'],
-          properties: {
-            ref: { $ref: '#/$defs/functionRef' },
-            outcomes: {
-              type: 'array',
-              minItems: 1,
-              items: { enum: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] },
-              contains: { const: 'SUCCEEDED' },
+          oneOf: [
+            {
+              type: 'object', additionalProperties: false,
+              required: ['ref', 'outcomes', 'effects', 'implementation', 'resources'],
+              properties: {
+                ref: { $ref: '#/$defs/functionRef' },
+                outcomes: {
+                  type: 'array', minItems: 1,
+                  items: { enum: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] },
+                  contains: { const: 'SUCCEEDED' },
+                },
+                effects: { enum: ['none', 'external', 'state'] },
+                implementation: { $ref: '#/$defs/implementationLocator' },
+                resources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
+              },
             },
-            effects: { enum: ['none', 'external', 'state'] },
-            implementation: { $ref: '#/$defs/implementationLocator' },
-            resources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
-          },
+            {
+              type: 'object', additionalProperties: false,
+              required: ['ref', 'invocationAbi', 'implementation', 'resources'],
+              properties: {
+                ref: { $ref: '#/$defs/functionRef' },
+                invocationAbi: { const: 'kdp-host-init/1' },
+                implementation: { $ref: '#/$defs/implementationLocator' },
+                resources: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
+              },
+            },
+          ],
         },
       },
       trustedRuntimeIntegrity: {

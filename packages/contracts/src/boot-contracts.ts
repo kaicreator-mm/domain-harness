@@ -1,6 +1,7 @@
 /** 当前领域契约：使用统一 Schema 和明确的类型边界，禁止运行时隐式升级。 */
 import type { ContentDigest, SemVer } from './base.js';
-import type { ResolvedTarget } from './refs.js';
+import type { ResolvedTarget, FunctionRef } from './refs.js';
+import type { ResourceRef } from './element-contracts.js';
 import type {
   DH_INSTALL_RECORD_SCHEMA_VERSION,
   DH_PIN_SCHEMA_VERSION,
@@ -17,8 +18,9 @@ export interface InstalledRecord {
   readonly lockPath: string;
   readonly lockDigest: ContentDigest;
   readonly kdpPackageId: string;
-  readonly kdpPrimaryEntry: 'bootstrap';
-  readonly kdpPrimaryDigest: ContentDigest;
+  readonly kdpInitFunction: FunctionRef;
+  readonly invocationAbi: 'kdp-host-init/1';
+  readonly kdpInitModule: ResourceRef;
   readonly recordDigest: ContentDigest;
 }
 
@@ -27,8 +29,9 @@ export interface BootstrapPin {
   readonly schemaVersion: typeof DH_PIN_SCHEMA_VERSION;
   readonly target: ResolvedTarget;
   readonly kdpPackageId: string;
-  readonly kdpPrimaryEntry: 'bootstrap';
-  readonly kdpPrimaryDigest: ContentDigest;
+  readonly kdpInitFunction: FunctionRef;
+  readonly invocationAbi: 'kdp-host-init/1';
+  readonly kdpInitModule: ResourceRef;
   readonly lockDigest: ContentDigest;
   readonly lockPath: string;
 }
@@ -54,7 +57,7 @@ export type KdpBootstrapResult =
   | { readonly status: 'FAILED'; readonly code: string; readonly reason: string };
 
 export interface KdpPrimary {
-  bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult>;
+  init(context: KdpBootstrapContext): Promise<KdpBootstrapResult>;
 }
 
 /** 启动前拒绝返回 REFUSED；选定 KDP 执行后的失败由 KDP 报告 FAILED。 */
