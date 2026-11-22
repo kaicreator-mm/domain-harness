@@ -24,11 +24,11 @@
 
 ## 9.1 Package/Element 实现修改的静态选择与摘要联动（R94 · 本次实证补充）
 
-> **CONFIRMED 的工程检查原则**：变更任何将被 SDK/BUILD 选定的 ESM Target Function，即使只修改私有循环、注释或业务逻辑，也必须与当前 Package 静态准入规则、封存资源字节、所有 Target Bindings 和实际消费者保持一致。此节来自 #1669 / Woodpecker #2986、#2988 的真实失败，不改变 Foundation 机器 ABI。
+> **CONFIRMED 的工程检查原则**：变更任何将在 App 组合时被选定的 ESM Target Function，即使只修改私有循环、注释或业务逻辑，也必须与当前 Package 静态准入规则、封存资源字节、所有 Target Bindings 和实际消费者保持一致。此节来自 #1669 / Woodpecker #2986、#2988 的真实失败，不改变 Foundation 机器 ABI。
 
-1. **BUILD 静态执行子集优先于运行期“能运行”**：当前 `tooling/build/src/static-package-guard.ts` 禁止计算成员访问 `value[key]`、不受控反射、未知代码加载与未声明 Extension。**不要**为了性能优化绕开或放宽这些规则；候选实现须能在真正 BUILD 的源代码门禁下通过，而不只是 Node 单独运行通过。精确允许语法以当前已审静态守门实现和 Target Profile 为准，不把一个列表固定为未来所有语言共同语法。
+1. **生成期静态执行子集优先于运行期“能运行”**：当前 `tooling/build/src/static-package-guard.ts` 禁止计算成员访问 `value[key]`、不受控反射、未知代码加载与未声明 Extension。**不要**为了性能优化绕开或放宽这些规则；候选实现须在生成期源代码静态门禁下通过，而不只是 Node 单独运行通过。精确允许语法以当前已审静态守门实现和 Target Profile 为准，不把一个列表固定为未来所有语言共同语法。
 2. **改代码就必须重新封存**：任何字节变动都要求更新所选资源的 SHA256 和引用它的全部 `ImplementationBinding.entry.module.digest`，以及真实组合时的 Package/Lock/Pin/安装记录与必要收据。不得用历史受审摘要解释新实现，也不得关闭 Digest 校验来通过演示。
-3. **预算与权限一同验证**：对不受信输入采用可证伪的早拒绝与预算检查；优化 `Object.entries()` 一类集中分配行为时，同时检验有界数量、早期拒绝、getter/Proxy 的副作用边界、语义不变和 BUILD 静态准入。未证明 JS 引擎的内存上界时，不得声称任意恶意对象已具严格常量空间保证。
+3. **预算与权限一同验证**：对不受信输入采用可证伪的早拒绝与预算检查；优化 `Object.entries()` 一类集中分配行为时，同时检验有界数量、早期拒绝、getter/Proxy 的副作用边界、语义不变和 生成期静态准入。未证明 JS 引擎的内存上界时，不得声称任意恶意对象已具严格常量空间保证。
 4. **单次有界失败诊断**：对 CI 首次失败，优先定位第一真实失败步骤和原始错误码（例如 `DH_BUILD_RESOURCE_DIGEST_MISMATCH`、`DH_BUILD_DEPENDS_ON_UNSELECTED`），只修正实际违规的 Target/Binding；测试和 Digest 在同一 Exact HEAD 后再复验。旧 FAILURE/PASS 与当前新 HEAD 的结论不能混用。
 
 上述规则适用于后续任何 v0.11.x Package/Standard Element 改动；并**不**表示 #1669 已合并或其剩余 Profile/P2 风险已自动解决。其限定实证仍由对应 PR / Review / CI 记录。

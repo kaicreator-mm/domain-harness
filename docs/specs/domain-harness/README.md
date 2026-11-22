@@ -4,7 +4,7 @@
 
 ## 推荐阅读路径
 
-- **任何任务先读**：[核心规范](./core.md)（根原则、状态解释和条款索引）。
+- **任何任务先读**：[核心规范](./core.md)（根原则、状态解释、术语和条款索引，尤其 **CORE-11：生成期负责 Package/Element 正确性、SDK 仅做最后兜底**）。
 - **按实际任务读取对应细节**：参见下面的目录。没有触及的模块不需要全部加载。
 - **设计新功能或审核现有功能**：同时阅读 [实施状态和决策](./status-and-decisions.md)，区分已确认设计与尚未实现的新合同；需要精确 ABI 时再查当前 TypeScript Contracts、版本 Product/L1、L2 和真实 Source SHA。
 - **LLM / Agent**：使用 [domain-harness-spec Skill](../../../.agents/skills/domain-harness-spec/SKILL.md) 作为导航/检查流程；Skill **不复制、不修改**本目录中的规范条款。
@@ -17,7 +17,7 @@
 | [architecture.md](./architecture.md) | §A/§5：系统蓝图、Boot/KDP 自举、模块职责、ARCH 不变量 | 架构、Kernel、Boot、职责调整 |
 | [element-package.md](./element-package.md) | §2/§3/§8：Element 内聚与多 Function/Content、Package 多 Element、Standard 准入 | 创建 Package/Element、代码归属、标准资产 |
 | [lifecycle-workflow.md](./lifecycle-workflow.md) | §4/§13.3/§13.5：Init/Exit、Core.Order、Outcome、Workflow/Hook/预算 | 生命周期、Workflow、状态及失败 |
-| [composition-trust.md](./composition-trust.md) | §6/§13.4：作者期组合、Lock/Pin、执行前完整性、资源/Effect | BUILD、安装、可信加载与权限 |
+| [composition-trust.md](./composition-trust.md) | §6/§13.4：生成期验证、App 组合与封存、Lock/Pin、安装完整性、资源/Effect | 生成、组合、安装、可信加载与权限 |
 | [identity-naming.md](./identity-naming.md) | §7/§13.1/§13.2：名称、Version/Digest、Ref/Content/Schema | 命名、序列化、Schema、版本迁移 |
 | [engineering-quality.md](./engineering-quality.md) | §9/§13.6：TypeScript、日志/配置、测试、Exact-SHA | 编码、CI、错误诊断、工程审核 |
 | [status-and-decisions.md](./status-and-decisions.md) | §10/§11/§12/§14：现行证据、未决设计、来源、变更控制 | 版本规划、Foundation #1668、合规判断 |

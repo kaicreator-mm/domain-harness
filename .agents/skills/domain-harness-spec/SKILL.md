@@ -10,7 +10,7 @@ description: 为 DomainHarness v0.11.x 的架构、设计、Package/Element、KD
 ## 始终执行的三步
 
 1. 先读取 [目录](../../../docs/specs/domain-harness/README.md) 与 [核心规范](../../../docs/specs/domain-harness/core.md)。
-2. 判断任务实际触及哪些接口、Package/Element、信任边界、生命周期、身份、可选标准能力。**只读对应的细则**，避免一次加载整个规范集；跨界任务可以读取多个。
+2. 判断任务实际触及哪些接口、Package/Element、信任边界、生命周期、身份、可选标准能力。**只读对应的细则**，避免一次加载整个规范集；跨界任务可以读取多个。遇到 Validator、静态 ESM、Schema、DAG、Boot 任务先核对 **CORE-11：Package/Element 的正确性归生成期作者，SDK Runtime 不得重新解析源码/证明静态正确性，只做完整性和故障兜底**。
 3. 结合当前仓库 Exact HEAD、Contracts/Manifest/Target、Product/L1、L2 与相应真实测试核实：**规范已经要求什么**、**源码实际做了什么**、**是否具有对应 SHA 的验收证据**。绝不把 `MIGRATION_REQUIRED` 或 `CANDIDATE` 写为实现 PASS。
 
 ## 模块选择
@@ -20,7 +20,7 @@ description: 为 DomainHarness v0.11.x 的架构、设计、Package/Element、KD
 | 架构重构、Boot、KDP、PackageSystem/Actor 所有权 | [architecture.md](../../../docs/specs/domain-harness/architecture.md) |
 | 编写 Package、Element、Standard Element 或拆分职责 | [element-package.md](../../../docs/specs/domain-harness/element-package.md) |
 | Core.Order、Init/Exit、Workflow、Outcome、Hook、预算 | [lifecycle-workflow.md](../../../docs/specs/domain-harness/lifecycle-workflow.md) |
-| BUILD、受信安装、Pin/Lock、ResourceRef/Effect、npm 依赖 | [composition-trust.md](../../../docs/specs/domain-harness/composition-trust.md) |
+| Package/Element 生成期质量、App 组合与封存、受信安装、Pin/Lock、ResourceRef/Effect、npm 依赖 | [composition-trust.md](../../../docs/specs/domain-harness/composition-trust.md) |
 | ID/Namespace/Schema/Digest/版本或改名 | [identity-naming.md](../../../docs/specs/domain-harness/identity-naming.md) |
 | TypeScript 质量、日志、配置、测试、CI/独审 | [engineering-quality.md](../../../docs/specs/domain-harness/engineering-quality.md) |
 | 当前是否合格、迁移状态、历史证据、规范改动 | [status-and-decisions.md](../../../docs/specs/domain-harness/status-and-decisions.md) |
