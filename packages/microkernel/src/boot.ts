@@ -10,6 +10,7 @@ import type {
   BootErrorCode,
 } from '@kaicreator/domain-harness-contracts';
 import { isRecord, normalizeBootstrapContext, readTrustedRecord, verifyContextPaths, verifyInstallTrust } from './verify.js';
+import { createKdpHostCallFence } from './kdp.js';
 
 function refused(code: BootErrorCode, reason: string): BootResult {
   return { status: 'REFUSED', code, reason };
@@ -124,29 +125,45 @@ export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Pro
     return { status: 'FAILED', code: 'DH_BOOT_KDP_ENTRY_INVALID',
       reason: 'selected KDP Host Init export is not callable (detail redacted)' };
   }
-  let result: unknown;
+  // 进入真正 KDP.Init 后，任何未处理异常/非法 Host 返回都需走一次有界 Exit。
+  // Boot 不实例化第二套运行时：仅持有 KDP 提供的一次性清理交接句柄。
+  const entered = createKdpHostCallFence(safeContext);
+  const failedAfterEntry = async (code: string, reason: string): Promise<BootResult> => {
+    const cleanup = await entered.cleanup();
+    const detail = cleanup === 'DONE' ? '' : cleanup === 'UNSAFE'
+      ? '; cleanup=CLEANUP_NOT_SAFE (trusted installation unavailable)'
+      : '; cleanup=EXIT_FAILED (details redacted)';
+    return { status: 'FAILED', code, reason: `${reason}${detail}` };
+  };
+
   try {
-    result = await (entry as KdpPrimary['init'])(safeContext);
+    const result: unknown = await (entry as KdpPrimary['init'])(entered.context);
+    // Host 结果是进程内 DomainApp，而非普通 JSON FunctionOutcome。
+    // Getter/Proxy 异常同样必须被统一兜底，不能越过 Exit 边界。
+    if (!isRecord(result) || (result['status'] !== 'BOOTED' && result['status'] !== 'FAILED')) {
+      return await failedAfterEntry(
+        'DH_KDP_PACKAGE_LOAD_FAILED', 'KDP Host Init did not return a valid Host result',
+      );
+    }
+    if (result['status'] === 'FAILED') {
+      return typeof result['code'] === 'string' && typeof result['reason'] === 'string'
+        ? await failedAfterEntry(result['code'], result['reason'])
+        : await failedAfterEntry(
+            'DH_KDP_PACKAGE_LOAD_FAILED', 'KDP Host Init returned malformed failure data',
+          );
+    }
+    const app = result['app'];
+    if (!isRecord(app) || !['READY', 'DEGRADED', 'BLOCKED', 'FAILED'].includes(app['status'] as string) ||
+        typeof app['inspect'] !== 'function' || typeof app['dispose'] !== 'function') {
+      return await failedAfterEntry(
+        'DH_KDP_PACKAGE_LOAD_FAILED', 'KDP Host Init returned an invalid DomainApp process handle',
+      );
+    }
+    return { status: 'BOOTED', app: app as unknown as import('@kaicreator/domain-harness-contracts').DomainApp };
   } catch {
-    return { status: 'FAILED', code: 'DH_KDP_PACKAGE_LOAD_FAILED',
-      reason: 'selected KDP Host Init threw an unhandled error (detail redacted)' };
+    console.error('[KDP Host] code=DH_KDP_PACKAGE_LOAD_FAILED phase=init detail=redacted');
+    return await failedAfterEntry(
+      'DH_KDP_PACKAGE_LOAD_FAILED', 'selected KDP Host Init raised an unhandled error (detail redacted)',
+    );
   }
-  // KDP Host 返回的是进程内 DomainApp，不属于普通 JSON FunctionOutcome。
-  if (!isRecord(result) || (result['status'] !== 'BOOTED' && result['status'] !== 'FAILED')) {
-    return { status: 'FAILED', code: 'DH_KDP_PACKAGE_LOAD_FAILED',
-      reason: 'KDP Host Init did not return a valid Host result' };
-  }
-  if (result['status'] === 'FAILED') {
-    return typeof result['code'] === 'string' && typeof result['reason'] === 'string'
-      ? { status: 'FAILED', code: result['code'], reason: result['reason'] }
-      : { status: 'FAILED', code: 'DH_KDP_PACKAGE_LOAD_FAILED',
-          reason: 'KDP Host Init returned malformed failure data' };
-  }
-  const app = result['app'];
-  if (!isRecord(app) || !['READY', 'DEGRADED', 'BLOCKED', 'FAILED'].includes(app['status'] as string) ||
-      typeof app['inspect'] !== 'function' || typeof app['dispose'] !== 'function') {
-    return { status: 'FAILED', code: 'DH_KDP_PACKAGE_LOAD_FAILED',
-      reason: 'KDP Host Init returned an invalid DomainApp process handle' };
-  }
-  return { status: 'BOOTED', app: app as unknown as import('@kaicreator/domain-harness-contracts').DomainApp };
 }
