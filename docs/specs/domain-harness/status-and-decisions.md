@@ -14,7 +14,7 @@
 | Core.Order=0 KDP、单轮 Init、直接 Extension、可选 Exit/InitFrom、真实逆序 Exit | **CONFIRMED / v0.11.0 scoped** | #1621/#1622/#1625 及受影响源码 |
 | Init→Workflow→Function、标准 JSON/YAML、单公开 SDK、真实 Reference App | **CONFIRMED / v0.11.1 scoped** | #1605/#1656/#1664；R72/#2979、R81/#2981 |
 | KDP Element 真正拥有 PackageSystem、Workflow Runtime/DomainApp 启动；Boot 只作预验+单委托 | **MIGRATION_REQUIRED** | 现有 `bootstrap`/Microkernel 双实现所有权差距；#1668 |
-| 作者期 App 组合与封存执行能力由真实 SDK Package/Element 拥有 | **MIGRATION_REQUIRED** | 与运行期 App 还未构建的自举问题在 #1668 L2 明确 |
+| 作者期 App 组合与封存执行能力由真实 SDK Package/Element 拥有 | **MIGRATION_REQUIRED** | 与未来 App 还未生成的自举问题在 #1668 L2 明确 |
 | 新 Package kebab-case、Element camelCase/Namespace 独立、自动化合法性 | **MIGRATION_REQUIRED** | Schema/生成期验证/组合封存/Lock/Pin/Consumer 全链迁移和新摘要 |
 | 旧 0.11.1 P2 | **KNOWN_NOT_FIXED** | 如真影响产品边界再做定点修复，不冒充已解决 |
 | 完整 0.11.x 主线、跨语言单 App/Forge/正式发布 | **NOT_DELIVERED / OUT_OF_SCOPE** | 不能从 0.11.1 资格推断完成 |
@@ -46,7 +46,7 @@
 - [v0.11.1 PRD](../../product/DomainHarness_v0.11.1_Task_Execution_PRD.md)、[#1656 R60](https://github.com/kaicreator-mm/domain-harness/issues/1656)、[v0.11.1 事后复盘](../../engineering/DOMAIN_HARNESS_V0111_VERSION_RETROSPECTIVE.md)、[Reference StageIndex](../../../examples/reference-domain-app/stages.json)。
 - [R87 Element/Package 组织分析](../DomainHarness_v0.11.x_ELEMENT_PACKAGE_ORGANIZATION_STANDARD.md)、[命名分析和迁移表](../DomainHarness_v0.11.x_NAMING_STANDARD.md)、[Boot/KDP 源码差距审计](../../architecture/DomainHarness_v0.11.x_ELEMENT_FIRST_BOOTSTRAP_OWNERSHIP_REVIEW.md)、[交付质量手册](../../engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)。
 
-**维护规则**：以后任何 Product、L2、Build、Agent、PR 想增加基础规范，应**首先修改规范集对应的唯一权威模块**，说明状态由何证据从 CANDIDATE→CONFIRMED 或 MIGRATION_REQUIRED→已实现、受影响 ABI/Schema 与验证范围；其它文档只保留参考链接或具体实现决议。不允许出现另外一份自称“当前唯一规则”且内容相反的基础规范，也不以文档修改等价代码已完成。
+**维护规则**：以后任何 Product、L2、生成者、Agent、PR 想增加基础规范，应**首先修改规范集对应的唯一权威模块**，说明状态由何证据从 CANDIDATE→CONFIRMED 或 MIGRATION_REQUIRED→已实现、受影响 ABI/Schema 与验证范围；其它文档只保留参考链接或具体实现决议。不允许出现另外一份自称“当前唯一规则”且内容相反的基础规范，也不以文档修改等价代码已完成。
 
 ## 14. 规范仍缺哪些决策（设计候选，不得冒充强制 ABI）
 
@@ -54,7 +54,7 @@
 |---|---|---|
 | **P0 / Foundation 先行** | R87 `ElementDefinition.id` camelCase、`namespace` 独立后的完整机器身份和 canonical digest、Package Owner/重复定义冲突、旧 Lock/Pin/Target 的迁移规则 | 影响引用唯一性与所有已选权限，归 #1668 L2；当前点分 ID 仍在代码中 |
 | **P0 / Foundation 先行** | Boot 到真实 KDP.Init 的唯一 Target/Pin、入口执行前字节验证与文件替换/TOCTOU、KDP 实现代码归属与失败清理顺序 | 影响自举正确性和受信边界，归 #1668 L2；不能将验证移到未验证的 KDP 自己 |
-| **P0 / Foundation 先行** | 作者期 Composition/Contracts 如何有真实 Package+Element 所有权，怎样通过已安装 SDK 固定入口构建尚未启动的 App | 不能产生第二套 App 组合机制或自举环，归 #1668 L2 |
+| **P0 / Foundation 先行** | 作者期 Composition/Contracts 如何有真实 Package+Element 所有权，怎样通过已安装 SDK 固定入口组合并封存尚未启动的 App | 不能产生第二套 App 组合机制或自举环，归 #1668 L2 |
 | **P1 / 真实用例驱动** | 通用 Resource/HostPort/Effect 能力约束、动态权限/资源消耗范围、失败原因与 KDP 技术兜底接口 | 仅对具体新能力/Host/Target 需求进行 L1/L2，不提前实现通用 Effect 平台 |
 | **P1 / 真实用例驱动** | 公共 Schema/Definition/Function/Package 的发布后演化、破坏性兼容与跨版本消费矩阵；多 Target 的物理实现差异 | 内部 0.11.x 当前不承诺 ABI 兼容，正式 Release 前由 Product/L2 确定；不得自行假设跨语言 ABI |
 | **P1 / 真实用例驱动** | 未来持久化、ASK/WAIT 恢复、取消/并发/超时以及业务状态恢复的完整合同 | 不是 0.11.1 已实现能力，待拥有该 Product 范围的阶段设计，不因此提前改后续版本 |
