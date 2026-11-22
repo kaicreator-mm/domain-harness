@@ -272,6 +272,27 @@ console.log('DH_R60_SDK_ONLY_REGISTRY_IMPORTS_OK');
   evidence.registryWorkflowSelected = sealed.selectedWorkflows.length;
   evidence.registryWorkflowBoot = true;
   evidence.registryDataReads = 4;
+  // R77: a normal, self-contained user Domain App lives outside the SDK source
+  // checkout and reuses the exact one-public-SDK install and bounded Registry.
+  const referenceSource = join(consumer, 'reference-domain-app');
+  await cp(join(repo, 'examples/reference-domain-app'), referenceSource, { recursive: true });
+  const referenceEvidence = join(temporary, 'reference-receipt');
+  const referenceRun = await runNode(referenceSource, ['main.mjs'], {
+    ...env, DH_REF_EVIDENCE: referenceEvidence,
+  });
+  assert.equal(referenceRun.code, 0, 'Independent Reference Domain App E2E: ' +
+    referenceRun.stderr + '\\n' + referenceRun.stdout);
+  assert.ok(referenceRun.stdout.includes('REFERENCE_DOMAIN_APP_ACCEPTANCE'));
+  const referenceReceipt = JSON.parse(await readFile(
+    join(referenceEvidence, 'reference-receipt.json'), 'utf8'));
+  assert.equal(referenceReceipt.status, 'PASS');
+  assert.equal(referenceReceipt.sdkDirectDependencies, 1);
+  assert.equal(referenceReceipt.workflowCount, 1);
+  assert.deepEqual(referenceReceipt.initOrder,
+    ['r41-kdp', 'r41-sdk-base', 'reference-business']);
+  assert.deepEqual(referenceReceipt.exitOrder,
+    ['reference-business', 'r41-sdk-base', 'r41-kdp']);
+  console.log('DH_R77_REFERENCE_DOMAIN_APP_PASS ' + JSON.stringify(referenceReceipt));
   console.log('DH_R60_REAL_REGISTRY_ONE_DIRECT_SDK_PASS '+JSON.stringify(evidence));
 } finally {
   if(server) await new Promise(resolve=>server.close(resolve));
