@@ -379,6 +379,12 @@ export function verifyGeneratedPackageImports(
       }
       if (ts.isCallExpression(node)) {
         if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+          // KDP 必须在首次 ESM 求值前完成闭包验证，延迟 import 即使字面量也不可出现。
+          // 普通 Business/SDK 仍按各自受选静态子集规则处理，不能用 KDP 权限放行。
+          if (consumer.role === 'primary' && consumer.layer === 'kernel' && consumer.order === 0) {
+            throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+              `selected KDP module '${key}' cannot use dynamic import (including literal imports)`);
+          }
           const arg = node.arguments[0];
           if (!arg || !ts.isStringLiteral(arg)) {
             throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `dynamic import with nonliteral target in '${key}'`);

@@ -69,6 +69,22 @@ refusalCase('DH_BUILD_REF_UNRESOLVED', (s) => {
   s.eligibility.dependencies = [{ element: 'orders.ghost', version: '1.0.0' }];
 });
 
+test('Foundation L2-1: FunctionRef namespace must match the selected logical Element key', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input, refs } = scenario.finalize();
+  const packages = input.packages.map((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core'
+    ? {
+      ...(pkg as DomainPackageManifest),
+      imports: [{
+        ...refs.evaluateRef,
+        element: { ...refs.evaluateRef.element, namespace: 'unselected-namespace' },
+      }],
+    } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_REF_UNRESOLVED');
+});
+
+
 refusalCase('DH_BUILD_ELEMENT_CYCLE', (s) => {
   s.faq.dependencies = [{ element: 'orders.eligibility', version: '^1.0.0' }];
 });
@@ -486,6 +502,27 @@ test('BUILD forbids Element content references to an undeclared Package', (t) =>
     packageId: 'kdp-kernel', path: 'content/unauthorized.json', digest: `sha256:${'0'.repeat(64)}`,
   };
   expectRefusal(buildApp(scenario.finalize().input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('Foundation L2-1: Order-0 Kernel refuses literal dynamic import before sealing KDP', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const kdp = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'kdp-kernel') as DomainPackageManifest;
+  const target = writeRaw(scenario.ws.packageRoots['kdp-kernel']!, 'dist/kdp.mjs',
+    new TextEncoder().encode('export async function init() { await import("./lazy.mjs"); }\nexport function exit() {}\n'));
+  const patched = {
+    ...kdp,
+    targetVariants: kdp.targetVariants.map((variant) => ({
+      ...variant,
+      implementations: variant.implementations.map((binding) => ({
+        ...binding,
+        entry: { ...binding.entry, module: target },
+      })),
+    })),
+  };
+  const packages = input.packages.map((pkg) => pkg === kdp ? patched : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
 function generatedLoaderCase(label: string, body: string, code: BuildErrorCode = 'DH_BUILD_DEPENDS_ON_UNSELECTED'): void {

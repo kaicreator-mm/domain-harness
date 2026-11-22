@@ -58,6 +58,11 @@ function elementNamespace(id: string): string {
   return id.slice(0, dot);
 }
 
+/** Element 的逻辑查询键必须同时包含 Namespace 和 ID；Owner/Digest 再独立核对。 */
+function qualifiedElementIdentity(namespace: string, id: string): string {
+  return JSON.stringify([namespace, id]);
+}
+
 function isCompatibleTarget(target: TargetSelector): boolean {
   return (
     target.runtime === 'node' &&
@@ -156,7 +161,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   // 第 3 段：按真实文件字节验证 Element 定义及资源；同一 Element 的 ID/版本只能有一个 owner。
   const scope = new ResourceScope(input.packageRoots);
   const elements = new Map<string, LoadedElement>();
-  const byLogicalId = new Map<string, Map<SemVer, LoadedElement>>();
+  const byQualifiedId = new Map<string, Map<SemVer, LoadedElement>>();
   const packagesSorted = [...selected.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
   for (const manifest of packagesSorted) {
     for (const entry of manifest.elements) {
@@ -206,16 +211,17 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
         visibility: entry.visibility,
       };
       elements.set(key, loaded);
-      const versions = byLogicalId.get(def.id) ?? new Map<SemVer, LoadedElement>();
+      const qualified = qualifiedElementIdentity(namespace, def.id);
+      const versions = byQualifiedId.get(qualified) ?? new Map<SemVer, LoadedElement>();
       versions.set(def.version, loaded);
-      byLogicalId.set(def.id, versions);
+      byQualifiedId.set(qualified, versions);
     }
   }
-  for (const [id, versions] of byLogicalId) {
+  for (const [qualifiedId, versions] of byQualifiedId) {
     if (versions.size > 1) {
       throw refusal(
         'DH_BUILD_VERSION_CONFLICT',
-        `element '${id}' is required at multiple versions: ${[...versions.keys()].sort().join(', ')}`,
+        `element '${qualifiedId}' is required at multiple versions: ${[...versions.keys()].sort().join(', ')}`,
       );
     }
   }
@@ -225,7 +231,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   for (const loaded of elements.values()) {
     const deps: string[] = [];
     for (const dep of loaded.def.dependencies ?? []) {
-      const versions = byLogicalId.get(dep.element);
+      const versions = byQualifiedId.get(qualifiedElementIdentity(elementNamespace(dep.element), dep.element));
       const resolved = versions
         ? [...versions.values()].find((candidate) => satisfiesSemver(candidate.def.version, dep.version))
         : undefined;
@@ -290,7 +296,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   }
 
   const resolveFunctionRef = (ref: FunctionRef, refPath: string): ResolvedFunction => {
-    const versions = byLogicalId.get(ref.element.id);
+    const versions = byQualifiedId.get(qualifiedElementIdentity(ref.element.namespace, ref.element.id));
     const loaded = versions?.get(ref.element.version);
     if (!loaded || loaded.namespace !== ref.element.namespace) {
       throw refusal('DH_BUILD_REF_UNRESOLVED', `function reference '${ref.element.id}' is not in the selected closure`, refPath);
