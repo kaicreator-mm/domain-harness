@@ -106,6 +106,6 @@ BLOCKER=<none or actual external reason>
 
 ## 5. 下一版本如何直接使用
 
-在每个 0.11.1+ 原生 Task DAG 的 **第一个实施任务** 引用本手册的 `1` 风险切面；后续 Task 仅补新增边界及测试。例：Task/Workflow/State Loop 不创建平行 Kernel；其运行状态、超时/中断、UNKNOWN 语义及权限保持在唯一 KDP/SDK 授权路径内，按“合法进入 → 无权限/未知/重复 → 中途失败 → 清理/观察”组织增量测试。该示例是**设计检查方式**，不表示 0.11.1 已实现、冻结或获得审核资格。
+在每个 0.11.1+ 原生 Task DAG 的 **第一个实施任务** 引用本手册的 `1` 风险切面；后续 Task 仅补新增边界及测试。例：Task/Workflow/State Loop 不创建平行 Kernel；其运行状态、超时/中断、UNKNOWN 语义及权限保持在唯一 KDP/SDK 授权路径内，按“合法进入 → 无权限/未知/重复 → 中途失败 → 清理/观察”组织增量测试。该示例原为历史设计检查方式；**0.11.1 现已完成 scoped 实施与独立 Reference App 验收**。后续任一阶段仍需先经 Owner 完成 Product/L1 功能澄清与 L2 审核，不能由已写业务示例或 CI SUCCESS 倒推产品范围。参见 [v0.11.1 版本复盘](./DOMAIN_HARNESS_V0111_VERSION_RETROSPECTIVE.md)。
 
 已有 [0.11.0 详细调用链](../architecture/DOMAIN_HARNESS_V0110_CODE_AND_CALL_FLOW.md) 是新增功能判断所属层的源码依据，优先复用已验证的 BUILD、Trust、Package、App 和 clean-install 测试。后续任何新的真实失败，按“现象→机制→预防关口→反例/脚本→验收”增量更新本手册；**不要添加单纯重复的口号性规范**。
