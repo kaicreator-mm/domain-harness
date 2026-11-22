@@ -1,7 +1,8 @@
 // 当前架构的可证伪测试：断言实际行为而非历史兼容。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { BootResult, BootstrapPin, ContentDigest } from '@kaicreator/domain-harness-contracts';
@@ -155,6 +156,38 @@ test('KDP artifact digest mismatch is DH_BOOT_PIN_MISMATCH', async (t) => {
     const flip = Buffer.from(bytes);
     flip[0] = flip[0] === 0x2f ? 0x30 : 0x2f;
     await fixture.writeKdpEntryBytes(flip);
+    const result = await boot(fixture.pin, fixture.context);
+    assertRefused(result, 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+});
+
+/** 受信根外的 KDP 软链接不得被 Lock 的旧字节摘要误认为合法安装。 */
+test('Boot rejects external KDP package symlink before selected Init', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const outside = await mkdtemp(join(tmpdir(), 'dh-kdp-outside-'));
+    t.after(() => rm(outside, { recursive: true, force: true }));
+    const selectedRoot = join(fixture.installRoot, 'node_modules', KDP_PACKAGE_ID);
+    await cp(selectedRoot, outside, { recursive: true });
+    await rm(selectedRoot, { recursive: true, force: true });
+    await symlink(outside, selectedRoot, process.platform === 'win32' ? 'junction' : 'dir');
+
+    const result = await boot(fixture.pin, fixture.context);
+    assertRefused(result, 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+});
+
+/** 即使物理 KDP 仍位于安装根内，重定向目录会改变 Node ESM 的 bare import 搜索路径。 */
+test('Boot rejects in-root relocated KDP package before selected Init', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const relocated = join(fixture.installRoot, 'store', 'relocated-kdp');
+    await mkdir(join(fixture.installRoot, 'store'), { recursive: true });
+    const selectedRoot = join(fixture.installRoot, 'node_modules', KDP_PACKAGE_ID);
+    await cp(selectedRoot, relocated, { recursive: true });
+    await rm(selectedRoot, { recursive: true, force: true });
+    await symlink(relocated, selectedRoot, process.platform === 'win32' ? 'junction' : 'dir');
+
     const result = await boot(fixture.pin, fixture.context);
     assertRefused(result, 'DH_BOOT_PIN_MISMATCH');
     sideEffectFree();
