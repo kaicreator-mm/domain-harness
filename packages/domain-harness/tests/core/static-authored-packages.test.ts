@@ -271,7 +271,7 @@ test('R60 W02: another Domain cannot import unselected or undeclared Standard Re
   const staleDigest = buildApp({ ...input, packages: selectedPool.map((pkg) =>
     pkg.id === 'r41-business' ? {
       ...pkg, imports: pkg.imports.map((item) => item.functionId === 'jsonReader'
-        ? { ...item, element: { ...item.element, digest: `sha256:${'0'.repeat(64)}` as `sha256:${string}` } : item),
+        ? { ...item, element: { ...item.element, digest: `sha256:${'0'.repeat(64)}` as `sha256:${string}` } } : item),
     } : pkg) });
   assert.equal(staleDigest.ok, false, 'wrong Standard Element digest is not an authorized FunctionRef');
 
