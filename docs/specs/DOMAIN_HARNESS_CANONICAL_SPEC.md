@@ -267,6 +267,9 @@ SDK 产品层：唯一 @kaicreator/domain-harness（作者期 + 运行期入口�
 
 ## 12. 规范依据、下位文件与变更办法
 
+> **R90 补充索引**：本规范 §13 统一跨层的身份/摘要、Content/Ref、状态与失败、安全/资源、预算、日志与配置原则；§14 则保留尚未实施的具体接口/迁移问题。**条款状态比“本文件写了什么”更重要**：仅已确认的原则可立即作为设计约束，待迁移/候选不应冒充当前代码已经支持。
+
+
 来源（按后续已确认裁决筛选，不机械继承旧候选）：
 
 - [#1563 R5 Element/Package 组织讨论](https://github.com/kaicreator-mm/domain-harness/issues/1563#issuecomment-7020667768)；[DIS #1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)；[Package #1480](https://github.com/kaicreator-mm/domain-harness/issues/1480)；[Boot/KDP #1484](https://github.com/kaicreator-mm/domain-harness/issues/1484)。
@@ -276,3 +279,69 @@ SDK 产品层：唯一 @kaicreator/domain-harness（作者期 + 运行期入口�
 - [R87 Element/Package 组织分析](./DomainHarness_v0.11.x_ELEMENT_PACKAGE_ORGANIZATION_STANDARD.md)、[命名分析和迁移表](./DomainHarness_v0.11.x_NAMING_STANDARD.md)、[Boot/KDP 源码差距审计](../architecture/DomainHarness_v0.11.x_ELEMENT_FIRST_BOOTSTRAP_OWNERSHIP_REVIEW.md)、[交付质量手册](../engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)。
 
 **维护规则**：以后任何 Product、L2、Build、Agent、PR 想增加基础规范，应**首先修改此一份文件的相关章节**，说明状态由何证据从 CANDIDATE→CONFIRMED 或 MIGRATION_REQUIRED→已实现、受影响 ABI/Schema 与验证范围；其它文档只保留参考链接或具体实现决议。不允许出现另外一份自称“当前唯一规则”且内容相反的基础规范，也不以文档修改等价代码已完成。
+
+
+## 13. 横切合同：哪些能力跨越所有 Package/Element 仍须统一规定（R90）
+
+> **新增定位**：§1–§9 主要明确“对象与架构所有权”；本节补充已经从 0.11.0 Contracts、0.11.1 L2、真实 Consumer 和既有 Owner 决策确认的**跨层语义原则**。**不把现行 Schema 字段拼写/Hash 算法细节提升为永久公共 ABI**。确切机器结构以受审 `packages/contracts` Schema、当前 Target Lock 和经相应 L2 确认的变更为准。
+
+### 13.1 多重身份、规范化序列化与版本边界 — CONFIRMED 原则
+
+- **逻辑身份与物理身份严格区分**：Domain/Package/Element/Function/Workflow/Content 的逻辑 ID、版本和 Owner；Definition/Contract/Implementation/Target/Resource 的具体字节与 Digest；App Descriptor、Lock/Pin、安装记录与 Receipt，各自承担不同责任。不得通过路径、显示名或文本相等替代精确的权威身份。
+- ElementRef 持有 `namespace/id/version/digest`，FunctionRef 另有 `functionId/contractVersion`；WorkflowRef 指向已选 Element 与其 `contentId`。**当前点分 Element ID 的 Namespace 派生与 R87 的变量式 ID 目标存在差距**，属于 #1668 的机器 ABI 迁移，不得只变更文本描述。
+- BUILD 应对使用到的 Definition、Target 实现、资源、Package 产物、App 组合按各自适用的规范化和 Digest 约束进行确定性封存；相同有效输入/Target 应产生等价的 Lock 和受信安装身份。**Digest 不保证来源权威，身份校验也不赋予未声明的调用或 Effect 权限**。
+- `schemaVersion`、Element `version`、Function `contractVersion`、Package SemVer、Target Profile、Lock/Pin 版本与 npm 发布版本不同；不混为一个全局版本号。对尚未发布的 `0.11.x` 内部阶段没有 ABI 兼容义务；对未来已发布合同的演进规则需要正式 L1/L2 决议。
+
+### 13.2 Content、Schema、Ref 与可见性 — CONFIRMED 原则
+
+- 已选 Element 内容使用 `contentKind + schemaRef` 的有类型内容块；资源 `value` 与 `ref` 的选用、必填/可选属性、inline/资源字节的规范化和摘要须由当前 Schema/BUILD 明确，不靠运行时猜测格式。
+- **未知必需内容不能在没有已确认类型/Schema 时默默接受；未知可选内容必须可确定性排除并可从 Lock/收据审计**。允许的扩展类型前缀不自动代表任意未知语义已受审或有权限执行。
+- 所属 Package、Element Visibility、直接 Extension、选定 FunctionRef、Target、具体资源/HostPort 共同构成授权边界；元数据能被索引不代表原始私有资源被任何 Package 读取。
+- 纯数据/零 Function Element 可以合法静态存在，运行期 Reader/Query 必须是实际选定并被授权的普通 Element.Function；**不得因 Content.Kind 为 `rule` 或 `workflow-definition` 自动获得执行能力**。
+
+### 13.3 结果、状态与失败语义不能混淆 — CONFIRMED
+
+| 层面 | 当前已经存在的状态/结果族 | 不变量 |
+|---|---|---|
+| **AppStatus / Package Init** | `READY/DEGRADED/BLOCKED/FAILED` | 只描述应用/Init 结果，不等于某个 Workflow 已完成 |
+| **FunctionOutcome** | `SUCCEEDED/UNKNOWN/FAILED` | `UNKNOWN` 不冒充成功；错误不可静默归一为 `SUCCEEDED` |
+| **WorkflowOutcome** | `COMPLETE/REJECT/ASK/WAIT/UNKNOWN/FAILED` | `ASK/WAIT` 仅本次有界结果，不承诺 durable Resume；与 AppStatus 相互独立 |
+| **Boot/BUILD** | 固定拒绝/异常类别、不可使用的选定目标 | 在信任/静态闭包失败时 fail-closed，不转换成业务完成或伪 READY |
+| **Exit/Dispose** | 真实 Init 进入记录的逆序退出尝试 | 首个失败原因应可定位，清理失败不阻断剩余退出，不掩盖启动根因 |
+
+- 公开状态族、错误结果与详细内部日志应分开；给出稳定可排查的 **阶段、Package/Element/FunctionRef（在适用且安全时）、错误类别和脱敏说明**。不把用户业务数据、Token、环境秘密或未经授权的 Content 直接写入日志。
+- Package Function 负责自己的预期业务错误与降级策略；KDP 只做不可恢复技术失败的最小兜底和 Exit。不得在 Kernel 新建一个泛用业务补偿/重试/Outcome 重写器。
+
+### 13.4 信任边界、资源与外部 Effect — CONFIRMED
+
+- **可信输入位置不同**：作者期/BUILD 根据被选文件和 Target 封存闭包；Boot 只验证已安装锚点、Pin/Lock/执行前 KDP 字节；KDP 只执行已选能力并进行必需运行时信任与生命周期守护；Function 内的领域判断归 Package。不得在运行期重新进行静态依赖寻优。
+- **最小资源原则**：Init/Function 获得的可读资源句柄只应来自其已选 `SelectedFunction.resources` 及明确的直接 Extension 授权，不从整个 Lock 全资源列表隐式派生。HostPort/Effect 必须有专门合同，`effect:'none'` 的纯格式 Parser/Writer 不因此具有 fs/network 写权限。
+- **第三方依赖需精确 Target/版本/可重现安装与完整性证据**；当前 Node Profile 通过受审的 SRI/Registry 与 `--ignore-scripts` 安装路径证明必要可信边界，不能将“已有 npm 依赖”理解成支持任意生命周期脚本/任意动态 Import。
+- **威胁模型和保证范围必须明示**：对合法被选代码的权限、完整性和资源选定可作有条件的限定验证；当前方案不是通用任意恶意 JS 隔离沙箱，也不保证任意巨型 JS 对象的绝对内存/CPU 上界。
+
+### 13.5 运行有界性与可观察性 — CONFIRMED 的当前 Workflow Profile
+
+- 根 WorkflowRun 使用**同一份**调用预算，子 Workflow/业务 Function/start-end Hook/Reader 等真实调用须遵守已受审的预留/消费语义；每条活动祖先的深度约束都要成立。不能绕过已选 FunctionRef/Target，不能因为子 Workflow 又产生新的无限预算。
+- Hook `start` 成功进入尝试后，`end` 最多一次并按最终清理规则 await；预算不足时不能先执行业务/Hook 再宣称“超过限制”。本合同来自 v0.11.1 受审 Node ESM Profile，不表示当前 SDK 已提供通用跨进程取消、持久恢复或执行环境强沙箱。
+- 可靠性检查至少观察合法完成、UNKNOWN/ASK/WAIT 或其他不完成状态、未声明/未选/错误 Digest、Init 中途故障/Exit 和可复现资源边界。**可观察结果与实际拒绝不能仅靠 Mock 冒充**。
+
+### 13.6 稳定开发与应用配置原则 — CONFIRMED/按产品适用
+
+- SDK 是嵌入式库，不自行定义每个交互式 Domain App 的 UI、配置向导或持久化形式。**交互式产品**如需要配置，应允许先启动到受限设置界面，再配置和授权业务运行；配置完成前不允许未授权业务操作。CLI、容器或后台服务可根据自己的已声明 Host 启动合同使用启动参数或环境配置，不能强制通用 UI。
+- 源码与文档使用无迭代号的稳定语义命名；中文注释必须描述**当前**职责/不变量，不能保留过时“旧 v011”实现说明或通过机械替换改坏类型。Typecheck/Lint/改动范围测试和真实 Consumer 是提交前的必要质量证据，独立 CI 按真实环境与信任边界使用，不以冗余流水线代替自身等价验证。
+- 对外 SDK 的错误与日志应能区分无权限/依赖错误、Schema/Content 不合格、运行故障和必要 Host 配置缺失。只规定**可诊断、结构化、脱敏的原则**，不强制每个业务 Package 使用同一个日志框架或把应用启动配置塞进 SDK。
+
+## 14. 规范仍缺哪些决策（设计候选，不得冒充强制 ABI）
+
+| 优先级 | 待冻结的关键设计问题 | 原因与正确归口 |
+|---|---|---|
+| **P0 / Foundation 先行** | R87 `ElementDefinition.id` camelCase、`namespace` 独立后的完整机器身份和 canonical digest、Package Owner/重复定义冲突、旧 Lock/Pin/Target 的迁移规则 | 影响引用唯一性与所有已选权限，归 #1668 L2；当前点分 ID 仍在代码中 |
+| **P0 / Foundation 先行** | Boot 到真实 KDP.Init 的唯一 Target/Pin、入口执行前字节验证与文件替换/TOCTOU、KDP 实现代码归属与失败清理顺序 | 影响自举正确性和受信边界，归 #1668 L2；不能将验证移到未验证的 KDP 自己 |
+| **P0 / Foundation 先行** | 作者期 Composition/Contracts 如何有真实 Package+Element 所有权，怎样通过已安装 SDK 固定入口构建尚未启动的 App | 不能产生第二套 BUILD 或自举环，归 #1668 L2 |
+| **P1 / 真实用例驱动** | 通用 Resource/HostPort/Effect 能力约束、动态权限/资源消耗范围、失败原因与 KDP 技术兜底接口 | 仅对具体新能力/Host/Target 需求进行 L1/L2，不提前实现通用 Effect 平台 |
+| **P1 / 真实用例驱动** | 公共 Schema/Definition/Function/Package 的发布后演化、破坏性兼容与跨版本消费矩阵；多 Target 的物理实现差异 | 内部 0.11.x 当前不承诺 ABI 兼容，正式 Release 前由 Product/L2 确定；不得自行假设跨语言 ABI |
+| **P1 / 真实用例驱动** | 未来持久化、ASK/WAIT 恢复、取消/并发/超时以及业务状态恢复的完整合同 | 不是 0.11.1 已实现能力，待拥有该 Product 范围的阶段设计，不因此提前改后续版本 |
+| **P2 / 按风险选择** | 大对象预枚举/严格内存预算、规则事实源单一性、性能与可诊断性基准 | 当前 v0.11.1 有非阻塞 P2 和真实边界；只有目标能力需要更强保证时才新增代码验收 |
+
+**规范维护准则**：这份表是**差距/设计议题登记**，不是向其它版本下发实现任务，更不自动重开已完成的 v0.11.1。每项在有实际 Product/Owner 决议、L2 和必要源码/消费者证据后，才能提升为正式机器合同。凡是 DIS 自有规范，应链接其适用条款，**不要用 DomainHarness 文档重新定义一份相互冲突的 DIS**。
+
