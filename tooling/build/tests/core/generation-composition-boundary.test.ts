@@ -60,7 +60,7 @@ test('SDK 组合只封存生成方已提交的传递资源字节，拒绝未选 
     assert.equal(composed.lock.resourceDigests['orders-business/dist/generated-transitive.js'],
       generated.digest);
     assert.ok(composed.appPackage.files.some((file) =>
-      file.path === 'node_modules/orders-business/dist/generated-transitive.js'));
+      file.path === 'packages/orders-business/dist/generated-transitive.js'));
   }
 
   const forbidden = composeApp({
