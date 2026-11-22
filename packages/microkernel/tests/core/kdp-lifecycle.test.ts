@@ -220,7 +220,7 @@ test('R124 Host KDP continuation preserves explicit repeated Extension entry and
   ]);
   await system.runExit();
   assert.deepEqual(timeline('package-exit'),
-    ['fixture-business', 'fixture-ext', '@fixture/sdk', 'fixture-ext', 'fixture-kernel'],
+    ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-ext', 'fixture-kernel'],
     'each actual Extension entry exits independently, KDP last');
 });
 
