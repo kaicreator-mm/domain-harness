@@ -46,6 +46,4 @@ export interface BuildInput {
   readonly packageRoots: Readonly<Record<string, string>>;
   readonly packageArtifacts: Readonly<Record<string, string>>;
   readonly kdpArtifact: KdpArtifactInput;
-  /** 组合 App 启动入口使用的精确运行时依赖；不得浮动寻优。 */
-  readonly runtimeDependencies: Readonly<Record<string, string>>;
 }

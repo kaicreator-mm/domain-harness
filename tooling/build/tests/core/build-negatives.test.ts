@@ -552,6 +552,19 @@ export async function init() { return loader('return import("undeclared-package"
 export function exit() {}
 `);
 
+generatedLoaderCase('ambient global fetch is not an approved Effect', `
+export async function init() { await fetch('https://example.invalid/no-network'); }
+export function exit() {}
+`);
+generatedLoaderCase('globalThis.fetch bypass is refused before Boot', `
+export async function init() { return globalThis.fetch('https://example.invalid/no-network'); }
+export function exit() {}
+`);
+generatedLoaderCase('ambient process.env access is refused before Boot', `
+export async function init() { return process.env.DH_UNAPPROVED_EFFECT; }
+export function exit() {}
+`);
+
 generatedLoaderCase('private named imports from a declared Extension are refused', `
 import { notExported } from 'orders-ext';
 export async function init() { return notExported(); }
@@ -630,19 +643,21 @@ test('R18 P1: selected Package cannot resolve external optional, peer, bundled, 
   }
 });
 
-test('R18 P1: caller-supplied external or unpinned root runtime dependencies are rejected', (t) => {
-  for (const runtimeDependencies of [
-    { '@kaicreator/domain-harness-microkernel': '0.11.0', 'unselected-probe': '1.0.0' },
-    { '@kaicreator/domain-harness-microkernel': '0.11.0', 'unselected-probe': 'file:../probe' },
-    { '@kaicreator/domain-harness-microkernel': '0.11.0', xstate: '^5.0.0', yaml: '2.9.1' },
-    { '@kaicreator/domain-harness-microkernel': '0.11.0', xstate: '5.33.2', yaml: '^2.9.0' },
-    { '@kaicreator/domain-harness-microkernel': '0.11.1' },
-  ]) {
-    const scenario = standardCase();
-    t.after(scenario.ws.dispose);
-    const { input } = scenario.finalize();
-    expectRefusal(buildApp({ ...input, runtimeDependencies }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
-  }
+test('R55: composed App binds SDK as the only direct runtime product dependency', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const built = buildApp(input);
+  assert.equal(built.ok, true, built.ok ? '' : built.message);
+  if (!built.ok) return;
+  const manifest = built.appPackage.files.find((entry) => entry.path === 'package.json');
+  assert.ok(manifest);
+  const app = JSON.parse(Buffer.from(manifest.bytes).toString('utf8')) as {
+    dependencies: Record<string, string>;
+  };
+  assert.equal(app.dependencies['@kaicreator/domain-harness'], '0.11.0');
+  assert.equal(app.dependencies['@kaicreator/domain-harness-microkernel'], undefined);
+  assert.equal(app.dependencies['@kaicreator/domain-harness-contracts'], undefined);
 });
 
 test('R20 P1: selected root binding.gyp triggers implicit node-gyp and is rejected before npm install', (t) => {

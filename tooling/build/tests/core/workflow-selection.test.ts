@@ -114,7 +114,6 @@ function workflowCase(
     input: {
       ...input,
       packages,
-      runtimeDependencies: { ...input.runtimeDependencies, xstate: '5.33.2', yaml: '2.9.1' },
     },
     ref, resource, workflow, foreignRef: selectedForeignRef,
   };
@@ -208,7 +207,7 @@ function crossOwnerWorkflowCase(t: import('node:test').TestContext,
     };
     return pkg;
   });
-  return { ...input, packages, runtimeDependencies: { ...input.runtimeDependencies, xstate: '5.33.2', yaml: '2.9.1' } };
+  return { ...input, packages };
 }
 
 function accepted(result: BuildResult): Extract<BuildResult, { ok: true }> {
@@ -228,8 +227,11 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
   assert.deepEqual(a.lockBytes, b.lockBytes, 'only one deterministic Lock is used');
   assert.equal(a.appPackage.packageDigest, b.appPackage.packageDigest);
   const composedManifest = JSON.parse(Buffer.from(a.appPackage.files.find((file) => file.path === 'package.json')!.bytes).toString('utf8'));
-  assert.equal(composedManifest.dependencies.xstate, '5.33.2');
-  assert.equal(composedManifest.dependencies.yaml, '2.9.1');
+  assert.equal(composedManifest.dependencies['@kaicreator/domain-harness'], '0.11.0');
+  assert.equal(composedManifest.dependencies.xstate, undefined,
+    'Workflow runtime is an SDK-owned transitive dependency, not an App direct dependency');
+  assert.equal(composedManifest.dependencies.yaml, undefined,
+    'YAML runtime is an SDK-owned transitive dependency, not an App direct dependency');
   assert.deepEqual(a.lock.trustedRuntimeIntegrity?.map((archive) => archive.name), ['xstate', 'yaml']);
   const attestFile = a.appPackage.files.find((file) => file.path === 'dh-install/trusted-runtime.json');
   const verifyFile = a.appPackage.files.find((file) => file.path === 'dh-install/verify-runtime.mjs');
@@ -242,8 +244,13 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
   const bootModule = a.appPackage.files.find((file) => file.path === 'boot.mjs');
   assert.ok(bootModule);
   const bootSource = Buffer.from(bootModule.bytes).toString('utf8');
-  assert.ok(bootSource.indexOf('verify-runtime.mjs') < bootSource.indexOf("import('@kaicreator/domain-harness-microkernel')"),
-    'external trusted runtime attestation must run BEFORE dynamic KDP import');
+  // R55: the generated App invokes Boot through the one public SDK, never a direct Microkernel import.
+  const attestationOffset = bootSource.indexOf("await import('./dh-install/verify-runtime.mjs')");
+  const sdkBootOffset = bootSource.indexOf("await import('@kaicreator/domain-harness/runtime')");
+  assert.ok(attestationOffset >= 0 && sdkBootOffset > attestationOffset,
+    'trusted runtime SRI attestation must precede the real public SDK Boot import');
+  assert.equal(bootSource.includes("import('@kaicreator/domain-harness-microkernel')"), false,
+    'generated Domain App must not bypass its public SDK runtime');
   assert.equal(a.lock.selectedWorkflows?.length, 1);
   const selected = a.lock.selectedWorkflows![0]!;
   assert.deepEqual(selected.ref, { element: ref, contentId: 'business-flow' });
@@ -617,11 +624,20 @@ for (const [label, raw] of [
   });
 }
 
-test('T12 R1: selected Workflow refuses a composed package without exact trusted runtime dependencies', (t) => {
+test('R55: selected Workflow is delivered through the sole SDK, not caller-supplied npm dependencies', (t) => {
   const { input } = workflowCase(t, { format: 'yaml', withData: true });
-  const { xstate: ignored, ...runtimeDependencies } = input.runtimeDependencies;
-  void ignored;
-  rejected(buildApp({ ...input, runtimeDependencies }), 'DH_BUILD_TARGET_INVALID');
+  const built = accepted(buildApp(input));
+  const manifest = built.appPackage.files.find((entry) => entry.path === 'package.json');
+  assert.ok(manifest);
+  const app = JSON.parse(Buffer.from(manifest.bytes).toString('utf8')) as {
+    dependencies: Record<string, string>;
+  };
+  assert.equal(app.dependencies['@kaicreator/domain-harness'], '0.11.0');
+  assert.equal(app.dependencies['@kaicreator/domain-harness-microkernel'], undefined);
+  assert.equal(app.dependencies['@kaicreator/domain-harness-contracts'], undefined);
+  assert.equal(app.dependencies.xstate, undefined);
+  assert.equal(app.dependencies.yaml, undefined);
+  assert.ok(built.appPackage.files.some((entry) => entry.path === 'dh-install/trusted-runtime.json'));
 });
 
 test('T12 R1: a Package without Workflow is still valid and has no synthetic Task', (t) => {  const scenario = standardCase();

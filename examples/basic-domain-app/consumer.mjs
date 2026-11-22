@@ -26,9 +26,11 @@ const npmManifest = require.resolve('npm/package.json', {
   paths: [dirname(process.execPath), resolve(dirname(process.execPath), '../lib/node_modules')],
 });
 const npmCli = process.env.npm_execpath ?? join(dirname(npmManifest), 'bin/npm-cli.js');
+const sdkTarball = process.env.DH_T05_SDK_TARBALL;
 const microkernelTarball = process.env.DH_T05_MICROKERNEL_TARBALL;
 const contractsTarball = process.env.DH_T05_CONTRACTS_TARBALL;
-assert.ok(microkernelTarball && contractsTarball, 'driver must provide exact local runtime tarballs for composed App installation');
+assert.ok(sdkTarball && microkernelTarball && contractsTarball,
+  'driver must provide exact SDK and local transitive tarballs for composed App installation');
 const evidenceDir = process.env.DH_T05_EVIDENCE ?? join(consumerRoot, 'evidence');
 const eventsPath = join(evidenceDir, 'consumer-events.ndjson');
 await mkdir(evidenceDir, { recursive: true });
@@ -225,7 +227,7 @@ async function authoring(label, rule, options = {}) {
   await write(dirs['rules-package'], 'dist/rules.mjs',
     rulesModule(options.workflow === true, options.workflowFatalAt ?? ''));
   await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
-  await write(dirs['kernel-primary'], 'dist/index.js', "export { bootstrap } from '@kaicreator/domain-harness-microkernel';\n");
+  await write(dirs['kernel-primary'], 'dist/index.js', "export { bootstrap } from '@kaicreator/domain-harness/runtime';\n");
   for (const id of Object.keys(dirs)) {
     const exports = id === 'kernel-primary'
       ? { '.': './dist/index.js' }
@@ -479,10 +481,6 @@ async function authoring(label, rule, options = {}) {
     packageRoots: dirs,
     packageArtifacts: Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
     kdpArtifact: { packageId: 'kernel-primary', path: 'dist/index.js' },
-    runtimeDependencies: {
-      '@kaicreator/domain-harness-microkernel': '0.11.0',
-      ...(workflow ? { xstate: '5.33.2', yaml: '2.9.1' } : {}),
-    },
   };
   return {
     root, dirs, input, descriptor, definitions,
@@ -502,15 +500,15 @@ async function installComposedDependencies(label, installRoot) {
     if (error?.code !== 'ENOENT') throw error;
   }
   const installArgs = isWorkflowInstaller
-    ? [installer, microkernelTarball, contractsTarball]
-    : [npmCli, 'install', microkernelTarball, contractsTarball, '--no-audit', '--no-fund', '--ignore-scripts'];
+    ? [installer, sdkTarball, microkernelTarball, contractsTarball]
+    : [npmCli, 'install', sdkTarball, microkernelTarball, contractsTarball, '--no-audit', '--no-fund', '--ignore-scripts'];
   const install = spawnSync(process.execPath, installArgs, {
     cwd: installRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, npm_config_registry: process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry },
   });
   await evidence(`${label}.composed-package-npm-install`, {
     exit: install.status, signal: install.signal,
-    method: isWorkflowInstaller ? 'sealed-lock-first-ci' : 'legacy-non-workflow',
+    method: isWorkflowInstaller ? 'sealed-lock-first-ci' : 'sdk-only-non-workflow',
   });
   assert.equal(install.status, 0, `${label}: composed App npm install failed\n${install.stdout}\n${install.stderr}`);
   // An admitted Workflow App seals the exact archive SRI pins in the same Lock

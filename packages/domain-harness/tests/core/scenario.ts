@@ -519,7 +519,6 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         'orders-ext': 'dist/index.mjs',
       },
       kdpArtifact: { packageId: KDP_PACKAGE_ID, path: 'dist/index.js' },
-      runtimeDependencies: { [MICROKERNEL_PACKAGE_ID]: '0.11.0' },
     };
 
     const built = await buildApp(input);

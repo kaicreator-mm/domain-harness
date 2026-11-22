@@ -163,7 +163,7 @@ import { fileURLToPath } from 'node:url';
 const installRoot = fileURLToPath(new URL('.', import.meta.url));
 const pin = JSON.parse(await readFile(new URL('./dh-install/bootstrap-pin.json', import.meta.url), 'utf8'));
 ${verifyTrustedWorkflowRuntime ? "await import('./dh-install/verify-runtime.mjs');" : ''}
-const { boot } = await import('@kaicreator/domain-harness-microkernel');
+const { boot } = await import('@kaicreator/domain-harness/runtime');
 const result = await boot(pin, {
   installRoot,
   descriptorPath: 'descriptor/app.json',
@@ -188,7 +188,6 @@ export function composeAppPackage(
   descriptor: DomainAppDescriptor,
   lock: DomainAppLock,
   lockBytes: Uint8Array,
-  runtimeDependencies: Readonly<Record<string, string>>,
 ): ComposedAppPackage {
   const files: AppPackageFile[] = [];
   const paths = new Set<string>();
@@ -238,17 +237,7 @@ export function composeAppPackage(
   };
   add('dh-install/bootstrap-pin.json', encoded(pin as unknown as JsonValue));
 
-  if (runtimeDependencies['@kaicreator/domain-harness-microkernel'] === undefined) {
-    throw refusal('DH_BUILD_TARGET_INVALID', 'composed App Package requires an exact microkernel runtime dependency');
-  }
-  // 唯一可信的外部运行时：DomainHarness 与经审定的精确 Workflow 依赖版本。
-  // 不接受调用方自由追加 npm/git/file 包，更不能让未检查的包在安装时执行 hook。
-  const trustedRuntime = new Map<string, string>([
-    ['@kaicreator/domain-harness-microkernel', '0.11.0'],
-    ['@kaicreator/domain-harness-contracts', '0.11.0'],
-    ['xstate', '5.33.2'],
-    ['yaml', '2.9.1'],
-  ]);
+  // Domain App 只声明单一 SDK，内部 Contracts/KDP/Workflow 的运行时闭包由 SDK 决定。
   const needsWorkflowRuntime = (lock.selectedWorkflows?.length ?? 0) > 0;
   if (needsWorkflowRuntime) {
     const pins = TRUSTED_WORKFLOW_NPM_ARCHIVES.map((item) => ({ ...item }));
@@ -263,21 +252,12 @@ export function composeAppPackage(
     add('dh-install/verify-runtime.mjs', new TextEncoder().encode(TRUSTED_RUNTIME_VERIFY_MODULE));
   }
 
-  if (needsWorkflowRuntime && (runtimeDependencies['xstate'] === undefined || runtimeDependencies['yaml'] === undefined)) {
-    throw refusal('DH_BUILD_TARGET_INVALID', 'selected Workflow requires exact xstate and yaml runtime dependencies');
-  }
   const dependencies: Record<string, string> = {};
   for (const pkg of lock.selectedPackages) dependencies[pkg.packageId] = `file:./packages/${pkg.packageId}`;
-  for (const [id, version] of Object.entries(runtimeDependencies)) {
-    if (trustedRuntime.get(id) !== version) {
-      throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
-        `runtime dependency '${id}' is not an explicitly trusted exact runtime Package`);
-    }
-    if (dependencies[id] !== undefined && dependencies[id] !== version) {
-      throw refusal('DH_BUILD_VERSION_CONFLICT', `runtime dependency '${id}' collides with a selected Package`);
-    }
-    dependencies[id] = version;
+  if (Object.prototype.hasOwnProperty.call(dependencies, '@kaicreator/domain-harness')) {
+    throw refusal('DH_BUILD_VERSION_CONFLICT', 'selected Domain Package collides with the sole public SDK');
   }
+  dependencies['@kaicreator/domain-harness'] = '0.11.0';
   add('package.json', encoded({
     name: descriptor.id,
     version: descriptor.version,

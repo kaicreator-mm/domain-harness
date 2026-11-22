@@ -58,13 +58,15 @@ if (npmLock.lockfileVersion !== 3 || typeof npmLock.packages !== 'object' ||
 }
 const owned = new Set((sealedLock.selectedPackages ?? []).map((pkg) => pkg.packageId));
 const allowedExternal = new Set([
+  '@kaicreator/domain-harness',
   '@kaicreator/domain-harness-microkernel',
   '@kaicreator/domain-harness-contracts',
   'xstate', 'yaml',
 ]);
 const approved = new Set([...owned, ...allowedExternal]);
 const supplied = Object.keys(app.dependencies ?? {});
-if (supplied.some((id) => !approved.has(id)) ||
+if (app.dependencies?.['@kaicreator/domain-harness'] === undefined ||
+    supplied.some((id) => !approved.has(id)) ||
     owned.size !== (sealedLock.selectedPackages ?? []).length ||
     [...owned].some((id) => app.dependencies[id] !== 'file:./packages/' + id)) {
   fail('DH_TRUSTED_RUNTIME_UNSELECTED_DEPENDENCY');
@@ -104,7 +106,6 @@ const approvedOrigin = (resolvedUrl) => {
 };
 for (const [index, archive] of manifest.archives.entries()) {
   if (archive.name !== ['xstate', 'yaml'][index] ||
-      app.dependencies[archive.name] !== archive.version ||
       typeof archive.integrity !== 'string' ||
       !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(archive.integrity)) {
     fail('DH_TRUSTED_RUNTIME_PIN_INVALID');
@@ -131,7 +132,7 @@ import { join } from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const artifacts = process.argv.slice(2);
-if (artifacts.length !== 2 || artifacts.some((value) => !value.endsWith('.tgz'))) {
+if (artifacts.length !== 3 || artifacts.some((value) => !value.endsWith('.tgz'))) {
   throw new Error('DH_TRUSTED_RUNTIME_FIRST_PARTY_TARBALLS_REQUIRED');
 }
 const cli = process.env.npm_execpath;
