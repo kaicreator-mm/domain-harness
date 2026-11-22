@@ -54,6 +54,13 @@ const result = await build({
   logLevel: 'warning',
 });
 
+// 发布 SDK 的 composition bundle 不得意外带入生成期 TypeScript 源码校验器。
+const forbiddenGenerationFiles = Object.keys(result.metafile.inputs).filter((path) =>
+  path.endsWith('/static-package-guard.ts') ||
+  path.endsWith('/generation-validation.ts') ||
+  path.includes('/typescript/lib/typescript.js'));
+assert.deepEqual(forbiddenGenerationFiles, [],
+  'SDK composition must not ship generation-time AST or correctness validators');
 const outputs = Object.values(result.metafile.outputs);
 assert.ok(outputs.some((output) => output.entryPoint?.endsWith('tooling/build/src/composition-entry.ts')),
   'SDK composition bundle must originate from the original validated implementation');
