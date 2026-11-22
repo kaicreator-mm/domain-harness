@@ -75,12 +75,20 @@ export function sealKdpModuleClosure(
             `KDP '${path}' uses deferred import(), including literal import`);
         }
       }
-      if (ts.isIdentifier(node) && ['require', 'createRequire', 'eval', 'Function'].includes(node.text)) {
+      // 选定 KDP Host ESM 不得经 ambient/global/reflection 构造第二条不可封存的加载路径。
+      if (ts.isElementAccessExpression(node)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `KDP '${path}' uses opaque computed member access outside the static ESM profile`);
+      }
+      if (ts.isIdentifier(node) &&
+          ['require', 'createRequire', 'eval', 'Function', 'globalThis', 'global',
+            'process', 'Reflect', 'Worker', 'WebAssembly'].includes(node.text)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `KDP '${path}' uses non-provable executable loader '${node.text}'`);
       }
       if (ts.isPropertyAccessExpression(node) &&
-          ['require', 'createRequire', 'getBuiltinModule', 'resolve'].includes(node.name.text)) {
+          ['require', 'createRequire', 'getBuiltinModule', 'resolve',
+            'constructor', 'getPrototypeOf', 'getOwnPropertyDescriptor'].includes(node.name.text)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `KDP '${path}' uses non-provable module resolution '${node.name.text}'`);
       }
