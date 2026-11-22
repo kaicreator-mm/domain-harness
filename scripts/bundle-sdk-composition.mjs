@@ -23,6 +23,17 @@ const result = await build({
   target: 'node22',
   packages: 'bundle',
   external: ['@kaicreator/domain-harness-contracts'],
+  // TypeScript 编译器的可选源码映射辅助不是 Package 组合运行必需依赖；
+  // 禁止把其不受控的 require 留到最终 Consumer 环境。
+  plugins: [{
+    name: 'sdk-isolate-optional-source-map-support',
+    setup(context) {
+      context.onResolve({ filter: /^source-map-support$/u },
+        () => ({ path: 'source-map-support', namespace: 'sdk-internal' }));
+      context.onLoad({ filter: /^source-map-support$/u, namespace: 'sdk-internal' },
+        () => ({ contents: 'module.exports = { install() {} };', loader: 'js' }));
+    },
+  }],
   // 兼容打包进 ESM 的第三方 CommonJS 依赖对 Node 内置模块的 require。
   banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
   legalComments: 'external',
