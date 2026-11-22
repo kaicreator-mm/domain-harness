@@ -1,5 +1,7 @@
 # DomainHarness 0.11.x — Standard Element 体系与递增复用规范（R29）
 
+> **【CURRENT · R60，版本归属修正】**：Owner 将本文件原计划 0.11.2 的 JsonReader/YamlReader、第二领域 Consumer 和状态模板有界判断全部移入 **[0.11.1 唯一 Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) W02**，旧 [#1644](https://github.com/kaicreator-mm/domain-harness/issues/1644) 已关闭为重复入口。R29 设计已接受不等于 Standard Elements 已实现（Catalog 仍均为 `CANDIDATE`，直到实码与 Reviewer 接受）；0.11.2 #1612 **只消费**本版真正合格的 Reader、再实现领域知识/事实/策略。下文早期阶段日期均以此 Owner 决议为准。
+
 > **【R36 当前 Standard Element Package 生成方式】**：Standard Element 也是普通多文件 Domain Package 的内容；可以由 ChatGPT/开发者直接编写 ElementDefinition、Manifest、Function ESM、资源并按 DIS 适用 + v0.11.x 实际合同验证。**不需要 Seed Builder、生成器或额外 Package Assembly 生产阶段**；组合 App 只选择/校验使用的文件、依赖、Target 和 Boot。参见 [R36](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
 
 
@@ -77,7 +79,7 @@ Catalog 初期采用仓库版本化 Markdown/清单即可（状态、ElementRef/
 
 **优先顺序（先消除重复，再扩张）：**
 
-1. **0.11.2 进入领域语义代码前：** 以 0.11.1 的 JsonReader/YamlReader 真正提取为可复用标准 Element 并消费。严格比较旧结果、`{format,source,value}`、Pin/SRI、UTF-8/大小与 YAML 负例。可采用逐步迁移，但**最终纯格式解析只能有一个业务语义所有者**；先做限定设计，再变更 KDP 与 Reader 的职责接线，保持同一 BUILD/Lock。若涉及原已接受 Contract，按受影响范围重审，不借“复用”暗中放权。
+1. **0.11.1 R60 #1656 W02 收尾前：** 以 0.11.1 的 JsonReader/YamlReader 真正提取为可复用标准 Element 并消费。严格比较旧结果、`{format,source,value}`、Pin/SRI、UTF-8/大小与 YAML 负例。可采用逐步迁移，但**最终纯格式解析只能有一个业务语义所有者**；先做限定设计，再变更 KDP 与 Reader 的职责接线，保持同一 BUILD/Lock。若涉及原已接受 Contract，按受影响范围重审，不借“复用”暗中放权。
 2. **同一工作批次或随后：** 把跨领域可复用的声明式状态模型/具名转换策略做成一个普通 `state-model` / `workflow-definition` Content/Function 资产，真实两个不同 Workflow 消费；**不迁移 XState Actor 引擎**、不重复路由与预算。若初始场景无法证明独立公共性，先只保留 `CANDIDATE`。
 3. **0.11.2 领域智能：** 将通用 `KnowledgeReader/FactNormalizer/ApplicabilityEvaluator/DeterministicRuleSelector` 作为可选 Standard 候选；领域规则/事实本身仍是 Domain Element，复杂知识生产归 DomainForge。
 4. **0.11.3–0.11.6：** 按各版真实需求逐步复用或提取 Intent Validator、纯 Guard、可复用交互选择、受授权 Effect 适配、LLM 结果验证、Durable Task 状态策略；所有授权/Effect/Checkpoint 真正权威仍归所属 KDP/Host，不被所谓标准 Element 绕过。

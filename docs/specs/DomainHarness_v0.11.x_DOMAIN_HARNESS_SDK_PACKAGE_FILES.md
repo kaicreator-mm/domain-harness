@@ -1,5 +1,7 @@
 # DomainHarness v0.11.x — Domain、Harness、SDK、Package 实例驱动规范（R37）
 
+> **CURRENT · R60 0.11.1 收尾责任**：本规范描述的 Package 由真实文件直接构成、单公开 SDK、Forge/Generator/Assembly 非前置原则有效。新 Task [#1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 在 **0.11.1 内**实现并验收 Standard Reader、类型单源、SDK 单项安装、受限 Node 业务依赖、跨代组合与性能；0.11.2 不承接此遗留。现有 R49 多语言永久边界仍在 DH PR #1653 / DIE PR #156 候选，**尚未独立审查/正式合并**。这段最新说明不将未知实现冒充已合格。
+
 > **Owner R36 修正 R34/R35 的工具化假设**：Domain Package 只是符合 DIS 适用 Package 规范与当前 Element-First 合同的一组文件，完全可以由 ChatGPT 在仓库中直接编写。**Seed Builder 不再是需要开发的工具，Package Assembly 也不是创建 Package 的必要环节**。细节见 [R36 产品与 Package 权威规范](DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
 
 ```ini
