@@ -84,3 +84,53 @@ test('公开 SDK 入口不可注入生成期回调或获得内部资源作用域
   assert.equal(composed.ok, true, composed.ok ? '' : composed.message);
   assert.equal(calls, 0, '发布 SDK 忽略额外 callback，内部生成期校验接口不对外暴露');
 });
+
+test('R122 P1-01: 未参与 App 选定的 Domain 正确性仅由生成期检查', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const candidate = { ...input, domains: [{ kind: 'NotDomain', id: 'unselected-invalid' }] };
+  const composed = publicSdkComposition(candidate);
+  assert.equal(composed.ok, true,
+    composed.ok ? '' : `SDK Composer must not validate unselected author Domain: ${composed.code}`);
+  const generated = buildApp(candidate);
+  assert.equal(generated.ok, false, 'creator must reject malformed authored Domain');
+  if (!generated.ok) assert.equal(generated.code, 'DH_BUILD_SCHEMA_INVALID');
+});
+
+test('R122 P1-01: 内容值是否满足业务 Schema 仅由生成期负责', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  // 此值类型不满足作者规则，但其 JSON 和摘要本身合法且仍可确定性封存。
+  scenario.eligibility.content[0]!.value = { minOrderTotal: 'invalid-number', regions: ['EU'] };
+  const { input } = scenario.finalize();
+  const composed = publicSdkComposition(input);
+  assert.equal(composed.ok, true,
+    composed.ok ? '' : `SDK Composer must only seal selected content bytes: ${composed.code}`);
+  if (composed.ok) {
+    assert.ok(composed.lock.selectedElements.some((entry) => entry.ref.id === scenario.eligibility.id));
+    assert.ok(composed.lock.resourceDigests['orders-business/definitions/eligibility-1.0.0-1.json']);
+  }
+  const generated = buildApp(input);
+  assert.equal(generated.ok, false, 'author must validate actual ContentBlock value against its declared schema');
+  if (!generated.ok) assert.equal(generated.code, 'DH_BUILD_SCHEMA_INVALID');
+});
+
+test('生成期验证移走后 SDK 仍拒绝错误的选定 Element 字节摘要', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const tampered = input.packages.map((raw) => {
+    const pkg = raw as DomainPackageManifest;
+    if (pkg.id !== 'orders-business') return raw;
+    return {
+      ...pkg,
+      elements: pkg.elements.map((entry) => entry.id === scenario.eligibility.id
+        ? { ...entry, definitionRef: { ...entry.definitionRef, digest: `sha256:${'0'.repeat(64)}` as `sha256:${string}` } }
+        : entry),
+    };
+  });
+  const composed = publicSdkComposition({ ...input, packages: tampered });
+  assert.equal(composed.ok, false, 'SDK must keep selected byte-integrity fallback');
+  if (!composed.ok) assert.equal(composed.code, 'DH_BUILD_RESOURCE_DIGEST_MISMATCH');
+});
