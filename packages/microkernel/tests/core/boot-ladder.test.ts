@@ -258,6 +258,7 @@ test('pinned entry without the named bootstrap export is DH_BOOT_KDP_ENTRY_INVAL
     // 被测场景是“真实受信字节不再导出 bootstrap”，不是未更新图摘要。
     const closure = lock['trustedKdpModuleClosure'] as Array<{
       module: { path: string; digest: ContentDigest };
+      dependencies: Array<{ path: string }>;
     }>;
     const entry = closure.find((item) => item.module.path === 'dist/index.js');
     assert.ok(entry);
