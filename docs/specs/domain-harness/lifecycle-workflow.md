@@ -16,6 +16,8 @@
 6. Exit 只于应用关闭或可捕获的全局未处理致命错误后执行，不在每一层 Init 递归返回时执行；只退出实际进入过的 Package，单个 Exit 失败不阻断其余尝试，断电/强杀不承诺执行退出。
 7. 业务/功能错误由所属 Element/Package 自治处理，KDP 仅针对未处理故障提供最小但可诊断且脱敏的日志、退出和状态兜底。不额外增加一个业务逻辑重复验证 Runtime。
 
+**KDP Host 特例**：只有 Core.Order=0 的 KDP.Init 采用 `kdp-host-init/1`，由最小 Boot 在可信安装验证后调用一次；其返回是进程内 `KdpBootstrapResult`（内含 `DomainApp`），不能冒充普通 `FunctionOutcome`。Host 已进入后由 KDP 的真实进入记录负责逆序 Exit；若 Host 实现在正常委托前抛错、委托后抛错或返回畸形对象，Boot 仅持有 KDP 提供的一次性清理交接句柄，不能另建第二运行时或重跑 Init。未验证的 Exit 一律不执行并报告不安全清理状态。
+
 ### 13.3 结果、状态与失败语义不能混淆 — CONFIRMED
 
 | 层面 | 当前已经存在的状态/结果族 | 不变量 |

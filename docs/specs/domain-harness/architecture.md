@@ -107,7 +107,7 @@ SDK 产品层：唯一 @kaicreator/domain-harness（作者期 + 运行期入口�
 ### A.7 对外 SDK Runtime API 入口（Foundation 公共暴露收敛）
 
 - **唯一公开的 Host 启动入口必须是 `boot(pin, context)`**。受信 Boot 校验 Pin/Lock、入口字节后才能选择并调用 KDP 内部初始化实现；公共 `@kaicreator/domain-harness` 与 `@kaicreator/domain-harness/runtime` 不应重新导出独立 `bootstrap(context)` 入口，使 Host 不需要传 Pin 即能直接触达内部 KDP 初始化。
-- **内部调用不等于公开业务 API**：当前过渡阶段内 `@kaicreator/domain-harness-microkernel` 对自身 KDP 接线可能仍保留 `bootstrap`，仅作为物理实现细节；相关测试可从内部源码验证其可信拒绝。最终仍由 #1668 将真正的 KDP Init 所有权归于 Kernel Package 的 Lifecycle Element，并从 Lock/Pin 精确选择 Target；隐藏公共入口**不代表架构整改完成**。
+- **内部调用不等于公开业务 API**：R127 机器迁移切片 #1681 将旧 `bootstrap` 导出删除，内部 `activateSelectedKdpHostInit` 仅由受选 KDP-owned `kdp-host-init/1` Target 调用；不可通过 SDK 根/`/runtime` 作为普通业务 Function 访问。机器入口变化不代表 Microkernel 私有源码已全部迁归 KDP Package，实现所有权仍须按 #1668 独立验收。
 - **受限验收门**：公开 SDK 根和 `/runtime` 都不得导出 `bootstrap`；调用 `boot()` 的现有真实 Consumer 保持原结果；不能把“公共 API 缩减”当作不需要严格验证安装完整性的理由。
 
 ### A.6 架构审核不变量（新代码必须满足；现有缺口单独标记）
@@ -140,6 +140,14 @@ SDK 产品层：唯一 @kaicreator/domain-harness（作者期 + 运行期入口�
 
 **严格 Boot 禁区**：遍历业务 Package DAG、创建 PackageSystem、运行 Workflow/Actor/Task、解释规则、裁定 READY/DEGRADED/BLOCKED/FAILED、业务 Function 路由、执行业务 Init、调用第二次 App Init、组织 Exit、运行时重新生成 App 或静态验证，**以及每次启动重新解析选定 JavaScript/ESM 源码、推导静态导入图或验证 Package/Element 正确性**。仅保留受信锚、身份、Pin/Lock 和必要字节完整性的最小核验。
 
-**当前具体差距（MIGRATION_REQUIRED）**：参考 KDP 的 `r41-kdp/dist/bootstrap.js` 仅 re-export `@kaicreator/domain-harness-microkernel.bootstrap`，`dist/index.mjs` 中 KDP Init Element 只做事件及下层转调；真正应用初始化/PackageSystem/Actor 在 `packages/microkernel/src/kdp.ts` 等模块。应迁移**实现所有权**和 Boot 单委托调用链，不能只改名字/目录。任何 KDP 入口在被可信 Boot 校验前不得 import 或执行；KDP 自验本身不允许替换执行前 Pin 检查。
+**当前具体差距（MIGRATION_REQUIRED，按切面拆分）**：#1681 的 R127 候选源码将参考 KDP 的 re-export `bootstrap.js` 删除并换为由自身 `dist/index.mjs` 直接持有的 `init` Target，Boot 依据唯一 Host FunctionRef 调用；此切片还需要独立审核与版本分支集成。真正的 PackageSystem/Actor 代码仍位于 `packages/microkernel/src/*` 物理 SDK 模块，必须继续核查与迁移至真实 KDP Package/Element 的实现所有权；不能用“调用了 KDP-owned 入口”冒充全部私有 Runtime 都归属 KDP。任何 KDP 入口在 Boot 核验安装信任、Lock/Pin/Target 与字节前均不得 import/执行。
+
+### 5.1 单一受选 KDP Host 机器合同（R127 目标；验收仍需 Exact-SHA 独审）
+
+- Lock、Pin、Install Record 分别采用 `dh.lock/0.11.1`、`dh.pin/0.11.1`、`dh.install/0.11.1`；旧机器结构直接拒绝，不暗中兼容 `0.11.0`。
+- Lock 使用 `selectedKdpHost` 精确封存 `kdpPackageId`、`kdpInitFunction: FunctionRef`、`invocationAbi: 'kdp-host-init/1'`、`kdpInitModule: ResourceRef`；Pin/安装记录与 Lock 使用同一身份和字节摘要。**无独立的 `kdpArtifact` / `bootstrap` 第二入口来源**。
+- 唯一 KDP Host Function 必须是 `Core.Order=0` 的 Kernel Package 自己声明的 `Init`，Target 实现归同一 Package；普通 Function 不得携带特权 ABI，也不能借普通 `invokeSelectedFunction` 执行它。Host 以 `KdpBootstrapResult` 返回真实进程内 `DomainApp`，不是 JSON `FunctionOutcome`。
+- Boot 的职责严格止于最小可信记录/选定路径/字节/命名导出验证与单次调用；已进入 Host 后的兜底 Exit 经私有一次性交接交给 KDP `PackageSystem`，包括委托前抛错、委托后抛错和畸形返回；不受信安装不可执行任何 Exit 代码，必须保留原始失败与 `CLEANUP_NOT_SAFE` 说明。任何单次进入不能被重复 Exit。
+- 本合同只覆盖单 Host ABI 与技术封存链，不证明完整安装来源签名/TOCTOU、全部传递 ESM 查找来源、R87 独立 Namespace/camelCase 身份或 SDK 作者期 Package/Element 所有权。**#1668 A6/A7 的完成资格与 #1681 的源码 CI 是两个不同判断。**
 
 **自举说明**：Element 化不等于每个私有 TypeScript helper、type 或 ESM 文件都要成为 Element。只需确保所有可公开执行/组合的能力属于真正的 Package/Element，内部源码可以分多个私有文件；不存在长期的“Microkernel 作为第二 Runtime”架构层。
