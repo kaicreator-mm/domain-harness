@@ -43,3 +43,7 @@ No Package generation is required. The previous v0.11.1 application files remain
 ## Review gate
 
 Exact-HEAD QA must check JSON/ESM syntax, manifest digest identities (UTF-8 file SHA versus canonical Element SHA), selected direct Extension imports, real four FunctionRefs in the Workflow Lock, independent npm package install, 10 distinct outcome cases, historical Stage Index preservation, actual log/receipt source SHA and bounded failure diagnostics. Do not claim `ACCEPTED`, `STANDARD_ACCEPTED`, CI PASS or source merge until evidenced.
+
+## Lifecycle correction (R4)
+
+The current `DomainPackageManifest` machine schema requires an exact `init` ElementRef for **every** selected runtime Package, including an Extension. The Knowledge Package therefore owns a private `reference.knowledge_lifecycle@1.0.0` Element with actual Init and optional Exit target ESM bindings, and the same Reference App validates their lifecycle events. This is not a second Core or Runtime. The original #2983 schema failure is retained as implementation evidence, not suppressed.

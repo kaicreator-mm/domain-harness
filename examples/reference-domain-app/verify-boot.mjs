@@ -24,6 +24,8 @@ assert.equal(verified.workflow, 'COMPLETE');
 assert.equal(verified.unknown, 'UNKNOWN');
 assert.equal(verified.denied, 'DH_WORKFLOW_UNSELECTED');
 assert.equal(verified.knowledgeRecords, 4);
+assert.equal(events.filter((item) => item.phase === 'extension-init' &&
+  item.packageId === 'reference-knowledge').length, 1, 'real Knowledge Extension Init missing');
 assert.match(verified.selectedResourceDigest, /^sha256:[0-9a-f]{64}$/u);
 assert.equal(verified.cases.length, 11);
 const cases = new Map(verified.cases.map((item) => [item.name, item]));
@@ -55,6 +57,8 @@ for (const name of ['US_ACCEPT', 'US_REJECT', 'CA_REJECT', 'CA_ACCEPT']) {
 await result.app.dispose();
 const exit = events.filter((item) => item.phase === 'exit').map((item) => item.packageId);
 assert.deepEqual(exit, [...init].reverse());
+assert.equal(events.filter((item) => item.phase === 'extension-exit' &&
+  item.packageId === 'reference-knowledge').length, 1, 'real Knowledge Extension Exit missing');
 console.log(`REFERENCE_DOMAIN_APP_PASS ${JSON.stringify({
   appStatus: 'READY', workflow: verified.workflow, unknown: verified.unknown,
   denied: verified.denied, initOrder: init, exitOrder: exit,

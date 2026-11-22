@@ -39,3 +39,12 @@ export function queryFacts(input) {
     revision: input.revision, resolved: { minimumScore: current[0].value, evidence },
   } };
 }
+
+export async function init() {
+  (globalThis.__dhR41Events ??= []).push({ phase: 'extension-init', packageId: 'reference-knowledge' });
+  return { status: 'READY' };
+}
+
+export function exit() {
+  (globalThis.__dhR41Events ??= []).push({ phase: 'extension-exit', packageId: 'reference-knowledge' });
+}

@@ -25,6 +25,7 @@ const domainDefinitions = await Promise.all([
   'reference-business/definitions/recognizer.json',
   'reference-business/definitions/validator.json',
   'reference-knowledge/definitions/knowledge.json',
+  'reference-knowledge/definitions/lifecycle.json',
 ].map((name) => readJson(join(sourceRoot, 'packages', name))));
 const domain = {
   kind: 'Domain', schemaVersion: 'dh.domain/0.11', id: 'reference-example', version: '1.1.0',
