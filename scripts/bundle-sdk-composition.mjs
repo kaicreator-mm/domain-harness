@@ -42,7 +42,7 @@ const result = await build({
     'const require = createRequire(import.meta.url);',
     'const __filename = fileURLToPath(import.meta.url);',
     'const __dirname = __sdkDirname(__filename);',
-  ].join('\\n') },
+  ].join('\n') },
   legalComments: 'external',
   metafile: true,
   logLevel: 'warning',
