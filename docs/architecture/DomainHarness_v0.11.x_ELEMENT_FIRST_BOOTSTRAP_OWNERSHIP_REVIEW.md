@@ -1,5 +1,10 @@
 # DomainHarness 0.11.x — Boot/KDP/基础设施 Element-First 所有权与自举审计（设计候选）
 
+> **R87 当前补充裁决 · 覆盖本文先前 R86 命名示例**：真实业务执行/内核能力均须属于选定 Package 的内聚 Element，Function 与 Content 为其内部结构；完整规则参见 [Element/Package 组织规范](../specs/DomainHarness_v0.11.x_ELEMENT_PACKAGE_ORGANIZATION_STANDARD.md)。**元素 ID 现在采用变量式 camelCase**，如 `kernelLifecycle`（Namespace `dh`），**不再以旧 R86 候选 `dh.kernel.lifecycle` 作为新的 ElementDefinition.id**。本文件之前所有这类点分名称仅为历史示意，新的 L2/源码迁移以 R87 规范为准。旧 Reference App/锁/摘要保留。
+>
+> **Boot 最小化不可再缩水的根：** 可信安装锚点 → Pin/Lock 中必要的 KDP 身份与摘要 → 在 import 前验证即将执行的 KDP 入口字节 → 将受限可信 Context **仅调用一次**已选 KDP Init Target。Boot 不能再实例化 PackageSystem、XState Actor，不能遍历其它 Core/Extension、解析业务 Workflow、裁决 AppStatus、调度 Exit，不能把 `kdp.ts::bootstrap` 保留为第二套业务初始化控制器。KDP.Init 负责其它已选模块的生命周期和 DomainApp 初始化。此为待 Owner/L2 确认、尚未改码的安全架构候选。
+>
+
 > **STATUS: ARCHITECTURE_CANDIDATE / NOT_OWNER_FROZEN / NO_SOURCE_IMPLEMENTATION**  
 > **审计基线**：`version/v0.11.x@e17c71f12b2f76b6ae321961a899e8ba01cbab9a`，对应 v0.11.1 阶段完成后的 doc-only 收尾。  
 > **整改入口**：[Foundation 设计先行 Issue #1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)；不修改 v0.11.2 相关 Issue/PR/源码。  

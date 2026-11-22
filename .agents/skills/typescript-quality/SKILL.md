@@ -8,7 +8,7 @@ description: DomainHarness 的 TypeScript 源码设计、重构、审查、中�
 参考 Apache-2.0 的 [TypeScript Best Practices](https://github.com/gohypergiant/agent-skills/blob/main/skills/accelint-ts-best-practices/SKILL.md) 和 [typescript-eslint 官方规则](https://typescript-eslint.com/users/configs/)。本 Skill 为本仓库自行编写的具体要求。
 
 - **架构**：仅 Contracts/BUILD/Microkernel/SDK 一套职责和公共入口。旧源码通过 Git 历史追溯，不在当前源码树中保留兼容或二次实现。
-- **命名**：统一遵循 [DomainHarness 命名规范](../../../docs/specs/DomainHarness_v0.11.x_NAMING_STANDARD.md) 与 [domain-naming Skill](../domain-naming/SKILL.md)。类型 PascalCase、变量/函数 camelCase、Package/Element/Function/Workflow 按稳定领域职责命名；禁止以 `r41`、`r60`、`V011` 等任务轮次/内部版本作新的永久 ID。既有已审 Reference App/StageIndex 必须保留历史 SHA/Digest，重命名属于受控迁移而非文字替换；npm SemVer 和机器 schemaVersion 合法。
+- **命名**：统一遵循 [DomainHarness R87 命名规范](../../../docs/specs/DomainHarness_v0.11.x_NAMING_STANDARD.md)、[Element/Package 组织规范](../../../docs/specs/DomainHarness_v0.11.x_ELEMENT_PACKAGE_ORGANIZATION_STANDARD.md) 与 [domain-naming Skill](../domain-naming/SKILL.md)。**Package.id 小写 kebab-case，ElementDefinition.id 变量式 camelCase，namespace 是独立字段**；Function/变量 camelCase、类型 PascalCase。禁止以 `r41`、`r60`、`V011` 等任务轮次/内部版本作新的永久 ID。新 Element ID 的机器 Schema/BUILD 落地尚待 #1668 Owner/L2 审查。既有已审 Reference App/StageIndex 必须保留历史 SHA/Digest，重命名属于受控迁移而非文字替换；npm SemVer 和机器 schemaVersion 合法。
 - **类型**：严格 TypeScript；`unknown` 收敛输入，尽量采用只读数据、判别联合、确定性错误码；不得通过 `any`、粗暴断言或默认成功掩盖未知条件。
 - **选型与复用**：先用 Node.js/JavaScript 原生能力和仓库现有可信依赖，再评估成熟、维护活跃、许可证合适且兼容 Node 22/ESM 的库；不自行实现通用解析器、加密、Schema 验证或状态机来替代合适的成熟方案。新依赖与自实现均遵循 [防回归手册 §1.1](../../../docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md) 的取舍和验证要求，避免不必要的依赖/框架。
 - **边界**：BUILD 负责编译与封存，Runtime 只读取 Pin/Lock 中选定资源；禁止运行期二次构建和未声明资源执行。

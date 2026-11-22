@@ -2,7 +2,7 @@
 
 当前使用 v0.11.x 单一内部版本列车；v0.11.1 已完成 scoped 验收，整个 0.11.x 尚未正式 Release。旧版本源码仅通过 Git 历史参考，不保留兼容入口。
 
-1. 修改 TypeScript 前必读 [TypeScript 编码质量 Skill](.agents/skills/typescript-quality/SKILL.md)；创建/修改任何持久标识时必读 [DomainHarness 统一命名 Skill](.agents/skills/domain-naming/SKILL.md) 与 [命名规范](docs/specs/DomainHarness_v0.11.x_NAMING_STANDARD.md)。
+1. 修改 TypeScript 前必读 [TypeScript 编码质量 Skill](.agents/skills/typescript-quality/SKILL.md)；创建/修改任何持久标识时必读 [DomainHarness 统一命名 Skill](.agents/skills/domain-naming/SKILL.md)、[命名规范](docs/specs/DomainHarness_v0.11.x_NAMING_STANDARD.md) 和 [Element/Package 组织规范](docs/specs/DomainHarness_v0.11.x_ELEMENT_PACKAGE_ORGANIZATION_STANDARD.md)。
 2. 源码放入 `src/`，公共 TS 标识符和路径不得携带版本号；代码注释和 JSDoc 必须为中文。
 3. 不另建重复 Runtime、Kernel、BUILD 或私有 SDK。现有四 Workspace 的物理布局不等于已经完成所有基础设施的 Package + Element 所有权；严格自举一致性审计见 [Foundation Issue #1668](https://github.com/kaicreator-mm/domain-harness/issues/1668) 与 [Boot/KDP 候选设计](docs/architecture/DomainHarness_v0.11.x_ELEMENT_FIRST_BOOTSTRAP_OWNERSHIP_REVIEW.md)，Owner/L2 通过前不擅改已验收代码。
 4. **原生优先、成熟库次之、避免自行重造通用能力**：实现前先评估 Node.js/JavaScript/TypeScript 原生 API 与仓库现有依赖；无法满足实际需求时选择可信、维护活跃且兼容 Node 22/ESM 的成熟库。只有没有合适方案或有明确的可靠性、授权、可验证性等原因时才自行实现，并在现有 Task/PR 简述取舍；不得为微小工具函数无谓引入新依赖。详情见 [防回归手册 §1.1](docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)。
