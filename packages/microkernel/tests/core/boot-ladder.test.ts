@@ -178,6 +178,22 @@ test('Boot rejects external KDP package symlink before selected Init', async (t)
   });
 });
 
+/** 真实 npm file:./packages/<id> 使用 node_modules 软链接，仍位于交付封存的目录。 */
+test('Boot accepts selected in-root npm file-package symlink with exact pinned bytes', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const selected = join(fixture.installRoot, 'node_modules', KDP_PACKAGE_ID);
+    const sealedLocal = join(fixture.installRoot, 'packages', KDP_PACKAGE_ID);
+    await mkdir(join(fixture.installRoot, 'packages'), { recursive: true });
+    await cp(selected, sealedLocal, { recursive: true });
+    await rm(selected, { recursive: true, force: true });
+    await symlink(sealedLocal, selected, process.platform === 'win32' ? 'junction' : 'dir');
+
+    const result = await boot(fixture.pin, fixture.context);
+    assert.equal(result.status, 'BOOTED', JSON.stringify(result));
+    if (result.status === 'BOOTED') await result.app.dispose();
+  });
+});
+
 /** 即使物理 KDP 仍位于安装根内，重定向目录会改变 Node ESM 的 bare import 搜索路径。 */
 test('Boot rejects in-root relocated KDP package before selected Init', async (t) => {
   await withFixture(t, async (fixture) => {
