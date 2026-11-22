@@ -6,49 +6,73 @@ const DENIED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 export async function init() {}
 export function exit() {}
 
-// 仅验证 JsonValue 边界，不重复实现底层格式解析器。
-function isJsonValue(value, ancestors = new WeakSet(), depth = 0,
+// 对实际消费的值构造独立快照，禁止预检后重新序列化原始可变对象。
+function snapshotJsonValue(value, ancestors = new WeakSet(), depth = 0,
   budget = { bytes: 0, nodes: 0, exceeded: false }) {
-  if (++budget.nodes > 32768) { budget.exceeded = true; return false; }
-  if (depth > 64) return false;
-  // 使用原生 JSON 或第三方 YAML 序列化之前，先限制遍历成本。
-  // 转义可能放大输出，序列化之后仍必须检查实际 UTF-8 字节上限。
+  const invalidValue = { ok: false };
+  if (++budget.nodes > 32768) { budget.exceeded = true; return invalidValue; }
+  if (depth > 64) return invalidValue;
   const charge = (bytes) => {
     budget.bytes += bytes + 16;
     if (budget.bytes > LIMIT_BYTES) { budget.exceeded = true; return false; }
     return true;
   };
-  if (value === null || typeof value === 'boolean') return charge(5);
-  if (typeof value === 'string') return charge(Buffer.byteLength(value, 'utf8'));
-  if (typeof value === 'number') return Number.isFinite(value) && charge(32);
-  if (typeof value !== 'object' || ancestors.has(value)) return false;
-  if (!Array.isArray(value) && Object.prototype.toString.call(value) !== '[object Object]') return false;
-  if (Array.isArray(value) && value.length > 32768) {
+  if (value === null) return charge(5) ? { ok: true, value: null } : invalidValue;
+  if (typeof value === 'boolean') return charge(5) ? { ok: true, value } : invalidValue;
+  if (typeof value === 'string') return charge(Buffer.byteLength(value, 'utf8'))
+    ? { ok: true, value } : invalidValue;
+  if (typeof value === 'number') return Number.isFinite(value) && charge(32)
+    ? { ok: true, value } : invalidValue;
+  if (typeof value !== 'object' || ancestors.has(value)) return invalidValue;
+  if (!Array.isArray(value) && Object.prototype.toString.call(value) !== '[object Object]') {
+    return invalidValue;
+  }
+
+  const array = Array.isArray(value);
+  const arrayLength = array ? value.length : 0;
+  if (array && arrayLength > 32768) {
     budget.exceeded = true;
-    return false;
+    return invalidValue;
   }
   ancestors.add(value);
   try {
-    if (Array.isArray(value)) {
-      return value.every((item, index) =>
-        Object.prototype.hasOwnProperty.call(value, index) &&
-        isJsonValue(item, ancestors, depth + 1, budget)) &&
-        Object.keys(value).length === value.length;
-    }
-    // 仅枚举自有键并计数，先拒绝超预算对象；不读取属性值、
-    // 不构造 Object.keys/entries 巨大临时数组，也不用 BUILD 禁止的 value[key]。
-    let ownKeys = 0;
+    // 在求值 getter 之前拒绝明显超大的自有键集合；不会预先分配巨大 entries。
+    let previewBytes = budget.bytes;
+    let previewKeys = 0;
     for (const key in value) {
       if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-      if (++ownKeys > 32768 - budget.nodes) {
+      if (++previewKeys > 32768 - budget.nodes) {
         budget.exceeded = true;
-        return false;
+        return invalidValue;
       }
-      if (DENIED_KEYS.has(key) || !charge(Buffer.byteLength(key, 'utf8'))) return false;
+      if (DENIED_KEYS.has(key)) return invalidValue;
+      previewBytes += Buffer.byteLength(key, 'utf8') + 16;
+      if (previewBytes > LIMIT_BYTES) {
+        budget.exceeded = true;
+        return invalidValue;
+      }
     }
-    // 只有已受数量/键预算约束时才读取值；所分配的 entries 数量有已知上限。
-    return Object.entries(value).every(([, child]) =>
-      isJsonValue(child, ancestors, depth + 1, budget));
+
+    // 对 Getter/Proxy 可能改变键集合的情况，重新校验本次真正被消费的 entries。
+    // 原始对象不再交给 JSON.stringify / YAML.stringify，防止第三次枚举绕过校验。
+    const entries = Object.entries(value);
+    if (entries.length > 32768 - budget.nodes) {
+      budget.exceeded = true;
+      return invalidValue;
+    }
+    if (array && entries.length !== arrayLength) return invalidValue;
+    const checkedEntries = [];
+    const checkedArray = [];
+    for (const [key, child] of entries) {
+      if (DENIED_KEYS.has(key)) return invalidValue;
+      if (!charge(Buffer.byteLength(key, 'utf8'))) return invalidValue;
+      if (array && key !== String(checkedArray.length)) return invalidValue;
+      const captured = snapshotJsonValue(child, ancestors, depth + 1, budget);
+      if (!captured.ok) return invalidValue;
+      if (array) checkedArray.push(captured.value);
+      else checkedEntries.push([key, captured.value]);
+    }
+    return { ok: true, value: array ? checkedArray : Object.fromEntries(checkedEntries) };
   } finally {
     ancestors.delete(value);
   }
@@ -75,8 +99,9 @@ function read(input, format) {
       if (document.errors.length || document.warnings.length) throw new Error('unsafe YAML');
       value = document.toJS({ maxAliasCount: 32 });
     }
-    if (!isJsonValue(value)) throw new Error('not a safe JsonValue');
-    return { kind: 'SUCCEEDED', value };
+    const checked = snapshotJsonValue(value);
+    if (!checked.ok) throw new Error('not a safe JsonValue');
+    return { kind: 'SUCCEEDED', value: checked.value };
   } catch {
     return invalid('DH_STD_FILE_INVALID', 'invalid or unsafe selected file data');
   }
@@ -86,13 +111,14 @@ function write(input, format) {
       !Object.prototype.hasOwnProperty.call(input, 'value')) return unknown();
   try {
     const budget = { bytes: 0, nodes: 0, exceeded: false };
-    if (!isJsonValue(input.value, new WeakSet(), 0, budget)) {
+    const checked = snapshotJsonValue(input.value, new WeakSet(), 0, budget);
+    if (!checked.ok) {
       return invalid(budget.exceeded ? 'DH_STD_FILE_SIZE' : 'DH_STD_FILE_INVALID',
         'invalid or oversized selected file value');
     }
     const source = format === 'json'
-      ? JSON.stringify(input.value, null, 2) + '\n'
-      : stringify(input.value, {
+      ? JSON.stringify(checked.value, null, 2) + '\n'
+      : stringify(checked.value, {
         schema: 'core', version: '1.2', aliasDuplicateObjects: false, lineWidth: 0,
       });
     if (Buffer.byteLength(source, 'utf8') > LIMIT_BYTES) {

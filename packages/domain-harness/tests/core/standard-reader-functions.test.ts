@@ -122,3 +122,69 @@ test('Standard File Writer keeps native own-enumerable object serialization sema
   assert.equal(encoded.kind, 'SUCCEEDED');
   assert.deepEqual(JSON.parse(encoded.value), { ownValue: 'ok' });
 });
+
+test('Standard File Writer never serializes Getter-added unsafe keys after preflight', async () => {
+  const module = await import(modulePath);
+  for (const format of ['json', 'yaml'] as const) {
+    const target: Record<string, unknown> = {};
+    Object.defineProperty(target, 'safe', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        Object.defineProperty(target, '__proto__', {
+          value: { polluted: true }, enumerable: true, configurable: true,
+        });
+        return 'checked';
+      },
+    });
+    const write = format === 'json' ? module.writeJson : module.writeYaml;
+    const read = format === 'json' ? module.readJson : module.readYaml;
+    const outcome = write({ format, value: target });
+    assert.equal(outcome.kind, 'SUCCEEDED', 'safe captured snapshot may succeed');
+    assert.equal(outcome.value.includes('__proto__'), false,
+      'mutation of original object must never be re-enumerated by serializer');
+    assert.deepEqual(read({ format, source: outcome.value }),
+      { kind: 'SUCCEEDED', value: { safe: 'checked' } });
+  }
+});
+
+test('Standard File Writer validates actual Proxy entries, not stale preflight ownKeys', async () => {
+  const module = await import(modulePath);
+  for (const format of ['json', 'yaml'] as const) {
+    const value = Object.create(null) as Record<string, unknown>;
+    Object.defineProperty(value, 'safe', { enumerable: true, configurable: true, value: 1 });
+    Object.defineProperty(value, '__proto__', {
+      enumerable: true, configurable: true, value: { injected: true },
+    });
+    let enumerations = 0;
+    const proxy = new Proxy(value, {
+      ownKeys() {
+        return ++enumerations === 1 ? ['safe'] : ['__proto__'];
+      },
+    });
+    const write = format === 'json' ? module.writeJson : module.writeYaml;
+    const outcome = write({ format, value: proxy });
+    assert.equal(outcome.kind, 'FAILED');
+    assert.equal(outcome.failure.code, 'DH_STD_FILE_INVALID');
+    assert.ok(enumerations >= 2, 'the consumed key set differs from preflight');
+  }
+});
+
+test('Standard File Writer outputs a stable snapshot without a third Proxy enumeration', async () => {
+  const module = await import(modulePath);
+  for (const format of ['json', 'yaml'] as const) {
+    const value = { safe: 'ok' };
+    let enumerations = 0;
+    const proxy = new Proxy(value, {
+      ownKeys() {
+        enumerations += 1;
+        return enumerations <= 2 ? ['safe'] : ['constructor'];
+      },
+    });
+    const write = format === 'json' ? module.writeJson : module.writeYaml;
+    const result = write({ format, value: proxy });
+    assert.equal(result.kind, 'SUCCEEDED');
+    assert.equal(enumerations, 2, 'serializer must receive only checked snapshot');
+    assert.equal(result.value.includes('constructor'), false);
+  }
+});
