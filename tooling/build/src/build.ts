@@ -711,8 +711,8 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     throw refusal('DH_BUILD_LOCK_NOT_REPRODUCIBLE', 'double-build self-check produced divergent Lock bytes');
   }
   const lockBytes = new TextEncoder().encode(lockText);
-  const appPackage = composeAppPackage(scope, descriptor, lock, lockBytes, input.runtimeDependencies);
-  const secondAppPackage = composeAppPackage(scope, descriptor, lock, lockBytes, input.runtimeDependencies);
+  const appPackage = composeAppPackage(scope, descriptor, lock, lockBytes);
+  const secondAppPackage = composeAppPackage(scope, descriptor, lock, lockBytes);
   if (!sameAppPackageBytes(appPackage, secondAppPackage)) {
     throw refusal('DH_BUILD_LOCK_NOT_REPRODUCIBLE', 'double-build self-check produced divergent App Package bytes');
   }

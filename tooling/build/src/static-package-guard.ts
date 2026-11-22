@@ -9,6 +9,8 @@ import { resolveExportedModule } from './app-package.js';
 
 const SAFE_BUILTINS = new Set(['node:buffer', 'node:crypto', 'node:path', 'node:url', 'node:util']);
 const OPAQUE_IDENTIFIERS = new Set(['require', 'eval', 'Function', 'Worker', 'Reflect']);
+// 仅为当前受信任 Node Package 的静态准入拒绝，不构成任意代码的沙箱证明。
+const AMBIENT_EFFECT_GLOBALS = new Set(['fetch', 'process', 'WebSocket', 'XMLHttpRequest', 'navigator', 'Deno', 'Bun']);
 const OPAQUE_MEMBERS = new Set([
   'require',
   'eval',
@@ -268,6 +270,18 @@ export function verifyGeneratedPackageImports(
     const walk = (node: ts.Node): void => {
       if (ts.isIdentifier(node) && OPAQUE_IDENTIFIERS.has(node.text)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `opaque code-loading identifier '${node.text}' in '${key}'`);
+      }
+      if (ts.isIdentifier(node) && AMBIENT_EFFECT_GLOBALS.has(node.text) &&
+          !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) &&
+          !(ts.isPropertyAssignment(node.parent) && node.parent.name === node)) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `unapproved ambient process/network global '${node.text}' in '${key}'`);
+      }
+      if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+          ts.isIdentifier(node.expression) && (node.expression.text === 'globalThis' || node.expression.text === 'global') &&
+          AMBIENT_EFFECT_GLOBALS.has(propertyName(node) ?? '')) {
+        throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+          `unapproved ambient process/network access in '${key}'`);
       }
       if (ts.isElementAccessExpression(node) &&
           !ts.isStringLiteral(node.argumentExpression) &&

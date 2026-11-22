@@ -14,6 +14,12 @@ const dist = join(repo, 'packages/domain-harness/dist');
 const outfile = join(dist, 'composition.js');
 const declaration = join(dist, 'composition.d.ts');
 
+// 单 SDK 的公开类型必须与内部组合实现的原始类型字节完全一致。
+const internalTypes = readFileSync(join(repo, 'tooling/build/src/types.ts'), 'utf8');
+const publicTypes = readFileSync(join(repo, 'packages/domain-harness/src/composition-types.ts'), 'utf8');
+assert.equal(publicTypes, internalTypes,
+  'SDK public composition types drifted from the implementation; synchronize the single contract');
+
 const result = await build({
   entryPoints: [join(repo, 'tooling/build/src/index.ts')],
   outfile,
