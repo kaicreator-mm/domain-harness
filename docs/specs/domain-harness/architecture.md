@@ -76,7 +76,7 @@
 
 1. **只有一个 Boot → 一个 KDP → 一套 PackageSystem/运行控制**。现有 `packages/microkernel` 可以是物理 TS 实现工作空间/私有代码，但不能在逻辑架构上继续充当与 KDP Package 平行的第二内核权威；它的执行能力必须归属 KDP 的真实 Elements。
 2. **只有一套 Init/Exit 生命周期**。Boot 通过受信入口调用 KDP 的真实 `init`，并由 Package.Init 链完成必要启动；不能再出现 `bootstrap → 一套 App 初始化 → KDP.Init 外壳 → 又一套 App 初始化`。Workflow 在声明它的 Package.Init 内启动，业务函数由已选 FunctionRef 调用。
-3. **只有一个静态选择/组合体系**。Package 文件可直接手写；作者期 Composition 可通过同一 SDK 的固定受信版本运行，不能要求未生成的 App 自举，也不能引入额外 Forge/Seed Builder/独立 Assembly 产品。Runtime 不能替代生成期重新解析未声明依赖与动态权限。
+3. **只有一个静态选择/组合体系**。Package 文件可直接手写；作者期 Composition 可通过同一 SDK 的固定受信版本运行，不能要求未生成的 App 自举，也不能引入额外的强制生成器或独立 App 组合产品。Runtime 不能替代生成期重新解析未声明依赖与动态权限。
 4. **只有一份公开语义身份体系**。Package、Element、Function、Owner/Namespace、Version、Target 和 Digest 各有定义；物理 npm workspace、导出路径、CLI 或文件名不能代替公开 Element/Function 的声明、选择与权限检查。
 
 **允许的复用**：一个 Package 包含多个内聚 Elements；一个 Element 使用多个普通实现文件、私有函数和 Target 资源；可在分发时物理合并 KDP/SDK Packages，但必须能证明逻辑身份、权限和生命周期等价。**不允许**因此把任何辅助函数变为自动可跨包访问的隐形公开 API。
@@ -119,7 +119,7 @@ SDK 产品层：唯一 @kaicreator/domain-harness（作者期 + 运行期入口�
 | ARCH-03 | PackageSystem/XState/Workflow 是唯一一套且由 KDP Kernel Elements 拥有吗？业务流程仍在 Business/Standard Content 吗？ | #1668 待整改 |
 | ARCH-04 | K/S/B 使用统一 Manifest；Core.Order、直接 Extension、Init/Exit 均遵守单一链吗？ | Foundation 已 Scoped；新目标增量复核 |
 | ARCH-05 | 同一 App 能否只有一个公开 SDK 直接依赖，且所有选定 Function/Target/Resource/Host 权限可追到 Lock？ | v0.11.1 已 Scoped |
-| ARCH-06 | 作者期 Composition 是否不要求待构建 App 已经 Boot，亦未形成未声明的新运行时权限？ | #1668 L2 待明确 |
+| ARCH-06 | 作者期 Composition 是否不要求待生成 App 已经 Boot，亦未形成未声明的新运行时权限？ | #1668 L2 待明确 |
 | ARCH-07 | Element 是内聚职责的 0..N Function + Typed Content，不按源码文件数量/固定类型拆分吗？ | 合同已确认；以后持续核对 |
 | ARCH-08 | Package/Element ID 是否按新的包名/变量名规范，Namespace/Owner 独立，迁移后重算真实摘要？ | #1668 机器身份待迁移 |
 | ARCH-09 | 旧 v0.11.1 Exact-SHA 审核与 Digest 是否保持不可变，新的架构实现是否重新受限 E2E 和非 Writer 复核？ | #1668 结束门禁 |
