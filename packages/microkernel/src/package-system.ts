@@ -156,14 +156,6 @@ export class PackageSystem {
   }
 
   /**
-   * 旧 Bootstrap 调用路径的递归调度入口，保留供迁移期既有测试使用。
-   * 正式 Host ABI 切换后必须删除，不能再通过它重复调用 KDP Init。
-   */
-  async runInit(context: AppInitContext): Promise<unknown> {
-    return this.runInitFrom(context, false);
-  }
-
-  /**
    * KDP Host Init 一旦已被 Boot 真正调用，就立即登记真实进入历史。
    * 必须在进一步检查其它 Function/Hook/资源之前登记，保证后续任一失败都能尝试 KDP.Exit。
    * 这不是普通 Package.Init 去重器，不能用于吞掉 Extension 的多次调用。
@@ -173,7 +165,7 @@ export class PackageSystem {
       throw new KdpLoadError('KDP Host Init has already entered this activation', 'DH_RUNTIME_NOT_READY');
     }
     const rootId = this.lock.coreOrder[0];
-    if (!rootId || this.lock.bootstrapKdpPin.kdpPackageId !== rootId) {
+    if (!rootId || this.lock.selectedKdpHost.kdpPackageId !== rootId) {
       throw new KdpLoadError('Host KDP identity does not match the selected Core.Order 0', 'DH_BOOT_PIN_MISMATCH');
     }
     this.kernelHostEntered = true;
@@ -196,10 +188,10 @@ export class PackageSystem {
     }
     if (!this.kernelHostEntered) this.recordSelectedKernelHostEntry();
     this.kernelHostContinuationStarted = true;
-    return this.runInitFrom(context, true);
+    return this.continueFromEnteredKernel(context);
   }
 
-  private async runInitFrom(context: AppInitContext, kernelAlreadyEntered: boolean): Promise<unknown> {
+  private async continueFromEnteredKernel(context: AppInitContext): Promise<unknown> {
     const seen = new Set<string>();
     const businessResults: unknown[] = [];
     const completedCores = new Set<string>();
@@ -335,8 +327,8 @@ export class PackageSystem {
     const cores = this.lock.coreOrder;
     if (!cores.length) throw new KdpLoadError('Lock has no Core.Order chain');
     const rootId = cores[0]!;
-    if (this.lock.bootstrapKdpPin.kdpPackageId !== rootId) {
-      throw new KdpLoadError('Order 0 Core and bootstrap KDP Package identities differ', 'DH_BOOT_PIN_MISMATCH');
+    if (this.lock.selectedKdpHost.kdpPackageId !== rootId) {
+      throw new KdpLoadError('Order 0 Core and selected Host KDP Package identities differ', 'DH_BOOT_PIN_MISMATCH');
     }
     const coreBinding = (index: number, caller: InitCaller): PackageInitBinding => ({
       init: async (): Promise<void> => {
@@ -353,33 +345,30 @@ export class PackageSystem {
         completedCores.add(id);
       },
     });
-    if (kernelAlreadyEntered) {
-      const kernel = this.packageById(rootId);
-      if (!kernel || kernel.role !== 'primary' || kernel.layer !== 'kernel' || kernel.order !== 0) {
-        throw new KdpLoadError('Host KDP must be the unique selected Kernel Core at Order 0');
-      }
-      const selectedInit = this.functionByRef(kernel.initFunction);
-      if (!selectedInit || canonicalJson(selectedInit.ref.element) !== canonicalJson(kernel.init)) {
-        throw new KdpLoadError('Host KDP Init Element/Function identity mismatch', 'DH_BOOT_PIN_MISMATCH');
-      }
-      // Kernel 进入事件已经由 Host 激活前沿登记，不能在此重复写入。
-      if (!this.kernelHostEntered) {
-        throw new KdpLoadError('Selected Kernel Host Init is missing its entered record', 'DH_RUNTIME_NOT_READY');
-      }
-      const directExtensions = kernel.dependsOn
-        .map((id) => this.packageById(id))
-        .filter((pkg): pkg is SelectedPackage => pkg?.role === 'extension')
-        .sort((a, b) => a.packageId.localeCompare(b.packageId));
-      for (const extension of directExtensions) {
-        await enter(extension.packageId, { type: 'Package', packageId: rootId }, extension.layer);
-      }
-      completedCores.add(rootId);
-      if (cores.length > 1) {
-        await coreBinding(1, { type: 'Package', packageId: rootId }).init();
-      }
-    } else {
-      await coreBinding(0, { type: 'Boot' }).init();
+    const kernel = this.packageById(rootId);
+    if (!kernel || kernel.role !== 'primary' || kernel.layer !== 'kernel' || kernel.order !== 0) {
+      throw new KdpLoadError('Host KDP must be the unique selected Kernel Core at Order 0');
     }
+    const selectedInit = this.functionByRef(kernel.initFunction);
+    if (!selectedInit || canonicalJson(selectedInit.ref.element) !== canonicalJson(kernel.init)) {
+      throw new KdpLoadError('Host KDP Init Element/Function identity mismatch', 'DH_BOOT_PIN_MISMATCH');
+    }
+    // Kernel 进入事件已经由 Host 激活前沿登记，不能在此重复写入。
+    if (!this.kernelHostEntered) {
+      throw new KdpLoadError('Selected Kernel Host Init is missing its entered record', 'DH_RUNTIME_NOT_READY');
+    }
+    const directExtensions = kernel.dependsOn
+      .map((id) => this.packageById(id))
+      .filter((pkg): pkg is SelectedPackage => pkg?.role === 'extension')
+      .sort((a, b) => a.packageId.localeCompare(b.packageId));
+    for (const extension of directExtensions) {
+      await enter(extension.packageId, { type: 'Package', packageId: rootId }, extension.layer);
+    }
+    completedCores.add(rootId);
+    if (cores.length > 1) {
+      await coreBinding(1, { type: 'Package', packageId: rootId }).init();
+    }
+
     // Core 负责转交下一 Core；KDP 不补跑漏掉的 Core，但在对外标记 READY 前必须确认全链完成。
     const missing = cores.filter((id) => !completedCores.has(id));
     if (missing.length > 0) {
@@ -461,6 +450,11 @@ export class PackageSystem {
   ): Promise<FunctionOutcome> {
     const selected = this.functionByRef(ref);
     if (!selected) return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_FUNCTION_UNSELECTED', message: 'unselected FunctionRef' } };
+    if (selected.invocationAbi === 'kdp-host-init/1') {
+      return { kind: 'FAILED', failure: {
+        code: 'DH_RUNTIME_FUNCTION_UNSELECTED', message: 'privileged Host Init cannot be invoked as a JSON Function',
+      } };
+    }
     if (selected.effects !== 'none') return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_UNSUPPORTED_PROFILE', message: 'effectful Function not supported' } };
     const schemas = await this.functionSchemas(selected);
     if (schemas === null) return { kind: 'UNKNOWN', unknownReason: { code: 'DH_RUNTIME_UNSUPPORTED_PROFILE', message: 'Function Schema unavailable' } };
@@ -531,7 +525,8 @@ export class PackageSystem {
         (candidate) =>
           candidate.id === fn.ref.functionId && candidate.contractVersion === fn.ref.contractVersion,
       );
-      if (definition !== null && contract !== undefined) {
+      if (definition !== null && contract !== undefined &&
+          contract.invocationAbi !== 'kdp-host-init/1') {
         const input = await this.resolveSchemaRef(contract.inputSchemaRef);
         const output = await this.resolveSchemaRef(contract.outputSchemaRef);
         if (input !== null && output !== null) resolved = { input, output };

@@ -48,13 +48,22 @@ export interface SelectedElement {
  * 已选 Function 的运行期最小授权：实现入口、允许的 Outcome、Effect 意图及资源集合。
  * KDP 只能按这里的 resources 向 App Init 发放只读句柄，不能把整个 resourceDigests 暴露给业务。
  */
-export interface SelectedFunction {
+interface SelectedFunctionBase {
   readonly ref: FunctionRef;
-  readonly outcomes: readonly FunctionOutcomeKind[];
-  readonly effects: EffectIntent;
   readonly implementation: ImplementationLocator;
   readonly resources: readonly ResourceRef[];
 }
+export type SelectedFunction =
+  | (SelectedFunctionBase & {
+      readonly invocationAbi?: never;
+      readonly outcomes: readonly FunctionOutcomeKind[];
+      readonly effects: EffectIntent;
+    })
+  | (SelectedFunctionBase & {
+      readonly invocationAbi: 'kdp-host-init/1';
+      readonly outcomes?: never;
+      readonly effects?: never;
+    });
 
 export interface SealedHookBinding {
   readonly ownerPackageId: string;
@@ -71,10 +80,12 @@ export interface SelectedWorkflow {
   readonly definition: WorkflowDefinition;
 }
 
-export interface BootstrapKdpRef {
+export interface SelectedKdpHostRef {
   readonly kdpPackageId: string;
-  readonly kdpPrimaryEntry: 'bootstrap';
-  readonly kdpPrimaryDigest: ContentDigest;
+  readonly kdpInitFunction: FunctionRef;
+  readonly invocationAbi: 'kdp-host-init/1';
+  /** 从同一已选 Function 的 Target ImplementationLocator 派生，不是第二入口。 */
+  readonly kdpInitModule: ResourceRef;
 }
 
 /**
@@ -91,7 +102,7 @@ export interface DomainAppLock {
     readonly descriptorDigest: ContentDigest;
   };
   readonly target: ResolvedTarget;
-  readonly bootstrapKdpPin: BootstrapKdpRef;
+  readonly selectedKdpHost: SelectedKdpHostRef;
   readonly selectedPackages: readonly SelectedPackage[];
   readonly selectedElements: readonly SelectedElement[];
   readonly selectedFunctions: readonly SelectedFunction[];

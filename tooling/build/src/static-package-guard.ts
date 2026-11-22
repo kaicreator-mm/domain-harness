@@ -184,6 +184,19 @@ export function verifyGeneratedPackageImports(
     }
     const allowed = new Set(consumer.dependsOn.map((dep) => dep.package));
     const inspectModule = (specifier: string, declaration?: ts.ImportDeclaration, dynamic = false): string => {
+      // 唯一受信 KDP Host Profile 只允许精确的 SDK Host 激活端口。
+      // 这是生成期许可，不能借此导入任何其他 SDK 能力、动态模块或任意包。
+      if (consumer.role === 'primary' && consumer.layer === 'kernel' && consumer.order === 0 &&
+          specifier === '@kaicreator/domain-harness-microkernel' && !dynamic &&
+          declaration?.importClause && !declaration.importClause.name &&
+          declaration.importClause.namedBindings &&
+          ts.isNamedImports(declaration.importClause.namedBindings) &&
+          declaration.importClause.namedBindings.elements.length === 1 &&
+          declaration.importClause.namedBindings.elements[0]?.name.text === 'activateSelectedKdpHostInit' &&
+          (declaration.importClause.namedBindings.elements[0]?.propertyName?.text ??
+            declaration.importClause.namedBindings.elements[0]?.name.text) === 'activateSelectedKdpHostInit') {
+        return 'node:builtin';
+      }
       if (specifier === 'yaml') {
         // 仅所选且显式声明精确版本的 SDK/Business Package 可导入受信第三方库。
         // 此范围只支持预先审核并具有受控 SRI 的 Node ESM 子集。

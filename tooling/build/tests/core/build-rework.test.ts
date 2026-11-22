@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { symlinkSync, writeFileSync } from 'node:fs';
-import { DH_ELEMENT_SCHEMA_VERSION } from '@kaicreator/domain-harness-contracts';
+import { DH_ELEMENT_SCHEMA_VERSION, type DomainPackageManifest } from '@kaicreator/domain-harness-contracts';
 import { buildApp, type BuildResult } from '../../src/index.js';
 import { sha256OfBytes } from './fixtures.js';
 import { standardCase } from './standard-case.js';
@@ -163,14 +163,21 @@ test('P2-9: secondary Core.Order zero is rejected at BUILD', (t) => {
   expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_DUPLICATE');
 });
 
-test('R11 P1-03: bootstrap artifact Package must be the Order 0 KDP Core', (t) => {
+test('R127: selected KDP Host Init must bind the uniquely declared privileged Target', (t) => {
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  expectRefusal(buildApp({
-    ...input,
-    kdpArtifact: { ...input.kdpArtifact, packageId: '@kaicreator/domain-harness-microkernel' },
-  }), 'DH_BUILD_PRIMARY_MISSING');
+  const packages = input.packages.map((raw) => {
+    const pkg = raw as DomainPackageManifest;
+    if (pkg.id !== 'kdp-kernel') return pkg;
+    return { ...pkg, targetVariants: pkg.targetVariants.map((variant) => ({
+      ...variant, implementations: variant.implementations.map((binding) =>
+        binding.functionId === 'init'
+          ? { ...binding, invocationAbi: undefined }
+          : binding),
+    })) };
+  });
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_SCHEMA_INVALID');
 });
 
 test('regression: modifying one BUILD fixture Target never mutates subsequent fixture Targets', (t) => {

@@ -12,7 +12,6 @@ export type {
   BuildResult,
   BuildSuccess,
   BuildFailure,
-  KdpArtifactInput,
   AppPackageFile,
   ComposedAppPackage,
 } from './composition-types.js';

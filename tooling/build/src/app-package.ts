@@ -231,18 +231,20 @@ export function composeAppPackage(
     target: lock.target,
     lockPath: 'dh-lock/app.lock.json',
     lockDigest: lock.closureDigest,
-    kdpPackageId: lock.bootstrapKdpPin.kdpPackageId,
-    kdpPrimaryEntry: 'bootstrap',
-    kdpPrimaryDigest: lock.bootstrapKdpPin.kdpPrimaryDigest,
+    kdpPackageId: lock.selectedKdpHost.kdpPackageId,
+    kdpInitFunction: lock.selectedKdpHost.kdpInitFunction,
+    invocationAbi: lock.selectedKdpHost.invocationAbi,
+    kdpInitModule: lock.selectedKdpHost.kdpInitModule,
   };
   const record = { ...recordBase, recordDigest: contentDigestOf(recordBase as unknown as JsonValue) };
   add('dh-install/installed-record.json', encoded(record as unknown as JsonValue));
   const pin = {
     schemaVersion: DH_PIN_SCHEMA_VERSION,
     target: lock.target,
-    kdpPackageId: lock.bootstrapKdpPin.kdpPackageId,
-    kdpPrimaryEntry: 'bootstrap',
-    kdpPrimaryDigest: lock.bootstrapKdpPin.kdpPrimaryDigest,
+    kdpPackageId: lock.selectedKdpHost.kdpPackageId,
+    kdpInitFunction: lock.selectedKdpHost.kdpInitFunction,
+    invocationAbi: lock.selectedKdpHost.invocationAbi,
+    kdpInitModule: lock.selectedKdpHost.kdpInitModule,
     lockDigest: lock.closureDigest,
     lockPath: 'dh-lock/app.lock.json',
   };

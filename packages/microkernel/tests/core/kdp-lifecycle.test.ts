@@ -11,7 +11,6 @@ import {
   type FixtureInstall, type FixtureScenario,
 } from './helpers/install.js';
 
-const INIT_ORDER = ['fixture-kernel', '@fixture/sdk', 'fixture-ext', 'fixture-business'];
 const EXIT_ORDER = ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-kernel'];
 const appCtx = (fixture: FixtureInstall) => ({
   appId: 'fixture.orders-app', activationId: 'activation',
@@ -33,7 +32,8 @@ test('B0-07: Boot selects the unique ordered Core chain and Hook Provider before
     assert.equal(result.status, 'BOOTED', JSON.stringify(result));
     if (result.status !== 'BOOTED') return;
     assert.equal(result.app.status, 'READY');
-    assert.deepEqual(timeline('package-init'), INIT_ORDER);
+    assert.deepEqual(timeline('package-init'), ['@fixture/sdk', 'fixture-ext', 'fixture-business'],
+      'Boot must never run an ordinary KDP.Init after selected Host Init');
     assert.ok(timeline('module-evaluated').includes('fixture-ext:hook'));
     assert.equal(timeline('hook-provider-invoked').length, 0);
     const selected = events().find((entry) => entry['event'] === 'init-selected-function');
@@ -111,7 +111,7 @@ test('B0-02: selected Exit is optional and does not block remaining Exit chain',
     return withoutExit;
   }) };
   const system = new PackageSystem(fixture.installRoot, lock, []);
-  await system.runInit(appCtx(fixture));
+  await system.runRemainingCoresAfterKernelEntered(appCtx(fixture));
   await system.runExit();
   assert.deepEqual(timeline('package-exit'), ['fixture-business', '@fixture/sdk', 'fixture-kernel']);
 });
@@ -126,21 +126,22 @@ test('B0-07: InitFrom is optional independently of Exit bookkeeping', async (t) 
     return without;
   }) };
   const system = new PackageSystem(fixture.installRoot, lock, []);
-  await system.runInit(appCtx(fixture));
+  await system.runRemainingCoresAfterKernelEntered(appCtx(fixture));
   assert.equal(system.initFrom('fixture-business'), undefined);
   await system.runExit();
   assert.deepEqual(timeline('package-exit'), EXIT_ORDER);
 });
 
-test('B0-07: Kernel never deduplicates valid repeated Init entries', async (t) => {
+test('R127: selected KDP Host Init is single-entry; Extensions still manage their own repeat', async (t) => {
   const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
   t.after(async () => fixture.cleanup());
   const system = new PackageSystem(fixture.installRoot, fixture.lock, []);
-  await system.runInit(appCtx(fixture));
-  await system.runInit(appCtx(fixture));
-  assert.deepEqual(system.initFrom('fixture-kernel'), [{ type: 'Boot' }, { type: 'Boot' }]);
+  await system.runRemainingCoresAfterKernelEntered(appCtx(fixture));
+  await assert.rejects(system.runRemainingCoresAfterKernelEntered(appCtx(fixture)),
+    /already entered this activation/);
+  assert.deepEqual(system.initFrom('fixture-kernel'), [{ type: 'Boot' }]);
   await system.runExit();
-  assert.equal(timeline('package-exit').length, INIT_ORDER.length * 2);
+  assert.deepEqual(timeline('package-exit'), EXIT_ORDER);
 });
 
 test('B0-07: cross-layer directly declared Extension is not silently omitted', async (t) => {
@@ -150,8 +151,8 @@ test('B0-07: cross-layer directly declared Extension is not silently omitted', a
     pkg.packageId === 'fixture-ext' ? { ...pkg, layer: 'sdk' as const } : pkg),
   };
   const system = new PackageSystem(fixture.installRoot, lock, []);
-  await system.runInit(appCtx(fixture));
-  assert.deepEqual(timeline('package-init'), INIT_ORDER);
+  await system.runRemainingCoresAfterKernelEntered(appCtx(fixture));
+  assert.deepEqual(timeline('package-init'), ['@fixture/sdk', 'fixture-ext', 'fixture-business']);
   await system.runExit();
 });
 
@@ -164,8 +165,8 @@ test('B0-02: an incorrect selected lifecycle FunctionRef is not silently execute
     } : pkg),
   };
   const system = new PackageSystem(fixture.installRoot, lock, []);
-  await assert.rejects(system.runInit(appCtx(fixture)), /Init Element\/Function identity mismatch/);
-  assert.deepEqual(timeline('package-init'), ['fixture-kernel']);
+  await assert.rejects(system.runRemainingCoresAfterKernelEntered(appCtx(fixture)), /Init Element\/Function identity mismatch/);
+  assert.deepEqual(timeline('package-init'), [], 'selected Host Kernel is already entered; no ordinary KDP.Init executes');
 });
 
 test('B0-07: valid Business READY cannot mask a missing trailing Core.Init', async (t) => {
@@ -178,7 +179,7 @@ test('B0-07: valid Business READY cannot mask a missing trailing Core.Init', asy
     selectedPackages: [...fixture.lock.selectedPackages, { ...sdk, packageId: 'trailing-sdk-core', order: 7 }],
   };
   const system = new PackageSystem(fixture.installRoot, lock, []);
-  await assert.rejects(system.runInit(appCtx(fixture)), /Core.Order chain incomplete/);
+  await assert.rejects(system.runRemainingCoresAfterKernelEntered(appCtx(fixture)), /Core.Order chain incomplete/);
   await system.runExit();
   assert.deepEqual(timeline('package-exit'), EXIT_ORDER);
 });
@@ -247,9 +248,9 @@ test('B0-05: all Business Core results conservatively determine App status', () 
 test('B0-07: Boot Pin must match Order 0 KDP identity before running package Init', async (t) => {
   const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
   t.after(async () => fixture.cleanup());
-  const lock = { ...fixture.lock, bootstrapKdpPin: { ...fixture.lock.bootstrapKdpPin, kdpPackageId: 'different-kdp' } };
+  const lock = { ...fixture.lock, selectedKdpHost: { ...fixture.lock.selectedKdpHost, kdpPackageId: 'different-kdp' } };
   const system = new PackageSystem(fixture.installRoot, lock, []);
-  await assert.rejects(system.runInit(appCtx(fixture)), /identities differ/);
+  await assert.rejects(system.runRemainingCoresAfterKernelEntered(appCtx(fixture)), /identity does not match/);
   assert.equal(timeline('package-init').length, 0);
 });
 

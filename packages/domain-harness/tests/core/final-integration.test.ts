@@ -136,7 +136,12 @@ test('B0: unsupported Node Host target is refused before package execution', { t
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status !== 'FAILED') return;
     assert.equal(result.code, 'DH_RUNTIME_UNSUPPORTED_PROFILE');
-    assert.equal(events().filter((entry) => entry['event'] === 'package-init').length, 0);
+    assert.deepEqual(events().filter((entry) => entry['event'] === 'package-init')
+      .map((entry) => entry['package']), ['kdp-kernel'],
+      'Host KDP.Init was already entered; no ordinary Package Init can execute');
+    assert.deepEqual(events().filter((entry) => entry['event'] === 'package-exit')
+      .map((entry) => entry['package']), ['kdp-kernel'],
+      'selected Host target failure still cleans up its entered KDP');
   });
 });
 

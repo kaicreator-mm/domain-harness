@@ -287,12 +287,12 @@ export const ILLEGAL_FIXTURES: readonly IllegalFixture[] = [
     })(),
   },
   {
-    name: 'lock-kdp-entry-wrong',
+    name: 'lock-selected-kdp-host-abi-wrong',
     expectedCode: 'DH_BUILD_SCHEMA_INVALID',
     target: 'lock',
     value: (() => {
       const draft = cloneLegal(DOMAIN_APP_LOCK_FIXTURE);
-      asRecord(draft['bootstrapKdpPin'])['kdpPrimaryEntry'] = 'init';
+      asRecord(draft['selectedKdpHost'])['invocationAbi'] = 'ordinary-json-function';
       return draft;
     })(),
   },

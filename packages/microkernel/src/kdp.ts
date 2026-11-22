@@ -97,20 +97,73 @@ export function validateBusinessCoreResults(raw: unknown): { status: AppStatus }
     statuses.includes('DEGRADED') ? 'DEGRADED' : 'READY' };
 }
 /**
+ * 内部 Host Exit 交接：Boot 只持有一次性清理句柄，真正的逆序 Exit
+ * 仍由 KDP 的 PackageSystem 执行。使用进程内 Symbol 注册以跨 npm file: 安装
+ * 的 SDK 模块副本传递同一激活责任；不是公开 Domain Package Function API。
+ */
+const HOST_EXIT_FENCE = Symbol.for('domain-harness.internal.kdp-host-exit/1');
+type HostExit = () => Promise<void>;
+interface HostExitRegistration {
+  registerExit(exit: HostExit): void;
+}
+export function createKdpHostCallFence(context: KdpBootstrapContext): {
+  readonly context: KdpBootstrapContext;
+  cleanup(): Promise<'DONE' | 'UNSAFE' | 'FAILED'>;
+} {
+  let exit: HostExit | undefined;
+  let cleanupFlight: Promise<'DONE' | 'UNSAFE' | 'FAILED'> | undefined;
+  const registration: HostExitRegistration = {
+    registerExit(selectedExit): void {
+      if (exit === undefined) exit = selectedExit;
+    },
+  };
+  const boundContext = Object.defineProperty({ ...context }, HOST_EXIT_FENCE, {
+    value: registration, configurable: false, enumerable: false, writable: false,
+  });
+  const runFallback = async (): Promise<'DONE' | 'UNSAFE' | 'FAILED'> => {
+    if (exit === undefined) {
+      // KDP.Init 在调用正常激活服务前抛出时，不能使用未经验证的 Exit。
+      // 必须重新确认安装信任，再以已选 Order 0 Host 进入历史清理。
+      let trusted: Awaited<ReturnType<typeof verifyInstallTrust>>;
+      try {
+        trusted = await verifyInstallTrust(boundContext);
+      } catch {
+        return 'UNSAFE';
+      }
+      if (!trusted.ok) return 'UNSAFE';
+      try {
+        const packages = new PackageSystem(
+          trusted.value.context.installRoot, trusted.value.lock, trusted.value.context.hostPorts,
+        );
+        packages.recordSelectedKernelHostEntry();
+        exit = () => packages.runExit();
+      } catch {
+        return 'UNSAFE';
+      }
+    }
+    try {
+      await exit();
+      return 'DONE';
+    } catch {
+      return 'FAILED';
+    }
+  };
+  return {
+    context: boundContext,
+    cleanup: () => (cleanupFlight ??= runFallback()),
+  };
+}
+
+/**
  * 单一 KDP Host Init 专用的启动后半段：调用者已经是由 Boot 选定并导入的
  * KDP Package.Init，故这里只登记其一次真实进入并递归其余 Core，而不再调用 Kernel.Init。
- * 真正的 Host ABI/Pin/Lock 机器身份将由下一原子合同迁移绑定，不以此函数名授权。
+ * Host FunctionRef/Target 与 Pin/Lock 身份在 Boot 侧绑定；本服务仅接管后半段调度。
  */
 export async function activateSelectedKdpHostInit(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
   // 此调用本身已进入受选的 KDP Host Init：在第一次 await 之前登记退出责任。
   // 此处不加载文件或执行 Exit；后续仅在验证可信安装来源之后转交 PackageSystem。
   const enteredHost: { readonly entered: true } = { entered: true };
   return activateKernel(context, enteredHost);
-}
-
-/** 迁移阶段旧入口：保留既有回归用例；最终 Host ABI 切换将删除此路径。 */
-export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
-  return activateKernel(context);
 }
 
 /**
@@ -120,22 +173,19 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
  */
 async function activateKernel(
   context: KdpBootstrapContext,
-  enteredHost?: { readonly entered: true },
+  enteredHost: { readonly entered: true },
 ): Promise<KdpBootstrapResult> {
-  const hostAlreadyEntered = enteredHost?.entered === true;
+  // 由受选 Host KDP.Init 在首次 await 前建立的进入责任，不存在旧 bootstrap 路径。
+  void enteredHost;
   let trust: Awaited<ReturnType<typeof verifyInstallTrust>>;
   try {
     trust = await verifyInstallTrust(context);
   } catch {
     return failed('DH_KDP_PACKAGE_LOAD_FAILED',
-      hostAlreadyEntered
-        ? 'KDP trusted installation verification threw (detail redacted); cleanup=CLEANUP_NOT_SAFE'
-        : 'KDP trusted installation verification threw (detail redacted)');
+      'KDP trusted installation verification threw (detail redacted); cleanup=CLEANUP_NOT_SAFE');
   }
   if (!trust.ok) {
-    return failed(trust.failure.code, hostAlreadyEntered
-      ? `${trust.failure.reason}; cleanup=CLEANUP_NOT_SAFE (untrusted install)`
-      : trust.failure.reason);
+    return failed(trust.failure.code, `${trust.failure.reason}; cleanup=CLEANUP_NOT_SAFE (untrusted install)`);
   }
 
   const { lock } = trust.value;
@@ -145,7 +195,11 @@ async function activateKernel(
   try {
     // 必须紧接首次可信 Lock 获取后转交已经进入的 Host Kernel；后面的所有早期失败
     // 都通过同一个 catch/Exit 处理，绝不能通过 return 绕过 Exit。
-    if (hostAlreadyEntered) packages.recordSelectedKernelHostEntry();
+    packages.recordSelectedKernelHostEntry();
+    const hostFence = (context as KdpBootstrapContext & {
+      readonly [HOST_EXIT_FENCE]?: HostExitRegistration;
+    })[HOST_EXIT_FENCE];
+    hostFence?.registerExit(() => packages.runExit());
 
     const profile: string = lock.target.profile;
     if (profile !== NODE22_ESM_PROFILE) {
@@ -188,9 +242,7 @@ async function activateKernel(
     };
     let rawInitResult: unknown;
     try {
-      rawInitResult = hostAlreadyEntered
-        ? await packages.runRemainingCoresAfterKernelEntered(initContext)
-        : await packages.runInit(initContext);
+      rawInitResult = await packages.runRemainingCoresAfterKernelEntered(initContext);
     } catch (error) {
       throw new KdpLoadError(
         error instanceof KdpLoadError ? error.message : 'Core.Init raised an unhandled error (detail redacted)',

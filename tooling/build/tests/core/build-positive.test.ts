@@ -27,7 +27,7 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
   const lock = first.lock;
 
   assert.equal(lock.kind, 'DomainAppLock');
-  assert.equal(lock.schemaVersion, 'dh.lock/0.11');
+  assert.equal(lock.schemaVersion, 'dh.lock/0.11.1');
   assert.deepEqual(lock.target, { runtime: 'node', module: 'esm', nodeMajor: 22, profile: 'node22-esm/1' });
   assert.deepEqual(lock.appIdentity, {
     id: 'orders.basic',
@@ -94,9 +94,12 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     [],
   );
 
-  assert.equal(lock.bootstrapKdpPin.kdpPackageId, 'kdp-kernel');
-  assert.equal(lock.bootstrapKdpPin.kdpPrimaryEntry, 'bootstrap');
-  assert.match(lock.bootstrapKdpPin.kdpPrimaryDigest, /^sha256:[0-9a-f]{64}$/u);
+  assert.equal(lock.selectedKdpHost.kdpPackageId, 'kdp-kernel');
+  assert.equal(lock.selectedKdpHost.invocationAbi, 'kdp-host-init/1');
+  assert.equal(lock.selectedKdpHost.kdpInitFunction.functionId, 'init');
+  assert.equal(lock.selectedKdpHost.kdpInitModule.path, 'dist/kdp.mjs');
+  assert.match(lock.selectedKdpHost.kdpInitModule.digest, /^sha256:[0-9a-f]{64}$/u);
+  assert.equal(lock.selectedFunctions.filter((fn) => fn.invocationAbi === 'kdp-host-init/1').length, 1);
 
   for (const key of [
     'orders-business/content/faq.json',
@@ -104,7 +107,7 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     'orders-business/docs/eligibility.md',
     'orders-business/definitions/eligibility-1.0.0-1.json',
     'orders-business/dist/business.mjs',
-    'kdp-kernel/dist/index.js',
+    'kdp-kernel/dist/kdp.mjs',
     'kdp-kernel/package.json',
   ]) {
     assert.match(lock.resourceDigests[key] ?? '', /^sha256:[0-9a-f]{64}$/u, `resourceDigests['${key}']`);

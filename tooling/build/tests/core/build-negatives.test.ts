@@ -200,9 +200,18 @@ test('R27: BUILD rejects artifact paths Runtime would reject', (t) => {
       ...input, packageArtifacts: { ...input.packageArtifacts, 'orders-business': path },
     }), 'DH_BUILD_RESOURCE_MISSING');
   }
+  const kdp = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'kdp-kernel') as DomainPackageManifest;
+  const invalidKdp = {
+    ...kdp, targetVariants: kdp.targetVariants.map((variant) => ({
+      ...variant, implementations: variant.implementations.map((binding) =>
+        binding.functionId === 'init'
+          ? { ...binding, entry: { ...binding.entry, module: { ...binding.entry.module, path: './dist/kdp.mjs' } } }
+          : binding),
+    })),
+  };
   expectRefusal(buildApp({
-    ...input, kdpArtifact: { ...input.kdpArtifact, path: `./${input.kdpArtifact.path}` },
-  }), 'DH_BUILD_RESOURCE_MISSING');
+    ...input, packages: input.packages.map((pkg) => pkg === kdp ? invalidKdp : pkg),
+  }), 'DH_BUILD_SCHEMA_INVALID');
 });
 
 test('B0-02: lifecycle ElementRef digest mismatch is refused before choosing a Target', (t) => {
@@ -445,7 +454,7 @@ test('BUILD rejects missing KDP Order 0', (t) => {
   const { input } = scenario.finalize();
   const kdp = input.packages.find((pkg) => (pkg as { id: string }).id === 'kdp-kernel') as { order: number };
   kdp.order = 9;
-  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_MISSING');
+  expectRefusal(buildApp(input), 'DH_BUILD_SCHEMA_INVALID');
 });
 
 test('BUILD rejects imports from an undeclared direct Extension', (t) => {

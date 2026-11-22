@@ -5,7 +5,6 @@ export type {
   BuildResult,
   BuildSuccess,
   BuildFailure,
-  KdpArtifactInput,
   AppPackageFile,
   ComposedAppPackage,
 } from './types.js';
