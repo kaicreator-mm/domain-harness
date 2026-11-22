@@ -504,6 +504,27 @@ test('BUILD forbids Element content references to an undeclared Package', (t) =>
   expectRefusal(buildApp(scenario.finalize().input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
+test('Foundation L2-1: Order-0 Kernel refuses literal dynamic import before sealing KDP', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const kdp = input.packages.find((pkg) => pkg.id === 'kdp-kernel')!;
+  const target = writeRaw(scenario.ws.packageRoots['kdp-kernel']!, 'dist/kdp.mjs',
+    new TextEncoder().encode('export async function init() { await import("./lazy.mjs"); }\nexport function exit() {}\n'));
+  const patched = {
+    ...kdp,
+    targetVariants: kdp.targetVariants.map((variant) => ({
+      ...variant,
+      implementations: variant.implementations.map((binding) => ({
+        ...binding,
+        entry: { ...binding.entry, module: target },
+      })),
+    })),
+  };
+  const packages = input.packages.map((pkg) => pkg === kdp ? patched : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
 function generatedLoaderCase(label: string, body: string, code: BuildErrorCode = 'DH_BUILD_DEPENDS_ON_UNSELECTED'): void {
   test(`B0 selected ESM proof: ${label}`, (t) => {
     const scenario = standardCase();
