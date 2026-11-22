@@ -1,5 +1,5 @@
 // 当前架构的可证伪测试：断言实际行为而非历史兼容。
-import { mkdtemp, mkdir, writeFile, cp, readFile, readdir } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, cp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -347,7 +347,21 @@ export async function buildFixtureInstall(
       exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
     }),
   );
-  await cp(MICROKERNEL_DIST, join(kdpPackageDir, 'dist'), { recursive: true });
+  // 测试用 KDP 也只包含真正可证明的两节点 Host ESM 薄层。
+  // SDK Microkernel 的真正实现安装在独立、受信的同一 App node_modules 中。
+  await mkdir(join(kdpPackageDir, 'dist'), { recursive: true });
+  await writeFile(join(kdpPackageDir, 'dist', 'index.js'),
+    "export { bootstrap } from './bootstrap.js';\n");
+  await writeFile(join(kdpPackageDir, 'dist', 'bootstrap.js'),
+    "export { bootstrap } from '@kaicreator/domain-harness-microkernel';\n");
+  const trustedSdkDir = join(installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel');
+  await mkdir(trustedSdkDir, { recursive: true });
+  await writeFile(join(trustedSdkDir, 'package.json'), JSON.stringify({
+    name: '@kaicreator/domain-harness-microkernel',
+    version: '0.11.0', type: 'module',
+    exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
+  }));
+  await cp(MICROKERNEL_DIST, join(trustedSdkDir, 'dist'), { recursive: true });
 
   const contractsPackageDir = join(installRoot, 'node_modules', '@kaicreator/domain-harness-contracts');
   await mkdir(contractsPackageDir, { recursive: true });
@@ -477,21 +491,20 @@ export async function buildFixtureInstall(
     digest: await fileBytesDigest(join(installRoot, 'node_modules', FIXTURE_BUSINESS, 'content', 'rules.json')),
   };
 
-  // Microkernel 测试夹具独立安装整个已编译 SDK：选定入口及 dist 中所有 JS
-  // 采用保守的封存超集，完整机器导入边的构造由 BUILD 静态扫描器正反例验证。
-  const kernelModuleFiles = (await readdir(join(kdpPackageDir, 'dist')))
-    .filter((name) => /\.js$/u.test(name)).sort();
-  const trustedKdpModuleClosure = await Promise.all(kernelModuleFiles.map(async (name) => ({
-    module: {
-      packageId: KDP_PACKAGE_ID, path: `dist/${name}`,
-      digest: await fileBytesDigest(join(kdpPackageDir, 'dist', name)),
-    },
-    dependencies: [],
-    trustedImports: [],
-  })));
-  if (!trustedKdpModuleClosure.some((node) => node.module.path === 'dist/index.js')) {
-    throw new Error('fixture KDP export is not in the sealed JS module inventory');
-  }
+  // 采用真实静态根→相对子模块→受控 SDK bare import，测试不再用空边超集
+  // 偷换 BUILD 图证明。每条边均由 Boot 独立解析实际源码核对。
+  const pinnedKdpEntry = {
+    packageId: KDP_PACKAGE_ID, path: 'dist/index.js',
+    digest: await fileBytesDigest(join(kdpPackageDir, 'dist', 'index.js')),
+  };
+  const pinnedKdpChild = {
+    packageId: KDP_PACKAGE_ID, path: 'dist/bootstrap.js',
+    digest: await fileBytesDigest(join(kdpPackageDir, 'dist', 'bootstrap.js')),
+  };
+  const trustedKdpModuleClosure = [
+    { module: pinnedKdpChild, dependencies: [], trustedImports: ['@kaicreator/domain-harness-microkernel'] },
+    { module: pinnedKdpEntry, dependencies: [pinnedKdpChild], trustedImports: [] },
+  ];
 
   const resourceDigests: Record<string, ContentDigest> = {
     [`${KDP_PACKAGE_ID}/package.json`]: await fileBytesDigest(join(kdpPackageDir, 'package.json')),
