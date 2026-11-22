@@ -26,11 +26,14 @@ const npmManifest = require.resolve('npm/package.json', {
   paths: [dirname(process.execPath), resolve(dirname(process.execPath), '../lib/node_modules')],
 });
 const npmCli = process.env.npm_execpath ?? join(dirname(npmManifest), 'bin/npm-cli.js');
+const registryFixtureOnly = process.env.DH_R60_REGISTRY_WORKFLOW_FIXTURE_ONLY === '1';
 const sdkTarball = process.env.DH_T05_SDK_TARBALL;
 const microkernelTarball = process.env.DH_T05_MICROKERNEL_TARBALL;
 const contractsTarball = process.env.DH_T05_CONTRACTS_TARBALL;
-assert.ok(sdkTarball && microkernelTarball && contractsTarball,
-  'driver must provide exact SDK and local transitive tarballs for composed App installation');
+if (!registryFixtureOnly) {
+  assert.ok(sdkTarball && microkernelTarball && contractsTarball,
+    'driver must provide exact SDK and local transitive tarballs for composed App installation');
+}
 const evidenceDir = process.env.DH_T05_EVIDENCE ?? join(consumerRoot, 'evidence');
 const eventsPath = join(evidenceDir, 'consumer-events.ndjson');
 await mkdir(evidenceDir, { recursive: true });
@@ -1238,8 +1241,34 @@ async function main() {
   console.log(JSON.stringify(result));
 }
 
+/** R70: reuse the actual T14 authoring fixture inside the Registry-installed SDK consumer. */
+async function prepareRegistryWorkflowFixture() {
+  const prepared = await authoring('registry-workflow',
+    { minOrderTotal: 50, regions: ['EU', 'US'] }, { workflow: true });
+  try {
+    const built = buildApp(prepared.input);
+    assert.equal(built.ok, true, built.ok ? '' : JSON.stringify(built));
+    assert.equal(built.lock.selectedWorkflows?.length, 7);
+    assert.equal(built.lock.selectedElements.filter((item) =>
+      item.ref.id.startsWith('basic.data_')).length, 4);
+    assert.deepEqual(built.lock.trustedRuntimeIntegrity?.map((entry) =>
+      [entry.name, entry.version]), [['xstate', '5.33.2'], ['yaml', '2.9.1']]);
+    const installRoot = join(consumerRoot, 'registry-workflow-app');
+    for (const file of built.appPackage.files) await write(installRoot, file.path, file.bytes);
+    assert.equal(JSON.parse(await readFile(join(installRoot, 'package.json'), 'utf8'))
+      .dependencies['@kaicreator/domain-harness'], '0.11.0');
+    console.log('DH_R70_REGISTRY_WORKFLOW_FIXTURE ' + JSON.stringify({
+      selectedWorkflows: 7, selectedResources: 4,
+      lockDigest: built.lock.closureDigest,
+    }));
+  } finally {
+    await rm(prepared.root, { recursive: true, force: true });
+  }
+}
+
 try {
-  await main();
+  if (registryFixtureOnly) await prepareRegistryWorkflowFixture();
+  else await main();
 } catch (error) {
   const result = { status: 'FAIL', error: String(error?.stack ?? error), events: events.length };
   await evidence('consumer.failure', result);

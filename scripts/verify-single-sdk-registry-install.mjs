@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -19,7 +19,9 @@ assert.ok(upstream && /^https?:\/\//u.test(upstream),
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const temporary = await mkdtemp(join(tmpdir(), 'dh-r60-one-sdk-registry-'));
 const evidence = { schemaVersion: 'dh.r60.registry/1', node: process.version,
-  sdkDirectDependencies: 1, workflowTransitiveSRI: false, boot: false, tamperRejected: false };
+  sdkDirectDependencies: 1, workflowTransitiveSRI: false, boot: false, tamperRejected: false,
+  registryWorkflowSelected: 0, registryWorkflowBoot: false, registryDataReads: 0,
+  preinstallTamperedSRIRejected: false };
 let server;
 async function runNpm(cwd, args, env) {
   const result = await new Promise((settle, reject) => {
@@ -174,6 +176,77 @@ console.log('DH_R60_SDK_ONLY_REGISTRY_IMPORTS_OK');
   assert.notEqual(tamper.code,0,'modified selected Package must not reach BOOTED');
   assert.equal(tamper.stdout.includes('"status":"BOOTED"'),false);
   evidence.tamperRejected = true;
+  // R70 AC60-06: this same one-SDK Registry-installed consumer composes
+  // a real T14 Workflow App; do not supply three first-party tarballs.
+  const demo = join(repo, 'examples/basic-domain-app');
+  await cp(join(demo, 'consumer.mjs'), join(consumer, 'registry-workflow-fixture.mjs'));
+  await cp(join(demo, 'workflow-fixture.mjs'), join(consumer, 'workflow-fixture.mjs'));
+  const fileSource = join(temporary, 'selected-packages/packages/r60-standard-files');
+  await mkdir(dirname(fileSource), { recursive: true });
+  await cp(join(repo, 'examples/selected-packages/packages/r60-standard-files'),
+    fileSource, { recursive: true });
+  const fixture = await runNode(consumer, ['registry-workflow-fixture.mjs'], {
+    ...env, DH_R60_REGISTRY_WORKFLOW_FIXTURE_ONLY: '1',
+    DH_T05_EVIDENCE: join(temporary, 'workflow-evidence'),
+  });
+  assert.equal(fixture.code, 0, 'Registry SDK Workflow fixture: ' +
+    fixture.stderr + '\n' + fixture.stdout);
+  assert.ok(fixture.stdout.includes('DH_R70_REGISTRY_WORKFLOW_FIXTURE'));
+  const workflowRoot = join(consumer, 'registry-workflow-app');
+  const sealed = JSON.parse(await readFile(join(workflowRoot, 'dh-lock/app.lock.json'), 'utf8'));
+  assert.equal(sealed.selectedWorkflows?.length, 7);
+  const appJson = JSON.parse(await readFile(join(workflowRoot, 'package.json'), 'utf8'));
+  assert.equal(appJson.dependencies['@kaicreator/domain-harness'], '0.11.0');
+  assert.deepEqual(Object.keys(appJson.dependencies).filter((name) =>
+    name.startsWith('@kaicreator/')), ['@kaicreator/domain-harness']);
+  assert.equal(Object.keys(consumerLock.packages[''].dependencies).length, 1);
+  const selectedPins = sealed.trustedRuntimeIntegrity;
+  assert.deepEqual(selectedPins?.map((archive) => [archive.name, archive.version]),
+    [['xstate', '5.33.2'], ['yaml', '2.9.1']]);
+  const runtimeManifest = JSON.parse(await readFile(join(workflowRoot,
+    'dh-install/trusted-runtime.json'), 'utf8'));
+  assert.deepEqual(runtimeManifest.archives, selectedPins);
+  await runNpm(workflowRoot, ['install', '--package-lock-only',
+    '--ignore-scripts', '--no-audit', '--no-fund'], env);
+  const lockPath = join(workflowRoot, 'package-lock.json');
+  const originalLock = await readFile(lockPath);
+  const npmLock = JSON.parse(originalLock.toString('utf8'));
+  for (const archive of selectedPins) {
+    for (const packages of [consumerLock.packages, npmLock.packages]) {
+      const found = packages['node_modules/' + archive.name];
+      assert.equal(found?.version, archive.version);
+      assert.equal(found?.integrity, archive.integrity,
+        'Registry npm pin must equal the selected App DomainAppLock SRI');
+    }
+  }
+  const preflight = await runNode(workflowRoot, ['dh-install/verify-preinstall.mjs'], env);
+  assert.equal(preflight.code, 0, preflight.stderr);
+  assert.ok(preflight.stdout.includes('DH_TRUSTED_RUNTIME_PREINSTALL_APPROVED'));
+  evidence.workflowTransitiveSRI = true;
+  // Negative runs before npm ci and Boot: an approved archive SRI is changed.
+  const bad = structuredClone(npmLock);
+  bad.packages['node_modules/yaml'].integrity = 'sha512-' + 'A'.repeat(86) + '==';
+  await writeFile(lockPath, JSON.stringify(bad));
+  const rejected = await runNode(workflowRoot, ['dh-install/verify-preinstall.mjs'], env);
+  assert.notEqual(rejected.code, 0, 'mutated archive SRI must be rejected before install');
+  assert.ok(rejected.stderr.includes('DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH'),
+    rejected.stderr);
+  assert.ok(!rejected.stdout.includes('DH_TRUSTED_RUNTIME_PREINSTALL_APPROVED'));
+  evidence.preinstallTamperedSRIRejected = true;
+  await writeFile(lockPath, originalLock);
+  const restored = await runNode(workflowRoot, ['dh-install/verify-preinstall.mjs'], env);
+  assert.equal(restored.code, 0, restored.stderr);
+  await runNpm(workflowRoot, ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], env);
+  const postflight = await runNode(workflowRoot, ['dh-install/verify-runtime.mjs'], env);
+  assert.equal(postflight.code, 0, postflight.stderr);
+  const workflowBoot = await runNode(workflowRoot,
+    ['--input-type=module', '--eval', "\nimport assert from 'node:assert/strict';\nimport { readFile } from 'node:fs/promises';\nimport { boot } from '@kaicreator/domain-harness/runtime';\nconst pin = JSON.parse(await readFile('dh-install/bootstrap-pin.json', 'utf8'));\nconst result = await boot(pin, {\n  installRoot: process.cwd(), descriptorPath: 'descriptor/app.json',\n  lockPath: 'dh-lock/app.lock.json', hostPorts: [],\n  env: {nodeMajor: Number(process.versions.node.split('.')[0]), platform: process.platform},\n});\nassert.equal(result.status, 'BOOTED', JSON.stringify(result));\nassert.equal(result.app.status, 'READY');\nconst events = globalThis.__domainHarnessT05Events ?? [];\nconst cutoff = events.findIndex((item) => item.event === 'workflow-cases-begin');\nassert.ok(cutoff > 0, 'real selected nested Workflow must run during Package.Init');\nconst reads = events.slice(0, cutoff).filter((item) => item.event === 'workflow-read');\nassert.deepEqual(reads.map((item) => [item.format, item.parsed?.id, item.parsed?.result]), [\n  ['json', 'json-a', 1], ['yaml', 'yaml-a', 3],\n  ['json', 'json-b', 2], ['yaml', 'yaml-b', 4],\n]);\nassert.deepEqual(events.find((item) => item.event === 'workflow-outcome')?.outcome,\n  { status: 'COMPLETE', value: {id:'yaml-b',result:4} });\nconst cases = events.filter((item) => item.event === 'workflow-case');\nfor (const [name, status] of [['unknown','UNKNOWN'],['failed','FAILED'],\n  ['shared-budget','FAILED'],['ancestor-depth','FAILED']]) {\n  assert.equal(cases.find((item) => item.name === name)?.outcome.status, status);\n}\nconsole.log('DH_R70_REGISTRY_WORKFLOW_BOOT_OK ' + JSON.stringify({\n  status: result.status, reads: reads.length, cases: cases.length,\n}));\nawait result.app.dispose();\n"], env);
+  assert.equal(workflowBoot.code, 0, 'Registry real Workflow Boot: ' +
+    workflowBoot.stderr + '\n' + workflowBoot.stdout);
+  assert.ok(workflowBoot.stdout.includes('DH_R70_REGISTRY_WORKFLOW_BOOT_OK'));
+  evidence.registryWorkflowSelected = sealed.selectedWorkflows.length;
+  evidence.registryWorkflowBoot = true;
+  evidence.registryDataReads = 4;
   console.log('DH_R60_REAL_REGISTRY_ONE_DIRECT_SDK_PASS '+JSON.stringify(evidence));
 } finally {
   if(server) await new Promise(resolve=>server.close(resolve));
