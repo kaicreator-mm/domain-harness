@@ -2,6 +2,17 @@
 
 > **归口**：Foundation Issue [#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)，不是 v0.11.2 功能。**状态：R107 ACCEPT_L2_SCOPED（设计范围 P0/P1=0）；源码实施与验收未完成**。本文件是具体实施细节，不是第二套规范。权威规范以 [目录](../specs/domain-harness/README.md)、[核心](../specs/domain-harness/core.md)、[架构](../specs/domain-harness/architecture.md)、[对象](../specs/domain-harness/element-package.md)、[生命周期](../specs/domain-harness/lifecycle-workflow.md)、[身份](../specs/domain-harness/identity-naming.md) 和 [信任](../specs/domain-harness/composition-trust.md) 为准。
 
+## R118. Owner 职责裁决：生成期负责 Package/Element 正确性，SDK 只做最小兜底
+
+> 本条按 CORE-11 和 composition-trust.md 为准，优先于本文件 R107 中任何暗示运行时重新验证静态依赖正确性的措辞。旧 PR #1675 的 Runtime ESM lexer 修补路线不合格，已关闭且没有合并。
+
+1. **生成期正确性**：由 Package/Element 作者（人、LLM、Agent、未来 Forge）与其生成/修改流程负责 Schema、依赖、Function、Target、静态代码和测试的正确性及可信证据；Package 是可直接编写的文件集合，不强制生成器或额外 SDK 扩展。
+2. **组合/交付期职责**：消费合格产物，执行必要的目标选择、技术一致性校验及确定性 Lock/Pin/安装封存；这些动作不把领域/代码正确性责任转给 SDK。Lock/Record/Pin 的自摘要只能证明其自身一致性，无法单独认证生成者，必要受信发行/安装来源须由交付侧提供。
+3. **运行期仅兜底**：Boot 在可信安装/发行锚点下核对已封存身份、必要字节与受选 KDP 入口，并最小委托真实 KDP.Init；KDP 负责已选调用、错误和 Exit。**禁止** SDK 运行时解析 JS/ESM 语法、重新求静态依赖图、证明 Domain Package/Element 的正确性；不能用运行时 lexer/AST 试图修复不可信交付。
+4. **测试分层**：生成期负例覆盖动态 import、反射代码加载、未声明依赖、错误 Owner/Target、错误封存等；SDK 运行时负例验证可信来源、Pin/Lock/选定资源完整性、不匹配拒绝及最后异常处理。若需要保证完整 ESM 依赖图，该证明必须在生成/发行侧完成并具有真实来源绑定，Boot 只能消费证据，不做二次源码审核。
+5. **解释优先级**：下文 L2 中“Boot 导入前验证整个 KDP 闭包”应仅解释为在受信生成/安装证据下的字节完整性核验，不是运行时对代码或静态图的正确性证明。未发布 0.11.x 不保留旧 ABI 兼容；真实源码、CI、非 Writer 审核继续在 Foundation #1668 完成，不推给 0.11.2。
+
+---
 ## A1. 真实所有权审计
 
 | 当前真实源码 | 当前代码作用 | 目标逻辑 Owner / Element | 必须删除的重复入口 |
