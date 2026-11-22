@@ -185,9 +185,9 @@ export function verifyGeneratedPackageImports(
     const allowed = new Set(consumer.dependsOn.map((dep) => dep.package));
     const inspectModule = (specifier: string, declaration?: ts.ImportDeclaration, dynamic = false): string => {
       if (specifier === 'yaml') {
-        // Only a selected SDK/Business Package whose own npm manifest declares the
-        // exact reviewed Node profile may use this pinned third-party pure ESM module.
-        // No fallback to an unselected or dynamically resolved external dependency.
+        // 仅所选且显式声明精确版本的 SDK/Business Package 可导入受信第三方库。
+        // 此范围只支持预先审核并具有受控 SRI 的 Node ESM 子集。
+        // 未选定、未经声明或动态加载的外部依赖全部拒绝。
         const json = JSON.parse(Buffer.from(scope.read(ref.packageId, 'package.json')).toString('utf8')) as {
           readonly dependencies?: Readonly<Record<string, string>>;
         };
