@@ -54,3 +54,7 @@ node main.mjs
 | 0.11.9 | Server 端聚合进化候选 | 真实批准/版本封存，不自动发布 |
 
 每阶段保持只读的版本/制品 SHA、Package/Target/Lock Digest、执行日志与非 Writer 审核证据；历史 `SDK[i]+Packages[i]+App[i]` 独立配对复用轻量 Smoke，不强制 0.11.x 内部跨阶段 ABI 兼容。新 SDK 消费旧 Package，符合当前规范则必须正常运行，不适用则要有清晰拒绝或最小迁移实例。不新造永久 Agent 或全量 CI 笛卡尔矩阵。
+
+## 【CANDIDATE · 0.11.2 Domain Intelligence #1666】
+
+This same Reference App now contains a normal, multi-file `reference-knowledge` Extension and a Business Package with the real selected `recognize → queryFacts → validate → decide` Workflow. The domain-specific result is an evidence-backed ACCEPT/REJECT or explicit UNKNOWN; missing, conflicting, stale, wrong version, wrong domain and missing score cannot be silently promoted. The sole authoritative numeric rule thresholds are in the selected, signed `reference-knowledge/content/facts.json`, **not** Business ESM. Changing fact bytes without updated sealed references must fail before Boot. The initial 0.11.1 Stage Index remains unchanged; this new stage is a source candidate until actual CI plus independent exact-SHA review. No second SDK, KDP, BUILD, Forge or Domain App was introduced.
