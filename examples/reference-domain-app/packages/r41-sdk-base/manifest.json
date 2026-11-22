@@ -1,0 +1,84 @@
+{
+  "kind": "DomainPackage",
+  "schemaVersion": "dh.package/0.11",
+  "id": "r41-sdk-base",
+  "version": "1.0.0",
+  "layer": "sdk",
+  "role": "primary",
+  "order": 1,
+  "elements": [
+    {
+      "id": "r41.sdk_base",
+      "version": "1.0.0",
+      "definitionRef": {
+        "packageId": "r41-sdk-base",
+        "path": "definitions/lifecycle.json",
+        "digest": "sha256:9449c7984137d69f8968a72089c5761fa9df3eb4664e90624cbafc2da503da28"
+      },
+      "visibility": "public"
+    }
+  ],
+  "dependsOn": [
+    {
+      "package": "r41-kdp",
+      "version": "1.0.0",
+      "interface": "r41.kernel"
+    }
+  ],
+  "imports": [],
+  "exports": [
+    {
+      "interfaceId": "r41.sdk"
+    }
+  ],
+  "contributesTo": [],
+  "targetVariants": [
+    {
+      "target": {
+        "runtime": "node",
+        "module": "esm",
+        "nodeMajor": 22
+      },
+      "implementations": [
+        {
+          "elementId": "r41.sdk_base",
+          "functionId": "init",
+          "contractVersion": "1",
+          "entry": {
+            "module": {
+              "packageId": "r41-sdk-base",
+              "path": "dist/index.mjs",
+              "digest": "sha256:c653878940744cdbcae556d6c2d7132e0abc8c9464d3cb4c8a4b15c9bd801e32"
+            },
+            "exportName": "init"
+          }
+        },
+        {
+          "elementId": "r41.sdk_base",
+          "functionId": "exit",
+          "contractVersion": "1",
+          "entry": {
+            "module": {
+              "packageId": "r41-sdk-base",
+              "path": "dist/index.mjs",
+              "digest": "sha256:c653878940744cdbcae556d6c2d7132e0abc8c9464d3cb4c8a4b15c9bd801e32"
+            },
+            "exportName": "exit"
+          }
+        }
+      ]
+    }
+  ],
+  "init": {
+    "namespace": "r41",
+    "id": "r41.sdk_base",
+    "version": "1.0.0",
+    "digest": "sha256:c539bd1234b3f5f042ce73decf5664e26d5f227dea6c45beba6b83073061eb93"
+  },
+  "exit": {
+    "namespace": "r41",
+    "id": "r41.sdk_base",
+    "version": "1.0.0",
+    "digest": "sha256:c539bd1234b3f5f042ce73decf5664e26d5f227dea6c45beba6b83073061eb93"
+  }
+}

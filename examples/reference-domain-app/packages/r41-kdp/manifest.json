@@ -1,0 +1,78 @@
+{
+  "kind": "DomainPackage",
+  "schemaVersion": "dh.package/0.11",
+  "id": "r41-kdp",
+  "version": "1.0.0",
+  "layer": "kernel",
+  "role": "primary",
+  "order": 0,
+  "elements": [
+    {
+      "id": "r41.kdp",
+      "version": "1.0.0",
+      "definitionRef": {
+        "packageId": "r41-kdp",
+        "path": "definitions/lifecycle.json",
+        "digest": "sha256:3767582dc20cbb2646bcc4d255041f6fd9a4b5246b8a60b6d34434089f1b2fc4"
+      },
+      "visibility": "public"
+    }
+  ],
+  "dependsOn": [],
+  "imports": [],
+  "exports": [
+    {
+      "interfaceId": "r41.kernel"
+    }
+  ],
+  "contributesTo": [],
+  "targetVariants": [
+    {
+      "target": {
+        "runtime": "node",
+        "module": "esm",
+        "nodeMajor": 22
+      },
+      "implementations": [
+        {
+          "elementId": "r41.kdp",
+          "functionId": "init",
+          "contractVersion": "1",
+          "entry": {
+            "module": {
+              "packageId": "r41-kdp",
+              "path": "dist/index.mjs",
+              "digest": "sha256:0bd1846e9410a653893f7fa0c87db50af8e698ef8078f780fce71f9d9c0c114a"
+            },
+            "exportName": "init"
+          }
+        },
+        {
+          "elementId": "r41.kdp",
+          "functionId": "exit",
+          "contractVersion": "1",
+          "entry": {
+            "module": {
+              "packageId": "r41-kdp",
+              "path": "dist/index.mjs",
+              "digest": "sha256:0bd1846e9410a653893f7fa0c87db50af8e698ef8078f780fce71f9d9c0c114a"
+            },
+            "exportName": "exit"
+          }
+        }
+      ]
+    }
+  ],
+  "init": {
+    "namespace": "r41",
+    "id": "r41.kdp",
+    "version": "1.0.0",
+    "digest": "sha256:1a639c51287a4272fbb8f2ed79cc4c5a2f2410446068cf3f25bf1b8285f208df"
+  },
+  "exit": {
+    "namespace": "r41",
+    "id": "r41.kdp",
+    "version": "1.0.0",
+    "digest": "sha256:1a639c51287a4272fbb8f2ed79cc4c5a2f2410446068cf3f25bf1b8285f208df"
+  }
+}
