@@ -183,6 +183,59 @@ test('B0-07: valid Business READY cannot mask a missing trailing Core.Init', asy
   assert.deepEqual(timeline('package-exit'), EXIT_ORDER);
 });
 
+test('R124 Host KDP Init records Kernel once and starts remaining Cores without importing ordinary Kernel Init', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const system = new PackageSystem(fixture.installRoot, fixture.lock, []);
+  const result = await system.runRemainingCoresAfterKernelEntered(appCtx(fixture));
+  assert.deepEqual(validateBusinessCoreResults(result), { status: 'READY' });
+  assert.deepEqual(timeline('package-init'), ['@fixture/sdk', 'fixture-ext', 'fixture-business'],
+    'selected KDP ordinary Init must not execute again');
+  assert.deepEqual(system.initFrom('fixture-kernel'), [{ type: 'Boot' }]);
+
+  await assert.rejects(system.runRemainingCoresAfterKernelEntered(appCtx(fixture)),
+    /already entered this activation/);
+  assert.deepEqual(system.initFrom('fixture-kernel'), [{ type: 'Boot' }]);
+  await system.runExit();
+  assert.deepEqual(timeline('package-exit'), EXIT_ORDER,
+    'KDP Exit must run last even though its ordinary Init module was not invoked');
+  await system.runExit();
+  assert.deepEqual(timeline('package-exit'), EXIT_ORDER, 'Exit is idempotent');
+});
+
+test('R124 Host KDP continuation preserves explicit repeated Extension entry and reverse Exit order', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
+  t.after(async () => fixture.cleanup());
+  const lock = { ...fixture.lock, selectedPackages: fixture.lock.selectedPackages.map((pkg) =>
+    pkg.packageId === 'fixture-kernel'
+      ? { ...pkg, dependsOn: ['fixture-ext'] }
+      : pkg),
+  };
+  const system = new PackageSystem(fixture.installRoot, lock, []);
+  await system.runRemainingCoresAfterKernelEntered(appCtx(fixture));
+  assert.deepEqual(timeline('package-init'), ['fixture-ext', '@fixture/sdk', 'fixture-ext', 'fixture-business']);
+  assert.deepEqual(system.initFrom('fixture-ext'), [
+    { type: 'Package', packageId: 'fixture-kernel' },
+    { type: 'Package', packageId: 'fixture-business' },
+  ]);
+  await system.runExit();
+  assert.deepEqual(timeline('package-exit'),
+    ['fixture-business', 'fixture-ext', '@fixture/sdk', 'fixture-ext', 'fixture-kernel'],
+    'each actual Extension entry exits independently, KDP last');
+});
+
+test('R124 Host KDP failure after entering still exits Kernel without twice running Kernel.Init', async (t) => {
+  const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {}, sdkInitThrow: true });
+  t.after(async () => fixture.cleanup());
+  const system = new PackageSystem(fixture.installRoot, fixture.lock, []);
+  await assert.rejects(system.runRemainingCoresAfterKernelEntered(appCtx(fixture)), /Package.*Init Element raised/);
+  assert.deepEqual(timeline('package-init'), ['@fixture/sdk'],
+    'Kernel normal Init is never called by the Host continuation');
+  await system.runExit();
+  assert.deepEqual(timeline('package-exit'), ['@fixture/sdk', 'fixture-kernel'],
+    'entered Kernel is cleaned up last even on next-Core failure');
+});
+
 test('B0-05: all Business Core results conservatively determine App status', () => {
   assert.deepEqual(validateBusinessCoreResults([{ status: 'READY' }, { status: 'READY' }]), { status: 'READY' });
   assert.deepEqual(validateBusinessCoreResults([{ status: 'READY' }, { status: 'BLOCKED' }]), { status: 'BLOCKED' });
