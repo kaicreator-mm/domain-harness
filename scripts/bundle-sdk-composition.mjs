@@ -14,7 +14,7 @@ const dist = join(repo, 'packages/domain-harness/dist');
 const outfile = join(dist, 'composition.js');
 const declaration = join(dist, 'composition.d.ts');
 
-// 单 SDK 的公开类型必须与内部组合实现的原始类型字节完全一致。
+// SDK 的公开类型由 scripts/generate-sdk-composition-types.mjs 每次构建从唯一源码自动生成。
 const internalTypes = readFileSync(join(repo, 'tooling/build/src/types.ts'), 'utf8');
 const publicTypes = readFileSync(join(repo, 'packages/domain-harness/src/composition-types.ts'), 'utf8');
 assert.equal(publicTypes, internalTypes,
