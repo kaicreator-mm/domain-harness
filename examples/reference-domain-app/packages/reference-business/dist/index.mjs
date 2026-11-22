@@ -20,6 +20,10 @@ export function recognize(input) {
 }
 
 export function validate(input) {
+  if (!input || input.domain !== 'reference-example' ||
+      typeof input.score !== 'number' || !Number.isFinite(input.score)) {
+    return unknown('REFERENCE_VALIDATION_UNPROVEN', 'rule input is outside the authorized domain');
+  }
   const claim = input?.resolved;
   if (!claim || !Number.isSafeInteger(claim.minimumScore) || claim.minimumScore < 0 ||
       !Array.isArray(claim.evidence) || claim.evidence.length === 0 ||
@@ -32,6 +36,10 @@ export function validate(input) {
 }
 
 export function decide(input) {
+  if (!input || input.domain !== 'reference-example' ||
+      typeof input.score !== 'number' || !Number.isFinite(input.score)) {
+    return unknown('REFERENCE_DECISION_INPUT_UNKNOWN', 'cannot decide without a valid bounded score');
+  }
   const threshold = input?.resolved?.minimumScore;
   if (!Number.isSafeInteger(threshold) || !Array.isArray(input?.resolved?.evidence) ||
       input.resolved.evidence.length === 0) {
@@ -74,10 +82,13 @@ export async function init(context) {
     { name: 'VERSION', region: 'US', score: 22, status: 'UNKNOWN', reason: 'REFERENCE_KNOWLEDGE_VERSION_UNAVAILABLE', revision: '2025.01' },
     { name: 'DOMAIN', region: 'US', score: 22, status: 'UNKNOWN', reason: 'REFERENCE_DOMAIN_NOT_APPLICABLE', domain: 'other' },
     { name: 'UNKNOWN_SCORE', region: 'US', score: null, status: 'UNKNOWN', reason: 'REFERENCE_SCORE_UNKNOWN' },
+    { name: 'FORGED_FACTS', region: 'US', score: 42, status: 'UNKNOWN', reason: 'REFERENCE_KNOWLEDGE_DIGEST_MISMATCH', forged: true },
   ];
   const results = [];
   for (const test of cases) {
-    const result = await context.workflows.start(workflowRef, { ...template, region: test.region,
+    const selectedKnowledge = test.forged ? structuredClone(knowledge) : knowledge;
+    if (test.forged) selectedKnowledge.facts.find((fact) => fact.id === 'policy-us').value = 99;
+    const result = await context.workflows.start(workflowRef, { ...template, knowledge: selectedKnowledge, region: test.region,
       score: test.score, ...(test.asOf ? { asOf: test.asOf } : {}),
       ...(test.revision ? { revision: test.revision } : {}),
       ...(test.domain ? { domain: test.domain } : {}) });

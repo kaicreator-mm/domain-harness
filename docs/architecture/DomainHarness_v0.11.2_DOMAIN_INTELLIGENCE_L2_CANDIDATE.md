@@ -24,7 +24,7 @@ No Package generation is required. The previous v0.11.1 application files remain
 ## Data + Function Contract
 
 1. Knowledge File `content/facts.json` is strictly package-root relative, verified and included in the Lock by `ContentBlock.ref` with SHA256. It includes `domain`, `revision`, and at most 64 relevant facts; each record has `id`, `key`, `region`, `value`, `source{id,version,kind}`, `validFrom`, `validTo`, `revision`.
-2. Business Init gets this content **only** from the KDP selected read-only ResourceHandle and decodes it via the accepted `dh.std.file.json.readJson` Function. No unsealed fs/network/Host path lookup. It starts the BUILD-selected Workflow with the resource data and input; user input cannot select additional FunctionRefs or WorkflowRoots.
+2. Business Init gets this content **only** from the KDP selected read-only ResourceHandle and decodes it via the accepted `dh.std.file.json.readJson` Function. The selected `queryFacts` function also checks the canonical JSON bytes against the same pinned SHA256, so even an authorized caller cannot supply unsealed forged facts and receive a trusted provenance claim. No unsealed fs/network/Host path lookup. It starts the BUILD-selected Workflow with the resource data and input; user input cannot select additional FunctionRefs or WorkflowRoots.
 3. `reference.recognizer.recognize` validates domain, finite score, region, effective date and requested revision; unknown or out of scope returns UNKNOWN with a stable reason.
 4. `reference.knowledge.queryFacts` is a separately selected **pure** Function in a directly declared ordinary Extension Package. It filters key+region+revision+effective interval; any conflicting current values or missing source identity yields UNKNOWN, never a made-up threshold. The result carries `minimumScore` and Evidence/Provenance identities.
 5. `reference.validator.validate` checks that the resolved evidence is nonempty, applicable to exact scope/version/date and well formed, otherwise returns UNKNOWN.
@@ -35,7 +35,7 @@ No Package generation is required. The previous v0.11.1 application files remain
 ## Failure/recovery boundaries
 
 - No external effects, LLM, tools, database, dynamic imports, arbitrary HostPorts or independent agent state machine.
-- Modified facts bytes retaining old `ContentBlock.ref` MUST fail before Boot; wrong ESM digest/undeclared direct import also fail. The existing SRI preinstall negative and unselected Workflow negative remain.
+- Modified facts bytes retaining old `ContentBlock.ref` MUST fail before Boot; a forged fact object passed through an otherwise selected Workflow must yield `REFERENCE_KNOWLEDGE_DIGEST_MISMATCH` UNKNOWN; wrong ESM digest/undeclared direct import also fail. The existing SRI preinstall negative and unselected Workflow negative remain.
 - An UPDATE of selected knowledge facts MUST require a new SHA in the Element definition, changed Manifest definitionRef/ElementRef, fresh deterministic Lock and newly verified App; no hot swapping of a pinned Package/Workflow instance.
 - Historical `SDK[i]+Packages[i]+ReferenceApp[i]` pairs are retained by real commit/ref/digest/receipt, not the latest source masquerading as history. This candidate does not claim to have reinstalled historical app on this new SHA.
 - Prior 0.11.1 R72 preallocation P2 and R81 threshold duplication P2 are separate; the latter should close only after real two-threshold outcomes, exact SHA CI and independent review.

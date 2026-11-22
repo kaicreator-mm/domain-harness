@@ -1,10 +1,18 @@
-// Pure query function. Source facts are injected only from the BUILD-selected, verified ResourceHandle.
+// Pure query, restricted to the exact authored and BUILD-selected knowledge file digest.
+import { createHash } from 'node:crypto';
+const AUTHORED_FACTS_DIGEST = 'sha256:249c0808b5b353f8a65a25adebe97f7c27cb0e1ae01a75707082c7dec32c8429';
 const unknown = (code, message) => ({ kind: 'UNKNOWN', unknownReason: { code, message } });
 export function queryFacts(input) {
   const facts = input?.knowledge;
   if (!facts || facts.schemaVersion !== 'reference.knowledge/1' ||
       facts.domain !== 'reference-example' || !Array.isArray(facts.facts) || facts.facts.length > 64) {
     return unknown('REFERENCE_KNOWLEDGE_UNAVAILABLE', 'selected bounded knowledge has invalid identity or shape');
+  }
+  // Caller-supplied facts are NOT automatically trusted even if the caller owns a selected WorkflowRoot.
+  // Only the content bytes pinned by the authored ContentBlock.ref may yield accepted evidence.
+  const actual = 'sha256:' + createHash('sha256').update(JSON.stringify(facts) + '\n').digest('hex');
+  if (actual !== AUTHORED_FACTS_DIGEST) {
+    return unknown('REFERENCE_KNOWLEDGE_DIGEST_MISMATCH', 'caller facts differ from selected source digest');
   }
   const all = facts.facts.filter((fact) => fact?.key === 'minimum-score' &&
     fact.region === input.region);

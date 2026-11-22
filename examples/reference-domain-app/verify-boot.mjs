@@ -25,7 +25,7 @@ assert.equal(verified.unknown, 'UNKNOWN');
 assert.equal(verified.denied, 'DH_WORKFLOW_UNSELECTED');
 assert.equal(verified.knowledgeRecords, 4);
 assert.match(verified.selectedResourceDigest, /^sha256:[0-9a-f]{64}$/u);
-assert.equal(verified.cases.length, 10);
+assert.equal(verified.cases.length, 11);
 const cases = new Map(verified.cases.map((item) => [item.name, item]));
 assert.deepEqual(
   ['US_ACCEPT', 'US_REJECT', 'CA_REJECT', 'CA_ACCEPT'].map((name) =>
@@ -44,6 +44,7 @@ for (const [name, code] of [
   ['VERSION', 'REFERENCE_KNOWLEDGE_VERSION_UNAVAILABLE'],
   ['DOMAIN', 'REFERENCE_DOMAIN_NOT_APPLICABLE'],
   ['UNKNOWN_SCORE', 'REFERENCE_SCORE_UNKNOWN'],
+  ['FORGED_FACTS', 'REFERENCE_KNOWLEDGE_DIGEST_MISMATCH'],
 ]) {
   assert.equal(cases.get(name)?.status, 'UNKNOWN');
   assert.equal(cases.get(name)?.reason, code);
