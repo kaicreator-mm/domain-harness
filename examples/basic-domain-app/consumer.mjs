@@ -1122,8 +1122,20 @@ async function main() {
   refused = await boot(businessTamperInstall.pin, businessTamperInstall.context);
   assert.equal(refused.status, 'FAILED', JSON.stringify(refused));
   assert.equal(refused.code, 'DH_BOOT_PIN_MISMATCH');
-  assert.equal(globalThis.__domainHarnessT05Events.length, before, 'selected executable byte tamper must fail before any selected Package evaluation');
-  await evidence('negative.selected-business-executable-tamper', { status: 'PASS', code: refused.code, freshInstall: true, loadedPackageEvents: 0 });
+  const postEntryEvents = globalThis.__domainHarnessT05Events.slice(before);
+  assert.deepEqual(postEntryEvents.filter((event) => event.event === 'package-init')
+    .map((event) => event.package), ['kernel-primary'],
+  'trusted Host KDP.Init has entered before its own preflight, but ordinary Package.Init must not run');
+  assert.deepEqual(postEntryEvents.filter((event) => event.event === 'package-exit')
+    .map((event) => event.package), ['kernel-primary'],
+  'the already-entered KDP must be safely exited after Business byte tamper');
+  assert.equal(postEntryEvents.some((event) =>
+    event.package === 'app-business' || event.package === 'rules-package'), false,
+  'untrusted selected Business modules must never be evaluated');
+  await evidence('negative.selected-business-executable-tamper', {
+    status: 'PASS', code: refused.code, freshInstall: true,
+    onlyTrustedHostEntered: true, loadedBusinessEvents: 0, kernelExit: 1,
+  });
 
   const forgedInstall = await cloneInstall(a.install);
   before = globalThis.__domainHarnessT05Events.length;
