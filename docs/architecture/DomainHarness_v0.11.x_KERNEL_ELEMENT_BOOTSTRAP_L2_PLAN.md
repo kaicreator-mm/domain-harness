@@ -101,3 +101,69 @@ KDP 反向按真实已进入列表尝试 Exit（KDP Exit 最后）
 不更改 0.11.2 工作集；不重新开发已受限验收的 T11–T14/Reader/Workflow；不创建第二个 Kernel/Forge；不做 0.10.x 兼容；不对任意恶意 JS/多语言单 App 提供新承诺；不添加未经真实需求支持的应用配置或远程服务。
 
 **执行入口**：全部规范切片完成后，#1668 的 A6/A7 才能从 `MIGRATION_REQUIRED` 改为有来源、有证据的接受状态。
+
+## R103. R102 设计 P1 完整修正（仍须独立审查，不是已发布机器 ABI）
+
+> R102 独立结论：[REWORK_L2，P0=0/P1=5/P2=2](https://github.com/kaicreator-mm/domain-harness/issues/1668#issuecomment-7083691835)。本节对 A2.1/A3/A4.1 的开放问题提出**确定的 L2 选择**，取代其“审查决定”措辞；待另一对话非 Writer 与 Owner 确认后才成为 frozen implementation contract。单一规范目录仍是权威；此处只定义按其要求落地的具体 ABI/实施路径。
+
+### R103-P1-01：唯一 KDP Host Init 的封闭机读 ABI
+
+1. 新增唯一特权 ABI 字面值 `kdp-host-init/1`。机器合同中 `FunctionContract` 使用判别联合：普通 Function 保留 `inputSchemaRef/outputSchemaRef/outcomes/effects` JSON 契约；**仅** KDP 的 `init` 使用特殊分支 `{id:'init',contractVersion:'1',invocationAbi:'kdp-host-init/1'}`，且**不包含/不假称** JSON Schema 能描述 Host 进程内 `DomainApp` 句柄。普通 Package.Init 仍按已受审 `PackageInitContext -> AppInitResult`，普通业务 Function 仍按 `FunctionOutcome`；任何其它 Function 声明此特殊 ABI 均由 BUILD 拒绝。
+2. `ImplementationBinding.invocationAbi` 和 `SelectedFunction.invocationAbi` 仅对该特殊 KDP Init 为必填且精确等于 `kdp-host-init/1`，其它函数禁止声明；现有 `FunctionRef` 仍负责逻辑身份，不用字段名或运行期类型猜测 ABI。BUILD 校验对应 `FunctionContract`、`SelectedFunction`、`SelectedPackage.initFunction`、`SelectedPackage.init` 和唯一 `Core.Order=0` Kernel Owner 一一相符，不能对另一 Package 注册相同身份获得 Host 权限。
+3. `DomainAppLock.bootstrapKdpPin` 持有 `kdpInitFunction:FunctionRef`、`invocationAbi:'kdp-host-init/1'` 和该已选 Implementation 的精确 `ResourceRef`；`BootstrapPin`、`InstalledRecord` 持有同一不可变逻辑身份、ABI、入口 Target Digest、Lock Digest。Build 输出时按选定 Function 唯一派生；Boot 比对这些字段与 Lock/可信安装记录，差异**import 前 REFUSED**。删除旧 `kdpPrimaryEntry:'bootstrap'` 兼容路径及独立维护的第二 Target 真相源；新版 Lock/Pin/Install Record SchemaVersion 原子提升，旧格式按拒绝处理。
+4. Boot 是唯一可以调用该特殊 Target 的 Host 适配器，调用签名仅为 `KdpHostInit(context:KdpBootstrapContext):Promise<KdpBootstrapResult>`；KDP 实现可向 Host 返回本进程 `DomainApp`，不得通过普通 `ReadonlyFunctionHandle.invoke`、Hook、FunctionRef 导入或领域 JSON Output 模拟该返回类型。Host result 运行时判别 `BOOTED+DomainApp/FAILED+code+reason`，错误日志脱敏；若返回结构非法，为执行阶段 `FAILED`，不重写成 `READY`。
+5. 正反要求：**POS** 特权 Host 入口唯一选择、正确导入并启动；**NEG** 普通 Function 宣告特殊 ABI、绑定错 Owner/Target/Version/Digest、错 Order、普通 Package 调 Host、Pin/Lock/InstallRecord ABI 不一致、普通 FunctionOutcome 假冒 BOOTED、旧 bootstrap 格式全部静态或执行前拒绝。
+
+### R103-P1-02：BUILD 封存完整、Boot 导入前独立验证的 KDP ESM 闭包
+
+`DomainAppLock.trustedKdpModuleClosure`（确切 JSON 字段名在机器合同实现时固定）必须是一个**确定、有界**的图，而不是单个入口摘要或“运行后再检查”的承诺。由 BUILD 对被选择 KDP Host Init 的入口及静态同步 import/export 依赖做 Node22 ESM/Package exports 解析：
+
+- 每个图节点标记包 Owner、相对解析路径、Target Profile、`ResourceRef` 的实际 SHA256；对于可信 SDK 安装依赖，此外带精确包名/版本、受信安装根与 npm 归档 SHA512 SRI，明确其属于事先获信的 SDK TCB 而不是可由不受信 App 任意注入的 bare import。所有静态 import/re-export 递归展开，记录 specifier→resolved node 边及参与解析的 `package.json`/exports 的真实摘要。仅允许已声明的 Node builtin 精确 allowlist 和受限受信 SDK 包；其它 bare import、越包路径、软链接出根、未选包、未声明 Extension、动态非字面量 import 或无法穷尽的解析形式拒绝。
+- Boot 使用**独立于任何待导入 KDP 模块的可信校验 helper**，先从 Pin/Record/Lock 确认入口 FunctionRef/ABI/Target、每条图边、Node ESM 解析结果及字节/SRI，然后才 `import` 同一个已受信 `ImplementationLocator`；Node 解析将加载的文件路径及 `package.json` 必须与锁图一致。KDP 运行后的 `verifySelectedArtifacts` 可以补验业务的选定 Function，不得代替 KDP 静态导入闭包的 Boot 前置检查。
+- 信任模型限定为**受控且在本次激活中不可变的安装快照**：防止“受验前任意用户提供的已修改文件”得到执行，不承诺防御有权限在校验与 import 之间并发篡改本地文件的敌对进程；如运行环境不能保证不可变安装快照，必须 fail-closed 或使用能够实现同等隔离的可信执行载体，不能宣称无 TOCTOU。
+- **NEG** 改变 KDP 二级/三级相对依赖、受信 SDK bare-import 映射、Package exports、SRI、所选 Target、插入符号链接、找不到静态闭包文件、非字面量动态导入时，任何选定 KDP 顶层副作用发生前拒绝；用可观察的副作用计数器证明 **0 次求值**。**POS** clean-packed Node>=22.12 可从单 SDK 实际运行正常 KDP + Workflow。可信 Boot/SDK 自身的依赖属于已安装 TCB，不能靠此豁免未验证的选定 KDP 包静态导入。
+
+### R103-P1-03：KDP 唯一 Init 状态机、提前失败与单次 Exit
+
+每次激活有独立 `ActivationKernelRecord`，由**进入唯一受选 KDP.Init 的第一条可执行语句**注册；不得使用进程全局 once-map 去重普通 Extension。技术生命周期阶段为：
+
+```text
+NOT_ENTERED
+  ├─ Boot 执行前检查失败 → REFUSED（未进入，无 Exit）
+  ├─ KDP ESM import / 顶层求值失败 → FAILED（未进入，无假 Exit）
+  └─ KDP.Init 实际进入 → ENTERED_ONCE（原子登记 KDP 进入事件）
+       ├─ 创建/绑定唯一 PackageSystem + Exit Registry
+       └─ 进入 KDP 声明的直接 Extension.Init → CORE_INIT_CHAIN
+             └─ 下一个 Core.Order（不得再次访问 coreOrder[0]）
+                   ├─ Business/Workflow 失败 → FAILED_CLEANUP
+                   └─ 真实结果验收 → APP_CREATED (BOOTED，AppStatus 独立)
+ APP_CREATED/FAILED_CLEANUP → EXITING → EXITED (幂等、一次)
+```
+
+- `runRemainingCoresAfterKernelEntered` 或等价内部 API **必须显式跳过**第一个 KDP Core 的再次执行；不得把 `runInit()` 从 `coreOrder[0]` 重调 KDP。先按已声明直接依赖顺序执行 Kernel 本层 Extensions，再调下一 Core；Extension 不能控制下一 Core。每个 **进入**的普通 Package/Extension（允许重复）立即记真实 `ENTERED`，独立记 `INIT_SUCCEEDED/INIT_FAILED`，Core 完成与进入不得混记为成功。
+- KDP.Init 尚未完整创建 `PackageSystem` 即抛错时，利用激活最早登记的受选 KDP Exit Target 尝试**仅已进入**的清理，不重新创建 Kernel；有 System 时复用它的 Exit Registry。最初的异常作为根因保留，Exit 的失败仅追加脱敏诊断，逐一逆序尝试已有 Exit，KDP Exit 最后；强杀/进程掉电不承诺 Exit。
+- `DomainApp.dispose()` 与 `processLifecycle` 共享同一激活的 `EXITING/EXITED` 幂等边界，不能重复退出。前置不可信 Pin/Lock 拒绝用 `REFUSED`；KDP 模块 import 阶段及之后失败用 `FAILED`；`BOOTED` 仅表示 Host 获得可检查的 App 句柄，**不代表业务 AppStatus.READY**。AppStatus 与 Function/Workflow Outcome 各独立，UNKNOWN/ASK/WAIT 不可晋升成功。
+- **POS** 一个 KDP.Init、正确 Order/Extension、一次逆序 Exit（KDP 最后）、含重复 Extension 进入记录。**NEG** 非法 Order、递归调用、KDP Init 进入前/进入后/构造 PackageSystem 前故障、Business Init FAILED、Exit 抛错、dispose+Host 同时退出、不可用 Lock；逐项记录 entered/succeeded/failed/cleanup 事件，首错不可被 Exit 覆盖。
+
+### R103-P1-04：Namespace 复合键必须贯通所有匹配和授权路径
+
+完整机器迁移不止原 A4.1 三个字段。将 `ElementDefinition.namespace`、`ElementEntry.namespace`、`ImplementationBinding.elementNamespace` 和 `ExportEntry.elementNamespace` 显式加入 Schema/Type；`ElementDependency.element` 从裸 ID 字符串迁移为受选复合 `ElementRef`（包含 namespace/id/version/digest），或完全等价的显式全字段结构。凡其它设计仍以裸 Element ID 查找的 Content/Workflow/Hook/Import/Owner 检查，必须升级为已选 `ElementRef` / `FunctionRef` 并与 Owner、Visibility/Export/Direct Extension 核对；旧字段的混合表达式拒绝。
+
+- 语义逻辑查找键固定为 `(namespace,id,version)`；`digest` 用于 Definition/锁定资源字节校验，`ownerPackageId` 用于归属/授权。相同逻辑键若有不同 Digest **或** Owner，一律失败；不同 Namespace 下同名 camelCase Element 合法且不得互相覆盖。查找、Binding、导出、签定 SelectedElement/SelectedFunction、授权与运行读取都不得只用 `elementId`。
+- Schema 的精确正则分别约束 Package kebab-case、Element camelCase、Namespace；锁结构、静态 BUILD `byLogicalId`、接口 Export/Import、Dependency、目标实现、Manifest、Catalog、安装后的 Boot/Pin 整体同步迁移。新 `schemaVersion` 和 Lock/Pin/Install Record/Digest 一次受控跃迁；旧 r41/r60 资产只保留在历史 Git Commit/StageIndex，不假设新名字继承历史 `STANDARD_ACCEPTED`。
+- **POS** 同 `id='kernelLifecycle'` 在 `namespace='dh'` 和 `namespace='reference'` 可独立定义并选定。**NEG** 同 namespace/id/version 的错 Digest/错 Owner、错误 Binding.namespace/Export.namespace、未声明直系 Extension 伪导入、旧点分 ID、缺 namespace、过期 SHA256、只改元数据不改 Lock 的篡改，必须 BUILD 或 Boot 拒绝，且不得执行不受信目标。
+
+### R103-P1-05：SDK 作者期 Composition Package 的可重复自举来源
+
+- 唯一**SDK 自有的**作者期逻辑 Package 候选稳定身份 `dh-authoring`（版本与 SDK 安装的精确版本绑定）、Element `composition`、Function `buildApp`；有真实 Manifest、Element Definition、Function 合同和受审 ESM Target/资源摘要。其 `buildApp` 是作者期 Function，允许在已安装 SDK 授信闭包内读取作者选定 Package 文件并执行既有静态编译/校验；**不在待构建 DomainApp Runtime Lock 中产生可调用 BUILD Function**。不发明公共第二 BUILD npm 产品。
+- `@kaicreator/domain-harness/composition` 仅做已安装 SDK 中确定版本的 `dh-authoring:composition.buildApp` 的静态 facade/装载；其 Package/Element/Target 所有权、实际 bundle/build provenance 与安装 SDK `package.json`、锁定传递依赖、Registry tarball SRI（或等价可信签定安装收据）逐一匹配。**信任由当前已安装 SDK 而非尚不存在的新 App Lock 建立**，所以不发生“先创建 App 再能创建 App”的循环。
+- 作者期受权限约束的文件系统读/写、TypeScript 静态分析和 Validator 是 SDK authoring 能力，不继承 Runtime `effects:'none'` 或 HostPort；不执行业务 Package.Init/Exit，不装载未选目标代码，也不在 RunTime 引入第二 Composer。只有既有 `buildApp` 算法一个事实源，BUILD 的 Dependency DAG 与受信 Lock/Pin 规则不能因 facade 特例放宽。
+- **POS** clean-packed Node>=22.12 单一 SDK（没有既存 App Lock、无 Forge/外部 BUILD npm 直接依赖）对普通手写 Package 文件完成确定性组合，并真实 Boot/Workflow。**NEG** SDK authoring 包版本/摘要不符、未获允许的作者期 I/O、企图执行候选 Init、对 Domain App Runtime 导出作者期 Function、缺少静态直接 Extension/Target/SRI 等必须拒绝。
+
+### R103-P2：分段与事件定义
+
+实施顺序冻结为 **(1) Contracts + JSON Schema + BUILD/Lock/Pin/Install Record + 全链 Namespace/ABI/闭包静态 NEG → (2) Boot/KDP Init/Exit → (3) SDK 作者期归属 → (4) 全新 Reference/Standard/Registry Consumer 和验收**。若阶段间形成不合法的组合，须在**同一原子 PR 集成 HEAD**验收，不能把其中一个中间提交冒称合格的可安装 SDK。每个阶段都要提交对应的真实 tests 与根/子正反例。
+
+`Init entered` 只决定“有必要尝试 Exit”，`Init succeeded/failed` 只记操作结果，`Core completed` 指声明的 Extension/后续 Core 已执行且满足结果；三者不得复用同一个状态标记。失败后只对进入过的节点逆序 Exit，不得伪造成功。旧历史 R72/R81/R83/R84 Source/CI/StageIndex 不覆盖，新 Foundation 受审结果另写新 SHA/Digest/Receipt。
+
+**R103 当前处置**：以上为 R102 五个 P1 的 L2 设计修订和两个 P2 的明确处理方案，**不是**已完成生产源码重构或独立 L2 `ACCEPT`；#1668 A5 再次限定独立审核 P0/P1=0 与 Owner 签收前，不进入受信机器 ABI 生产实现。
