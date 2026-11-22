@@ -1,7 +1,7 @@
 // 当前架构的可证伪测试：断言实际行为而非历史兼容。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -209,6 +209,39 @@ test('Boot rejects in-root relocated KDP package before selected Init', async (t
     sideEffectFree();
   });
 });
+
+/** 只核验 SDK 安装来源的真实 Node 查找路径，不重新扫描 KDP JavaScript 源码。 */
+for (const shadowKind of ['packages-parent', 'kdp-private'] as const) {
+  test(`Boot rejects same-name SDK lookup shadow under ${shadowKind} before KDP evaluation`, async (t) => {
+    await withFixture(t, async (fixture) => {
+      const selectedRoot = join(fixture.installRoot, 'node_modules', KDP_PACKAGE_ID);
+      const localRoot = join(fixture.installRoot, 'packages', KDP_PACKAGE_ID);
+      await mkdir(join(fixture.installRoot, 'packages'), { recursive: true });
+      await cp(selectedRoot, localRoot, { recursive: true });
+      await rm(selectedRoot, { recursive: true, force: true });
+      await symlink(localRoot, selectedRoot, process.platform === 'win32' ? 'junction' : 'dir');
+
+      const shadowBase = shadowKind === 'packages-parent'
+        ? join(fixture.installRoot, 'packages', 'node_modules')
+        : join(localRoot, 'node_modules');
+      const shadowName = shadowKind === 'packages-parent'
+        ? 'domain-harness-microkernel'
+        : 'domain-harness-contracts';
+      const shadowRoot = join(shadowBase, '@kaicreator', shadowName);
+      await mkdir(shadowRoot, { recursive: true });
+      // 即使受选 KDP 自身的入口字节仍与 Lock 相同，Node 也可能优先找到此同名包。
+      await writeFile(join(shadowRoot, 'package.json'),
+        JSON.stringify({ name: `@kaicreator/${shadowName}`, version: '9.9.9', type: 'module' }));
+      await writeFile(join(shadowRoot, 'index.js'),
+        'globalThis.__untrustedSdkLookupExecuted = true;\\n');
+
+      const result = await boot(fixture.pin, fixture.context);
+      assertRefused(result, 'DH_BOOT_PIN_MISMATCH');
+      sideEffectFree();
+      assert.equal((globalThis as { __untrustedSdkLookupExecuted?: boolean }).__untrustedSdkLookupExecuted, undefined);
+    });
+  });
+}
 
 test('pinned entry without the named bootstrap export is DH_BOOT_KDP_ENTRY_INVALID', async (t) => {
   await withFixture(t, async (fixture) => {
