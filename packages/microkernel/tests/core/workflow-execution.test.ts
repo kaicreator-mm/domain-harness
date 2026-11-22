@@ -137,7 +137,7 @@ test('T13: sealed Reader bytes become JSON Function input; never a dynamic Host 
       return new TextEncoder().encode('name: alpha\n');
     }));
   assert.equal(result.status, 'COMPLETE');
-  assert.deepEqual(received, { format: 'yaml', source: 'name: alpha\n', value: { name: 'alpha' } });
+  assert.deepEqual(received, { format: 'yaml', source: 'name: alpha\n' }, 'KDP may not parse data on behalf of the selected Reader');
   const small = selected(rootRef, definition([{ ...node, data: { ...node.data, maxBytes: 1 } }]));
   await assert.rejects(() => startWorkflowRun(rootRef, {}, driver([small], () => ok(null),
     async () => new TextEncoder().encode('name: alpha\n'))), /DH_WORKFLOW_READER_SIZE_LIMIT/);
@@ -182,17 +182,20 @@ test('T13: fatal start errors propagate only after the required end attempt', as
   assert.deepEqual(events, ['start', 'end']);
 });
 
-test('T13: unsafe YAML is actually parsed and rejected before Reader Function execution', async () => {
+test('R60 W02: KDP forwards sealed YAML bytes, format validation belongs to the selected Reader', async () => {
   const source: ResourceRef = {
     packageId: 'orders-business', path: 'content/duplicate.yml',
     digest: `sha256:${'c'.repeat(64)}`,
   };
   const node = { ...only('yaml-reader'), data: { format: 'yaml' as const, resource: source, maxBytes: 128 } };
   const root = selected(rootRef, definition([node]));
-  let invoked = false;
-  await assert.rejects(() => startWorkflowRun(rootRef, {}, driver([root], () => {
-    invoked = true;
-    return ok(null);
-  }, async () => new TextEncoder().encode('a: 1\na: 2\n'))), /DH_WORKFLOW_READER_INVALID/);
-  assert.equal(invoked, false);
+  let received: JsonValue = null;
+  const outcome = await startWorkflowRun(rootRef, {}, driver([root], (_ref, input) => {
+    received = input;
+    // 此单元驱动模拟受选 Reader 的业务拒绝；唯一 KDP 不再自行解析。
+    return { kind: 'FAILED', failure: { code: 'DH_STD_READER_INVALID', message: 'duplicate YAML keys' } };
+  }, async () => new TextEncoder().encode('a: 1\\na: 2\\n')));
+  assert.deepEqual(received, { format: 'yaml', source: 'a: 1\\na: 2\\n' });
+  assert.deepEqual(outcome,
+    { status: 'FAILED', reason: { code: 'DH_STD_READER_INVALID', message: 'duplicate YAML keys' } });
 });
