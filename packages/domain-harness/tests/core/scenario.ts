@@ -88,10 +88,6 @@ function kernelModuleSource(): string {
   return `
 const events = (globalThis.__domainHarnessT04Events ??= []);
 events.push({ event: 'module-evaluated', package: 'kdp-kernel' });
-export async function init(ctx) {
-  events.push({ event: 'package-init', package: 'kdp-kernel' });
-  return ctx.nextCore?.init();
-}
 export async function exit(ctx) {
   events.push({ event: 'package-exit', package: 'kdp-kernel' });
 }
@@ -310,7 +306,15 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     await write(
       kernelDir,
       'dist/index.js',
-      `export { bootstrap } from '${MICROKERNEL_PACKAGE_ID}';\n`,
+      [
+        `import { activateSelectedKdpHostInit } from '${MICROKERNEL_PACKAGE_ID}';`,
+        "const events = (globalThis.__domainHarnessT04Events ??= []);",
+        "export async function init(context) {",
+        "  events.push({ event: 'package-init', package: 'kdp-kernel' });",
+        "  return activateSelectedKdpHostInit(context);",
+        "}",
+        "",
+      ].join('\n'),
     );
     for (const [dir, id, artifactPath] of [
       [kernelDir, 'kdp-kernel', 'dist/index.js'],
@@ -367,12 +371,15 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         id: `orders.lifecycle_${id.replaceAll('-', '_')}`, version: '1.0.0',
         description: 'Selected Package lifecycle Element',
         content: [],
-        functions: ['init', 'exit'].map((name) => ({
-          id: name, contractVersion: '1',
-          inputSchemaRef: { inline: { type: 'object' } },
-          outputSchemaRef: { inline: { type: 'object' } },
-          outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
-        })),
+        functions: ['init', 'exit'].map((name) =>
+          id === 'kdp-kernel' && name === 'init'
+            ? { id: 'init' as const, contractVersion: '1' as const, invocationAbi: 'kdp-host-init/1' as const }
+            : {
+                id: name, contractVersion: '1',
+                inputSchemaRef: { inline: { type: 'object' } },
+                outputSchemaRef: { inline: { type: 'object' } },
+                outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
+              }),
       };
       lifecycle[id] = definition;
       const bytes = canonicalJson(definition as unknown as JsonValue);
@@ -387,11 +394,17 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         namespace: 'orders', id: definition.id, version: '1.0.0', digest: contentDigestOf(definition as unknown as JsonValue),
       };
     }
+    const hostModule: ResourceRef = {
+      packageId: 'kdp-kernel', path: 'dist/index.js',
+      digest: await fileBytesDigest(join(kernelDir, 'dist/index.js')),
+    };
     const targetLife = (id: string, module: ResourceRef, initResources: readonly ResourceRef[] = []) =>
       (lifecycle[id] as ElementDefinition).functions.map((fn) => ({
         elementId: (lifecycle[id] as ElementDefinition).id,
         functionId: fn.id, contractVersion: fn.contractVersion,
-        entry: { module, exportName: fn.id }, ...(fn.id === 'init' ? { resources: initResources } : {}),
+        ...(fn.invocationAbi === 'kdp-host-init/1' ? { invocationAbi: 'kdp-host-init/1' as const } : {}),
+        entry: { module: fn.invocationAbi === 'kdp-host-init/1' ? hostModule : module, exportName: fn.id },
+        ...(fn.id === 'init' ? { resources: initResources } : {}),
       }));
     const kernelRef = {
       packageId: 'kdp-kernel', path: 'dist/index.mjs', digest: await fileBytesDigest(kernelModule),
@@ -518,7 +531,6 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         'kdp-kernel': 'dist/index.mjs',
         'orders-ext': 'dist/index.mjs',
       },
-      kdpArtifact: { packageId: KDP_PACKAGE_ID, path: 'dist/index.js' },
     };
 
     const built = await buildApp(input);
@@ -576,8 +588,9 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       lockPath: LOCK_RELATIVE_PATH,
       lockDigest: lock.closureDigest,
       kdpPackageId: KDP_PACKAGE_ID,
-      kdpPrimaryEntry: 'bootstrap',
-      kdpPrimaryDigest: lock.bootstrapKdpPin.kdpPrimaryDigest,
+      kdpInitFunction: lock.bootstrapKdpPin.kdpInitFunction,
+      invocationAbi: 'kdp-host-init/1',
+      kdpInitModule: lock.bootstrapKdpPin.kdpInitModule,
     };
     const record: InstalledRecord = {
       ...(recordBase as unknown as InstalledRecord),
@@ -589,8 +602,9 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       schemaVersion: 'dh.pin/0.11',
       target: lock.target,
       kdpPackageId: KDP_PACKAGE_ID,
-      kdpPrimaryEntry: 'bootstrap',
-      kdpPrimaryDigest: record.kdpPrimaryDigest,
+      kdpInitFunction: lock.bootstrapKdpPin.kdpInitFunction,
+      invocationAbi: 'kdp-host-init/1',
+      kdpInitModule: lock.bootstrapKdpPin.kdpInitModule,
       lockDigest: lock.closureDigest,
       lockPath: LOCK_RELATIVE_PATH,
     };
