@@ -142,6 +142,9 @@ async function activateKernel(context: KdpBootstrapContext, kernelAlreadyEntered
   const packages = new PackageSystem(safeContext.installRoot, lock, safeContext.hostPorts);
 
   try {
+    // 真正 KDP Host Init 已由 Boot 调用：在任何后续资源/Hook 核验前登记 KDP 进入，
+    // 若随后失败，runExit 必须能尝试该已经进入的 KDP.Exit。
+    if (kernelAlreadyEntered) packages.recordSelectedKernelHostEntry();
     // 预先检查所有可执行产物，避免在前序 Package 已执行后才发现后序文件被篡改。
     await packages.verifySelectedArtifacts();
     await packages.sealHooks();
