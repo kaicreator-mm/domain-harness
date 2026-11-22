@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { readFileSync, statSync } from 'node:fs';
+import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -35,8 +36,7 @@ assert.ok(outputs.some((output) => output.entryPoint?.endsWith('tooling/build/sr
 for (const output of outputs) {
   for (const imported of output.imports ?? []) {
     const name = imported.path;
-    assert.ok(name === '@kaicreator/domain-harness-contracts' ||
-      name.startsWith('node:') || ['fs', 'path', 'os', 'crypto', 'util', 'module', 'buffer', 'url', 'stream'].includes(name),
+    assert.ok(name === '@kaicreator/domain-harness-contracts' || isBuiltin(name),
       `SDK composition bundle leaked external implementation dependency: ${name}`);
   }
 }
