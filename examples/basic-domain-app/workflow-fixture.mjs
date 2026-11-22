@@ -42,12 +42,6 @@ const content = (id, value) => ({
   required: true, value,
 });
 export async function prepareWorkflowElements(dirs, rules, app, fn, standardReader) {
-  const schema = {
-    type: 'object', required: ['format', 'source'],
-    properties: {
-      format: { enum: ['json', 'yaml'] }, source: { type: 'string' },
-    },
-  };
   rules.functions.push(
     fn('startWorkflow', { type: 'object' }, { type: 'object' }),
     fn('endWorkflow', { type: 'object' }, { type: 'object' }),
