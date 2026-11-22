@@ -11,9 +11,13 @@ import * as microkernel from '@kaicreator/domain-harness-microkernel';
 import * as build from '@kaicreator/domain-harness-build';
 
 test('R43: runtime subpath supplies Contracts/Boot but no BUILD or Package authoring API', () => {
-  const expected = new Set([...Object.keys(contracts), ...Object.keys(microkernel)]);
+  const expected = new Set([
+    ...Object.keys(contracts),
+    ...Object.keys(microkernel).filter((name) => name !== 'bootstrap'),
+  ]);
   assert.deepEqual(new Set(Object.keys(runtime)), expected);
   assert.equal(runtime.boot, microkernel.boot);
+  assert.equal('bootstrap' in runtime, false, 'KDP bootstrap remains an internal implementation detail');
   assert.equal('buildApp' in runtime, false);
   assert.equal('BuildRefusal' in runtime, false);
   assert.equal('digestOfBytes' in runtime, false);
@@ -36,6 +40,7 @@ test('R43: root facade stays one public SDK product and reuses both existing imp
   assert.deepEqual(new Set(Object.keys(sdk)),
     new Set([...Object.keys(runtime), ...Object.keys(composition)]));
   assert.equal(sdk.boot, runtime.boot);
+  assert.equal('bootstrap' in sdk, false, 'root SDK must not expose direct KDP bootstrap');
   assert.equal(sdk.buildApp, composition.buildApp);
 });
 

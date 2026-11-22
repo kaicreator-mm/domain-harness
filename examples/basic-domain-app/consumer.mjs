@@ -218,7 +218,7 @@ async function authoring(label, rule, options = {}) {
   await write(dirs['rules-package'], 'dist/rules.mjs',
     rulesModule(options.workflow === true, options.workflowFatalAt ?? ''));
   await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
-  await write(dirs['kernel-primary'], 'dist/index.js', "export { bootstrap } from '@kaicreator/domain-harness/runtime';\n");
+  await write(dirs['kernel-primary'], 'dist/index.js', "export { bootstrap } from '@kaicreator/domain-harness-microkernel';\n");
   for (const id of Object.keys(dirs)) {
     const exports = id === 'kernel-primary'
       ? { '.': './dist/index.js' }

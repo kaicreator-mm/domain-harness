@@ -96,3 +96,29 @@ test('R70: File Writer bounds input bytes and node cost before serialization', a
   assert.deepEqual(module.readYaml({ format:'yaml', source:encoded.value }),
     { kind:'SUCCEEDED', value:data });
 });
+
+test('Standard File Writer rejects oversized objects before visiting later getters', async () => {
+  const module = await import(modulePath);
+  const huge = Object.fromEntries(Array.from({ length: 32_768 }, (_, index) =>
+    [`field${index}`, index]));
+  // Object.entries 会在预算检查之前求值最后一个 getter；分步枚举必须先拒绝超预算输入。
+  Object.defineProperty(huge, 'lateGetter', {
+    enumerable: true,
+    get() { throw new Error('late getter should not be evaluated'); },
+  });
+  for (const format of ['json', 'yaml'] as const) {
+    const write = format === 'json' ? module.writeJson : module.writeYaml;
+    const outcome = write({ format, value: huge });
+    assert.equal(outcome.kind, 'FAILED');
+    assert.equal(outcome.failure.code, 'DH_STD_FILE_SIZE');
+  }
+});
+
+test('Standard File Writer keeps native own-enumerable object serialization semantics', async () => {
+  const module = await import(modulePath);
+  const inherited = Object.create({ inheritedValue: 'private' }) as Record<string, unknown>;
+  inherited['ownValue'] = 'ok';
+  const encoded = module.writeJson({ format: 'json', value: inherited });
+  assert.equal(encoded.kind, 'SUCCEEDED');
+  assert.deepEqual(JSON.parse(encoded.value), { ownValue: 'ok' });
+});

@@ -1,4 +1,4 @@
-/** Standard JSON/YAML file format Elements: pure codecs, not host filesystem authority. */
+/** 标准 JSON/YAML 格式 Element：纯编解码，不授予宿主文件系统权限。 */
 import { parseDocument, stringify } from 'yaml';
 
 const LIMIT_BYTES = 1048576;
@@ -6,13 +6,13 @@ const DENIED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 export async function init() {}
 export function exit() {}
 
-// Validate the JsonValue boundary without reimplementing either format parser.
+// 仅验证 JsonValue 边界，不重复实现底层格式解析器。
 function isJsonValue(value, ancestors = new WeakSet(), depth = 0,
   budget = { bytes: 0, nodes: 0, exceeded: false }) {
   if (++budget.nodes > 32768) { budget.exceeded = true; return false; }
   if (depth > 64) return false;
-  // Bound traversal before calling native JSON or library YAML serialization.
-  // Escaping can grow the output, so the actual final UTF-8 limit is also checked.
+  // 使用原生 JSON 或第三方 YAML 序列化之前，先限制遍历成本。
+  // 转义可能放大输出，序列化之后仍必须检查实际 UTF-8 字节上限。
   const charge = (bytes) => {
     budget.bytes += bytes + 16;
     if (budget.bytes > LIMIT_BYTES) { budget.exceeded = true; return false; }
@@ -35,8 +35,19 @@ function isJsonValue(value, ancestors = new WeakSet(), depth = 0,
         isJsonValue(item, ancestors, depth + 1, budget)) &&
         Object.keys(value).length === value.length;
     }
-    return Object.entries(value).every(([key, child]) =>
-      !DENIED_KEYS.has(key) && charge(Buffer.byteLength(key, 'utf8')) &&
+    // 仅枚举自有键并计数，先拒绝超预算对象；不读取属性值、
+    // 不构造 Object.keys/entries 巨大临时数组，也不用 BUILD 禁止的 value[key]。
+    let ownKeys = 0;
+    for (const key in value) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+      if (++ownKeys > 32768 - budget.nodes) {
+        budget.exceeded = true;
+        return false;
+      }
+      if (DENIED_KEYS.has(key) || !charge(Buffer.byteLength(key, 'utf8'))) return false;
+    }
+    // 只有已受数量/键预算约束时才读取值；所分配的 entries 数量有已知上限。
+    return Object.entries(value).every(([, child]) =>
       isJsonValue(child, ancestors, depth + 1, budget));
   } finally {
     ancestors.delete(value);
