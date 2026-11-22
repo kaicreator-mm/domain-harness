@@ -1,4 +1,4 @@
-/** 构建期职责：校验并封存选定的依赖、资源和函数，保证生成确定性 Lock。 */
+/** SDK App 组合入口：消费已合格的 Package，进行选择与确定性封存；不负责源码静态正确性。 */
 import {
   DH_LOCK_SCHEMA_VERSION,
   NODE22_ESM_PROFILE,
@@ -39,7 +39,6 @@ import { BuildRefusal, refusal } from './refusal.js';
 import { SchemaChecker } from './schema-check.js';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
-import { verifyGeneratedPackageImports, verifyImplementationExport } from './static-package-guard.js';
 import { composeAppPackage, sameAppPackageBytes, sealPackageManifest } from './app-package.js';
 import { TRUSTED_WORKFLOW_NPM_ARCHIVES } from './trusted-runtime.js';
 import { selectWorkflows, workflowKey } from './workflow-selection.js';
@@ -85,8 +84,8 @@ function firstIssue(issues: readonly ValidationIssue[]): ValidationIssue {
 }
 
 
-/** 构建入口只处理已声明的域定义与资源闭包。错误返回稳定拒绝码，不修复输入，也不在运行期重新选择实现。 */
-export function buildApp(input: BuildInput): BuildResult {
+/** App 组合：验证选定关系与资源封存一致性；源码正确性由生成期的独立验证工具负责。 */
+export function composeApp(input: BuildInput): BuildResult {
   try {
     return { ok: true, ...runBuild(input) };
   } catch (error) {
@@ -471,7 +470,6 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       }
     }
     scope.verify(binding.entry.module);
-    verifyImplementationExport(scope, binding.entry, `${resolved.element.def.id}.${resolved.fn.id}`);
     for (const resource of binding.resources ?? []) {
       if (!directExtension(implementor.id, resource.packageId)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
@@ -672,16 +670,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
   }
-  // 对最终选定的 ESM 模块字节做静态检查；依赖无法证明时 BUILD 拒绝。
-  verifyGeneratedPackageImports(scope, packagesSorted, [
-    ...sealedPackages.map((pkg) => pkg.artifact),
-    ...sealedFunctions.map((fn) => fn.implementation.module),
-    ...hookBindings.flatMap((hook) => hook.providers.map((ref) => {
-      const selected = sealedFunctions.find((fn) => canonicalJson(toJson(fn.ref)) === canonicalJson(toJson(ref)));
-      if (!selected) throw refusal('DH_BUILD_IMPLEMENTATION_MISSING', 'Hook provider implementation missing');
-      return selected.implementation.module;
-    })),
-  ]);
+  // 生成期源码静态验证不得在 SDK 组合入口重做；此处仅封存已选字节。
   const kdpBytes = scope.read(input.kdpArtifact.packageId, input.kdpArtifact.path);
   const kdpDigest = digestOfBytes(kdpBytes);
   scope.record(input.kdpArtifact.packageId, input.kdpArtifact.path, kdpDigest);
