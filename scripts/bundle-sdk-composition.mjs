@@ -35,7 +35,14 @@ const result = await build({
     },
   }],
   // 兼容打包进 ESM 的第三方 CommonJS 依赖对 Node 内置模块的 require。
-  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+  banner: { js: [
+    "import { createRequire } from 'node:module';",
+    "import { fileURLToPath } from 'node:url';",
+    "import { dirname as __sdkDirname } from 'node:path';",
+    'const require = createRequire(import.meta.url);',
+    'const __filename = fileURLToPath(import.meta.url);',
+    'const __dirname = __sdkDirname(__filename);',
+  ].join('\\n') },
   legalComments: 'external',
   metafile: true,
   logLevel: 'warning',
