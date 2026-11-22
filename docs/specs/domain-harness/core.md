@@ -11,16 +11,29 @@
 | 编号 | 根原则 | 具体权威细节 |
 |---|---|---|
 | CORE-01 | DomainHarness 是嵌入式 SDK；消费者仅需一个公开 SDK 产品 | [§1](./core.md)、[§6](./composition-trust.md) |
-| CORE-02 | Domain Package 是可直接编写的文件集合，作者工具/Forge/额外 Assembly 非必需 | [§3](./element-package.md)、[§6](./composition-trust.md) |
+| CORE-02 | Domain Package 是可直接编写的文件集合，作者工具/Forge/额外组合服务非必需 | [§3](./element-package.md)、[§6](./composition-trust.md) |
 | CORE-03 | 可执行能力属于真实 Package + 内聚 Element；普通源码 helper 不必逐个 Element 化 | [§2–§3](./element-package.md)、[§A](./architecture.md) |
 | CORE-04 | 唯一最小可信 Boot → 唯一真正 KDP.Init；不得有第二 Kernel 或第二 App Init | [§A/§5](./architecture.md)（当前实现仍 MIGRATION_REQUIRED） |
 | CORE-05 | 单轮 Core.Order/显式直接 Extension Init；退出按真实进入逆序可选 Exit | [§4](./lifecycle-workflow.md) |
-| CORE-06 | 唯一作者期静态组合/Lock/Pin 与受信执行；运行期不得重新选型或越权 | [§6/§13.4](./composition-trust.md) |
+| CORE-06 | 生成期独立保证正确性；App 组合期选择并封存 Lock/Pin；运行期不得重新选型或越权 | [§6/§13.4](./composition-trust.md) |
 | CORE-07 | Package 身份、Element/FunctionRef、Namespace、Target、Digest 独立；统一稳定语义命名 | [§7/§13.1–2](./identity-naming.md)（命名迁移待实现） |
 | CORE-08 | Workflow/Function/AppStatus 严格区分，未知不得变成功；运行预算需受限 | [§4/§13.3/§13.5](./lifecycle-workflow.md) |
 | CORE-09 | 一个 Package 和一个 Domain App 直接执行闭包只用同一语言及 Runtime | [§1](./core.md)、[§6](./composition-trust.md) |
 | CORE-10 | 所有接受结论必须与实际 Source SHA/目标平台/审查和测试匹配，不得伪造成功 | [§9](./engineering-quality.md)、[§10](./status-and-decisions.md) |
 | **CORE-11** | **Package/Element 的正确性由其创建、生成或修改者在产物生成期负责并提供证据；SDK 不承担正确性证明，运行时只做最小可信兜底** | [§6/§13.4](./composition-trust.md)、[§A](./architecture.md) |
+| **CORE-12** | 使用明确的“生成、生成期验证、App 组合与封存、编译/打包、运行期”术语，不再以模糊英文统称跨阶段责任 | [本文件·术语约束](./core.md) |
+
+## 术语约束：只使用明确的阶段名（CORE-12）
+
+**禁止使用单个含糊的英文阶段名同时指代 Package 生成、静态验证、App 组合与编译。** 规范、L2、Issue 与审核应直接使用：
+
+- **Package/Element 生成**：人、LLM、Agent 或工具编写/修改文件，承担合同、实现、依赖、行为正确性；不预设自动生成器。
+- **生成期验证**：由生成者负责的 Schema、静态依赖检查、测试和目标适配证明；可使用独立工具，不是 SDK 的必要运行时能力。
+- **App 组合与封存**：按既有合格产物选择 Package/Element/Function/Target，形成确定性 App、Lock/Pin、安装证据；此阶段不替代生成期正确性负责者。
+- **编译/打包**：TypeScript 编译、npm 脚本、bundle、归档等具体工程动作，按实际行为称呼，不将它们上升为统一的架构阶段。
+- **运行期兜底**：SDK 仅核验必要可信身份/完整性，执行已选能力，处理最终技术错误与 Exit，不再验证 Package/Element 正确性。
+
+旧源码路径、`buildApp` 等既存 API、具体 npm 脚本名、GitHub/CI 历史标签仍按其真实名称引用；它们不是可以替代上述阶段定义的规范概念。若 L2、Reviewer 或 Agent 用含糊阶段名增加 SDK 责任，应拒绝并要求指定 Owner、输入、输出和执行时机。
 
 ## 0. 规范状态与阅读规则
 
