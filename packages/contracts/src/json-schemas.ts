@@ -671,6 +671,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
       'appIdentity',
       'target',
       'bootstrapKdpPin',
+      'trustedKdpModuleClosure',
       'selectedPackages',
       'selectedElements',
       'selectedFunctions',
@@ -702,6 +703,20 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
           kdpPackageId: { type: 'string', minLength: 1 },
           kdpPrimaryEntry: { const: 'bootstrap' },
           kdpPrimaryDigest: { type: 'string', pattern: CONTENT_DIGEST_PATTERN },
+        },
+      },
+      trustedKdpModuleClosure: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 256,
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['module', 'dependencies', 'trustedImports'],
+          properties: {
+            module: { $ref: '#/$defs/resourceRef' },
+            dependencies: { type: 'array', items: { $ref: '#/$defs/resourceRef' } },
+            trustedImports: { type: 'array', items: { type: 'string', minLength: 1 } },
+          },
         },
       },
       selectedPackages: {
