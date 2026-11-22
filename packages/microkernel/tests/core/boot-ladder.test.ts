@@ -76,6 +76,68 @@ test('pin mismatch: any pin field disagreement is REFUSED with DH_BOOT_PIN_MISMA
   });
 });
 
+test('R127 Host ABI migration: previous Lock/Pin/InstallRecord versions are refused before KDP import', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const oldPin = { ...fixture.pin, schemaVersion: 'dh.pin/0.11' } as unknown as BootstrapPin;
+    assertRefused(await boot(oldPin, fixture.context), 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+  await withFixture(t, async (fixture) => {
+    const record = await fixture.readRecord();
+    record['schemaVersion'] = 'dh.install/0.11';
+    delete record['recordDigest'];
+    record['recordDigest'] = digestOf(record);
+    await fixture.writeRecord(record);
+    assertRefused(await boot(fixture.pin, fixture.context), 'DH_BOOT_RECORD_INVALID');
+    sideEffectFree();
+  });
+  await withFixture(t, async (fixture) => {
+    const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
+    lock['schemaVersion'] = 'dh.lock/0.11';
+    delete lock['closureDigest'];
+    lock['closureDigest'] = digestOf(lock);
+    await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
+    const record = await fixture.readRecord();
+    record['lockDigest'] = lock['closureDigest'];
+    delete record['recordDigest'];
+    record['recordDigest'] = digestOf(record);
+    await fixture.writeRecord(record);
+    const pin: BootstrapPin = {
+      ...fixture.pin, lockDigest: lock['closureDigest'] as ContentDigest,
+    };
+    assertRefused(await boot(pin, fixture.context), 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+});
+
+test('R127: duplicate special Host ABI Function or malformed selected function graph refuses before execution', async (t) => {
+  for (const mutation of ['duplicate-host', 'malformed-function'] as const) {
+    await withFixture(t, async (fixture) => {
+      const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
+      const functions = lock['selectedFunctions'] as Array<Record<string, unknown>>;
+      if (mutation === 'duplicate-host') {
+        const host = functions.find((entry) => entry['invocationAbi'] === 'kdp-host-init/1');
+        assert.ok(host);
+        functions.push({ ...structuredClone(host),
+          ref: { ...(host['ref'] as Record<string, unknown>), functionId: 'another-host' } });
+      } else {
+        functions[0] = { ref: null };
+      }
+      delete lock['closureDigest'];
+      lock['closureDigest'] = digestOf(lock);
+      await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
+      const record = await fixture.readRecord();
+      record['lockDigest'] = lock['closureDigest'];
+      delete record['recordDigest'];
+      record['recordDigest'] = digestOf(record);
+      await fixture.writeRecord(record);
+      const pin = { ...fixture.pin, lockDigest: lock['closureDigest'] as ContentDigest };
+      assertRefused(await boot(pin, fixture.context), 'DH_BOOT_PIN_MISMATCH');
+      sideEffectFree();
+    });
+  }
+});
+
 test('missing record: absent installed-record.json is DH_BOOT_RECORD_MISSING', async (t) => {
   await withFixture(t, async (fixture) => {
     await rm(join(fixture.installRoot, 'dh-install'), { recursive: true, force: true });
