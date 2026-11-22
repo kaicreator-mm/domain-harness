@@ -13,7 +13,7 @@
       "definitionRef": {
         "packageId": "r41-kdp",
         "path": "definitions/lifecycle.json",
-        "digest": "sha256:3767582dc20cbb2646bcc4d255041f6fd9a4b5246b8a60b6d34434089f1b2fc4"
+        "digest": "sha256:0ae60f299fae639941ee9326f8583085e5986832523fec86e72d4e43d7e647a4"
       },
       "visibility": "public"
     }
@@ -42,10 +42,11 @@
             "module": {
               "packageId": "r41-kdp",
               "path": "dist/index.mjs",
-              "digest": "sha256:0bd1846e9410a653893f7fa0c87db50af8e698ef8078f780fce71f9d9c0c114a"
+              "digest": "sha256:81a30fedc1e198abfd127325ccb13df1e269d12c449c09cd6cc687aae2420f62"
             },
             "exportName": "init"
-          }
+          },
+          "invocationAbi": "kdp-host-init/1"
         },
         {
           "elementId": "r41.kdp",
@@ -55,7 +56,7 @@
             "module": {
               "packageId": "r41-kdp",
               "path": "dist/index.mjs",
-              "digest": "sha256:0bd1846e9410a653893f7fa0c87db50af8e698ef8078f780fce71f9d9c0c114a"
+              "digest": "sha256:81a30fedc1e198abfd127325ccb13df1e269d12c449c09cd6cc687aae2420f62"
             },
             "exportName": "exit"
           }
@@ -67,12 +68,12 @@
     "namespace": "r41",
     "id": "r41.kdp",
     "version": "1.0.0",
-    "digest": "sha256:1a639c51287a4272fbb8f2ed79cc4c5a2f2410446068cf3f25bf1b8285f208df"
+    "digest": "sha256:eb4f9493aa848a45a549a84e86738afec1444a5cb12eed74f4e15cf9d251def8"
   },
   "exit": {
     "namespace": "r41",
     "id": "r41.kdp",
     "version": "1.0.0",
-    "digest": "sha256:1a639c51287a4272fbb8f2ed79cc4c5a2f2410446068cf3f25bf1b8285f208df"
+    "digest": "sha256:eb4f9493aa848a45a549a84e86738afec1444a5cb12eed74f4e15cf9d251def8"
   }
 }

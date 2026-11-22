@@ -9,22 +9,7 @@
     {
       "id": "init",
       "contractVersion": "1",
-      "inputSchemaRef": {
-        "inline": {
-          "type": "object"
-        }
-      },
-      "outputSchemaRef": {
-        "inline": {
-          "type": "object"
-        }
-      },
-      "outcomes": [
-        "SUCCEEDED",
-        "UNKNOWN",
-        "FAILED"
-      ],
-      "effects": "none"
+      "invocationAbi": "kdp-host-init/1"
     },
     {
       "id": "exit",
