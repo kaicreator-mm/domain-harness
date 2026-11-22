@@ -213,7 +213,7 @@ async function r60OtherDomain(t: import('node:test').TestContext): Promise<strin
   const definition = readJson(join(source, 'packages', STANDARD_READER, 'definitions/json-reader.json')) as
     import('@kaicreator/domain-harness-contracts').ElementDefinition;
   const readerRef = {
-    element: { namespace: 'r60', id: definition.id, version: definition.version,
+    element: { namespace: definition.id.split('.')[0]!, id: definition.id, version: definition.version,
       digest: contentDigestOf(definition as unknown as JsonValue) },
     functionId: 'jsonReader', contractVersion: '1',
   };
