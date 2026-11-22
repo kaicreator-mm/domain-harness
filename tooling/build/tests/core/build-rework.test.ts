@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { symlinkSync, writeFileSync } from 'node:fs';
-import { DH_ELEMENT_SCHEMA_VERSION } from '@kaicreator/domain-harness-contracts';
+import { DH_ELEMENT_SCHEMA_VERSION, type DomainPackageManifest } from '@kaicreator/domain-harness-contracts';
 import { buildApp, type BuildResult } from '../../src/index.js';
 import { sha256OfBytes } from './fixtures.js';
 import { standardCase } from './standard-case.js';

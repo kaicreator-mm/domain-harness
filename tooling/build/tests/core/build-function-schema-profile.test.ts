@@ -10,7 +10,7 @@ import { addPackage, writeJson } from './fixtures.js';
 import { standardCase, type StandardCase } from './standard-case.js';
 
 type SchemaChannel = 'inputSchemaRef' | 'outputSchemaRef';
-type SchemaRef = FunctionContract['inputSchemaRef'];
+type SchemaRef = NonNullable<FunctionContract['inputSchemaRef']>;
 
 function setEvaluateSchema(scenario: StandardCase, channel: SchemaChannel, ref: SchemaRef): void {
   const fn = scenario.eligibility.functions.find((candidate) => candidate.id === 'evaluate')!;

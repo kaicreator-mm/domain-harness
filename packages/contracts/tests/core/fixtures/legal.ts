@@ -242,11 +242,18 @@ const lifecycleElement = (id: string) => ({
 const lifecycleFunction = (id: string, name: 'init' | 'exit') => ({
   element: lifecycleElement(id), functionId: name, contractVersion: '1',
 });
-const lifecycleSelected = (id: string, module: typeof ORDERS_BUSINESS_ARTIFACT) => ['init', 'exit'].map((name) => ({
-  ref: lifecycleFunction(id, name as 'init' | 'exit'),
-  outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
-  implementation: { module, exportName: name }, resources: [],
-}));
+const lifecycleSelected = (id: string, module: typeof ORDERS_BUSINESS_ARTIFACT) => ['init', 'exit'].map((name) =>
+  id === 'kdp-basic' && name === 'init'
+    ? {
+        ref: lifecycleFunction(id, 'init'),
+        invocationAbi: 'kdp-host-init/1' as const,
+        implementation: { module, exportName: name }, resources: [],
+      }
+    : {
+        ref: lifecycleFunction(id, name as 'init' | 'exit'),
+        outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
+        implementation: { module, exportName: name }, resources: [],
+      });
 
 export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
   kind: 'DomainAppLock',
@@ -259,8 +266,12 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
   target: APP_TARGET,
   bootstrapKdpPin: {
     kdpPackageId: 'kdp-basic',
-    kdpPrimaryEntry: 'bootstrap',
-    kdpPrimaryDigest: contentDigestOf({ fixture: 'kdp/bootstrap-entry', revision: 1 }),
+    kdpInitFunction: lifecycleFunction('kdp-basic', 'init'),
+    invocationAbi: 'kdp-host-init/1',
+    kdpInitModule: {
+      packageId: 'kdp-basic', path: 'dist/kdp-basic.mjs',
+      digest: contentDigestOf({ fixture: 'kdp-basic/artifact', revision: 1 }),
+    },
   },
   selectedPackages: [
     {
