@@ -68,10 +68,10 @@ function lifecycleModule(packageId) {
   return `
 const events = (globalThis.__domainHarnessT05Events ??= []);
 events.push({ event: 'module-evaluated', package: '${packageId}' });
-export async function init(ctx) {
+${packageId !== 'kernel-primary' ? `export async function init(ctx) {
   events.push({ event: 'package-init', package: '${packageId}', initFrom: ctx.InitFrom });
   ${packageId === 'app-business' ? "return (await import('./app.mjs')).init(ctx);" : 'return ctx.nextCore?.init();'}
-}
+}` : ''}
 export async function exit() { events.push({ event: 'package-exit', package: '${packageId}' }); }
 `;
 }
@@ -218,7 +218,15 @@ async function authoring(label, rule, options = {}) {
   await write(dirs['rules-package'], 'dist/rules.mjs',
     rulesModule(options.workflow === true, options.workflowFatalAt ?? ''));
   await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
-  await write(dirs['kernel-primary'], 'dist/index.js', "export { bootstrap } from '@kaicreator/domain-harness-microkernel';\n");
+  await write(dirs['kernel-primary'], 'dist/index.js', [
+    "import { activateSelectedKdpHostInit } from '@kaicreator/domain-harness-microkernel';",
+    'const events = (globalThis.__domainHarnessT05Events ??= []);',
+    'export async function init(context) {',
+    "  events.push({ event: 'package-init', package: 'kernel-primary', initFrom: [{ type: 'Boot' }] });",
+    '  return activateSelectedKdpHostInit(context);',
+    '}',
+    '',
+  ].join('\n'));
   for (const id of Object.keys(dirs)) {
     const exports = id === 'kernel-primary'
       ? { '.': './dist/index.js' }
@@ -372,12 +380,15 @@ async function authoring(label, rule, options = {}) {
       id: `basic.lifecycle_${id.replaceAll('-', '_')}`, version: '1.0.0',
       description: 'Package-owned Init/Exit Element and optional Hook Provider.',
       content: [],
-      functions: ['init', 'exit', ...(id === 'kernel-extension' ? ['auditHook'] : [])].map((name) => ({
-        id: name, contractVersion: '1',
-        inputSchemaRef: { inline: { type: 'object' } },
-        outputSchemaRef: { inline: { type: 'object' } },
-        outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'], effects: 'none',
-      })),
+      functions: ['init', 'exit', ...(id === 'kernel-extension' ? ['auditHook'] : [])].map((name) =>
+        id === 'kernel-primary' && name === 'init'
+          ? { id: 'init', contractVersion: '1', invocationAbi: 'kdp-host-init/1' }
+          : {
+              id: name, contractVersion: '1',
+              inputSchemaRef: { inline: { type: 'object' } },
+              outputSchemaRef: { inline: { type: 'object' } },
+              outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'], effects: 'none',
+            }),
     };
     lifecycleDefs[id] = definition;
     await write(dirs[id], 'elements/lifecycle.json', canonicalJson(definition));
@@ -391,11 +402,18 @@ async function authoring(label, rule, options = {}) {
   });
   const target = { runtime: 'node', module: 'esm', nodeMajor: 22 };
   const variant = (implementations) => [{ target, implementations }];
+  const hostKdpRef = await artifactRef('kernel-primary', 'dist/index.js');
   const lifeImplementations = (id) =>
-    lifecycleDefs[id].functions.map((fn) => implementation(
-      lifecycleDefs[id].id, fn.id, artifactRefs[id], fn.id,
-      id === 'app-business' && fn.id === 'init' ? [ruleRef] : undefined,
-    ));
+    lifecycleDefs[id].functions.map((fn) => ({
+      ...implementation(
+        lifecycleDefs[id].id, fn.id,
+        id === 'kernel-primary' && fn.id === 'init' ? hostKdpRef : artifactRefs[id],
+        fn.id,
+        id === 'app-business' && fn.id === 'init' ? [ruleRef] : undefined,
+      ),
+      ...(id === 'kernel-primary' && fn.id === 'init'
+        ? { invocationAbi: 'kdp-host-init/1' } : {}),
+    }));
   const implementation = (elementId, functionId, module, exportName, resources) => ({
     elementId, functionId, contractVersion: '1', entry: { module, exportName }, ...(resources === undefined ? {} : { resources }),
   });
@@ -513,7 +531,6 @@ async function authoring(label, rule, options = {}) {
       ...Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
       ...(standardRoot ? { [standardPkgId]: 'dist/index.mjs' } : {}),
     },
-    kdpArtifact: { packageId: 'kernel-primary', path: 'dist/index.js' },
   };
   return {
     root, dirs, input, descriptor, definitions,
@@ -673,7 +690,7 @@ async function runPositive(label, rule, expectedAtHundred) {
     const runtimeEvents = globalThis.__domainHarnessT05Events;
     const initialized = runtimeEvents.filter((event) => event.event === 'package-init').map((event) => event.package);
     assert.deepEqual(install.lock.coreOrder, ['kernel-primary', 'sdk-primary', 'app-business']);
-    assert.deepEqual(initialized, ['kernel-extension', 'kernel-primary', 'sdk-extension', 'sdk-primary', 'rules-package', 'app-business']);
+    assert.deepEqual(initialized, ['kernel-primary', 'kernel-extension', 'sdk-extension', 'sdk-primary', 'rules-package', 'app-business']);
     const businessInitIndex = runtimeEvents.findIndex((event) => event.event === 'business-init');
     const lastInitIndex = runtimeEvents.map((event) => event.event).lastIndexOf('package-init');
     assert.ok(lastInitIndex >= 0 && businessInitIndex > lastInitIndex, 'Business Core.Init executes once after own Extension Init');
@@ -991,8 +1008,9 @@ async function main() {
     pkg(p, 'app-business').targetVariants[0].implementations[0].resources[0].digest = `sha256:${'0'.repeat(64)}`;
   }, 'DH_BUILD_RESOURCE_DIGEST_MISMATCH');
   await expectBuildMutationRefusal('noncanonical-artifact-path', (p) => {
-    p.input.kdpArtifact.path = './dist/index.js';
-  }, 'DH_BUILD_RESOURCE_MISSING');
+    pkg(p, 'kernel-primary').targetVariants[0].implementations
+      .find((fn) => fn.functionId === 'init').entry.module.path = './dist/index.js';
+  }, 'DH_BUILD_SCHEMA_INVALID');
 
   const inlinePrepared = await authoring('inline-rule', { minOrderTotal: 50, regions: ['EU', 'US'] }, { inlineRule: true });
   try {
@@ -1022,7 +1040,7 @@ async function main() {
     const initialized = timeline.filter((event) => event.event === 'package-init').map((event) => event.package);
     const disposed = timeline.filter((event) => event.event === 'package-exit').map((event) => event.package);
     assert.ok(initialized.length > 0, 'failure fixture must actually initialize Packages');
-    assert.deepEqual(initialized, ['kernel-extension', 'kernel-primary', 'sdk-extension', 'sdk-primary', 'rules-package', 'app-business']);
+    assert.deepEqual(initialized, ['kernel-primary', 'kernel-extension', 'sdk-extension', 'sdk-primary', 'rules-package', 'app-business']);
     assert.deepEqual(disposed,
       ['rules-package', 'app-business', 'sdk-extension', 'sdk-primary', 'kernel-extension', 'kernel-primary'],
       'failed Init must Exit all entered Packages from deepest to root');
