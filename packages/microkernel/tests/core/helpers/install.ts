@@ -1,5 +1,5 @@
 // 当前架构的可证伪测试：断言实际行为而非历史兼容。
-import { mkdtemp, mkdir, writeFile, cp, readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, cp, readFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -477,8 +477,25 @@ export async function buildFixtureInstall(
     digest: await fileBytesDigest(join(installRoot, 'node_modules', FIXTURE_BUSINESS, 'content', 'rules.json')),
   };
 
+  // Microkernel 测试夹具独立安装整个已编译 SDK：选定入口及 dist 中所有 JS
+  // 采用保守的封存超集，完整机器导入边的构造由 BUILD 静态扫描器正反例验证。
+  const kernelModuleFiles = (await readdir(join(kdpPackageDir, 'dist')))
+    .filter((name) => /\.js$/u.test(name)).sort();
+  const trustedKdpModuleClosure = await Promise.all(kernelModuleFiles.map(async (name) => ({
+    module: {
+      packageId: KDP_PACKAGE_ID, path: `dist/${name}`,
+      digest: await fileBytesDigest(join(kdpPackageDir, 'dist', name)),
+    },
+    dependencies: [],
+    trustedImports: [],
+  })));
+  if (!trustedKdpModuleClosure.some((node) => node.module.path === 'dist/index.js')) {
+    throw new Error('fixture KDP export is not in the sealed JS module inventory');
+  }
+
   const resourceDigests: Record<string, ContentDigest> = {
     [`${KDP_PACKAGE_ID}/package.json`]: await fileBytesDigest(join(kdpPackageDir, 'package.json')),
+    ...Object.fromEntries(trustedKdpModuleClosure.map((node) => [`${KDP_PACKAGE_ID}/${node.module.path}`, node.module.digest])),
     [`${FIXTURE_KERNEL}/dist/index.mjs`]: kernelArtifact.digest,
     [`${FIXTURE_SDK}/dist/index.mjs`]: sdkArtifact.digest,
     [`${FIXTURE_BUSINESS}/dist/index.mjs`]: businessArtifact.digest,
@@ -508,6 +525,7 @@ export async function buildFixtureInstall(
       kdpPrimaryEntry: 'bootstrap',
       kdpPrimaryDigest: kdpEntryDigest,
     },
+    trustedKdpModuleClosure,
     selectedPackages: [
       { packageId: FIXTURE_KERNEL, version: '1.0.0', recordInitFrom: true, order: 0, layer: 'kernel', role: 'primary', artifact: kernelArtifact,
         init: lifecycleRefs[FIXTURE_KERNEL]!, initFunction: lifeFunction(FIXTURE_KERNEL, 'init'),
