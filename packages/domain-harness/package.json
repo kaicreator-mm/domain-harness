@@ -33,8 +33,15 @@
     "test:typecheck": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@kaicreator/domain-harness-build": "0.11.0",
     "@kaicreator/domain-harness-contracts": "0.11.0",
     "@kaicreator/domain-harness-microkernel": "0.11.0"
+  },
+  "peerDependencies": {
+    "@kaicreator/domain-harness-build": "0.11.0"
+  },
+  "peerDependenciesMeta": {
+    "@kaicreator/domain-harness-build": {
+      "optional": true
+    }
   }
 }
