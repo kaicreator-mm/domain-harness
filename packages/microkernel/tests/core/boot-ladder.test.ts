@@ -305,41 +305,106 @@ for (const shadowKind of ['packages-parent', 'kdp-private'] as const) {
   });
 }
 
+/** 修改真正受选 KDP Host ESM 后，Lock/Record/Pin 三方使用同一真实新字节摘要。 */
+async function resealKdpHostEntry(fixture: FixtureInstall, source: string): Promise<BootstrapPin> {
+  await fixture.writeKdpEntryBytes(Buffer.from(source, 'utf8'));
+  const digest = `sha256:${createHash('sha256').update(source, 'utf8').digest('hex')}` as ContentDigest;
+  const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
+  const selection = lock['selectedKdpHost'] as Record<string, unknown>;
+  const module = selection['kdpInitModule'] as Record<string, unknown>;
+  module['digest'] = digest;
+  const functions = lock['selectedFunctions'] as Array<Record<string, unknown>>;
+  const host = functions.find((fn) => fn['invocationAbi'] === 'kdp-host-init/1')!;
+  ((host['implementation'] as Record<string, unknown>)['module'] as Record<string, unknown>)['digest'] = digest;
+  (lock['resourceDigests'] as Record<string, unknown>)[`${KDP_PACKAGE_ID}/dist/index.js`] = digest;
+  delete lock['closureDigest'];
+  lock['closureDigest'] = digestOf(lock);
+
+  const record = await fixture.readRecord();
+  (record['kdpInitModule'] as Record<string, unknown>)['digest'] = digest;
+  record['lockDigest'] = lock['closureDigest'];
+  delete record['recordDigest'];
+  record['recordDigest'] = digestOf(record);
+  await fixture.writeRecord(record);
+  await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
+  return {
+    ...fixture.pin,
+    kdpInitModule: { ...fixture.pin.kdpInitModule, digest },
+    lockDigest: lock['closureDigest'] as ContentDigest,
+  };
+}
+
 test('R127: digest-consistent but non-callable KDP Init export is FAILED, never BOOTED', async (t) => {
   await withFixture(t, async (fixture) => {
-    const stub = 'export const init = 1;\n';
-    await fixture.writeKdpEntryBytes(Buffer.from(stub, 'utf8'));
-    const stubDigest = `sha256:${createHash('sha256').update(stub, 'utf8').digest('hex')}` as ContentDigest;
-    const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
-    const kdpPin = lock['selectedKdpHost'] as Record<string, unknown>;
-    const kdpModule = kdpPin['kdpInitModule'] as Record<string, unknown>;
-    kdpModule['digest'] = stubDigest;
-    const selected = lock['selectedFunctions'] as Array<Record<string, unknown>>;
-    const host = selected.find((fn) => fn['invocationAbi'] === 'kdp-host-init/1')!;
-    ((host['implementation'] as Record<string, unknown>)['module'] as Record<string, unknown>)['digest'] = stubDigest;
-    (lock['resourceDigests'] as Record<string, unknown>)[`${KDP_PACKAGE_ID}/dist/index.js`] = stubDigest;
-    delete lock['closureDigest'];
-    lock['closureDigest'] = digestOf(lock);
-
-    const record = await fixture.readRecord();
-    (record['kdpInitModule'] as Record<string, unknown>)['digest'] = stubDigest;
-    record['lockDigest'] = lock['closureDigest'];
-    delete record['recordDigest'];
-    record['recordDigest'] = digestOf(record);
-    await fixture.writeRecord(record);
-    await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
-
-    const pin: BootstrapPin = {
-      ...fixture.pin,
-      kdpInitModule: { ...fixture.pin.kdpInitModule, digest: stubDigest },
-      lockDigest: lock['closureDigest'] as ContentDigest,
-    };
+    const pin = await resealKdpHostEntry(fixture, 'export const init = 1;\n');
     const result = await boot(pin, fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status === 'FAILED') assert.equal(result.code, 'DH_BOOT_KDP_ENTRY_INVALID');
     sideEffectFree();
   });
 });
+
+for (const candidate of [
+  {
+    name: 'pre-delegation throw',
+    source: "export async function init() { throw new Error('TOKEN_SECRET_CANARY_8029'); }\n",
+    expectedExits: ['fixture-kernel'],
+    expectedCode: 'DH_KDP_PACKAGE_LOAD_FAILED',
+  },
+  {
+    name: 'post-delegation throw',
+    source: [
+      "import { activateSelectedKdpHostInit } from '@kaicreator/domain-harness-microkernel';",
+      "export async function init(context) {",
+      "  await activateSelectedKdpHostInit(context);",
+      "  throw new Error('TOKEN_SECRET_CANARY_8029');",
+      "}",
+      "",
+    ].join('\n'),
+    expectedExits: ['fixture-business', 'fixture-ext', '@fixture/sdk', 'fixture-kernel'],
+    expectedCode: 'DH_KDP_PACKAGE_LOAD_FAILED',
+  },
+  {
+    name: 'malformed BOOTED handle',
+    source: "export function init() { return { status: 'BOOTED', app: {} }; }\n",
+    expectedExits: ['fixture-kernel'],
+    expectedCode: 'DH_KDP_PACKAGE_LOAD_FAILED',
+  },
+  {
+    name: 'throwing Host return getter',
+    source: "export function init() { return Object.defineProperty({}, 'status', { get() { throw new Error('TOKEN_SECRET_CANARY_8029'); } }); }\n",
+    expectedExits: ['fixture-kernel'],
+    expectedCode: 'DH_KDP_PACKAGE_LOAD_FAILED',
+  },
+  {
+    name: 'Host-declared typed FAILED before delegation',
+    source: "export function init() { return { status: 'FAILED', code: 'FIXTURE_HOST_DECLINED', reason: 'scoped failure' }; }\n",
+    expectedExits: ['fixture-kernel'],
+    expectedCode: 'FIXTURE_HOST_DECLINED',
+  },
+] as const) {
+  test(`R128: selected Host ${candidate.name} is FAILED and exits every entered Package once`, async (t) => {
+    await withFixture(t, async (fixture) => {
+      const pin = await resealKdpHostEntry(fixture, candidate.source);
+      const result = await boot(pin, fixture.context);
+      assert.equal(result.status, 'FAILED', JSON.stringify(result));
+      if (result.status !== 'FAILED') return;
+      assert.equal(result.code, candidate.expectedCode);
+      assert.doesNotMatch(result.reason, /TOKEN_SECRET_CANARY_8029/);
+      assert.doesNotMatch(result.reason, /CLEANUP_NOT_SAFE|EXIT_FAILED/,
+        'trusted selected Exit must remain runnable after Host failure');
+      const exits = events().filter((event) => event['event'] === 'package-exit')
+        .map((event) => event['package']);
+      assert.deepEqual(exits, candidate.expectedExits, 'only actual Init entries Exit, in reverse order');
+      assert.equal(exits.filter((id) => id === 'fixture-kernel').length, 1,
+        'Kernel Host must Exit exactly once');
+      if (candidate.name !== 'post-delegation throw') {
+        assert.equal(events().filter((event) => event['event'] === 'business-init').length, 0,
+          'failed Host before delegation must not reach Business');
+      }
+    });
+  });
+}
 
 test('path substitution: traversal/absolute/out-of-root lock paths are REFUSED', async (t) => {
   await withFixture(t, async (fixture) => {
