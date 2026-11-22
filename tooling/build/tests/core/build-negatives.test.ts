@@ -525,6 +525,25 @@ test('Foundation L2-1: Order-0 Kernel refuses literal dynamic import before seal
   expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
+// 当前 Host 根 KDP ESM 必须与其普通 Init Target 同样受到 BUILD 静态禁用加载器的约束。
+for (const [description, moduleSource] of [
+  ['literal dynamic import', 'export async function bootstrap() { return import("./lazy.js"); }'],
+  ['nonliteral dynamic import', 'export async function bootstrap(specifier) { return import(specifier); }'],
+  ['unsealed CommonJS require', 'export function bootstrap() { return require("./lazy.js"); }'],
+  ['unselected Node builtin', 'import { readFile } from "node:fs"; export function bootstrap() { return readFile; }'],
+  ['escaping static dependency', 'export { bootstrap } from "../../unselected.js";'],
+  ['unselected SDK subpath', 'export { bootstrap } from "@kaicreator/domain-harness-microkernel/unselected";'],
+] as const) {
+  test(`Foundation A6: KDP Host entry refuses ${description} before Lock generation`, (t) => {
+    const scenario = standardCase();
+    t.after(scenario.ws.dispose);
+    const { input } = scenario.finalize();
+    writeRaw(scenario.ws.packageRoots['kdp-kernel']!, 'dist/index.js',
+      new TextEncoder().encode(moduleSource + '\n'));
+    expectRefusal(buildApp(input), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  });
+}
+
 function generatedLoaderCase(label: string, body: string, code: BuildErrorCode = 'DH_BUILD_DEPENDS_ON_UNSELECTED'): void {
   test(`B0 selected ESM proof: ${label}`, (t) => {
     const scenario = standardCase();
