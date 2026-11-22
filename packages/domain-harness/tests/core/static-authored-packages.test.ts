@@ -207,7 +207,7 @@ async function r60OtherDomain(t: import('node:test').TestContext): Promise<strin
   globalThis.__dhR41Events.push({ phase: 'standard-reader', packageId: 'r41-business' });
   return { status: 'READY' };`);
   writeFileSync(modulePath, moduleText);
-  const digest = `sha256:${createHash('sha256').update(moduleText).digest('hex')}`;
+  const digest: `sha256:${string}` = `sha256:${createHash('sha256').update(moduleText).digest('hex')}`;
   const manifestPath = join(businessDir, 'manifest.json');
   const manifest = readJson(manifestPath) as DomainPackageManifest;
   const definition = readJson(join(source, 'packages', STANDARD_READER, 'definitions/reader.json')) as
@@ -260,10 +260,11 @@ test('R60 W02: second domain r41 App boots and actually invokes same ordinary St
 test('R60 W02: another Domain cannot import unselected or undeclared Standard Reader', async (t) => {
   const source = await r60OtherDomain(t);
   const input = authoredInput('extended', source, true);
-  const unimported = buildApp({ ...input, packages: input.packages.map((pkg) =>
+  const selectedPool = input.packages as readonly DomainPackageManifest[];
+  const unimported = buildApp({ ...input, packages: selectedPool.map((pkg) =>
     pkg.id === 'r41-business' ? { ...pkg, imports: [] } : pkg) });
   assert.equal(unimported.ok, false, 'a public Reader still requires an exact manifest import');
-  const unselected = buildApp({ ...input, packages: input.packages.filter((pkg) =>
+  const unselected = buildApp({ ...input, packages: selectedPool.filter((pkg) =>
     pkg.id !== STANDARD_READER) });
   assert.equal(unselected.ok, false, 'omitting a selected Standard Package cannot silently grant access');
 });
