@@ -71,6 +71,16 @@ export interface SelectedWorkflow {
   readonly definition: WorkflowDefinition;
 }
 
+/** BUILD 对选定 KDP 入口及全部本 Package 静态 ESM 依赖建立的有界前置校验清单。
+ * trustedImports 仅列出预先安装的可信 SDK TCB 和受限 Node 内置模块；
+ * 其 SRI / Authoring Provenance 在 Foundation 后续机器 ABI 完成。
+ */
+export interface TrustedKdpModule {
+  readonly module: ResourceRef;
+  readonly dependencies: readonly ResourceRef[];
+  readonly trustedImports: readonly string[];
+}
+
 export interface BootstrapKdpRef {
   readonly kdpPackageId: string;
   readonly kdpPrimaryEntry: 'bootstrap';
@@ -92,6 +102,8 @@ export interface DomainAppLock {
   };
   readonly target: ResolvedTarget;
   readonly bootstrapKdpPin: BootstrapKdpRef;
+  /** KDP 第一个 ESM 模块求值之前必须完成的静态依赖闭包字节验证。 */
+  readonly trustedKdpModuleClosure: readonly TrustedKdpModule[];
   readonly selectedPackages: readonly SelectedPackage[];
   readonly selectedElements: readonly SelectedElement[];
   readonly selectedFunctions: readonly SelectedFunction[];
