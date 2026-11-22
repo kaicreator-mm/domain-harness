@@ -33,7 +33,8 @@ test('B0-07: Boot selects the unique ordered Core chain and Hook Provider before
     assert.equal(result.status, 'BOOTED', JSON.stringify(result));
     if (result.status !== 'BOOTED') return;
     assert.equal(result.app.status, 'READY');
-    assert.deepEqual(timeline('package-init'), INIT_ORDER);
+    assert.deepEqual(timeline('package-init'), ['@fixture/sdk', 'fixture-ext', 'fixture-business'],
+      'Boot must never run an ordinary KDP.Init after selected Host Init');
     assert.ok(timeline('module-evaluated').includes('fixture-ext:hook'));
     assert.equal(timeline('hook-provider-invoked').length, 0);
     const selected = events().find((entry) => entry['event'] === 'init-selected-function');

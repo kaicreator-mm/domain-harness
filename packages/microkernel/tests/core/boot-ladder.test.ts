@@ -70,7 +70,7 @@ test('pin mismatch: any pin field disagreement is REFUSED with DH_BOOT_PIN_MISMA
     assertRefused(result, 'DH_BOOT_PIN_MISMATCH');
     sideEffectFree();
 
-    const wrongEntry = { ...fixture.pin, kdpPrimaryEntry: 'notBootstrap' } as unknown as BootstrapPin;
+    const wrongEntry = { ...fixture.pin, invocationAbi: 'ordinary-json-function' } as unknown as BootstrapPin;
     assertRefused(await boot(wrongEntry, fixture.context), 'DH_BOOT_PIN_MISMATCH');
     sideEffectFree();
   });
@@ -243,35 +243,38 @@ for (const shadowKind of ['packages-parent', 'kdp-private'] as const) {
   });
 }
 
-test('pinned entry without the named bootstrap export is DH_BOOT_KDP_ENTRY_INVALID', async (t) => {
+test('R127: digest-consistent but non-callable KDP Init export is FAILED, never BOOTED', async (t) => {
   await withFixture(t, async (fixture) => {
-    const stub = 'export const notBootstrap = 1;\n';
+    const stub = 'export const init = 1;\n';
     await fixture.writeKdpEntryBytes(Buffer.from(stub, 'utf8'));
     const stubDigest = `sha256:${createHash('sha256').update(stub, 'utf8').digest('hex')}` as ContentDigest;
-
-    const lockBytes = await fixture.readLockBytes();
-    const lock = JSON.parse(lockBytes.toString('utf8')) as Record<string, unknown>;
-    const bootstrapKdpPin = lock['bootstrapKdpPin'] as Record<string, unknown>;
-    bootstrapKdpPin['kdpPrimaryDigest'] = stubDigest;
+    const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
+    const kdpPin = lock['bootstrapKdpPin'] as Record<string, unknown>;
+    const kdpModule = kdpPin['kdpInitModule'] as Record<string, unknown>;
+    kdpModule['digest'] = stubDigest;
+    const selected = lock['selectedFunctions'] as Array<Record<string, unknown>>;
+    const host = selected.find((fn) => fn['invocationAbi'] === 'kdp-host-init/1')!;
+    ((host['implementation'] as Record<string, unknown>)['module'] as Record<string, unknown>)['digest'] = stubDigest;
+    (lock['resourceDigests'] as Record<string, unknown>)[`${KDP_PACKAGE_ID}/dist/index.js`] = stubDigest;
     delete lock['closureDigest'];
     lock['closureDigest'] = digestOf(lock);
 
     const record = await fixture.readRecord();
-    record['kdpPrimaryDigest'] = stubDigest;
+    (record['kdpInitModule'] as Record<string, unknown>)['digest'] = stubDigest;
     record['lockDigest'] = lock['closureDigest'];
-    const recordBase = { ...record };
-    delete recordBase['recordDigest'];
-    record['recordDigest'] = digestOf(recordBase);
+    delete record['recordDigest'];
+    record['recordDigest'] = digestOf(record);
     await fixture.writeRecord(record);
     await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
 
-    const pin = {
+    const pin: BootstrapPin = {
       ...fixture.pin,
-      kdpPrimaryDigest: stubDigest,
+      kdpInitModule: { ...fixture.pin.kdpInitModule, digest: stubDigest },
       lockDigest: lock['closureDigest'] as ContentDigest,
     };
     const result = await boot(pin, fixture.context);
-    assertRefused(result, 'DH_BOOT_KDP_ENTRY_INVALID');
+    assert.equal(result.status, 'FAILED', JSON.stringify(result));
+    if (result.status === 'FAILED') assert.equal(result.code, 'DH_BOOT_KDP_ENTRY_INVALID');
     sideEffectFree();
   });
 });

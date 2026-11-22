@@ -10,7 +10,7 @@ import {
   events,
   type FixtureInstall,
 } from './helpers/install.js';
-import { bootstrap, activateSelectedKdpHostInit } from '../../src/kdp.js';
+import { activateSelectedKdpHostInit } from '../../src/kdp.js';
 
 async function withFixture(
   t: import('node:test').TestContext,
@@ -133,7 +133,7 @@ test('R125 P1: Host Init cannot execute unverified Kernel Exit when no trusted i
 
 test('direct bootstrap on a consistent install boots READY (same trust ladder as Boot)', async (t) => {
   await withFixture(t, async (fixture) => {
-    const result = await bootstrap(fixture.context);
+    const result = await activateSelectedKdpHostInit(fixture.context);
     assert.equal(result.status, 'BOOTED', JSON.stringify(result));
     if (result.status !== 'BOOTED') return;
     assert.equal(result.app.status, 'READY');
@@ -151,7 +151,7 @@ test('direct bootstrap with a self-signed Lock is FAILED (closure digest vs trus
     lock['closureDigest'] = digestOf(lock);
     await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
 
-    const result = await bootstrap(fixture.context);
+    const result = await activateSelectedKdpHostInit(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status === 'FAILED') {
       assert.equal(result.code, 'DH_BOOT_PIN_MISMATCH');
@@ -171,11 +171,11 @@ test('direct bootstrap with forged KDP entry bytes is FAILED (entry bytes vs tru
     ].join('\n');
     await fixture.writeKdpEntryBytes(Buffer.from(forged, 'utf8'));
 
-    const result = await bootstrap(fixture.context);
+    const result = await activateSelectedKdpHostInit(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status === 'FAILED') {
       assert.equal(result.code, 'DH_BOOT_PIN_MISMATCH');
-      assert.match(result.reason, /kdpPrimaryDigest/);
+      assert.match(result.reason, /selected KDP Host Function module/);
     }
     assert.equal(events().some((event) => event['event'] === 'business-init'), false);
   });
@@ -184,7 +184,7 @@ test('direct bootstrap with forged KDP entry bytes is FAILED (entry bytes vs tru
 test('direct bootstrap with a removed installed record is FAILED (record is the trust anchor)', async (t) => {
   await withFixture(t, async (fixture) => {
     await rm(join(fixture.installRoot, 'dh-install'), { recursive: true, force: true });
-    const result = await bootstrap(fixture.context);
+    const result = await activateSelectedKdpHostInit(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status === 'FAILED') {
       assert.equal(result.code, 'DH_BOOT_RECORD_MISSING');
@@ -194,7 +194,7 @@ test('direct bootstrap with a removed installed record is FAILED (record is the 
 
 test('direct bootstrap with a null/garbage context is typed FAILED, never a TypeError', async () => {
   for (const badContext of [null, undefined, 42]) {
-    const result = await bootstrap(badContext as unknown as Parameters<typeof bootstrap>[0]);
+    const result = await activateSelectedKdpHostInit(badContext as unknown as Parameters<typeof activateSelectedKdpHostInit>[0]);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status === 'FAILED') {
       assert.equal(result.code, 'DH_BOOT_RECORD_MISSING');
