@@ -1,6 +1,6 @@
 # DomainHarness v0.11.0 Basic App — 全新外部安装验收示例
 
-> **CURRENT v0.11.1 R60 NOTE**: This v0.11.0-labelled demo name is historical; current public product is one `@kaicreator/domain-harness` SDK with built-in Composition and `/runtime`. Internal Contracts/Microkernel are transitive dependencies, not extra Consumer SDK products. JSON/YAML functions in this v0.11.1 demo are not yet independent Standard Readers; extraction and a second Domain Consumer are owned by [0.11.1 Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656), not 0.11.2.
+> **CURRENT v0.11.1 R74**：v0.11.0 Basic App 名称沿用为历史标签。唯一公开 SDK 是 `@kaicreator/domain-harness`，Contracts/Microkernel 是传递依赖。普通 Standard File Element `dh.std.file.json/yaml@1.0.0` 已在 [v0.11.1 #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 完成，经 [#1663](https://github.com/kaicreator-mm/domain-harness/pull/1663) 受审合并、R72 P0/P1=0、#2979 同 SHA SUCCESS，限定 Node22 ESM `STANDARD_ACCEPTED`。本 Basic App 是演示的一部分；七 Workflow 和第二 Domain 证据见 [Catalog](../../docs/architecture/DomainHarness_v0.11.x_STANDARD_ELEMENT_CATALOG.md)。不将实施推给 0.11.2，不代表正式 Release。
 
 
 本示例面向 Package/Element 作者，真实执行 v0.11.0 Element-First SDK；不包含第二套 Runtime、Kernel、BUILD、Router、App Init 或 Effect 引擎。

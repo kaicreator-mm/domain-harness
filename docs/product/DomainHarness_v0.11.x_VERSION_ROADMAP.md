@@ -1,5 +1,5 @@
 <!-- DH_V0111_R60_CURRENT_REMAINING_OPTIMIZATIONS_OWNER -->
-> **【CURRENT · 2026-11-22 · R60，覆盖以下旧 R29/R4 状态】**：0.11.1 原 T11–T14/Function/Workflow Product/L1/L2 的限定资格及 R53/R58 单 SDK 架构修正确已受审合入版本列车 `054a2b2f6f67c518f205936befd3b30fbc24990b`。但 Owner 新增 [0.11.1 单一 Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) W01–W08、AC60-01..10 **尚待执行/审查**，不得因为原资格已通过就宣称 R60 完成。原 [#1644](https://github.com/kaicreator-mm/domain-harness/issues/1644) 0.11.2 Standard Reader 任务已关闭为历史重复入口，**JSON/YAML Standard Reader 的实际抽取、跨域消费、跨语言规范收口、公共类型去重、真实 SDK 一项安装、业务第三方依赖、跨代验证、文档清理，都归 0.11.1 #1656**。0.11.2 #1612 只新增 Domain Intelligence 能力，待 0.11.1 R60 通过后**复用**已实现 Standard Reader，不再承担其生产。内部四个 Workspace ≠ Consumer 要安装四个产品；公开唯一 SDK 为 `@kaicreator/domain-harness`，BUILD workspace 已私有化。R49 DIS/DH PR #156/#1653 尚待独立审核，不能称正式合并。
+> **【CURRENT · R74 · v0.11.1 W01–W08 受审合入】**：[Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 全部 W01–W08 实码已由 [PR #1663](https://github.com/kaicreator-mm/domain-harness/pull/1663) 在被审 HEAD `030032416c684d066daa1f8c5a2e50d60c41c779` 经 [R72 ACCEPT_SCOPED P0=0/P1=0/P2=1](https://github.com/kaicreator-mm/domain-harness/pull/1663#pullrequestreview-6012506153)、[Woodpecker #2979 SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2979/1) 后合并到 `version/v0.11.x@9f53c6e17d7a854fb57b2e1232702af15e6defe8`。普通 `dh.std.file.json/yaml@1.0.0` 已在 [Standard Catalog](../architecture/DomainHarness_v0.11.x_STANDARD_ELEMENT_CATALOG.md) 为 Node22 ESM Profile 的 `STANDARD_ACCEPTED`，两个真实领域 Consumer、Workflow、SRI/Lock/FunctionRef/权限负例在本版完成。DIS #156 已独审并合入；来源 #1653/#1657–1662 已由集成 PR 取代并关闭，不重复合入。0.11.2 #1612 只消费本版已有标准资产，不承担 Reader/Writer 生产。R72 唯一非阻塞 P2 为超大对象 `Object.entries` 先于预算检查的瞬时分配，不应宣称绝对内存/CPU 预分配边界。**下列 R29/R60/R4 状态为历史快照，只有本段是目前权威版本状态**；内部 Train 已合并 ≠ main/正式 Release。
 
 <!-- DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
 
@@ -11,7 +11,7 @@
 
 # DomainHarness 0.11.x — 完整重写与 Domain-Bounded Harness 版本路线图（R4 Owner 基线 + R29 当前状态）
 
-> **【R29 当前进度，覆盖下文 R4/R1 当时的阶段状态】**：0.11.0 #1564 与 0.11.1 #1605/#1608 已完成限定资格，0.11.1 T11–T14 功能与最终 Product/L1/L2 R27 已受审、实现及两份文档均合入 `version/v0.11.x@3145104258a4da5f8cc940482ff77322b97d6cf6`。0.11.2 #1612 只开始领域语义设计；标准 Element 提取归属 0.11.1 R60 #1656，0.11.2–0.11.9 尚未交付。下方早期 R4/R1 的状态快照仅用来说明路线图决策的历史来源，不可覆盖本段当前状态；完整源真相见 #1563 R28 记录。
+> **【HISTORICAL · R29 当时进度快照，顶部 R74 优先】**：0.11.0 #1564 与 0.11.1 #1605/#1608 已完成限定资格，0.11.1 T11–T14 功能与最终 Product/L1/L2 R27 已受审、实现及两份文档均合入 `version/v0.11.x@3145104258a4da5f8cc940482ff77322b97d6cf6`。0.11.2 #1612 只开始领域语义设计；标准 Element 提取归属 0.11.1 R60 #1656，0.11.2–0.11.9 尚未交付。下方早期 R4/R1 的状态快照仅用来说明路线图决策的历史来源，不可覆盖本段当前状态；完整源真相见 #1563 R28 记录。
 
 <!-- DH_V011X_R33_SDK_FORGE_OWNER_CORRECTION_20261122 -->
 ## 【最新 Owner R36】0.11.x 独立完成 DomainHarness SDK，Package 由真实文件直接构成
@@ -87,7 +87,7 @@ NODE_MINIMUM=22.12.0
 - **标准资格**：`CANDIDATE → STANDARD_ACCEPTED → DEPRECATED/REPLACED`，仅在具体版本、Function/Schema/权限、真实跨场景 clean-packed 调用、必要正反例及独立 Exact-SHA 审核后提升。只更新 Catalog 与本阶段必要代码，无人为数量目标、永久任务和行政 Gate。
 - **完整且优先适用的技术规范**：[Standard Element 体系与递增复用规范](../architecture/DomainHarness_v0.11.x_STANDARD_ELEMENT_SYSTEM.md)。所有后续版本 L1/L2、Task/PR 必须先复用已存在、语义适用的 Standard Element；若不使用，留下具体技术理由，不自动复制业务无关的解析器和流程组件。
 
-**当前真实状态**：v0.11.1 已按 R27 Product/L1/L2 `ACCEPT_SCOPED`、T11–T14 全部完成并合入；版本列车 `3145104258a4da5f8cc940482ff77322b97d6cf6`。本 R29 只是新增跨版本复用规范，**首批 Standard Element 源码提取仍为 CANDIDATE/NOT_IMPLEMENTED**；不将已接受的 T14 示例 Reader 谎称已发布的标准库。不单独对外发行 v0.11.1，整个 0.11.x 完成后统一 main/Release。
+**【HISTORICAL · R29 快照】当时真实状态**：v0.11.1 已按 R27 Product/L1/L2 `ACCEPT_SCOPED`、T11–T14 全部完成并合入；版本列车 `3145104258a4da5f8cc940482ff77322b97d6cf6`。本 R29 只是新增跨版本复用规范，**首批 Standard Element 源码提取仍为 CANDIDATE/NOT_IMPLEMENTED**；不将已接受的 T14 示例 Reader 谎称已发布的标准库。不单独对外发行 v0.11.1，整个 0.11.x 完成后统一 main/Release。
 
 ## 3. 版本正式划分：按照 Harness/Agent 纵向闭环逐步完善
 
@@ -125,8 +125,8 @@ NODE_MINIMUM=22.12.0
 ## 5. 分阶段交付与源真相
 
 - **0.11.0 的事实不变**：已完成 Element-First 基线和唯一 Demo `examples/v011-basic-app`，#1597 / PR #1601，Woodpecker #2759；AC01–AC10 是 Scoped PASS，不能凭旧版测试或本规划提升任何 Full Conformance。
-- **【R29 当前状态】0.11.1 已完成限定交付；0.11.2–0.11.9 仍处于规划/实施待验收阶段**：后续每阶段明确最小 Product/L1 delta、必要 L2、任务 DAG、真实 Consumer/负例，且只验证实际改动；不得因分配版本号自动获得 L1/L2 资格。
-- **【R29 下一步】** 继承已接受的 0.11.0/0.11.1 基线，在 0.11.1 #1656 下完成真正可复用的标准 Reader Element；#1644 已标历史，0.11.2 仅消费；不得由文档更新触发长期本地 Agent 任务。
+- **【HISTORICAL · R29 快照】0.11.1 已完成限定交付；0.11.2–0.11.9 仍处于规划/实施待验收阶段**：后续每阶段明确最小 Product/L1 delta、必要 L2、任务 DAG、真实 Consumer/负例，且只验证实际改动；不得因分配版本号自动获得 L1/L2 资格。
+- **【HISTORICAL · R29 当时下一步】** 继承已接受的 0.11.0/0.11.1 基线，在 0.11.1 #1656 下完成真正可复用的标准 Reader Element；#1644 已标历史，0.11.2 仅消费；不得由文档更新触发长期本地 Agent 任务。
 - **不纳入本轮默认完成门**：跨平台所有 Target、通用多 Agent 协作、全平台知识图数据库、全面 DIS Full Conformance、Server 专用学习基础设施、所有下游旧业务迁移。实际需要时单独明确为 0.11.x 后续范围，不预设新的必须版本。
 
 <!-- /DH_V011X_OWNER_CONFIRMED_FULL_REWRITE_STAGE_ROADMAP_20261121 -->
@@ -192,4 +192,4 @@ NODE_MINIMUM=22.12.0
 <!-- /DH_V011X_ONE_ISSUE_PER_VERSION_HISTORICAL_MAPPING_R1_20261121 -->
 
 
-> **R69（0.11.1 R60 W02 更新）**：原仅 Reader 的目标已变更为两个双向格式 Element `dh.std.file.json` / `dh.std.file.yaml`，使用 Node 内置 JSON + pinned `yaml@2.9.1`。Write 是纯序列化输出，实际持久化须单独授权，避免引入越权 Host fs；此为 #1656 同版工作，不转移到 0.11.2。是否合格仍取决于新 Exact-SHA CI 与独立审核。
+> **【HISTORICAL · R69 审核前候选，现已 R74 受审合并】**：原仅 Reader 的目标已变更为两个双向格式 Element `dh.std.file.json` / `dh.std.file.yaml`，使用 Node 内置 JSON + pinned `yaml@2.9.1`。Write 是纯序列化输出，实际持久化须单独授权，避免引入越权 Host fs；此为 #1656 同版工作，不转移到 0.11.2。是否合格仍取决于新 Exact-SHA CI 与独立审核。
