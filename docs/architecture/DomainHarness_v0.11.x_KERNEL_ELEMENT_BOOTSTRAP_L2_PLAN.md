@@ -51,6 +51,18 @@ KDP 反向按真实已进入列表尝试 Exit（KDP Exit 最后）
 5. **Effect 和 SDK**：HostPort、FunctionRef、资源仍来自选定 Lock；不能因将 Kernel 源码移至 KDP 包而自动开放文件/网络权限，所有 Business 无隐式内核能力。
 6. **物理发行**：可把 KDP Kernel 实现源码编译或 bundle 为 KDP 所有的 ESM Target，依赖显式版本和可信 SRI 封存；新 KDP 的 Build 静态准入与 Runtime Loader 应针对可信 Kernel Profile 严格定义，不允许借此将任意未声明或恶意 Business Source 排除在校验外。
 
+### A2.1 KDP Init Host ABI：待独审的具体候选（不是已实现合同）
+
+**约束**：不新增第二种 Element 根类型，也不允许 Host 通过普通 `DomainApp.invoke` 或不受选的公共 `bootstrap` 绕过 Pin。唯一合法 Host 入口仍是 `boot(pin, context)`，其中 `pin` 只定位**唯一已选**的 KDP Init Function，而不是自由指定一个 JavaScript export。
+
+1. **身份绑定提案**：将当前 `BootstrapKdpRef` / `BootstrapPin` / `InstalledRecord` 的 `kdpPrimaryEntry:'bootstrap'` 替换成显式的 `kdpInitFunction: FunctionRef`，并在 Lock 已选 Function 中唯一确定其 `ImplementationLocator`（module `ResourceRef` + `exportName`）。Boot 校验 `coreOrder[0]` 为唯一 KDP、`SelectedPackage.init` 与 `SelectedPackage.initFunction` 同时匹配、所选 `SelectedFunction.ref` 与 Pin 精确匹配，入口 module 的真实字节摘要与 Lock、可信安装记录一致。不能另存一份可自行偏离 Lock 的“bootstrap target”；现行 `kdpPrimaryDigest` 应迁移为该已选 Target 的可核验字节绑定，字段最终命名由机器合同审查确认。
+2. **特殊 Host ABI 而非第二 Init**：受信 Boot 对此**唯一** FunctionRef 使用 `KdpHostInit(context: KdpBootstrapContext): Promise<KdpBootstrapResult>` 调用约定，返回 `BOOTED|FAILED`；`REFUSED` 只由导入前的 Boot 前置检查产生。KDP Init 负责构建 `DomainApp`，该对象是 Host 进程内句柄，**不是 JSON Content、普通 `FunctionOutcome` 或可由 Business 通过 `ReadonlyFunctionHandle.invoke` 调用的函数结果**。普通 Package.Init 继续接受受限 `PackageInitContext`、返回其 `AppInitResult`；二者由唯一 KDP 身份和 BUILD/Lock 中的 Init 绑定明确区分，不能把 KDP Host ABI 自动开放给任意 Package。
+3. **校验时序提案**：`readTrustedRecord → pin/record 一致 → Lock 签定/摘要/Target → selected KDP package/init FunctionRef/Target 映射 → KDP ESM 导入闭包真实字节验证 → import + 调用`。相同原始字节须绑定 Pin、SelectedFunction.implementation、ResourceDigests；若 KDP 首次模块求值之前有未验证的静态依赖或宿主级副作用，仍是拒绝，不能通过“随后由 KDP 自检”补票。真实文件的并发替换只能在明确受控安装快照/威胁模型中作有限承诺。
+4. **不递归 Init 的责任边界**：KDP.Init 进入时由 KDP 创建一次激活的 PackageSystem/Exit 历史，并将 KDP 自身的进入事件记录**恰好一次**；内部调用“从已进入的 Kernel 继续”流程，先处理 KDP 声明的直接 Extension.Init，再按 Core.Order 进入下一个 Core，不能重新从 `coreOrder[0]` 执行 KDP.Init。Extension 的多次调用仍由各 Package 自治；有环直接失败。Kernel Init 早期失败（包括尚未完整构造 PackageSystem）仍必须尽可能执行已进入的 KDP.Exit，保留首个错误，清理失败只附加脱敏诊断。
+5. **兼容和静态 Profile**：此为尚未发布的 0.11.x 内部 ABI 迁移，不维持旧 `bootstrap` 兼容入口；`kdp-host-init/1` 如需机器标识，只能绑定唯一受选 KDP Init，而不是新建公共可调用 Function 类别。Target 导入闭包的 Node 内建模块与受限 SDK 可信依赖须有显式 Kernel Profile 的封存/准入规则；不得直接豁免 Business 的静态 ESM/Effect 检查。
+
+**此小节的独立审查问题**：`KdpBootstrapResult` 含 Host 进程对象、与一般 `FunctionContract.outputSchemaRef` 的 JSON 结果约束不同，必须确认上述特殊的受信 Init ABI 是否只靠唯一 KDP 选定身份就可无歧义表达，或者是否必须在现有 Binding/Lock 增加**一个有限的 invocationAbi 字段**。没有此决定不允许开始 L2-1 源码修改。
+
 ## A3. 作者期 Composition 不是 Domain App Runtime 的第二入口
 
 - 已安装 SDK 的 `/composition` **可以在待构建 App 尚无 Lock/KDP 时调用**；它由 SDK 自身的作者期 Package + Composition Element 真正拥有 `buildApp` 与必要静态图算法。物理 TypeScript 公共 facade 可以作为导出适配器，但必须可追溯到已安装 SDK 的真实拥有者、源码/目标签名和受审 Package 版本。
@@ -62,6 +74,15 @@ KDP 反向按真实已进入列表尝试 Exit（KDP Exit 最后）
 - Package：稳定 `kebab-case`，KDP 候选 `dh-kernel`；Element Definition ID：变量风格 `camelCase`，如 `kernelLifecycle`；`namespace` 独立字段。新名称和 TypeScript API /文件命名必须分别按 [身份规范](../specs/domain-harness/identity-naming.md) 核对。
 - **先以独立 L2 测试决定身份唯一键**，再统一更改 `ElementDefinition`、Schema、`elementNamespace()`、ElementRef、FunctionRef、Manifest、Target/Lock/Pin、Catalog、Consumer 与实际安装验证。新对象的所有真实摘要重新计算；不能靠全局字符串替换更改历史被审证据。
 - 旧 r41/r60、点分 ID 和 R72/R81/R83/R84 仍在**历史原 Commit/Receipt**。新 Foundation Baseline 用新 Source SHA/CI/Review/锁摘要独立归档；不需要为未发布的 0.11.x 保留旧 Runtime ABI。
+
+### A4.1 Namespace 与目标绑定的最小一致性方案（待独审）
+
+现行 `ElementRef` 已有独立的 `namespace/id/version/digest`；缺口主要在 `ElementDefinition.id`、`ElementEntry.id` 与 `ImplementationBinding.elementId` 没有完整显式命名空间，BUILD 仍从点分 ID 推导。新规范不应只在 Definition 上加一个字段，却继续使用模糊的 Target 绑定。
+
+- **机器格式候选**：`ElementDefinition.namespace`、`ElementEntry.namespace`、`ImplementationBinding.elementNamespace` 均显式存在；Definition/Manifest/Binding/ElementRef 中的 `namespace + id` 必须逐字段一致。Element.id 只接受 camelCase；Package.id 只接受 kebab-case；不能以拼接字符串或文件名猜 Namespace。
+- **选定身份键候选**：用于同一 App 已选图校验的语义键为 `namespace + id + version`，内容权威还包括 `digest` 和明确的 `ownerPackageId`。同一语义键出现两个互相冲突的 Definition Digest 或 Owner 时 fail-closed；跨 Package 访问仍必须通过直接 Extension、真实 Export/Import 与受选 FunctionRef，不因 Namespace 相同就获授权。ElementRef 已带 Digest，不能在签定 Lock 之后按最新版本替换。
+- **增量改动路径**：先更新 Contracts/JSON Schemas/静态 BUILD，次更新 Source Manifest 与 Target Binding，再更新 Lock/Pin/真实安装、Standard Catalog 与 Reference/第二 Consumer；所有 Definition/Manifest/ESM/Lock/Pin 的实物 Digest 都按**新字节**重新封存。旧 R41/R60 历史证据及其 StageIndex 原封不动，新的 StageIndex 明确引用新树与 E2E 结论。
+- **必须有的拒绝用例**：ElementRef.namespace 与 Definition 不同；两个 Package 声明冲突的 `namespace/id/version`；Binding 缺 Namespace 或绑错 Owner；旧点分 ID 混用新字段；旧 Digest 的新 Manifest；假造相同 Namespace 的跨包未授权 Function 调用；错 Target/Profile/SRI；已选择却未封存 KDP Init Target。不得仅以 TypeScript 字段存在证明 BUILD/Runtime 已拒绝。
 
 ## A5. 实施切片与最低验收
 
