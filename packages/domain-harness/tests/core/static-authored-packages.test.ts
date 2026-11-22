@@ -198,7 +198,7 @@ async function r60OtherDomain(t: import('node:test').TestContext): Promise<strin
   const oldModule = readFileSync(modulePath, 'utf8');
   const oldReturn = "  return { status: 'READY' };";
   assert.ok(oldModule.includes(oldReturn), 'second Domain must preserve real business Init body');
-  const moduleText = `import { readJson, writeJson } from 'r60-standard-files';\n` +
+  const moduleText = `import { readJson, writeJson, writeYaml } from 'r60-standard-files';\n` +
     oldModule.replace(oldReturn, `
   const readerResult = readJson({ format: 'json', source: '{"customer":"r41"}' });
   if (readerResult.kind !== 'SUCCEEDED' || readerResult.value.customer !== 'r41') {
@@ -208,7 +208,12 @@ async function r60OtherDomain(t: import('node:test').TestContext): Promise<strin
   if (written.kind !== 'SUCCEEDED' || JSON.parse(written.value).customer !== 'r41') {
     throw new Error('R60 failed to serialize selected JSON file data');
   }
+  const yamlText = writeYaml({ format: 'yaml', value: readerResult.value });
+  if (yamlText.kind !== 'SUCCEEDED' || !yamlText.value.includes('customer: r41')) {
+    throw new Error('R70 selected YAML Writer failed during Package.Init');
+  }
   globalThis.__dhR41Events.push({ phase: 'standard-reader', packageId: 'r41-business' });
+  globalThis.__dhR41Events.push({ phase: 'standard-yaml-writer', packageId: 'r41-business' });
   return { status: 'READY' };`);
   writeFileSync(modulePath, moduleText);
   const digest: `sha256:${string}` = `sha256:${createHash('sha256').update(moduleText).digest('hex')}`;
@@ -221,11 +226,18 @@ async function r60OtherDomain(t: import('node:test').TestContext): Promise<strin
       digest: contentDigestOf(definition as unknown as JsonValue) },
     functionId: 'readJson', contractVersion: '1',
   };
+  const yamlDefinition = readJson(join(source, 'packages', STANDARD_READER,
+    'definitions/yaml-file.json')) as import('@kaicreator/domain-harness-contracts').ElementDefinition;
+  const yamlWriterRef = {
+    element: { namespace: yamlDefinition.id.split('.')[0]!, id: yamlDefinition.id,
+      version: yamlDefinition.version, digest: contentDigestOf(yamlDefinition as unknown as JsonValue) },
+    functionId: 'writeYaml', contractVersion: '1',
+  };
   const updated: DomainPackageManifest = {
     ...manifest,
     dependsOn: [...manifest.dependsOn,
       { package: STANDARD_READER, version: '1.0.0', interface: 'r60.files.api' }],
-    imports: [...manifest.imports, readerRef, { ...readerRef, functionId: 'writeJson' }],
+    imports: [...manifest.imports, readerRef, { ...readerRef, functionId: 'writeJson' }, yamlWriterRef],
     targetVariants: manifest.targetVariants.map((variant) => ({
       ...variant, implementations: variant.implementations.map((fn) => ({
         ...fn, entry: { ...fn.entry, module: { ...fn.entry.module, digest } },
@@ -253,14 +265,20 @@ test('R60 W02: second domain r41 App boots and actually invokes same ordinary St
   assert.ok(selected, 'cross-domain exact File.Read FunctionRef selected by BUILD');
   assert.ok(built.lock.selectedFunctions.some((fn) =>
     fn.ref.element.id === 'dh.std.file.json' && fn.ref.functionId === 'writeJson'),
-  'cross-domain exact File.Write FunctionRef selected by BUILD');
+  'cross-domain exact JSON File.Write FunctionRef selected by BUILD');
+  assert.ok(built.lock.selectedFunctions.some((fn) =>
+    fn.ref.element.id === 'dh.std.file.yaml' && fn.ref.functionId === 'writeYaml'),
+  'cross-domain exact YAML File.Write FunctionRef selected by BUILD');
   const result = await installAuthoredApp('extended', t, source, true);
   assert.equal(result.app.status, 'BOOTED', JSON.stringify(result.app));
   if (result.app.status !== 'BOOTED') return;
   assert.equal(result.app.app.status, 'READY');
   assert.ok((globalThis.__dhR41Events ?? []).some((event) =>
     event.phase === 'standard-reader' && event.packageId === 'r41-business'),
-  'another bounded domain must run the same Reader Function in its real Init');
+  'another bounded domain must run the same File Function in its real Init');
+  assert.ok((globalThis.__dhR41Events ?? []).some((event) =>
+    event.phase === 'standard-yaml-writer' && event.packageId === 'r41-business'),
+  'YAML Writer must execute within the second real Domain Package.Init');
   await result.app.app.dispose();
 });
 
@@ -276,6 +294,11 @@ test('R60 W02: another Domain cannot import unselected or undeclared Standard Re
       ? { ...pkg, imports: pkg.imports.filter((item) => item.functionId !== 'writeJson') }
       : pkg) });
   assert.equal(missingWrite.ok, false, 'selected File.Write cannot bypass exact FunctionRef import');
+  const missingYamlWrite = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+    pkg.id === 'r41-business'
+      ? { ...pkg, imports: pkg.imports.filter((item) => item.functionId !== 'writeYaml') }
+      : pkg) });
+  assert.equal(missingYamlWrite.ok, false, 'YAML Writer cannot bypass exact FunctionRef import');
   const unselected = buildApp({ ...input, packages: selectedPool.filter((pkg) =>
     pkg.id !== STANDARD_READER) });
   assert.equal(unselected.ok, false, 'omitting a selected Standard Package cannot silently grant access');

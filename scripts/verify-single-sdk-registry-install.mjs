@@ -224,7 +224,7 @@ console.log('DH_R60_SDK_ONLY_REGISTRY_IMPORTS_OK');
   assert.ok(preflight.stdout.includes('DH_TRUSTED_RUNTIME_PREINSTALL_APPROVED'));
   evidence.workflowTransitiveSRI = true;
   // Negative runs before npm ci and Boot: an approved archive SRI is changed.
-  const bad = structuredClone(npmLock);
+  const bad = globalThis.structuredClone(npmLock);
   bad.packages['node_modules/yaml'].integrity = 'sha512-' + 'A'.repeat(86) + '==';
   await writeFile(lockPath, JSON.stringify(bad));
   const rejected = await runNode(workflowRoot, ['dh-install/verify-preinstall.mjs'], env);
