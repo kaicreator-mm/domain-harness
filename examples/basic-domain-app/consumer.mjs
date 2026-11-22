@@ -300,7 +300,8 @@ async function authoring(label, rule, options = {}) {
       const marker = "    const events = (globalThis.__domainHarnessT05Events ??= []);";
       assert.ok(original.includes(marker), 'Standard Reader failure-injection seam absent');
       const modified = original.replace(marker,
-        "    if (parsed?.id === 'json-a') throw new Error('T14 deliberate selected Function fatal');\\n" + marker);
+        "    if (parsed?.id === 'json-a') throw new Error('T14 deliberate selected Function fatal');" +
+        String.fromCharCode(10) + marker);
       await writeFile(modulePath, modified);
       const manifestPath = join(standardRoot, 'manifest.json');
       const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
