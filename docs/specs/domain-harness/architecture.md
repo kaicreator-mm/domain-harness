@@ -8,7 +8,7 @@
 
 ## A. 统一架构蓝图与模块责任（Architecture Blueprint）
 
-> **规范地位**：本节给出架构拓扑、允许的执行路径与稳定责任边界。下文 §1–§9 对各节点的语义、安全与工程质量进一步约束。**现行运行时代码是否满足目标结构，以 §10 的状态和真实源码/E2E 为准**；该图不是宣称 Boot/KDP/BUILD 已经完成迁移。未定的物理 ABI/目录/Element 数量归 #1668 的 L2，不在此臆定。
+> **规范地位**：本节给出架构拓扑、允许的执行路径与稳定责任边界。下文 §1–§9 对各节点的语义、安全与工程质量进一步约束。**现行运行时代码是否满足目标结构，以 §10 的状态和真实源码/E2E 为准**；该图不是宣称 Boot/KDP/作者期组合与封存已经完成迁移。未定的物理 ABI/目录/Element 数量归 #1668 的 L2，不在此臆定。
 
 ### A.1 顶层形态：一个嵌入式 SDK、一套 Element/Package 模型
 
@@ -63,20 +63,20 @@
 | 组件或责任域 | 必须拥有的职责 | 不能拥有/越过的职责 | 状态 |
 |---|---|---|---|
 | **Domain App Host** | 提供进程和启动/配置/必要的物理 Host Port，调用一个公开 SDK | 不因是宿主就绕过已选 Function/资源/Effect 权限；不自建业务 Runtime | CONFIRMED |
-| **可信 Boot** | 以生成/安装侧受信锚为前提，在 KDP import 前验证必要 Pin/Lock、选定入口身份与字节完整性，单次委托 KDP Init | Package/Element 领域正确性证明、运行时 JS/ESM 源码解析或静态图编译、PackageSystem/Workflow/Exit 调度/在线 BUILD | MIGRATION_REQUIRED |
+| **可信 Boot** | 以生成/安装侧受信锚为前提，在 KDP import 前验证必要 Pin/Lock、选定入口身份与字节完整性，单次委托 KDP Init | Package/Element 领域正确性证明、运行时 JS/ESM 源码解析或静态图编译、PackageSystem/Workflow/Exit 调度/运行时生成或静态图分析 | MIGRATION_REQUIRED |
 | **KDP Kernel Package** | 唯一运行时权威；本 Package 真正的 Init/Exit Element；PackageSystem、通用 Workflow/Actor、基本状态/故障/Exit 控制 | 业务知识、具体 Rule/Decision/Reader/UI；独立第二 Runtime 或业务规则解释器 | MIGRATION_REQUIRED |
 | **SDK Domain Packages** | 可复用、按 App 需求静态选择的服务/Standard Elements、Function/Target 实现和资源 | 偷偷变成必须全部安装的单体 SDK 功能；隐式公共权限 | CONFIRMED |
 | **Business Domain Packages** | 领域数据/规则/约束/Workflow Definition、公开 Functions、所需资源与业务异常处理 | 重新实现 KDP 的通用 Package Loader/XState 引擎；未声明地调用其它 Package | CONFIRMED |
 | **Package/Element 作者/生成期验证** | 对产物正确性、合同/依赖/Schema/实现/Target/测试负责；可用独立工具 | 把不合格产物的验证责任转给 SDK | CONFIRMED（CORE-11） |
 | **作者期 Composition** | 消费已有正确性证据并进行必要的选型、技术一致性检查与 Lock/Pin/受控安装封存 | 为 Package/Element 领域正确性背书；在 Runtime 动态重建授权图；强制自动生成器 | Package/Element 实现所有权 MIGRATION_REQUIRED |
-| **Contracts/Schema/Validator** | 统一机器身份、结构、语义依赖、构建期质量/权限验证；源码私有 helper 仍可只是普通文件 | 以裸 public export、路径或未选运行时 Function 绕过 Package/Element；每次 Runtime 重新做全量静态 BUILD | 可执行公开行为所有权待迁移 |
+| **Contracts/Schema/Validator** | 统一机器身份、结构、语义依赖、生成期质量/权限验证；源码私有 helper 仍可只是普通文件 | 以裸 public export、路径或未选运行时 Function 绕过 Package/Element；每次 Runtime 重新进行全量静态正确性验证 | 可执行公开行为所有权待迁移 |
 | **外部协议/Host Effect** | 在当前已选择、真正授权和有证据的接口执行物理操作 | 由于某 Package 持有代码就自动获得 fs/network/process 权限；越过 KDP 的受选边界 | 仅针对具体版本 Profile/能力承诺 |
 
 ### A.3 架构依赖规则：四个禁止出现的第二系统
 
 1. **只有一个 Boot → 一个 KDP → 一套 PackageSystem/运行控制**。现有 `packages/microkernel` 可以是物理 TS 实现工作空间/私有代码，但不能在逻辑架构上继续充当与 KDP Package 平行的第二内核权威；它的执行能力必须归属 KDP 的真实 Elements。
 2. **只有一套 Init/Exit 生命周期**。Boot 通过受信入口调用 KDP 的真实 `init`，并由 Package.Init 链完成必要启动；不能再出现 `bootstrap → 一套 App 初始化 → KDP.Init 外壳 → 又一套 App 初始化`。Workflow 在声明它的 Package.Init 内启动，业务函数由已选 FunctionRef 调用。
-3. **只有一个静态选择/组合体系**。Package 文件可直接手写；作者期 Composition 可通过同一 SDK 的固定受信版本运行，不能要求未生成的 App 自举，也不能引入额外 Forge/Seed Builder/独立 Assembly 产品。Runtime 不能替代 BUILD 重新解析未声明依赖与动态权限。
+3. **只有一个静态选择/组合体系**。Package 文件可直接手写；作者期 Composition 可通过同一 SDK 的固定受信版本运行，不能要求未生成的 App 自举，也不能引入额外 Forge/Seed Builder/独立 Assembly 产品。Runtime 不能替代生成期重新解析未声明依赖与动态权限。
 4. **只有一份公开语义身份体系**。Package、Element、Function、Owner/Namespace、Version、Target 和 Digest 各有定义；物理 npm workspace、导出路径、CLI 或文件名不能代替公开 Element/Function 的声明、选择与权限检查。
 
 **允许的复用**：一个 Package 包含多个内聚 Elements；一个 Element 使用多个普通实现文件、私有函数和 Target 资源；可在分发时物理合并 KDP/SDK Packages，但必须能证明逻辑身份、权限和生命周期等价。**不允许**因此把任何辅助函数变为自动可跨包访问的隐形公开 API。
@@ -85,8 +85,8 @@
 
 - **生成与验证期**：任意作者/生成者负责 Package/Element 的结构、合同、依赖、Target、功能及测试；可使用独立静态验证工具，**不以 SDK 运行期校验替代正确性**。
 - **作者期组合**：用户或工具可以使用已安装、可信的 DomainHarness SDK `/composition` 对**已验证 Package**进行选型与确定性封存，形成 App Lock/Pin。组合技术检查不等于为 Domain Package 正确性背书；不要求未来 App 已经启动。
-- **运行期**：Domain App 在有安装与 Lock 证据后调用 `/runtime` 的最小 Boot。Boot 的执行前验证**不依赖任何未验证的 KDP 代码**；验证通过后才移交给唯一 KDP Init。KDP 运行被 BUILD 选定的 Package/Element/Workflow，不重新建立权限图。
-- **自举目标**：Kernel、SDK 可执行能力都具有真实 Package/Element 所有权。作者期静态入口仅是加载既有 SDK 的方法，不是赋予新 App 动态执行 BUILD 的隐藏万能权限。具体作者期 Package/Element Target 和初始启动 Pin 字段属于 **L2 尚待确认的 MIGRATION_REQUIRED 接线**。
+- **运行期**：Domain App 在有安装与 Lock 证据后调用 `/runtime` 的最小 Boot。Boot 的执行前验证**不依赖任何未验证的 KDP 代码**；验证通过后才移交给唯一 KDP Init。KDP 运行 App 组合与封存时已选定的 Package/Element/Workflow，不重新建立权限图。
+- **自举目标**：Kernel、SDK 可执行能力都具有真实 Package/Element 所有权。作者期静态入口仅是加载既有 SDK 的方法，不是赋予新 App 动态执行生成期验证或组合封存的隐藏万能权限。具体作者期 Package/Element Target 和初始启动 Pin 字段属于 **L2 尚待确认的 MIGRATION_REQUIRED 接线**。
 - **失败边界**：以已证明的发行来源/安装快照为可信根，必要完整性校验失败不得产生任何 KDP 模块副作用；Package 内部异常归自己处理，未处理的由 KDP 有界记录并逆实际 Init 历史 Exit。不能以“自举改造”为由删除必要 Pin/SRI/字节拒绝证据，亦不能把完整性验证扩展成 Runtime 的源码正确性证明。
 
 ### A.5 分层视图与源码边界不是同一件事
@@ -138,7 +138,7 @@ SDK 产品层：唯一 @kaicreator/domain-harness（作者期 + 运行期入口�
 - 通用 Workflow/StateMachine、XState Actor 与有界执行机制；**Owner 的后期 KDP 裁决**覆盖早期让每个 Business Package 自建通用 Workflow Engine 的建议。
 - 必须的运行时已选 Function/资源/Hook 绑定及最后的异常/Exit 兜底；具体业务 Rule/Guard/State/Workflow Content 归各自 Standard/Business Element，不硬编码进 Kernel。
 
-**严格 Boot 禁区**：遍历业务 Package DAG、创建 PackageSystem、运行 Workflow/Actor/Task、解释规则、裁定 READY/DEGRADED/BLOCKED/FAILED、业务 Function 路由、执行业务 Init、调用第二次 App Init、组织 Exit、在线重新 BUILD，**以及每次启动重新解析选定 JavaScript/ESM 源码、推导静态导入图或验证 Package/Element 正确性**。仅保留受信锚、身份、Pin/Lock 和必要字节完整性的最小核验。
+**严格 Boot 禁区**：遍历业务 Package DAG、创建 PackageSystem、运行 Workflow/Actor/Task、解释规则、裁定 READY/DEGRADED/BLOCKED/FAILED、业务 Function 路由、执行业务 Init、调用第二次 App Init、组织 Exit、运行时重新生成 App 或静态验证，**以及每次启动重新解析选定 JavaScript/ESM 源码、推导静态导入图或验证 Package/Element 正确性**。仅保留受信锚、身份、Pin/Lock 和必要字节完整性的最小核验。
 
 **当前具体差距（MIGRATION_REQUIRED）**：参考 KDP 的 `r41-kdp/dist/bootstrap.js` 仅 re-export `@kaicreator/domain-harness-microkernel.bootstrap`，`dist/index.mjs` 中 KDP Init Element 只做事件及下层转调；真正应用初始化/PackageSystem/Actor 在 `packages/microkernel/src/kdp.ts` 等模块。应迁移**实现所有权**和 Boot 单委托调用链，不能只改名字/目录。任何 KDP 入口在被可信 Boot 校验前不得 import 或执行；KDP 自验本身不允许替换执行前 Pin 检查。
 
