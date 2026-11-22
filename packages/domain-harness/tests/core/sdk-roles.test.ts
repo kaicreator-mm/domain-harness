@@ -13,11 +13,13 @@ import * as build from '@kaicreator/domain-harness-build';
 test('R43: runtime subpath supplies Contracts/Boot but no BUILD or Package authoring API', () => {
   const expected = new Set([
     ...Object.keys(contracts),
-    ...Object.keys(microkernel).filter((name) => name !== 'bootstrap'),
+    ...Object.keys(microkernel).filter((name) => name !== 'bootstrap' && name !== 'activateSelectedKdpHostInit'),
   ]);
   assert.deepEqual(new Set(Object.keys(runtime)), expected);
   assert.equal(runtime.boot, microkernel.boot);
   assert.equal('bootstrap' in runtime, false, 'KDP bootstrap remains an internal implementation detail');
+  assert.equal('activateSelectedKdpHostInit' in runtime, false,
+    'Host-only Kernel activation is not exposed through the normal App runtime facade');
   assert.equal('buildApp' in runtime, false);
   assert.equal('BuildRefusal' in runtime, false);
   assert.equal('digestOfBytes' in runtime, false);
