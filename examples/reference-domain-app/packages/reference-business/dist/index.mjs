@@ -16,7 +16,11 @@ export function evaluate(input) {
 }
 
 export async function init(context) {
-  const order = events.filter((entry) => entry.phase === 'init').map((entry) => entry.packageId);
+  // 每次激活只核对最近一次 Kernel Exit 之后的 Init，避免历史日志污染本轮状态。
+  const lastKernelExit = events.findLastIndex((entry) =>
+    entry.phase === 'exit' && entry.packageId === 'r41-kdp');
+  const order = events.slice(lastKernelExit + 1)
+    .filter((entry) => entry.phase === 'init').map((entry) => entry.packageId);
   if (JSON.stringify(order) !== JSON.stringify(['r41-kdp', 'r41-sdk-base'])) {
     throw new Error('REFERENCE_INIT_ORDER_INVALID:' + JSON.stringify(order));
   }
@@ -66,5 +70,7 @@ export async function init(context) {
 }
 
 export function exit() {
+  // 禁止上一激活的 Rule Content 继续为新激活或已退出的 Function 提供决策。
+  selectedThreshold = undefined;
   events.push({ phase: 'exit', packageId: 'reference-business' });
 }
