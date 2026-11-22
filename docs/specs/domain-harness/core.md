@@ -20,6 +20,7 @@
 | CORE-08 | Workflow/Function/AppStatus 严格区分，未知不得变成功；运行预算需受限 | [§4/§13.3/§13.5](./lifecycle-workflow.md) |
 | CORE-09 | 一个 Package 和一个 Domain App 直接执行闭包只用同一语言及 Runtime | [§1](./core.md)、[§6](./composition-trust.md) |
 | CORE-10 | 所有接受结论必须与实际 Source SHA/目标平台/审查和测试匹配，不得伪造成功 | [§9](./engineering-quality.md)、[§10](./status-and-decisions.md) |
+| **CORE-11** | **Package/Element 的正确性由其创建、生成或修改者在产物生成期负责并提供证据；SDK 不承担正确性证明，运行时只做最小可信兜底** | [§6/§13.4](./composition-trust.md)、[§A](./architecture.md) |
 
 ## 0. 规范状态与阅读规则
 
@@ -40,3 +41,13 @@
 4. 正常业务执行链为 **`Boot → KDP.Init → selected Package.Init → selected Workflow → Element.Function`**；某 Package 没有业务 Workflow 时只执行自己的 Init，不需要虚构一个 Workflow 或默认 Main。
 5. 仅有 K/S/B **三种 Package 层职责** `kernel|sdk|business`；每个 Package 共享同一种技术 Manifest/Element/Function/Init/Exit 合同。实际启动由 `Core.Order` 与显式直接 Extension 依赖确定，不能把 K/S/B 数量/层级写死成固定三节点循环。
 6. 一个 Package、一个 Domain App 的**直接执行闭包只能用一种编程语言和 Runtime**。多语言仅属于 DIS/Package 规范可分别描述的不同独立 App/Package；跨语言经受控外部进程协议，不在一个 App 内混合两种 VM 或直接跨语言 FunctionRef。
+
+## 1.1 Package / Element 正确性责任边界 — CONFIRMED（Owner R118）
+
+1. **正确性责任在生成期**：无论 Domain Package / Element 是由人、LLM、Agent 或未来 Forge 手写或自动生成，作者/生成流程均必须对最终产物的结构、功能合同、依赖、实现、资源、适用 Target 和必要的测试承担正确性责任，并形成可追溯证据。修改即触发相应验证和重新封存，不得把不合格文件交给 SDK 并期待其在运行中修正。
+2. **验证工具不等于 SDK 义务**：生成阶段可以使用独立 Validator、Schema、静态分析、编译器、测试和打包/组合工具。这些工具可以由任何实现提供；既不要求 Package 必须由某个生成器创建，也不要求 SDK Runtime 或 SDK Composition 对领域逻辑/源码正确性作最终证明。
+3. **SDK 仅保留必要的安全与故障兜底**：Boot/KDP 可以检查与已交付产物直接相关的受信安装记录、Pin/Lock、受选身份、摘要/完整性、明确的最小权限和生命周期；遇到无法继续的错误受控拒绝、打印可诊断日志并执行有界 Exit。**禁止** SDK 在运行期重新解析 JavaScript/其他语言源码、重编译依赖/权限 DAG、做全量 Package/Element Schema 或领域正确性审核；不得凭运行期“二次验证”替代生成期签定证据。
+4. **两种检查不得混淆**：验证已封存的摘要/身份是**完整性兜底**，不是正确性证明；一个只有自摘要的可改写 Lock/Record/Pin，也不能证明其来自获信的生成者。可信来源/安装证据必须由生成与交付链建立，运行时仅按已定义的可信根进行必要的局部核验。不能用运行时静态解析器来补救缺失的生成 provenance。
+5. **错误分层**：生成期不合格 Package/Element → 生成/构建任务失败，禁止发布；已封存产物安装损坏/缺失/不匹配 → SDK 拒绝启动；Package 运行时业务错误 → Package 自治处理；未处理的技术失败 → SDK/KDP 最后兜底。任何 L2、PR 或 Reviewer 不得将生成期缺口转移成运行时 SDK 功能。
+
+**架构优先级**：CORE-11 是跨 v0.11.x 的明确边界；已有 L2 或未合并实现若要求 SDK 运行时重新验证 Package/Element 的正确性，属于 **DESIGN_REWORK** 而不是继续给 Runtime 添加校验分支。以 #1668 的真实源码和新受审结果证明迁移，不推给 v0.11.2。
