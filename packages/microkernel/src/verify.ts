@@ -1,6 +1,6 @@
 // 当前唯一 KDP：Boot 验证选定资源，初始化 Package 后才开放业务入口。
-import { readFile, realpath } from 'node:fs/promises';
-import { dirname, relative, sep, isAbsolute } from 'node:path';
+import { lstat, readFile, realpath } from 'node:fs/promises';
+import { dirname, join, relative, sep, isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
   DH_INSTALL_RECORD_SCHEMA_VERSION,
@@ -16,6 +16,7 @@ import type {
   KdpBootstrapContext,
   BootErrorCode,
 } from '@kaicreator/domain-harness-contracts';
+import { inspectKdpHostImports, TRUSTED_KDP_SDK } from './kdp-import-graph.js';
 import {
   INSTALLED_RECORD_RELATIVE_PATH,
   isWellFormedPackageId,
@@ -298,6 +299,83 @@ export async function resolveKdpEntryPath(
   return { ok: true, value: resolved };
 }
 
+/** 从实际 KDP 入口到安装根的可信相对路径必须始终是目录内路径。 */
+function withinTrustedRoot(root: string, candidate: string): boolean {
+  const rel = relative(root, candidate);
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+}
+
+/**
+ * 精确固定 Node 22 bare SDK 解析位置；KDP 目录或其子目录若有就近同名
+ * node_modules，则 Node 优先加载它，故在第一次 KDP import 前直接拒绝。
+ * SDK 内部包的完整不可变归档/SRI 仍是 Foundation 下一机器 ABI 切片。
+ */
+async function verifyTrustedKdpSdkResolution(
+  installRoot: string,
+  installReal: string,
+  kdpPackageId: string,
+  sourceModules: readonly string[],
+): Promise<string | null> {
+  if (kdpPackageId === TRUSTED_KDP_SDK) return null;
+  const sdkRootPath = resolveInRoot(installRoot, `node_modules/${TRUSTED_KDP_SDK}`);
+  if (sdkRootPath === null) return 'trusted SDK canonical package path is invalid';
+  let sdkReal: string;
+  try {
+    sdkReal = await realpath(sdkRootPath);
+  } catch {
+    return 'trusted SDK Package missing from this app installation';
+  }
+  if (!withinTrustedRoot(installReal, sdkReal)) {
+    return 'trusted SDK package resolves outside the app installation root';
+  }
+  let metadata: unknown;
+  try {
+    metadata = JSON.parse(await readFile(join(sdkRootPath, 'package.json'), 'utf8'));
+  } catch {
+    return 'trusted SDK package.json cannot be read';
+  }
+  if (!isRecord(metadata) || metadata['name'] !== TRUSTED_KDP_SDK ||
+      metadata['version'] !== '0.11.0' || metadata['type'] !== 'module') {
+    return 'trusted SDK package identity/version does not match the selected Node22 SDK';
+  }
+  const exportsField = metadata['exports'];
+  const dot = isRecord(exportsField) ? exportsField['.'] : exportsField;
+  if (resolveConditionalExports(dot) !== './dist/index.js') {
+    return 'trusted SDK package exports are outside the pinned SDK entry profile';
+  }
+  let sdkEntryReal: string;
+  try {
+    sdkEntryReal = await realpath(join(sdkRootPath, 'dist', 'index.js'));
+  } catch {
+    return 'trusted SDK entry is not readable';
+  }
+  if (!withinTrustedRoot(sdkReal, sdkEntryReal)) {
+    return 'trusted SDK executable entry escapes its package root';
+  }
+  for (const sourcePath of sourceModules) {
+    let current = dirname(sourcePath);
+    const kdpRoot = resolveInRoot(installRoot, `node_modules/${kdpPackageId}`);
+    if (kdpRoot === null) return 'KDP package root cannot be resolved for SDK search';
+    // 模拟 Node 向父级逐层搜索 node_modules；只有安装顶层允许唯一 SDK 实例。
+    while (withinTrustedRoot(kdpRoot, current)) {
+      const shadow = join(current, 'node_modules', TRUSTED_KDP_SDK);
+      try {
+        await lstat(shadow);
+        return 'trusted SDK name is shadowed by nested KDP node_modules';
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          return 'cannot prove absence of shadow SDK package';
+        }
+      }
+      if (current === kdpRoot) break;
+      const parent = dirname(current);
+      if (parent === current) return 'KDP parent resolution is not bounded';
+      current = parent;
+    }
+  }
+  return null;
+}
+
 /**
  * Host 级前置验证：只按 BUILD 已封存的静态 KDP 图验证每个本地 ESM 文件，
  * 验证完毕前绝不对选定 KDP 执行 import()。SDK TCB 本身由已安装 SDK 授信；
@@ -320,14 +398,25 @@ async function verifyKdpStaticClosure(
   const manifestPath = resolvePackageFile(installRoot, record.kdpPackageId, 'package.json');
   if (manifestPath === null) return invalid('KDP package root cannot be resolved');
   let rootReal: string;
+  let installReal: string;
   try {
+    installReal = await realpath(installRoot);
     rootReal = await realpath(dirname(manifestPath));
   } catch {
-    return invalid('KDP installed package root is not readable');
+    return invalid('KDP installed package or installation root is not readable');
+  }
+  if (!withinTrustedRoot(installReal, rootReal)) {
+    return invalid('KDP installed package realpath escapes the app installation root');
   }
 
-  const modules = new Map<string, { ref: { packageId: string; path: string; digest: string };
-    dependencies: unknown[]; trustedImports: unknown[] }>();
+  const modules = new Map<string, {
+    ref: { packageId: string; path: string; digest: string };
+    dependencies: unknown[];
+    trustedImports: unknown[];
+    actualDependencies: readonly string[];
+    actualTrustedImports: readonly string[];
+    sourcePath: string;
+  }>();
   let bytesTotal = 0;
   for (const node of nodes as unknown[]) {
     if (!isRecord(node) || !isRecord(node['module']) ||
@@ -365,14 +454,39 @@ async function verifyKdpStaticClosure(
     }
     const trusted = node['trustedImports'] as unknown[];
     if (!trusted.every((name) => typeof name === 'string' &&
-       (name === '@kaicreator/domain-harness-microkernel' ||
+       (name === TRUSTED_KDP_SDK ||
          ['node:buffer', 'node:crypto', 'node:path', 'node:url', 'node:util'].includes(name)))) {
       return invalid('KDP ESM closure has an untrusted builtin or bare SDK import');
     }
+    // 不相信 Lock 自己声明的导入边：Boot 从实际已验摘要的 ESM 字节重新求图。
+    // Boot 使用独立的更窄 Node22 词法子集，歧义语法一律拒绝。
+    let actual: ReturnType<typeof inspectKdpHostImports>;
+    try {
+      actual = inspectKdpHostImports(bytes, ref['path']);
+    } catch {
+      return invalid('KDP actual static ESM graph cannot be independently proven');
+    }
+    const declaredDeps = node['dependencies'] as unknown[];
+    if (!declaredDeps.every((child) => isRecord(child) &&
+        child['packageId'] === record.kdpPackageId &&
+        typeof child['path'] === 'string' && isContentDigest(child['digest']))) {
+      return invalid('KDP ESM closure contains malformed dependency edges');
+    }
+    const actualDeps = actual.dependencies;
+    const lockedDeps = declaredDeps.map((child) => (child as Record<string, unknown>)['path'] as string).sort();
+    if (JSON.stringify(actualDeps) !== JSON.stringify(lockedDeps)) {
+      return invalid('KDP actual ESM import graph differs from locked dependencies');
+    }
+    if (JSON.stringify(actual.trustedImports) !== JSON.stringify([...trusted].sort())) {
+      return invalid('KDP actual trusted imports differ from locked imports');
+    }
     modules.set(ref['path'], {
       ref: { packageId: ref['packageId'], path: ref['path'], digest: ref['digest'] },
-      dependencies: node['dependencies'] as unknown[],
+      dependencies: declaredDeps,
       trustedImports: trusted,
+      actualDependencies: actual.dependencies,
+      actualTrustedImports: actual.trustedImports,
+      sourcePath: absolute,
     });
   }
   let hasEntry = false;
@@ -392,7 +506,29 @@ async function verifyKdpStaticClosure(
       }
     }
   }
-  return hasEntry ? null : invalid('KDP actual package export is not the pinned module closure root');
+  if (!hasEntry) return invalid('KDP actual package export is not the pinned module closure root');
+  // 除逐节点一致之外，还必须证明从真实入口完整可达，禁止额外任意载入节点。
+  const entry = [...modules.values()].find((node) => node.sourcePath === entryPath);
+  if (!entry) return invalid('KDP closure contains no exact exported entry');
+  const reachable = new Set<string>();
+  const visit = (path: string): void => {
+    if (reachable.has(path)) return;
+    reachable.add(path);
+    const node = modules.get(path);
+    if (node) for (const child of node.actualDependencies) visit(child);
+  };
+  visit(entry.ref.path);
+  if (reachable.size !== modules.size) {
+    return invalid('KDP ESM closure contains unreachable or unproved nodes');
+  }
+  if ([...modules.values()].some((node) => node.actualTrustedImports.includes(TRUSTED_KDP_SDK))) {
+    const resolutionError = await verifyTrustedKdpSdkResolution(
+      installRoot, installReal, record.kdpPackageId,
+      [...modules.values()].map((node) => node.sourcePath),
+    );
+    if (resolutionError) return invalid(resolutionError);
+  }
+  return null;
 }
 
 export async function verifyKdpEntryBytes(
