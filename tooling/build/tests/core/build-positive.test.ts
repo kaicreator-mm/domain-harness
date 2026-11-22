@@ -94,6 +94,13 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     [],
   );
 
+  assert.ok(lock.trustedKdpModuleClosure.some((item) =>
+    item.module.packageId === 'kdp-kernel' && item.module.path === 'dist/index.js'),
+    'KDP executable root must appear in the pre-import closure');
+  assert.ok(lock.trustedKdpModuleClosure.every((item) =>
+    lock.resourceDigests[`${item.module.packageId}/${item.module.path}`] === item.module.digest),
+    'each pinned KDP ESM module must be present in the actual Resource closure');
+
   assert.equal(lock.bootstrapKdpPin.kdpPackageId, 'kdp-kernel');
   assert.equal(lock.bootstrapKdpPin.kdpPrimaryEntry, 'bootstrap');
   assert.match(lock.bootstrapKdpPin.kdpPrimaryDigest, /^sha256:[0-9a-f]{64}$/u);
@@ -109,6 +116,25 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
   ]) {
     assert.match(lock.resourceDigests[key] ?? '', /^sha256:[0-9a-f]{64}$/u, `resourceDigests['${key}']`);
   }
+});
+
+test('Foundation A6: BUILD recursively seals static KDP relative import bytes into Lock and App Package', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const root = scenario.ws.packageRoots['kdp-kernel']!;
+  const child = writeRaw(root, 'dist/child.js',
+    new TextEncoder().encode('export const selected = 7;\n'));
+  writeRaw(root, 'dist/index.js',
+    new TextEncoder().encode('import { selected } from "./child.js";\nexport async function bootstrap() { return selected; }\n'));
+  const result = expectSuccess(buildApp(input));
+  assert.deepEqual(result.lock.trustedKdpModuleClosure.map((entry) => entry.module.path),
+    ['dist/child.js', 'dist/index.js']);
+  const entry = result.lock.trustedKdpModuleClosure.find((node) => node.module.path === 'dist/index.js')!;
+  assert.deepEqual(entry.dependencies, [child]);
+  assert.equal(result.lock.resourceDigests['kdp-kernel/dist/child.js'], child.digest);
+  assert.equal(result.appPackage.files.some((file) =>
+    file.path === 'packages/kdp-kernel/dist/child.js' && file.digest === child.digest), true);
 });
 
 test('R2 P1-01: const function and immutable local function alias both remain callable Targets', (t) => {
