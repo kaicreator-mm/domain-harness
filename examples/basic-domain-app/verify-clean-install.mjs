@@ -317,6 +317,26 @@ await assert.rejects(import('@kaicreator/domain-harness/composition'),
   npm(['ls', '--json'], consumerRoot, 'consumer.ls');
   npm(['ls', 'xstate', 'yaml', '--json'], consumerRoot, 'consumer.workflow-runtime-ls');
   assertInstalledRealpaths(tarballMembers);
+  // 与 runtime-only 三包独立环境互为正反例：显式安装 -build 后子入口必须可运行。
+  const compositionProbe = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+import assert from 'node:assert/strict';
+import { buildApp, BuildRefusal } from '@kaicreator/domain-harness/composition';
+import { boot } from '@kaicreator/domain-harness/runtime';
+import * as root from '@kaicreator/domain-harness';
+assert.equal(root.buildApp, buildApp);
+assert.equal(root.boot, boot);
+assert.equal(typeof buildApp, 'function');
+assert.equal(typeof BuildRefusal, 'function');
+`], {
+    cwd: consumerRoot, encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024,
+    env: installEnv,
+  });
+  writeFileSync(join(evidenceDir, 'composition.probe.stdout.log'), compositionProbe.stdout ?? '');
+  writeFileSync(join(evidenceDir, 'composition.probe.stderr.log'), compositionProbe.stderr ?? '');
+  record('composition.optional-peer-present', { exit: compositionProbe.status, signal: compositionProbe.signal });
+  if (compositionProbe.error || compositionProbe.status !== 0) {
+    throw new Error(`composition optional Peer import failed after four-tarball install\n${compositionProbe.stdout ?? ''}\n${compositionProbe.stderr ?? ''}`);
+  }
   for (const name of ['consumer.mjs', 'workflow-fixture.mjs']) {
     cpSync(fileURLToPath(new URL(`./${name}`, import.meta.url)), join(consumerRoot, name));
   }
