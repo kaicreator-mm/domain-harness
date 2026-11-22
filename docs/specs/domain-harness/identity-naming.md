@@ -25,7 +25,7 @@ Package 使用包名规则、Element 使用变量名规则；Namespace 为独立
 
 **Namespace、Element.id、Owner Package、Version、Digest 各为不同属性**。不再把 `dh.kernel.lifecycle` 点分串写入**新** ElementDefinition.id；可用作展示历史全限定引用，不能代替逻辑对象独立属性。
 
-**当前机器合同差距**：`tooling/build/src/build.ts::elementNamespace()` 仍基于点分 Element ID 推断 Namespace；`json-schemas.ts::IDENTIFIER_PATTERN` 对不同 ID 类型太宽松。新 Schema/BUILD/Ref/Lock/Pin/Manifest/Catalog/Consumer 的身份格式、同名唯一性、旧→新迁移、Digest/版本重算仍需 #1668 L2/源码/独立 E2E。**不能当前就对所有历史 fixture 加一个会误判的全仓 Gate**。
+**当前机器合同差距**：`tooling/build/src/build.ts::elementNamespace()` 仍基于点分 Element ID 推断 Namespace；`json-schemas.ts::IDENTIFIER_PATTERN` 对不同 ID 类型太宽松。新 Schema/生成期校验/Ref/Lock/Pin/Manifest/Catalog/Consumer 的身份格式、同名唯一性、旧→新迁移、Digest/版本重算仍需 #1668 L2/源码/独立 E2E。**不能当前就对所有历史 fixture 加一个会误判的全仓 Gate**。
 
 **旧→新仅为迁移候选，不是已改代码**：`r41-kdp/r41.kdp → dh-kernel / dh:kernelLifecycle`；`r60-standard-files/dh.std.file.json → dh-standard-file / dh:jsonCodec`。旧锁、审查 SHA、`STANDARD_ACCEPTED` 及历史 StageIndex 永久保留，不自动把原资格搬到新身份。
 
@@ -33,12 +33,12 @@ Package 使用包名规则、Element 使用变量名规则；Namespace 为独立
 
 - **逻辑身份与物理身份严格区分**：Domain/Package/Element/Function/Workflow/Content 的逻辑 ID、版本和 Owner；Definition/Contract/Implementation/Target/Resource 的具体字节与 Digest；App Descriptor、Lock/Pin、安装记录与 Receipt，各自承担不同责任。不得通过路径、显示名或文本相等替代精确的权威身份。
 - ElementRef 持有 `namespace/id/version/digest`，FunctionRef 另有 `functionId/contractVersion`；WorkflowRef 指向已选 Element 与其 `contentId`。**当前点分 Element ID 的 Namespace 派生与 R87 的变量式 ID 目标存在差距**，属于 #1668 的机器 ABI 迁移，不得只变更文本描述。
-- BUILD 应对使用到的 Definition、Target 实现、资源、Package 产物、App 组合按各自适用的规范化和 Digest 约束进行确定性封存；相同有效输入/Target 应产生等价的 Lock 和受信安装身份。**Digest 不保证来源权威，身份校验也不赋予未声明的调用或 Effect 权限**。
+- 生成期应证明 Definition、Target 实现、资源及 Package 的结构和正确性，App 组合与封存阶段应按适用规范化与 Digest 约束确定性封存；相同有效输入/Target 应产生等价的 Lock 和受信安装身份。**Digest 不保证来源权威，身份校验也不赋予未声明的调用或 Effect 权限**。
 - `schemaVersion`、Element `version`、Function `contractVersion`、Package SemVer、Target Profile、Lock/Pin 版本与 npm 发布版本不同；不混为一个全局版本号。对尚未发布的 `0.11.x` 内部阶段没有 ABI 兼容义务；对未来已发布合同的演进规则需要正式 L1/L2 决议。
 
 ### 13.2 Content、Schema、Ref 与可见性 — CONFIRMED 原则
 
-- 已选 Element 内容使用 `contentKind + schemaRef` 的有类型内容块；资源 `value` 与 `ref` 的选用、必填/可选属性、inline/资源字节的规范化和摘要须由当前 Schema/BUILD 明确，不靠运行时猜测格式。
+- 已选 Element 内容使用 `contentKind + schemaRef` 的有类型内容块；资源 `value` 与 `ref` 的选用、必填/可选属性、inline/资源字节的规范化和摘要须由当前生成期 Schema 与 App 封存合同明确，不靠运行时猜测格式。
 - **未知必需内容不能在没有已确认类型/Schema 时默默接受；未知可选内容必须可确定性排除并可从 Lock/收据审计**。允许的扩展类型前缀不自动代表任意未知语义已受审或有权限执行。
 - 所属 Package、Element Visibility、直接 Extension、选定 FunctionRef、Target、具体资源/HostPort 共同构成授权边界；元数据能被索引不代表原始私有资源被任何 Package 读取。
 - 纯数据/零 Function Element 可以合法静态存在，运行期 Reader/Query 必须是实际选定并被授权的普通 Element.Function；**不得因 Content.Kind 为 `rule` 或 `workflow-definition` 自动获得执行能力**。
