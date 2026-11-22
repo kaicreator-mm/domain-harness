@@ -346,8 +346,15 @@ async function verifySdkLookupPath(
   installRoot: string,
   selectedKdpEntry: string,
 ): Promise<TrustFailure | null> {
-  const trustedRoot = await realpath(installRoot);
-  const realEntry = await realpath(selectedKdpEntry);
+  let trustedRoot: string;
+  let realEntry: string;
+  try {
+    trustedRoot = await realpath(installRoot);
+    realEntry = await realpath(selectedKdpEntry);
+  } catch {
+    return trustFailure('DH_BOOT_PIN_MISMATCH',
+      'trusted SDK source lookup cannot be verified for this installation');
+  }
   const sdkOwners = [
     '@kaicreator/domain-harness',
     '@kaicreator/domain-harness-microkernel',
