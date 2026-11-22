@@ -317,7 +317,10 @@ async function authoring(label, rule, options = {}) {
     await writeFile(manifestPath, canonicalJson(manifest));
   }
   const standardDefinition = standardRoot
-    ? JSON.parse(await readFile(join(standardRoot, 'definitions/reader.json'), 'utf8')) : null;
+    ? {
+        json: JSON.parse(await readFile(join(standardRoot, 'definitions/json-reader.json'), 'utf8')),
+        yaml: JSON.parse(await readFile(join(standardRoot, 'definitions/yaml-reader.json'), 'utf8')),
+      } : null;
   const standardManifest = standardRoot
     ? JSON.parse(await readFile(join(standardRoot, 'manifest.json'), 'utf8')) : null;
   const workflow = options.workflow === true
@@ -511,7 +514,7 @@ async function authoring(label, rule, options = {}) {
   };
   return {
     root, dirs, input, descriptor, definitions,
-    domainElements: [knowledge, rules, app, ...(workflow ? [workflow.child, standardDefinition] : [])],
+    domainElements: [knowledge, rules, app, ...(workflow ? [workflow.child, standardDefinition.json, standardDefinition.yaml] : [])],
     ruleRef, refs, workflow,
   };
 }

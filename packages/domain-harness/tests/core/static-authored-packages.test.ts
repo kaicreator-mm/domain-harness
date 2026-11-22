@@ -210,7 +210,7 @@ async function r60OtherDomain(t: import('node:test').TestContext): Promise<strin
   const digest: `sha256:${string}` = `sha256:${createHash('sha256').update(moduleText).digest('hex')}`;
   const manifestPath = join(businessDir, 'manifest.json');
   const manifest = readJson(manifestPath) as DomainPackageManifest;
-  const definition = readJson(join(source, 'packages', STANDARD_READER, 'definitions/reader.json')) as
+  const definition = readJson(join(source, 'packages', STANDARD_READER, 'definitions/json-reader.json')) as
     import('@kaicreator/domain-harness-contracts').ElementDefinition;
   const readerRef = {
     element: { namespace: 'r60', id: definition.id, version: definition.version,
@@ -245,7 +245,7 @@ test('R60 W02: second domain r41 App boots and actually invokes same ordinary St
   const built = accepted(input);
   assert.ok(built.lock.selectedPackages.some((pkg) => pkg.packageId === STANDARD_READER));
   const selected = built.lock.selectedFunctions.find((fn) =>
-    fn.ref.element.id === 'r60.reader' && fn.ref.functionId === 'jsonReader');
+    fn.ref.element.id === 'dh.std.reader.json' && fn.ref.functionId === 'jsonReader');
   assert.ok(selected, 'cross-domain exact Reader FunctionRef selected by BUILD');
   const result = await installAuthoredApp('extended', t, source, true);
   assert.equal(result.app.status, 'BOOTED', JSON.stringify(result.app));

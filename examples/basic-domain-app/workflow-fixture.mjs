@@ -81,11 +81,13 @@ export async function prepareWorkflowElements(dirs, rules, app, fn, standardRead
     throw new Error('T14 fixture must preserve direct Element dependency on basic.rules');
   }
   ruleDependency.functions.push('startWorkflow', 'endWorkflow', 'workflowDecision');
-  app.dependencies.push({ element: standardReader.id, version: standardReader.version,
-    functions: ['jsonReader', 'yamlReader'] });
+  app.dependencies.push({ element: standardReader.json.id, version: standardReader.json.version,
+    functions: ['jsonReader'] });
+  app.dependencies.push({ element: standardReader.yaml.id, version: standardReader.yaml.version,
+    functions: ['yamlReader'] });
   app.dependencies.push(...dataElements.map((el) => ({ element: el.id, version: el.version })));
-  const jsonReader = ref(standardReader, 'jsonReader');
-  const yamlReader = ref(standardReader, 'yamlReader');
+  const jsonReader = ref(standardReader.json, 'jsonReader');
+  const yamlReader = ref(standardReader.yaml, 'yamlReader');
   const hooks = { start: ref(rules, 'startWorkflow'), end: ref(rules, 'endWorkflow') };
   const child = {
     kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
@@ -98,7 +100,7 @@ export async function prepareWorkflowElements(dirs, rules, app, fn, standardRead
     ],
     functions: [],
     dependencies: [
-      { element: standardReader.id, version: standardReader.version, functions: ['jsonReader'] },
+      { element: standardReader.json.id, version: standardReader.json.version, functions: ['jsonReader'] },
       { element: 'basic.data_json_b', version: '1.0.0' },
     ],
   };
