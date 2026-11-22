@@ -10,7 +10,7 @@ import {
   events,
   type FixtureInstall,
 } from './helpers/install.js';
-import { bootstrap } from '../../src/kdp.js';
+import { bootstrap, activateSelectedKdpHostInit } from '../../src/kdp.js';
 
 async function withFixture(
   t: import('node:test').TestContext,
