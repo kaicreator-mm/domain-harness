@@ -264,7 +264,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
     descriptorDigest: contentDigestOf({ fixture: 'orders/basic-descriptor', revision: 1 }),
   },
   target: APP_TARGET,
-  bootstrapKdpPin: {
+  selectedKdpHost: {
     kdpPackageId: 'kdp-basic',
     kdpInitFunction: lifecycleFunction('kdp-basic', 'init'),
     invocationAbi: 'kdp-host-init/1',

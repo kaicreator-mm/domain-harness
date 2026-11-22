@@ -588,9 +588,9 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       lockPath: LOCK_RELATIVE_PATH,
       lockDigest: lock.closureDigest,
       kdpPackageId: KDP_PACKAGE_ID,
-      kdpInitFunction: lock.bootstrapKdpPin.kdpInitFunction,
+      kdpInitFunction: lock.selectedKdpHost.kdpInitFunction,
       invocationAbi: 'kdp-host-init/1',
-      kdpInitModule: lock.bootstrapKdpPin.kdpInitModule,
+      kdpInitModule: lock.selectedKdpHost.kdpInitModule,
     };
     const record: InstalledRecord = {
       ...(recordBase as unknown as InstalledRecord),
@@ -602,9 +602,9 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       schemaVersion: 'dh.pin/0.11.1',
       target: lock.target,
       kdpPackageId: KDP_PACKAGE_ID,
-      kdpInitFunction: lock.bootstrapKdpPin.kdpInitFunction,
+      kdpInitFunction: lock.selectedKdpHost.kdpInitFunction,
       invocationAbi: 'kdp-host-init/1',
-      kdpInitModule: lock.bootstrapKdpPin.kdpInitModule,
+      kdpInitModule: lock.selectedKdpHost.kdpInitModule,
       lockDigest: lock.closureDigest,
       lockPath: LOCK_RELATIVE_PATH,
     };

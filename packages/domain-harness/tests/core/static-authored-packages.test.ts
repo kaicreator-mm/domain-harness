@@ -145,18 +145,18 @@ async function installAuthoredApp(
     target: built.lock.target, lockPath: LOCK_PATH,
     lockDigest: built.lock.closureDigest,
     kdpPackageId: KDP,
-    kdpInitFunction: built.lock.bootstrapKdpPin.kdpInitFunction,
+    kdpInitFunction: built.lock.selectedKdpHost.kdpInitFunction,
     invocationAbi: 'kdp-host-init/1',
-    kdpInitModule: built.lock.bootstrapKdpPin.kdpInitModule,
+    kdpInitModule: built.lock.selectedKdpHost.kdpInitModule,
   };
   await writeFile(join(installRoot, 'dh-install/installed-record.json'),
     JSON.stringify({ ...recordBase, recordDigest: contentDigestOf(recordBase as unknown as JsonValue) }));
   const pin = {
     schemaVersion: 'dh.pin/0.11.1' as const,
     target: built.lock.target, kdpPackageId: KDP,
-    kdpInitFunction: built.lock.bootstrapKdpPin.kdpInitFunction,
+    kdpInitFunction: built.lock.selectedKdpHost.kdpInitFunction,
     invocationAbi: 'kdp-host-init/1' as const,
-    kdpInitModule: built.lock.bootstrapKdpPin.kdpInitModule,
+    kdpInitModule: built.lock.selectedKdpHost.kdpInitModule,
     lockDigest: built.lock.closureDigest,
     lockPath: LOCK_PATH,
   };

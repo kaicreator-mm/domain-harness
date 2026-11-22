@@ -686,7 +686,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
       'schemaVersion',
       'appIdentity',
       'target',
-      'bootstrapKdpPin',
+      'selectedKdpHost',
       'selectedPackages',
       'selectedElements',
       'selectedFunctions',
@@ -710,7 +710,7 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
         },
       },
       target: { $ref: '#/$defs/resolvedTarget' },
-      bootstrapKdpPin: {
+      selectedKdpHost: {
         type: 'object',
         additionalProperties: false,
         required: ['kdpPackageId', 'kdpInitFunction', 'invocationAbi', 'kdpInitModule'],

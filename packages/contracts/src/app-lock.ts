@@ -80,7 +80,7 @@ export interface SelectedWorkflow {
   readonly definition: WorkflowDefinition;
 }
 
-export interface BootstrapKdpRef {
+export interface SelectedKdpHostRef {
   readonly kdpPackageId: string;
   readonly kdpInitFunction: FunctionRef;
   readonly invocationAbi: 'kdp-host-init/1';
@@ -102,7 +102,7 @@ export interface DomainAppLock {
     readonly descriptorDigest: ContentDigest;
   };
   readonly target: ResolvedTarget;
-  readonly bootstrapKdpPin: BootstrapKdpRef;
+  readonly selectedKdpHost: SelectedKdpHostRef;
   readonly selectedPackages: readonly SelectedPackage[];
   readonly selectedElements: readonly SelectedElement[];
   readonly selectedFunctions: readonly SelectedFunction[];

@@ -230,14 +230,14 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock target is malformed (expected an object with a profile string)') };
   }
   if (
-    !isRecord(lock.bootstrapKdpPin) ||
-    typeof lock.bootstrapKdpPin['kdpPackageId'] !== 'string' ||
-    !isRecord(lock.bootstrapKdpPin['kdpInitFunction']) ||
-    !isRecord(lock.bootstrapKdpPin['kdpInitFunction']['element']) ||
-    lock.bootstrapKdpPin['invocationAbi'] !== 'kdp-host-init/1' ||
-    !isRecord(lock.bootstrapKdpPin['kdpInitModule'])
+    !isRecord(lock.selectedKdpHost) ||
+    typeof lock.selectedKdpHost['kdpPackageId'] !== 'string' ||
+    !isRecord(lock.selectedKdpHost['kdpInitFunction']) ||
+    !isRecord(lock.selectedKdpHost['kdpInitFunction']['element']) ||
+    lock.selectedKdpHost['invocationAbi'] !== 'kdp-host-init/1' ||
+    !isRecord(lock.selectedKdpHost['kdpInitModule'])
   ) {
-    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock bootstrapKdpPin is malformed (expected selected KDP FunctionRef, ABI and Target ResourceRef)') };
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock selectedKdpHost is malformed (expected selected KDP FunctionRef, ABI and Target ResourceRef)') };
   }
   if (
     !isRecord(lock.appIdentity) ||
@@ -246,23 +246,23 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock appIdentity is malformed (expected a descriptorDigest string)') };
   }
   if (
-    lock.bootstrapKdpPin.kdpPackageId !== record.kdpPackageId ||
-    canonicalJson(lock.bootstrapKdpPin.kdpInitFunction) !==
+    lock.selectedKdpHost.kdpPackageId !== record.kdpPackageId ||
+    canonicalJson(lock.selectedKdpHost.kdpInitFunction) !==
       canonicalJson(record.kdpInitFunction) ||
-    lock.bootstrapKdpPin.invocationAbi !== record.invocationAbi ||
-    canonicalJson(lock.bootstrapKdpPin.kdpInitModule) !==
+    lock.selectedKdpHost.invocationAbi !== record.invocationAbi ||
+    canonicalJson(lock.selectedKdpHost.kdpInitModule) !==
       canonicalJson(record.kdpInitModule)
   ) {
-    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock bootstrapKdpPin disagrees with the installed record') };
+    return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock selectedKdpHost disagrees with the installed record') };
   }
   const orderZero = findOrderZeroCore(lock);
-  if (lock.coreOrder[0] !== lock.bootstrapKdpPin.kdpPackageId || !orderZero) {
+  if (lock.coreOrder[0] !== lock.selectedKdpHost.kdpPackageId || !orderZero) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Order 0 Core and selected KDP Package identities differ') };
   }
   // 上面 Array.isArray 的运行时保护会将属性窄化为 any[]；在验证之后
   // 通过独立的强类型视图恢复机器合同，禁止 any 漏到后续身份/权限比较。
   const verifiedLock = parsed as unknown as DomainAppLock;
-  const initRef = verifiedLock.bootstrapKdpPin.kdpInitFunction;
+  const initRef = verifiedLock.selectedKdpHost.kdpInitFunction;
   const matching = verifiedLock.selectedFunctions.filter((candidate) =>
     canonicalJson(candidate.ref) === canonicalJson(initRef));
   const target = matching[0];
@@ -277,7 +277,7 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
       target?.invocationAbi !== 'kdp-host-init/1' ||
       target.implementation.module.packageId !== orderZero.packageId ||
       canonicalJson(target.implementation.module) !==
-        canonicalJson(lock.bootstrapKdpPin.kdpInitModule)) {
+        canonicalJson(lock.selectedKdpHost.kdpInitModule)) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH',
       'Lock selected Kernel Init Function/Target does not exactly match the privileged Host ABI and Order 0 owner') };
   }
@@ -464,7 +464,7 @@ export async function verifyKdpEntryBytes(
   const entryResult = await resolveKdpEntryPath(installRoot, record.kdpPackageId);
   if (!entryResult.ok) return entryResult;
   const entryPath = entryResult.value;
-  const selectedModule = lock.bootstrapKdpPin.kdpInitModule;
+  const selectedModule = lock.selectedKdpHost.kdpInitModule;
   const selectedPath = resolvePackageFile(installRoot, selectedModule.packageId, selectedModule.path);
   if (!selectedPath || selectedModule.packageId !== record.kdpPackageId ||
       selectedPath !== entryPath) {
