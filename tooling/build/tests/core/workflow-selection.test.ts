@@ -227,8 +227,11 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
   assert.deepEqual(a.lockBytes, b.lockBytes, 'only one deterministic Lock is used');
   assert.equal(a.appPackage.packageDigest, b.appPackage.packageDigest);
   const composedManifest = JSON.parse(Buffer.from(a.appPackage.files.find((file) => file.path === 'package.json')!.bytes).toString('utf8'));
-  assert.equal(composedManifest.dependencies.xstate, '5.33.2');
-  assert.equal(composedManifest.dependencies.yaml, '2.9.1');
+  assert.equal(composedManifest.dependencies['@kaicreator/domain-harness'], '0.11.0');
+  assert.equal(composedManifest.dependencies.xstate, undefined,
+    'Workflow runtime is an SDK-owned transitive dependency, not an App direct dependency');
+  assert.equal(composedManifest.dependencies.yaml, undefined,
+    'YAML runtime is an SDK-owned transitive dependency, not an App direct dependency');
   assert.deepEqual(a.lock.trustedRuntimeIntegrity?.map((archive) => archive.name), ['xstate', 'yaml']);
   const attestFile = a.appPackage.files.find((file) => file.path === 'dh-install/trusted-runtime.json');
   const verifyFile = a.appPackage.files.find((file) => file.path === 'dh-install/verify-runtime.mjs');
