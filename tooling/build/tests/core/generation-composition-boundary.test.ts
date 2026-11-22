@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import type { DomainPackageManifest } from '@kaicreator/domain-harness-contracts';
 import { buildApp } from '../../src/index.js';
 import { composeApp } from '../../src/build.js';
+import { buildApp as publicSdkComposition } from '../../src/composition-entry.js';
 import { writeRaw } from './fixtures.js';
 import { standardCase } from './standard-case.js';
 
@@ -69,4 +70,17 @@ test('SDK 组合只封存生成方已提交的传递资源字节，拒绝未选 
   });
   assert.equal(forbidden.ok, false, '未选 Package 不得注入安装资源');
   if (!forbidden.ok) assert.equal(forbidden.code, 'DH_BUILD_RESOURCE_MISSING');
+});
+
+test('公开 SDK 入口不可注入生成期回调或获得内部资源作用域', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  let calls = 0;
+  const attempt = publicSdkComposition as unknown as (
+    candidate: typeof input, untrustedCallback: () => void
+  ) => ReturnType<typeof publicSdkComposition>;
+  const composed = attempt(input, () => { calls++; });
+  assert.equal(composed.ok, true, composed.ok ? '' : composed.message);
+  assert.equal(calls, 0, '发布 SDK 忽略额外 callback，内部生成期校验接口不对外暴露');
 });
