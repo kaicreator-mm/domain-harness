@@ -73,9 +73,9 @@ test('Foundation L2-1: FunctionRef namespace must match the selected logical Ele
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input, refs } = scenario.finalize();
-  const packages = input.packages.map((pkg) => pkg.id === 'sdk-core'
+  const packages = input.packages.map((pkg) => (pkg as DomainPackageManifest).id === 'sdk-core'
     ? {
-      ...pkg,
+      ...(pkg as DomainPackageManifest),
       imports: [{
         ...refs.evaluateRef,
         element: { ...refs.evaluateRef.element, namespace: 'unselected-namespace' },
@@ -508,7 +508,7 @@ test('Foundation L2-1: Order-0 Kernel refuses literal dynamic import before seal
   const scenario = standardCase();
   t.after(scenario.ws.dispose);
   const { input } = scenario.finalize();
-  const kdp = input.packages.find((pkg) => pkg.id === 'kdp-kernel')!;
+  const kdp = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'kdp-kernel') as DomainPackageManifest;
   const target = writeRaw(scenario.ws.packageRoots['kdp-kernel']!, 'dist/kdp.mjs',
     new TextEncoder().encode('export async function init() { await import("./lazy.mjs"); }\nexport function exit() {}\n'));
   const patched = {
