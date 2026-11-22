@@ -259,15 +259,17 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
   if (lock.coreOrder[0] !== lock.bootstrapKdpPin.kdpPackageId || !orderZero) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Order 0 Core and selected KDP Package identities differ') };
   }
-  // 可信安装的闭包必须指向同一张机器选定关系图；不能让 Pin 另造 Host Function。
-  const initRef = lock.bootstrapKdpPin.kdpInitFunction;
-  const matching = lock.selectedFunctions?.filter((candidate) =>
+  // 上面 Array.isArray 的运行时保护会将属性窄化为 any[]；在验证之后
+  // 通过独立的强类型视图恢复机器合同，禁止 any 漏到后续身份/权限比较。
+  const verifiedLock = parsed as unknown as DomainAppLock;
+  const initRef = verifiedLock.bootstrapKdpPin.kdpInitFunction;
+  const matching = verifiedLock.selectedFunctions.filter((candidate) =>
     canonicalJson(candidate.ref) === canonicalJson(initRef));
-  const target = matching?.[0];
-  const selectedElement = lock.selectedElements?.find((candidate) =>
+  const target = matching[0];
+  const selectedElement = verifiedLock.selectedElements.find((candidate) =>
     canonicalJson(candidate.ref) === canonicalJson(initRef.element));
   if (!Array.isArray(matching) || matching.length !== 1 ||
-      lock.selectedFunctions.filter((fn) => fn.invocationAbi === 'kdp-host-init/1').length !== 1 ||
+      verifiedLock.selectedFunctions.filter((fn) => fn.invocationAbi === 'kdp-host-init/1').length !== 1 ||
       initRef.functionId !== 'init' || initRef.contractVersion !== '1' ||
       canonicalJson(orderZero.init) !== canonicalJson(initRef.element) ||
       canonicalJson(orderZero.initFunction) !== canonicalJson(initRef) ||
