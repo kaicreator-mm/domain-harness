@@ -20,7 +20,7 @@
 | `packages/microkernel/src/boot.ts`, `verify.ts` 中的执行前验证 | 信任锚点→Pin/Lock/KDP 字节→动态导入 | Package 外**唯一**极薄可信 Boot，只有验证和交接；校验 helper 不强制 Element 化 | 不允许调度 Core/Workflow 或创建 DomainApp |
 | `packages/microkernel/src/kdp.ts` | 目前 `bootstrap(context)` 实际创建 PackageSystem、Hook、App、Exit | 真正的 KDP Kernel Package 内 **kernelLifecycle Init Element** 的私有实现 | 不得再存在独立于 KDP.Init 的 App 初始化过程 |
 | `package-system.ts`、`selected-function.ts`、`workflow-run.ts`、`workflow-execution.ts`、`domain-app.ts`、`process-exit.ts` | 已选 Function、Core/Extension Init/Exit、Workflow Actor、App 生命周期 | KDP Kernel Package 所属的内聚 runtime/lifecycle/workflow Elements；可共用私有 TS 源，不要求一文件一 Element | 禁止第二套 Loader/Actor/状态引擎 |
-| `tooling/build/src/build.ts`、`static-package-guard.ts`、`app-package.ts`、`graph.ts` 和 `packages/domain-harness/src/composition.ts` | 作者期静态组合、验证和 Lock/Pin 输出 | 已安装 DomainHarness SDK 所拥有的 **authoring Composition Package/Element**；公共 SDK /composition 是装载适配器 | 不引入必须先 Boot 的待构建 Domain App 或额外 Forge/生成期验证 服务 |
+| `tooling/build/src/build.ts`、`static-package-guard.ts`、`app-package.ts`、`graph.ts` 和 `packages/domain-harness/src/composition.ts` | 现有作者期源码混合生成期静态验证、App 组合与 Lock/Pin 封存 | 生成期正确性验证归 Package/Element 作者；已安装 SDK 的 **authoring Composition Package/Element** 只负责 App 选型、组合、封存，公共 SDK /composition 为装载适配器 | 不引入要求待生成 App 先 Boot 的循环或额外强制生成/组合服务 |
 | `packages/contracts/src/*`、JSON Schema 与验证 helper | 可共享定义/静态规则 | SDK 内 Contracts 归属；类型/静态纯函数可为普通私有源码，不要求每个 type/helper 单独 Element | 禁止裸公共命令绕过已选 Function/Target |
 | `examples/reference-domain-app/packages/r41-kdp/dist/bootstrap.js` 与 `dist/index.mjs` | 前者重新导出 SDK microkernel.bootstrap；后者空壳 KDP.Init 只记日志/转调用 | KDP 唯一**受选** Init Function 及其真实实现 | 删除双层 bootstrap→runInit→再次 KDP.Init 的路径 |
 | Standard JSON/YAML 与 Business Rule | 真实业务 Function 与 Domain Content | 各自标准/业务 Package 的内聚 Element | 不吸收到 KDP 硬编码业务 Engine |
@@ -60,14 +60,14 @@ KDP 反向按真实已进入列表尝试 Exit（KDP Exit 最后）
 3. **信任顺序**：Pin/安装记录在可信范围内形成一致性证明，Lock/闭包与 KDP 入口资源在**import 求值前**进行摘要检查。运行时可再验证其它受选字节与脚本/依赖 SRI，绝不能让未被验证的 KDP 先 import 后自检。任何 TOCTOU 风险需要明确是受控安装快照还是限定 Threat Model，不声称任意本地敌对进程可完全隔离。
 4. **退出安全**：KDP Init 进入历史必须恰好一条且在最先记录；Extension 重复由 Package 自治，Exit 用真实进入记录逆序；前序 Init 抛错也清理已经进入者，Exit 自身失败不吞掉根失败，不承诺强杀会执行 Exit。
 5. **Effect 和 SDK**：HostPort、FunctionRef、资源仍来自选定 Lock；不能因将 Kernel 源码移至 KDP 包而自动开放文件/网络权限，所有 Business 无隐式内核能力。
-6. **物理发行**：可把 KDP Kernel 实现源码编译或 bundle 为 KDP 所有的 ESM Target，依赖显式版本和可信 SRI 封存；新 KDP 的 Build 静态准入与 Runtime Loader 应针对可信 Kernel Profile 严格定义，不允许借此将任意未声明或恶意 Business Source 排除在校验外。
+6. **物理发行**：可把 KDP Kernel 实现源码编译或 bundle 为 KDP 所有的 ESM Target，依赖显式版本和可信 SRI 封存；新 KDP 的生成期静态准入和运行期最小加载兜底应针对可信 Kernel Profile 分别定义，不允许借此将任意未声明或恶意 Business Source 排除在校验外。
 
 ### A2.1 KDP Init Host ABI：R107 已接受的具体实施合同（源码未实现）
 
 **约束**：不新增第二种 Element 根类型，也不允许 Host 通过普通 `DomainApp.invoke` 或不受选的公共 `bootstrap` 绕过 Pin。唯一合法 Host 入口仍是 `boot(pin, context)`，其中 `pin` 只定位**唯一已选**的 KDP Init Function，而不是自由指定一个 JavaScript export。
 
 1. **身份绑定提案**：将当前 `BootstrapKdpRef` / `BootstrapPin` / `InstalledRecord` 的 `kdpPrimaryEntry:'bootstrap'` 替换成显式的 `kdpInitFunction: FunctionRef`，并在 Lock 已选 Function 中唯一确定其 `ImplementationLocator`（module `ResourceRef` + `exportName`）。Boot 校验 `coreOrder[0]` 为唯一 KDP、`SelectedPackage.init` 与 `SelectedPackage.initFunction` 同时匹配、所选 `SelectedFunction.ref` 与 Pin 精确匹配，入口 module 的真实字节摘要与 Lock、可信安装记录一致。不能另存一份可自行偏离 Lock 的“bootstrap target”；现行 `kdpPrimaryDigest` 应迁移为该已选 Target 的可核验字节绑定，字段最终命名由机器合同审查确认。
-2. **特殊 Host ABI 而非第二 Init**：受信 Boot 对此**唯一** FunctionRef 使用 `KdpHostInit(context: KdpBootstrapContext): Promise<KdpBootstrapResult>` 调用约定，返回 `BOOTED|FAILED`；`REFUSED` 只由导入前的 Boot 前置检查产生。KDP Init 负责构建 `DomainApp`，该对象是 Host 进程内句柄，**不是 JSON Content、普通 `FunctionOutcome` 或可由 Business 通过 `ReadonlyFunctionHandle.invoke` 调用的函数结果**。普通 Package.Init 继续接受受限 `PackageInitContext`、返回其 `AppInitResult`；二者由唯一 KDP 身份和 生成期验证/Lock 中的 Init 绑定明确区分，不能把 KDP Host ABI 自动开放给任意 Package。
+2. **特殊 Host ABI 而非第二 Init**：受信 Boot 对此**唯一** FunctionRef 使用 `KdpHostInit(context: KdpBootstrapContext): Promise<KdpBootstrapResult>` 调用约定，返回 `BOOTED|FAILED`；`REFUSED` 只由导入前的 Boot 前置检查产生。KDP Init 负责创建 `DomainApp`，该对象是 Host 进程内句柄，**不是 JSON Content、普通 `FunctionOutcome` 或可由 Business 通过 `ReadonlyFunctionHandle.invoke` 调用的函数结果**。普通 Package.Init 继续接受受限 `PackageInitContext`、返回其 `AppInitResult`；二者由唯一 KDP 身份和生成期已证明、组合期封存的 Lock Init 绑定明确区分，不能把 KDP Host ABI 自动开放给任意 Package。
 3. **校验时序提案**：`readTrustedRecord → pin/record 一致 → Lock 签定/摘要/Target → selected KDP package/init FunctionRef/Target 映射 → KDP ESM 导入闭包真实字节验证 → import + 调用`。相同原始字节须绑定 Pin、SelectedFunction.implementation、ResourceDigests；若 KDP 首次模块求值之前有未验证的静态依赖或宿主级副作用，仍是拒绝，不能通过“随后由 KDP 自检”补票。真实文件的并发替换只能在明确受控安装快照/威胁模型中作有限承诺。
 4. **不递归 Init 的责任边界**：KDP.Init 进入时由 KDP 创建一次激活的 PackageSystem/Exit 历史，并将 KDP 自身的进入事件记录**恰好一次**；内部调用“从已进入的 Kernel 继续”流程，先处理 KDP 声明的直接 Extension.Init，再按 Core.Order 进入下一个 Core，不能重新从 `coreOrder[0]` 执行 KDP.Init。Extension 的多次调用仍由各 Package 自治；有环直接失败。Kernel Init 早期失败（包括尚未完整构造 PackageSystem）仍必须尽可能执行已进入的 KDP.Exit，保留首个错误，清理失败只附加脱敏诊断。
 5. **兼容和静态 Profile**：此为尚未发布的 0.11.x 内部 ABI 迁移，不维持旧 `bootstrap` 兼容入口；`kdp-host-init/1` 是**必需的机器判别字段**，只能绑定唯一受选 KDP Init，而不是新建公共可调用 Function 类别。Target 导入闭包的 Node 内建模块与受限 SDK 可信依赖须有显式 Kernel Profile 的封存/准入规则；不得直接豁免 Business 的静态 ESM/Effect 检查。
@@ -76,9 +76,9 @@ KDP 反向按真实已进入列表尝试 Exit（KDP Exit 最后）
 
 ## A3. 作者期 Composition 不是 Domain App Runtime 的第二入口
 
-- 已安装 SDK 的 `/composition` **可以在待构建 App 尚无 Lock/KDP 时调用**；它由 SDK 自身的作者期 Package + Composition Element 真正拥有 `buildApp` 与必要静态图算法。物理 TypeScript 公共 facade 可以作为导出适配器，但必须可追溯到已安装 SDK 的真实拥有者、源码/目标签名和受审 Package 版本。
+- 已安装 SDK 的 `/composition` **可以在待生成 App 尚无 Lock/KDP 时调用**；它由 SDK 自身的作者期 Package + Composition Element 拥有 `buildApp` 及必要的选型、组合和封存算法，但不对 Package/Element 静态正确性负责。物理 TypeScript 公共 facade 可以作为导出适配器，但必须可追溯到已安装 SDK 的真实拥有者、源码/目标签名和受审 Package 版本。
 - 组合已有 Package 文件时按直接 Extension、Element Owner、可见性、目标实现和资源闭包进行静态验证；先完成结果确定性，再发行 Lock/Pin。不能添加 “Generator/Forge/Assembly 服务”作为 Package 形成的必经流程；任何人/Agent 都可直接写符合规范的文件。
-- 作者期 Composer 被调用时不能获得待构建 App 的运行时 Function/Host 权限，也不能执行任意 Package 的 Init/Exit；将现有 `tooling/build` 嵌入唯一 SDK 是打包结构，不等于自动满足真正的 Package+Element 所有权。
+- 作者期 Composer 被调用时不能获得待生成 App 的运行时 Function/Host 权限，也不能执行任意 Package 的 Init/Exit；将现有 `tooling/build` 嵌入唯一 SDK 是打包结构，不等于自动满足真正的 Package+Element 所有权。
 
 ## A4. 命名与 ABI 迁移策略（Foundation 单一真实迁移，不做兼容桥）
 
