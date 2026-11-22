@@ -48,6 +48,8 @@ export class PackageSystem {
   private readonly initEvents: string[] = [];
   private readonly callerHistory = new Map<string, InitCaller[]>();
   private exited = false;
+  /** Host-only KDP Init 只能把当前激活转交给下一 Core 一次，不影响 Package 自主重复 Init。 */
+  private kernelHostEntered = false;
 
   constructor(
     private readonly installRoot: string,
@@ -153,10 +155,27 @@ export class PackageSystem {
   }
 
   /**
-   * 唯一 Init 轮次：Boot→Order 0→本层 Extension 递归→当前 Core→下一个 Core。
-   * Package 自行决定 Init 函数内部是否去重；KDP 只记录全部进入事件。
+   * 旧 Bootstrap 调用路径的递归调度入口，保留供迁移期既有测试使用。
+   * 正式 Host ABI 切换后必须删除，不能再通过它重复调用 KDP Init。
    */
   async runInit(context: AppInitContext): Promise<unknown> {
+    return this.runInitFrom(context, false);
+  }
+
+  /**
+   * 当真正受选的 KDP Host Init 已经进入时，仅继续它的直接 Extension 和下一 Core。
+   * KDP 的 Init Element 不再经普通 Package 执行器二次加载；只登记一次真实进入，
+   * 并让 KDP.Exit 成为最末尾的退出动作。非 KDP 的重复 Init 仍由 Package 自行决定。
+   */
+  async runRemainingCoresAfterKernelEntered(context: AppInitContext): Promise<unknown> {
+    if (this.kernelHostEntered) {
+      throw new KdpLoadError('KDP Host Init has already entered this activation', 'DH_RUNTIME_NOT_READY');
+    }
+    this.kernelHostEntered = true;
+    return this.runInitFrom(context, true);
+  }
+
+  private async runInitFrom(context: AppInitContext, kernelAlreadyEntered: boolean): Promise<unknown> {
     const seen = new Set<string>();
     const businessResults: unknown[] = [];
     const completedCores = new Set<string>();
@@ -310,7 +329,36 @@ export class PackageSystem {
         completedCores.add(id);
       },
     });
-    await coreBinding(0, { type: 'Boot' }).init();
+    if (kernelAlreadyEntered) {
+      const kernel = this.packageById(rootId);
+      if (!kernel || kernel.role !== 'primary' || kernel.layer !== 'kernel' || kernel.order !== 0) {
+        throw new KdpLoadError('Host KDP must be the unique selected Kernel Core at Order 0');
+      }
+      const selectedInit = this.functionByRef(kernel.initFunction);
+      if (!selectedInit || canonicalJson(selectedInit.ref.element) !== canonicalJson(kernel.init)) {
+        throw new KdpLoadError('Host KDP Init Element/Function identity mismatch', 'DH_BOOT_PIN_MISMATCH');
+      }
+      // 已由 Boot 实际调用的 Host Init 在这里登记，不能再次导入、执行普通 KDP.Init。
+      this.initEvents.push(rootId);
+      if (kernel.recordInitFrom === true) {
+        const history = this.callerHistory.get(rootId) ?? [];
+        history.push({ type: 'Boot' });
+        this.callerHistory.set(rootId, history);
+      }
+      const directExtensions = kernel.dependsOn
+        .map((id) => this.packageById(id))
+        .filter((pkg): pkg is SelectedPackage => pkg?.role === 'extension')
+        .sort((a, b) => a.packageId.localeCompare(b.packageId));
+      for (const extension of directExtensions) {
+        await enter(extension.packageId, { type: 'Package', packageId: rootId }, extension.layer);
+      }
+      completedCores.add(rootId);
+      if (cores.length > 1) {
+        await coreBinding(1, { type: 'Package', packageId: rootId }).init();
+      }
+    } else {
+      await coreBinding(0, { type: 'Boot' }).init();
+    }
     // Core 负责转交下一 Core；KDP 不补跑漏掉的 Core，但在对外标记 READY 前必须确认全链完成。
     const missing = cores.filter((id) => !completedCores.has(id));
     if (missing.length > 0) {
