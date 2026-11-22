@@ -45,6 +45,24 @@ Domain App（宿主 / 业务入口，嵌入 DomainHarness SDK）
 
 这区分两种“合并”：**物理打包/静态链接融合是允许的分发优化**，不要求在运行时分别加载相同物理文件；**把 Kernel 与 SDK 改为同一个 `DomainPackageManifest` 或取消 `kernel|sdk|business` 逻辑边界不是当前要求**，在单一 `layer` 既有合同下仍需单独 L2 决议、正反例和增量审核。即使单一物理 artifact，也必须可审计地映射到多个已选逻辑 Package。
 
+### R49 · DIS/Package 规范可描述多语言；每个 Package 和每个 Domain App 永远只使用一种语言与运行时
+
+> **Owner R49 最终约束，覆盖 R47/R48 中所有“暂时不做单 App 多语言、未来可能支持单 App 多运行时”的表述。** 这是**长期架构不变量**，不是 0.11.x 暂时简化：DomainHarness 不计划在一个 Domain Package 内或一个 Domain App 内支持混合编程语言/运行时；多语言仅由 **DIS 与 Domain Package 规范层**允许分别描述、校验和交付不同语言的**独立 Package/Domain App**，不能解释为同一 App 混合装载它们。
+
+**标准归属**：DIS/Package 跨语言规范候选的详细条款由 [DIE DIS R49 PR #156](https://github.com/kaicreator-mm/domain-intelligence-engineering/pull/156) 承接（[DIS-LANG-01..06](https://github.com/kaicreator-mm/domain-intelligence-engineering/blob/docs/dis-r49-package-app-one-language-runtime/dis/research/candidates/DIS-0.2.0/PACKAGE_LANGUAGE_RUNTIME_BOUNDARY_R49.zh-CN.md)）；此处只规定 DomainHarness v0.11.x 如何遵循 Owner 的单语言/单运行时架构，不成为第二套标准权威。上述 DIE PR 仍是 DIS v0.2.0 **候选**，不修改冻结的 DIS 0.1.0 或声称完成多语言运行时实现。
+
+**统一边界（Owner 已决议，规范层原则）：**
+
+1. **每个 Domain Package 固定一种编程语言和一种运行时。** 构建/封存时绑定，整个 Package 的执行实现（Init、Exit、Functions 等）必须一致；禁止一个 Manifest 用 `targetVariants` 把 Node、Python、Rust 等不同语言/运行时组合为“同一个 Package 的不同实现”。`targetVariants` 只可在**相同语言和运行时**内描述适配 Target（如平台版本），不改变 Package 的语言/运行时身份。
+2. **每个 Domain App 固定一种编程语言和一种运行时。** App 在应用组合时选定统一的语言/运行时，其**直接纳入同一 App 执行闭包的所有 Kernel、SDK、Business Domain Packages 必须与该 App 一致**；不允许一个 Node App 直接加载 Python/Rust Package、通过双 VM 使它们作为同一 App 内部 Package 协同执行，或在 Boot 时为不同 Packages 切换语言/Runtime。这条约束**未来也不放宽**。
+3. **同一 App 内的 Package-to-Package 直接依赖/调用**继续遵守既有 `dependsOn`、`imports/exports`、FunctionRef、Target、权限与 Core.Order/Init/Exit，前提是属于**相同语言/运行时的执行闭包**。不同语言组件或不同语言的 Package 需要互操作时，**仅允许在各自独立进程/应用之外经显式授权的外部调用边界**（例如 RPC、IPC、独立进程 FFI bridge/Host Port）交换消息/请求；这不是跨语言 `FunctionRef` 直调，不把对端加入本 App 的 Package 闭包，也不构成应用内多 Runtime。任何 FFI 如涉及本进程直接装载另一个语言运行时，**不能据此绕过本条单 Runtime 约束**；必要时使用独立进程适配。调用边界的权限、协议、错误及 Effect 必须有独立的受控契约。
+4. **多语言是 DIS/Package 规范的可表达范围**：例如可以存在由 TypeScript/Node 实现的 A Package 与由 Python/Python Runtime 实现的 B Package，也可分别有 Node Domain App 与 Python Domain App；**不能**把这两个不同运行时的 Packages 直接装配进同一个 Domain App。DomainHarness SDK 的**某个实现版本**只须支持其已宣布的语言/运行时，不需实现多语言加载器或通用包管理平台。
+5. **本次 0.11.x 唯一受支持的实现目标仍是 TypeScript 编写、构建为 JavaScript ESM、运行于 Node.js**（当前已实现的 `node22-esm/1` Profile，Node >=22.12.0）。TypeScript 是编写/构建语言，ESM 是编译后执行格式，并非一个 Package 内两种运行时；现存直接编写的 ESM 文件属于这个 Node 执行模型的制品。当前 `TargetSelector`、`DomainPackageManifest`、`DomainAppLock` 与 Schema 只有该 Node ESM 合同，**尚未实现独立的语言身份字段或跨语言同 App 检查**；不能把文档决议冒充已具备跨语言拒绝测试。
+6. **依赖分类保持清晰**：`dependsOn` 指 Domain Package 的显式 API/权限依赖；npm、pip、Cargo 等是各语言环境自身的外部库/工具链依赖。当前只实际使用 Node/npm，BUILD/安装侧确定依赖版本、制品摘要和可复现结果，Boot 不在线解析或选择语言。未来 DIS/Package 规范可增补语言/运行时及原生依赖锁定元数据，但无需在现在创造通用 Resolver、FFI 框架、双 VM 或另一套 Kernel/BUILD/Forge。
+7. **演进边界**：未来确实要支持另一门语言时，独立实现**该语言对应的 Package / Domain App / SDK 适配范围**并建立其执行合同；不放宽单 Package/单 App 单语言单运行时的规范。不为这一未来假设现在改造 v0.11.x 的已验收 Node ESM Manifest、Lock、Boot 或 R52/R58 单一 SDK 内置 Composition 的当前安装合同。
+
+**结论**：**DIS/Package 标准可跨语言复用；一个具体 Package 和一个具体 Domain App 的执行边界必须同语言、同运行时。跨语言只能通过明确授权的外部进程/服务调用协议衔接，不是 App 内的混合 Package 组合。**
+
 ## 2. Domain Package 的文件构成
 
 最简形式是 **一份规范 Manifest + 必要的 Element Definitions + 被引用的内容/函数实现/资源文件**。根据实际 Package 合同决定文件数量与类型，不规定必须有多少文件、必须使用某个模板目录、必须是工具产物。当前的 `packages/contracts/src/package-manifest.ts::DomainPackageManifest` 已含：

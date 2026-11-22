@@ -47,11 +47,10 @@ export interface WorkflowDataSource {
   readonly maxBytes: number;
 }
 
-/** T13 从封存 ResourceRef 读出 UTF-8 后，同时提供原文与受信解析后的纯 JSON 值。 */
+/** KDP 只读取已封存 ResourceRef 的 UTF-8；实际 Format→JsonValue 由已选普通 Reader Element 负责。 */
 export interface WorkflowReaderInput {
   readonly format: 'json' | 'yaml';
   readonly source: string;
-  readonly value: JsonValue;
 }
 
 export interface WorkflowElementHooks {

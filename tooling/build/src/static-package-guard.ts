@@ -2,7 +2,7 @@
 import { posix } from 'node:path';
 import * as ts from 'typescript';
 import type { DomainPackageManifest, ResourceRef } from '@kaicreator/domain-harness-contracts';
-import { isRelativeResourcePath } from '@kaicreator/domain-harness-contracts';
+import { isRelativeResourcePath, contentDigestOf, type JsonValue } from '@kaicreator/domain-harness-contracts';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { refusal } from './refusal.js';
 import { resolveExportedModule } from './app-package.js';
@@ -184,6 +184,20 @@ export function verifyGeneratedPackageImports(
     }
     const allowed = new Set(consumer.dependsOn.map((dep) => dep.package));
     const inspectModule = (specifier: string, declaration?: ts.ImportDeclaration, dynamic = false): string => {
+      if (specifier === 'yaml') {
+        // 仅所选且显式声明精确版本的 SDK/Business Package 可导入受信第三方库。
+        // 此范围只支持预先审核并具有受控 SRI 的 Node ESM 子集。
+        // 未选定、未经声明或动态加载的外部依赖全部拒绝。
+        const json = JSON.parse(Buffer.from(scope.read(ref.packageId, 'package.json')).toString('utf8')) as {
+          readonly dependencies?: Readonly<Record<string, string>>;
+        };
+        if (dynamic || (consumer.layer !== 'business' && consumer.layer !== 'sdk') ||
+            json.dependencies?.yaml !== '2.9.1') {
+          throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+            `Package '${ref.packageId}' imports unapproved external npm capability '${specifier}'`);
+        }
+        return 'node:builtin';
+      }
       if (specifier.startsWith('node:')) {
         if (!SAFE_BUILTINS.has(specifier)) {
           throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
@@ -220,12 +234,39 @@ export function verifyGeneratedPackageImports(
         }
         if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
           const actual = staticallyExportedNames(parseModule(target, scope.verify(target)));
-          const publicNames = publicFunctionExportNames(selected.get(owner)!, target);
+          const ownerPackage = selected.get(owner)!;
+          const publicNames = publicFunctionExportNames(ownerPackage, target);
           for (const element of clause.namedBindings.elements) {
             const importedName = element.propertyName?.text ?? element.name.text;
             if (!actual.has(importedName) || !publicNames.has(importedName)) {
               throw refusal('DH_BUILD_EXPORT_MISSING',
                 `Package '${ref.packageId}' imports private or missing export '${importedName}' from '${specifier}'`);
+            }
+            // 仅声明直接 Package dependsOn 不提供具体 Element.Function 的调用权；
+            // 必须同时持有已选 owner 的真实 Element 内容摘要 + 精确 FunctionRef。
+            const matched = ownerPackage.targetVariants.some((variant) =>
+              variant.implementations.some((binding) => {
+                if (binding.entry.exportName !== importedName ||
+                    binding.entry.module.packageId !== target.packageId ||
+                    binding.entry.module.path !== target.path ||
+                    binding.entry.module.digest !== target.digest) return false;
+                const entry = ownerPackage.elements.find((candidate) =>
+                  candidate.id === binding.elementId);
+                if (!entry) return false;
+                const definition = JSON.parse(new TextDecoder('utf-8', { fatal: true })
+                  .decode(scope.verify(entry.definitionRef))) as JsonValue;
+                const digest = contentDigestOf(definition);
+                return consumer.imports.some((authorized) =>
+                  authorized.element.id === binding.elementId &&
+                  authorized.element.namespace === binding.elementId.split('.')[0] &&
+                  authorized.element.version === entry.version &&
+                  authorized.element.digest === digest &&
+                  authorized.functionId === binding.functionId &&
+                  authorized.contractVersion === binding.contractVersion);
+              }));
+            if (!matched) {
+              throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+                `Package '${ref.packageId}' imports '${importedName}' without exact FunctionRef authorization`);
             }
           }
         }

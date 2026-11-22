@@ -310,6 +310,14 @@ assert.equal(typeof BuildRefusal, 'function');
   for (const name of ['consumer.mjs', 'workflow-fixture.mjs']) {
     cpSync(fileURLToPath(new URL(`./${name}`, import.meta.url)), join(consumerRoot, name));
   }
+  // R60 W02：外部隔离 Consumer 必须携带标准的真实多文件 Package 源，
+  // 不能在临时环境中隐式回读 SDK 仓库，更不能把解析实现复制成第二份。
+  const standardReaderSource = join(repoRoot, 'examples/selected-packages/packages/r60-standard-files');
+  const standardReaderConsumer = join(workRoot, 'selected-packages/packages/r60-standard-files');
+  mkdirSync(dirname(standardReaderConsumer), { recursive: true });
+  cpSync(standardReaderSource, standardReaderConsumer, { recursive: true });
+  assert.ok(existsSync(join(standardReaderConsumer, 'manifest.json')));
+  record('standard-reader.external-real-package', { imported: true, packageCount: 1 });
   const consumerEvidence = join(evidenceDir, 'consumer');
   mkdirSync(consumerEvidence, { recursive: true });
   const child = spawnSync(process.execPath, ['consumer.mjs'], {

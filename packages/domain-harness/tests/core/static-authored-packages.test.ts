@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -20,6 +21,7 @@ const XSTATE_DIR = dirname(fileURLToPath(import.meta.resolve('xstate/package.jso
 const YAML_DIR = dirname(fileURLToPath(import.meta.resolve('yaml/package.json')));
 const IDS = ['r41-kdp', 'r41-sdk-base', 'r41-sdk-extra', 'r41-business'] as const;
 const KDP = 'r41-kdp';
+const STANDARD_READER = 'r60-standard-files';
 const MICROKERNEL = '@kaicreator/domain-harness-microkernel';
 const CONTRACTS = '@kaicreator/domain-harness-contracts';
 const LOCK_PATH = 'dh-lock/app.lock.json';
@@ -29,15 +31,16 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;
 }
 
-function authoredInput(name: 'basic' | 'extended', source = SOURCE): BuildInput {
-  const packages = IDS.map((id) =>
+function authoredInput(name: 'basic' | 'extended', source = SOURCE, withReader = false): BuildInput {
+  const ids: readonly string[] = withReader ? [...IDS, STANDARD_READER] : IDS;
+  const packages = ids.map((id) =>
     readJson(join(source, 'packages', id, 'manifest.json')) as DomainPackageManifest);
   const descriptor = readJson(join(source, 'apps', `${name}.json`)) as DomainAppDescriptor;
   return {
     descriptor, packages,
-    packageRoots: Object.fromEntries(IDS.map((id) =>
+    packageRoots: Object.fromEntries(ids.map((id) =>
       [id, join(source, 'packages', id)])),
-    packageArtifacts: Object.fromEntries(IDS.map((id) => [id, 'dist/index.mjs'])),
+    packageArtifacts: Object.fromEntries(ids.map((id) => [id, 'dist/index.mjs'])),
     kdpArtifact: { packageId: KDP, path: 'dist/bootstrap.js' },
   };
 }
@@ -110,13 +113,15 @@ async function copyWorkspaceDependency(
 async function installAuthoredApp(
   name: 'basic' | 'extended',
   t: import('node:test').TestContext,
+  source: string = SOURCE,
+  withReader = false,
 ): Promise<{ lock: DomainAppLock; app: Awaited<ReturnType<typeof boot>> }> {
-  const built = accepted(authoredInput(name));
+  const built = accepted(authoredInput(name, source, withReader));
   const installRoot = await mkdtemp(join(tmpdir(), 'dh-r41-boot-'));
   t.after(async () => rm(installRoot, { recursive: true, force: true }));
   const selected = built.lock.selectedPackages.map((pkg) => pkg.packageId);
   for (const id of selected) {
-    await cp(join(SOURCE, 'packages', id),
+    await cp(join(source, 'packages', id),
       join(installRoot, 'node_modules', id), { recursive: true });
   }
   const exported = { '.': { types: './dist/index.d.ts', import: './dist/index.js' } };
@@ -127,7 +132,7 @@ async function installAuthoredApp(
   await cp(XSTATE_DIR, join(installRoot, 'node_modules/xstate'), { recursive: true });
   await cp(YAML_DIR, join(installRoot, 'node_modules/yaml'), { recursive: true });
 
-  const descriptor = authoredInput(name).descriptor as DomainAppDescriptor;
+  const descriptor = authoredInput(name, source, withReader).descriptor as DomainAppDescriptor;
   await mkdir(join(installRoot, 'descriptor'), { recursive: true });
   await mkdir(join(installRoot, 'dh-lock'), { recursive: true });
   await mkdir(join(installRoot, 'dh-install'), { recursive: true });
@@ -182,3 +187,243 @@ for (const name of ['basic', 'extended'] as const) {
         .map((event) => event.packageId), [...expected].reverse());
     });
 }
+
+/** R60 W02：另一真实领域 r41 在 Package.Init 中直接调用已选的公共 Reader Function。 */
+async function r60OtherDomain(t: import('node:test').TestContext): Promise<string> {
+  const source = await mkdtemp(join(tmpdir(), 'dh-r60-second-domain-'));
+  t.after(async () => rm(source, { recursive: true, force: true }));
+  await cp(SOURCE, source, { recursive: true });
+  const businessDir = join(source, 'packages/r41-business');
+  const modulePath = join(businessDir, 'dist/index.mjs');
+  const oldModule = readFileSync(modulePath, 'utf8');
+  const oldReturn = "  return { status: 'READY' };";
+  assert.ok(oldModule.includes(oldReturn), 'second Domain must preserve real business Init body');
+  const moduleText = `import { readJson, writeJson, writeYaml } from 'r60-standard-files';\n` +
+    oldModule.replace(oldReturn, `
+  const readerResult = readJson({ format: 'json', source: '{"customer":"r41"}' });
+  if (readerResult.kind !== 'SUCCEEDED' || readerResult.value.customer !== 'r41') {
+    throw new Error('R60 failed to execute selected reader');
+  }
+  const written = writeJson({ format: 'json', value: readerResult.value });
+  if (written.kind !== 'SUCCEEDED' || JSON.parse(written.value).customer !== 'r41') {
+    throw new Error('R60 failed to serialize selected JSON file data');
+  }
+  const yamlText = writeYaml({ format: 'yaml', value: readerResult.value });
+  if (yamlText.kind !== 'SUCCEEDED' || !yamlText.value.includes('customer: r41')) {
+    throw new Error('R70 selected YAML Writer failed during Package.Init');
+  }
+  globalThis.__dhR41Events.push({ phase: 'standard-reader', packageId: 'r41-business' });
+  globalThis.__dhR41Events.push({ phase: 'standard-yaml-writer', packageId: 'r41-business' });
+  return { status: 'READY' };`);
+  writeFileSync(modulePath, moduleText);
+  const digest: `sha256:${string}` = `sha256:${createHash('sha256').update(moduleText).digest('hex')}`;
+  const manifestPath = join(businessDir, 'manifest.json');
+  const manifest = readJson(manifestPath) as DomainPackageManifest;
+  const definition = readJson(join(source, 'packages', STANDARD_READER, 'definitions/json-file.json')) as
+    import('@kaicreator/domain-harness-contracts').ElementDefinition;
+  const readerRef = {
+    element: { namespace: definition.id.split('.')[0]!, id: definition.id, version: definition.version,
+      digest: contentDigestOf(definition as unknown as JsonValue) },
+    functionId: 'readJson', contractVersion: '1',
+  };
+  const yamlDefinition = readJson(join(source, 'packages', STANDARD_READER,
+    'definitions/yaml-file.json')) as import('@kaicreator/domain-harness-contracts').ElementDefinition;
+  const yamlWriterRef = {
+    element: { namespace: yamlDefinition.id.split('.')[0]!, id: yamlDefinition.id,
+      version: yamlDefinition.version, digest: contentDigestOf(yamlDefinition as unknown as JsonValue) },
+    functionId: 'writeYaml', contractVersion: '1',
+  };
+  const updated: DomainPackageManifest = {
+    ...manifest,
+    dependsOn: [...manifest.dependsOn,
+      { package: STANDARD_READER, version: '1.0.0', interface: 'r60.files.api' }],
+    imports: [...manifest.imports, readerRef, { ...readerRef, functionId: 'writeJson' }, yamlWriterRef],
+    targetVariants: manifest.targetVariants.map((variant) => ({
+      ...variant, implementations: variant.implementations.map((fn) => ({
+        ...fn, entry: { ...fn.entry, module: { ...fn.entry.module, digest } },
+      })),
+    })),
+  };
+  writeFileSync(manifestPath, canonicalJson(updated as unknown as JsonValue));
+  const appPath = join(source, 'apps/extended.json');
+  const app = readJson(appPath) as DomainAppDescriptor;
+  writeFileSync(appPath, canonicalJson({
+    ...app, extensions: [...app.extensions, { package: STANDARD_READER, version: '1.0.0' }],
+  } as unknown as JsonValue));
+  return source;
+}
+
+test('R60 W02: second domain r41 App boots and actually invokes same ordinary Standard Reader', {
+  timeout: 120_000,
+}, async (t) => {
+  const source = await r60OtherDomain(t);
+  const input = authoredInput('extended', source, true);
+  const built = accepted(input);
+  assert.ok(built.lock.selectedPackages.some((pkg) => pkg.packageId === STANDARD_READER));
+  const selected = built.lock.selectedFunctions.find((fn) =>
+    fn.ref.element.id === 'dh.std.file.json' && fn.ref.functionId === 'readJson');
+  assert.ok(selected, 'cross-domain exact File.Read FunctionRef selected by BUILD');
+  assert.ok(built.lock.selectedFunctions.some((fn) =>
+    fn.ref.element.id === 'dh.std.file.json' && fn.ref.functionId === 'writeJson'),
+  'cross-domain exact JSON File.Write FunctionRef selected by BUILD');
+  assert.ok(built.lock.selectedFunctions.some((fn) =>
+    fn.ref.element.id === 'dh.std.file.yaml' && fn.ref.functionId === 'writeYaml'),
+  'cross-domain exact YAML File.Write FunctionRef selected by BUILD');
+  const result = await installAuthoredApp('extended', t, source, true);
+  assert.equal(result.app.status, 'BOOTED', JSON.stringify(result.app));
+  if (result.app.status !== 'BOOTED') return;
+  assert.equal(result.app.app.status, 'READY');
+  assert.ok((globalThis.__dhR41Events ?? []).some((event) =>
+    event.phase === 'standard-reader' && event.packageId === 'r41-business'),
+  'another bounded domain must run the same File Function in its real Init');
+  assert.ok((globalThis.__dhR41Events ?? []).some((event) =>
+    event.phase === 'standard-yaml-writer' && event.packageId === 'r41-business'),
+  'YAML Writer must execute within the second real Domain Package.Init');
+  await result.app.app.dispose();
+});
+
+test('R60 W02: another Domain cannot import unselected or undeclared Standard Reader', async (t) => {
+  const source = await r60OtherDomain(t);
+  const input = authoredInput('extended', source, true);
+  const selectedPool = input.packages as readonly DomainPackageManifest[];
+  const unimported = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+    pkg.id === 'r41-business' ? { ...pkg, imports: [] } : pkg) });
+  assert.equal(unimported.ok, false, 'a public File Function still requires an exact manifest import');
+  const missingWrite = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+    pkg.id === 'r41-business'
+      ? { ...pkg, imports: pkg.imports.filter((item) => item.functionId !== 'writeJson') }
+      : pkg) });
+  assert.equal(missingWrite.ok, false, 'selected File.Write cannot bypass exact FunctionRef import');
+  const missingYamlWrite = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+    pkg.id === 'r41-business'
+      ? { ...pkg, imports: pkg.imports.filter((item) => item.functionId !== 'writeYaml') }
+      : pkg) });
+  assert.equal(missingYamlWrite.ok, false, 'YAML Writer cannot bypass exact FunctionRef import');
+  const unselected = buildApp({ ...input, packages: selectedPool.filter((pkg) =>
+    pkg.id !== STANDARD_READER) });
+  assert.equal(unselected.ok, false, 'omitting a selected Standard Package cannot silently grant access');
+
+  const staleDigest = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+    pkg.id === 'r41-business' ? {
+      ...pkg, imports: pkg.imports.map((item) => item.functionId === 'readJson'
+        ? { ...item, element: { ...item.element, digest: `sha256:${'0'.repeat(64)}` as `sha256:${string}` } } : item),
+    } : pkg) });
+  assert.equal(staleDigest.ok, false, 'wrong Standard Element digest is not an authorized FunctionRef');
+
+  const privateSource = await r60OtherDomain(t);
+  const manifestFile = join(privateSource, 'packages', STANDARD_READER, 'manifest.json');
+  const original = readJson(manifestFile) as DomainPackageManifest;
+  const privatized = { ...original,
+    elements: original.elements.map((item) => item.id === 'dh.std.file.json'
+      ? { ...item, visibility: 'private' as const } : item),
+  };
+  writeFileSync(manifestFile, canonicalJson(privatized as unknown as JsonValue));
+  const denied = buildApp(authoredInput('extended', privateSource, true));
+  assert.equal(denied.ok, false, 'public Function name cannot bypass private Standard Element visibility');
+});
+
+/**
+ * R60 W07: directly edit real Package files (no Generator / Forge) into a second
+ * SDK generation, then use the identical public Composition + Boot path.
+ * A changing implementation is not legitimate until all version/digest/target
+ * identities are sealed together; stale or incompatible references must refuse.
+ */
+async function nextGenerationSource(t: import('node:test').TestContext): Promise<string> {
+  const source = await mkdtemp(join(tmpdir(), 'dh-r60-sdk-generation2-'));
+  t.after(async () => rm(source, { recursive: true, force: true }));
+  await cp(SOURCE, source, { recursive: true });
+  const pkgRoot = join(source, 'packages/r41-sdk-extra');
+  const definitionPath = join(pkgRoot, 'definitions/lifecycle.json');
+  const modulePath = join(pkgRoot, 'dist/index.mjs');
+  const descriptorPath = join(source, 'apps/extended.json');
+  const oldDefinition = readJson(definitionPath) as Record<string, unknown>;
+  const version = '1.0.1';
+  const definition = { ...oldDefinition, version,
+    description: 'Second-generation directly authored SDK Extension lifecycle' };
+  const definitionBytes = Buffer.from(canonicalJson(definition as unknown as JsonValue), 'utf8');
+  await writeFile(definitionPath, definitionBytes);
+  const definitionSha = `sha256:${createHash('sha256').update(definitionBytes).digest('hex')}`;
+  const definitionIdentity = contentDigestOf(definition as unknown as JsonValue);
+
+  const before = readFileSync(modulePath, 'utf8');
+  const oldMarker = "events.push({ phase: 'init', packageId: 'r41-sdk-extra' });";
+  assert.ok(before.includes(oldMarker), 'second generation requires original actual Init implementation');
+  const moduleBytes = Buffer.from(before.replace(oldMarker,
+    "events.push({ phase: 'init', packageId: 'r41-sdk-extra-v2' });"), 'utf8');
+  await writeFile(modulePath, moduleBytes);
+  const moduleSha = `sha256:${createHash('sha256').update(moduleBytes).digest('hex')}`;
+
+  const manifest = readJson(join(pkgRoot, 'manifest.json')) as DomainPackageManifest;
+  const upgraded = {
+    ...manifest, version,
+    elements: manifest.elements.map((item) => ({
+      ...item, version, definitionRef: { ...item.definitionRef, digest: definitionSha },
+    })),
+    init: { ...manifest.init, version, digest: definitionIdentity },
+    ...(manifest.exit ? { exit: { ...manifest.exit, version, digest: definitionIdentity } } : {}),
+    targetVariants: manifest.targetVariants.map((variant) => ({
+      ...variant,
+      implementations: variant.implementations.map((impl) => ({
+        ...impl,
+        entry: { ...impl.entry, module: { ...impl.entry.module, digest: moduleSha } },
+      })),
+    })),
+  };
+  await writeFile(join(pkgRoot, 'manifest.json'), canonicalJson(upgraded as unknown as JsonValue));
+  const packageJson = readJson(join(pkgRoot, 'package.json')) as Record<string, unknown>;
+  await writeFile(join(pkgRoot, 'package.json'), canonicalJson({
+    ...packageJson, version,
+  } as unknown as JsonValue));
+  const oldDescriptor = readJson(descriptorPath) as DomainAppDescriptor;
+  const updatedDescriptor = {
+    ...oldDescriptor, version,
+    roots: { ...oldDescriptor.roots,
+      cores: oldDescriptor.roots.cores.map((core) =>
+        core.package === 'r41-sdk-extra' ? { ...core, version } : core),
+    },
+  };
+  await writeFile(descriptorPath, canonicalJson(updatedDescriptor as unknown as JsonValue));
+  return source;
+}
+
+test('R60 W07: SDK composes and boots a directly authored second SDK Package generation', {
+  timeout: 120_000,
+}, async (t) => {
+  const source = await nextGenerationSource(t);
+  const original = accepted(authoredInput('extended'));
+  const newBuild = accepted(authoredInput('extended', source));
+  assert.notEqual(newBuild.lock.closureDigest, original.lock.closureDigest);
+  assert.notDeepEqual(newBuild.lockBytes, original.lockBytes);
+  assert.ok(newBuild.lock.selectedPackages.some((pkg) =>
+    pkg.packageId === 'r41-sdk-extra' && pkg.version === '1.0.1'));
+  assert.deepEqual(accepted(authoredInput('extended', source)).lockBytes, newBuild.lockBytes);
+  const { app } = await installAuthoredApp('extended', t, source);
+  assert.equal(app.status, 'BOOTED', JSON.stringify(app));
+  if (app.status !== 'BOOTED') return;
+  assert.equal(app.app.status, 'READY');
+  assert.ok((globalThis.__dhR41Events ?? []).some((e) =>
+    e.phase === 'init' && e.packageId === 'r41-sdk-extra-v2'),
+  'new authored SDK version must execute actual new selected Init');
+  await app.app.dispose();
+  assert.ok((globalThis.__dhR41Events ?? []).some((e) =>
+    e.phase === 'exit' && e.packageId === 'r41-sdk-extra'));
+});
+
+test('R60 W07: second-generation version and Target mismatches fail closed before Boot', async (t) => {
+  const source = await nextGenerationSource(t);
+  const input = authoredInput('extended', source);
+  const descriptor = input.descriptor as DomainAppDescriptor;
+  const stale = { ...descriptor,
+    roots: { ...descriptor.roots,
+      cores: descriptor.roots.cores.map((core) => core.package === 'r41-sdk-extra'
+        ? { ...core, version: '1.0.0' } : core),
+    },
+  };
+  const rejectedVersion = buildApp({ ...input, descriptor: stale });
+  assert.equal(rejectedVersion.ok, false, 'stale SDK Package reference must never execute');
+  const incompatibleTarget = {
+    ...descriptor, target: { ...descriptor.target, nodeMajor: 23 },
+  };
+  const rejectedTarget = buildApp({ ...input, descriptor: incompatibleTarget });
+  assert.equal(rejectedTarget.ok, false, 'unselected Node Target must never silently remap');
+});

@@ -1,7 +1,9 @@
-# DomainHarness 0.11.0
+# DomainHarness 0.11.x · 单一嵌入式 SDK（全量重写）
 
-纯净 Element-First monorepo。生产实现仅有 `packages/contracts`、`tooling/build`、`packages/microkernel`、`packages/domain-harness` 四个工作空间；旧版源码不保留在工作树中，历史可从 Git 查询。
+纯净 Element-First Git monorepo：内部有 Contracts、私有 Composition 实现 `tooling/build`、Microkernel 和公开 SDK 四个 Workspace；**Consumer 只声明一个公开产品 `@kaicreator/domain-harness`**，通过 `/runtime` 与 `/composition` 使用能力，不能再显式安装独立 BUILD。Domain Package 是可由人工/ChatGPT/Agent 直接编写的合规文件集合，Forge/Generator/独立 Assembly 不是前置。旧版源码只在 Git 历史中。
 
 最低 Node.js 22.12.0。运行 `npm ci && npm run verify`，执行完整的单一 Domain App Demo `examples/basic-domain-app`。
 
 [源码架构与完整调用流程](docs/architecture/DOMAIN_HARNESS_V0110_CODE_AND_CALL_FLOW.md) · [0.11.0 产品 PRD](docs/product/DomainHarness_v0.11.0_ELEMENT_FIRST_PRODUCT_PRD_CANDIDATE.md) · [L2](docs/architecture/DomainHarness_v0.11.0_L2_ARCHITECTURE_CANDIDATE.md) · [TypeScript Skill](.agents/skills/typescript-quality/SKILL.md) · [重构工程经验](docs/engineering/DOMAIN_HARNESS_V0110_REFACTOR_LESSONS.md) · [后续版本防回归手册](docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)
+
+当前内部阶段：v0.11.1 T11–T14 和 R53/R58 已受审集成；最近架构优化归 [v0.11.1 单一 Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656)，**新增验收尚未完成，不转 0.11.2**。整个 0.11.x 尚未对外 Release。

@@ -1,5 +1,7 @@
 # DomainHarness 0.11.x — Standard Element 体系与递增复用规范（R29）
 
+> **【CURRENT · R70 W02】** 标准 dh.std.file.json / dh.std.file.yaml 的读写 Element 实码归 0.11.1 [#1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 与唯一 [集成 PR #1663](https://github.com/kaicreator-mm/domain-harness/pull/1663)。R69 独立审核结论为 REWORK（单 SDK Registry Workflow E2E 存在 P1 证据缺口），R70 在本版修复并等待新 HEAD 验证及另一对话受影响复审。**合并验收前不冒充 STANDARD_ACCEPTED**；KDP 仍只处理已选资源字节、授权和 Lock，真正 JSON/YAML 解析及序列化仅由普通 File Element 完成。
+
 > **【R36 当前 Standard Element Package 生成方式】**：Standard Element 也是普通多文件 Domain Package 的内容；可以由 ChatGPT/开发者直接编写 ElementDefinition、Manifest、Function ESM、资源并按 DIS 适用 + v0.11.x 实际合同验证。**不需要 Seed Builder、生成器或额外 Package Assembly 生产阶段**；组合 App 只选择/校验使用的文件、依赖、Target 和 Boot。参见 [R36](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
 
 
@@ -38,16 +40,16 @@ SCOPE=DESIGN_AND_INCREMENTAL_EXTRACTION_NOT_IMPLEMENTED
 
 **严禁用继承树或新增 `kind:'StandardElement'` 取代当前 `kind:'Element'`。** `standard` 是资产级分类/所有权/准入资格，记录在标准目录/文档及构建期 Package 清单中，绝不是运行时新的根类型、全局动态 Service Locator、自动放权或强制安装所有标准库。组合 App 只包含 BUILD 显式选中的内容。
 
-## 2. 从 0.11.1 提取的首批候选：分清“已证明复用”与“已经标准化”
+## 2. 【HISTORICAL · R29 早期候选状态，非 R70 源码现状】 从 0.11.1 提取的首批候选：分清“已证明复用”与“已经标准化”
 
 | 候选公共资产 | v0.11.1 实际来源 | 目标 Standard Element | 执行边界 |
 |---|---|---|---|
-| **JsonReader** | `workflow-fixture.mjs` 中的 demo `jsonReader`；实际 `JSON.parse` 在 `workflow-execution.ts::prepareDataInput` | `dh.std.reader.json`：声明纯输入/输出/失败语义的通用已选 Reader Function | BUILD/KDP 仍负责固定资源授权、摘要、大小与严格 UTF-8；可复用解析必须有**单一**实现归属，不能 KDP 与 Element 各自解释不同的 JSON |
-| **YamlReader** | demo `yamlReader`；实际 `yaml.parseDocument`、JSON-compatible 检查在 `workflow-execution.ts` | `dh.std.reader.yaml`：安全、版本化 YAML→JsonValue Reader | 保留 YAML 1.2 core/uniqueKeys、别名/Tag/节点成本边界及清晰 UNKNOWN/FAILED；不能向业务暴露任意 fs/network |
+| **JsonReader** | `workflow-fixture.mjs` 中的 demo `readJson`；实际 `JSON.parse` 在 `workflow-execution.ts::prepareDataInput` | `dh.std.file.json`：声明纯输入/输出/失败语义的通用已选 File.Read Function | BUILD/KDP 仍负责固定资源授权、摘要、大小与严格 UTF-8；可复用解析必须有**单一**实现归属，不能 KDP 与 Element 各自解释不同的 JSON |
+| **YamlReader** | demo `readYaml`；实际 `yaml.parseDocument`、JSON-compatible 检查在 `workflow-execution.ts` | `dh.std.file.yaml`：安全、版本化 YAML↔JsonValue File Element | 保留 YAML 1.2 core/uniqueKeys、别名/Tag/节点成本边界及清晰 UNKNOWN/FAILED；不能向业务暴露任意 fs/network |
 | **通用状态模型与转换策略** | `workflow-contracts.ts` 中 `WorkflowDefinition` / `state-model` ContentKind；`workflow-run.ts` 中 XState Actor、`workflow-execution.ts` 中路由和预算 | `dh.std.workflow.transition`（候选）：声明式状态模型/纯 Guard/具名 Transition/合法终态模板，可以被不同领域 Workflow 选用 | **XState Actor、子 Workflow 调度、Hook、计数/深度、授权/预算继续由唯一 KDP 执行；不能把 XState 引擎包装为第二个可调用 Workflow Runtime Element** |
 | **具名 Switch、Outcome 公共合同** | T11 合同 + T13 KDP 语义 | 优先复用已有 Contracts；有跨领域业务规则时才提取 `dh.std.decision.selector` 等 Function Element | 通用路由/拒绝语义属于 Engine，不因为提取公共 Element 而复制一个自由选路框架 |
 
-**重要现状判断：** T14 已证实“多个 JSON/YAML Data Elements 复用同一 Reader FunctionRef”，但这些 Reader 目前仍由 demo 中的 `basic.rules` 提供；这**不等于**仓库已有可独立依赖、独立版本化的标准 `JsonReader/YamlReader` Package。状态机同理：复用底层 XState 并不等于已有独立的 Standard StateMachine Element。必须通过后续有限提取、实际消费和独立验收才能将候选标为 `STANDARD_ACCEPTED`。
+**【HISTORICAL · SUPERSEDED_BY_R69/R70】重要现状判断：** T14 已证实“多个 JSON/YAML Data Elements 复用同一 File.Read FunctionRef”，但这些 Reader 目前仍由 demo 中的 `basic.rules` 提供；这**不等于**仓库已有可独立依赖、独立版本化的标准 `JsonReader/YamlReader` Package。状态机同理：复用底层 XState 并不等于已有独立的 Standard StateMachine Element。必须通过后续有限提取、实际消费和独立验收才能将候选标为 `STANDARD_ACCEPTED`。
 
 ## 3. Element 标准化条件：最小、可证伪、不搞行政审批
 
@@ -71,7 +73,7 @@ Catalog 初期采用仓库版本化 Markdown/清单即可（状态、ElementRef/
 
 **初始资产清单与状态**：[0.11.x Standard Element Catalog](./DomainHarness_v0.11.x_STANDARD_ELEMENT_CATALOG.md)。每个候选如尚无独立标准 Package/Consumer 验证，就只能标 `CANDIDATE`；不能把 demo Reader、已存在 KDP/XState 引擎当作已发布的 Standard Element。
 
-## 4. 单仓代码组织与下一轮有限提取
+## 4. 【HISTORICAL · R29 旧提取计划，现归 0.11.1 #1656】 单仓代码组织与下一轮有限提取
 
 建议在现有 Git monorepo 中渐进建立 `packages/standard-elements/`（或同等单一标准 Package 工作区），其中按 `readers/`、`workflow/`、`decision/`、`validation/` 整理。**目录只是源码管理，并不自动产生跨 Package 的调用权限。** 每个可选标准资产须明确 Package Manifest、ElementDefinition、FunctionRef、Target 实现及 BUILD 所选资源；必要时标准包可以拆为多个更小的普通 Package 供按需组合。新 workspaces/lockfile 变化与实际 Package 生成必须经过受影响构建测试，不因设计文件存在而宣称模块已可安装。
 
@@ -95,8 +97,18 @@ Catalog 初期采用仓库版本化 Markdown/清单即可（状态、ElementRef/
 
 每个版本收尾记录新增/复用/降级的标准候选与真实受审证据，Catalog 随实现合并更新，未实施的条目仅标 `CANDIDATE`。由各版已有主 Issue 负责实施和资格，#1563 只做跨阶段索引；不创建第二个版本总控和永久驻留 Agent 任务。
 
-## 6. 当前证据与不可冒领
+## 6. 【HISTORICAL · R29 旧实施状态，不代表当前】 当前证据与不可冒领
 
 - [v0.11.1 Product #1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)、[L2 #1608](https://github.com/kaicreator-mm/domain-harness/issues/1608)：R27 `ACCEPT_SCOPED`，T11–T14 原始 Source/E2E 合入 `version/v0.11.x@3145104258a4da5f8cc940482ff77322b97d6cf6`。当前标准 Reader 与 StateMachine Asset 的**提取实施 NOT_STARTED**。
 - Parser 现状：`packages/microkernel/src/workflow-execution.ts`；Demo Reader 现状：`examples/basic-domain-app/workflow-fixture.mjs` 与 `consumer.mjs`；XState runtime：`packages/microkernel/src/workflow-run.ts`。
 - 执行边界：0.11.0 Foundation、0.11.1 Task 既有已接受资格复用；新抽取只对改动的代码/实际 Consumer 做独立 Review/必要 CI；不把文档规划、候选 Catalog、Mock 结果升级为 `STANDARD_ACCEPTED` 或正式 Release。
+
+
+## R69 · 标准文件格式 Element 的双向接口（归属 v0.11.1 #1656）
+
+标准 ID 为 `dh.std.file.json`、`dh.std.file.yaml`。每个普通 Element 各自同时声明 Read 与 Write FunctionContract；Read 接受已锁定来源的格式及 UTF-8 source，Write 接受 JsonValue 并输出确定性 UTF-8 source。**Write 的语义是序列化，不是任意 Host 文件系统 I/O**：无独立授权的 sink、路径、事务/原子写协议时，禁止偷偷添加 fs.writeFile；外部持久化须另受 Effect/资源授权。本版本只使用 Node 原生 JSON 与已精确锁定 `yaml@2.9.1`，不创建手写解析器/序列化器、第二 KDP 或外部 BUILD。两个 Consumer 的合法直接导入、私有/未声明调用及读写安全反例均应作为同 HEAD 审核范围；在审核前保持候选状态。
+
+
+## 7. R70 本版本限定修复（CURRENT · #1656 / #1663）
+
+此前 R69 DH 独立审核为 REWORK P1=1/P2=3。本轮要在同一个仅以 SDK 为直接公共产品依赖的 Registry Consumer 中执行真实 T14 Workflow，并在安装前比对 xstate/yaml 精确 SHA512 SRI 与所选 App Lock。单独增补 Registry SRI 篡改前置拒绝、第二领域 Package.Init 精确 FunctionRef 的 YAML Writer 及缺失 import 负例，以及 Writer 序列化前有界遍历成本控制。本节仅描述受影响的实现范围；是否合格须以新增 exact-SHA CI 和非 Writer 增量审核作证，不得将旧 R29 提取计划或 #2975 SUCCESS 当作当前 HEAD 通过。

@@ -26,11 +26,14 @@ const npmManifest = require.resolve('npm/package.json', {
   paths: [dirname(process.execPath), resolve(dirname(process.execPath), '../lib/node_modules')],
 });
 const npmCli = process.env.npm_execpath ?? join(dirname(npmManifest), 'bin/npm-cli.js');
+const registryFixtureOnly = process.env.DH_R60_REGISTRY_WORKFLOW_FIXTURE_ONLY === '1';
 const sdkTarball = process.env.DH_T05_SDK_TARBALL;
 const microkernelTarball = process.env.DH_T05_MICROKERNEL_TARBALL;
 const contractsTarball = process.env.DH_T05_CONTRACTS_TARBALL;
-assert.ok(sdkTarball && microkernelTarball && contractsTarball,
-  'driver must provide exact SDK and local transitive tarballs for composed App installation');
+if (!registryFixtureOnly) {
+  assert.ok(sdkTarball && microkernelTarball && contractsTarball,
+    'driver must provide exact SDK and local transitive tarballs for composed App installation');
+}
 const evidenceDir = process.env.DH_T05_EVIDENCE ?? join(consumerRoot, 'evidence');
 const eventsPath = join(evidenceDir, 'consumer-events.ndjson');
 await mkdir(evidenceDir, { recursive: true });
@@ -85,19 +88,7 @@ export function evaluate(input) {
 }
 export function optionalReport() { return { kind: 'SUCCEEDED', value: 'optional-report-ok' }; }
 ${withWorkflow ? `
-function workflowRead(input, expectedFormat) {
-  if (input?.format !== expectedFormat || typeof input?.source !== 'string' ||
-      input?.value === null || typeof input?.value !== 'object' || Array.isArray(input.value)) {
-    return { kind: 'UNKNOWN', unknownReason: { code: 'T14_READER_INVALID', message: 'data not selected as plain object' } };
-  }
-  events.push({ event: 'workflow-read', format: input.format, parsed: input.value });
-  if (${JSON.stringify(workflowFatalAt)} === 'leaf' && input.value.id === 'json-a') {
-    throw new Error('T14 deliberate selected Function fatal');
-  }
-  return { kind: 'SUCCEEDED', value: input.value };
-}
-export function jsonReader(input) { return workflowRead(input, 'json'); }
-export function yamlReader(input) { return workflowRead(input, 'yaml'); }
+// JSON/YAML 解析由真正选定的 r60.reader Standard Element 负责。
 export async function startWorkflow() {
   events.push({ event: 'workflow-hook', kind: 'start' });
   await Promise.resolve();
@@ -299,8 +290,44 @@ async function authoring(label, rule, options = {}) {
     rules.content[0].ref = { ...ruleRef, path: 'content/no-such-rule.json' };
   }
 
+  // 从仓库中直接拷贝真实手写的多文件 Standard Reader Domain Package。
+  const standardPkgId = 'r60-standard-files';
+  const standardRoot = options.workflow === true ? join(root, standardPkgId) : null;
+  if (standardRoot) {
+    await cp(resolve(dirname(fileURLToPath(import.meta.url)), '../selected-packages/packages/r60-standard-files'),
+      standardRoot, { recursive: true });
+    // 生产 Standard Reader 源不携带 Demo 全局日志或故障注入；
+    // 唯有隔离 E2E 的临时测试副本加入观测，并同步真实 Target 摘要。
+    const modulePath = join(standardRoot, 'dist/index.mjs');
+    const original = await readFile(modulePath, 'utf8');
+    const marker = "    return { kind: 'SUCCEEDED', value };";
+    assert.ok(original.includes(marker), 'Standard Reader success seam absent');
+    const instrumentation = [
+      ...(options.workflowFatalAt === 'leaf'
+        ? ["    if (value?.id === 'json-a') throw new Error('T14 deliberate selected Function fatal');"]
+        : []),
+      "    const events = (globalThis.__domainHarnessT05Events ??= []);",
+      "    events.push({ event: 'workflow-read', format, parsed: value });",
+    ].join(String.fromCharCode(10));
+    await writeFile(modulePath, original.replace(marker, instrumentation +
+      String.fromCharCode(10) + marker));
+    const manifestPath = join(standardRoot, 'manifest.json');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    const digest = await fileDigest(modulePath);
+    for (const variant of manifest.targetVariants) {
+      for (const binding of variant.implementations) binding.entry.module.digest = digest;
+    }
+    await writeFile(manifestPath, canonicalJson(manifest));
+  }
+  const standardDefinition = standardRoot
+    ? {
+        json: JSON.parse(await readFile(join(standardRoot, 'definitions/json-file.json'), 'utf8')),
+        yaml: JSON.parse(await readFile(join(standardRoot, 'definitions/yaml-file.json'), 'utf8')),
+      } : null;
+  const standardManifest = standardRoot
+    ? JSON.parse(await readFile(join(standardRoot, 'manifest.json'), 'utf8')) : null;
   const workflow = options.workflow === true
-    ? await prepareWorkflowElements(dirs, rules, app, fn) : null;
+    ? await prepareWorkflowElements(dirs, rules, app, fn, standardDefinition) : null;
   const definitions = {
     'basic.knowledge': knowledge, 'basic.rules': rules, 'basic.app': app,
     ...(workflow ? {
@@ -429,7 +456,7 @@ async function authoring(label, rule, options = {}) {
         implementation('basic.rules', 'evaluate', rulesEntryRef, 'evaluate', [ruleRef]),
         implementation('basic.rules', 'optionalReport', rulesEntryRef, 'optionalReport'),
         implementation('basic.rules', 'initializeRule', rulesEntryRef, 'initializeRule'),
-        ...(workflow ? ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow', 'workflowDecision']
+        ...(workflow ? ['startWorkflow', 'endWorkflow', 'workflowDecision']
           .map((functionId) => implementation('basic.rules', functionId, rulesEntryRef, functionId)) : []),
       ]),
       init: lifecycleRefs['rules-package'],
@@ -437,7 +464,8 @@ async function authoring(label, rule, options = {}) {
     }),
     manifest('app-business', {
       layer: 'business', role: 'primary', order: 2,
-      ...(options.omitBusinessInitFrom === true ? {} : { recordInitFrom: true }), dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }],
+      ...(options.omitBusinessInitFrom === true ? {} : { recordInitFrom: true }), dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' },
+        ...(workflow ? [{ package: standardPkgId, version: '1.0.0', interface: 'r60.files.api' }] : [])],
       elements: [
         { id: lifecycleDefs['app-business'].id, version: '1.0.0',
           definitionRef: await artifactRef('app-business', 'elements/lifecycle.json'), visibility: 'private' },
@@ -457,6 +485,7 @@ async function authoring(label, rule, options = {}) {
       init: lifecycleRefs['app-business'],
       ...(options.omitBusinessExit === true ? {} : { exit: lifecycleRefs['app-business'] }),
     }),
+    ...(workflow ? [standardManifest] : []),
   ];
 
   const descriptor = {
@@ -473,18 +502,22 @@ async function authoring(label, rule, options = {}) {
       { package: 'kernel-extension', version: '1.0.0' },
       { package: 'sdk-extension', version: '1.0.0' },
       { package: 'rules-package', version: '1.0.0' },
+      ...(workflow ? [{ package: standardPkgId, version: '1.0.0' }] : []),
     ],
     config: { example: 'basic-domain-app' },
   };
   const input = {
     descriptor, packages,
-    packageRoots: dirs,
-    packageArtifacts: Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
+    packageRoots: { ...dirs, ...(standardRoot ? { [standardPkgId]: standardRoot } : {}) },
+    packageArtifacts: {
+      ...Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
+      ...(standardRoot ? { [standardPkgId]: 'dist/index.mjs' } : {}),
+    },
     kdpArtifact: { packageId: 'kernel-primary', path: 'dist/index.js' },
   };
   return {
     root, dirs, input, descriptor, definitions,
-    domainElements: [knowledge, rules, app, ...(workflow ? [workflow.child] : [])],
+    domainElements: [knowledge, rules, app, ...(workflow ? [workflow.child, standardDefinition.json, standardDefinition.yaml] : [])],
     ruleRef, refs, workflow,
   };
 }
@@ -697,7 +730,7 @@ async function runWorkflowE2E() {
     assert.equal(first.lock.selectedWorkflows?.length, 7, 'parent, child and five independent acceptance roots share one sealed Lock');
     assert.equal(first.lock.selectedElements.filter((item) => item.ref.id.startsWith('basic.data_')).length, 4,
       'two JSON and two YAML Data Elements must be selected, not only files');
-    for (const fnName of ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow', 'workflowDecision']) {
+    for (const fnName of ['readJson', 'readYaml', 'startWorkflow', 'endWorkflow', 'workflowDecision']) {
       assert.equal(first.lock.selectedFunctions.filter((item) => item.ref.functionId === fnName).length, 1,
         `one selected FunctionRef for ${fnName}, reusable across distinct data Elements`);
     }
@@ -1208,8 +1241,34 @@ async function main() {
   console.log(JSON.stringify(result));
 }
 
+/** R70: reuse the actual T14 authoring fixture inside the Registry-installed SDK consumer. */
+async function prepareRegistryWorkflowFixture() {
+  const prepared = await authoring('registry-workflow',
+    { minOrderTotal: 50, regions: ['EU', 'US'] }, { workflow: true });
+  try {
+    const built = buildApp(prepared.input);
+    assert.equal(built.ok, true, built.ok ? '' : JSON.stringify(built));
+    assert.equal(built.lock.selectedWorkflows?.length, 7);
+    assert.equal(built.lock.selectedElements.filter((item) =>
+      item.ref.id.startsWith('basic.data_')).length, 4);
+    assert.deepEqual(built.lock.trustedRuntimeIntegrity?.map((entry) =>
+      [entry.name, entry.version]), [['xstate', '5.33.2'], ['yaml', '2.9.1']]);
+    const installRoot = join(consumerRoot, 'registry-workflow-app');
+    for (const file of built.appPackage.files) await write(installRoot, file.path, file.bytes);
+    assert.equal(JSON.parse(await readFile(join(installRoot, 'package.json'), 'utf8'))
+      .dependencies['@kaicreator/domain-harness'], '0.11.0');
+    console.log('DH_R70_REGISTRY_WORKFLOW_FIXTURE ' + JSON.stringify({
+      selectedWorkflows: 7, selectedResources: 4,
+      lockDigest: built.lock.closureDigest,
+    }));
+  } finally {
+    await rm(prepared.root, { recursive: true, force: true });
+  }
+}
+
 try {
-  await main();
+  if (registryFixtureOnly) await prepareRegistryWorkflowFixture();
+  else await main();
 } catch (error) {
   const result = { status: 'FAIL', error: String(error?.stack ?? error), events: events.length };
   await evidence('consumer.failure', result);

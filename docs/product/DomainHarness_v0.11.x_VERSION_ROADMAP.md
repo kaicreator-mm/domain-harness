@@ -1,3 +1,6 @@
+<!-- DH_V0111_R60_CURRENT_REMAINING_OPTIMIZATIONS_OWNER -->
+> **【CURRENT · 2026-11-22 · R60，覆盖以下旧 R29/R4 状态】**：0.11.1 原 T11–T14/Function/Workflow Product/L1/L2 的限定资格及 R53/R58 单 SDK 架构修正确已受审合入版本列车 `054a2b2f6f67c518f205936befd3b30fbc24990b`。但 Owner 新增 [0.11.1 单一 Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) W01–W08、AC60-01..10 **尚待执行/审查**，不得因为原资格已通过就宣称 R60 完成。原 [#1644](https://github.com/kaicreator-mm/domain-harness/issues/1644) 0.11.2 Standard Reader 任务已关闭为历史重复入口，**JSON/YAML Standard Reader 的实际抽取、跨域消费、跨语言规范收口、公共类型去重、真实 SDK 一项安装、业务第三方依赖、跨代验证、文档清理，都归 0.11.1 #1656**。0.11.2 #1612 只新增 Domain Intelligence 能力，待 0.11.1 R60 通过后**复用**已实现 Standard Reader，不再承担其生产。内部四个 Workspace ≠ Consumer 要安装四个产品；公开唯一 SDK 为 `@kaicreator/domain-harness`，BUILD workspace 已私有化。R49 DIS/DH PR #156/#1653 尚待独立审核，不能称正式合并。
+
 <!-- DH_V0110_SOURCE_QUALITY_R15_CLOSED_20261121 -->
 
 > **Foundation B0 增量覆盖历史资格（#1624 / Draft #1625，2026-11-21）**：此前 0.11.0 Scoped 证据只针对旧入口合同。当前 Element-First 修订要求 Package.Init → 已选 Function 真调用；旧 READY 后直接 Function ingress、技术/业务双初始化、裸 EntryRef 全部退出公共模型。0.11.1 仅负责 Workflow 编排，不得为 0.11.0 的身份或执行漏洞建立兼容层。本增量须按最终 Exact HEAD 独审并合入 `version/v0.11.x` 才能晋升已修复，不得提前标注通过。
@@ -8,7 +11,7 @@
 
 # DomainHarness 0.11.x — 完整重写与 Domain-Bounded Harness 版本路线图（R4 Owner 基线 + R29 当前状态）
 
-> **【R29 当前进度，覆盖下文 R4/R1 当时的阶段状态】**：0.11.0 #1564 与 0.11.1 #1605/#1608 已完成限定资格，0.11.1 T11–T14 功能与最终 Product/L1/L2 R27 已受审、实现及两份文档均合入 `version/v0.11.x@3145104258a4da5f8cc940482ff77322b97d6cf6`。0.11.2 #1612 开始标准 Element 提取/领域语义设计，0.11.2–0.11.9 尚未交付。下方早期 R4/R1 的状态快照仅用来说明路线图决策的历史来源，不可覆盖本段当前状态；完整源真相见 #1563 R28 记录。
+> **【R29 当前进度，覆盖下文 R4/R1 当时的阶段状态】**：0.11.0 #1564 与 0.11.1 #1605/#1608 已完成限定资格，0.11.1 T11–T14 功能与最终 Product/L1/L2 R27 已受审、实现及两份文档均合入 `version/v0.11.x@3145104258a4da5f8cc940482ff77322b97d6cf6`。0.11.2 #1612 只开始领域语义设计；标准 Element 提取归属 0.11.1 R60 #1656，0.11.2–0.11.9 尚未交付。下方早期 R4/R1 的状态快照仅用来说明路线图决策的历史来源，不可覆盖本段当前状态；完整源真相见 #1563 R28 记录。
 
 <!-- DH_V011X_R33_SDK_FORGE_OWNER_CORRECTION_20261122 -->
 ## 【最新 Owner R36】0.11.x 独立完成 DomainHarness SDK，Package 由真实文件直接构成
@@ -79,8 +82,8 @@ NODE_MINIMUM=22.12.0
 **强制设计原则：** `0.11.1–0.11.9` 期间发现跨领域、语义稳定、可通过普通 Element/Function/Content 合同封装的公共能力时，优先提取为 **Standard Element**，后续版本以 BUILD 显式选定、直接 Extension/Import 复用为默认路径；不能每次编写新的通用 Reader、状态机规则、Guard/Validator/Selector。不是“所有功能都 Element 化”：Node 标准库/纯基础安全机制和 KDP/BUILD/Lock/Boot 权限与执行引擎继续留在 Engine 层。
 
 - **三层架构**：Contracts/BUILD/Lock/KDP primitives → **Standard Elements（可选普通 Package）** → **Domain Elements**。Standard 是资产资格，不是新 `ElementDefinition.kind`、额外 Runtime、全局注册中心或对 BUILD 权限的例外。
-- **从已接受的 0.11.1 开始提取**：demo `jsonReader/yamlReader` 目前并非独立标准包；真实 JSON/YAML 解析还在 `workflow-execution.ts`。优先归一到同一套真正可重复使用的 Reader Element，并把可信资源/UTF-8/大小/摘要授权保留在现有 BUILD/KDP；**不能保留两套有不同安全语义的解析器**。XState Actor 引擎继续在 KDP，只提取跨领域的声明式状态模型、具名 Transition/Guard 模板为标准 Element/Content，不创造第二 Workflow Runtime。
-- **实施责任**：v0.11.2 [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) 在新领域语义代码前优先消费/提取第一批 JSON/YAML Readers，按真实需要提取状态转换模板；后续各版每次先做最小 Catalog/复用检查。保留各版本唯一主 Issue 和原范围，不重开 0.11.1 已接受任务来要求重新全量测试。
+- **从已接受的 0.11.1 开始提取**：demo `readJson/readYaml` 目前并非独立标准包；真实 JSON/YAML 解析还在 `workflow-execution.ts`。优先归一到同一套真正可重复使用的 Reader Element，并把可信资源/UTF-8/大小/摘要授权保留在现有 BUILD/KDP；**不能保留两套有不同安全语义的解析器**。XState Actor 引擎继续在 KDP，只提取跨领域的声明式状态模型、具名 Transition/Guard 模板为标准 Element/Content，不创造第二 Workflow Runtime。
+- **实施责任**：v0.11.1 [#1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 在收尾时负责真实提取并跨域验证首批 JSON/YAML Readers，v0.11.2 #1612 仅在新领域语义代码中消费，按真实需要提取状态转换模板；后续各版每次先做最小 Catalog/复用检查。保留各版本唯一主 Issue 和原范围，不重开 0.11.1 已接受任务来要求重新全量测试。
 - **标准资格**：`CANDIDATE → STANDARD_ACCEPTED → DEPRECATED/REPLACED`，仅在具体版本、Function/Schema/权限、真实跨场景 clean-packed 调用、必要正反例及独立 Exact-SHA 审核后提升。只更新 Catalog 与本阶段必要代码，无人为数量目标、永久任务和行政 Gate。
 - **完整且优先适用的技术规范**：[Standard Element 体系与递增复用规范](../architecture/DomainHarness_v0.11.x_STANDARD_ELEMENT_SYSTEM.md)。所有后续版本 L1/L2、Task/PR 必须先复用已存在、语义适用的 Standard Element；若不使用，留下具体技术理由，不自动复制业务无关的解析器和流程组件。
 
@@ -90,7 +93,7 @@ NODE_MINIMUM=22.12.0
 
 | 阶段 | 版本定位 | 本阶段主要交付 | 独立验收结果 |
 |---|---|---|---|
-| **0.11.0 — Foundation** | 新架构能定义、装配、运行一个 Domain App（**已通过 Scoped 验收**） | Element/Content/Function；K/S/B Package；BUILD/AOT/Lock；Boot→唯一 KDP→App Init；clean public SDK；Selected no-effect Function | 四包安装的新 SDK Consumer 能构建、启动、执行实际已选 Knowledge/Rule 改变结果的 Function；AC01–AC10 Scoped PASS |
+| **0.11.0 — Foundation** | 新架构能定义、装配、运行一个 Domain App（**已通过 Scoped 验收**） | Element/Content/Function；K/S/B Package；BUILD/AOT/Lock；Boot→唯一 KDP→App Init；clean public SDK；Selected no-effect Function | 历史四工作区 clean-packed SDK Consumer 能构建、启动（R53/R58 后公开产品仅一个 SDK）、执行实际已选 Knowledge/Rule 改变结果的 Function；AC01–AC10 Scoped PASS |
 | **0.11.1 — Task Execution** | 使用 Workflow + State Machine 实现**确定性 Task Execution Loop** | Goal/TaskRun、Workflow Step/Branch、Task/Domain 状态机合同、Guard、Bounded Coordinator/Observation/Outcome；选定 Function 的步骤执行 | 无 LLM/外部 Effect 的多步真实任务，能 COMPLETE、ASK/WAIT、REJECT/UNKNOWN，不能非法转移或无限循环；简单 Function 仍可直接调用 |
 | **0.11.2 — Domain Intelligence** | 把 0.11.1 的结构性流程**领域语义化** | Domain concepts/objects、Knowledge/Rule/Recognizer/Validator/Decision、Intent/Applicability、必要最小 Reader/Query、领域策略选择和 UNKNOWN | 同一 Goal 在不同领域事实、版本、适用性条件下可选择正确的规则、流程与结果；知识不足或冲突时不编造结论 |
 | **0.11.3 — Semantic Interaction** | 领域语义驱动的**自适应交互**，而不是“动态表单引擎” | typed Intent/Requirement/Interaction model、基于任务现有事实连续澄清、交互类型与成熟 UI 组件适配（Form、Selector、Table、Wizard、Chat 等）、确认后继续 Workflow | 用户表达不完整需求时，系统根据理解选择合适确定性 UI 交互；反复补齐事实后得到有类型/可校验的意图，未经确认不得执行敏感操作 |
@@ -123,7 +126,7 @@ NODE_MINIMUM=22.12.0
 
 - **0.11.0 的事实不变**：已完成 Element-First 基线和唯一 Demo `examples/v011-basic-app`，#1597 / PR #1601，Woodpecker #2759；AC01–AC10 是 Scoped PASS，不能凭旧版测试或本规划提升任何 Full Conformance。
 - **【R29 当前状态】0.11.1 已完成限定交付；0.11.2–0.11.9 仍处于规划/实施待验收阶段**：后续每阶段明确最小 Product/L1 delta、必要 L2、任务 DAG、真实 Consumer/负例，且只验证实际改动；不得因分配版本号自动获得 L1/L2 资格。
-- **【R29 下一步】** 继承已接受的 0.11.0/0.11.1 基线，在 0.11.2 #1612 下按 #1644 优先提取真正可复用的标准 Reader Element；不得由文档更新触发长期本地 Agent 任务。
+- **【R29 下一步】** 继承已接受的 0.11.0/0.11.1 基线，在 0.11.1 #1656 下完成真正可复用的标准 Reader Element；#1644 已标历史，0.11.2 仅消费；不得由文档更新触发长期本地 Agent 任务。
 - **不纳入本轮默认完成门**：跨平台所有 Target、通用多 Agent 协作、全平台知识图数据库、全面 DIS Full Conformance、Server 专用学习基础设施、所有下游旧业务迁移。实际需要时单独明确为 0.11.x 后续范围，不预设新的必须版本。
 
 <!-- /DH_V011X_OWNER_CONFIRMED_FULL_REWRITE_STAGE_ROADMAP_20261121 -->
@@ -187,3 +190,6 @@ NODE_MINIMUM=22.12.0
 **历史对照的约束**：对某历史条目若新架构没有真实消费价值，版本 Issue 可以明确 OUT / OPTIONAL / REPLACED，不必实施；必须保存不采纳的原因。v0.10 原来提供的 Kernel/Workflow/Model/Provider 的具体 API、存储/Actor 格式、测试与可执行源码不自动成为 0.11.x 公共接口。跨版本进展在主 Issue #1563 统一追踪，阶段内仅维护其版本 Issue。
 
 <!-- /DH_V011X_ONE_ISSUE_PER_VERSION_HISTORICAL_MAPPING_R1_20261121 -->
+
+
+> **R69（0.11.1 R60 W02 更新）**：原仅 Reader 的目标已变更为两个双向格式 Element `dh.std.file.json` / `dh.std.file.yaml`，使用 Node 内置 JSON + pinned `yaml@2.9.1`。Write 是纯序列化输出，实际持久化须单独授权，避免引入越权 Host fs；此为 #1656 同版工作，不转移到 0.11.2。是否合格仍取决于新 Exact-SHA CI 与独立审核。

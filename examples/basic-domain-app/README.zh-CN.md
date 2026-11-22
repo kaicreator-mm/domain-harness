@@ -1,5 +1,8 @@
 # DomainHarness v0.11.0 Basic App — 全新外部安装验收示例
 
+> **CURRENT v0.11.1 R60 NOTE**: This v0.11.0-labelled demo name is historical; current public product is one `@kaicreator/domain-harness` SDK with built-in Composition and `/runtime`. Internal Contracts/Microkernel are transitive dependencies, not extra Consumer SDK products. JSON/YAML functions in this v0.11.1 demo are not yet independent Standard Readers; extraction and a second Domain Consumer are owned by [0.11.1 Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656), not 0.11.2.
+
+
 本示例面向 Package/Element 作者，真实执行 v0.11.0 Element-First SDK；不包含第二套 Runtime、Kernel、BUILD、Router、App Init 或 Effect 引擎。
 
 ## Consumer 编写的领域结构
@@ -42,3 +45,6 @@ node examples/basic-domain-app/verify-clean-install.mjs
 通过 `DH_T05_NPM_REGISTRY` 选择第三方传递依赖的 registry/缓存，通过 `DH_T05_EVIDENCE` 指定证据目录。全程不执行 `npm publish`。
 
 AC01–AC10 结果区分本路径实际执行的断言与复用的上游 contracts/BUILD/runtime 焦点证据。本结果属于候选验证，不代表 npm 正式发布，也不声明与旧可执行 App ABI 兼容。
+
+
+> v0.11.1 R69: `dh.std.file.json` / `dh.std.file.yaml` 提供独立读写格式函数。Workflow 在本演示仅选定 Read Function；Write 是纯序列化，落盘不属于未授权的 Element Effect。

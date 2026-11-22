@@ -449,3 +449,71 @@ export function init() {
   const result = buildApp({ ...input, packages });
   assert.equal(result.ok, true, JSON.stringify(result));
 });
+
+test('R60 W06: real selected Business ESM may import only pinned pure yaml@2.9.1, locked and verified', (t) => {
+  const make = (dependencies: Record<string, string> | undefined, source = `
+import { parseDocument } from 'yaml';
+export const artifact = 'orders-business';
+export function init() {
+  const doc = parseDocument('verified: 42', { schema: 'core', version: '1.2', uniqueKeys: true });
+  if (doc.errors.length) throw new Error('selected YAML library failed');
+  return { status: 'READY', value: doc.toJS() };
+}
+export function exit() {}
+`) => {
+    const scenario = standardCase();
+    t.after(scenario.ws.dispose);
+    const { input } = scenario.finalize();
+    const dir = scenario.ws.packageRoots['orders-business']!;
+    const module = writeRaw(dir, 'dist/business.mjs', new TextEncoder().encode(source));
+    writeRaw(dir, 'package.json', new TextEncoder().encode(JSON.stringify({
+      name:'orders-business', version:'1.0.0', type:'module',
+      exports:{'.':'./dist/business.mjs'},
+      ...(dependencies ? { dependencies } : {}),
+    })));
+    const selected = input.packages.find((item) => (item as DomainPackageManifest).id === 'orders-business') as DomainPackageManifest;
+    const revised = { ...selected, targetVariants: selected.targetVariants.map((variant) => ({
+      ...variant, implementations: variant.implementations.map((fn) => fn.entry.module.path === 'dist/business.mjs'
+        ? { ...fn, entry: { ...fn.entry, module } } : fn),
+    })) };
+    return buildApp({ ...input, packages: input.packages.map((item) => item === selected ? revised : item) });
+  };
+  const accepted = make({yaml:'2.9.1'});
+  assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.message);
+  if (accepted.ok) {
+    const archive = accepted.lock.trustedRuntimeIntegrity;
+    assert.equal(archive?.length, 2, 'exact SHA512 transitive closure must remain immutable');
+    assert.equal(archive?.[1]?.name, 'yaml');
+    assert.equal(archive?.[1]?.version, '2.9.1');
+    assert.match(archive?.[1]?.integrity ?? '', /^sha512-/u);
+    const app = accepted.appPackage.files.find((item) => item.path === 'package.json');
+    assert.ok(app);
+    const manifest = JSON.parse(Buffer.from(app.bytes).toString('utf8')) as {
+      dependencies: Record<string,string>;
+    };
+    assert.equal(manifest.dependencies['@kaicreator/domain-harness'], '0.11.0');
+    assert.equal(manifest.dependencies.yaml, '2.9.1');
+    assert.equal(manifest.dependencies['@kaicreator/domain-harness-build'], undefined);
+    assert.ok(accepted.appPackage.files.some((item) => item.path === 'dh-install/verify-preinstall.mjs'));
+    assert.ok(accepted.appPackage.files.some((item) => item.path === 'dh-install/verify-runtime.mjs'));
+    assert.ok(accepted.appPackage.files.some((item) => item.path === 'dh-install/install-runtime.mjs'));
+  }
+  for (const deps of [
+    {yaml:'^2.9.1'},
+    {yaml:'2.9.2'},
+    {yaml:'2.9.1', 'unapproved-package':'1.0.0'},
+  ]) {
+    const rejected = make(deps);
+    assert.equal(rejected.ok, false, 'floating or unexpected npm dependencies must refuse');
+    if (!rejected.ok) assert.equal(rejected.code, 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  }
+  const undeclared = make(undefined);
+  assert.equal(undeclared.ok, false, 'undocumented external import must refuse before install');
+  if (!undeclared.ok) assert.equal(undeclared.code, 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+  const dynamic = make({yaml:'2.9.1'}, `
+export async function init() { return (await import('yaml')).parseDocument('a: 1'); }
+export function exit() {}
+`);
+  assert.equal(dynamic.ok, false, 'dynamically resolved third-party runtime must refuse');
+  if (!dynamic.ok) assert.equal(dynamic.code, 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
