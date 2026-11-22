@@ -300,14 +300,14 @@ async function authoring(label, rule, options = {}) {
     // 唯有隔离 E2E 的临时测试副本加入观测，并同步真实 Target 摘要。
     const modulePath = join(standardRoot, 'dist/index.mjs');
     const original = await readFile(modulePath, 'utf8');
-    const marker = "    return { kind: 'SUCCEEDED', value };";
+    const marker = "    return { kind: 'SUCCEEDED', value: checked.value };";
     assert.ok(original.includes(marker), 'Standard Reader success seam absent');
     const instrumentation = [
       ...(options.workflowFatalAt === 'leaf'
-        ? ["    if (value?.id === 'json-a') throw new Error('T14 deliberate selected Function fatal');"]
+        ? ["    if (checked.value?.id === 'json-a') throw new Error('T14 deliberate selected Function fatal');"]
         : []),
       "    const events = (globalThis.__domainHarnessT05Events ??= []);",
-      "    events.push({ event: 'workflow-read', format, parsed: value });",
+      "    events.push({ event: 'workflow-read', format, parsed: checked.value });",
     ].join(String.fromCharCode(10));
     await writeFile(modulePath, original.replace(marker, instrumentation +
       String.fromCharCode(10) + marker));
