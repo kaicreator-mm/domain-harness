@@ -23,7 +23,6 @@ const input = {
   descriptor, packages: manifests,
   packageRoots: Object.fromEntries(PACKAGE_IDS.map((name) => [name, join(sourceRoot, 'packages', name)])),
   packageArtifacts: Object.fromEntries(PACKAGE_IDS.map((name) => [name, 'dist/index.mjs'])),
-  kdpArtifact: { packageId: 'r41-kdp', path: 'dist/bootstrap.js' },
 };
 const accepted = buildApp(input);
 assert.equal(accepted.ok, true, accepted.ok ? '' : `${accepted.code}: ${accepted.message}`);
