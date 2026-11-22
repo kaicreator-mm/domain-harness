@@ -310,6 +310,9 @@ async function verifyKdpStaticClosure(
   entryPath: string,
 ): Promise<TrustFailure | null> {
   const invalid = (reason: string): TrustFailure => trustFailure('DH_BOOT_PIN_MISMATCH', reason);
+  if (!isRecord(lock.resourceDigests)) {
+    return invalid('KDP closure cannot be checked without a sealed resource map');
+  }
   const nodes: unknown = lock.trustedKdpModuleClosure;
   if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 256) {
     return invalid('KDP static module closure is missing or unbounded');
@@ -367,7 +370,7 @@ async function verifyKdpStaticClosure(
       return invalid('KDP ESM closure has an untrusted builtin or bare SDK import');
     }
     modules.set(ref['path'], {
-      ref: { packageId: ref['packageId'] as string, path: ref['path'], digest: ref['digest'] },
+      ref: { packageId: ref['packageId'], path: ref['path'], digest: ref['digest'] },
       dependencies: node['dependencies'] as unknown[],
       trustedImports: trusted,
     });
