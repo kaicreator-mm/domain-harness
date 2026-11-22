@@ -121,12 +121,18 @@ function assertTarball(path, expected) {
   assert.equal(manifest.engines?.node, '>=22.12.0');
   assert.deepEqual(manifest.exports?.['.'], expected.root);
   assert.deepEqual(manifest.dependencies ?? {}, expected.dependencies);
-  for (const section of ['optionalDependencies', 'peerDependencies', 'peerDependenciesMeta', 'bundledDependencies', 'bundleDependencies']) {
+  for (const section of ['optionalDependencies', 'bundledDependencies', 'bundleDependencies']) {
     assert.equal(manifest[section], undefined, `${expected.name}: ${section} must stay outside the frozen release graph`);
   }
   if (expected.name === '@kaicreator/domain-harness') {
+    // 普通 Runtime Consumer 不自动安装 BUILD；Composition Consumer 显式选用同版 BUILD。
+    assert.deepEqual(manifest.peerDependencies, { '@kaicreator/domain-harness-build': '0.11.0' });
+    assert.deepEqual(manifest.peerDependenciesMeta, { '@kaicreator/domain-harness-build': { optional: true } });
+    assert.deepEqual(Object.keys(manifest.exports), ['.', './runtime', './composition']);
     assert.equal(manifest.scripts?.prepack, 'npm run build');
   } else {
+    assert.equal(manifest.peerDependencies, undefined, `${expected.name}: unexpected peer dependency`);
+    assert.equal(manifest.peerDependenciesMeta, undefined, `${expected.name}: unexpected peer dependency metadata`);
     assert.equal(manifest.scripts?.prepack, undefined, `${expected.name}: unexpected prepack lifecycle`);
   }
   const paths = [...members.keys()];
@@ -197,7 +203,7 @@ const packages = [
     dir: 'packages/domain-harness', name: '@kaicreator/domain-harness',
     root: { types: './dist/index.d.ts', import: './dist/index.js' },
     dependencies: {
-      '@kaicreator/domain-harness-build': '0.11.0', '@kaicreator/domain-harness-contracts': '0.11.0', '@kaicreator/domain-harness-microkernel': '0.11.0',
+      '@kaicreator/domain-harness-contracts': '0.11.0', '@kaicreator/domain-harness-microkernel': '0.11.0',
     },
   },
   {
@@ -244,6 +250,63 @@ try {
   npm(['init', '-y'], consumerRoot, 'consumer.init');
   const registry = process.env.DH_T05_NPM_REGISTRY ?? process.env.npm_config_registry ?? 'https://registry.npmjs.org';
   const installEnv = { ...process.env, npm_config_registry: registry };
+
+  // 与四包 Composition Consumer 隔离：独立 npm 根只安装同一 SDK 产品 + 两项 Runtime 依赖。
+  // Optional peer 不能偷偷变成 -build/TypeScript/Ajv 的自动安装或加载。
+  const runtimeOnlyRoot = join(workRoot, 'runtime-only-consumer');
+  mkdirSync(runtimeOnlyRoot, { recursive: true });
+  assert.ok(isOutside(repoRoot, runtimeOnlyRoot));
+  npm(['init', '-y'], runtimeOnlyRoot, 'runtime-only.init');
+  const runtimeTarballs = [
+    '@kaicreator/domain-harness',
+    '@kaicreator/domain-harness-contracts',
+    '@kaicreator/domain-harness-microkernel',
+  ].map((name) => {
+    const path = tarballPathsByName.get(name);
+    assert.ok(path, `runtime-only tarball is missing: ${name}`);
+    return path;
+  });
+  const runtimeInstall = spawnSync(process.execPath, [npmCli, 'install', ...runtimeTarballs,
+    '--no-audit', '--no-fund', '--ignore-scripts'], {
+    cwd: runtimeOnlyRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024,
+    env: installEnv,
+  });
+  writeFileSync(join(evidenceDir, 'runtime-only.install.stdout.log'), runtimeInstall.stdout ?? '');
+  writeFileSync(join(evidenceDir, 'runtime-only.install.stderr.log'), runtimeInstall.stderr ?? '');
+  record('runtime-only.install', { exit: runtimeInstall.status, signal: runtimeInstall.signal, registry });
+  if (runtimeInstall.error || runtimeInstall.status !== 0) {
+    throw new Error(`runtime-only install failed: ${runtimeInstall.error?.message ?? ''}\n${runtimeInstall.stdout ?? ''}\n${runtimeInstall.stderr ?? ''}`);
+  }
+  for (const name of ['@kaicreator/domain-harness-build', 'typescript', 'ajv']) {
+    assert.equal(existsSync(join(runtimeOnlyRoot, 'node_modules', ...name.split('/'))), false,
+      `runtime-only Consumer must not install authoring dependency '${name}'`);
+  }
+  const runtimeLock = JSON.parse(readFileSync(join(runtimeOnlyRoot, 'package-lock.json'), 'utf8'));
+  for (const key of ['node_modules/@kaicreator/domain-harness-build', 'node_modules/typescript', 'node_modules/ajv']) {
+    assert.equal(runtimeLock.packages[key], undefined, `runtime-only Lock contains optional BUILD dependency '${key}'`);
+  }
+  const runtimeProbe = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+import assert from 'node:assert/strict';
+import { boot, canonicalJson } from '@kaicreator/domain-harness/runtime';
+assert.equal(typeof boot, 'function');
+assert.equal(typeof canonicalJson, 'function');
+const runtime = await import('@kaicreator/domain-harness/runtime');
+assert.equal('buildApp' in runtime, false);
+await assert.rejects(import('@kaicreator/domain-harness/composition'),
+  (error) => error?.code === 'ERR_MODULE_NOT_FOUND');
+`], {
+    cwd: runtimeOnlyRoot, encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024,
+    env: installEnv,
+  });
+  writeFileSync(join(evidenceDir, 'runtime-only.probe.stdout.log'), runtimeProbe.stdout ?? '');
+  writeFileSync(join(evidenceDir, 'runtime-only.probe.stderr.log'), runtimeProbe.stderr ?? '');
+  record('runtime-only.probe', { exit: runtimeProbe.status, signal: runtimeProbe.signal });
+  if (runtimeProbe.error || runtimeProbe.status !== 0) {
+    throw new Error(`runtime-only SDK import probe failed\n${runtimeProbe.stdout ?? ''}\n${runtimeProbe.stderr ?? ''}`);
+  }
+  record('runtime-only.optional-peer-isolation', { status: 'PASS', absent: ['BUILD', 'TypeScript', 'Ajv'],
+    runtimeImport: 'PASS', missingCompositionPeer: 'EXPECTED_REFUSAL' });
+
   const install = spawnSync(process.execPath, [npmCli, 'install', ...tarballs, '--no-audit', '--no-fund', '--ignore-scripts'], {
     cwd: consumerRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024, env: installEnv,
   });
@@ -254,6 +317,26 @@ try {
   npm(['ls', '--json'], consumerRoot, 'consumer.ls');
   npm(['ls', 'xstate', 'yaml', '--json'], consumerRoot, 'consumer.workflow-runtime-ls');
   assertInstalledRealpaths(tarballMembers);
+  // 与 runtime-only 三包独立环境互为正反例：显式安装 -build 后子入口必须可运行。
+  const compositionProbe = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+import assert from 'node:assert/strict';
+import { buildApp, BuildRefusal } from '@kaicreator/domain-harness/composition';
+import { boot } from '@kaicreator/domain-harness/runtime';
+import * as root from '@kaicreator/domain-harness';
+assert.equal(root.buildApp, buildApp);
+assert.equal(root.boot, boot);
+assert.equal(typeof buildApp, 'function');
+assert.equal(typeof BuildRefusal, 'function');
+`], {
+    cwd: consumerRoot, encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024,
+    env: installEnv,
+  });
+  writeFileSync(join(evidenceDir, 'composition.probe.stdout.log'), compositionProbe.stdout ?? '');
+  writeFileSync(join(evidenceDir, 'composition.probe.stderr.log'), compositionProbe.stderr ?? '');
+  record('composition.optional-peer-present', { exit: compositionProbe.status, signal: compositionProbe.signal });
+  if (compositionProbe.error || compositionProbe.status !== 0) {
+    throw new Error(`composition optional Peer import failed after four-tarball install\n${compositionProbe.stdout ?? ''}\n${compositionProbe.stderr ?? ''}`);
+  }
   for (const name of ['consumer.mjs', 'workflow-fixture.mjs']) {
     cpSync(fileURLToPath(new URL(`./${name}`, import.meta.url)), join(consumerRoot, name));
   }
