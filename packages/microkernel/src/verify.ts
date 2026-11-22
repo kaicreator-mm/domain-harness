@@ -1,5 +1,5 @@
 // 当前唯一 KDP：Boot 验证选定资源，初始化 Package 后才开放业务入口。
-import { readFile, realpath } from 'node:fs/promises';
+import { lstat, readFile, realpath } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
@@ -341,6 +341,55 @@ async function verifySealedKdpLocation(
   return null;
 }
 
+/** 本次 Profile 只允许受信 SDK 从安装根的顶层 node_modules 解析，不信包内同名阴影。 */
+async function verifySdkLookupPath(
+  installRoot: string,
+  selectedKdpEntry: string,
+): Promise<TrustFailure | null> {
+  let trustedRoot: string;
+  let realEntry: string;
+  try {
+    trustedRoot = await realpath(installRoot);
+    realEntry = await realpath(selectedKdpEntry);
+  } catch {
+    return trustFailure('DH_BOOT_PIN_MISMATCH',
+      'trusted SDK source lookup cannot be verified for this installation');
+  }
+  const sdkOwners = [
+    '@kaicreator/domain-harness',
+    '@kaicreator/domain-harness-microkernel',
+    '@kaicreator/domain-harness-contracts',
+  ] as const;
+  // Node 对 ESM 的 bare package 查找以真实文件的目录为起点，逐级向上找 node_modules。
+  // 不分析或再验证 KDP 源码，仅禁止改变 SDK 受信安装来源的包级路径遮蔽。
+  let cursor = dirname(realEntry);
+  while (cursor !== trustedRoot) {
+    const rel = relative(trustedRoot, cursor);
+    if (rel === '..' || rel.startsWith('../') || rel.startsWith('..\\')) {
+      return trustFailure('DH_BOOT_PIN_MISMATCH', 'selected KDP entry escapes the trusted install root');
+    }
+    for (const name of sdkOwners) {
+      const shadow = resolve(cursor, 'node_modules', ...name.split('/'));
+      try {
+        await lstat(shadow);
+        return trustFailure('DH_BOOT_PIN_MISMATCH',
+          'selected KDP could resolve a shadow SDK package outside the trusted top-level installation');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          return trustFailure('DH_BOOT_PIN_MISMATCH',
+            'cannot establish that the selected KDP resolves only trusted SDK package locations');
+        }
+      }
+    }
+    const parent = dirname(cursor);
+    if (parent === cursor) {
+      return trustFailure('DH_BOOT_PIN_MISMATCH', 'selected KDP has no trusted SDK resolution boundary');
+    }
+    cursor = parent;
+  }
+  return null;
+}
+
 export async function verifyKdpEntryBytes(
   installRoot: string,
   record: InstalledRecord,
@@ -366,6 +415,8 @@ export async function verifyKdpEntryBytes(
   const entryPath = entryResult.value;
   const physicalEntryFailure = await verifySealedKdpLocation(installRoot, record.kdpPackageId, entryPath);
   if (physicalEntryFailure !== null) return { ok: false, failure: physicalEntryFailure };
+  const lookupFailure = await verifySdkLookupPath(installRoot, entryPath);
+  if (lookupFailure !== null) return { ok: false, failure: lookupFailure };
   let bytes: Buffer;
   try {
     bytes = await readFile(entryPath);
