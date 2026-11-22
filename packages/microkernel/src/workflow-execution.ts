@@ -10,8 +10,6 @@ import {
   selectWorkflowTarget,
   withinWorkflowAncestorDepth,
 } from '@kaicreator/domain-harness-contracts';
-import { parseDocument } from 'yaml';
-import { isPlainJsonValue } from './schema-subset.js';
 import type {
   FunctionOutcome,
   FunctionRef,
@@ -87,25 +85,10 @@ async function prepareDataInput(
   if (bytes.byteLength > node.data.maxBytes) {
     throw new Error('DH_WORKFLOW_READER_SIZE_LIMIT');
   }
+  // KDP 只负责已封存 ResourceRef 的真实字节、大小与严格 UTF-8；
+  // 解析唯一归选中的 Standard Reader Element.Function，不再重复 JSON/YAML 业务解析。
   const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  try {
-    let parsed: unknown;
-    if (node.data.format === 'json') {
-      parsed = JSON.parse(source);
-    } else {
-      const document = parseDocument(source, {
-        schema: 'core', strict: true, uniqueKeys: true,
-        version: '1.2', logLevel: 'silent', intAsBigInt: false,
-      });
-      if (document.errors.length > 0 || document.warnings.length > 0) throw new Error('YAML parse rejected');
-      parsed = document.toJS({ maxAliasCount: 32 });
-    }
-    canonicalJson(parsed);
-    if (!isPlainJsonValue(parsed)) throw new Error('Reader value is not plain JSON');
-    return { format: node.data.format, source, value: parsed };
-  } catch {
-    throw new Error('DH_WORKFLOW_READER_INVALID');
-  }
+  return { format: node.data.format, source };
 }
 
 /** 每次真实 Function 调用只扣一次预算，调用前必须已经完成整叶预留。 */
