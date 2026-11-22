@@ -244,8 +244,13 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
   const bootModule = a.appPackage.files.find((file) => file.path === 'boot.mjs');
   assert.ok(bootModule);
   const bootSource = Buffer.from(bootModule.bytes).toString('utf8');
-  assert.ok(bootSource.indexOf('verify-runtime.mjs') < bootSource.indexOf("import('@kaicreator/domain-harness-microkernel')"),
-    'external trusted runtime attestation must run BEFORE dynamic KDP import');
+  // R55: the generated App invokes Boot through the one public SDK, never a direct Microkernel import.
+  const attestationOffset = bootSource.indexOf("await import('./dh-install/verify-runtime.mjs')");
+  const sdkBootOffset = bootSource.indexOf("await import('@kaicreator/domain-harness/runtime')");
+  assert.ok(attestationOffset >= 0 && sdkBootOffset > attestationOffset,
+    'trusted runtime SRI attestation must precede the real public SDK Boot import');
+  assert.equal(bootSource.includes("import('@kaicreator/domain-harness-microkernel')"), false,
+    'generated Domain App must not bypass its public SDK runtime');
   assert.equal(a.lock.selectedWorkflows?.length, 1);
   const selected = a.lock.selectedWorkflows![0]!;
   assert.deepEqual(selected.ref, { element: ref, contentId: 'business-flow' });
