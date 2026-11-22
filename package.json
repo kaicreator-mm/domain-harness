@@ -17,7 +17,9 @@
     "lint": "node scripts/check-source-quality.mjs && eslint .",
     "test": "npm run test:typecheck --workspaces && node --import tsx --test packages/contracts/tests/core/*.test.ts tooling/build/tests/core/*.test.ts packages/microkernel/tests/core/*.test.ts packages/domain-harness/tests/core/*.test.ts",
     "test:demo": "node examples/basic-domain-app/verify-clean-install.mjs",
-    "verify": "npm run build && npm run typecheck && npm run lint && npm test && npm run test:demo"
+    "verify": "npm run build && npm run typecheck && npm run lint && npm test && npm run test:demo",
+    "test:registry": "node scripts/verify-single-sdk-registry-install.mjs",
+    "perf:profile": "node scripts/profile-sdk-entrypoints.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

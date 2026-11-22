@@ -47,4 +47,6 @@ steps:
       - npm run typecheck
       - npm run lint
       - npm test
+      - npm run perf:profile
       - DH_T05_ALREADY_BUILT=1 DH_T05_NPM_REGISTRY=http://host.docker.internal:14873 npm run test:demo
+      - DH_T05_NPM_REGISTRY=http://host.docker.internal:14873 npm run test:registry
