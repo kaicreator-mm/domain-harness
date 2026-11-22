@@ -11,7 +11,7 @@ test('SDK facade exposes selected public contracts, BUILD and Boot but not inter
   const expected = new Set<string>([
     ...Object.keys(contracts),
     ...Object.keys(build),
-    ...Object.keys(microkernel).filter((name) => name !== 'bootstrap'),
+    ...Object.keys(microkernel).filter((name) => name !== 'bootstrap' && name !== 'activateSelectedKdpHostInit'),
   ]);
   const actual = new Set<string>(Object.keys(facade));
 
@@ -24,4 +24,6 @@ test('SDK facade exposes selected public contracts, BUILD and Boot but not inter
   );
   assert.ok(actual.size > 0);
   assert.equal('bootstrap' in facade, false, 'internal KDP bootstrap must not be public');
+  assert.equal('activateSelectedKdpHostInit' in facade, false,
+    'Host-only KDP activation must not become a public SDK Function API');
 });

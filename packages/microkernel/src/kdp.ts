@@ -96,39 +96,86 @@ export function validateBusinessCoreResults(raw: unknown): { status: AppStatus }
   return { status: statuses.includes('BLOCKED') ? 'BLOCKED' :
     statuses.includes('DEGRADED') ? 'DEGRADED' : 'READY' };
 }
-/** KDP 复验可信安装后按 Lock 完成技术初始化、Hook、业务初始化；任一步失败必须撤销已完成的初始化。 */
+/**
+ * 单一 KDP Host Init 专用的启动后半段：调用者已经是由 Boot 选定并导入的
+ * KDP Package.Init，故这里只登记其一次真实进入并递归其余 Core，而不再调用 Kernel.Init。
+ * 真正的 Host ABI/Pin/Lock 机器身份将由下一原子合同迁移绑定，不以此函数名授权。
+ */
+export async function activateSelectedKdpHostInit(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
+  // 此调用本身已进入受选的 KDP Host Init：在第一次 await 之前登记退出责任。
+  // 此处不加载文件或执行 Exit；后续仅在验证可信安装来源之后转交 PackageSystem。
+  const enteredHost: { readonly entered: true } = { entered: true };
+  return activateKernel(context, enteredHost);
+}
+
+/** 迁移阶段旧入口：保留既有回归用例；最终 Host ABI 切换将删除此路径。 */
 export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
-  const trust = await verifyInstallTrust(context);
-  if (!trust.ok) return failed(trust.failure.code, trust.failure.reason);
+  return activateKernel(context);
+}
+
+/**
+ * KDP 单次激活：Host 已进入责任必须在调用者首次 await 前建立。
+ * 不受信 Lock/Record/Pin 时禁止尝试加载任意 Exit，明确 CLEANUP_NOT_SAFE；
+ * 可信安装已核实后立刻登记 Kernel Exit，再执行任何 Target/Descriptor/资源验证。
+ */
+async function activateKernel(
+  context: KdpBootstrapContext,
+  enteredHost?: { readonly entered: true },
+): Promise<KdpBootstrapResult> {
+  const hostAlreadyEntered = enteredHost?.entered === true;
+  let trust: Awaited<ReturnType<typeof verifyInstallTrust>>;
+  try {
+    trust = await verifyInstallTrust(context);
+  } catch {
+    return failed('DH_KDP_PACKAGE_LOAD_FAILED',
+      hostAlreadyEntered
+        ? 'KDP trusted installation verification threw (detail redacted); cleanup=CLEANUP_NOT_SAFE'
+        : 'KDP trusted installation verification threw (detail redacted)');
+  }
+  if (!trust.ok) {
+    return failed(trust.failure.code, hostAlreadyEntered
+      ? `${trust.failure.reason}; cleanup=CLEANUP_NOT_SAFE (untrusted install)`
+      : trust.failure.reason);
+  }
+
   const { lock } = trust.value;
   const safeContext = trust.value.context;
-
-  const profile: string = lock.target.profile;
-  if (profile !== NODE22_ESM_PROFILE) {
-    return failed('DH_KDP_PACKAGE_LOAD_FAILED', `Lock target profile '${profile}' is not the frozen '${NODE22_ESM_PROFILE}'`);
-  }
-  const [actualNodeMajor = 0, actualNodeMinor = 0] = process.versions.node.split('.').map(Number);
-  if (actualNodeMajor < 22 || (actualNodeMajor === 22 && actualNodeMinor < 12)) {
-    return failed('DH_RUNTIME_UNSUPPORTED_PROFILE', `actual Node.js ${process.versions.node} is below the supported 22.12 runtime floor`);
-  }
-  const minimumNodeMajor = lock.target.nodeMajor ?? 22;
-  if (safeContext.env.nodeMajor < minimumNodeMajor) {
-    return failed(
-      'DH_RUNTIME_UNSUPPORTED_PROFILE',
-      `Host nodeMajor ${safeContext.env.nodeMajor} is below the Lock target floor ${minimumNodeMajor} for '${NODE22_ESM_PROFILE}'`,
-    );
-  }
-
-  const configResult = await readDescriptorConfig(safeContext, lock);
-  if (!configResult.ok) return configResult.result;
-  const config = configResult.config;
-
-  // 单轮启动：验证选定字节 → 封存 Hook/公开入口 → Core.Order 递归 Init；不再额外调用 Business App Init。
-  // 任何一步失败，都不得返回可调用 DomainApp。
   const packages = new PackageSystem(safeContext.installRoot, lock, safeContext.hostPorts);
 
   try {
-    // 预先检查所有可执行产物，避免在前序 Package 已执行后才发现后序文件被篡改。
+    // 必须紧接首次可信 Lock 获取后转交已经进入的 Host Kernel；后面的所有早期失败
+    // 都通过同一个 catch/Exit 处理，绝不能通过 return 绕过 Exit。
+    if (hostAlreadyEntered) packages.recordSelectedKernelHostEntry();
+
+    const profile: string = lock.target.profile;
+    if (profile !== NODE22_ESM_PROFILE) {
+      throw new KdpLoadError(
+        `Lock target profile '${profile}' is not the frozen '${NODE22_ESM_PROFILE}'`);
+    }
+    const [actualNodeMajor = 0, actualNodeMinor = 0] = process.versions.node.split('.').map(Number);
+    if (actualNodeMajor < 22 || (actualNodeMajor === 22 && actualNodeMinor < 12)) {
+      throw new KdpLoadError(
+        `actual Node.js ${process.versions.node} is below the supported 22.12 runtime floor`,
+        'DH_RUNTIME_UNSUPPORTED_PROFILE');
+    }
+    const minimumNodeMajor = lock.target.nodeMajor ?? 22;
+    if (safeContext.env.nodeMajor < minimumNodeMajor) {
+      throw new KdpLoadError(
+        `Host nodeMajor ${safeContext.env.nodeMajor} is below the Lock target floor ${minimumNodeMajor} for '${NODE22_ESM_PROFILE}'`,
+        'DH_RUNTIME_UNSUPPORTED_PROFILE');
+    }
+
+    const configResult = await readDescriptorConfig(safeContext, lock);
+    if (!configResult.ok) {
+      const failure = configResult.result;
+      if (failure.status !== 'FAILED') {
+        throw new KdpLoadError('KDP descriptor configuration returned invalid failure result');
+      }
+      throw new KdpLoadError(failure.reason, failure.code);
+    }
+    const config = configResult.config;
+
+    // 完成受选文件预检后才允许导入普通 Package/Hook 模块。
     await packages.verifySelectedArtifacts();
     await packages.sealHooks();
     const initContext: AppInitContext = {
@@ -141,14 +188,16 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     };
     let rawInitResult: unknown;
     try {
-      rawInitResult = await packages.runInit(initContext);
+      rawInitResult = hostAlreadyEntered
+        ? await packages.runRemainingCoresAfterKernelEntered(initContext)
+        : await packages.runInit(initContext);
     } catch (error) {
-      throw new KdpLoadError(error instanceof KdpLoadError ? error.message : 'Core.Init raised an unhandled error (detail redacted)', 'DH_RUNTIME_NOT_READY');
+      throw new KdpLoadError(
+        error instanceof KdpLoadError ? error.message : 'Core.Init raised an unhandled error (detail redacted)',
+        'DH_RUNTIME_NOT_READY');
     }
 
     const validated = validateBusinessCoreResults(rawInitResult);
-
-    // 只有 App Init 结果通过 READY/DEGRADED 等状态检查后才创建可对外使用的实例。
     const app = createDomainApp({ lock, packages, initialStatus: validated.status });
     const exposedApp = safeContext.processLifecycle === undefined
       ? app
@@ -156,13 +205,15 @@ export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootst
     return { status: 'BOOTED', app: exposedApp };
   } catch (error) {
     let cleanupFailure = '';
-    // 即使 Init 在中间失败，也只逆序清理真正进入过的 Package。
     try {
       await packages.runExit();
     } catch {
       cleanupFailure = '; cleanup also failed (details redacted)';
     }
     const loadError = error instanceof KdpLoadError ? error : null;
-    return failed(loadError?.code ?? 'DH_KDP_PACKAGE_LOAD_FAILED', `${loadError?.message ?? 'Unexpected KDP failure (detail redacted)'}${cleanupFailure}`);
+    return failed(
+      loadError?.code ?? 'DH_KDP_PACKAGE_LOAD_FAILED',
+      `${loadError?.message ?? 'Unexpected KDP failure (detail redacted)'}${cleanupFailure}`,
+    );
   }
 }

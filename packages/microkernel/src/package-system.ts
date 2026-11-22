@@ -48,6 +48,9 @@ export class PackageSystem {
   private readonly initEvents: string[] = [];
   private readonly callerHistory = new Map<string, InitCaller[]>();
   private exited = false;
+  /** Host-only KDP Init 只能把当前激活转交给下一 Core 一次，不影响 Package 自主重复 Init。 */
+  private kernelHostEntered = false;
+  private kernelHostContinuationStarted = false;
 
   constructor(
     private readonly installRoot: string,
@@ -153,10 +156,50 @@ export class PackageSystem {
   }
 
   /**
-   * 唯一 Init 轮次：Boot→Order 0→本层 Extension 递归→当前 Core→下一个 Core。
-   * Package 自行决定 Init 函数内部是否去重；KDP 只记录全部进入事件。
+   * 旧 Bootstrap 调用路径的递归调度入口，保留供迁移期既有测试使用。
+   * 正式 Host ABI 切换后必须删除，不能再通过它重复调用 KDP Init。
    */
   async runInit(context: AppInitContext): Promise<unknown> {
+    return this.runInitFrom(context, false);
+  }
+
+  /**
+   * KDP Host Init 一旦已被 Boot 真正调用，就立即登记真实进入历史。
+   * 必须在进一步检查其它 Function/Hook/资源之前登记，保证后续任一失败都能尝试 KDP.Exit。
+   * 这不是普通 Package.Init 去重器，不能用于吞掉 Extension 的多次调用。
+   */
+  recordSelectedKernelHostEntry(): void {
+    if (this.kernelHostEntered) {
+      throw new KdpLoadError('KDP Host Init has already entered this activation', 'DH_RUNTIME_NOT_READY');
+    }
+    const rootId = this.lock.coreOrder[0];
+    if (!rootId || this.lock.bootstrapKdpPin.kdpPackageId !== rootId) {
+      throw new KdpLoadError('Host KDP identity does not match the selected Core.Order 0', 'DH_BOOT_PIN_MISMATCH');
+    }
+    this.kernelHostEntered = true;
+    this.initEvents.push(rootId);
+    if (this.packageById(rootId)?.recordInitFrom === true) {
+      const history = this.callerHistory.get(rootId) ?? [];
+      history.push({ type: 'Boot' });
+      this.callerHistory.set(rootId, history);
+    }
+  }
+
+  /**
+   * 已进入的 Host Kernel 后半段：只执行其直系 Extension，然后进入下一个 Core。
+   * 若调用者尚未先登记，则此方法先登记（供已有可信应用内调度复用）；
+   * 真正 Host 激活入口必须提前在最初可清理边界登记。
+   */
+  async runRemainingCoresAfterKernelEntered(context: AppInitContext): Promise<unknown> {
+    if (this.kernelHostContinuationStarted) {
+      throw new KdpLoadError('KDP Host continuation has already entered this activation', 'DH_RUNTIME_NOT_READY');
+    }
+    if (!this.kernelHostEntered) this.recordSelectedKernelHostEntry();
+    this.kernelHostContinuationStarted = true;
+    return this.runInitFrom(context, true);
+  }
+
+  private async runInitFrom(context: AppInitContext, kernelAlreadyEntered: boolean): Promise<unknown> {
     const seen = new Set<string>();
     const businessResults: unknown[] = [];
     const completedCores = new Set<string>();
@@ -310,7 +353,33 @@ export class PackageSystem {
         completedCores.add(id);
       },
     });
-    await coreBinding(0, { type: 'Boot' }).init();
+    if (kernelAlreadyEntered) {
+      const kernel = this.packageById(rootId);
+      if (!kernel || kernel.role !== 'primary' || kernel.layer !== 'kernel' || kernel.order !== 0) {
+        throw new KdpLoadError('Host KDP must be the unique selected Kernel Core at Order 0');
+      }
+      const selectedInit = this.functionByRef(kernel.initFunction);
+      if (!selectedInit || canonicalJson(selectedInit.ref.element) !== canonicalJson(kernel.init)) {
+        throw new KdpLoadError('Host KDP Init Element/Function identity mismatch', 'DH_BOOT_PIN_MISMATCH');
+      }
+      // Kernel 进入事件已经由 Host 激活前沿登记，不能在此重复写入。
+      if (!this.kernelHostEntered) {
+        throw new KdpLoadError('Selected Kernel Host Init is missing its entered record', 'DH_RUNTIME_NOT_READY');
+      }
+      const directExtensions = kernel.dependsOn
+        .map((id) => this.packageById(id))
+        .filter((pkg): pkg is SelectedPackage => pkg?.role === 'extension')
+        .sort((a, b) => a.packageId.localeCompare(b.packageId));
+      for (const extension of directExtensions) {
+        await enter(extension.packageId, { type: 'Package', packageId: rootId }, extension.layer);
+      }
+      completedCores.add(rootId);
+      if (cores.length > 1) {
+        await coreBinding(1, { type: 'Package', packageId: rootId }).init();
+      }
+    } else {
+      await coreBinding(0, { type: 'Boot' }).init();
+    }
     // Core 负责转交下一 Core；KDP 不补跑漏掉的 Core，但在对外标记 READY 前必须确认全链完成。
     const missing = cores.filter((id) => !completedCores.has(id));
     if (missing.length > 0) {
