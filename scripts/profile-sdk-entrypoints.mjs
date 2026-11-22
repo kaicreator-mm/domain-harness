@@ -58,6 +58,12 @@ const evidence = {
   sdkPackBytes:dryRun.size,
   sdkUnpackedBytes:dryRun.unpackedSize,
   samples,
+  rootVsRuntime: {
+    medianElapsedDeltaMs: Number((samples.root.medianElapsedMs - samples.runtime.medianElapsedMs).toFixed(3)),
+    medianRssDeltaBytes: samples.root.medianRssBytes - samples.runtime.medianRssBytes,
+    // 根入口仍提供同步 buildApp 与 BuildRefusal；/runtime 保证纯 Boot 的导入边界。
+    decision: 'KEEP_AS_IS_ROOT_SYNC_API_AND_USE_RUNTIME_SUBPATH_FOR_BOOT_ONLY',
+  },
   note:'Observational only: no arbitrary performance gate, no claimed prechange measurements.',
 };
 mkdirSync(dirname(output), {recursive:true});
