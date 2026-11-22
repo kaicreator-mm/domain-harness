@@ -1,10 +1,12 @@
 // 当前唯一 KDP：Boot 验证选定资源，初始化 Package 后才开放业务入口。
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
+import { dirname, relative, sep, isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
   DH_INSTALL_RECORD_SCHEMA_VERSION,
   contentDigestOf,
   isContentDigest,
+  isRelativeResourcePath,
 } from '@kaicreator/domain-harness-contracts';
 import type {
   DomainAppLock,
@@ -296,6 +298,100 @@ export async function resolveKdpEntryPath(
   return { ok: true, value: resolved };
 }
 
+/**
+ * Host 级前置验证：只按 BUILD 已封存的静态 KDP 图验证每个本地 ESM 文件，
+ * 验证完毕前绝不对选定 KDP 执行 import()。SDK TCB 本身由已安装 SDK 授信；
+ * 本阶段的图不代替后续 kdp-host-init/1 与 SDK SRI 的完整 ABI 迁移。
+ */
+async function verifyKdpStaticClosure(
+  installRoot: string,
+  record: InstalledRecord,
+  lock: DomainAppLock,
+  entryPath: string,
+): Promise<TrustFailure | null> {
+  const invalid = (reason: string): TrustFailure => trustFailure('DH_BOOT_PIN_MISMATCH', reason);
+  const nodes: unknown = lock.trustedKdpModuleClosure;
+  if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 256) {
+    return invalid('KDP static module closure is missing or unbounded');
+  }
+  const manifestPath = resolvePackageFile(installRoot, record.kdpPackageId, 'package.json');
+  if (manifestPath === null) return invalid('KDP package root cannot be resolved');
+  let rootReal: string;
+  try {
+    rootReal = await realpath(dirname(manifestPath));
+  } catch {
+    return invalid('KDP installed package root is not readable');
+  }
+
+  const modules = new Map<string, { ref: { packageId: string; path: string; digest: string };
+    dependencies: unknown[]; trustedImports: unknown[] }>();
+  let bytesTotal = 0;
+  for (const node of nodes as unknown[]) {
+    if (!isRecord(node) || !isRecord(node['module']) ||
+        !Array.isArray(node['dependencies']) || !Array.isArray(node['trustedImports'])) {
+      return invalid('KDP closure contains a malformed ESM node');
+    }
+    const ref = node['module'];
+    if (ref['packageId'] !== record.kdpPackageId || typeof ref['path'] !== 'string' ||
+        !isRelativeResourcePath(ref['path']) || !/\.(?:js|mjs)$/u.test(ref['path']) ||
+        !isContentDigest(ref['digest']) || modules.has(ref['path'])) {
+      return invalid('KDP closure contains a duplicate or invalid module identity');
+    }
+    const key = `${record.kdpPackageId}/${ref['path']}`;
+    if (lock.resourceDigests[key] !== ref['digest']) {
+      return invalid('KDP module closure digest does not match the Lock resource map');
+    }
+    const absolute = resolvePackageFile(installRoot, record.kdpPackageId, ref['path']);
+    if (absolute === null) return invalid('KDP ESM path escapes installed package');
+    let resolved: string;
+    let bytes: Uint8Array;
+    try {
+      resolved = await realpath(absolute);
+      bytes = await readFile(absolute);
+    } catch {
+      return invalid('KDP ESM dependency is missing or unreadable');
+    }
+    const rel = relative(rootReal, resolved);
+    if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+      return invalid('KDP ESM realpath escapes trusted package root');
+    }
+    bytesTotal += bytes.byteLength;
+    if (bytesTotal > 4 * 1024 * 1024) return invalid('KDP ESM closure exceeds 4 MiB');
+    if (bytesContentDigest(bytes) !== ref['digest']) {
+      return invalid('KDP transitive ESM dependency bytes do not match the selected Lock');
+    }
+    const trusted = node['trustedImports'] as unknown[];
+    if (!trusted.every((name) => typeof name === 'string' &&
+       (name === '@kaicreator/domain-harness-microkernel' ||
+         ['node:buffer', 'node:crypto', 'node:path', 'node:url', 'node:util'].includes(name)))) {
+      return invalid('KDP ESM closure has an untrusted builtin or bare SDK import');
+    }
+    modules.set(ref['path'], {
+      ref: { packageId: ref['packageId'] as string, path: ref['path'], digest: ref['digest'] },
+      dependencies: node['dependencies'] as unknown[],
+      trustedImports: trusted,
+    });
+  }
+  let hasEntry = false;
+  for (const node of modules.values()) {
+    const file = resolvePackageFile(installRoot, record.kdpPackageId, node.ref.path);
+    if (file === entryPath) {
+      hasEntry = node.ref.digest === record.kdpPrimaryDigest;
+    }
+    for (const child of node.dependencies) {
+      if (!isRecord(child) || child['packageId'] !== record.kdpPackageId ||
+          typeof child['path'] !== 'string' || !isContentDigest(child['digest'])) {
+        return invalid('KDP ESM closure contains an invalid dependency edge');
+      }
+      const expected = modules.get(child['path']);
+      if (!expected || expected.ref.digest !== child['digest']) {
+        return invalid('KDP ESM static dependency is not pinned in the closure');
+      }
+    }
+  }
+  return hasEntry ? null : invalid('KDP actual package export is not the pinned module closure root');
+}
+
 export async function verifyKdpEntryBytes(
   installRoot: string,
   record: InstalledRecord,
@@ -326,6 +422,8 @@ export async function verifyKdpEntryBytes(
   if (bytesContentDigest(bytes) !== record.kdpPrimaryDigest) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'KDP entry artifact bytes do not equal the installed record kdpPrimaryDigest') };
   }
+  const closureFailure = await verifyKdpStaticClosure(installRoot, record, lock, entryPath);
+  if (closureFailure) return { ok: false, failure: closureFailure };
   return { ok: true, value: entryPath };
 }
 
