@@ -1,8 +1,9 @@
 // 当前架构的可证伪测试：断言实际行为而非历史兼容。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile, rm } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import type { BootResult, BootstrapPin, ContentDigest } from '@kaicreator/domain-harness-contracts';
 import {
@@ -164,7 +165,7 @@ test('KDP artifact digest mismatch is DH_BOOT_PIN_MISMATCH', async (t) => {
 test('KDP transitive installed ESM tamper is refused before any module side effect', async (t) => {
   await withFixture(t, async (fixture) => {
     // 只篡改真实磁盘上的依赖；Pin/Record/Lock 仍与 BUILD 封存字节一致。
-    const dependency = join(fixture.installRoot, 'node_modules', KDP_PACKAGE_ID, 'dist', 'kdp.js');
+    const dependency = join(fixture.installRoot, 'node_modules', KDP_PACKAGE_ID, 'dist', 'bootstrap.js');
     const original = await readFile(dependency);
     await writeFile(dependency, Buffer.concat([original, Buffer.from('\n// altered after installation\n')]));
     assertRefused(await boot(fixture.pin, fixture.context), 'DH_BOOT_PIN_MISMATCH');
@@ -190,6 +191,60 @@ test('KDP closure missing from a digest-consistent Lock is refused before import
   });
 });
 
+/** 错误图与自洽摘要不是受信 BUILD 的证明：源码仍含原始静态边。 */
+test('R115-P1-01: removing one real child and edge with rehashed Lock/Record/Pin still refuses pre-import', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
+    const nodes = lock['trustedKdpModuleClosure'] as Array<{
+      module: { path: string };
+      dependencies: Array<{ path: string }>;
+    }>;
+    const entry = nodes.find((node) => node.module.path === 'dist/index.js');
+    assert.ok(entry);
+    entry.dependencies = [];
+    lock['trustedKdpModuleClosure'] = [entry];
+    delete (lock['resourceDigests'] as Record<string, unknown>)[`${KDP_PACKAGE_ID}/dist/bootstrap.js`];
+    delete lock['closureDigest'];
+    lock['closureDigest'] = digestOf(lock);
+    await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
+    const record = await fixture.readRecord();
+    record['lockDigest'] = lock['closureDigest'];
+    delete record['recordDigest'];
+    record['recordDigest'] = digestOf(record);
+    await fixture.writeRecord(record);
+    assertRefused(await boot({ ...fixture.pin, lockDigest: lock['closureDigest'] as ContentDigest },
+      fixture.context), 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+});
+
+/** R115-P1-02: 同 SHA KDP 即使通过 Record 与入口校验，也不允许其根逃到外部目录。 */
+test('R115-P1-02: external symlinked KDP root fails before external code evaluation', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const external = await mkdtemp(join(tmpdir(), 'dh-r115-external-kdp-'));
+    t.after(() => rm(external, { recursive: true, force: true }));
+    const root = join(fixture.installRoot, 'node_modules', KDP_PACKAGE_ID);
+    await cp(root, external, { recursive: true });
+    await rm(root, { recursive: true, force: true });
+    await symlink(external, root, process.platform === 'win32' ? 'junction' : 'dir');
+    assertRefused(await boot(fixture.pin, fixture.context), 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+});
+
+test('R115-P1-02: external same-name trusted SDK package is refused pre-import', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const external = await mkdtemp(join(tmpdir(), 'dh-r115-external-sdk-'));
+    t.after(() => rm(external, { recursive: true, force: true }));
+    const sdk = join(fixture.installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel');
+    await cp(sdk, external, { recursive: true });
+    await rm(sdk, { recursive: true, force: true });
+    await symlink(external, sdk, process.platform === 'win32' ? 'junction' : 'dir');
+    assertRefused(await boot(fixture.pin, fixture.context), 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+});
+
 test('pinned entry without the named bootstrap export is DH_BOOT_KDP_ENTRY_INVALID', async (t) => {
   await withFixture(t, async (fixture) => {
     const stub = 'export const notBootstrap = 1;\n';
@@ -208,6 +263,10 @@ test('pinned entry without the named bootstrap export is DH_BOOT_KDP_ENTRY_INVAL
     assert.ok(entry);
     entry.module.digest = stubDigest;
     (lock['resourceDigests'] as Record<string, ContentDigest>)[`${KDP_PACKAGE_ID}/dist/index.js`] = stubDigest;
+    // 入口已重封成无导入的 stub，合法静态图因此只保留根；下一步确实检查 export 缺失。
+    lock['trustedKdpModuleClosure'] = [entry];
+    entry.dependencies = [];
+    delete (lock['resourceDigests'] as Record<string, ContentDigest>)[`${KDP_PACKAGE_ID}/dist/bootstrap.js`];
     delete lock['closureDigest'];
     lock['closureDigest'] = digestOf(lock);
 
