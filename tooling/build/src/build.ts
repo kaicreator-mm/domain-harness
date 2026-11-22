@@ -639,8 +639,8 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     scope.record(manifest.id, artifactPath, digest);
     // 已选 Target 的真实命名导出在 sealedFunctions 构造时逐个检验。
     sealPackageManifest(scope, manifest, manifest.id === kdpId ? input.kdpArtifact.path : undefined);
-    // Read only an already validated Package manifest; the author cannot expand
-    // runtime dependencies without BUILD admitting the exact pinned subset.
+    // 只读取已验证的 Package npm 元数据，外部依赖不得绕过 BUILD 已准入的精确范围。
+    // 未经 BUILD 校验的第三方库不得扩大运行时依赖范围。
     const npmManifest = JSON.parse(Buffer.from(scope.read(manifest.id, 'package.json')).toString('utf8')) as {
       readonly dependencies?: Readonly<Record<string, string>>;
     };
