@@ -262,6 +262,14 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
     kdpPrimaryEntry: 'bootstrap',
     kdpPrimaryDigest: contentDigestOf({ fixture: 'kdp/bootstrap-entry', revision: 1 }),
   },
+  trustedKdpModuleClosure: [{
+    module: {
+      packageId: 'kdp-basic', path: 'dist/bootstrap.js',
+      digest: contentDigestOf({ fixture: 'kdp/bootstrap-entry', revision: 1 }),
+    },
+    dependencies: [],
+    trustedImports: [],
+  }],
   selectedPackages: [
     {
       packageId: 'kdp-basic',
@@ -368,6 +376,7 @@ export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
   hookBindings: [],
   coreOrder: ['kdp-basic', 'sdk-core', 'orders-business'],
   resourceDigests: {
+    'kdp-basic/dist/bootstrap.js': contentDigestOf({ fixture: 'kdp/bootstrap-entry', revision: 1 }),
     'orders-business/content/rules.json': contentDigestOf({ fixture: 'orders/rules', revision: 1 }),
     'orders-business/content/faq.json': contentDigestOf({ fixture: 'orders/faq', revision: 1 }),
   },
