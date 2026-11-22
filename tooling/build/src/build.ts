@@ -45,6 +45,7 @@ import { TRUSTED_WORKFLOW_NPM_ARCHIVES } from './trusted-runtime.js';
 import { selectWorkflows, workflowKey } from './workflow-selection.js';
 import type { LoadedElement, ResolvedFunction } from './selection-types.js';
 import { selectPackageClosure } from './package-selection.js';
+import { sealKdpModuleClosure } from './kdp-module-closure.js';
 
 
 function elementNamespace(id: string): string {
@@ -682,9 +683,14 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       return selected.implementation.module;
     })),
   ]);
-  const kdpBytes = scope.read(input.kdpArtifact.packageId, input.kdpArtifact.path);
-  const kdpDigest = digestOfBytes(kdpBytes);
-  scope.record(input.kdpArtifact.packageId, input.kdpArtifact.path, kdpDigest);
+  // 单独封存真实 Host 入口的 ESM 静态闭包：此入口不一定等于普通 KDP Package.Init Target。
+  // 每个本 Package 的相对依赖字节均进入 Lock/resourceDigests，Boot 必须导入前逐个验证。
+  const trustedKdpModuleClosure = sealKdpModuleClosure(scope, input.kdpArtifact);
+  const kdpRoot = trustedKdpModuleClosure.find((node) =>
+    node.module.packageId === input.kdpArtifact.packageId &&
+    node.module.path === input.kdpArtifact.path);
+  if (!kdpRoot) throw refusal('DH_BUILD_RESOURCE_MISSING', 'selected KDP entry absent from sealed ESM graph');
+  const kdpDigest = kdpRoot.module.digest;
 
   // 第 6 段：同时封存描述符语义、KDP 入口字节、Package/Function/Hook 与资源闭包。
   const descriptorDigest = contentDigestOf(toJson(descriptor));
@@ -699,6 +705,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
         kdpPrimaryEntry: 'bootstrap' as const,
         kdpPrimaryDigest: kdpDigest,
       },
+      trustedKdpModuleClosure,
       selectedPackages: sealedPackages,
       selectedElements: sealedElements,
       selectedFunctions: sealedFunctions,
