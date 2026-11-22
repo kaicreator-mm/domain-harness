@@ -12,15 +12,34 @@ import { fileURLToPath } from 'node:url';
 import { buildApp } from '@kaicreator/domain-harness';
 
 const sourceRoot = dirname(fileURLToPath(import.meta.url));
-const PACKAGE_IDS = ['r41-kdp', 'r41-sdk-base', 'r60-standard-files', 'reference-business'];
+const PACKAGE_IDS = ['r41-kdp', 'r41-sdk-base', 'r60-standard-files', 'reference-knowledge', 'reference-business'];
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const sdkManifest = await readJson(join(sourceRoot, 'package.json'));
 assert.deepEqual(sdkManifest.dependencies, { '@kaicreator/domain-harness': '0.11.0' },
   'the independently authored app may directly depend on only one public SDK');
 const descriptor = await readJson(join(sourceRoot, 'apps/reference.json'));
 const manifests = await Promise.all(PACKAGE_IDS.map((name) => readJson(join(sourceRoot, 'packages', name, 'manifest.json'))));
+const domainDefinitions = await Promise.all([
+  'reference-business/definitions/app.json',
+  'reference-business/definitions/rule.json',
+  'reference-business/definitions/recognizer.json',
+  'reference-business/definitions/validator.json',
+  'reference-knowledge/definitions/knowledge.json',
+  'reference-knowledge/definitions/lifecycle.json',
+].map((name) => readJson(join(sourceRoot, 'packages', name))));
+const domain = {
+  kind: 'Domain', schemaVersion: 'dh.domain/0.11', id: 'reference-example', version: '1.1.0',
+  description: 'Selected facts, applicability, recognition, validation and deterministic decisions.',
+  elements: domainDefinitions,
+  semanticRelations: [
+    { relation: 'recognizes', from: 'reference.recognizer', to: 'reference.knowledge' },
+    { relation: 'provides-evidence', from: 'reference.knowledge', to: 'reference.validator' },
+    { relation: 'validates', from: 'reference.validator', to: 'reference.rule' },
+    { relation: 'executes', from: 'reference.app', to: 'reference.rule' },
+  ],
+};
 const input = {
-  descriptor, packages: manifests,
+  descriptor, domains: [domain], packages: manifests,
   packageRoots: Object.fromEntries(PACKAGE_IDS.map((name) => [name, join(sourceRoot, 'packages', name)])),
   packageArtifacts: Object.fromEntries(PACKAGE_IDS.map((name) => [name, 'dist/index.mjs'])),
   kdpArtifact: { packageId: 'r41-kdp', path: 'dist/bootstrap.js' },
@@ -36,6 +55,10 @@ assert.deepEqual(accepted.lockBytes, reproducible.lockBytes);
 assert.deepEqual(accepted.lock.coreOrder, ['r41-kdp', 'r41-sdk-base', 'reference-business']);
 assert.equal(accepted.lock.selectedWorkflows.length, 1);
 assert.ok(accepted.lock.selectedPackages.some((item) => item.packageId === 'r60-standard-files'));
+assert.ok(accepted.lock.selectedPackages.some((item) => item.packageId === 'reference-knowledge'));
+assert.equal(accepted.lock.selectedFunctions.filter((item) =>
+  ['reference.recognizer', 'reference.knowledge', 'reference.validator', 'reference.rule']
+    .includes(item.ref.element.id)).length, 4);
 assert.deepEqual(accepted.lock.trustedRuntimeIntegrity.map((item) => [item.name, item.version]),
   [['xstate', '5.33.2'], ['yaml', '2.9.1']]);
 
@@ -51,6 +74,27 @@ absent.find((item) => item.id === 'reference-business').imports = [];
 const absentResult = buildApp({ ...input, packages: absent });
 assert.equal(absentResult.ok, false, 'undeclared Standard Element imports must fail at BUILD');
 const missingImportCode = absentResult.ok ? 'UNEXPECTED_SUCCESS' : absentResult.code;
+
+// Source facts must be sealed: changing their bytes without changing their digest is refused.
+const tamperRoot = await mkdtemp(join(tmpdir(), 'dh-reference-knowledge-tamper-'));
+let mutatedFactsCode;
+try {
+  const tamperedKnowledge = join(tamperRoot, 'reference-knowledge');
+  await cp(join(sourceRoot, 'packages/reference-knowledge'), tamperedKnowledge, { recursive: true });
+  const factsPath = join(tamperedKnowledge, 'content/facts.json');
+  const facts = await readJson(factsPath);
+  const source = facts.facts.find((item) => item.id === 'policy-us');
+  assert.ok(source);
+  source.value = 30;
+  await writeFile(factsPath, JSON.stringify(facts));
+  const mutated = buildApp({
+    ...input, packageRoots: { ...input.packageRoots, 'reference-knowledge': tamperedKnowledge },
+  });
+  assert.equal(mutated.ok, false, 'changed fact bytes must be refused without a new signed digest');
+  mutatedFactsCode = mutated.ok ? 'UNEXPECTED_SUCCESS' : mutated.code;
+} finally {
+  await rm(tamperRoot, { recursive: true, force: true });
+}
 
 const installRoot = await mkdtemp(join(tmpdir(), 'dh-reference-domain-app-'));
 function run(executable, args, label, expectedOk = true) {
@@ -93,13 +137,13 @@ try {
   const line = bootResult.stdout.split('\n').find((item) => item.startsWith('REFERENCE_DOMAIN_APP_PASS '));
   const report = JSON.parse(line.slice('REFERENCE_DOMAIN_APP_PASS '.length));
   const evidence = {
-    kind: 'DHReferenceDomainAppReceipt', stage: '0.11.1', status: 'PASS',
+    kind: 'DHReferenceDomainAppReceipt', stage: '0.11.2', status: 'PASS',
     sourceSha: process.env.CI_COMMIT_SHA ?? 'LOCAL_UNBOUND',
     node: process.version, sdkDirectDependencies: 1,
     packageIds: accepted.lock.selectedPackages.map((item) => item.packageId),
     packageDigest: accepted.appPackage.packageDigest,
     lockDigest: accepted.lock.closureDigest, workflowCount: accepted.lock.selectedWorkflows.length,
-    staleCode, missingImportCode, preinstallTamperRejected: true, ...report,
+    staleCode, missingImportCode, mutatedFactsCode, preinstallTamperRejected: true, ...report,
   };
   if (process.env.DH_REF_EVIDENCE) {
     await mkdir(process.env.DH_REF_EVIDENCE, { recursive: true });

@@ -23,10 +23,45 @@ assert.ok(verified, 'actual Standard File/Workflow execution must occur within P
 assert.equal(verified.workflow, 'COMPLETE');
 assert.equal(verified.unknown, 'UNKNOWN');
 assert.equal(verified.denied, 'DH_WORKFLOW_UNSELECTED');
+assert.equal(verified.knowledgeRecords, 4);
+assert.equal(events.filter((item) => item.phase === 'extension-init' &&
+  item.packageId === 'reference-knowledge').length, 1, 'real Knowledge Extension Init missing');
+assert.match(verified.selectedResourceDigest, /^sha256:[0-9a-f]{64}$/u);
+assert.equal(verified.cases.length, 11);
+const cases = new Map(verified.cases.map((item) => [item.name, item]));
+assert.deepEqual(
+  ['US_ACCEPT', 'US_REJECT', 'CA_REJECT', 'CA_ACCEPT'].map((name) =>
+    [name, cases.get(name)?.status, cases.get(name)?.decision, cases.get(name)?.threshold]),
+  [
+    ['US_ACCEPT', 'COMPLETE', 'ACCEPT', 10],
+    ['US_REJECT', 'COMPLETE', 'REJECT', 10],
+    ['CA_REJECT', 'COMPLETE', 'REJECT', 20],
+    ['CA_ACCEPT', 'COMPLETE', 'ACCEPT', 20],
+  ],
+);
+for (const [name, code] of [
+  ['CONFLICT', 'REFERENCE_KNOWLEDGE_CONFLICT'],
+  ['MISSING', 'REFERENCE_KNOWLEDGE_NOT_APPLICABLE'],
+  ['STALE', 'REFERENCE_KNOWLEDGE_STALE'],
+  ['VERSION', 'REFERENCE_KNOWLEDGE_VERSION_UNAVAILABLE'],
+  ['DOMAIN', 'REFERENCE_DOMAIN_NOT_APPLICABLE'],
+  ['UNKNOWN_SCORE', 'REFERENCE_SCORE_UNKNOWN'],
+  ['FORGED_FACTS', 'REFERENCE_KNOWLEDGE_DIGEST_MISMATCH'],
+]) {
+  assert.equal(cases.get(name)?.status, 'UNKNOWN');
+  assert.equal(cases.get(name)?.reason, code);
+}
+for (const name of ['US_ACCEPT', 'US_REJECT', 'CA_REJECT', 'CA_ACCEPT']) {
+  assert.ok(cases.get(name)?.evidence.length > 0, 'Decision outcome must contain signed source FactId');
+}
 await result.app.dispose();
 const exit = events.filter((item) => item.phase === 'exit').map((item) => item.packageId);
 assert.deepEqual(exit, [...init].reverse());
+assert.equal(events.filter((item) => item.phase === 'extension-exit' &&
+  item.packageId === 'reference-knowledge').length, 1, 'real Knowledge Extension Exit missing');
 console.log(`REFERENCE_DOMAIN_APP_PASS ${JSON.stringify({
   appStatus: 'READY', workflow: verified.workflow, unknown: verified.unknown,
   denied: verified.denied, initOrder: init, exitOrder: exit,
+  cases: verified.cases, knowledgeRecords: verified.knowledgeRecords,
+  selectedResourceDigest: verified.selectedResourceDigest,
 })}`);
