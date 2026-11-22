@@ -7,6 +7,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildApp as validateGeneratedApp } from '../../../../tooling/build/src/index.js';
 import {
   boot, buildApp, canonicalJson, contentDigestOf, type BuildInput,
   type BuildSuccess, type DomainAppDescriptor,
@@ -282,19 +283,19 @@ test('R60 W02: second domain r41 App boots and actually invokes same ordinary St
   await result.app.app.dispose();
 });
 
-test('R60 W02: another Domain cannot import unselected or undeclared Standard Reader', async (t) => {
+test('R60 W02: generator rejects undeclared Reader imports; Composer rejects missing or stale bindings', async (t) => {
   const source = await r60OtherDomain(t);
   const input = authoredInput('extended', source, true);
   const selectedPool = input.packages as readonly DomainPackageManifest[];
-  const unimported = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+  const unimported = validateGeneratedApp({ ...input, packages: selectedPool.map((pkg) =>
     pkg.id === 'r41-business' ? { ...pkg, imports: [] } : pkg) });
   assert.equal(unimported.ok, false, 'a public File Function still requires an exact manifest import');
-  const missingWrite = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+  const missingWrite = validateGeneratedApp({ ...input, packages: selectedPool.map((pkg) =>
     pkg.id === 'r41-business'
       ? { ...pkg, imports: pkg.imports.filter((item) => item.functionId !== 'writeJson') }
       : pkg) });
   assert.equal(missingWrite.ok, false, 'selected File.Write cannot bypass exact FunctionRef import');
-  const missingYamlWrite = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+  const missingYamlWrite = validateGeneratedApp({ ...input, packages: selectedPool.map((pkg) =>
     pkg.id === 'r41-business'
       ? { ...pkg, imports: pkg.imports.filter((item) => item.functionId !== 'writeYaml') }
       : pkg) });
