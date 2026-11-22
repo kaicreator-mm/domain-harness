@@ -28,9 +28,9 @@ const result = await build({
   plugins: [{
     name: 'sdk-isolate-optional-source-map-support',
     setup(context) {
-      context.onResolve({ filter: /^source-map-support$/u },
+      context.onResolve({ filter: /^source-map-support$/ },
         () => ({ path: 'source-map-support', namespace: 'sdk-internal' }));
-      context.onLoad({ filter: /^source-map-support$/u, namespace: 'sdk-internal' },
+      context.onLoad({ filter: /^source-map-support$/, namespace: 'sdk-internal' },
         () => ({ contents: 'module.exports = { install() {} };', loader: 'js' }));
     },
   }],
