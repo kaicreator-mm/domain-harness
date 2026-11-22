@@ -299,7 +299,7 @@ export async function resolveKdpEntryPath(
 
 /**
  * Boot 只核对受信安装的物理位置，不重扫源码，也不重新证明 Package 正确性。
- * 相对路径已经由安装记录选定；禁止 KDP 根或入口被软链接重定向。
+ * 相对路径已经由安装记录选定；仅允许 npm 已封存 local file 包位置，禁止任意软链接重定向。
  * 安装根自身可由 Host 给出别名，故以其 realpath 作为唯一物理基准。
  */
 async function verifySealedKdpLocation(
@@ -313,12 +313,14 @@ async function verifySealedKdpLocation(
   }
   try {
     const trustedRoot = await realpath(installRoot);
-    const selectedRoot = resolve(trustedRoot, 'node_modules', ...packageId.split('/'));
+    const installedRoot = resolve(trustedRoot, 'node_modules', ...packageId.split('/'));
+    // npm 对 file:./packages/<id> 安装的合法目录使用 node_modules 软链接。
+    // 只允许这两个预先确定的受信物理位置，拒绝任意 store/或安装根外重定向。
+    const sealedLocalRoot = resolve(trustedRoot, 'packages', ...packageId.split('/'));
     const actualRoot = await realpath(dirname(manifestPath));
-    // 拒绝包目录的任何重定向（包括安装根内部重定向）；
-    // 不尝试使用 Node 的运行时 bare import 规则作第二次静态分析。
-    if (relative(selectedRoot, actualRoot) !== '') {
-      return trustFailure('DH_BOOT_PIN_MISMATCH', 'sealed KDP package root has been relocated');
+    if (relative(installedRoot, actualRoot) !== '' &&
+        relative(sealedLocalRoot, actualRoot) !== '') {
+      return trustFailure('DH_BOOT_PIN_MISMATCH', 'sealed KDP package root is outside its selected installation locations');
     }
     if (entryPath !== undefined) {
       const logicalRoot = dirname(manifestPath);
