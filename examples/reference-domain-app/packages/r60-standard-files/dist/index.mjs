@@ -35,17 +35,18 @@ function isJsonValue(value, ancestors = new WeakSet(), depth = 0,
         isJsonValue(item, ancestors, depth + 1, budget)) &&
         Object.keys(value).length === value.length;
     }
-    // 先给自有可枚举键计数并收取键字节预算，避免超限时 Object.entries
-    // 预先取值、触发后续 getter，或创建大量 [key, value] 临时条目。
-    const keys = Object.keys(value);
-    if (keys.length > 32768 - budget.nodes) {
-      budget.exceeded = true;
-      return false;
-    }
-    for (const key of keys) {
+    // 仅枚举自有键并计数，先拒绝超预算对象；不读取属性值、
+    // 不构造 Object.keys/entries 巨大临时数组，也不用 BUILD 禁止的 value[key]。
+    let ownKeys = 0;
+    for (const key in value) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+      if (++ownKeys > 32768 - budget.nodes) {
+        budget.exceeded = true;
+        return false;
+      }
       if (DENIED_KEYS.has(key) || !charge(Buffer.byteLength(key, 'utf8'))) return false;
     }
-    // 经过数量与键预算预检后才枚举值；不使用 BUILD 禁止的动态成员访问。
+    // 只有已受数量/键预算约束时才读取值；所分配的 entries 数量有已知上限。
     return Object.entries(value).every(([, child]) =>
       isJsonValue(child, ancestors, depth + 1, budget));
   } finally {
