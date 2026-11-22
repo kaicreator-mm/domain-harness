@@ -17,7 +17,7 @@ const values = [
 
 function ref(rules, functionId) {
   return {
-    element: { namespace: 'basic', id: rules.id, version: rules.version, digest: contentDigestOf(rules) },
+    element: { namespace: rules.id.split('.')[0], id: rules.id, version: rules.version, digest: contentDigestOf(rules) },
     functionId, contractVersion: '1',
   };
 }
@@ -41,16 +41,14 @@ const content = (id, value) => ({
   id, contentKind: 'workflow-definition', schemaRef: { inline: { type: 'object' } },
   required: true, value,
 });
-export async function prepareWorkflowElements(dirs, rules, app, fn) {
+export async function prepareWorkflowElements(dirs, rules, app, fn, standardReader) {
   const schema = {
-    type: 'object', required: ['format', 'source', 'value'],
+    type: 'object', required: ['format', 'source'],
     properties: {
-      format: { enum: ['json', 'yaml'] }, source: { type: 'string' }, value: { type: 'object' },
+      format: { enum: ['json', 'yaml'] }, source: { type: 'string' },
     },
   };
   rules.functions.push(
-    fn('jsonReader', schema, { type: 'object' }),
-    fn('yamlReader', schema, { type: 'object' }),
     fn('startWorkflow', { type: 'object' }, { type: 'object' }),
     fn('endWorkflow', { type: 'object' }, { type: 'object' }),
     { ...fn('workflowDecision', { type: 'object' }, { type: 'object' }),
@@ -88,10 +86,12 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
   if (!ruleDependency || !Array.isArray(ruleDependency.functions)) {
     throw new Error('T14 fixture must preserve direct Element dependency on basic.rules');
   }
-  ruleDependency.functions.push('jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow', 'workflowDecision');
+  ruleDependency.functions.push('startWorkflow', 'endWorkflow', 'workflowDecision');
+  app.dependencies.push({ element: standardReader.id, version: standardReader.version,
+    functions: ['jsonReader', 'yamlReader'] });
   app.dependencies.push(...dataElements.map((el) => ({ element: el.id, version: el.version })));
-  const jsonReader = ref(rules, 'jsonReader');
-  const yamlReader = ref(rules, 'yamlReader');
+  const jsonReader = ref(standardReader, 'jsonReader');
+  const yamlReader = ref(standardReader, 'yamlReader');
   const hooks = { start: ref(rules, 'startWorkflow'), end: ref(rules, 'endWorkflow') };
   const child = {
     kind: 'Element', schemaVersion: DH_ELEMENT_SCHEMA_VERSION,
@@ -104,7 +104,7 @@ export async function prepareWorkflowElements(dirs, rules, app, fn) {
     ],
     functions: [],
     dependencies: [
-      { element: 'basic.rules', version: '1.0.0', functions: ['jsonReader'] },
+      { element: standardReader.id, version: standardReader.version, functions: ['jsonReader'] },
       { element: 'basic.data_json_b', version: '1.0.0' },
     ],
   };
