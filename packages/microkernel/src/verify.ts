@@ -1,5 +1,6 @@
 // 当前唯一 KDP：Boot 验证选定资源，初始化 Package 后才开放业务入口。
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
+import { dirname, relative, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
   DH_INSTALL_RECORD_SCHEMA_VERSION,
@@ -296,11 +297,57 @@ export async function resolveKdpEntryPath(
   return { ok: true, value: resolved };
 }
 
+/**
+ * Boot 只核对受信安装的物理位置，不重扫源码，也不重新证明 Package 正确性。
+ * 相对路径已经由安装记录选定；仅允许 npm 已封存 local file 包位置，禁止任意软链接重定向。
+ * 安装根自身可由 Host 给出别名，故以其 realpath 作为唯一物理基准。
+ */
+async function verifySealedKdpLocation(
+  installRoot: string,
+  packageId: string,
+  entryPath?: string,
+): Promise<TrustFailure | null> {
+  const manifestPath = resolvePackageFile(installRoot, packageId, 'package.json');
+  if (manifestPath === null) {
+    return trustFailure('DH_BOOT_PIN_MISMATCH', 'sealed KDP package path is invalid');
+  }
+  try {
+    const trustedRoot = await realpath(installRoot);
+    const installedRoot = resolve(trustedRoot, 'node_modules', ...packageId.split('/'));
+    // npm 对 file:./packages/<id> 安装的合法目录使用 node_modules 软链接。
+    // 只允许这两个预先确定的受信物理位置，拒绝任意 store/或安装根外重定向。
+    const sealedLocalRoot = resolve(trustedRoot, 'packages', ...packageId.split('/'));
+    const actualRoot = await realpath(dirname(manifestPath));
+    if (relative(installedRoot, actualRoot) !== '' &&
+        relative(sealedLocalRoot, actualRoot) !== '') {
+      return trustFailure('DH_BOOT_PIN_MISMATCH', 'sealed KDP package root is outside its selected installation locations');
+    }
+    if (entryPath !== undefined) {
+      const logicalRoot = dirname(manifestPath);
+      const withinPackage = relative(logicalRoot, entryPath);
+      if (withinPackage === '' || withinPackage === '..' ||
+          withinPackage.startsWith('../') || withinPackage.startsWith('..\\')) {
+        return trustFailure('DH_BOOT_PIN_MISMATCH', 'sealed KDP entry is outside its package');
+      }
+      const expectedEntry = resolve(actualRoot, withinPackage);
+      const actualEntry = await realpath(entryPath);
+      if (relative(expectedEntry, actualEntry) !== '') {
+        return trustFailure('DH_BOOT_PIN_MISMATCH', 'sealed KDP entry was redirected by a link');
+      }
+    }
+  } catch {
+    return trustFailure('DH_BOOT_PIN_MISMATCH', 'sealed KDP installation path is not readable');
+  }
+  return null;
+}
+
 export async function verifyKdpEntryBytes(
   installRoot: string,
   record: InstalledRecord,
   lock: DomainAppLock,
 ): Promise<TrustResult<string>> {
+  const physicalRootFailure = await verifySealedKdpLocation(installRoot, record.kdpPackageId);
+  if (physicalRootFailure !== null) return { ok: false, failure: physicalRootFailure };
   const manifestPath = resolvePackageFile(installRoot, record.kdpPackageId, 'package.json');
   const manifestDigest = lock.resourceDigests[`${record.kdpPackageId}/package.json`];
   if (manifestPath === null || manifestDigest === undefined) {
@@ -317,6 +364,8 @@ export async function verifyKdpEntryBytes(
   const entryResult = await resolveKdpEntryPath(installRoot, record.kdpPackageId);
   if (!entryResult.ok) return entryResult;
   const entryPath = entryResult.value;
+  const physicalEntryFailure = await verifySealedKdpLocation(installRoot, record.kdpPackageId, entryPath);
+  if (physicalEntryFailure !== null) return { ok: false, failure: physicalEntryFailure };
   let bytes: Buffer;
   try {
     bytes = await readFile(entryPath);
