@@ -21,7 +21,7 @@ assert.equal(publicTypes, internalTypes,
   'SDK public composition types drifted from the implementation; synchronize the single contract');
 
 const result = await build({
-  entryPoints: [join(repo, 'tooling/build/src/index.ts')],
+  entryPoints: [join(repo, 'tooling/build/src/composition-entry.ts')],
   outfile,
   bundle: true,
   platform: 'node',
@@ -55,7 +55,7 @@ const result = await build({
 });
 
 const outputs = Object.values(result.metafile.outputs);
-assert.ok(outputs.some((output) => output.entryPoint?.endsWith('tooling/build/src/index.ts')),
+assert.ok(outputs.some((output) => output.entryPoint?.endsWith('tooling/build/src/composition-entry.ts')),
   'SDK composition bundle must originate from the original validated implementation');
 for (const output of outputs) {
   for (const imported of output.imports ?? []) {
