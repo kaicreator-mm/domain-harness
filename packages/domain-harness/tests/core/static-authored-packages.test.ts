@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -20,6 +21,7 @@ const XSTATE_DIR = dirname(fileURLToPath(import.meta.resolve('xstate/package.jso
 const YAML_DIR = dirname(fileURLToPath(import.meta.resolve('yaml/package.json')));
 const IDS = ['r41-kdp', 'r41-sdk-base', 'r41-sdk-extra', 'r41-business'] as const;
 const KDP = 'r41-kdp';
+const STANDARD_READER = 'r60-standard-readers';
 const MICROKERNEL = '@kaicreator/domain-harness-microkernel';
 const CONTRACTS = '@kaicreator/domain-harness-contracts';
 const LOCK_PATH = 'dh-lock/app.lock.json';
@@ -29,15 +31,16 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;
 }
 
-function authoredInput(name: 'basic' | 'extended', source = SOURCE): BuildInput {
-  const packages = IDS.map((id) =>
+function authoredInput(name: 'basic' | 'extended', source = SOURCE, withReader = false): BuildInput {
+  const ids: readonly string[] = withReader ? [...IDS, STANDARD_READER] : IDS;
+  const packages = ids.map((id) =>
     readJson(join(source, 'packages', id, 'manifest.json')) as DomainPackageManifest);
   const descriptor = readJson(join(source, 'apps', `${name}.json`)) as DomainAppDescriptor;
   return {
     descriptor, packages,
-    packageRoots: Object.fromEntries(IDS.map((id) =>
+    packageRoots: Object.fromEntries(ids.map((id) =>
       [id, join(source, 'packages', id)])),
-    packageArtifacts: Object.fromEntries(IDS.map((id) => [id, 'dist/index.mjs'])),
+    packageArtifacts: Object.fromEntries(ids.map((id) => [id, 'dist/index.mjs'])),
     kdpArtifact: { packageId: KDP, path: 'dist/bootstrap.js' },
   };
 }
@@ -110,13 +113,15 @@ async function copyWorkspaceDependency(
 async function installAuthoredApp(
   name: 'basic' | 'extended',
   t: import('node:test').TestContext,
+  source: string = SOURCE,
+  withReader = false,
 ): Promise<{ lock: DomainAppLock; app: Awaited<ReturnType<typeof boot>> }> {
-  const built = accepted(authoredInput(name));
+  const built = accepted(authoredInput(name, source, withReader));
   const installRoot = await mkdtemp(join(tmpdir(), 'dh-r41-boot-'));
   t.after(async () => rm(installRoot, { recursive: true, force: true }));
   const selected = built.lock.selectedPackages.map((pkg) => pkg.packageId);
   for (const id of selected) {
-    await cp(join(SOURCE, 'packages', id),
+    await cp(join(source, 'packages', id),
       join(installRoot, 'node_modules', id), { recursive: true });
   }
   const exported = { '.': { types: './dist/index.d.ts', import: './dist/index.js' } };
@@ -127,7 +132,7 @@ async function installAuthoredApp(
   await cp(XSTATE_DIR, join(installRoot, 'node_modules/xstate'), { recursive: true });
   await cp(YAML_DIR, join(installRoot, 'node_modules/yaml'), { recursive: true });
 
-  const descriptor = authoredInput(name).descriptor as DomainAppDescriptor;
+  const descriptor = authoredInput(name, source, withReader).descriptor as DomainAppDescriptor;
   await mkdir(join(installRoot, 'descriptor'), { recursive: true });
   await mkdir(join(installRoot, 'dh-lock'), { recursive: true });
   await mkdir(join(installRoot, 'dh-install'), { recursive: true });
