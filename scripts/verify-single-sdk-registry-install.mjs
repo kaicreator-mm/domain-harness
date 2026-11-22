@@ -103,7 +103,32 @@ try {
       }
       const from = new URL(req.url, upstream);
       const remote = await globalThis.fetch(from, { signal: globalThis.AbortSignal.timeout(30_000) });
-      res.writeHead(remote.status, { 'content-type': remote.headers.get('content-type') ?? 'application/octet-stream' });
+      const contentType = remote.headers.get('content-type') ?? 'application/octet-stream';
+      if (remote.ok && (name === 'xstate' || name === 'yaml')) {
+        // npm's upstream packument may retain a host.docker.internal tarball
+        // URL even though npm_config_registry points at this exact loopback
+        // Registry. The trusted install verifier correctly rejects that
+        // mismatch. Keep the upstream SRI unchanged and make the bytes flow
+        // through this same bounded Registry instead of weakening the verifier.
+        const packument = await remote.json();
+        const version = name === 'xstate' ? '5.33.2' : '2.9.1';
+        const dist = packument.versions?.[version]?.dist;
+        assert.ok(dist && typeof dist.tarball === 'string' &&
+          typeof dist.integrity === 'string',
+        'selected npm archive metadata must provide exact tarball and SRI');
+        const upstreamTarball = new URL(dist.tarball);
+        assert.equal(upstreamTarball.pathname.startsWith(`/${name}/-/`), true,
+          'npm packument must not redirect a pinned archive outside its selected package path');
+        assert.equal(upstreamTarball.search, '',
+          'selected npm archive must not require an unsealed query-based URL');
+        const immutableSRI = dist.integrity;
+        dist.tarball = `http://127.0.0.1:${server.address().port}${upstreamTarball.pathname}`;
+        assert.equal(dist.integrity, immutableSRI, 'proxy must never rewrite approved archive integrity');
+        res.writeHead(remote.status, { 'content-type': contentType });
+        res.end(JSON.stringify(packument));
+        return;
+      }
+      res.writeHead(remote.status, { 'content-type': contentType });
       res.end(Buffer.from(await remote.arrayBuffer()));
     } catch (error) {
       res.writeHead(502); res.end(String(error));
