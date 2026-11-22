@@ -286,11 +286,11 @@ export function standardCase(): StandardCase {
     writeRaw(businessDir, 'dist/init.mjs', new TextEncoder().encode('export function init() { return "ready"; }\n'));
     const businessArtifact = writeRaw(businessDir, 'dist/business.mjs', new TextEncoder().encode("export const artifact = \"orders-business\";\nexport function init() { return { status: \"READY\" }; }\nexport function exit() {}\n"));
     const sdkArtifact = writeRaw(sdkDir, 'dist/sdk.mjs', new TextEncoder().encode("export const artifact = \"sdk-core\";\nexport function init() {}\nexport function exit() {}\n"));
-    const kdpArtifact = writeRaw(kdpDir, 'dist/kdp.mjs', new TextEncoder().encode("export const artifact = \"kdp-kernel\";\nexport function init() {}\nexport function exit() {}\n"));
+    const kdpArtifact = writeRaw(kdpDir, 'dist/kdp.mjs', new TextEncoder().encode("export const artifact = \"kdp-kernel\";\nexport async function init() { return { status: 'FAILED', code: 'FIXTURE', reason: 'author-only dummy Host' }; }\nexport function exit() {}\n"));
     const aaaArtifact = writeRaw(aaaDir, 'dist/aaa.mjs', new TextEncoder().encode("export const artifact = \"aaa-ext\";\nexport function init() {}\nexport function exit() {}\nexport function audit() {}\n"));
     const auditModule = writeRaw(extDir, 'dist/audit.mjs', new TextEncoder().encode('export function audit() {}\n'));
     const extArtifact = writeRaw(extDir, 'dist/ext.mjs', new TextEncoder().encode("export const artifact = \"orders-ext\";\nexport function init() {}\nexport function exit() {}\n"));
-    writeRaw(kdpDir, 'dist/index.js', new TextEncoder().encode('export async function bootstrap() { return { status: "BOOTED" }; }\n'));
+
     for (const [dir, id, artifactPath] of [
       [businessDir, 'orders-business', 'dist/business.mjs'],
       [sdkDir, 'sdk-core', 'dist/sdk.mjs'],
@@ -302,7 +302,7 @@ export function standardCase(): StandardCase {
       })));
     }
     writeRaw(kdpDir, 'package.json', new TextEncoder().encode(canonicalJson({
-      name: 'kdp-kernel', version: '1.0.0', type: 'module', exports: { '.': './dist/index.js' },
+      name: 'kdp-kernel', version: '1.0.0', type: 'module', exports: { '.': './dist/kdp.mjs' },
     })));
 
     // 同一个 Element/Function/Target identity 构建所有 Package 的生命周期合同。
@@ -313,17 +313,21 @@ export function standardCase(): StandardCase {
         id: `${packageId}.lifecycle`, version: '1.0.0',
         description: 'Package-owned lifecycle and selected Hook Functions.',
         content: [],
-        functions: ['init', 'exit', ...other.map((fn) => fn.id)].map((id) => ({
-          id, contractVersion: '1',
-          inputSchemaRef: { inline: { type: 'object' } },
-          outputSchemaRef: { inline: { type: 'object' } },
-          outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
-        })),
+        functions: ['init', 'exit', ...other.map((fn) => fn.id)].map((id) =>
+          packageId === 'kdp-kernel' && id === 'init'
+            ? { id: 'init' as const, contractVersion: '1' as const, invocationAbi: 'kdp-host-init/1' as const }
+            : {
+                id, contractVersion: '1',
+                inputSchemaRef: { inline: { type: 'object' } },
+                outputSchemaRef: { inline: { type: 'object' } },
+                outcomes: ['SUCCEEDED', 'UNKNOWN', 'FAILED'] as const, effects: 'none' as const,
+              }),
       };
       const definitionRef = writeJson(dir, 'definitions/lifecycle.json', definition as unknown as JsonValue);
       const entry = { id: definition.id, version: definition.version, definitionRef, visibility: 'public' as const };
       const implementations = definition.functions.map((fn) => ({
         elementId: definition.id, functionId: fn.id, contractVersion: fn.contractVersion,
+        ...(fn.invocationAbi === 'kdp-host-init/1' ? { invocationAbi: 'kdp-host-init/1' as const } : {}),
         entry: { module: other.find((item) => item.id === fn.id)?.module ?? artifact, exportName: fn.id },
       }));
       return { definition, entry, ref: elementRefOf(definition),
@@ -492,7 +496,6 @@ export function standardCase(): StandardCase {
         'aaa-ext': 'dist/aaa.mjs',
         'orders-ext': 'dist/ext.mjs',
       },
-      kdpArtifact: { packageId: 'kdp-kernel', path: 'dist/index.js' },
     };
     return { input, refs: { evaluateRef, initRef } };
   }

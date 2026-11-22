@@ -200,8 +200,17 @@ test('R27: BUILD rejects artifact paths Runtime would reject', (t) => {
       ...input, packageArtifacts: { ...input.packageArtifacts, 'orders-business': path },
     }), 'DH_BUILD_RESOURCE_MISSING');
   }
+  const kdp = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'kdp-kernel') as DomainPackageManifest;
+  const invalidKdp = {
+    ...kdp, targetVariants: kdp.targetVariants.map((variant) => ({
+      ...variant, implementations: variant.implementations.map((binding) =>
+        binding.functionId === 'init'
+          ? { ...binding, entry: { ...binding.entry, module: { ...binding.entry.module, path: './dist/kdp.mjs' } } }
+          : binding),
+    })),
+  };
   expectRefusal(buildApp({
-    ...input, kdpArtifact: { ...input.kdpArtifact, path: `./${input.kdpArtifact.path}` },
+    ...input, packages: input.packages.map((pkg) => pkg === kdp ? invalidKdp : pkg),
   }), 'DH_BUILD_RESOURCE_MISSING');
 });
 
