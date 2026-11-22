@@ -22,7 +22,7 @@
 | [engineering-quality.md](./engineering-quality.md) | §9/§13.6：TypeScript、日志/配置、测试、Exact-SHA | 编码、CI、错误诊断、工程审核 |
 | [status-and-decisions.md](./status-and-decisions.md) | §10/§11/§12/§14：现行证据、未决设计、来源、变更控制 | 版本规划、Foundation #1668、合规判断 |
 
-**条款 ID 保留原单文件 Canonical Spec 的章节编号**，方便历史 Issue、PR、Review 引用。章节拆到不同文件不代表改变此前已确定的语义。
+**条款 ID 保留原单文件 Canonical Spec 的章节编号**，方便历史 Issue、PR、Review 引用。原 §13 横切合同将身份、状态、预算、权限、日志等已确认原则分别归入对应的主题文件；没有把现行 Schema 字段拼写、哈希实现算法或历史 L2 示例自动提升为永久公共 ABI，精确机器合同仍以受审 Contracts、Lock/Target 及适用 L2 为准。章节拆到不同文件不代表改变此前已确定的语义。
 
 ## 规范状态与优先级
 
