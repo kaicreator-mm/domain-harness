@@ -50,7 +50,7 @@ STATUS=PLAN_ONLY_SOURCE_UNCHANGED
 
 **X1：删除“DomainHarness BUILD = 全生态 Package 生产平台”的产品主张。** 本轮文档直接修正，不要求删掉正在保障安全的模块。
 
-**X2：撤销“将缺少通用 Domain Package 生成器视为 0.11.0 Foundation 不合格缺口”的自动 Gate。** DomainHarness Foundation 验收必须基于 SDK/Assembly/Boot/Package 目标；生成器属于 Forge Product 后续阶段，除最小一次性 Bootstrap Seed 外不得回流。
+**X2：撤销“将缺少通用 Domain Package 生成器视为 0.11.0 Foundation 不合格缺口”的自动 Gate。** DomainHarness Foundation 验收基于实际 Domain Package 文件、SDK 的应用选定/静态授权/封存及 Boot；**没有必须实施的 Bootstrap Seed 或其它生成器例外**。Package 由 ChatGPT、开发者或 Agent 直接编写即可以现有规范校验，未来 Forge 可以选择提供生成能力，但不是 DH 0.11.x 前置条件。
 
 **X3：禁止第二 BUILD/Compiler/Lock/Service/Runner。** 凡是仅为了给 Standard Element 再造 Loader、为不同 Target 单独维护新 Kernel、为了 Forge 自动生成反向引入私有 Harness 编译实现的设计，均视为不必要的重复。
 

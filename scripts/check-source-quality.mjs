@@ -39,8 +39,19 @@ for(const dir of dirs){
 }
 for(const dir of ['packages/contracts','tooling/build','packages/microkernel','packages/domain-harness']){
  const m=JSON.parse(await readFile(new URL(dir+'/package.json',root),'utf8'));
- assert.deepEqual(Object.keys(m.exports),['.'],'包根之外不得保留兼容导出：'+dir);
+ // 只有单一公共 SDK 可以按职责开放 runtime/composition 子入口；其余内部 Workspace 仍仅开放包根。
+ const sdk = dir === 'packages/domain-harness';
+ const allowed = sdk ? ['.', './runtime', './composition'] : ['.'];
+ assert.deepEqual(Object.keys(m.exports), allowed,
+   '只能导出明确批准的公共 SDK 入口，禁止兼容/深层入口：'+dir);
  assert.equal(m.exports['.'].import,'./dist/index.js');
+ if (sdk) {
+  for (const name of ['runtime', 'composition']) {
+   assert.deepEqual(m.exports['./'+name], {
+    types:'./dist/'+name+'.d.ts', import:'./dist/'+name+'.js',
+   }, 'SDK 子入口不得重定向到内部或其它 Workspace：'+name);
+  }
+ }
 }
 // R12/R14 实证：生产 TS 类型通过不代表测试 TS 通过；新的 Workspace 不能静默绕开测试编译。
 const monorepo = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
