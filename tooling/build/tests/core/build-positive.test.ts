@@ -27,7 +27,7 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
   const lock = first.lock;
 
   assert.equal(lock.kind, 'DomainAppLock');
-  assert.equal(lock.schemaVersion, 'dh.lock/0.11');
+  assert.equal(lock.schemaVersion, 'dh.lock/0.11.1');
   assert.deepEqual(lock.target, { runtime: 'node', module: 'esm', nodeMajor: 22, profile: 'node22-esm/1' });
   assert.deepEqual(lock.appIdentity, {
     id: 'orders.basic',

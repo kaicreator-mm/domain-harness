@@ -73,9 +73,9 @@ test('T01: schemaVersion discriminators carry the frozen spellings (L2 §2.1)', 
   assert.equal(DH_ELEMENT_SCHEMA_VERSION, 'dh.element/0.11');
   assert.equal(DH_PACKAGE_SCHEMA_VERSION, 'dh.package/0.11');
   assert.equal(DH_APP_SCHEMA_VERSION, 'dh.app/0.11');
-  assert.equal(DH_LOCK_SCHEMA_VERSION, 'dh.lock/0.11');
-  assert.equal(DH_PIN_SCHEMA_VERSION, 'dh.pin/0.11');
-  assert.equal(DH_INSTALL_RECORD_SCHEMA_VERSION, 'dh.install/0.11');
+  assert.equal(DH_LOCK_SCHEMA_VERSION, 'dh.lock/0.11.1');
+  assert.equal(DH_PIN_SCHEMA_VERSION, 'dh.pin/0.11.1');
+  assert.equal(DH_INSTALL_RECORD_SCHEMA_VERSION, 'dh.install/0.11.1');
 });
 
 test('T01: error catalog counts and spellings match the frozen directory (L2 §9.1)', () => {

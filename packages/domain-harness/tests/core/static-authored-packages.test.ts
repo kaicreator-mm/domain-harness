@@ -140,7 +140,7 @@ async function installAuthoredApp(
   await writeFile(join(installRoot, DESC_PATH), canonicalJson(descriptor));
   await writeFile(join(installRoot, LOCK_PATH), built.lockBytes);
   const recordBase = {
-    kind: 'DomainAppInstallRecord', schemaVersion: 'dh.install/0.11',
+    kind: 'DomainAppInstallRecord', schemaVersion: 'dh.install/0.11.1',
     appId: descriptor.id, appVersion: descriptor.version,
     target: built.lock.target, lockPath: LOCK_PATH,
     lockDigest: built.lock.closureDigest,
@@ -152,7 +152,7 @@ async function installAuthoredApp(
   await writeFile(join(installRoot, 'dh-install/installed-record.json'),
     JSON.stringify({ ...recordBase, recordDigest: contentDigestOf(recordBase as unknown as JsonValue) }));
   const pin = {
-    schemaVersion: 'dh.pin/0.11' as const,
+    schemaVersion: 'dh.pin/0.11.1' as const,
     target: built.lock.target, kdpPackageId: KDP,
     kdpInitFunction: built.lock.bootstrapKdpPin.kdpInitFunction,
     invocationAbi: 'kdp-host-init/1' as const,

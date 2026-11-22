@@ -581,7 +581,7 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
 
     const recordBase = {
       kind: 'DomainAppInstallRecord',
-      schemaVersion: 'dh.install/0.11',
+      schemaVersion: 'dh.install/0.11.1',
       appId: APP_ID,
       appVersion: APP_VERSION,
       target: lock.target,
@@ -599,7 +599,7 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     await write(installRoot, 'dh-install/installed-record.json', JSON.stringify(record));
 
     const pin: BootstrapPin = {
-      schemaVersion: 'dh.pin/0.11',
+      schemaVersion: 'dh.pin/0.11.1',
       target: lock.target,
       kdpPackageId: KDP_PACKAGE_ID,
       kdpInitFunction: lock.bootstrapKdpPin.kdpInitFunction,

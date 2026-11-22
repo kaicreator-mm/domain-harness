@@ -257,7 +257,7 @@ const lifecycleSelected = (id: string, module: typeof ORDERS_BUSINESS_ARTIFACT) 
 
 export const DOMAIN_APP_LOCK_FIXTURE: DomainAppLock = {
   kind: 'DomainAppLock',
-  schemaVersion: 'dh.lock/0.11',
+  schemaVersion: 'dh.lock/0.11.1',
   appIdentity: {
     id: 'orders.basic',
     version: '1.0.0',

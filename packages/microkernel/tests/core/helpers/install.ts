@@ -527,7 +527,7 @@ export async function buildFixtureInstall(
 
   const lockBase = {
     kind: 'DomainAppLock',
-    schemaVersion: 'dh.lock/0.11',
+    schemaVersion: 'dh.lock/0.11.1',
     appIdentity: {
       id: APP_ID,
       version: APP_VERSION,
@@ -596,7 +596,7 @@ export async function buildFixtureInstall(
 
   const recordBase = {
     kind: 'DomainAppInstallRecord',
-    schemaVersion: 'dh.install/0.11',
+    schemaVersion: 'dh.install/0.11.1',
     appId: APP_ID,
     appVersion: APP_VERSION,
     target: TARGET,
@@ -614,7 +614,7 @@ export async function buildFixtureInstall(
   await write('dh-install/installed-record.json', JSON.stringify(record));
 
   const pin: BootstrapPin = {
-    schemaVersion: 'dh.pin/0.11',
+    schemaVersion: 'dh.pin/0.11.1',
     target: TARGET,
     kdpPackageId: KDP_PACKAGE_ID,
     kdpInitFunction: lockBase.bootstrapKdpPin.kdpInitFunction,
