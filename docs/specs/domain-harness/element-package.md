@@ -12,10 +12,10 @@
 2. **一个 Element = 一项稳定、内聚、可陈述的职责**。Element 可以拥有 0..N 个公开 Functions、多个不同 ContentBlocks、规则/知识/工作流/数据/状态/说明、Schema、受控资源、证据和私有代码辅助实现。
 3. 一个 Element 完全允许 **`functions:[]`**：纯知识、纯数据、纯规则、纯声明都合法，不能为了统一外观造假的 `invoke`。但其内容不能因此被任何运行时 Package 随意读取；需有已选/授权 Reader 或 Function。
 4. 划分粒度优先看**职责、Owner、版本演进、适用范围、公开接口、权限及独立验收/复用**。不是一文件一 Element、一函数一 Element、一条规则一 Element，也不是 JSON 与代码必须拆成两个 Element。
-5. 一个 Element 的多种 Functions 可以绑定不同 Target 实现/资源，物理同文件/多文件均允许；Function 精确声明输入/输出 Schema、ContractVersion、Outcome、EffectIntent，是否调用取决于 FunctionRef/直接依赖/公开接口与 BUILD 已选择的 Target。
+5. 一个 Element 的多种 Functions 可以绑定不同 Target 实现/资源，物理同文件/多文件均允许；Function 精确声明输入/输出 Schema、ContractVersion、Outcome、EffectIntent，是否调用取决于 FunctionRef/直接依赖/公开接口与 App 组合时已选定的 Target。
 6. ElementRef 标识**逻辑 Element**，FunctionRef 标识**可调用合同**，私有 `module:ResourceRef + exportName` 只是已选 Target 的物理定位信息；原独立公共 `EntryRef` 不得复活。
 7. 生命周期 Init/Exit/技术 Hook 的 Element 也要有真正的已选 FunctionContract 与唯一 Target，不得用裸导出或空壳 Element 冒充。普通零函数 Element 与**可执行的生命周期 Element**权限不同。
-8. 静态 Element 依赖边用于 BUILD 的无环选定闭包；Domain 语义关系允许合理环；Workflow/Task 的控制图和 Package 依赖图分别管理，不能统一为一个超级 DAG。
+8. 静态 Element 依赖边由生成期验证，并在 App 组合时形成无环选定闭包；Domain 语义关系允许合理环；Workflow/Task 的控制图和 Package 依赖图分别管理，不能统一为一个超级 DAG。
 
 **当前 ABI 提示**：现行 `ElementDefinition` 真实字段为 `id/version/schemaVersion/description/roles/content/functions/dependencies/validation` 等，R5 讨论中的 `facets/resources/implementations/provenance` 并**非全部已经加入同一个 Definition Schema**；不得直接把早期示意 YAML 当作现行已实现机器合同。
 
@@ -33,5 +33,5 @@
 
 1. Standard Element 仍是普通 Element/Package，既不是 `kind:'StandardElement'` 新根类型，也不是自动获得 Kernel 权限的特例。候选至少通过两个不同实际使用场景证明独立职责、公开边界、Static Selection、真实受控 Consumer、错误/拒绝，才可在 Catalog 针对**具体 Target/Profile** 标 `STANDARD_ACCEPTED`。
 2. v0.11.1 已受审 `dh.std.file.json`、`dh.std.file.yaml` 限于当时被审身份、Node ESM Profile、真实 Lock/消费者。正在讨论的 camelCase 迁移不会保留原 ID 的无差别执行资格。
-3. 共享的状态转换/Workflow 执行基本机制由 KDP Kernel Element 管理；业务 Workflow 内容、规则和私有函数由各自 Domain/Standard Element 拥有。例行 JSON/YAML 等通用数据处理可由按需选用的标准 Element 提供，不在 KDP/BUILD 中复制另一份相互竞争的业务解析。
+3. 共享的状态转换/Workflow 执行基本机制由 KDP Kernel Element 管理；业务 Workflow 内容、规则和私有函数由各自 Domain/Standard Element 拥有。例行 JSON/YAML 等通用数据处理可由按需选用的标准 Element 提供，不在 KDP 或 App 组合逻辑中复制另一份相互竞争的业务解析。
 4. Package 内部业务错误、超时/重试、降级由该 Package 的 Element/Function 负责；运行时技术故障和 Exit 兜底由 KDP 负责。不得为了“所有通用功能都放 KDP”把业务 Rule、Validator、Decision、Reader、知识库或 UI 变成不可选择的 Kernel 硬编码。
