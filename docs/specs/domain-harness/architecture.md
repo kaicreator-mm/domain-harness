@@ -99,6 +99,13 @@ SDK 产品层：唯一 @kaicreator/domain-harness（作者期 + 运行期入口�
 - TypeScript `contracts`、`microkernel`、`tooling/build` 等文件夹是否还要存在，属于生产代码重构和打包优化问题；**权威判断不是文件夹名字，而是执行功能是否由真实 Package/Element 持有且受选调用**。
 - 系统可在一个 Git monorepo 内维护多个模块；SDK 最终公开入口仍只有一个。没有新的实证，不发明跨语言 Package Loader、Host 自动认证服务或通用 Forge 生产流水线。
 
+
+### A.7 对外 SDK Runtime API 入口（Foundation 公共暴露收敛）
+
+- **唯一公开的 Host 启动入口必须是 `boot(pin, context)`**。受信 Boot 校验 Pin/Lock、入口字节后才能选择并调用 KDP 内部初始化实现；公共 `@kaicreator/domain-harness` 与 `@kaicreator/domain-harness/runtime` 不应重新导出独立 `bootstrap(context)` 入口，使 Host 不需要传 Pin 即能直接触达内部 KDP 初始化。
+- **内部调用不等于公开业务 API**：当前过渡阶段内 `@kaicreator/domain-harness-microkernel` 对自身 KDP 接线可能仍保留 `bootstrap`，仅作为物理实现细节；相关测试可从内部源码验证其可信拒绝。最终仍由 #1668 将真正的 KDP Init 所有权归于 Kernel Package 的 Lifecycle Element，并从 Lock/Pin 精确选择 Target；隐藏公共入口**不代表架构整改完成**。
+- **受限验收门**：公开 SDK 根和 `/runtime` 都不得导出 `bootstrap`；调用 `boot()` 的现有真实 Consumer 保持原结果；不能把“公共 API 缩减”当作不需要严格验证安装完整性的理由。
+
 ### A.6 架构审核不变量（新代码必须满足；现有缺口单独标记）
 
 | ID | 必须能回答的验证问题 | 现状归属 |
