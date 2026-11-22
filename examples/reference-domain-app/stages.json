@@ -3,16 +3,66 @@
   "stages": [
     {
       "stage": "0.11.1",
-      "state": "CANDIDATE_PENDING_EXACT_CI_AND_INDEPENDENT_REVIEW",
+      "state": "MERGED_ACCEPT_SCOPED_RAW_CI_RECEIPT_ARCHIVE_PENDING",
       "referenceApp": "examples/reference-domain-app",
       "basis": {
         "sdkReviewedHead": "030032416c684d066daa1f8c5a2e50d60c41c779",
-        "review": "DH_V0111_R72_R69_P1_P2_EXACT_INCREMENTAL_INDEPENDENT_REVIEW",
-        "mergedSdkTrain": "02d51b9fa3c91222b1ef2b05f1269eb6942222eb",
-        "implementationIssue": 1664
+        "sdkReview": "DH_V0111_R72_R69_P1_P2_EXACT_INCREMENTAL_INDEPENDENT_REVIEW",
+        "sdkMergedTrain": "02d51b9fa3c91222b1ef2b05f1269eb6942222eb",
+        "referenceSourceHead": "b4d9c5a9a095cfcb01af7118bd79a4add8f0b210",
+        "referenceReview": "DH_V011X_R81_REFERENCE_DOMAIN_APP_INDEPENDENT_REVIEW",
+        "reviewUrl": "https://github.com/kaicreator-mm/domain-harness/pull/1665#pullrequestreview-6012849208",
+        "reviewVerdict": "ACCEPT_SCOPED",
+        "p0": 0,
+        "p1": 0,
+        "p2": 1,
+        "issue": 1664,
+        "pr": 1665,
+        "mergeSha": "62885289f4236051fa9d3d0f67b968004c5259b2",
+        "ciSha": "b4d9c5a9a095cfcb01af7118bd79a4add8f0b210",
+        "ci": "WOODPECKER_2981_SUCCESS",
+        "ciUrl": "https://ci.kaicreator.com/repos/18/pipeline/2981/1"
       },
       "target": "node22-esm",
+      "baselinePackageFiles": {
+        "snapshot": "R72_ACCEPTED_15_SOURCE_FILES_GITHUB_BLOB_EXACT_MATCH",
+        "businessEsmSha256": "47a2a8ca0237f7dc94b82442c41467b7c2c55f42c75b116dd70a3458d76dd2df",
+        "businessAppDefinitionRawSha256": "74633ab9e17f6b36a896bf22eff53c9538cf34e0d9fda739ab1e126e079a9a01",
+        "businessAppElementCanonicalSha256": "378eb7460db80b43776e9605a004b62478226ca82d612e714aa94dc1001330f0",
+        "businessRuleDefinitionRawSha256": "295ea4a51e2dc4c86c31e2139d366e1c649224987f0b48955379621ebb216dba",
+        "businessRuleElementCanonicalSha256": "467525b3b6214c262c2f1fa114324eb2c2540806f7518af146ad922226a0b2dc"
+      },
+      "verifiedCiReceipt": {
+        "kind": "CI_ASSERTED_EPHEMERAL_RECEIPT",
+        "generatedFilename": "reference-receipt.json",
+        "verifiedBy": "scripts/verify-single-sdk-registry-install.mjs",
+        "status": "PASS",
+        "oneDirectPublicSdk": true,
+        "selectedWorkflowCount": 1,
+        "initOrder": [
+          "r41-kdp",
+          "r41-sdk-base",
+          "reference-business"
+        ],
+        "exitOrder": [
+          "reference-business",
+          "r41-sdk-base",
+          "r41-kdp"
+        ],
+        "failuresAndTamperRejected": true,
+        "exactRawJsonArchived": false,
+        "appPackageDigest": null,
+        "lockDigest": null,
+        "archiveGap": "Raw #2981 receipt values must be retrieved from original successful pipeline log; null is not a digest or failure."
+      },
       "actualReferenceReceipt": null,
+      "nonblockingFindings": [
+        {
+          "id": "R81-P2-01",
+          "description": "reference.rule.scope.threshold=10 duplicates ESM evaluate score>=10",
+          "disposition": "Resolve on v0.11.2 Domain Knowledge/Rule evolution via one authoritative value and a threshold-mutation negative test; preserve new SHA/digests."
+        }
+      ],
       "release": false
     }
   ]

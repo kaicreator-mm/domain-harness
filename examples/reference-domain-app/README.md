@@ -26,6 +26,13 @@ node main.mjs
 
 环境变量 `DH_REF_KEEP_INSTALL=1` 只用于调试保留临时 App，正常运行自动清理。**不得把仅写在 README 的 PASS 当作真实验证**；需 GitHub Exact-SHA 绑定 CI/独立 Reviewer。
 
+## 【CURRENT · R82】首个 Reference Domain App 已受审合并
+
+- [PR #1665](https://github.com/kaicreator-mm/domain-harness/pull/1665) 的实际源码 `b4d9c5a9a095cfcb01af7118bd79a4add8f0b210` 已经过 [R81 非 Writer ACCEPT_SCOPED P0=0/P1=0/P2=1](https://github.com/kaicreator-mm/domain-harness/pull/1665#pullrequestreview-6012849208) 和 [同 SHA Woodpecker #2981 SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2981/1)，squash 合入 `version/v0.11.x@62885289f4236051fa9d3d0f67b968004c5259b2`。这是真实已运行的单 SDK Domain App，不是待编写 Mock。
+- 本目录的 [stages.json](./stages.json) 已冻结源码 Exact SHA、SDK/业务 Package 原始文件及 Element Digest、CI/审核链接和已证实的 `PASS` 断言。**尚缺** #2981 原始 stdout 中 `REFERENCE_DOMAIN_APP_ACCEPTANCE` 行的完整 `reference-receipt.json` 内容及其中 AppPackage/Lock Digest 数值；目前两项为明确 `null`、Task #1664 的最后收尾门禁。不得凭已有 PASS 猜测 Digest，不因纯状态文档修改重复原始源码 CI。
+- R81 非阻塞 P2：业务 Element 的 `scope.threshold=10` 与 `evaluate()` 中的 `score>=10` 是两个权威候选；0.11.2 领域规则演进时应归一到真实数据源并加阈值更改负例，不能在别处复制规则。
+- 后续版本继续**演进本 Reference App 的同一套多文件 Package/DomainApp**；基线源码按受审 SHA 保留，历史组合以有限 smoke 回归，不引入第二 Runtime/Forge/跨阶段通用兼容层。
+
 ## 各阶段在同一 Reference App 继续扩展
 
 | 阶段 | 本参考 App 增量 | 历史回归 |
