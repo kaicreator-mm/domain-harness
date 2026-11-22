@@ -61,5 +61,5 @@ const evidence = {
   note:'Observational only: no arbitrary performance gate, no claimed prechange measurements.',
 };
 mkdirSync(dirname(output), {recursive:true});
-writeFileSync(output, JSON.stringify(evidence,null,2)+'\\n');
+writeFileSync(output, JSON.stringify(evidence,null,2)+String.fromCharCode(10));
 console.log(JSON.stringify(evidence,null,2));
