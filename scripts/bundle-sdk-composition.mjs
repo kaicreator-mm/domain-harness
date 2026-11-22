@@ -46,9 +46,9 @@ for (const value of ['buildApp', 'BuildRefusal', 'digestOfBytes']) {
   assert.match(compiled, new RegExp(`\\b${value}\\b`, 'u'), `SDK composition missing implementation ${value}`);
   assert.match(types, new RegExp(`\\b${value}\\b`, 'u'), `SDK composition missing public types ${value}`);
 }
-assert.doesNotMatch(compiled, /@kaicreator\\/domain-harness-build/u,
+assert.equal(compiled.includes('@kaicreator/domain-harness-build'), false,
   'Consumer SDK must not resolve a separate BUILD package');
-assert.doesNotMatch(types, /@kaicreator\\/domain-harness-build/u,
+assert.equal(types.includes('@kaicreator/domain-harness-build'), false,
   'Public types must be self-contained within the SDK');
 assert.ok(statSync(outfile).size > 1_000, 'SDK composition bundle unexpectedly empty');
 console.log('SDK 内置 Package 组合实现已打包；公开 API 不依赖外部 BUILD。');
