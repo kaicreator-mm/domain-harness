@@ -26,10 +26,16 @@ node main.mjs
 
 环境变量 `DH_REF_KEEP_INSTALL=1` 只用于调试保留临时 App，正常运行自动清理。**不得把仅写在 README 的 PASS 当作真实验证**；需 GitHub Exact-SHA 绑定 CI/独立 Reviewer。
 
-## 【CURRENT · R82】首个 Reference Domain App 已受审合并
+## 【CURRENT · R84】v0.11.1 参考 App 原始验收摘要已封存
+
+[R83 #2981 原始日志取证](https://github.com/kaicreator-mm/domain-harness/issues/1664#issuecomment-7080935568) 与 [PR 同步回执](https://github.com/kaicreator-mm/domain-harness/pull/1665#issuecomment-7080936004) 确认：单工作流 Verify step 36220 第 440 行 `DH_R77_REFERENCE_DOMAIN_APP_PASS`，源提交精确为 `b4d9c5a9a095cfcb01af7118bd79a4add8f0b210`，`packageDigest=sha256:18d47da3a087e30a5e098ade5eba45756c272221a51cfd6b0d8c5467c646c8ea`，`lockDigest=sha256:f64e5658a9d8e66f0aece567b86c6df338aa8a4cfc89d861fdc8c4b9aa9e7942`，CI 执行 Node `v24.21.0`。真实审查结果 `R81 ACCEPT_SCOPED P0=0/P1=0/P2=1_NONBLOCKING`，同 HEAD [Woodpecker #2981 SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2981/1)，合并提交 `62885289f4236051fa9d3d0f67b968004c5259b2`。参见 [stages.json](./stages.json) 的实际字段/负例/摘要。这里是对 **R83 已取得的历史运行日志** 的完整身份归档，而不是在此纯文档 SHA 上重新执行。
+
+**准确边界**：这是一份 Node22 目标、Node24.21 CI 执行成功的 **源码 + 组合 Package/Lock Digest + 精确日志/审核身份基线**；不冒充已经发行或永久存储完整 npm SDK 归档。下一阶段使用相同 App 做增量验证，并对历史 SHA 的真正重构/最小 smoke 单独留证。不需要再次生成第二套 app。R81 阈值双重来源的非阻塞 P2 仍保留，交由 0.11.2 的 Knowledge/Rule 实施时解决。
+
+## 【HISTORICAL · R82】首个 Reference Domain App 已受审合并
 
 - [PR #1665](https://github.com/kaicreator-mm/domain-harness/pull/1665) 的实际源码 `b4d9c5a9a095cfcb01af7118bd79a4add8f0b210` 已经过 [R81 非 Writer ACCEPT_SCOPED P0=0/P1=0/P2=1](https://github.com/kaicreator-mm/domain-harness/pull/1665#pullrequestreview-6012849208) 和 [同 SHA Woodpecker #2981 SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2981/1)，squash 合入 `version/v0.11.x@62885289f4236051fa9d3d0f67b968004c5259b2`。这是真实已运行的单 SDK Domain App，不是待编写 Mock。
-- 本目录的 [stages.json](./stages.json) 已冻结源码 Exact SHA、SDK/业务 Package 原始文件及 Element Digest、CI/审核链接和已证实的 `PASS` 断言。**尚缺** #2981 原始 stdout 中 `REFERENCE_DOMAIN_APP_ACCEPTANCE` 行的完整 `reference-receipt.json` 内容及其中 AppPackage/Lock Digest 数值；目前两项为明确 `null`、Task #1664 的最后收尾门禁。不得凭已有 PASS 猜测 Digest，不因纯状态文档修改重复原始源码 CI。
+- 本目录的 [stages.json](./stages.json) 已冻结源码 Exact SHA、SDK/业务 Package 原始文件及 Element Digest、CI/审核链接和已证实的 `PASS` 断言。**R83 已补齐（原历史记载）** #2981 原始 stdout 中 `REFERENCE_DOMAIN_APP_ACCEPTANCE` 行的完整 `reference-receipt.json` 内容及其中 AppPackage/Lock Digest 数值；目前两项为明确 `null`、Task #1664 的最后收尾门禁。不得凭已有 PASS 猜测 Digest，不因纯状态文档修改重复原始源码 CI。
 - R81 非阻塞 P2：业务 Element 的 `scope.threshold=10` 与 `evaluate()` 中的 `score>=10` 是两个权威候选；0.11.2 领域规则演进时应归一到真实数据源并加阈值更改负例，不能在别处复制规则。
 - 后续版本继续**演进本 Reference App 的同一套多文件 Package/DomainApp**；基线源码按受审 SHA 保留，历史组合以有限 smoke 回归，不引入第二 Runtime/Forge/跨阶段通用兼容层。
 
