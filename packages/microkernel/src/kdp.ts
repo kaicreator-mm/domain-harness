@@ -108,11 +108,6 @@ export async function activateSelectedKdpHostInit(context: KdpBootstrapContext):
   return activateKernel(context, enteredHost);
 }
 
-/** 迁移阶段旧入口：保留既有回归用例；最终 Host ABI 切换将删除此路径。 */
-export async function bootstrap(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
-  return activateKernel(context);
-}
-
 /**
  * KDP 单次激活：Host 已进入责任必须在调用者首次 await 前建立。
  * 不受信 Lock/Record/Pin 时禁止尝试加载任意 Exit，明确 CLEANUP_NOT_SAFE；

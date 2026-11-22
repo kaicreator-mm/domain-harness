@@ -461,6 +461,11 @@ export class PackageSystem {
   ): Promise<FunctionOutcome> {
     const selected = this.functionByRef(ref);
     if (!selected) return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_FUNCTION_UNSELECTED', message: 'unselected FunctionRef' } };
+    if (selected.invocationAbi === 'kdp-host-init/1') {
+      return { kind: 'FAILED', failure: {
+        code: 'DH_RUNTIME_FUNCTION_UNSELECTED', message: 'privileged Host Init cannot be invoked as a JSON Function',
+      } };
+    }
     if (selected.effects !== 'none') return { kind: 'FAILED', failure: { code: 'DH_RUNTIME_UNSUPPORTED_PROFILE', message: 'effectful Function not supported' } };
     const schemas = await this.functionSchemas(selected);
     if (schemas === null) return { kind: 'UNKNOWN', unknownReason: { code: 'DH_RUNTIME_UNSUPPORTED_PROFILE', message: 'Function Schema unavailable' } };
@@ -531,7 +536,8 @@ export class PackageSystem {
         (candidate) =>
           candidate.id === fn.ref.functionId && candidate.contractVersion === fn.ref.contractVersion,
       );
-      if (definition !== null && contract !== undefined) {
+      if (definition !== null && contract !== undefined &&
+          contract.invocationAbi !== 'kdp-host-init/1') {
         const input = await this.resolveSchemaRef(contract.inputSchemaRef);
         const output = await this.resolveSchemaRef(contract.outputSchemaRef);
         if (input !== null && output !== null) resolved = { input, output };

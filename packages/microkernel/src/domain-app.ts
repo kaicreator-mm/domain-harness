@@ -19,9 +19,10 @@ export function createDomainApp(deps: DomainAppDeps): DomainApp {
     elements: lock.selectedElements.map((e) => ({
       ref: { ...e.ref }, ownerPackageId: e.ownerPackageId, visibility: e.visibility,
     })),
-    functions: lock.selectedFunctions.map((fn) => ({
+    // KDP Host Init 是进程内特权能力，不是可检查的普通领域 Function。
+    functions: lock.selectedFunctions.filter((fn) => fn.invocationAbi !== 'kdp-host-init/1').map((fn) => ({
       ref: { ...fn.ref, element: { ...fn.ref.element } },
-      outcomes: [...fn.outcomes], effects: fn.effects,
+      outcomes: [...fn.outcomes!], effects: fn.effects!,
     })),
   });
   const dispose = (): Promise<{ readonly status: 'DISPOSED' }> => {
