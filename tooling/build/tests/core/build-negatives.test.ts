@@ -69,6 +69,22 @@ refusalCase('DH_BUILD_REF_UNRESOLVED', (s) => {
   s.eligibility.dependencies = [{ element: 'orders.ghost', version: '1.0.0' }];
 });
 
+test('Foundation L2-1: FunctionRef namespace must match the selected logical Element key', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input, refs } = scenario.finalize();
+  const packages = input.packages.map((pkg) => pkg.id === 'sdk-core'
+    ? {
+      ...pkg,
+      imports: [{
+        ...refs.evaluateRef,
+        element: { ...refs.evaluateRef.element, namespace: 'unselected-namespace' },
+      }],
+    } : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_REF_UNRESOLVED');
+});
+
+
 refusalCase('DH_BUILD_ELEMENT_CYCLE', (s) => {
   s.faq.dependencies = [{ element: 'orders.eligibility', version: '^1.0.0' }];
 });
