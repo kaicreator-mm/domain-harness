@@ -115,22 +115,19 @@ export async function activateSelectedKdpHostInit(context: KdpBootstrapContext):
  */
 async function activateKernel(
   context: KdpBootstrapContext,
-  enteredHost?: { readonly entered: true },
+  enteredHost: { readonly entered: true },
 ): Promise<KdpBootstrapResult> {
-  const hostAlreadyEntered = enteredHost?.entered === true;
+  // 由受选 Host KDP.Init 在首次 await 前建立的进入责任，不存在旧 bootstrap 路径。
+  void enteredHost;
   let trust: Awaited<ReturnType<typeof verifyInstallTrust>>;
   try {
     trust = await verifyInstallTrust(context);
   } catch {
     return failed('DH_KDP_PACKAGE_LOAD_FAILED',
-      hostAlreadyEntered
-        ? 'KDP trusted installation verification threw (detail redacted); cleanup=CLEANUP_NOT_SAFE'
-        : 'KDP trusted installation verification threw (detail redacted)');
+      'KDP trusted installation verification threw (detail redacted); cleanup=CLEANUP_NOT_SAFE');
   }
   if (!trust.ok) {
-    return failed(trust.failure.code, hostAlreadyEntered
-      ? `${trust.failure.reason}; cleanup=CLEANUP_NOT_SAFE (untrusted install)`
-      : trust.failure.reason);
+    return failed(trust.failure.code, `${trust.failure.reason}; cleanup=CLEANUP_NOT_SAFE (untrusted install)`);
   }
 
   const { lock } = trust.value;
@@ -140,7 +137,7 @@ async function activateKernel(
   try {
     // 必须紧接首次可信 Lock 获取后转交已经进入的 Host Kernel；后面的所有早期失败
     // 都通过同一个 catch/Exit 处理，绝不能通过 return 绕过 Exit。
-    if (hostAlreadyEntered) packages.recordSelectedKernelHostEntry();
+    packages.recordSelectedKernelHostEntry();
 
     const profile: string = lock.target.profile;
     if (profile !== NODE22_ESM_PROFILE) {
@@ -183,9 +180,7 @@ async function activateKernel(
     };
     let rawInitResult: unknown;
     try {
-      rawInitResult = hostAlreadyEntered
-        ? await packages.runRemainingCoresAfterKernelEntered(initContext)
-        : await packages.runInit(initContext);
+      rawInitResult = await packages.runRemainingCoresAfterKernelEntered(initContext);
     } catch (error) {
       throw new KdpLoadError(
         error instanceof KdpLoadError ? error.message : 'Core.Init raised an unhandled error (detail redacted)',
