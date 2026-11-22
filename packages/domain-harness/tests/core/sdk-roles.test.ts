@@ -19,11 +19,17 @@ test('R43: runtime subpath supplies Contracts/Boot but no BUILD or Package autho
   assert.equal('digestOfBytes' in runtime, false);
 });
 
-test('R43: composition subpath only exposes existing deterministic Build primitives', () => {
+test('R52: composition is bundled inside the SDK, preserving exported API without a BUILD peer', () => {
   assert.deepEqual(new Set(Object.keys(composition)), new Set(Object.keys(build)));
-  assert.equal(composition.buildApp, build.buildApp);
-  assert.equal(composition.BuildRefusal, build.BuildRefusal);
-  assert.equal(composition.digestOfBytes, build.digestOfBytes);
+  assert.equal(typeof composition.buildApp, 'function');
+  assert.equal(typeof composition.BuildRefusal, 'function');
+  assert.equal(typeof composition.digestOfBytes, 'function');
+  // Two separately built module instances are not the same JavaScript function identity.
+  assert.notEqual(composition.buildApp, build.buildApp);
+  const bytes = new TextEncoder().encode('sdk-owned-composition');
+  assert.equal(composition.digestOfBytes(bytes), build.digestOfBytes(bytes));
+  assert.equal(new composition.BuildRefusal('DH_BUILD_SCHEMA_INVALID', 'R52').code,
+    new build.BuildRefusal('DH_BUILD_SCHEMA_INVALID', 'R52').code);
 });
 
 test('R43: root facade stays one public SDK product and reuses both existing implementations', () => {

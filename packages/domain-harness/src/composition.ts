@@ -1,13 +1,12 @@
 /**
- * Domain App 组合时使用的 SDK 入口。
- * 从已经编写的 Package 文件选择、验证和封存确定性 App；
- * 不创建 Domain Package，也不依赖 Forge/Package Generator。
+ * DomainHarness SDK 内部的 Package 选择、校验与组合入口。
+ * 本文件定义稳定公开 TypeScript 类型；发布的 dist/composition.js
+ * 由同一仓库的内部组合实现构建并封入 SDK，无任何外部 BUILD 包。
+ * 不生成 Domain Package，不引入 Forge 或第二个运行时。
  */
-export {
-  buildApp,
-  BuildRefusal,
-  digestOfBytes,
-} from '@kaicreator/domain-harness-build';
+import type { BuildErrorCode, ContentDigest } from '@kaicreator/domain-harness-contracts';
+import type { BuildInput, BuildResult } from './composition-types.js';
+
 export type {
   BuildInput,
   BuildResult,
@@ -16,4 +15,17 @@ export type {
   KdpArtifactInput,
   AppPackageFile,
   ComposedAppPackage,
-} from '@kaicreator/domain-harness-build';
+} from './composition-types.js';
+
+/** 确定性地验证并封存用户已提供的 Domain Packages。 */
+export declare function buildApp(input: BuildInput): BuildResult;
+
+/** BUILD 阶段的稳定拒绝错误，归属 SDK 的组合能力而非独立产品。 */
+export declare class BuildRefusal extends Error {
+  readonly code: BuildErrorCode;
+  readonly refPath: string | undefined;
+  constructor(code: BuildErrorCode, message: string, refPath?: string);
+}
+
+/** 用于验证已有 Package 资源的字节摘要。 */
+export declare function digestOfBytes(bytes: Uint8Array): ContentDigest;
