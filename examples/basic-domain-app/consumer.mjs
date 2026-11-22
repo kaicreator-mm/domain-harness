@@ -85,19 +85,7 @@ export function evaluate(input) {
 }
 export function optionalReport() { return { kind: 'SUCCEEDED', value: 'optional-report-ok' }; }
 ${withWorkflow ? `
-function workflowRead(input, expectedFormat) {
-  if (input?.format !== expectedFormat || typeof input?.source !== 'string' ||
-      input?.value === null || typeof input?.value !== 'object' || Array.isArray(input.value)) {
-    return { kind: 'UNKNOWN', unknownReason: { code: 'T14_READER_INVALID', message: 'data not selected as plain object' } };
-  }
-  events.push({ event: 'workflow-read', format: input.format, parsed: input.value });
-  if (${JSON.stringify(workflowFatalAt)} === 'leaf' && input.value.id === 'json-a') {
-    throw new Error('T14 deliberate selected Function fatal');
-  }
-  return { kind: 'SUCCEEDED', value: input.value };
-}
-export function jsonReader(input) { return workflowRead(input, 'json'); }
-export function yamlReader(input) { return workflowRead(input, 'yaml'); }
+// JSON/YAML 解析由真正选定的 r60.reader Standard Element 负责。
 export async function startWorkflow() {
   events.push({ event: 'workflow-hook', kind: 'start' });
   await Promise.resolve();
@@ -299,8 +287,36 @@ async function authoring(label, rule, options = {}) {
     rules.content[0].ref = { ...ruleRef, path: 'content/no-such-rule.json' };
   }
 
+  // 从仓库中直接拷贝真实手写的多文件 Standard Reader Domain Package。
+  const standardPkgId = 'r60-standard-readers';
+  const standardRoot = options.workflow === true ? join(root, standardPkgId) : null;
+  if (standardRoot) {
+    await cp(resolve(dirname(fileURLToPath(import.meta.url)), '../selected-packages/packages/r60-standard-readers'),
+      standardRoot, { recursive: true });
+    if (options.workflowFatalAt === 'leaf') {
+      // 仅在故障注入临时副本中修改 ESM，并同步 Target 的真实摘要。
+      const modulePath = join(standardRoot, 'dist/index.mjs');
+      const original = await readFile(modulePath, 'utf8');
+      const marker = "    const events = (globalThis.__domainHarnessT05Events ??= []);";
+      assert.ok(original.includes(marker), 'Standard Reader failure-injection seam absent');
+      const modified = original.replace(marker,
+        "    if (parsed?.id === 'json-a') throw new Error('T14 deliberate selected Function fatal');\\n" + marker);
+      await writeFile(modulePath, modified);
+      const manifestPath = join(standardRoot, 'manifest.json');
+      const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+      const digest = await fileDigest(modulePath);
+      for (const variant of manifest.targetVariants) {
+        for (const binding of variant.implementations) binding.entry.module.digest = digest;
+      }
+      await writeFile(manifestPath, canonicalJson(manifest));
+    }
+  }
+  const standardDefinition = standardRoot
+    ? JSON.parse(await readFile(join(standardRoot, 'definitions/reader.json'), 'utf8')) : null;
+  const standardManifest = standardRoot
+    ? JSON.parse(await readFile(join(standardRoot, 'manifest.json'), 'utf8')) : null;
   const workflow = options.workflow === true
-    ? await prepareWorkflowElements(dirs, rules, app, fn) : null;
+    ? await prepareWorkflowElements(dirs, rules, app, fn, standardDefinition) : null;
   const definitions = {
     'basic.knowledge': knowledge, 'basic.rules': rules, 'basic.app': app,
     ...(workflow ? {
@@ -429,7 +445,7 @@ async function authoring(label, rule, options = {}) {
         implementation('basic.rules', 'evaluate', rulesEntryRef, 'evaluate', [ruleRef]),
         implementation('basic.rules', 'optionalReport', rulesEntryRef, 'optionalReport'),
         implementation('basic.rules', 'initializeRule', rulesEntryRef, 'initializeRule'),
-        ...(workflow ? ['jsonReader', 'yamlReader', 'startWorkflow', 'endWorkflow', 'workflowDecision']
+        ...(workflow ? ['startWorkflow', 'endWorkflow', 'workflowDecision']
           .map((functionId) => implementation('basic.rules', functionId, rulesEntryRef, functionId)) : []),
       ]),
       init: lifecycleRefs['rules-package'],
@@ -437,7 +453,8 @@ async function authoring(label, rule, options = {}) {
     }),
     manifest('app-business', {
       layer: 'business', role: 'primary', order: 2,
-      ...(options.omitBusinessInitFrom === true ? {} : { recordInitFrom: true }), dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' }],
+      ...(options.omitBusinessInitFrom === true ? {} : { recordInitFrom: true }), dependsOn: [{ package: 'rules-package', version: '1.0.0', interface: 'rules.api' },
+        ...(workflow ? [{ package: standardPkgId, version: '1.0.0', interface: 'r60.readers.api' }] : [])],
       elements: [
         { id: lifecycleDefs['app-business'].id, version: '1.0.0',
           definitionRef: await artifactRef('app-business', 'elements/lifecycle.json'), visibility: 'private' },
@@ -457,6 +474,7 @@ async function authoring(label, rule, options = {}) {
       init: lifecycleRefs['app-business'],
       ...(options.omitBusinessExit === true ? {} : { exit: lifecycleRefs['app-business'] }),
     }),
+    ...(workflow ? [standardManifest] : []),
   ];
 
   const descriptor = {
@@ -473,18 +491,22 @@ async function authoring(label, rule, options = {}) {
       { package: 'kernel-extension', version: '1.0.0' },
       { package: 'sdk-extension', version: '1.0.0' },
       { package: 'rules-package', version: '1.0.0' },
+      ...(workflow ? [{ package: standardPkgId, version: '1.0.0' }] : []),
     ],
     config: { example: 'basic-domain-app' },
   };
   const input = {
     descriptor, packages,
-    packageRoots: dirs,
-    packageArtifacts: Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
+    packageRoots: { ...dirs, ...(standardRoot ? { [standardPkgId]: standardRoot } : {}) },
+    packageArtifacts: {
+      ...Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
+      ...(standardRoot ? { [standardPkgId]: 'dist/index.mjs' } : {}),
+    },
     kdpArtifact: { packageId: 'kernel-primary', path: 'dist/index.js' },
   };
   return {
     root, dirs, input, descriptor, definitions,
-    domainElements: [knowledge, rules, app, ...(workflow ? [workflow.child] : [])],
+    domainElements: [knowledge, rules, app, ...(workflow ? [workflow.child, standardDefinition] : [])],
     ruleRef, refs, workflow,
   };
 }
