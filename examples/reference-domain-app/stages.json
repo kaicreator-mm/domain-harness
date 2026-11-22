@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "dh.reference-stages/1",
+  "stages": [
+    {
+      "stage": "0.11.1",
+      "state": "CANDIDATE_PENDING_EXACT_CI_AND_INDEPENDENT_REVIEW",
+      "referenceApp": "examples/reference-domain-app",
+      "basis": {
+        "sdkReviewedHead": "030032416c684d066daa1f8c5a2e50d60c41c779",
+        "review": "DH_V0111_R72_R69_P1_P2_EXACT_INCREMENTAL_INDEPENDENT_REVIEW",
+        "mergedSdkTrain": "02d51b9fa3c91222b1ef2b05f1269eb6942222eb",
+        "implementationIssue": 1664
+      },
+      "target": "node22-esm",
+      "actualReferenceReceipt": null,
+      "release": false
+    }
+  ]
+}
