@@ -14,7 +14,7 @@
 4. **作者期组合代码若属于同一 SDK，应有 SDK Domain Package + 内聚 Element 实现所有权**（MIGRATION_REQUIRED）；但它仅负责**组合与封存**的已定义技术行为，不承担候选 Package/Element 的正确性证明。新 App 尚未组装，不能要求先 Boot 它自身才能执行 `buildApp`；公共 SDK 可以通过已安装 SDK 的静态作者期入口调用 Composition Element，不能让 App Runtime 获得 App 组合/生成期特权。独立的生成/验证工具可以完成候选正确性验证，SDK 不得强制绑定某个生成者。
 5. 允许将逻辑 KDP、SDK Packages 物理 bundle/融合发行，前提仍能证明原有逻辑身份、Layer/Order/显式授权/Init/Exit/Target/摘要。**物理一个 tarball 或 ESM bundle 不等于一个逻辑 Package**。
 6. 不做通用多语言装载器；当前实际工程为 Node ESM Profile，最低 Node `>=22.12.0`。标准层可描述另一语言的独立 App；不得从 Node 24 CI 推出 Node 22 全 OS 组合已独立 E2E 证明。
-7. 不引入 DomainForge、Seed Builder 或自动生成器作为当前 SDK 的前提；可按实际必要写轻量独立 Validator，只负责验证已有文件，不控制谁生成文件。
+7. 不将 DomainForge 或任何自动生成器作为当前 SDK 的前提；可按实际必要写轻量独立 Validator，只负责验证已有文件，不控制谁生成文件。
 8. Runtime/Package 的安全声明仅限静态选定、直接访问、受信字节/摘要/权限等真实可测范围，不将此视为任意第三方 JS 代码的通用沙箱。
 
 ### 13.4 信任边界、资源与外部 Effect — CONFIRMED
