@@ -1,6 +1,6 @@
 # DomainHarness 0.11.x — Standard Element 体系与递增复用规范（R29）
 
-> **【CURRENT · R70 W02】** 标准 dh.std.file.json / dh.std.file.yaml 的读写 Element 实码归 0.11.1 [#1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 与唯一 [集成 PR #1663](https://github.com/kaicreator-mm/domain-harness/pull/1663)。R69 独立审核结论为 REWORK（单 SDK Registry Workflow E2E 存在 P1 证据缺口），R70 在本版修复并等待新 HEAD 验证及另一对话受影响复审。**合并验收前不冒充 STANDARD_ACCEPTED**；KDP 仍只处理已选资源字节、授权和 Lock，真正 JSON/YAML 解析及序列化仅由普通 File Element 完成。
+> **【CURRENT · R74 已受审并合入 v0.11.x】** 0.11.1 [#1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 的普通 Standard File `dh.std.file.json` / `dh.std.file.yaml` 已经通过 [R72 独立 ACCEPT_SCOPED P0=0/P1=0/P2=1](https://github.com/kaicreator-mm/domain-harness/pull/1663#pullrequestreview-6012506153) 和同 SHA [CI #2979 SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2979/1)，[PR #1663](https://github.com/kaicreator-mm/domain-harness/pull/1663) squash 合入 `version/v0.11.x@9f53c6e17d7a854fb57b2e1232702af15e6defe8`。**仅在当前 Node22 ESM Target、已选 Package/FunctionRef/Lock/权限闭包内，两者为 `STANDARD_ACCEPTED`；** 不是正式 npm 发布或任意语言/目标的通用承诺。KDP 只承担资源授权、原始字节、UTF-8 和 Lock，格式语义由普通 File Element 提供。旧 R69/R70 的待审叙述属于 HISTORICAL，不可当最新状态。
 
 > **【R36 当前 Standard Element Package 生成方式】**：Standard Element 也是普通多文件 Domain Package 的内容；可以由 ChatGPT/开发者直接编写 ElementDefinition、Manifest、Function ESM、资源并按 DIS 适用 + v0.11.x 实际合同验证。**不需要 Seed Builder、生成器或额外 Package Assembly 生产阶段**；组合 App 只选择/校验使用的文件、依赖、Target 和 Boot。参见 [R36](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
 
@@ -109,6 +109,13 @@ Catalog 初期采用仓库版本化 Markdown/清单即可（状态、ElementRef/
 标准 ID 为 `dh.std.file.json`、`dh.std.file.yaml`。每个普通 Element 各自同时声明 Read 与 Write FunctionContract；Read 接受已锁定来源的格式及 UTF-8 source，Write 接受 JsonValue 并输出确定性 UTF-8 source。**Write 的语义是序列化，不是任意 Host 文件系统 I/O**：无独立授权的 sink、路径、事务/原子写协议时，禁止偷偷添加 fs.writeFile；外部持久化须另受 Effect/资源授权。本版本只使用 Node 原生 JSON 与已精确锁定 `yaml@2.9.1`，不创建手写解析器/序列化器、第二 KDP 或外部 BUILD。两个 Consumer 的合法直接导入、私有/未声明调用及读写安全反例均应作为同 HEAD 审核范围；在审核前保持候选状态。
 
 
-## 7. R70 本版本限定修复（CURRENT · #1656 / #1663）
+## 7. 【HISTORICAL · R70 实施过程，R72/R74 已受审合入】 本版本限定修复（#1656 / #1663）
 
 此前 R69 DH 独立审核为 REWORK P1=1/P2=3。本轮要在同一个仅以 SDK 为直接公共产品依赖的 Registry Consumer 中执行真实 T14 Workflow，并在安装前比对 xstate/yaml 精确 SHA512 SRI 与所选 App Lock。单独增补 Registry SRI 篡改前置拒绝、第二领域 Package.Init 精确 FunctionRef 的 YAML Writer 及缺失 import 负例，以及 Writer 序列化前有界遍历成本控制。本节仅描述受影响的实现范围；是否合格须以新增 exact-SHA CI 和非 Writer 增量审核作证，不得将旧 R29 提取计划或 #2975 SUCCESS 当作当前 HEAD 通过。
+
+## 8. 【CURRENT · R74】本版本正式合入与准入边界
+
+- **独立接受**：R69 基线全范围 + R72 同 Exact-SHA 增量（4 commits / 7 files）分别覆盖实际 API、真实两领域 Consumer、仅一个直接 SDK 产品的 Registry Workflow、前置 SRI 拒绝、精确 Writer FunctionRef、Reader/Writer 安全和过期文档修复；R72 ACCEPT_SCOPED P0=0 / P1=0 / P2=1；Woodpecker #2979 SUCCESS。
+- **已经合并**：集成 PR #1663 的被审 HEAD `030032416c684d066daa1f8c5a2e50d60c41c779`，合并后的 `version/v0.11.x@9f53c6e17d7a854fb57b2e1232702af15e6defe8`。现行 [Standard Element Catalog](./DomainHarness_v0.11.x_STANDARD_ELEMENT_CATALOG.md) 对两个 Standard File 分别记 `1.0.0 · STANDARD_ACCEPTED`，其他候选不自动晋升。
+- **受审 P2 范围限制**：Writer 已执行节点/估算字节预检与最终 UTF-8 1MiB 上限，但 `Object.entries(value)` 对极大既有对象的临时分配不是严格预分配资源界；不得声称当前实现提供任意 JS 对象/代码的通用内存沙箱。该项是 R72 非阻塞 P2 记录，不是 0.11.2 的 File Element 实施义务。
+- **规范层次**：此前 R29 的“解析留在 KDP”及“Reader 提取尚未开始/计划 0.11.2”等只在标示 HISTORICAL/SUPERSEDED 的段落中保留供审计；真正解析及序列化由已选普通 File Element 提供。任何后续 Target/语义/资源上限变更必须新版本化并按受影响范围验证。
