@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import {
   DH_INSTALL_RECORD_SCHEMA_VERSION,
   contentDigestOf,
+  canonicalJson,
   isContentDigest,
 } from '@kaicreator/domain-harness-contracts';
 import type {
@@ -446,7 +447,7 @@ export async function verifyKdpEntryBytes(
   const selectedModule = lock.bootstrapKdpPin.kdpInitModule;
   const selectedPath = resolvePackageFile(installRoot, selectedModule.packageId, selectedModule.path);
   if (!selectedPath || selectedModule.packageId !== record.kdpPackageId ||
-      !sameResolvedFile(selectedPath, entryPath)) {
+      selectedPath !== entryPath) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH',
       'KDP package root export does not equal the Lock-selected Host Function module path') };
   }
