@@ -267,4 +267,22 @@ test('R60 W02: another Domain cannot import unselected or undeclared Standard Re
   const unselected = buildApp({ ...input, packages: selectedPool.filter((pkg) =>
     pkg.id !== STANDARD_READER) });
   assert.equal(unselected.ok, false, 'omitting a selected Standard Package cannot silently grant access');
+
+  const staleDigest = buildApp({ ...input, packages: selectedPool.map((pkg) =>
+    pkg.id === 'r41-business' ? {
+      ...pkg, imports: pkg.imports.map((item) => item.functionId === 'jsonReader'
+        ? { ...item, element: { ...item.element, digest: `sha256:${'0'.repeat(64)}` as `sha256:${string}` } : item),
+    } : pkg) });
+  assert.equal(staleDigest.ok, false, 'wrong Standard Element digest is not an authorized FunctionRef');
+
+  const privateSource = await r60OtherDomain(t);
+  const manifestFile = join(privateSource, 'packages', STANDARD_READER, 'manifest.json');
+  const original = readJson(manifestFile) as DomainPackageManifest;
+  const privatized = { ...original,
+    elements: original.elements.map((item) => item.id === 'dh.std.reader.json'
+      ? { ...item, visibility: 'private' as const } : item),
+  };
+  writeFileSync(manifestFile, canonicalJson(privatized as unknown as JsonValue));
+  const denied = buildApp(authoredInput('extended', privateSource, true));
+  assert.equal(denied.ok, false, 'public Function name cannot bypass private Standard Element visibility');
 });
