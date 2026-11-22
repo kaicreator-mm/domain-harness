@@ -8,8 +8,8 @@ const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourcePath = join(repo, 'tooling/build/src/types.ts');
 const generatedPath = join(repo, 'packages/domain-harness/src/composition-types.ts');
 const source = readFileSync(sourcePath, 'utf8');
-assert.match(source, /export interface BuildInput\\b/u, 'internal Composition ABI missing BuildInput');
-assert.match(source, /export type BuildResult\\b/u, 'internal Composition ABI missing BuildResult');
+assert.ok(source.includes('export interface BuildInput {'), 'internal Composition ABI missing BuildInput');
+assert.ok(source.includes('export type BuildResult ='), 'internal Composition ABI missing BuildResult');
 const old = existsSync(generatedPath) ? readFileSync(generatedPath, 'utf8') : '';
 if (process.argv.includes('--check')) {
   assert.equal(old, source, 'generated SDK public Composition ABI is stale; run generator');
