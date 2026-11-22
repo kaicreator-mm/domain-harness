@@ -248,7 +248,7 @@ test('B0-05: all Business Core results conservatively determine App status', () 
 test('B0-07: Boot Pin must match Order 0 KDP identity before running package Init', async (t) => {
   const fixture = await buildFixtureInstall({ init: { status: 'READY' }, functions: {} });
   t.after(async () => fixture.cleanup());
-  const lock = { ...fixture.lock, bootstrapKdpPin: { ...fixture.lock.bootstrapKdpPin, kdpPackageId: 'different-kdp' } };
+  const lock = { ...fixture.lock, selectedKdpHost: { ...fixture.lock.selectedKdpHost, kdpPackageId: 'different-kdp' } };
   const system = new PackageSystem(fixture.installRoot, lock, []);
   await assert.rejects(system.runRemainingCoresAfterKernelEntered(appCtx(fixture)), /identity does not match/);
   assert.equal(timeline('package-init').length, 0);

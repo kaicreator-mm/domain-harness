@@ -165,7 +165,7 @@ export class PackageSystem {
       throw new KdpLoadError('KDP Host Init has already entered this activation', 'DH_RUNTIME_NOT_READY');
     }
     const rootId = this.lock.coreOrder[0];
-    if (!rootId || this.lock.bootstrapKdpPin.kdpPackageId !== rootId) {
+    if (!rootId || this.lock.selectedKdpHost.kdpPackageId !== rootId) {
       throw new KdpLoadError('Host KDP identity does not match the selected Core.Order 0', 'DH_BOOT_PIN_MISMATCH');
     }
     this.kernelHostEntered = true;
@@ -327,7 +327,7 @@ export class PackageSystem {
     const cores = this.lock.coreOrder;
     if (!cores.length) throw new KdpLoadError('Lock has no Core.Order chain');
     const rootId = cores[0]!;
-    if (this.lock.bootstrapKdpPin.kdpPackageId !== rootId) {
+    if (this.lock.selectedKdpHost.kdpPackageId !== rootId) {
       throw new KdpLoadError('Order 0 Core and selected Host KDP Package identities differ', 'DH_BOOT_PIN_MISMATCH');
     }
     const coreBinding = (index: number, caller: InitCaller): PackageInitBinding => ({

@@ -311,7 +311,7 @@ test('R127: digest-consistent but non-callable KDP Init export is FAILED, never 
     await fixture.writeKdpEntryBytes(Buffer.from(stub, 'utf8'));
     const stubDigest = `sha256:${createHash('sha256').update(stub, 'utf8').digest('hex')}` as ContentDigest;
     const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
-    const kdpPin = lock['bootstrapKdpPin'] as Record<string, unknown>;
+    const kdpPin = lock['selectedKdpHost'] as Record<string, unknown>;
     const kdpModule = kdpPin['kdpInitModule'] as Record<string, unknown>;
     kdpModule['digest'] = stubDigest;
     const selected = lock['selectedFunctions'] as Array<Record<string, unknown>>;
@@ -485,10 +485,10 @@ test('KDP manifest exports conditions: nested node/import resolve, unresolvable 
   });
 });
 
-test('digest-consistent Lock with malformed target/bootstrapKdpPin is a typed mismatch, not a TypeError', async (t) => {
+test('digest-consistent Lock with malformed target/selectedKdpHost is a typed mismatch, not a TypeError', async (t) => {
   await withFixture(t, async (fixture) => {
     const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
-    delete lock['bootstrapKdpPin'];
+    delete lock['selectedKdpHost'];
     delete lock['closureDigest'];
     lock['closureDigest'] = digestOf(lock);
 
@@ -507,7 +507,7 @@ test('digest-consistent Lock with malformed target/bootstrapKdpPin is a typed mi
     const result = await boot(pin, fixture.context);
     assertRefused(result, 'DH_BOOT_PIN_MISMATCH');
     if (result.status === 'REFUSED') {
-      assert.match(result.reason, /bootstrapKdpPin is malformed/);
+      assert.match(result.reason, /selectedKdpHost is malformed/);
     }
     sideEffectFree();
   });

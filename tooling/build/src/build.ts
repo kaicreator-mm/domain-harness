@@ -733,7 +733,7 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
       schemaVersion: DH_LOCK_SCHEMA_VERSION,
       appIdentity: { id: descriptor.id, version: descriptor.version, descriptorDigest },
       target,
-      bootstrapKdpPin: {
+      selectedKdpHost: {
         kdpPackageId: kdpId,
         kdpInitFunction: kdpInitRef,
         invocationAbi: 'kdp-host-init/1' as const,

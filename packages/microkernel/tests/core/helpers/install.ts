@@ -534,7 +534,7 @@ export async function buildFixtureInstall(
       descriptorDigest: bytesDigest(descriptorBytes),
     },
     target: TARGET,
-    bootstrapKdpPin: {
+    selectedKdpHost: {
       kdpPackageId: KDP_PACKAGE_ID,
       kdpInitFunction: lifeFunction(FIXTURE_KERNEL, 'init'),
       invocationAbi: 'kdp-host-init/1' as const,
@@ -603,9 +603,9 @@ export async function buildFixtureInstall(
     lockPath: LOCK_RELATIVE_PATH,
     lockDigest: closureDigest,
     kdpPackageId: KDP_PACKAGE_ID,
-    kdpInitFunction: lockBase.bootstrapKdpPin.kdpInitFunction,
+    kdpInitFunction: lockBase.selectedKdpHost.kdpInitFunction,
     invocationAbi: 'kdp-host-init/1',
-    kdpInitModule: lockBase.bootstrapKdpPin.kdpInitModule,
+    kdpInitModule: lockBase.selectedKdpHost.kdpInitModule,
   };
   const record: InstalledRecord = {
     ...(recordBase as unknown as InstalledRecord),
@@ -617,9 +617,9 @@ export async function buildFixtureInstall(
     schemaVersion: 'dh.pin/0.11.1',
     target: TARGET,
     kdpPackageId: KDP_PACKAGE_ID,
-    kdpInitFunction: lockBase.bootstrapKdpPin.kdpInitFunction,
+    kdpInitFunction: lockBase.selectedKdpHost.kdpInitFunction,
     invocationAbi: 'kdp-host-init/1',
-    kdpInitModule: lockBase.bootstrapKdpPin.kdpInitModule,
+    kdpInitModule: lockBase.selectedKdpHost.kdpInitModule,
     lockDigest: closureDigest,
     lockPath: LOCK_RELATIVE_PATH,
   };

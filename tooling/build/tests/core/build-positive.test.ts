@@ -94,11 +94,11 @@ test('AC02/03/04/07 positive: full K/S/B closure seals the exact Lock', (t) => {
     [],
   );
 
-  assert.equal(lock.bootstrapKdpPin.kdpPackageId, 'kdp-kernel');
-  assert.equal(lock.bootstrapKdpPin.invocationAbi, 'kdp-host-init/1');
-  assert.equal(lock.bootstrapKdpPin.kdpInitFunction.functionId, 'init');
-  assert.equal(lock.bootstrapKdpPin.kdpInitModule.path, 'dist/kdp.mjs');
-  assert.match(lock.bootstrapKdpPin.kdpInitModule.digest, /^sha256:[0-9a-f]{64}$/u);
+  assert.equal(lock.selectedKdpHost.kdpPackageId, 'kdp-kernel');
+  assert.equal(lock.selectedKdpHost.invocationAbi, 'kdp-host-init/1');
+  assert.equal(lock.selectedKdpHost.kdpInitFunction.functionId, 'init');
+  assert.equal(lock.selectedKdpHost.kdpInitModule.path, 'dist/kdp.mjs');
+  assert.match(lock.selectedKdpHost.kdpInitModule.digest, /^sha256:[0-9a-f]{64}$/u);
   assert.equal(lock.selectedFunctions.filter((fn) => fn.invocationAbi === 'kdp-host-init/1').length, 1);
 
   for (const key of [
