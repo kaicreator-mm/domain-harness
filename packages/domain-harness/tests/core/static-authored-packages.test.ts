@@ -203,10 +203,10 @@ async function nextGenerationSource(t: import('node:test').TestContext): Promise
   const version = '1.0.1';
   const definition = { ...oldDefinition, version,
     description: 'Second-generation directly authored SDK Extension lifecycle' };
-  const definitionBytes = Buffer.from(canonicalJson(definition as JsonValue), 'utf8');
+  const definitionBytes = Buffer.from(canonicalJson(definition as unknown as JsonValue), 'utf8');
   await writeFile(definitionPath, definitionBytes);
   const definitionSha = `sha256:${createHash('sha256').update(definitionBytes).digest('hex')}`;
-  const definitionIdentity = contentDigestOf(definition as JsonValue);
+  const definitionIdentity = contentDigestOf(definition as unknown as JsonValue);
 
   const before = readFileSync(modulePath, 'utf8');
   const oldMarker = "events.push({ phase: 'init', packageId: 'r41-sdk-extra' });";
@@ -236,7 +236,7 @@ async function nextGenerationSource(t: import('node:test').TestContext): Promise
   const packageJson = readJson(join(pkgRoot, 'package.json')) as Record<string, unknown>;
   await writeFile(join(pkgRoot, 'package.json'), canonicalJson({
     ...packageJson, version,
-  } as JsonValue));
+  } as unknown as JsonValue));
   const oldDescriptor = readJson(descriptorPath) as DomainAppDescriptor;
   const updatedDescriptor = {
     ...oldDescriptor, version,
