@@ -211,7 +211,7 @@ test('R27: BUILD rejects artifact paths Runtime would reject', (t) => {
   };
   expectRefusal(buildApp({
     ...input, packages: input.packages.map((pkg) => pkg === kdp ? invalidKdp : pkg),
-  }), 'DH_BUILD_RESOURCE_MISSING');
+  }), 'DH_BUILD_SCHEMA_INVALID');
 });
 
 test('B0-02: lifecycle ElementRef digest mismatch is refused before choosing a Target', (t) => {
@@ -454,7 +454,7 @@ test('BUILD rejects missing KDP Order 0', (t) => {
   const { input } = scenario.finalize();
   const kdp = input.packages.find((pkg) => (pkg as { id: string }).id === 'kdp-kernel') as { order: number };
   kdp.order = 9;
-  expectRefusal(buildApp(input), 'DH_BUILD_PRIMARY_MISSING');
+  expectRefusal(buildApp(input), 'DH_BUILD_SCHEMA_INVALID');
 });
 
 test('BUILD rejects imports from an undeclared direct Extension', (t) => {

@@ -764,8 +764,8 @@ export const DOMAIN_APP_LOCK_JSON_SCHEMA: JsonObject = defsEnvelope(
       selectedFunctions: {
         type: 'array',
         items: {
-          type: 'object',
-          additionalProperties: false,
+          // 仅每个封闭的 oneOf 分支定义允许字段，外层禁止 additionalProperties:false
+          // 否则与内层 properties 不共享声明，合法函数会被错误拒绝。
           oneOf: [
             {
               type: 'object', additionalProperties: false,
