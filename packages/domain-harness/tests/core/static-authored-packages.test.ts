@@ -42,7 +42,6 @@ function authoredInput(name: 'basic' | 'extended', source = SOURCE, withReader =
     packageRoots: Object.fromEntries(ids.map((id) =>
       [id, join(source, 'packages', id)])),
     packageArtifacts: Object.fromEntries(ids.map((id) => [id, 'dist/index.mjs'])),
-    kdpArtifact: { packageId: KDP, path: 'dist/bootstrap.js' },
   };
 }
 
@@ -145,16 +144,19 @@ async function installAuthoredApp(
     appId: descriptor.id, appVersion: descriptor.version,
     target: built.lock.target, lockPath: LOCK_PATH,
     lockDigest: built.lock.closureDigest,
-    kdpPackageId: KDP, kdpPrimaryEntry: 'bootstrap',
-    kdpPrimaryDigest: built.lock.bootstrapKdpPin.kdpPrimaryDigest,
+    kdpPackageId: KDP,
+    kdpInitFunction: built.lock.bootstrapKdpPin.kdpInitFunction,
+    invocationAbi: 'kdp-host-init/1',
+    kdpInitModule: built.lock.bootstrapKdpPin.kdpInitModule,
   };
   await writeFile(join(installRoot, 'dh-install/installed-record.json'),
     JSON.stringify({ ...recordBase, recordDigest: contentDigestOf(recordBase as unknown as JsonValue) }));
   const pin = {
     schemaVersion: 'dh.pin/0.11' as const,
     target: built.lock.target, kdpPackageId: KDP,
-    kdpPrimaryEntry: 'bootstrap' as const,
-    kdpPrimaryDigest: recordBase.kdpPrimaryDigest,
+    kdpInitFunction: built.lock.bootstrapKdpPin.kdpInitFunction,
+    invocationAbi: 'kdp-host-init/1' as const,
+    kdpInitModule: built.lock.bootstrapKdpPin.kdpInitModule,
     lockDigest: built.lock.closureDigest,
     lockPath: LOCK_PATH,
   };
