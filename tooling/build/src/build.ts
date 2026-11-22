@@ -5,7 +5,6 @@ import {
   contentDigestOf,
   isRelativeResourcePath,
   isUnknownContentKind,
-  validateDomainDefinition,
   validateElementDefinition,
   type ContentBlock,
   type ContentDigest,
@@ -90,6 +89,7 @@ export type GenerationSourceCheck = (
   manifests: readonly DomainPackageManifest[],
   artifacts: readonly ResourceRef[],
   functions: readonly SelectedFunction[],
+  elements: readonly LoadedElement[],
 ) => void;
 
 /** App 组合：验证选定关系与资源封存一致性；源码正确性由生成期的独立验证工具负责。 */
@@ -111,24 +111,11 @@ export function composeApp(input: BuildInput, generationCheck?: GenerationSource
 
 /** 依次建立包闭包、Element 所有权和依赖图，校验资源内容后生成确定性 Lock；所有步骤必须先于启动执行。 */
 function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): Omit<BuildSuccess, 'ok'> {
-  // 第 1 段：先验证 App、Domain 和 Manifest 的机器合同，再允许任何包进入候选池。
+  // 仅核验 App 选型输入与 Manifest 的必要机器结构；独立 Domain 作者正确性归生成期。
   const schemas = new SchemaChecker();
 
   schemas.validateDocument('descriptor', input.descriptor);
   const descriptor = input.descriptor as DomainAppDescriptor;
-
-  for (const [index, domain] of (input.domains ?? []).entries()) {
-    const result = validateDomainDefinition(domain);
-    if (!result.ok) {
-      const issue = firstIssue(result.issues);
-      throw new BuildRefusal(
-        issue.code as BuildErrorCode,
-        `domains[${index}]: ${issue.message}`,
-        issue.path,
-      );
-    }
-    schemas.validateDocument('domain', domain);
-  }
 
   const pool = new Map<string, DomainPackageManifest>();
   for (const [index, candidate] of input.packages.entries()) {
@@ -627,7 +614,16 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
         excludedUnknownContent.push(`${loaded.def.id}/${block.id}`);
         continue;
       }
-      contentDigests.push(validateBlockContent(schemas, loaded, block, scope));
+      if (!('inline' in block.schemaRef)) {
+        if (block.schemaRef.packageId !== loaded.owner.id &&
+            !(dependsOnEdges.get(loaded.owner.id) ?? []).includes(block.schemaRef.packageId)) {
+          throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+            `Element '${loaded.def.id}' uses a content Schema from undeclared Extension '${block.schemaRef.packageId}'`);
+        }
+        // SchemaRef 的选定归属与字节是组合技术合同，业务 Schema 的有效性由生成者证明。
+        scope.verify(block.schemaRef);
+      }
+      contentDigests.push(sealBlockContent(loaded, block, scope));
     }
     if (loaded.def.validation) scope.verify(loaded.def.validation.ref);
     sealedElements.push({
@@ -689,7 +685,7 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
       return selected.implementation.module;
     })),
   ];
-  generationCheck?.(scope, packagesSorted, selectedArtifacts, sealedFunctions);
+  generationCheck?.(scope, packagesSorted, selectedArtifacts, sealedFunctions, [...elements.values()]);
   // 若生成者已提交静态闭包资源，SDK 仅对选定 Package 内字节及摘要作封存一致性检查。
   const allowedResourceOwners = new Set(packagesSorted.map((pkg) => pkg.id));
   for (const ref of input.generatedResources ?? []) {
@@ -833,8 +829,7 @@ function compareHookBinding(a: SealedHookBinding, b: SealedHookBinding): number 
 }
 
 /** 内容块的内联值与外部资源在解析后应产生同一语义摘要，同时保留原始文件字节校验。 */
-function validateBlockContent(
-  schemas: SchemaChecker,
+function sealBlockContent(
   loaded: LoadedElement,
   block: ContentBlock,
   scope: ResourceScope,
@@ -842,7 +837,6 @@ function validateBlockContent(
   const blockPath = `${loaded.def.id}/${block.id}`;
   if (!block.ref) {
     const value = toJson(block.value);
-    validateAgainstSchema(schemas, scope, block, value, blockPath);
     return contentDigestOf(value);
   }
   const bytes = scope.verify(block.ref);
@@ -859,31 +853,7 @@ function validateBlockContent(
     }
     return block.ref.digest;
   }
-  validateAgainstSchema(schemas, scope, block, parsed, blockPath);
   return contentDigestOf(parsed);
-}
-
-function validateAgainstSchema(
-  schemas: SchemaChecker,
-  scope: ResourceScope,
-  block: ContentBlock,
-  value: JsonValue,
-  blockPath: string,
-): void {
-  const validate =
-    'inline' in block.schemaRef
-      ? schemas.compileInlineSchema(block.schemaRef.inline, `${blockPath}.schemaRef`)
-      : schemas.compileInlineSchema(
-          parseSchemaResource(scope, block.schemaRef, blockPath),
-          `${blockPath}.schemaRef`,
-        );
-  if (!validate(value)) {
-    throw refusal(
-      'DH_BUILD_SCHEMA_INVALID',
-      `content block '${blockPath}' does not pass its declared schema`,
-      blockPath,
-    );
-  }
 }
 
 function parseSchemaResource(
