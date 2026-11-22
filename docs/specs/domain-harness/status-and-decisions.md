@@ -13,7 +13,7 @@
 | Element 统一根类型、0..N Function、typed Content、FunctionRef/Target/显式依赖 | **CONFIRMED / v0.11.0 scoped** | #1564/#1624；现行 TypeScript Contract |
 | Core.Order=0 KDP、单轮 Init、直接 Extension、可选 Exit/InitFrom、真实逆序 Exit | **CONFIRMED / v0.11.0 scoped** | #1621/#1622/#1625 及受影响源码 |
 | Init→Workflow→Function、标准 JSON/YAML、单公开 SDK、真实 Reference App | **CONFIRMED / v0.11.1 scoped** | #1605/#1656/#1664；R72/#2979、R81/#2981 |
-| Boot 按受选 KDP.Init Host ABI 单次委托，Lock/Pin/Record 新身份链 | **R127 SOURCE_READY / 独立审查与合并待完成** | #1681：`selectedKdpHost`、`kdp-host-init/1`、旧 `bootstrap` 删除；不能仅凭 CI 标记整版完成 |
+| Boot 按受选 KDP.Init Host ABI 单次委托，Lock/Pin/Record 新身份链 | **R129 ACCEPT_SCOPED / 已合入版本列车** | #1681：R129 独审 `ACCEPT_SCOPED P0=0/P1=0/P2=1`，Exact HEAD `c87b45e4d30bbd28dd0ea06395fecdfb06f557c8`，CI #3090 SUCCESS，合并 `8c0a1138b5629d3d10de76f33f87eb1572a53687`；仍有 import 失败分类 P2 #1683 与 KDP 真正引擎归属 #1682，不代表 A6/A7 完成 |
 | KDP Element 真正拥有 PackageSystem、Workflow Runtime/DomainApp 全部实现 | **MIGRATION_REQUIRED** | 机器调用入口 ≠ 全部私有实现归属；#1668 A6/A7 必须继续推进 |
 | 作者期 App 组合与封存执行能力由真实 SDK Package/Element 拥有 | **MIGRATION_REQUIRED** | 与未来 App 还未生成的自举问题在 #1668 L2 明确 |
 | 新 Package kebab-case、Element camelCase/Namespace 独立、自动化合法性 | **MIGRATION_REQUIRED** | Schema/生成期验证/组合封存/Lock/Pin/Consumer 全链迁移和新摘要 |

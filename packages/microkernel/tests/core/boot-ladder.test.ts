@@ -344,6 +344,32 @@ test('R127: digest-consistent but non-callable KDP Init export is FAILED, never 
   });
 });
 
+test('R129 P2: sealed KDP ESM evaluation throw is FAILED after side effects, before Host Init', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const scope = globalThis as typeof globalThis & { __dhR129EsmEvaluated?: boolean };
+    delete scope.__dhR129EsmEvaluated;
+    t.after(() => { delete scope.__dhR129EsmEvaluated; });
+    const source = [
+      'globalThis.__dhR129EsmEvaluated = true;',
+      "throw new Error('TOKEN_SECRET_IMPORT_EVAL_5027');",
+      "export async function init() { throw new Error('Host Init must not be entered'); }",
+      '',
+    ].join('\n');
+    const pin = await resealKdpHostEntry(fixture, source);
+    const result = await boot(pin, fixture.context);
+    assert.equal(result.status, 'FAILED', JSON.stringify(result));
+    if (result.status !== 'FAILED') return;
+    assert.equal(result.code, 'DH_BOOT_KDP_ENTRY_INVALID');
+    assert.match(result.reason, /import\/evaluation/);
+    assert.doesNotMatch(result.reason, /TOKEN_SECRET_IMPORT_EVAL_5027/);
+    assert.equal(scope.__dhR129EsmEvaluated, true, 'selected ESM top-level did execute');
+    assert.deepEqual(events().filter((event) => event['event'] === 'package-exit'), [],
+      'Host Init was not invoked, so no Package.Exit should be fabricated');
+    assert.deepEqual(events().filter((event) => event['event'] === 'business-init'), [],
+      'no business initialization should be started');
+  });
+});
+
 for (const candidate of [
   {
     name: 'pre-delegation throw',

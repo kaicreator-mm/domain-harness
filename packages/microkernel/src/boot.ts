@@ -111,7 +111,11 @@ export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Pro
   try {
     kdpModule = (await import(pathToFileURL(trust.value.entryPath).href)) as Record<string, unknown>;
   } catch {
-    return refused('DH_BOOT_KDP_ENTRY_INVALID', 'pinned KDP entry failed to import (detail redacted)');
+    // 动态 import() 已开始加载/求值已选 ESM；可能已经发生模块顶层副作用，不能报告执行前 REFUSED。
+    // 此时尚未调用 Host Init，因此不虚构 Init/Exit 记录，也不执行未授权清理代码。
+    console.error('[KDP Host] code=DH_BOOT_KDP_ENTRY_INVALID phase=module-import detail=redacted');
+    return { status: 'FAILED', code: 'DH_BOOT_KDP_ENTRY_INVALID',
+      reason: 'selected KDP ESM module import/evaluation failed (detail redacted); Host Init not entered' };
   }
   // Host 只能执行已选 Function/Target 的确定导出名，绝不回退到自由 bootstrap 字符串。
   const selected = trust.value.lock.selectedFunctions.find((candidate) =>
