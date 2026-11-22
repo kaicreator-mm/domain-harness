@@ -104,7 +104,7 @@ export function sealPackageManifest(
         `Package '${pkg.id}' dependencies outside the approved exact yaml@2.9.1 Node ESM subset`);
     }
   }
-  // No other install-affecting inputs may enter the selected graph.
+  // 其余可能影响安装图的字段一律不能进入已选依赖闭包。
   for (const field of [
     'devDependencies', 'optionalDependencies', 'peerDependencies',
     'bundleDependencies', 'bundledDependencies', 'overrides', 'workspaces',
