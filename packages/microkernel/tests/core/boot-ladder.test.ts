@@ -1,7 +1,7 @@
 // 当前架构的可证伪测试：断言实际行为而非历史兼容。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, rm } from 'node:fs/promises';
+import { readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { BootResult, BootstrapPin, ContentDigest } from '@kaicreator/domain-harness-contracts';
@@ -161,6 +161,35 @@ test('KDP artifact digest mismatch is DH_BOOT_PIN_MISMATCH', async (t) => {
   });
 });
 
+test('KDP transitive installed ESM tamper is refused before any module side effect', async (t) => {
+  await withFixture(t, async (fixture) => {
+    // 只篡改真实磁盘上的依赖；Pin/Record/Lock 仍与 BUILD 封存字节一致。
+    const dependency = join(fixture.installRoot, 'node_modules', KDP_PACKAGE_ID, 'dist', 'kdp.js');
+    const original = await readFile(dependency);
+    await writeFile(dependency, Buffer.concat([original, Buffer.from('\n// altered after installation\n')]));
+    assertRefused(await boot(fixture.pin, fixture.context), 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+});
+
+test('KDP closure missing from a digest-consistent Lock is refused before import', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
+    delete lock['trustedKdpModuleClosure'];
+    delete lock['closureDigest'];
+    lock['closureDigest'] = digestOf(lock);
+    await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
+    const record = await fixture.readRecord();
+    record['lockDigest'] = lock['closureDigest'];
+    delete record['recordDigest'];
+    record['recordDigest'] = digestOf(record);
+    await fixture.writeRecord(record);
+    const pin = { ...fixture.pin, lockDigest: lock['closureDigest'] as ContentDigest };
+    assertRefused(await boot(pin, fixture.context), 'DH_BOOT_PIN_MISMATCH');
+    sideEffectFree();
+  });
+});
+
 test('pinned entry without the named bootstrap export is DH_BOOT_KDP_ENTRY_INVALID', async (t) => {
   await withFixture(t, async (fixture) => {
     const stub = 'export const notBootstrap = 1;\n';
@@ -171,6 +200,14 @@ test('pinned entry without the named bootstrap export is DH_BOOT_KDP_ENTRY_INVAL
     const lock = JSON.parse(lockBytes.toString('utf8')) as Record<string, unknown>;
     const bootstrapKdpPin = lock['bootstrapKdpPin'] as Record<string, unknown>;
     bootstrapKdpPin['kdpPrimaryDigest'] = stubDigest;
+    // 被测场景是“真实受信字节不再导出 bootstrap”，不是未更新图摘要。
+    const closure = lock['trustedKdpModuleClosure'] as Array<{
+      module: { path: string; digest: ContentDigest };
+    }>;
+    const entry = closure.find((item) => item.module.path === 'dist/index.js');
+    assert.ok(entry);
+    entry.module.digest = stubDigest;
+    (lock['resourceDigests'] as Record<string, ContentDigest>)[`${KDP_PACKAGE_ID}/dist/index.js`] = stubDigest;
     delete lock['closureDigest'];
     lock['closureDigest'] = digestOf(lock);
 
