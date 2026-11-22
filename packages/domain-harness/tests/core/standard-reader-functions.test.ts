@@ -35,3 +35,15 @@ test('R60 W02: YAML aliases, duplicate keys, invalid JSON and wrong format fail 
   assert.equal(tooLarge.kind, 'FAILED');
   assert.equal(tooLarge.failure.code, 'DH_STD_READER_SIZE');
 });
+
+test('R60 W02: separate Standard Reader Element outputs support scalar, array and null JsonValues', async () => {
+  const module = await import(modulePath);
+  assert.deepEqual(module.jsonReader({ format: 'json', source: '42' }),
+    { kind: 'SUCCEEDED', value: 42 });
+  assert.deepEqual(module.jsonReader({ format: 'json', source: '[true,null,"a"]' }),
+    { kind: 'SUCCEEDED', value: [true, null, 'a'] });
+  assert.deepEqual(module.yamlReader({ format: 'yaml', source: '- 1\n- 2\n' }),
+    { kind: 'SUCCEEDED', value: [1, 2] });
+  assert.deepEqual(module.jsonReader({ format: 'json', source: 'null' }),
+    { kind: 'SUCCEEDED', value: null });
+});
