@@ -1,5 +1,7 @@
 # DomainHarness 0.11.x — Standard Element 体系与递增复用规范（R29）
 
+> **【CURRENT · R60 W02】** 原计划 0.11.2 负责 Standard JSON/YAML Reader 已被 Owner 收回至 **0.11.1 [#1656](https://github.com/kaicreator-mm/domain-harness/issues/1656)**；实码候选见 [#1662](https://github.com/kaicreator-mm/domain-harness/pull/1662)，**状态仍为待 CI/独立审核，不等于 Standard Accepted**。仅以两个实际 Consumer 为证，State/Guard/Transition 模板在本版做 `CANDIDATE_NOT_IMPLEMENTED` 的有界不抽取决议，KDP XState 保持唯一 Actor。
+
 > **【R36 当前 Standard Element Package 生成方式】**：Standard Element 也是普通多文件 Domain Package 的内容；可以由 ChatGPT/开发者直接编写 ElementDefinition、Manifest、Function ESM、资源并按 DIS 适用 + v0.11.x 实际合同验证。**不需要 Seed Builder、生成器或额外 Package Assembly 生产阶段**；组合 App 只选择/校验使用的文件、依赖、Target 和 Boot。参见 [R36](../specs/DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)。
 
 
