@@ -2,6 +2,8 @@
 
 纯净 Element-First Git monorepo：内部有 Contracts、私有 Composition 实现 `tooling/build`、Microkernel 和公开 SDK 四个 Workspace；**Consumer 只声明一个公开产品 `@kaicreator/domain-harness`**，通过 `/runtime` 与 `/composition` 使用能力，不能再显式安装独立 BUILD。Domain Package 是可由人工/ChatGPT/Agent 直接编写的合规文件集合，Forge/Generator/独立 Assembly 不是前置。旧版源码只在 Git 历史中。
 
+**统一规范入口**：[模块化规范目录](docs/specs/domain-harness/README.md) · [核心规范](docs/specs/domain-harness/core.md) · [LLM/Agent 规范 Skill](.agents/skills/domain-harness-spec/SKILL.md)。基础设计、实施细节和历史证据按模块分别查阅；Canonical 旧单文件路径只用于跳转。
+
 最低 Node.js 22.12.0。运行 `npm ci && npm run verify`，执行完整的单一 Domain App Demo `examples/basic-domain-app`。
 
 [源码架构与完整调用流程](docs/architecture/DOMAIN_HARNESS_V0110_CODE_AND_CALL_FLOW.md) · [0.11.0 产品 PRD](docs/product/DomainHarness_v0.11.0_ELEMENT_FIRST_PRODUCT_PRD_CANDIDATE.md) · [L2](docs/architecture/DomainHarness_v0.11.0_L2_ARCHITECTURE_CANDIDATE.md) · [TypeScript Skill](.agents/skills/typescript-quality/SKILL.md) · [重构工程经验](docs/engineering/DOMAIN_HARNESS_V0110_REFACTOR_LESSONS.md) · [后续版本防回归手册](docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)
