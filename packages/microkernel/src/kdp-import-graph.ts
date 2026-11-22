@@ -157,7 +157,7 @@ export function inspectKdpHostImports(bytes: Uint8Array, filePath: string): Veri
     }
     if (token.value === 'export') {
       if (tokens[i + 1]?.value !== '*' && tokens[i + 1]?.value !== '{') continue;
-      // export * from 'target', export * as name from 'target', export {name} from 'target'
+      // 导出星号、命名空间及花括号重导出：都必须封存其 from 依赖目标。
       const opening = tokens[i + 1]?.value === '{';
       let depth = 0;
       let seenClose = !opening;
