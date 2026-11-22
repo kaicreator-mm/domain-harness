@@ -184,6 +184,20 @@ export function verifyGeneratedPackageImports(
     }
     const allowed = new Set(consumer.dependsOn.map((dep) => dep.package));
     const inspectModule = (specifier: string, declaration?: ts.ImportDeclaration, dynamic = false): string => {
+      if (specifier === 'yaml') {
+        // Only a selected SDK/Business Package whose own npm manifest declares the
+        // exact reviewed Node profile may use this pinned third-party pure ESM module.
+        // No fallback to an unselected or dynamically resolved external dependency.
+        const json = JSON.parse(Buffer.from(scope.read(ref.packageId, 'package.json')).toString('utf8')) as {
+          readonly dependencies?: Readonly<Record<string, string>>;
+        };
+        if (dynamic || (consumer.layer !== 'business' && consumer.layer !== 'sdk') ||
+            json.dependencies?.yaml !== '2.9.1') {
+          throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+            `Package '${ref.packageId}' imports unapproved external npm capability '${specifier}'`);
+        }
+        return 'node:builtin';
+      }
       if (specifier.startsWith('node:')) {
         if (!SAFE_BUILTINS.has(specifier)) {
           throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',

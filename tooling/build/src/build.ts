@@ -628,6 +628,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
   }
 
   const sealedPackages: SelectedPackage[] = [];
+  let selectedTrustedYaml = false;
   for (const manifest of packagesSorted) {
     const artifactPath = input.packageArtifacts[manifest.id];
     if (!artifactPath) {
@@ -638,6 +639,12 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
     scope.record(manifest.id, artifactPath, digest);
     // 已选 Target 的真实命名导出在 sealedFunctions 构造时逐个检验。
     sealPackageManifest(scope, manifest, manifest.id === kdpId ? input.kdpArtifact.path : undefined);
+    // Read only an already validated Package manifest; the author cannot expand
+    // runtime dependencies without BUILD admitting the exact pinned subset.
+    const npmManifest = JSON.parse(Buffer.from(scope.read(manifest.id, 'package.json')).toString('utf8')) as {
+      readonly dependencies?: Readonly<Record<string, string>>;
+    };
+    if (npmManifest.dependencies?.yaml === '2.9.1') selectedTrustedYaml = true;
     const pair = lifecycle.get(manifest.id)!;
     const initRef = toFunctionRef(pair.init);
     const initSelected = sealedFunctions.find((fn) => canonicalJson(toJson(fn.ref)) === canonicalJson(toJson(initRef)))!;
@@ -693,7 +700,7 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       ...(sealedWorkflows.size > 0
         ? { selectedWorkflows: [...sealedWorkflows.values()].sort((a, b) =>
             workflowKey(a.ref).localeCompare(workflowKey(b.ref))) } : {}),
-      ...(sealedWorkflows.size > 0
+      ...(sealedWorkflows.size > 0 || selectedTrustedYaml
         ? { trustedRuntimeIntegrity: TRUSTED_WORKFLOW_NPM_ARCHIVES.map((item) => ({ ...item })) } : {}),
       coreOrder,
       resourceDigests: scope.toLockMap(),

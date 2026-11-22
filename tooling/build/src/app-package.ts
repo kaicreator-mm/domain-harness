@@ -91,11 +91,22 @@ export function sealPackageManifest(
       }
     }
   }
-  // 组合 App 的 root 已精确列出每个 BUILD 所选 Package。
-  // 任意 Package 自行携带安装依赖（含 file/git/registry/peer/optional）都可能
-  // 在 npm install 时拉入未选定代码并执行其 postinstall，必须在 BUILD 拒绝。
+  // R60 W06: 当前唯一受支持的非 SDK 第三方 npm 依赖子集。
+  // 只允许真实 SDK/Business Package 明确声明精确 yaml@2.9.1，
+  // 同一受审 SHA512/SRI 随 Lock 与可信安装器封存；不接受浮动/其它 npm 库。
+  if (Object.prototype.hasOwnProperty.call(manifest, 'dependencies')) {
+    const deps = manifest.dependencies;
+    if ((pkg.layer !== 'business' && pkg.layer !== 'sdk') ||
+        typeof deps !== 'object' || deps === null || Array.isArray(deps) ||
+        Object.keys(deps).length !== 1 ||
+        (deps as Readonly<Record<string, unknown>>)['yaml'] !== '2.9.1') {
+      throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+        `Package '${pkg.id}' dependencies outside the approved exact yaml@2.9.1 Node ESM subset`);
+    }
+  }
+  // No other install-affecting inputs may enter the selected graph.
   for (const field of [
-    'dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies',
+    'devDependencies', 'optionalDependencies', 'peerDependencies',
     'bundleDependencies', 'bundledDependencies', 'overrides', 'workspaces',
   ] as const) {
     if (Object.prototype.hasOwnProperty.call(manifest, field)) {
@@ -238,7 +249,11 @@ export function composeAppPackage(
   add('dh-install/bootstrap-pin.json', encoded(pin as unknown as JsonValue));
 
   // Domain App 只声明单一 SDK，内部 Contracts/KDP/Workflow 的运行时闭包由 SDK 决定。
-  const needsWorkflowRuntime = (lock.selectedWorkflows?.length ?? 0) > 0;
+  const trustedYaml = lock.selectedPackages.some((pkg) => {
+    const installed = parsePackageJson(scope.read(pkg.packageId, 'package.json'), pkg.packageId);
+    return (installed.dependencies as Readonly<Record<string, unknown>> | undefined)?.['yaml'] === '2.9.1';
+  });
+  const needsWorkflowRuntime = (lock.selectedWorkflows?.length ?? 0) > 0 || trustedYaml;
   if (needsWorkflowRuntime) {
     const pins = TRUSTED_WORKFLOW_NPM_ARCHIVES.map((item) => ({ ...item }));
     if (canonicalJson(lock.trustedRuntimeIntegrity) !==
@@ -258,6 +273,12 @@ export function composeAppPackage(
     throw refusal('DH_BUILD_VERSION_CONFLICT', 'selected Domain Package collides with the sole public SDK');
   }
   dependencies['@kaicreator/domain-harness'] = '0.11.0';
+  if (trustedYaml) {
+    if (Object.prototype.hasOwnProperty.call(dependencies, 'yaml')) {
+      throw refusal('DH_BUILD_VERSION_CONFLICT', 'selected Package id conflicts with pinned third-party yaml');
+    }
+    dependencies['yaml'] = '2.9.1';
+  }
   add('package.json', encoded({
     name: descriptor.id,
     version: descriptor.version,
