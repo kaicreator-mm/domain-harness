@@ -4,7 +4,7 @@
 
 ## 推荐阅读路径
 
-- **任何任务先读**：[核心规范](./core.md)（根原则、状态解释和条款索引）。
+- **任何任务先读**：[核心规范](./core.md)（根原则、状态解释和条款索引，尤其 **CORE-11：生成期负责 Package/Element 正确性、SDK 仅做最后兜底**）。
 - **按实际任务读取对应细节**：参见下面的目录。没有触及的模块不需要全部加载。
 - **设计新功能或审核现有功能**：同时阅读 [实施状态和决策](./status-and-decisions.md)，区分已确认设计与尚未实现的新合同；需要精确 ABI 时再查当前 TypeScript Contracts、版本 Product/L1、L2 和真实 Source SHA。
 - **LLM / Agent**：使用 [domain-harness-spec Skill](../../../.agents/skills/domain-harness-spec/SKILL.md) 作为导航/检查流程；Skill **不复制、不修改**本目录中的规范条款。
