@@ -58,6 +58,20 @@ test('R124 selected KDP Host Init failure cleans up Kernel after entered downstr
     .map((event) => event['package']), ['@fixture/sdk', 'fixture-kernel']);
 });
 
+test('R124 selected Host KDP failure after initial entry performs its Exit even before next Core', async (t) => {
+  await withFixture(t, async (fixture) => {
+    await fixture.writePackageFile('fixture-business', 'dist/index.mjs',
+      Buffer.from('export async function init() { throw new Error("untrusted"); }\n', 'utf8'));
+    const result = await activateSelectedKdpHostInit(fixture.context);
+    assert.equal(result.status, 'FAILED', JSON.stringify(result));
+    assert.equal(events().filter((event) => event['event'] === 'package-init').length, 0,
+      'selected artifacts must be verified before ordinary Package.Init');
+    assert.deepEqual(events().filter((event) => event['event'] === 'package-exit')
+      .map((event) => event['package']), ['fixture-kernel'],
+      'KDP has already been entered by Host and must be the only cleanup');
+  });
+});
+
 test('direct bootstrap on a consistent install boots READY (same trust ladder as Boot)', async (t) => {
   await withFixture(t, async (fixture) => {
     const result = await bootstrap(fixture.context);
