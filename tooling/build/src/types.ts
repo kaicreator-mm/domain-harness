@@ -3,6 +3,7 @@ import type {
   DomainAppLock,
   BuildErrorCode,
   ContentDigest,
+  ResourceRef,
 } from '@kaicreator/domain-harness-contracts';
 
 export interface AppPackageFile {
@@ -46,4 +47,6 @@ export interface BuildInput {
   readonly packageRoots: Readonly<Record<string, string>>;
   readonly packageArtifacts: Readonly<Record<string, string>>;
   readonly kdpArtifact: KdpArtifactInput;
+  /** 生成方已经验证的额外静态依赖资源；App 组合只核对其受选归属与真实字节摘要。 */
+  readonly generatedResources?: readonly ResourceRef[];
 }

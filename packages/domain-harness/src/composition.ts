@@ -1,8 +1,8 @@
 /**
- * DomainHarness SDK 内部的 Package 选择、校验与组合入口。
+ * DomainHarness SDK 的 App 选择、组合与确定性封存入口。
  * 本文件定义稳定公开 TypeScript 类型；发布的 dist/composition.js
  * 由同一仓库的内部组合实现构建并封入 SDK，无任何外部 BUILD 包。
- * 不生成 Domain Package，不引入 Forge 或第二个运行时。
+ * 不生成或静态验证 Domain Package/Element 正确性；生成阶段由实际作者负责。
  */
 import type { BuildErrorCode, ContentDigest } from '@kaicreator/domain-harness-contracts';
 import type { BuildInput, BuildResult } from './composition-types.js';

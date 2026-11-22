@@ -1,11 +1,10 @@
-/** 构建期职责：校验并封存选定的依赖、资源和函数，保证生成确定性 Lock。 */
+/** SDK App 组合入口：消费已合格的 Package，进行选择与确定性封存；不负责源码静态正确性。 */
 import {
   DH_LOCK_SCHEMA_VERSION,
   NODE22_ESM_PROFILE,
   contentDigestOf,
   isRelativeResourcePath,
   isUnknownContentKind,
-  validateDomainDefinition,
   validateElementDefinition,
   type ContentBlock,
   type ContentDigest,
@@ -39,7 +38,6 @@ import { BuildRefusal, refusal } from './refusal.js';
 import { SchemaChecker } from './schema-check.js';
 import { ResourceScope, digestOfBytes } from './resources.js';
 import { compareSemver, kahnTopologicalOrder, satisfiesSemver } from './graph.js';
-import { verifyGeneratedPackageImports, verifyImplementationExport } from './static-package-guard.js';
 import { composeAppPackage, sameAppPackageBytes, sealPackageManifest } from './app-package.js';
 import { TRUSTED_WORKFLOW_NPM_ARCHIVES } from './trusted-runtime.js';
 import { selectWorkflows, workflowKey } from './workflow-selection.js';
@@ -85,10 +83,19 @@ function firstIssue(issues: readonly ValidationIssue[]): ValidationIssue {
 }
 
 
-/** 构建入口只处理已声明的域定义与资源闭包。错误返回稳定拒绝码，不修复输入，也不在运行期重新选择实现。 */
-export function buildApp(input: BuildInput): BuildResult {
+/** 生成期静态验证专用注入点；SDK 发行版不携带其实现。 */
+export type GenerationSourceCheck = (
+  scope: ResourceScope,
+  manifests: readonly DomainPackageManifest[],
+  artifacts: readonly ResourceRef[],
+  functions: readonly SelectedFunction[],
+  elements: readonly LoadedElement[],
+) => void;
+
+/** App 组合：验证选定关系与资源封存一致性；源码正确性由生成期的独立验证工具负责。 */
+export function composeApp(input: BuildInput, generationCheck?: GenerationSourceCheck): BuildResult {
   try {
-    return { ok: true, ...runBuild(input) };
+    return { ok: true, ...runBuild(input, generationCheck) };
   } catch (error) {
     if (error instanceof BuildRefusal) {
       return {
@@ -103,25 +110,12 @@ export function buildApp(input: BuildInput): BuildResult {
 }
 
 /** 依次建立包闭包、Element 所有权和依赖图，校验资源内容后生成确定性 Lock；所有步骤必须先于启动执行。 */
-function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
-  // 第 1 段：先验证 App、Domain 和 Manifest 的机器合同，再允许任何包进入候选池。
+function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): Omit<BuildSuccess, 'ok'> {
+  // 仅核验 App 选型输入与 Manifest 的必要机器结构；独立 Domain 作者正确性归生成期。
   const schemas = new SchemaChecker();
 
   schemas.validateDocument('descriptor', input.descriptor);
   const descriptor = input.descriptor as DomainAppDescriptor;
-
-  for (const [index, domain] of (input.domains ?? []).entries()) {
-    const result = validateDomainDefinition(domain);
-    if (!result.ok) {
-      const issue = firstIssue(result.issues);
-      throw new BuildRefusal(
-        issue.code as BuildErrorCode,
-        `domains[${index}]: ${issue.message}`,
-        issue.path,
-      );
-    }
-    schemas.validateDocument('domain', domain);
-  }
 
   const pool = new Map<string, DomainPackageManifest>();
   for (const [index, candidate] of input.packages.entries()) {
@@ -471,7 +465,6 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       }
     }
     scope.verify(binding.entry.module);
-    verifyImplementationExport(scope, binding.entry, `${resolved.element.def.id}.${resolved.fn.id}`);
     for (const resource of binding.resources ?? []) {
       if (!directExtension(implementor.id, resource.packageId)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
@@ -621,7 +614,16 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
         excludedUnknownContent.push(`${loaded.def.id}/${block.id}`);
         continue;
       }
-      contentDigests.push(validateBlockContent(schemas, loaded, block, scope));
+      if (!('inline' in block.schemaRef)) {
+        if (block.schemaRef.packageId !== loaded.owner.id &&
+            !(dependsOnEdges.get(loaded.owner.id) ?? []).includes(block.schemaRef.packageId)) {
+          throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+            `Element '${loaded.def.id}' uses a content Schema from undeclared Extension '${block.schemaRef.packageId}'`);
+        }
+        // SchemaRef 的选定归属与字节是组合技术合同，业务 Schema 的有效性由生成者证明。
+        scope.verify(block.schemaRef);
+      }
+      contentDigests.push(sealBlockContent(loaded, block, scope));
     }
     if (loaded.def.validation) scope.verify(loaded.def.validation.ref);
     sealedElements.push({
@@ -672,8 +674,9 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       dependsOn: [...(dependsOnEdges.get(manifest.id) ?? [])].sort(),
     });
   }
-  // 对最终选定的 ESM 模块字节做静态检查；依赖无法证明时 BUILD 拒绝。
-  verifyGeneratedPackageImports(scope, packagesSorted, [
+  // 已验证生成者可以注入静态源码检查，检查产生的传递闭包直接封入 Lock。
+  // 发行 SDK 仅接受已提供的正确性结果，不自行引入 JS Parser/第二生成期验证器。
+  const selectedArtifacts = [
     ...sealedPackages.map((pkg) => pkg.artifact),
     ...sealedFunctions.map((fn) => fn.implementation.module),
     ...hookBindings.flatMap((hook) => hook.providers.map((ref) => {
@@ -681,7 +684,16 @@ function runBuild(input: BuildInput): Omit<BuildSuccess, 'ok'> {
       if (!selected) throw refusal('DH_BUILD_IMPLEMENTATION_MISSING', 'Hook provider implementation missing');
       return selected.implementation.module;
     })),
-  ]);
+  ];
+  generationCheck?.(scope, packagesSorted, selectedArtifacts, sealedFunctions, [...elements.values()]);
+  // 若生成者已提交静态闭包资源，SDK 仅对选定 Package 内字节及摘要作封存一致性检查。
+  const allowedResourceOwners = new Set(packagesSorted.map((pkg) => pkg.id));
+  for (const ref of input.generatedResources ?? []) {
+    if (!allowedResourceOwners.has(ref.packageId)) {
+      throw refusal('DH_BUILD_RESOURCE_MISSING', 'generated resource owner is not selected in this App');
+    }
+    scope.verify(ref);
+  }
   const kdpBytes = scope.read(input.kdpArtifact.packageId, input.kdpArtifact.path);
   const kdpDigest = digestOfBytes(kdpBytes);
   scope.record(input.kdpArtifact.packageId, input.kdpArtifact.path, kdpDigest);
@@ -817,8 +829,7 @@ function compareHookBinding(a: SealedHookBinding, b: SealedHookBinding): number 
 }
 
 /** 内容块的内联值与外部资源在解析后应产生同一语义摘要，同时保留原始文件字节校验。 */
-function validateBlockContent(
-  schemas: SchemaChecker,
+function sealBlockContent(
   loaded: LoadedElement,
   block: ContentBlock,
   scope: ResourceScope,
@@ -826,7 +837,6 @@ function validateBlockContent(
   const blockPath = `${loaded.def.id}/${block.id}`;
   if (!block.ref) {
     const value = toJson(block.value);
-    validateAgainstSchema(schemas, scope, block, value, blockPath);
     return contentDigestOf(value);
   }
   const bytes = scope.verify(block.ref);
@@ -843,31 +853,7 @@ function validateBlockContent(
     }
     return block.ref.digest;
   }
-  validateAgainstSchema(schemas, scope, block, parsed, blockPath);
   return contentDigestOf(parsed);
-}
-
-function validateAgainstSchema(
-  schemas: SchemaChecker,
-  scope: ResourceScope,
-  block: ContentBlock,
-  value: JsonValue,
-  blockPath: string,
-): void {
-  const validate =
-    'inline' in block.schemaRef
-      ? schemas.compileInlineSchema(block.schemaRef.inline, `${blockPath}.schemaRef`)
-      : schemas.compileInlineSchema(
-          parseSchemaResource(scope, block.schemaRef, blockPath),
-          `${blockPath}.schemaRef`,
-        );
-  if (!validate(value)) {
-    throw refusal(
-      'DH_BUILD_SCHEMA_INVALID',
-      `content block '${blockPath}' does not pass its declared schema`,
-      blockPath,
-    );
-  }
 }
 
 function parseSchemaResource(
