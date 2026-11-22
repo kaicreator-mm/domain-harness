@@ -30,7 +30,10 @@
     "build": "tsc -p tsconfig.build.json && node ../../scripts/bundle-sdk-composition.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build",
-    "test:typecheck": "tsc -p tsconfig.test.json"
+    "test:typecheck": "tsc -p tsconfig.test.json",
+    "prebuild": "node ../../scripts/generate-sdk-composition-types.mjs",
+    "pretypecheck": "node ../../scripts/generate-sdk-composition-types.mjs",
+    "pretest:typecheck": "node ../../scripts/generate-sdk-composition-types.mjs"
   },
   "dependencies": {
     "@kaicreator/domain-harness-contracts": "0.11.0",

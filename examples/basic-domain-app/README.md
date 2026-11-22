@@ -1,5 +1,8 @@
 # DomainHarness v0.11.0 Basic App — clean packed consumer
 
+> **CURRENT v0.11.1 R60 NOTE**: This v0.11.0-labelled demo name is historical; current public product is one `@kaicreator/domain-harness` SDK with built-in Composition and `/runtime`. Internal Contracts/Microkernel are transitive dependencies, not extra Consumer SDK products. JSON/YAML functions in this v0.11.1 demo are not yet independent Standard Readers; extraction and a second Domain Consumer are owned by [0.11.1 Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656), not 0.11.2.
+
+
 This example is an author-facing, executable proof of the v0.11.0 Element-First SDK. It does not contain another Runtime, Kernel, BUILD, Router, App Init or Effect engine.
 
 ## What the consumer authors

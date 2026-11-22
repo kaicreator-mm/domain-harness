@@ -6,3 +6,7 @@ coverage/
 *.sqlite-shm
 *.sqlite-wal
 .DS_Store
+
+# R60: SDK public type file is generated from tooling/build/src/types.ts.
+packages/domain-harness/src/composition-types.ts
+_tmp/
