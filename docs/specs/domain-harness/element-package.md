@@ -21,7 +21,7 @@
 
 ## 3. Package 内 Element 组织、依赖与选定 — CONFIRMED
 
-1. Package 是按 DIS 适用合同编写的真实文件集合：Manifest、一个或多个 Element Definitions、必要的 Content、源码/Function 实现、Target/Schema/资源及测试。**作者可以是人、ChatGPT、Agent 或未来 Forge**；不需要 Package Generator、Seed Builder、额外 Package Assembly 阶段。
+1. Package 是按 DIS 适用合同编写的真实文件集合：Manifest、一个或多个 Element Definitions、必要的 Content、源码/Function 实现、Target/Schema/资源及测试。**作者可以是人、ChatGPT、Agent 或未来 Forge**；不要求特定 Package 生成器或额外的强制组装阶段。
 2. 一个 Package 可以持有多个 Elements；**当前每个可运行 Package 必须有本 Package 真实拥有的 Init Element**，Exit Element 可缺省，默认为 no-op。因此“理论可以零业务 Function”与“合法可运行 Package 必须有 Init”并不矛盾。
 3. 每个已选 Element 在一份应用 Lock 中只有**唯一规范 Owner Package**；Manifest 的 `elements[]` 记录真实 DefinitionRef、Version、Visibility，跨 Package 只按显式 `imports/exports/provides/contributesTo` 和 `dependsOn` 授权。
 4. **只允许直接声明的 Extension 访问**：A→B→C 时 A 不得因为能调用 B，就直接获得 C 的 Function/Init/资源。传递依赖不能充当直接 Extension，也不能用无约束的句柄透传规避。Hook Provider 同样遵守具体 Owner/FunctionRef/公开接口/基数。
