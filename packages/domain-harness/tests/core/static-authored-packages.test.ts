@@ -187,3 +187,81 @@ for (const name of ['basic', 'extended'] as const) {
         .map((event) => event.packageId), [...expected].reverse());
     });
 }
+
+/** R60 W02：另一真实领域 r41 在 Package.Init 中直接调用已选的公共 Reader Function。 */
+async function r60OtherDomain(t: import('node:test').TestContext): Promise<string> {
+  const source = await mkdtemp(join(tmpdir(), 'dh-r60-second-domain-'));
+  t.after(async () => rm(source, { recursive: true, force: true }));
+  await cp(SOURCE, source, { recursive: true });
+  const businessDir = join(source, 'packages/r41-business');
+  const modulePath = join(businessDir, 'dist/index.mjs');
+  const oldModule = readFileSync(modulePath, 'utf8');
+  const moduleText = `import { jsonReader } from 'r60-standard-readers';\n` +
+    oldModule.replace('  return context.nextCore?.init();', `
+  const readerResult = jsonReader({ format: 'json', source: '{"customer":"r41"}' });
+  if (readerResult.kind !== 'SUCCEEDED' || readerResult.value.customer !== 'r41') {
+    throw new Error('R60 failed to execute selected reader');
+  }
+  globalThis.__dhR41Events.push({ phase: 'standard-reader', packageId: 'r41-business' });
+  return context.nextCore?.init();`);
+  writeFileSync(modulePath, moduleText);
+  const digest = `sha256:${createHash('sha256').update(moduleText).digest('hex')}`;
+  const manifestPath = join(businessDir, 'manifest.json');
+  const manifest = readJson(manifestPath) as DomainPackageManifest;
+  const definition = readJson(join(source, 'packages', STANDARD_READER, 'definitions/reader.json')) as
+    import('@kaicreator/domain-harness-contracts').ElementDefinition;
+  const readerRef = {
+    element: { namespace: 'r60', id: definition.id, version: definition.version,
+      digest: contentDigestOf(definition as unknown as JsonValue) },
+    functionId: 'jsonReader', contractVersion: '1',
+  };
+  const updated: DomainPackageManifest = {
+    ...manifest,
+    dependsOn: [...manifest.dependsOn,
+      { package: STANDARD_READER, version: '1.0.0', interface: 'r60.readers.api' }],
+    imports: [...manifest.imports, readerRef],
+    targetVariants: manifest.targetVariants.map((variant) => ({
+      ...variant, implementations: variant.implementations.map((fn) => ({
+        ...fn, entry: { ...fn.entry, module: { ...fn.entry.module, digest } },
+      })),
+    })),
+  };
+  writeFileSync(manifestPath, canonicalJson(updated as unknown as JsonValue));
+  const appPath = join(source, 'apps/extended.json');
+  const app = readJson(appPath) as DomainAppDescriptor;
+  writeFileSync(appPath, canonicalJson({
+    ...app, extensions: [...app.extensions, { package: STANDARD_READER, version: '1.0.0' }],
+  } as unknown as JsonValue));
+  return source;
+}
+
+test('R60 W02: second domain r41 App boots and actually invokes same ordinary Standard Reader', {
+  timeout: 120_000,
+}, async (t) => {
+  const source = await r60OtherDomain(t);
+  const input = authoredInput('extended', source, true);
+  const built = accepted(input);
+  assert.ok(built.lock.selectedPackages.some((pkg) => pkg.packageId === STANDARD_READER));
+  const selected = built.lock.selectedFunctions.find((fn) =>
+    fn.ref.element.id === 'r60.reader' && fn.ref.functionId === 'jsonReader');
+  assert.ok(selected, 'cross-domain exact Reader FunctionRef selected by BUILD');
+  const result = await installAuthoredApp('extended', t, source, true);
+  assert.equal(result.app.status, 'BOOTED', JSON.stringify(result.app));
+  if (result.app.status !== 'BOOTED') return;
+  assert.equal(result.app.app.status, 'READY');
+  assert.ok((globalThis.__dhR41Events ?? []).some((event) =>
+    event.phase === 'standard-reader' && event.packageId === 'r41-business'),
+  'another bounded domain must run the same Reader Function in its real Init');
+  await result.app.app.dispose();
+});
+
+test('R60 W02: another Domain cannot import unselected or undeclared Standard Reader', async (t) => {
+  const source = await r60OtherDomain(t);
+  const input = authoredInput('extended', source, true);
+  const unimported = buildApp({ ...input, packages: input.packages.map((pkg) =>
+    pkg.id === 'r41-business' ? { ...pkg, imports: [] } : pkg) });
+  assert.equal(unimported.ok, false, 'a public Reader still requires an exact manifest import');
+  const unselected = buildApp({ ...input, packages: input.packages.filter((pkg) =>
+    pkg.id !== STANDARD_READER) });
+  assert.equal(unselected.ok, false, 'omitting a selected Standard Package cannot silently grant access');
+});
