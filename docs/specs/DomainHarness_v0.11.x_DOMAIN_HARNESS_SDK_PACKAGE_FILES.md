@@ -59,7 +59,7 @@ Domain App（宿主 / 业务入口，嵌入 DomainHarness SDK）
 4. **多语言是 DIS/Package 规范的可表达范围**：例如可以存在由 TypeScript/Node 实现的 A Package 与由 Python/Python Runtime 实现的 B Package，也可分别有 Node Domain App 与 Python Domain App；**不能**把这两个不同运行时的 Packages 直接装配进同一个 Domain App。DomainHarness SDK 的**某个实现版本**只须支持其已宣布的语言/运行时，不需实现多语言加载器或通用包管理平台。
 5. **本次 0.11.x 唯一受支持的实现目标仍是 TypeScript 编写、构建为 JavaScript ESM、运行于 Node.js**（当前已实现的 `node22-esm/1` Profile，Node >=22.12.0）。TypeScript 是编写/构建语言，ESM 是编译后执行格式，并非一个 Package 内两种运行时；现存直接编写的 ESM 文件属于这个 Node 执行模型的制品。当前 `TargetSelector`、`DomainPackageManifest`、`DomainAppLock` 与 Schema 只有该 Node ESM 合同，**尚未实现独立的语言身份字段或跨语言同 App 检查**；不能把文档决议冒充已具备跨语言拒绝测试。
 6. **依赖分类保持清晰**：`dependsOn` 指 Domain Package 的显式 API/权限依赖；npm、pip、Cargo 等是各语言环境自身的外部库/工具链依赖。当前只实际使用 Node/npm，BUILD/安装侧确定依赖版本、制品摘要和可复现结果，Boot 不在线解析或选择语言。未来 DIS/Package 规范可增补语言/运行时及原生依赖锁定元数据，但无需在现在创造通用 Resolver、FFI 框架、双 VM 或另一套 Kernel/BUILD/Forge。
-7. **演进边界**：未来确实要支持另一门语言时，独立实现**该语言对应的 Package / Domain App / SDK 适配范围**并建立其执行合同；不放宽单 Package/单 App 单语言单运行时的规范。不为这一未来假设现在修改 v0.11.x 的已验收 Node ESM Manifest、Lock、Boot 或 R45 npm optional-peer 安装工作。
+7. **演进边界**：未来确实要支持另一门语言时，独立实现**该语言对应的 Package / Domain App / SDK 适配范围**并建立其执行合同；不放宽单 Package/单 App 单语言单运行时的规范。不为这一未来假设现在改造 v0.11.x 的已验收 Node ESM Manifest、Lock、Boot 或 R52/R58 单一 SDK 内置 Composition 的当前安装合同。
 
 **结论**：**DIS/Package 标准可跨语言复用；一个具体 Package 和一个具体 Domain App 的执行边界必须同语言、同运行时。跨语言只能通过明确授权的外部进程/服务调用协议衔接，不是 App 内的混合 Package 组合。**
 
