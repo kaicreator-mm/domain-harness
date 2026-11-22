@@ -230,11 +230,11 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
   }
   if (
     lock.bootstrapKdpPin.kdpPackageId !== record.kdpPackageId ||
-    canonicalJson(lock.bootstrapKdpPin.kdpInitFunction as unknown as JsonValue) !==
-      canonicalJson(record.kdpInitFunction as unknown as JsonValue) ||
+    canonicalJson(lock.bootstrapKdpPin.kdpInitFunction) !==
+      canonicalJson(record.kdpInitFunction) ||
     lock.bootstrapKdpPin.invocationAbi !== record.invocationAbi ||
-    canonicalJson(lock.bootstrapKdpPin.kdpInitModule as unknown as JsonValue) !==
-      canonicalJson(record.kdpInitModule as unknown as JsonValue)
+    canonicalJson(lock.bootstrapKdpPin.kdpInitModule) !==
+      canonicalJson(record.kdpInitModule)
   ) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH', 'Lock bootstrapKdpPin disagrees with the installed record') };
   }
@@ -245,19 +245,19 @@ export async function verifyLockAgainstRecord(installRoot: string, record: Insta
   // 可信安装的闭包必须指向同一张机器选定关系图；不能让 Pin 另造 Host Function。
   const initRef = lock.bootstrapKdpPin.kdpInitFunction;
   const matching = lock.selectedFunctions?.filter((candidate) =>
-    canonicalJson(candidate.ref as unknown as JsonValue) === canonicalJson(initRef as unknown as JsonValue));
+    canonicalJson(candidate.ref) === canonicalJson(initRef));
   const target = matching?.[0];
   const selectedElement = lock.selectedElements?.find((candidate) =>
-    canonicalJson(candidate.ref as unknown as JsonValue) === canonicalJson(initRef.element as unknown as JsonValue));
+    canonicalJson(candidate.ref) === canonicalJson(initRef.element));
   if (!Array.isArray(matching) || matching.length !== 1 ||
       initRef.functionId !== 'init' || initRef.contractVersion !== '1' ||
-      canonicalJson(orderZero.init as unknown as JsonValue) !== canonicalJson(initRef.element as unknown as JsonValue) ||
-      canonicalJson(orderZero.initFunction as unknown as JsonValue) !== canonicalJson(initRef as unknown as JsonValue) ||
+      canonicalJson(orderZero.init) !== canonicalJson(initRef.element) ||
+      canonicalJson(orderZero.initFunction) !== canonicalJson(initRef) ||
       selectedElement?.ownerPackageId !== orderZero.packageId ||
       target?.invocationAbi !== 'kdp-host-init/1' ||
       target.implementation.module.packageId !== orderZero.packageId ||
-      canonicalJson(target.implementation.module as unknown as JsonValue) !==
-        canonicalJson(lock.bootstrapKdpPin.kdpInitModule as unknown as JsonValue)) {
+      canonicalJson(target.implementation.module) !==
+        canonicalJson(lock.bootstrapKdpPin.kdpInitModule)) {
     return { ok: false, failure: trustFailure('DH_BOOT_PIN_MISMATCH',
       'Lock selected Kernel Init Function/Target does not exactly match the privileged Host ABI and Order 0 owner') };
   }

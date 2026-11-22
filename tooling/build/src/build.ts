@@ -504,8 +504,8 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
       resources: [...(binding.resources ?? [])],
     } : {
       ref: toFunctionRef(resolved),
-      outcomes: [...resolved.fn.outcomes!],
-      effects: resolved.fn.effects!,
+      outcomes: [...resolved.fn.outcomes],
+      effects: resolved.fn.effects,
       implementation: binding.entry,
       resources: [...(binding.resources ?? [])],
     });

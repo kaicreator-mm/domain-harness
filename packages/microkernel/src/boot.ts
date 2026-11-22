@@ -40,7 +40,7 @@ function readPin(pin: unknown): { pin: BootstrapPin; problems: string[] } {
     if (!isRecord(snapshot['kdpInitFunction'])) problems.push('pin kdpInitFunction must be an object');
     if (snapshot['invocationAbi'] !== 'kdp-host-init/1') problems.push('pin invocationAbi must be kdp-host-init/1');
     if (!isRecord(snapshot['kdpInitModule']) ||
-        !isContentDigest((snapshot['kdpInitModule'] as Record<string, unknown>)['digest'])) {
+        !isContentDigest(snapshot['kdpInitModule']['digest'])) {
       problems.push('pin kdpInitModule must be a valid ResourceRef');
     }
     if (!isContentDigest(snapshot['lockDigest'])) problems.push('pin lockDigest must be sha256:<64 lowercase hex>');
@@ -64,12 +64,12 @@ function checkPinAgainstRecord(pin: BootstrapPin, record: InstalledRecord): stri
   if (pin.kdpPackageId !== record.kdpPackageId) return 'pin kdpPackageId does not equal the installed record';
   if (pin.invocationAbi !== record.invocationAbi) return 'pin Host invocationAbi does not equal the installed record';
   try {
-    if (canonicalJson(pin.kdpInitFunction as unknown as import('@kaicreator/domain-harness-contracts').JsonValue) !==
-        canonicalJson(record.kdpInitFunction as unknown as import('@kaicreator/domain-harness-contracts').JsonValue)) {
+    if (canonicalJson(pin.kdpInitFunction) !==
+        canonicalJson(record.kdpInitFunction)) {
       return 'pin kdpInitFunction does not equal the installed record';
     }
-    if (canonicalJson(pin.kdpInitModule as unknown as import('@kaicreator/domain-harness-contracts').JsonValue) !==
-        canonicalJson(record.kdpInitModule as unknown as import('@kaicreator/domain-harness-contracts').JsonValue)) {
+    if (canonicalJson(pin.kdpInitModule) !==
+        canonicalJson(record.kdpInitModule)) {
       return 'pin kdpInitModule does not equal the installed record';
     }
   } catch {
@@ -114,8 +114,8 @@ export async function boot(pin: BootstrapPin, context: KdpBootstrapContext): Pro
   }
   // Host 只能执行已选 Function/Target 的确定导出名，绝不回退到自由 bootstrap 字符串。
   const selected = trust.value.lock.selectedFunctions.find((candidate) =>
-    canonicalJson(candidate.ref as unknown as import('@kaicreator/domain-harness-contracts').JsonValue) ===
-      canonicalJson(checkedPin.kdpInitFunction as unknown as import('@kaicreator/domain-harness-contracts').JsonValue));
+    canonicalJson(candidate.ref) ===
+      canonicalJson(checkedPin.kdpInitFunction));
   if (!selected || selected.invocationAbi !== 'kdp-host-init/1') {
     return refused('DH_BOOT_PIN_MISMATCH', 'selected Host Function missing privileged machine ABI');
   }
