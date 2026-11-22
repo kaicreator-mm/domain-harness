@@ -196,14 +196,16 @@ async function r60OtherDomain(t: import('node:test').TestContext): Promise<strin
   const businessDir = join(source, 'packages/r41-business');
   const modulePath = join(businessDir, 'dist/index.mjs');
   const oldModule = readFileSync(modulePath, 'utf8');
+  const oldReturn = "  return { status: 'READY' };";
+  assert.ok(oldModule.includes(oldReturn), 'second Domain must preserve real business Init body');
   const moduleText = `import { jsonReader } from 'r60-standard-readers';\n` +
-    oldModule.replace('  return context.nextCore?.init();', `
+    oldModule.replace(oldReturn, `
   const readerResult = jsonReader({ format: 'json', source: '{"customer":"r41"}' });
   if (readerResult.kind !== 'SUCCEEDED' || readerResult.value.customer !== 'r41') {
     throw new Error('R60 failed to execute selected reader');
   }
   globalThis.__dhR41Events.push({ phase: 'standard-reader', packageId: 'r41-business' });
-  return context.nextCore?.init();`);
+  return { status: 'READY' };`);
   writeFileSync(modulePath, moduleText);
   const digest = `sha256:${createHash('sha256').update(moduleText).digest('hex')}`;
   const manifestPath = join(businessDir, 'manifest.json');
