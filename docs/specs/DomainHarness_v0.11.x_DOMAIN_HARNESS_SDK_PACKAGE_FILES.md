@@ -45,6 +45,20 @@ Domain App（宿主 / 业务入口，嵌入 DomainHarness SDK）
 
 这区分两种“合并”：**物理打包/静态链接融合是允许的分发优化**，不要求在运行时分别加载相同物理文件；**把 Kernel 与 SDK 改为同一个 `DomainPackageManifest` 或取消 `kernel|sdk|business` 逻辑边界不是当前要求**，在单一 `layer` 既有合同下仍需单独 L2 决议、正反例和增量审核。即使单一物理 artifact，也必须可审计地映射到多个已选逻辑 Package。
 
+### R48 · 一个 Package 固定一种编程语言与运行时；当前只支持 TypeScript → Node.js ESM
+
+> **Owner R48 对 R47 多语言依赖提案的范围收敛。** 多语言是未来 **不同 Domain Packages 和不同 Domain Apps 可分别采用不同语言实现**，不是要求一个 Domain Package 中提供多套语言实现；现阶段不要求一个 Domain App 内同时运行多种语言。R47 关于不同语言可作为同一 Package 多种 Target Variant 的举例不再作为实施方向。
+
+**Package 边界（确定的产品原则）：**
+- 一个具体 Domain Package **在构建/封存时绑定唯一编程语言和执行运行时**。Package 的所有可执行 Function/Init/Exit 服从该绑定，不允许为同一 Package 在 BUILD/Boot 时根据环境临时切换成另一种编程语言或运行时。编程语言与运行时是两个独立概念：TypeScript 是源语言，现阶段由现有 TypeScript 工具链输出 JavaScript ESM，在 Node.js 中执行；不能把 “TS” 写成 Boot 所加载的另一种 VM。
+- `targetVariants` 可以继续表示**同一语言/运行时**的兼容 Target（例如同一个 Node ESM 模型上的适配），不意味着一个 Manifest 可在 Node/Python/Rust 间切换。未来支持其他语言时，各自以**独立构建并绑定语言/Runtime 的 Package**提供；业务领域可以有采用不同语言实现的不同 Domain App。
+- **当前一个 Domain App 只选定一种主编程语言和运行时**，其直接执行的 KDP、SDK 与 Business Domain Packages 必须与 App 的执行环境兼容。当前唯一实际实现/验收 Profile 仍是 Node 22+ ESM（源码默认 TypeScript，运行的是已构建 ESM），不新增 Python Worker、WASM、Rust 原生 ABI 或通用 Package 启动器。
+- **外部跨语言能力**如确需调用，可以由当前 Node Package **通过现有经授权的 Host/Effect 边界**接入 FFI、子进程或 RPC 等外部服务。它属于外部调用/宿主权限与数据协议，不将另一种语言的实现隐式视为同一个 Package 内第二 Target，也不允许借 FFI 绕过 FunctionRef、显式 Extension、Effect 授权、资源/Target/Lock/Pin 与既有错误处理。当前不新增 FFI 运行框架；是否及如何实现取决于后续实际消费者。
+- 同一 Runtime 下的多 Package 组合继续采用现有 **直接 `dependsOn` / `imports` / `exports` 授权**；npm 等第三方库依赖与 Domain Package 依赖区分。依赖获取和锁定由构建/安装工具负责，Boot **不在线解析、自动下载、升级或选择语言**；锁定的制品和真实依赖仍须满足当前受审的验证边界。
+- **只做最小抽象**：未来 Package 可采用其他语言，因此在设计上保留“源语言、运行时、Target、依赖清单、锁定制品/ABI”的独立概念；**此处不指定尚未验证的新 JSON Schema 字段、依赖管理器插件接口、跨语言 Function ABI 或新增 `ResolvedTargetProfile` 值**。现行 Manifest/Schema/Lock 仍严格只接受已实现的 `runtime='node', module='esm'`。若后续扩展，先用一个真实独立语言 Package/Domain App 实例形成最小字段和拒绝反例，再由对应 Product/L2 确认及审查。
+
+**对 0.11.x 本轮的实际要求：** 在 Node + TypeScript 的既有 SDK/Package、BUILD/Boot/Consumer 上继续开发，不为“将来多语言”改动安全合同或增加跨语言平台。已经进行中的 R45 npm optional Peer / clean-pack 验收保持独立；本 R48 为产品/规范决议，**不是**额外多语言源码能力或 CI 完成声明。
+
 ## 2. Domain Package 的文件构成
 
 最简形式是 **一份规范 Manifest + 必要的 Element Definitions + 被引用的内容/函数实现/资源文件**。根据实际 Package 合同决定文件数量与类型，不规定必须有多少文件、必须使用某个模板目录、必须是工具产物。当前的 `packages/contracts/src/package-manifest.ts::DomainPackageManifest` 已含：
