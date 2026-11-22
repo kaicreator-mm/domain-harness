@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve, basename } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -100,7 +100,7 @@ try {
         res.writeHead(404); res.end('R60 unselected npm name'); return;
       }
       const from = new URL(req.url, upstream);
-      const remote = await fetch(from, { signal: AbortSignal.timeout(30_000) });
+      const remote = await globalThis.fetch(from, { signal: globalThis.AbortSignal.timeout(30_000) });
       res.writeHead(remote.status, { 'content-type': remote.headers.get('content-type') ?? 'application/octet-stream' });
       res.end(Buffer.from(await remote.arrayBuffer()));
     } catch (error) {
