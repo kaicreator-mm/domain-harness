@@ -361,7 +361,7 @@ for (const candidate of [
       "}",
       "",
     ].join('\n'),
-    expectedExits: ['fixture-business', 'fixture-ext', '@fixture/sdk', 'fixture-kernel'],
+    expectedExits: ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-kernel'],
     expectedCode: 'DH_KDP_PACKAGE_LOAD_FAILED',
   },
   {
