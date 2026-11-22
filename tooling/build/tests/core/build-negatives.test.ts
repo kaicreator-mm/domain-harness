@@ -530,6 +530,8 @@ for (const [description, moduleSource] of [
   ['literal dynamic import', 'export async function bootstrap() { return import("./lazy.js"); }'],
   ['nonliteral dynamic import', 'export async function bootstrap(specifier) { return import(specifier); }'],
   ['unsealed CommonJS require', 'export function bootstrap() { return require("./lazy.js"); }'],
+  ['computed global Function loader', 'export function bootstrap() { return globalThis["Function"]("return 1")(); }'],
+  ['indirect constructor loader', 'export function bootstrap() { return ([]).constructor.constructor("return 1")(); }'],
   ['unselected Node builtin', 'import { readFile } from "node:fs"; export function bootstrap() { return readFile; }'],
   ['escaping static dependency', 'export { bootstrap } from "../../unselected.js";'],
   ['unselected SDK subpath', 'export { bootstrap } from "@kaicreator/domain-harness-microkernel/unselected";'],
