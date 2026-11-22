@@ -23,6 +23,41 @@ async function withFixture(
   await run(fixture);
 }
 
+test('R124 selected KDP Host Init creates actual App without invoking a second ordinary Kernel Init', async (t) => {
+  await withFixture(t, async (fixture) => {
+    const result = await activateSelectedKdpHostInit(fixture.context);
+    assert.equal(result.status, 'BOOTED', JSON.stringify(result));
+    if (result.status !== 'BOOTED') return;
+    assert.equal(result.app.status, 'READY');
+    const initiated = events().filter((event) => event['event'] === 'package-init')
+      .map((event) => event['package']);
+    assert.deepEqual(initiated, ['@fixture/sdk', 'fixture-ext', 'fixture-business'],
+      'actual Host KDP.Init must not be invoked through the ordinary Function loader again');
+    await result.app.dispose();
+    const exited = events().filter((event) => event['event'] === 'package-exit')
+      .map((event) => event['package']);
+    assert.deepEqual(exited,
+      ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-kernel'],
+      'selected KDP Exit remains the final teardown');
+  });
+});
+
+test('R124 selected KDP Host Init failure cleans up Kernel after entered downstream Core', async (t) => {
+  const fixture = await buildFixtureInstall({
+    ...DEFAULT_SCENARIO, sdkInitThrow: true,
+  });
+  t.after(async () => fixture.cleanup());
+  const result = await activateSelectedKdpHostInit(fixture.context);
+  assert.equal(result.status, 'FAILED', JSON.stringify(result));
+  if (result.status === 'FAILED') {
+    assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
+  }
+  assert.deepEqual(events().filter((event) => event['event'] === 'package-init')
+    .map((event) => event['package']), ['@fixture/sdk']);
+  assert.deepEqual(events().filter((event) => event['event'] === 'package-exit')
+    .map((event) => event['package']), ['@fixture/sdk', 'fixture-kernel']);
+});
+
 test('direct bootstrap on a consistent install boots READY (same trust ladder as Boot)', async (t) => {
   await withFixture(t, async (fixture) => {
     const result = await bootstrap(fixture.context);
