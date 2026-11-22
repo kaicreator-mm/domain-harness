@@ -12,7 +12,7 @@ export function recognize(input) {
     return unknown('REFERENCE_SCORE_UNKNOWN', 'score not known');
   }
   if (typeof input.region !== 'string' || !/^[A-Z]{2}$/.test(input.region) ||
-      typeof input.asOf !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(input.asOf) ||
+      typeof input.asOf !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(input.asOf) ||
       typeof input.revision !== 'string' || input.revision.length === 0) {
     return unknown('REFERENCE_APPLICABILITY_INPUT_UNKNOWN', 'region/date/revision not known');
   }
