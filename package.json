@@ -15,11 +15,12 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "node scripts/check-source-quality.mjs && eslint .",
-    "test": "npm run test:typecheck --workspaces && node --import tsx --test packages/contracts/tests/core/*.test.ts tooling/build/tests/core/*.test.ts packages/microkernel/tests/core/*.test.ts packages/domain-harness/tests/core/*.test.ts",
+    "test": "npm run test:typecheck --workspaces && node --import tsx --test packages/contracts/tests/core/*.test.ts tooling/build/tests/core/*.test.ts packages/microkernel/tests/core/*.test.ts packages/domain-harness/tests/core/*.test.ts && npm run test:generation",
     "test:demo": "node examples/basic-domain-app/verify-clean-install.mjs && node examples/native-domain-app/main.mjs",
     "verify": "npm run build && npm run typecheck && npm run lint && npm test && npm run test:demo",
     "test:registry": "node scripts/verify-single-sdk-registry-install.mjs",
-    "perf:profile": "node scripts/profile-sdk-entrypoints.mjs"
+    "perf:profile": "node scripts/profile-sdk-entrypoints.mjs",
+    "test:generation": "node --test scripts/tests/native-generation.test.mjs && node scripts/validate-native-generation.mjs --manifest examples/native-domain-app/package.json --core examples/native-domain-app/packages/kdp.mjs --core examples/native-domain-app/packages/business.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
