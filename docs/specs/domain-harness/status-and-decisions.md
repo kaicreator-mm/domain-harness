@@ -29,6 +29,17 @@
 | KDP 独占 XState/Workflow 与业务转发 | SDK Standard Workflow，可供任何业务直接使用 |
 | 给 Agent 的元数据与框架元数据两份 | Metadata 属于代码；Skill+TSDoc 是 Agent 指导 |
 
+## 历史 CORE 条款编号对照（R135 P2-01）
+
+> **禁止无版本地复用 CORE-11/CORE-12 引用。** 旧 R90/R118 与 R134 采用了相同编号但不同内容；旧 Issue/L2/Review 原句仅保留历史含义，不得按新条款解释。
+
+| 旧历史引用及含义 | 现行唯一权威 | 说明 |
+|---|---|---|
+| `CORE-11@R90/R118`：Package/Element 正确性由生成者负责，SDK 仅兜底 | [GEN-02](./composition-trust.md)、[CORE-07](./core.md)、[QA-01](./engineering-quality.md) | **不是**现行 CORE-11；旧链涉及 Pin/Lock 的 runtime fallback 已废止 |
+| `CORE-12@R90/R118`：区分生成、生成期验证、App 组合/封存、编译与运行等阶段 | [core.md 三阶段](./core.md)、[GEN-02..05](./composition-trust.md) | **不是**现行 CORE-12；旧独立 Lock/Pin 封存被静态 npm 组合取代 |
+| `CORE-11@R134+`：单 Package/App 同一语言与 Runtime | [CORE-11](./core.md) | 新编号，只适用于新规范 |
+| `CORE-12@R134+`：Exact-SHA 测试与审查证据 | [CORE-12](./core.md)、[QA-03](./engineering-quality.md) | 新编号，只适用于新规范 |
+
 ## 迁移次序与验收
 
 1. **#1685** 冻结 Canonical Spec + TS Profile + Agent Skill，经独立文档审查。
