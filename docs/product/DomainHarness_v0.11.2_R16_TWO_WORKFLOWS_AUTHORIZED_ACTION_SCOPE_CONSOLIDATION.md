@@ -1,5 +1,8 @@
 # DomainHarness 0.11.2 · R16：Intent 双 Workflow + 合并 Authorized Action 的两层 Domain Intelligence 方案
 
+> **CURRENT PRODUCT/L1 SINGLE CANDIDATE = [R21 consolidated after R20 REWORK](./DomainHarness_v0.11.2_R21_CONSOLIDATED_PRODUCT_L1_AFTER_R20_REWORK.md)**. **R16 的旧外部提交顺序已被 R20 P1-2 证明不安全**：不能在外部 Effect 后才执行投影 CAS。R21 第 5 节先要求权威资源条件提交/互斥准入，再允许互斥 Effect；原 Slice A 全套 SQLite/Vector/Graph/Expression 必选也按 R21 第 4 节统一表裁定。0.11.4 并入 0.11.2 仍待 Owner 正式选择。 R21 仍为 Product/L1 候选、未 Owner 冻结、未实施或运行 CI。\n\n
+
+
 ```ini
 OUTPUT_LABEL=DH_V0112_R16_TWO_WORKFLOWS_KNOWLEDGE_ACTION_SCOPE_CONSOLIDATION
 REPO=kaicreator-mm/domain-harness
