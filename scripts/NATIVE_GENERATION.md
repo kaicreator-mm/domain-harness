@@ -10,6 +10,12 @@ node scripts/validate-native-generation.mjs --manifest examples/native-domain-ap
 
 它只验证此小型静态组合 Profile 的确定条件；正式领域 Function 的 DIS 业务合同、行为、TypeScript 类型、外部真实 npm 安装与版本交付证据仍由生成者分别完成，并不因此被自动标记 PASS。
 
-纯静态依赖闭包才可得到 `GEN_VALIDATED`；出现运行时计算的导入时工具报告 `manualReviewPackages`，CLI 返回非零退出码，不将无法静态证明的依赖冒称通过。作者可采用项目适用的 npm/TypeScript/ESLint 工具和代码审查补足证据，这不是一套 JS 语法白名单。
+仅对显式传入的 Core 入口文件中已覆盖的静态条件才可得到 `GEN_VALIDATED`；这**不代表全 App 依赖闭包完整通过**；出现运行时计算的导入时工具报告 `manualReviewPackages`，CLI 返回非零退出码，不将无法静态证明的依赖冒称通过。作者可采用项目适用的 npm/TypeScript/ESLint 工具和代码审查补足证据，这不是一套 JS 语法白名单。
 
 对执行元数据要求纯字面量语义，不允许重复字段、展开或 getter 覆盖 Order；普通 TypeScript 的 `as const`、`satisfies` 及括号表达式合法。检查 `.ts/.mts/.cts` 使用 TypeScript AST，不据此限制普通业务 Class/Function 使用标准语言特性。
+
+## R149 限定静态保证
+
+元数据必须由 `export const packageMeta` 的直接字面量提供。验证器拒绝明显的直接属性赋值、重新赋值、`Object.assign` 改写与非常量绑定；发现简单别名时要求作者复核（`GEN_PARTIAL_REVIEW_REQUIRED`），不将无法证明的动态 Order 冒称确定。此工具**不是通用 JS/TS 数据流证明器**，更不在 SDK Runtime 重做正确性检查。
+
+`import type`、纯 `type` 重导出可使用直接声明的 `devDependencies`；值导入仍需直接运行依赖。相对导入只确认实际文件，TS NodeNext 明确扩展名的 `.js → .ts/.tsx`、`.mjs → .mts`、`.cjs → .cts` 允许源码验证；不是完整 TypeScript 编译器或全图 npm Resolver。对于其他未遍历文件的依赖行为，生成者继续用项目 Typecheck、ESLint 和实际 App 测试验证。

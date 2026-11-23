@@ -104,3 +104,65 @@ test('TypeScript 原生 as const satisfies PackageMeta 可静态解析', () => {
     });
   });
 });
+
+test('R149 P1：直接写入、let 绑定和 Object.assign 不再伪报静态 Order', () => {
+  for (const business of [
+    "export let packageMeta={id:'business',role:'core',order:2};",
+    "export const packageMeta={id:'business',role:'core',order:2}; packageMeta.order=0;",
+    "export const packageMeta={id:'business',role:'core',order:2}; packageMeta['order']=0;",
+    "export const packageMeta={id:'business',role:'core',order:2}; Object.assign(packageMeta,{order:0});",
+  ]) {
+    runCase({business}, x => assert.throws(() =>
+      validateNativeApp(x.manifest,[x.kdp,x.business]), /GEN_(?:MUTABLE|MUTATED)_METADATA/u));
+  }
+});
+
+test('R149 P1：元数据直接别名须非 PASS，保持原生语言能力', () => {
+  runCase({business:"export const packageMeta={id:'business',role:'core',order:2}; const same=packageMeta; same.order=0;"},
+    x => {
+      const result=validateNativeApp(x.manifest,[x.kdp,x.business]);
+      assert.deepEqual(result.manualReviewPackages,['business']);
+    });
+});
+
+test('R149 P1：TypeScript 纯类型依赖允许 devDependencies，值导入必须直接依赖', () => {
+  runCase({}, x => {
+    writeFileSync(x.manifest,JSON.stringify({
+      dependencies:{'@kaicreator/domain-harness':'0.11.1'},
+      devDependencies:{'types-only':'1.0.0'},
+    }));
+    const core=join(x.root,'packages/business.mts');
+    const metadata="export const packageMeta={id:'business',role:'core',order:2} as const;\\n";
+    writeFileSync(core,
+      "import type { Foo } from 'types-only';\\nexport type {Foo} from 'types-only';\\n"+metadata);
+    assert.equal(validateNativeApp(x.manifest,[x.kdp,core]).checked,2);
+    writeFileSync(core,
+      "import { type Foo } from 'types-only';\\n"+metadata);
+    assert.equal(validateNativeApp(x.manifest,[x.kdp,core]).checked,2);
+    writeFileSync(core,
+      "import { type Foo, realValue } from 'types-only';\\n"+metadata);
+    assert.throws(() => validateNativeApp(x.manifest,[x.kdp,core]),
+      /GEN_UNDECLARED_DIRECT_DEPENDENCY/u);
+    writeFileSync(core,
+      "import { realValue } from 'types-only';\\n"+metadata);
+    assert.throws(() => validateNativeApp(x.manifest,[x.kdp,core]),
+      /GEN_UNDECLARED_DIRECT_DEPENDENCY/u);
+  });
+});
+
+test('R149 P2：相对目录不是有效模块，NodeNext TS 源码 .js 输出映射可检查', () => {
+  runCase({}, x => {
+    const dir=join(x.root,'packages/helper-dir');
+    mkdirSync(dir);
+    writeFileSync(x.business,
+      "import './helper-dir'; export const packageMeta={id:'business',role:'core',order:2};");
+    assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),
+      /GEN_MISSING_DIRECT_IMPORT/u);
+
+    const core=join(x.root,'packages/business.mts');
+    writeFileSync(join(x.root,'packages/helper.ts'),'export const answer=42;');
+    writeFileSync(core,
+      "import './helper.js'; export const packageMeta={id:'business',role:'core',order:2} as const;");
+    assert.equal(validateNativeApp(x.manifest,[x.kdp,core]).checked,2);
+  });
+});
