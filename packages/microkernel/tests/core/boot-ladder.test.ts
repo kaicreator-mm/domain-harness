@@ -307,8 +307,13 @@ for (const shadowKind of ['packages-parent', 'kdp-private'] as const) {
 
 /** 修改真正受选 KDP Host ESM 后，Lock/Record/Pin 三方使用同一真实新字节摘要。 */
 async function resealKdpHostEntry(fixture: FixtureInstall, source: string): Promise<BootstrapPin> {
+  // 先把被替换前的真实引擎 bundle 保存在 KDP 包私有文件内并同样封存，
+  // 供“委托后抛出”候选在引擎真实激活之后模拟 Host 级失败。
+  const originalEntry = await fixture.readKdpEntryBytes();
+  await fixture.writePackageFile(KDP_PACKAGE_ID, 'dist/engine-real.mjs', originalEntry);
   await fixture.writeKdpEntryBytes(Buffer.from(source, 'utf8'));
   const digest = `sha256:${createHash('sha256').update(source, 'utf8').digest('hex')}` as ContentDigest;
+  const engineDigest = `sha256:${createHash('sha256').update(originalEntry).digest('hex')}` as ContentDigest;
   const lock = JSON.parse((await fixture.readLockBytes()).toString('utf8')) as Record<string, unknown>;
   const selection = lock['selectedKdpHost'] as Record<string, unknown>;
   const module = selection['kdpInitModule'] as Record<string, unknown>;
@@ -317,6 +322,7 @@ async function resealKdpHostEntry(fixture: FixtureInstall, source: string): Prom
   const host = functions.find((fn) => fn['invocationAbi'] === 'kdp-host-init/1')!;
   ((host['implementation'] as Record<string, unknown>)['module'] as Record<string, unknown>)['digest'] = digest;
   (lock['resourceDigests'] as Record<string, unknown>)[`${KDP_PACKAGE_ID}/dist/index.js`] = digest;
+  (lock['resourceDigests'] as Record<string, unknown>)[`${KDP_PACKAGE_ID}/dist/engine-real.mjs`] = engineDigest;
   delete lock['closureDigest'];
   lock['closureDigest'] = digestOf(lock);
 
@@ -354,10 +360,14 @@ for (const candidate of [
   {
     name: 'post-delegation throw',
     source: [
-      "import { activateSelectedKdpHostInit } from '@kaicreator/domain-harness-microkernel';",
+      // 引擎已在包内真实激活（已登记一次性 Exit 责任）后，Host 入口自身抛出。
       "export async function init(context) {",
-      "  await activateSelectedKdpHostInit(context);",
-      "  throw new Error('TOKEN_SECRET_CANARY_8029');",
+      "  const engine = await import('./engine-real.mjs');",
+      "  const result = await engine.init(context);",
+      "  if (result && result.status === 'BOOTED') {",
+      "    throw new Error('TOKEN_SECRET_CANARY_8029');",
+      "  }",
+      "  return result;",
       "}",
       "",
     ].join('\n'),

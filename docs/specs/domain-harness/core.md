@@ -13,7 +13,7 @@
 | CORE-01 | DomainHarness 是嵌入式 SDK；消费者仅需一个公开 SDK 产品 | [§1](./core.md)、[§6](./composition-trust.md) |
 | CORE-02 | Domain Package 是可直接编写的文件集合，作者工具/Forge/额外组合服务非必需 | [§3](./element-package.md)、[§6](./composition-trust.md) |
 | CORE-03 | 可执行能力属于真实 Package + 内聚 Element；普通源码 helper 不必逐个 Element 化 | [§2–§3](./element-package.md)、[§A](./architecture.md) |
-| CORE-04 | 唯一最小可信 Boot → 唯一真正 KDP.Init；不得有第二 Kernel 或第二 App Init | [§A/§5](./architecture.md)（当前实现仍 MIGRATION_REQUIRED） |
+| CORE-04 | 唯一最小可信 Boot → 唯一真正 KDP.Init；不得有第二 Kernel 或第二 App Init | [§A/§5](./architecture.md)（R130 源码已实施交付，待独立验收） |
 | CORE-05 | 单轮 Core.Order/显式直接 Extension Init；退出按真实进入逆序可选 Exit | [§4](./lifecycle-workflow.md) |
 | CORE-06 | 生成期独立保证正确性；App 组合期选择并封存 Lock/Pin；运行期不得重新选型或越权 | [§6/§13.4](./composition-trust.md) |
 | CORE-07 | Package 身份、Element/FunctionRef、Namespace、Target、Digest 独立；统一稳定语义命名 | [§7/§13.1–2](./identity-naming.md)（命名迁移待实现） |

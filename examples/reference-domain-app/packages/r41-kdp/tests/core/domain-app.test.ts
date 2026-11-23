@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { DomainApp, FunctionRef } from '@kaicreator/domain-harness-contracts';
 import { PackageSystem } from '../../src/package-system.js';
 import { normalizeOutcome } from '../../src/selected-function.js';
-import { boot, buildFixtureInstall, events, type FixtureScenario, type FixtureInstall } from './helpers/install.js';
+import { boot, buildFixtureInstall, events, type FixtureScenario, type FixtureInstall } from '../../../../../../packages/microkernel/tests/core/helpers/install.js';
 
 async function fixtureFor(t: import('node:test').TestContext, scenario: FixtureScenario): Promise<FixtureInstall> {
   const fixture = await buildFixtureInstall(scenario);

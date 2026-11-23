@@ -1,0 +1,9 @@
+{
+  "kind": "Element",
+  "schemaVersion": "dh.element/0.11",
+  "id": "r41.appLifecycle",
+  "version": "1.0.0",
+  "description": "R41 KDP-owned DomainApp and process lifecycle: in-process App handle, once-only dispose and the bounded Node process Exit handoff live in this Package's private sources.",
+  "content": [],
+  "functions": []
+}

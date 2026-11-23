@@ -4,12 +4,12 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import type { BootResult } from '@kaicreator/domain-harness-contracts';
 import { PackageSystem } from '../../src/package-system.js';
-import { validateBusinessCoreResults } from '../../src/kdp.js';
+import { validateBusinessCoreResults } from '../../src/kernel-lifecycle.js';
 import { splitResourceKey } from '../../src/paths.js';
 import {
   boot, buildFixtureInstall, events,
   type FixtureInstall, type FixtureScenario,
-} from './helpers/install.js';
+} from '../../../../../../packages/microkernel/tests/core/helpers/install.js';
 
 const EXIT_ORDER = ['fixture-ext', 'fixture-business', '@fixture/sdk', 'fixture-kernel'];
 const appCtx = (fixture: FixtureInstall) => ({

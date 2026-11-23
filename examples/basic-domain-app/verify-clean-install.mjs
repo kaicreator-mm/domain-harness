@@ -218,7 +218,8 @@ const packages = [
   {
     dir: 'packages/microkernel', name: '@kaicreator/domain-harness-microkernel',
     root: { types: './dist/index.d.ts', import: './dist/index.js' },
-    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0', xstate: '5.33.2', yaml: '2.9.1' },
+    // 引擎归属重构后本包只承载最小可信 Boot；XState 由受选 KDP 包自带闭包提供。
+    dependencies: { '@kaicreator/domain-harness-contracts': '0.11.0' },
   },
 ];
 
@@ -259,7 +260,12 @@ try {
   record('consumer.install', { exit: install.status, signal: install.signal, registry });
   if (install.error || install.status !== 0) throw new Error(`external install failed\n${install.stdout}\n${install.stderr}`);
   npm(['ls', '--json'], consumerRoot, 'consumer.ls');
-  npm(['ls', 'xstate', 'yaml', '--json'], consumerRoot, 'consumer.workflow-runtime-ls');
+  // 引擎归属重构后，公开 SDK 不再携带第三方运行时依赖：XState 由受选 KDP 包的
+  // 自含闭包提供，yaml 只属于选择了 Standard Reader 的具体 App（受控安装器验证）。
+  for (const name of ['xstate', 'yaml']) {
+    assert.equal(existsSync(join(consumerRoot, 'node_modules', name)), false,
+      `SDK-only consumer must not carry engine runtime dependency '${name}'`);
+  }
   assertInstalledRealpaths(tarballMembers);
   // 单一 SDK 自身交付运行和组合，不允许额外独立 BUILD、TS/Ajv 的外部安装。
   for (const name of ['@kaicreator/domain-harness-build', 'typescript', 'ajv']) {
@@ -318,6 +324,14 @@ assert.equal(typeof BuildRefusal, 'function');
   cpSync(standardReaderSource, standardReaderConsumer, { recursive: true });
   assert.ok(existsSync(join(standardReaderConsumer, 'manifest.json')));
   record('standard-reader.external-real-package', { imported: true, packageCount: 1 });
+  // R130：同一原则适用于真实 KDP 引擎闭包——外部 Consumer 携带真实 r41-kdp 包源，
+  // 不在临时环境中隐式回读 SDK 仓库。
+  const kdpEngineSource = join(repoRoot, 'examples/reference-domain-app/packages/r41-kdp');
+  const kdpEngineConsumer = join(consumerRoot, '..', 'reference-domain-app', 'packages', 'r41-kdp');
+  mkdirSync(dirname(kdpEngineConsumer), { recursive: true });
+  cpSync(kdpEngineSource, kdpEngineConsumer, { recursive: true });
+  assert.ok(existsSync(join(kdpEngineConsumer, 'dist', 'index.mjs')));
+  record('kdp-engine.external-real-package', { imported: true, packageCount: 1 });
   const consumerEvidence = join(evidenceDir, 'consumer');
   mkdirSync(consumerEvidence, { recursive: true });
   const child = spawnSync(process.execPath, ['consumer.mjs'], {

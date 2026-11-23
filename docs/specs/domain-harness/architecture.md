@@ -4,7 +4,7 @@
 > **状态**：`CONFIRMED`=已确定原则；`MIGRATION_REQUIRED`=目标明确但机器合同/源码未迁移；`CANDIDATE`=待决策。不得从规范条款推导源码或 CI 已 PASS。
 > **条款编号**：保留原 R90 单文件规范的编号以便 GitHub Issue、Review 和旧链接溯源；跨文件引用以目录索引为准。
 
-本模块定义系统拓扑、依赖方向、可信边界和架构审核不变量。当前 KDP 实现所有权和 Boot 单委托是 #1668 的 MIGRATION_REQUIRED，不是已经通过的源码事实。
+本模块定义系统拓扑、依赖方向、可信边界和架构审核不变量。Foundation A6/R130 已把真实引擎归属迁移为源码实现（真实 KDP Package 私有闭包承载 PackageSystem/Workflow/App/Exit，SDK 仅保留最小可信 Boot），该实现以未合并 PR 交付、仍待独立审核与 Exact-SHA CI，不构成已接受的源码事实；权威验收状态以 #1668/#1682 为准。
 
 ## A. 统一架构蓝图与模块责任（Architecture Blueprint）
 
@@ -140,7 +140,7 @@ SDK 产品层：唯一 @kaicreator/domain-harness（作者期 + 运行期入口�
 
 **严格 Boot 禁区**：遍历业务 Package DAG、创建 PackageSystem、运行 Workflow/Actor/Task、解释规则、裁定 READY/DEGRADED/BLOCKED/FAILED、业务 Function 路由、执行业务 Init、调用第二次 App Init、组织 Exit、运行时重新生成 App 或静态验证，**以及每次启动重新解析选定 JavaScript/ESM 源码、推导静态导入图或验证 Package/Element 正确性**。仅保留受信锚、身份、Pin/Lock 和必要字节完整性的最小核验。
 
-**当前具体差距（MIGRATION_REQUIRED，按切面拆分）**：#1681 的 R127 候选源码将参考 KDP 的 re-export `bootstrap.js` 删除并换为由自身 `dist/index.mjs` 直接持有的 `init` Target，Boot 依据唯一 Host FunctionRef 调用；此切片还需要独立审核与版本分支集成。真正的 PackageSystem/Actor 代码仍位于 `packages/microkernel/src/*` 物理 SDK 模块，必须继续核查与迁移至真实 KDP Package/Element 的实现所有权；不能用“调用了 KDP-owned 入口”冒充全部私有 Runtime 都归属 KDP。任何 KDP 入口在 Boot 核验安装信任、Lock/Pin/Target 与字节前均不得 import/执行。
+**当前状态（源码已交付，验收未完成）**：R127/#1681 已接受 Host ABI 单入口；R130/#1682 已把 PackageSystem、Workflow/XState、DomainApp 与 Exit 编排整体迁移进真实 KDP Package（`examples/*/packages/r41-kdp`）的私有源码与已 bundle 的受选 Target 闭包，SDK `packages/microkernel` 仅保留 `boot.ts`/`verify.ts`/`paths.ts` 的最小可信 Boot 面与一次性退出栅栏；生成期静态准入按受信 Kernel Profile 分别定义（引擎装载器的摘要钉选动态加载、JSON 原型完整性检查与进程生命周期为 Kernel 物理职责，require/eval/Function/Reflect 等求值向量与裸 npm 能力仍一律拒绝）。该实现以未合并 PR 交付，仍需独立非 Writer 审核、Exact-SHA CI 与 #1668 A6/A7 验收；不得以本段文字冒充 ACCEPTED。任何 KDP 入口在 Boot 核验安装信任、Lock/Pin/Target 与字节前均不得 import/执行。
 
 ### 5.1 单一受选 KDP Host 机器合同（R127 目标；验收仍需 Exact-SHA 独审）
 

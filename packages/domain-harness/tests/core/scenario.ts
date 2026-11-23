@@ -29,8 +29,9 @@ import type { BuildInput, BuildFailure } from '@kaicreator/domain-harness';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MICROKERNEL_DIR = join(HERE, '../../../microkernel');
 const CONTRACTS_DIR = join(HERE, '../../../contracts');
-const XSTATE_DIR = dirname(fileURLToPath(import.meta.resolve('xstate/package.json')));
-const YAML_DIR = dirname(fileURLToPath(import.meta.resolve('yaml/package.json')));
+// 受选 KDP Host Target 直接承载真实 r41-kdp 引擎闭包（Foundation A6/R130）；
+// 引擎已自含 XState，安装器不再需要复制第三方 xstate/yaml 目录。
+const KDP_ENGINE_BUNDLE = join(HERE, '../../../../examples/reference-domain-app/packages/r41-kdp/dist/index.mjs');
 const MICROKERNEL_PACKAGE_ID = '@kaicreator/domain-harness-microkernel';
 const KDP_PACKAGE_ID = 'kdp-kernel';
 const TARGET_SELECTOR = { runtime: 'node', module: 'esm', nodeMajor: 22 } as const;
@@ -303,15 +304,18 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
     const businessModule = await write(businessDir, 'dist/business.mjs', businessArtifactModuleSource());
     const evaluateModule = await write(businessDir, 'dist/evaluate.mjs', businessEntryModuleSource(scenario));
     const extModule = await write(extDir, 'dist/index.mjs', extensionModuleSource());
+    // 受选 Host Target = 真实引擎 bundle；dist/index.js 只是本夹具的可观测桥，
+    // 引擎（PackageSystem/Workflow/App/Exit）在 KDP 包私有文件内执行。
+    await writeFile(join(kernelDir, 'dist', 'engine.mjs'), await readFile(KDP_ENGINE_BUNDLE));
     await write(
       kernelDir,
       'dist/index.js',
       [
-        `import { activateSelectedKdpHostInit } from '${MICROKERNEL_PACKAGE_ID}';`,
+        "import { init as kernelInit } from './engine.mjs';",
         "const events = (globalThis.__domainHarnessT04Events ??= []);",
         "export async function init(context) {",
         "  events.push({ event: 'package-init', package: 'kdp-kernel' });",
-        "  return activateSelectedKdpHostInit(context);",
+        "  return kernelInit(context);",
         "}",
         "",
       ].join('\n'),
@@ -531,6 +535,12 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
         'kdp-kernel': 'dist/index.mjs',
         'orders-ext': 'dist/index.mjs',
       },
+      // KDP 包私有引擎闭包文件必须进入封存资源，安装包才会物化 engine.mjs。
+      generatedResources: [{
+        packageId: 'kdp-kernel',
+        path: 'dist/engine.mjs',
+        digest: `sha256:${createHash('sha256').update(await readFile(KDP_ENGINE_BUNDLE)).digest('hex')}`,
+      }],
     };
 
     const built = await buildApp(input);
@@ -572,8 +582,6 @@ export async function buildScenarioInstall(scenario: T04Scenario): Promise<T04In
       }),
     );
     await cp(join(CONTRACTS_DIR, 'dist'), join(contractsInstallDir, 'dist'), { recursive: true });
-    await copyPackage('xstate', XSTATE_DIR);
-    await copyPackage('yaml', YAML_DIR);
 
     await write(installRoot, DESCRIPTOR_RELATIVE_PATH, canonicalJson(descriptor as unknown as JsonValue));
     await mkdir(join(installRoot, 'dh-lock'), { recursive: true });

@@ -8,14 +8,44 @@
   "order": 0,
   "elements": [
     {
-      "id": "r41.kdp",
+      "id": "r41.kernelLifecycle",
       "version": "1.0.0",
       "definitionRef": {
         "packageId": "r41-kdp",
-        "path": "definitions/lifecycle.json",
-        "digest": "sha256:0ae60f299fae639941ee9326f8583085e5986832523fec86e72d4e43d7e647a4"
+        "path": "definitions/kernel-lifecycle.json",
+        "digest": "sha256:a755a43b4dccd5d5cb42615a7d5e9691897f36dbab2bf19676934f272805c798"
       },
       "visibility": "public"
+    },
+    {
+      "id": "r41.kernelRuntime",
+      "version": "1.0.0",
+      "definitionRef": {
+        "packageId": "r41-kdp",
+        "path": "definitions/kernel-runtime.json",
+        "digest": "sha256:780278414972242fc6846451a3e5c8e84f83bb44d6afe9182737936b3669f721"
+      },
+      "visibility": "private"
+    },
+    {
+      "id": "r41.workflowRuntime",
+      "version": "1.0.0",
+      "definitionRef": {
+        "packageId": "r41-kdp",
+        "path": "definitions/workflow-runtime.json",
+        "digest": "sha256:c3c97c1613bc63a5336635d8bcd0d847e3f310834980f490fb172b37e2ed21a0"
+      },
+      "visibility": "private"
+    },
+    {
+      "id": "r41.appLifecycle",
+      "version": "1.0.0",
+      "definitionRef": {
+        "packageId": "r41-kdp",
+        "path": "definitions/app-lifecycle.json",
+        "digest": "sha256:c5f3fcf0fe860847105eeb1f08e4846be1a0bec794847a2cde62af4353864170"
+      },
+      "visibility": "private"
     }
   ],
   "dependsOn": [],
@@ -35,28 +65,28 @@
       },
       "implementations": [
         {
-          "elementId": "r41.kdp",
+          "elementId": "r41.kernelLifecycle",
           "functionId": "init",
           "contractVersion": "1",
           "entry": {
             "module": {
               "packageId": "r41-kdp",
               "path": "dist/index.mjs",
-              "digest": "sha256:81a30fedc1e198abfd127325ccb13df1e269d12c449c09cd6cc687aae2420f62"
+              "digest": "sha256:341098676dd65c84a3d9265ecf2520e93c1fa1a8009f8f18c1ed88ebdbaadbc7"
             },
             "exportName": "init"
           },
           "invocationAbi": "kdp-host-init/1"
         },
         {
-          "elementId": "r41.kdp",
+          "elementId": "r41.kernelLifecycle",
           "functionId": "exit",
           "contractVersion": "1",
           "entry": {
             "module": {
               "packageId": "r41-kdp",
               "path": "dist/index.mjs",
-              "digest": "sha256:81a30fedc1e198abfd127325ccb13df1e269d12c449c09cd6cc687aae2420f62"
+              "digest": "sha256:341098676dd65c84a3d9265ecf2520e93c1fa1a8009f8f18c1ed88ebdbaadbc7"
             },
             "exportName": "exit"
           }
@@ -66,14 +96,14 @@
   ],
   "init": {
     "namespace": "r41",
-    "id": "r41.kdp",
+    "id": "r41.kernelLifecycle",
     "version": "1.0.0",
-    "digest": "sha256:eb4f9493aa848a45a549a84e86738afec1444a5cb12eed74f4e15cf9d251def8"
+    "digest": "sha256:06e4dc68c657ab6b7a3dcc9f15ef743d1ecdefe78abf4db4c94e1b9a5f2e654c"
   },
   "exit": {
     "namespace": "r41",
-    "id": "r41.kdp",
+    "id": "r41.kernelLifecycle",
     "version": "1.0.0",
-    "digest": "sha256:eb4f9493aa848a45a549a84e86738afec1444a5cb12eed74f4e15cf9d251def8"
+    "digest": "sha256:06e4dc68c657ab6b7a3dcc9f15ef743d1ecdefe78abf4db4c94e1b9a5f2e654c"
   }
 }

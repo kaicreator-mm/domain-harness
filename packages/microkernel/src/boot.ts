@@ -1,16 +1,34 @@
-// 当前唯一 KDP：Boot 验证选定资源，初始化 Package 后才开放业务入口。
+// 当前唯一 KDP：Boot 验证选定资源，单次调用真实 KDP Host Init。
+// Foundation A6/R130：Boot 是唯一极薄可信入口——安装记录、Pin/Lock、Target 与
+// KDP 入口字节全部在导入前核验；PackageSystem、Workflow、DomainApp 与 Exit 编排
+// 均由受选 KDP Package 私有代码执行，SDK 不再保留第二条 Kernel 执行路径。
+import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { DH_PIN_SCHEMA_VERSION, canonicalJson, isContentDigest } from '@kaicreator/domain-harness-contracts';
+import {
+  DH_KDP_HOST_EXIT_FENCE_KEY,
+  DH_PIN_SCHEMA_VERSION,
+  canonicalJson,
+  isContentDigest,
+} from '@kaicreator/domain-harness-contracts';
 import type {
   BootResult,
   BootstrapPin,
+  DomainAppLock,
   InstalledRecord,
   KdpBootstrapContext,
+  KdpHostExitFence,
   KdpPrimary,
   BootErrorCode,
 } from '@kaicreator/domain-harness-contracts';
-import { isRecord, normalizeBootstrapContext, readTrustedRecord, verifyContextPaths, verifyInstallTrust } from './verify.js';
-import { createKdpHostCallFence } from './kdp.js';
+import {
+  bytesContentDigest,
+  isRecord,
+  normalizeBootstrapContext,
+  readTrustedRecord,
+  verifyContextPaths,
+  verifyInstallTrust,
+} from './verify.js';
+import { resolvePackageFile } from './paths.js';
 
 function refused(code: BootErrorCode, reason: string): BootResult {
   return { status: 'REFUSED', code, reason };
@@ -79,6 +97,95 @@ function checkPinAgainstRecord(pin: BootstrapPin, record: InstalledRecord): stri
   if (pin.lockDigest !== record.lockDigest) return 'pin lockDigest does not equal the installed record';
   if (pin.lockPath !== record.lockPath) return 'pin lockPath does not equal the installed record';
   return null;
+}
+
+
+/**
+ * 内部 Host Exit 交接：Boot 只持有一次性清理句柄，真正的逆序 Exit 责任由 KDP
+ * 引擎通过栅栏登记。引擎未登记（委托前抛出）时，先复核安装信任，再直接调用
+ * 受选 KDP 自己的 Exit Element 一次——不重建 PackageSystem，不加载未验证代码。
+ * 交接键是 Contracts 常量字符串并以非枚举只读属性携带，跨 npm file: 安装的
+ * 模块副本语义一致；这不是公开 Domain Package Function API。
+ */
+type HostExit = () => Promise<void>;
+export function createKdpHostCallFence(context: KdpBootstrapContext): {
+  readonly context: KdpBootstrapContext;
+  cleanup(): Promise<'DONE' | 'UNSAFE' | 'FAILED'>;
+} {
+  let exit: HostExit | undefined;
+  let cleanupFlight: Promise<'DONE' | 'UNSAFE' | 'FAILED'> | undefined;
+  const registration: KdpHostExitFence = {
+    registerExit(selectedExit): void {
+      if (exit === undefined) exit = selectedExit;
+    },
+  };
+  const boundContext = Object.defineProperty({ ...context }, DH_KDP_HOST_EXIT_FENCE_KEY, {
+    value: registration, configurable: false, enumerable: false, writable: false,
+  });
+  const runFallback = async (): Promise<'DONE' | 'UNSAFE' | 'FAILED'> => {
+    if (exit === undefined) {
+      // KDP.Init 在调用正常激活服务前抛出时，不能使用未经验证的 Exit。
+      // 必须重新确认安装信任，再以已选 Order 0 Host 调用其唯一 Exit Element。
+      let trusted: Awaited<ReturnType<typeof verifyInstallTrust>>;
+      try {
+        trusted = await verifyInstallTrust(boundContext);
+      } catch {
+        return 'UNSAFE';
+      }
+      if (!trusted.ok) return 'UNSAFE';
+      try {
+        const selectedExit = await resolveSelectedKdpExit(boundContext, trusted.value.lock);
+        if (selectedExit === null) return 'DONE';
+        exit = selectedExit;
+      } catch {
+        return 'UNSAFE';
+      }
+    }
+    try {
+      await exit();
+      return 'DONE';
+    } catch {
+      return 'FAILED';
+    }
+  };
+  return {
+    context: boundContext,
+    cleanup: () => (cleanupFlight ??= runFallback()),
+  };
+}
+
+/**
+ * 委托前抛出的最小可信兜底：解析 Lock 中 Order 0 KDP 已选 Exit Element 的实现。
+ * 字节必须与封存摘要逐字一致；无已选 Exit 时无事可做（返回 null 即 DONE）。
+ */
+async function resolveSelectedKdpExit(
+  context: KdpBootstrapContext,
+  lock: DomainAppLock,
+): Promise<HostExit | null> {
+  const rootId = lock.coreOrder[0];
+  const pkg = lock.selectedPackages.find((candidate) => candidate.packageId === rootId);
+  if (!pkg?.exit || !pkg.exitFunction) return null;
+  const selected = lock.selectedFunctions.find((candidate) =>
+    canonicalJson(candidate.ref) === canonicalJson(pkg.exitFunction));
+  if (!selected) throw new Error('selected KDP Exit FunctionRef is missing from the Lock');
+  const moduleRef = selected.implementation.module;
+  const absolute = resolvePackageFile(context.installRoot, moduleRef.packageId, moduleRef.path);
+  if (absolute === null) throw new Error('selected KDP Exit module path is not addressable');
+  const bytes = await readFile(absolute);
+  if (bytesContentDigest(bytes) !== moduleRef.digest) {
+    throw new Error('selected KDP Exit module bytes do not match the sealed digest');
+  }
+  const mod = (await import(pathToFileURL(absolute).href)) as Record<string, unknown>;
+  const exported = mod[selected.implementation.exportName];
+  if (typeof exported !== 'function') throw new Error('selected KDP Exit export is not callable');
+  const hostPorts = pkg.role === 'primary' && pkg.order === 0 ? (context.hostPorts ?? []) : [];
+  return async (): Promise<void> => {
+    await (exported as (exitContext: unknown) => unknown)({
+      packageId: rootId,
+      ...(pkg.recordInitFrom === true ? { InitFrom: [{ type: 'Boot' }] } : {}),
+      hostPorts,
+    });
+  };
 }
 
 

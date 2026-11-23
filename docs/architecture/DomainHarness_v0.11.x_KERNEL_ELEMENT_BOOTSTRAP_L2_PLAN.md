@@ -1,6 +1,6 @@
 # DomainHarness v0.11.x · Kernel Package 真正自举与统一身份迁移 L2 接线方案
 
-> **归口**：Foundation Issue [#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)，不是 v0.11.2 功能。**状态：R107 ACCEPT_L2_SCOPED（设计范围 P0/P1=0）；源码实施与验收未完成**。本文件是具体实施细节，不是第二套规范。权威规范以 [目录](../specs/domain-harness/README.md)、[核心](../specs/domain-harness/core.md)、[架构](../specs/domain-harness/architecture.md)、[对象](../specs/domain-harness/element-package.md)、[生命周期](../specs/domain-harness/lifecycle-workflow.md)、[身份](../specs/domain-harness/identity-naming.md) 和 [信任](../specs/domain-harness/composition-trust.md) 为准。
+> **归口**：Foundation Issue [#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)，不是 v0.11.2 功能。**状态：R107 ACCEPT_L2_SCOPED（设计范围 P0/P1=0）；A6/R130 引擎归属源码已交付（真实 KDP Package 私有闭包承载引擎，SDK 仅保留最小可信 Boot，见 #1682 实施 PR），实现独立审核与验收未完成**。本文件是具体实施细节，不是第二套规范。权威规范以 [目录](../specs/domain-harness/README.md)、[核心](../specs/domain-harness/core.md)、[架构](../specs/domain-harness/architecture.md)、[对象](../specs/domain-harness/element-package.md)、[生命周期](../specs/domain-harness/lifecycle-workflow.md)、[身份](../specs/domain-harness/identity-naming.md) 和 [信任](../specs/domain-harness/composition-trust.md) 为准。
 
 ## R118. Owner 职责裁决：生成期负责 Package/Element 正确性，SDK 只做最小兜底
 

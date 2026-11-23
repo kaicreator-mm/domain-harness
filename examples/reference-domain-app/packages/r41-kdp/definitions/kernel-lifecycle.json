@@ -1,9 +1,9 @@
 {
   "kind": "Element",
   "schemaVersion": "dh.element/0.11",
-  "id": "r41.kdp",
+  "id": "r41.kernelLifecycle",
   "version": "1.0.0",
-  "description": "R41 real authored lifecycle for r41-kdp.",
+  "description": "R41 real authored Kernel Host lifecycle for r41-kdp: the selected kdp-host-init/1 Init owns PackageSystem creation, Core/Extension dispatch and reverse Exit orchestration.",
   "content": [],
   "functions": [
     {

@@ -485,10 +485,11 @@ export function exit() {}
   assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.message);
   if (accepted.ok) {
     const archive = accepted.lock.trustedRuntimeIntegrity;
-    assert.equal(archive?.length, 2, 'exact SHA512 transitive closure must remain immutable');
-    assert.equal(archive?.[1]?.name, 'yaml');
-    assert.equal(archive?.[1]?.version, '2.9.1');
-    assert.match(archive?.[1]?.integrity ?? '', /^sha512-/u);
+    // R130：引擎 XState 随 KDP 自含闭包交付；App 层钉唯一直接声明的 yaml 归档。
+    assert.equal(archive?.length, 1, 'exact SHA512 transitive closure must remain immutable');
+    assert.equal(archive?.[0]?.name, 'yaml');
+    assert.equal(archive?.[0]?.version, '2.9.1');
+    assert.match(archive?.[0]?.integrity ?? '', /^sha512-/u);
     const app = accepted.appPackage.files.find((item) => item.path === 'package.json');
     assert.ok(app);
     const manifest = JSON.parse(Buffer.from(app.bytes).toString('utf8')) as {

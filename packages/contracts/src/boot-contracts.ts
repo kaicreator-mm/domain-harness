@@ -60,6 +60,18 @@ export interface KdpPrimary {
   init(context: KdpBootstrapContext): Promise<KdpBootstrapResult>;
 }
 
+/**
+ * Boot 与真实 KDP 引擎之间的进程内一次性退出责任交接键。
+ * 双方都必须经同一 Contracts 常量取值；KDP 引擎以非枚举只读属性读取栅栏，
+ * 静态可证明的字符串键是生成期 Kernel Profile 静态准入的前提。
+ */
+export const DH_KDP_HOST_EXIT_FENCE_KEY = '__dhKdpHostExitFence/1' as const;
+
+/** Boot 交出的私有清理句柄：真实 KDP 引擎恰好登记一次逆序 Exit，Boot 仅在失败路径调用。 */
+export interface KdpHostExitFence {
+  registerExit(selectedExit: () => Promise<void>): void;
+}
+
 /** 启动前拒绝返回 REFUSED；选定 KDP 执行后的失败由 KDP 报告 FAILED。 */
 export type BootResult =
   | { readonly status: 'REFUSED'; readonly code: string; readonly reason: string }

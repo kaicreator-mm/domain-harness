@@ -4,10 +4,11 @@
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildApp } from '@kaicreator/domain-harness';
 
@@ -35,8 +36,9 @@ assert.deepEqual(accepted.lockBytes, reproducible.lockBytes);
 assert.deepEqual(accepted.lock.coreOrder, ['r41-kdp', 'r41-sdk-base', 'reference-business']);
 assert.equal(accepted.lock.selectedWorkflows.length, 1);
 assert.ok(accepted.lock.selectedPackages.some((item) => item.packageId === 'r60-standard-files'));
+// R130：引擎 XState 随受选 KDP 闭包自带；App 层仅钉直接声明的 yaml 归档。
 assert.deepEqual(accepted.lock.trustedRuntimeIntegrity.map((item) => [item.name, item.version]),
-  [['xstate', '5.33.2'], ['yaml', '2.9.1']]);
+  [['yaml', '2.9.1']]);
 
 // 只改变内存中的候选，证明错误摘要在 BUILD 阶段拒绝，不碰实际受选磁盘文件。
 const stale = globalThis.structuredClone(manifests);
@@ -66,10 +68,15 @@ try {
     await writeFile(destination, file.bytes);
     assert.equal(`sha256:${createHash('sha256').update(file.bytes).digest('hex')}`, file.digest);
   }
-  // 遵守 SDK 生成的受控先验 SRI+Lock+npm ci 流程。
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  // 遵守 SDK 生成的受控先验 SRI+Lock+npm ci 流程。Windows 上经 npm-cli.js 以
+  // 当前 Node 启动，避免 spawnSync 直接拉起 .cmd 填充程序（现代 Node EINVAL）。
+  const npmManifest = createRequire(import.meta.url).resolve('npm/package.json', {
+    paths: [dirname(process.execPath), resolve(dirname(process.execPath), '../lib/node_modules')],
+  });
+  const npmCli = process.env.npm_execpath ?? join(dirname(npmManifest), 'bin/npm-cli.js');
+  const npm = (npmArgs) => [npmCli, ...npmArgs];
   const flags = ['--ignore-scripts', '--no-audit', '--no-fund'];
-  run(npm, ['install', '--package-lock-only', ...flags], 'npm-lock-only');
+  run(process.execPath, npm(['install', '--package-lock-only', ...flags]), 'npm-lock-only');
   run(process.execPath, ['dh-install/verify-preinstall.mjs'], 'trusted-preinstall');
   const lockPath = join(installRoot, 'package-lock.json');
   const npmLockBytes = await readFile(lockPath);
@@ -80,7 +87,7 @@ try {
     'tampered-yaml-SRI-preinstall', false);
   assert.match(refused.stderr, /DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH/u);
   await writeFile(lockPath, npmLockBytes);
-  run(npm, ['ci', ...flags], 'npm-ci');
+  run(process.execPath, npm(['ci', ...flags]), 'npm-ci');
   run(process.execPath, ['dh-install/verify-runtime.mjs'], 'trusted-postinstall');
   await cp(join(sourceRoot, 'verify-boot.mjs'), join(installRoot, 'verify-boot.mjs'));
   const bootResult = run(process.execPath, ['verify-boot.mjs'], 'boot-init-workflow-exit');

@@ -746,7 +746,8 @@ function runBuild(input: BuildInput, generationCheck?: GenerationSourceCheck): O
       ...(sealedWorkflows.size > 0
         ? { selectedWorkflows: [...sealedWorkflows.values()].sort((a, b) =>
             workflowKey(a.ref).localeCompare(workflowKey(b.ref))) } : {}),
-      ...(sealedWorkflows.size > 0 || selectedTrustedYaml
+      // R130：Workflow 引擎随受选 KDP 闭包自带；只有显式声明 yaml 的 App 才封存第三方归档钉。
+      ...(selectedTrustedYaml
         ? { trustedRuntimeIntegrity: TRUSTED_WORKFLOW_NPM_ARCHIVES.map((item) => ({ ...item })) } : {}),
       coreOrder,
       resourceDigests: scope.toLockMap(),

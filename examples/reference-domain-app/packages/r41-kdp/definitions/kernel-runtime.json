@@ -1,0 +1,9 @@
+{
+  "kind": "Element",
+  "schemaVersion": "dh.element/0.11",
+  "id": "r41.kernelRuntime",
+  "version": "1.0.0",
+  "description": "R41 KDP-owned selected-module runtime: sealed-byte artifact verification, digest-pinned module loading, selected Function dispatch/Outcome, Hook sealing and resource handles live in this Package's private sources.",
+  "content": [],
+  "functions": []
+}

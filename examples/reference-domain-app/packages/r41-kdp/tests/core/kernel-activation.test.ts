@@ -9,8 +9,8 @@ import {
   digestOf,
   events,
   type FixtureInstall,
-} from './helpers/install.js';
-import { activateSelectedKdpHostInit } from '../../src/kdp.js';
+} from '../../../../../../packages/microkernel/tests/core/helpers/install.js';
+import { activateKernelLifecycle } from '../../src/kernel-lifecycle.js';
 
 async function withFixture(
   t: import('node:test').TestContext,
@@ -25,7 +25,7 @@ async function withFixture(
 
 test('R124 selected KDP Host Init creates actual App without invoking a second ordinary Kernel Init', async (t) => {
   await withFixture(t, async (fixture) => {
-    const result = await activateSelectedKdpHostInit(fixture.context);
+    const result = await activateKernelLifecycle(fixture.context);
     assert.equal(result.status, 'BOOTED', JSON.stringify(result));
     if (result.status !== 'BOOTED') return;
     assert.equal(result.app.status, 'READY');
@@ -47,7 +47,7 @@ test('R124 selected KDP Host Init failure cleans up Kernel after entered downstr
     ...DEFAULT_SCENARIO, sdkInitThrow: true,
   });
   t.after(async () => fixture.cleanup());
-  const result = await activateSelectedKdpHostInit(fixture.context);
+  const result = await activateKernelLifecycle(fixture.context);
   assert.equal(result.status, 'FAILED', JSON.stringify(result));
   if (result.status === 'FAILED') {
     assert.equal(result.code, 'DH_RUNTIME_NOT_READY');
@@ -62,7 +62,7 @@ test('R124 selected Host KDP failure after initial entry performs its Exit even 
   await withFixture(t, async (fixture) => {
     await fixture.writePackageFile('fixture-business', 'dist/index.mjs',
       Buffer.from('export async function init() { throw new Error("untrusted"); }\n', 'utf8'));
-    const result = await activateSelectedKdpHostInit(fixture.context);
+    const result = await activateKernelLifecycle(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     assert.equal(events().filter((event) => event['event'] === 'package-init').length, 0,
       'selected artifacts must be verified before ordinary Package.Init');
@@ -75,7 +75,7 @@ test('R124 selected Host KDP failure after initial entry performs its Exit even 
 test('R125 P1: Host Init entered before descriptor read, missing descriptor still runs exactly one KDP.Exit', async (t) => {
   await withFixture(t, async (fixture) => {
     await rm(join(fixture.installRoot, fixture.context.descriptorPath));
-    const result = await activateSelectedKdpHostInit(fixture.context);
+    const result = await activateKernelLifecycle(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status !== 'FAILED') return;
     assert.equal(result.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
@@ -91,7 +91,7 @@ test('R125 P1: Host Init entered before descriptor digest rejection, Kernel Exit
   await withFixture(t, async (fixture) => {
     await writeFile(join(fixture.installRoot, fixture.context.descriptorPath),
       JSON.stringify({ kind: 'DomainApp', id: 'changed-without-lock' }));
-    const result = await activateSelectedKdpHostInit(fixture.context);
+    const result = await activateKernelLifecycle(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status !== 'FAILED') return;
     assert.equal(result.code, 'DH_KDP_PACKAGE_LOAD_FAILED');
@@ -104,7 +104,7 @@ test('R125 P1: Host Init entered before descriptor digest rejection, Kernel Exit
 
 test('R125 P1: Host environment failure after trusted install triggers KDP.Exit without other Init', async (t) => {
   await withFixture(t, async (fixture) => {
-    const result = await activateSelectedKdpHostInit({
+    const result = await activateKernelLifecycle({
       ...fixture.context,
       env: { ...fixture.context.env, nodeMajor: 1 },
     });
@@ -120,7 +120,7 @@ test('R125 P1: Host environment failure after trusted install triggers KDP.Exit 
 test('R125 P1: Host Init cannot execute unverified Kernel Exit when no trusted installation remains', async (t) => {
   await withFixture(t, async (fixture) => {
     await rm(join(fixture.installRoot, 'dh-install'), { recursive: true, force: true });
-    const result = await activateSelectedKdpHostInit(fixture.context);
+    const result = await activateKernelLifecycle(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status !== 'FAILED') return;
     assert.equal(result.code, 'DH_BOOT_RECORD_MISSING');
@@ -133,7 +133,7 @@ test('R125 P1: Host Init cannot execute unverified Kernel Exit when no trusted i
 
 test('direct bootstrap on a consistent install boots READY (same trust ladder as Boot)', async (t) => {
   await withFixture(t, async (fixture) => {
-    const result = await activateSelectedKdpHostInit(fixture.context);
+    const result = await activateKernelLifecycle(fixture.context);
     assert.equal(result.status, 'BOOTED', JSON.stringify(result));
     if (result.status !== 'BOOTED') return;
     assert.equal(result.app.status, 'READY');
@@ -151,7 +151,7 @@ test('direct bootstrap with a self-signed Lock is FAILED (closure digest vs trus
     lock['closureDigest'] = digestOf(lock);
     await fixture.writeLockBytes(Buffer.from(JSON.stringify(lock), 'utf8'));
 
-    const result = await activateSelectedKdpHostInit(fixture.context);
+    const result = await activateKernelLifecycle(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status === 'FAILED') {
       assert.equal(result.code, 'DH_BOOT_PIN_MISMATCH');
@@ -171,7 +171,7 @@ test('direct bootstrap with forged KDP entry bytes is FAILED (entry bytes vs tru
     ].join('\n');
     await fixture.writeKdpEntryBytes(Buffer.from(forged, 'utf8'));
 
-    const result = await activateSelectedKdpHostInit(fixture.context);
+    const result = await activateKernelLifecycle(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status === 'FAILED') {
       assert.equal(result.code, 'DH_BOOT_PIN_MISMATCH');
@@ -184,7 +184,7 @@ test('direct bootstrap with forged KDP entry bytes is FAILED (entry bytes vs tru
 test('direct bootstrap with a removed installed record is FAILED (record is the trust anchor)', async (t) => {
   await withFixture(t, async (fixture) => {
     await rm(join(fixture.installRoot, 'dh-install'), { recursive: true, force: true });
-    const result = await activateSelectedKdpHostInit(fixture.context);
+    const result = await activateKernelLifecycle(fixture.context);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status === 'FAILED') {
       assert.equal(result.code, 'DH_BOOT_RECORD_MISSING');
@@ -194,7 +194,7 @@ test('direct bootstrap with a removed installed record is FAILED (record is the 
 
 test('direct bootstrap with a null/garbage context is typed FAILED, never a TypeError', async () => {
   for (const badContext of [null, undefined, 42]) {
-    const result = await activateSelectedKdpHostInit(badContext as unknown as Parameters<typeof activateSelectedKdpHostInit>[0]);
+    const result = await activateKernelLifecycle(badContext as unknown as Parameters<typeof activateKernelLifecycle>[0]);
     assert.equal(result.status, 'FAILED', JSON.stringify(result));
     if (result.status === 'FAILED') {
       assert.equal(result.code, 'DH_BOOT_RECORD_MISSING');

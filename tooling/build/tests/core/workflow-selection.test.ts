@@ -38,6 +38,7 @@ function workflowCase(
     readonly workflowElementId?: string;
     readonly rawData?: Uint8Array;
     readonly foreignOwner?: 'orders-ext' | 'aaa-ext';
+    readonly withYamlDependency?: boolean;
   } = {},
 ) {
   const scenario = standardCase();
@@ -100,6 +101,13 @@ function workflowCase(
   if (options.withData && scenario.ws.packageRoots[resource.packageId]) {
     const onDisk = writeRaw(scenario.ws.packageRoots[resource.packageId]!, resource.path, bytes);
     assert.equal(onDisk.digest, resource.digest);
+  }
+  if (options.withYamlDependency === true) {
+    // R130：受控第三方安装器只在 App 真实声明 yaml@2.9.1 时生成（orders-business 为 business 层）。
+    const manifestPath = join(scenario.ws.packageRoots['orders-business']!, 'package.json');
+    const npmManifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+    npmManifest['dependencies'] = { yaml: '2.9.1' };
+    writeFileSync(manifestPath, JSON.stringify(npmManifest));
   }
   const ref = elementRefOf(scenario.appMain as ElementDefinition);
   const packages: DomainPackageManifest[] = (input.packages as readonly DomainPackageManifest[]).map((pkg) =>
@@ -228,27 +236,21 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
   assert.equal(a.appPackage.packageDigest, b.appPackage.packageDigest);
   const composedManifest = JSON.parse(Buffer.from(a.appPackage.files.find((file) => file.path === 'package.json')!.bytes).toString('utf8'));
   assert.equal(composedManifest.dependencies['@kaicreator/domain-harness'], '0.11.0');
+  // R130：引擎 XState 由受选 KDP 自含闭包承载；App 直接依赖不含任何第三方运行时。
   assert.equal(composedManifest.dependencies.xstate, undefined,
-    'Workflow runtime is an SDK-owned transitive dependency, not an App direct dependency');
+    'Workflow engine ships inside the selected KDP closure, not as an App dependency');
   assert.equal(composedManifest.dependencies.yaml, undefined,
     'YAML runtime is an SDK-owned transitive dependency, not an App direct dependency');
-  assert.deepEqual(a.lock.trustedRuntimeIntegrity?.map((archive) => archive.name), ['xstate', 'yaml']);
-  const attestFile = a.appPackage.files.find((file) => file.path === 'dh-install/trusted-runtime.json');
-  const verifyFile = a.appPackage.files.find((file) => file.path === 'dh-install/verify-runtime.mjs');
-  assert.ok(attestFile && verifyFile, 'composed package must carry exact executable archive SRI attest + verifier');
-  const attest = JSON.parse(Buffer.from(attestFile.bytes).toString('utf8'));
-  assert.deepEqual(attest.archives, a.lock.trustedRuntimeIntegrity,
-    'trusted runtime byte pins must be sealed in both Lock and App Package');
-  assert.ok(attest.archives.every((item: { integrity: string }) => item.integrity.startsWith('sha512-')),
-    'third-party executable tarballs must be pinned by actual SHA-512 archive digest');
+  // R130：本 Case 未声明 yaml——引擎 XState 随受选 KDP 自含闭包交付，App 无第三方归档钉与受控安装器。
+  assert.equal(a.lock.trustedRuntimeIntegrity, undefined,
+    'a Workflow-only App without a declared yaml dependency carries no third-party archive pins');
+  assert.equal(a.appPackage.files.some((file) => file.path === 'dh-install/trusted-runtime.json'), false);
   const bootModule = a.appPackage.files.find((file) => file.path === 'boot.mjs');
   assert.ok(bootModule);
   const bootSource = Buffer.from(bootModule.bytes).toString('utf8');
   // R55: the generated App invokes Boot through the one public SDK, never a direct Microkernel import.
-  const attestationOffset = bootSource.indexOf("await import('./dh-install/verify-runtime.mjs')");
   const sdkBootOffset = bootSource.indexOf("await import('@kaicreator/domain-harness/runtime')");
-  assert.ok(attestationOffset >= 0 && sdkBootOffset > attestationOffset,
-    'trusted runtime SRI attestation must precede the real public SDK Boot import');
+  assert.ok(sdkBootOffset >= 0, 'generated App boots through the public SDK runtime entry');
   assert.equal(bootSource.includes("import('@kaicreator/domain-harness-microkernel')"), false,
     'generated Domain App must not bypass its public SDK runtime');
   assert.equal(a.lock.selectedWorkflows?.length, 1);
@@ -265,7 +267,7 @@ test('T12 R1: the existing BUILD selects and pins one real Workflow definition a
 });
 
 test('T12 R4: actual packaged first-party verifier refuses altered xstate/yaml sha512 before Boot', (t) => {
-  const { input } = workflowCase(t, { format: 'yaml', withData: true });
+  const { input } = workflowCase(t, { format: 'yaml', withData: true, withYamlDependency: true });
   const app = accepted(buildApp(input));
   const get = (path: string): Uint8Array => {
     const file = app.appPackage.files.find((item) => item.path === path);
@@ -303,7 +305,7 @@ test('T12 R4: actual packaged first-party verifier refuses altered xstate/yaml s
   assert.equal(valid.status, 0, `精确 npm Lock 与已安装版本必须通过校验：${valid.stderr}`);
 
   const bad = structuredClone(npmLock);
-  bad.packages['node_modules/xstate']!.integrity = 'sha512-INVALID_ARCHIVE_BYTES';
+  bad.packages['node_modules/yaml']!.integrity = 'sha512-INVALID_ARCHIVE_BYTES';
   write('package-lock.json', JSON.stringify(bad));
   const refused = runVerifier();
   assert.notEqual(refused.status, 0, 'tampered third-party npm tarball SRI MUST fail');
@@ -312,7 +314,7 @@ test('T12 R4: actual packaged first-party verifier refuses altered xstate/yaml s
   write('package-lock.json', JSON.stringify(npmLock));
   const forgedLock = {
     ...structuredClone(app.lock),
-    trustedRuntimeIntegrity: [{ ...pins[0]!, integrity: 'sha512-FAKE' }, pins[1]!],
+    trustedRuntimeIntegrity: [{ ...pins[0]!, integrity: 'sha512-FAKE' }],
   };
   write('dh-lock/app.lock.json', JSON.stringify(forgedLock));
   const refusedSealed = runVerifier();
@@ -321,7 +323,7 @@ test('T12 R4: actual packaged first-party verifier refuses altered xstate/yaml s
 });
 
 test('T12 R11 P1: BUILD seals a preinstall verifier and script-free lock-first installer', (t) => {
-  const { input } = workflowCase(t, { format: 'yaml', withData: true });
+  const { input } = workflowCase(t, { format: 'yaml', withData: true, withYamlDependency: true });
   const built = accepted(buildApp(input));
   const get = (path: string): Uint8Array => {
     const file = built.appPackage.files.find((entry) => entry.path === path);
@@ -400,15 +402,15 @@ test('T12 R11 P1: BUILD seals a preinstall verifier and script-free lock-first i
   assert.notEqual(unconfiguredLocal.status, 0, '不得允许与已声明 Registry 不符的 HTTP 源');
   assert.match(unconfiguredLocal.stderr, /DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH/u);
   const untrustedOrigin = structuredClone(localLock);
-  (untrustedOrigin.packages['node_modules/xstate'] as { resolved: string }).resolved =
-    'http://untrusted.example/xstate/-/xstate-5.33.2.tgz';
+  (untrustedOrigin.packages['node_modules/yaml'] as { resolved: string }).resolved =
+    'http://untrusted.example/yaml/-/yaml-2.9.1.tgz';
   write('package-lock.json', JSON.stringify(untrustedOrigin));
   const remoteRefused = run(localRegistry);
   assert.notEqual(remoteRefused.status, 0, '任意外部 HTTP Registry 必须在下载前被拒绝');
   assert.match(remoteRefused.stderr, /DH_TRUSTED_RUNTIME_PREINSTALL_SRI_MISMATCH/u);
   write('package-lock.json', JSON.stringify(npmLock));
   const altered = structuredClone(npmLock);
-  (altered.packages['node_modules/xstate'] as { integrity: string }).integrity = 'sha512-UNAPPROVED';
+  (altered.packages['node_modules/yaml'] as { integrity: string }).integrity = 'sha512-UNAPPROVED';
   write('package-lock.json', JSON.stringify(altered));
   const refused = run();
   assert.notEqual(refused.status, 0, '下载前必须拒绝与批准 SRI 不同的归档');
@@ -637,7 +639,8 @@ test('R55: selected Workflow is delivered through the sole SDK, not caller-suppl
   assert.equal(app.dependencies['@kaicreator/domain-harness-contracts'], undefined);
   assert.equal(app.dependencies.xstate, undefined);
   assert.equal(app.dependencies.yaml, undefined);
-  assert.ok(built.appPackage.files.some((entry) => entry.path === 'dh-install/trusted-runtime.json'));
+  // R130：本 Case 未声明 yaml——无第三方归档钉，也不生成受控安装器（yaml App 见 R4/R11P1 用例）。
+  assert.equal(built.appPackage.files.some((entry) => entry.path === 'dh-install/trusted-runtime.json'), false);
 });
 
 test('T12 R1: a Package without Workflow is still valid and has no synthetic Task', (t) => {  const scenario = standardCase();

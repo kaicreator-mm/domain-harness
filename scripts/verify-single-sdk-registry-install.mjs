@@ -1,7 +1,7 @@
 /**
  * R60 W05: real npm Registry protocol + a single explicitly installed public SDK.
  * The registry is in-process, scoped to this test, and never publishes to a shared
- * external registry. Existing local upstream supplies only reviewed xstate/yaml bytes.
+ * external registry. Existing local upstream supplies only reviewed third-party bytes (yaml).
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -16,7 +16,8 @@ const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const upstream = process.env.DH_T05_NPM_REGISTRY;
 assert.ok(upstream && /^https?:\/\//u.test(upstream),
   'R60 single-SDK Registry E2E requires the configured, bounded trusted npm upstream');
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+// Windows 上经 npm-cli.js 以当前 Node 启动，避免直接 spawn .cmd 填充程序（现代 Node EINVAL）。
+const npmCli = process.env.npm_execpath ?? null;
 const temporary = await mkdtemp(join(tmpdir(), 'dh-r60-one-sdk-registry-'));
 const evidence = { schemaVersion: 'dh.r60.registry/1', node: process.version,
   sdkDirectDependencies: 1, workflowTransitiveSRI: false, boot: false, tamperRejected: false,
@@ -24,8 +25,10 @@ const evidence = { schemaVersion: 'dh.r60.registry/1', node: process.version,
   preinstallTamperedSRIRejected: false };
 let server;
 async function runNpm(cwd, args, env) {
+  const command = npmCli ? process.execPath : (process.platform === 'win32' ? 'npm.cmd' : 'npm');
+  const fullArgs = npmCli ? [npmCli, ...args] : args;
   const result = await new Promise((settle, reject) => {
-    const child = spawn(npm, args, {
+    const child = spawn(command, fullArgs, {
       cwd, env: { ...process.env, npm_config_ignore_scripts: 'true', ...env },
       windowsHide: true,
     });
@@ -95,23 +98,23 @@ try {
           return;
         }
       }
-      // Do not turn this into a general-purpose mirror. Only two pinned
+      // Do not turn this into a general-purpose mirror. Only the pinned
       // third-party runtime package names can pass to the preconfigured local registry.
       const first = name.split('/')[0];
-      if (!['xstate','yaml'].includes(first)) {
+      if (!['yaml'].includes(first)) {
         res.writeHead(404); res.end('R60 unselected npm name'); return;
       }
       const from = new URL(req.url, upstream);
       const remote = await globalThis.fetch(from, { signal: globalThis.AbortSignal.timeout(30_000) });
       const contentType = remote.headers.get('content-type') ?? 'application/octet-stream';
-      if (remote.ok && (name === 'xstate' || name === 'yaml')) {
+      if (remote.ok && name === 'yaml') {
         // npm's upstream packument may retain a host.docker.internal tarball
         // URL even though npm_config_registry points at this exact loopback
         // Registry. The trusted install verifier correctly rejects that
         // mismatch. Keep the upstream SRI unchanged and make the bytes flow
         // through this same bounded Registry instead of weakening the verifier.
         const packument = await remote.json();
-        const version = name === 'xstate' ? '5.33.2' : '2.9.1';
+        const version = '2.9.1';
         const dist = packument.versions?.[version]?.dist;
         assert.ok(dist && typeof dist.tarball === 'string' &&
           typeof dist.integrity === 'string',
@@ -153,10 +156,11 @@ try {
   for (const name of ['@kaicreator/domain-harness-build', 'typescript', 'ajv']) {
     assert.equal(consumerLock.packages['node_modules/' + name], undefined);
   }
+  // R130：SDK-only Consumer 不再携带任何第三方运行时（引擎 XState 随受选 KDP 闭包自带，
+  // yaml 属于具体组合 App 的受控安装器验证范围）。
   for (const name of ['xstate','yaml']) {
-    const pinned = consumerLock.packages['node_modules/' + name];
-    assert.ok(pinned && pinned.integrity.startsWith('sha512-'),
-      `transitive ${name} must be exact and content-locked`);
+    assert.equal(consumerLock.packages['node_modules/' + name], undefined,
+      `SDK-only consumer must not carry third-party runtime '${name}'`);
   }
   evidence.workflowTransitiveSRI = true;
   await runNpm(consumer, ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], env);
@@ -179,8 +183,8 @@ console.log('DH_R60_SDK_ONLY_REGISTRY_IMPORTS_OK');
   const assembled = sdk.buildApp({
     descriptor, packages,
     packageRoots:Object.fromEntries(ids.map(id=>[id,join(fixtures,'packages',id)])),
+    // KDP Host 入口只从受选 Init Function 的 Target 推导；不存在第二 bootstrap 资源。
     packageArtifacts:Object.fromEntries(ids.map(id=>[id,'dist/index.mjs'])),
-    kdpArtifact:{ packageId:'r41-kdp', path:'dist/bootstrap.js' },
   });
   assert.equal(assembled.ok, true, assembled.ok ? '' : assembled.message);
   const appDir=join(temporary,'composed-app');
@@ -210,6 +214,12 @@ console.log('DH_R60_SDK_ONLY_REGISTRY_IMPORTS_OK');
   await mkdir(dirname(fileSource), { recursive: true });
   await cp(join(repo, 'examples/selected-packages/packages/r60-standard-files'),
     fileSource, { recursive: true });
+  // R130：外部 Consumer 携带真实 KDP 引擎闭包源（与 r60-standard-files 同一原则），
+  // 在 fixture 阶段就位于 consumer.mjs 解析的相对位置，不隐式回读 SDK 仓库。
+  const kdpEngineConsumer = join(consumer, '..', 'reference-domain-app', 'packages', 'r41-kdp');
+  await mkdir(dirname(kdpEngineConsumer), { recursive: true });
+  await cp(join(repo, 'examples/reference-domain-app/packages/r41-kdp'),
+    kdpEngineConsumer, { recursive: true });
   const fixture = await runNode(consumer, ['registry-workflow-fixture.mjs'], {
     ...env, DH_R60_REGISTRY_WORKFLOW_FIXTURE_ONLY: '1',
     DH_T05_EVIDENCE: join(temporary, 'workflow-evidence'),
@@ -227,7 +237,7 @@ console.log('DH_R60_SDK_ONLY_REGISTRY_IMPORTS_OK');
   assert.equal(Object.keys(consumerLock.packages[''].dependencies).length, 1);
   const selectedPins = sealed.trustedRuntimeIntegrity;
   assert.deepEqual(selectedPins?.map((archive) => [archive.name, archive.version]),
-    [['xstate', '5.33.2'], ['yaml', '2.9.1']]);
+    [['yaml', '2.9.1']]);
   const runtimeManifest = JSON.parse(await readFile(join(workflowRoot,
     'dh-install/trusted-runtime.json'), 'utf8'));
   assert.deepEqual(runtimeManifest.archives, selectedPins);
@@ -236,13 +246,16 @@ console.log('DH_R60_SDK_ONLY_REGISTRY_IMPORTS_OK');
   const lockPath = join(workflowRoot, 'package-lock.json');
   const originalLock = await readFile(lockPath);
   const npmLock = JSON.parse(originalLock.toString('utf8'));
+  // R130：SDK-only Consumer 不携带第三方运行时；受控安装的 Workflow App 锁必须逐字命中钉。
+  for (const name of ['xstate', 'yaml']) {
+    assert.equal(consumerLock.packages['node_modules/' + name], undefined,
+      `SDK-only consumer must not carry third-party runtime '${name}'`);
+  }
   for (const archive of selectedPins) {
-    for (const packages of [consumerLock.packages, npmLock.packages]) {
-      const found = packages['node_modules/' + archive.name];
-      assert.equal(found?.version, archive.version);
-      assert.equal(found?.integrity, archive.integrity,
-        'Registry npm pin must equal the selected App DomainAppLock SRI');
-    }
+    const found = npmLock.packages['node_modules/' + archive.name];
+    assert.equal(found?.version, archive.version);
+    assert.equal(found?.integrity, archive.integrity,
+      'Registry npm pin must equal the selected App DomainAppLock SRI');
   }
   const preflight = await runNode(workflowRoot, ['dh-install/verify-preinstall.mjs'], env);
   assert.equal(preflight.code, 0, preflight.stderr);

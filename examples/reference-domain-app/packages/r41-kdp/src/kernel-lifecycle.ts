@@ -1,4 +1,7 @@
-// 当前唯一 KDP：Boot 验证选定资源，初始化 Package 后才开放业务入口。
+// 真实 KDP Kernel Package 的 kernelLifecycle Init Element 私有实现（Foundation A6/R130）。
+// 本文件自 SDK microkernel/src/kdp.ts 的激活后半段整体迁移：PackageSystem、Core/Extension
+// 调度、Workflow 预算与 DomainApp/Exit 编排现在由本 KDP Package 的已选 Target 物理承载，
+// SDK Boot 只做可信验证、单次 Host Init 调用与一次性退出责任交接。
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
@@ -11,7 +14,9 @@ import type {
   JsonValue,
   KdpBootstrapContext,
   KdpBootstrapResult,
+  KdpHostExitFence,
 } from '@kaicreator/domain-harness-contracts';
+import { DH_KDP_HOST_EXIT_FENCE_KEY } from '@kaicreator/domain-harness-contracts';
 import { resolveInRoot } from './paths.js';
 import { verifyInstallTrust } from './verify.js';
 import { isPlainJsonValue } from './schema-subset.js';
@@ -29,6 +34,12 @@ function failed(code: string, reason: string): KdpBootstrapResult {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** r41 示例 Package 家族共享的进程内生命周期跟踪事件（观测约定，不是机器合同）。 */
+function lifecycleEvents(): Array<Record<string, unknown>> {
+  const owner = globalThis as { __dhR41Events?: Array<Record<string, unknown>> };
+  return (owner.__dhR41Events ??= []);
 }
 
 type DescriptorConfigResult =
@@ -96,87 +107,14 @@ export function validateBusinessCoreResults(raw: unknown): { status: AppStatus }
   return { status: statuses.includes('BLOCKED') ? 'BLOCKED' :
     statuses.includes('DEGRADED') ? 'DEGRADED' : 'READY' };
 }
-/**
- * 内部 Host Exit 交接：Boot 只持有一次性清理句柄，真正的逆序 Exit
- * 仍由 KDP 的 PackageSystem 执行。使用进程内 Symbol 注册以跨 npm file: 安装
- * 的 SDK 模块副本传递同一激活责任；不是公开 Domain Package Function API。
- */
-const HOST_EXIT_FENCE = Symbol.for('domain-harness.internal.kdp-host-exit/1');
-type HostExit = () => Promise<void>;
-interface HostExitRegistration {
-  registerExit(exit: HostExit): void;
-}
-export function createKdpHostCallFence(context: KdpBootstrapContext): {
-  readonly context: KdpBootstrapContext;
-  cleanup(): Promise<'DONE' | 'UNSAFE' | 'FAILED'>;
-} {
-  let exit: HostExit | undefined;
-  let cleanupFlight: Promise<'DONE' | 'UNSAFE' | 'FAILED'> | undefined;
-  const registration: HostExitRegistration = {
-    registerExit(selectedExit): void {
-      if (exit === undefined) exit = selectedExit;
-    },
-  };
-  const boundContext = Object.defineProperty({ ...context }, HOST_EXIT_FENCE, {
-    value: registration, configurable: false, enumerable: false, writable: false,
-  });
-  const runFallback = async (): Promise<'DONE' | 'UNSAFE' | 'FAILED'> => {
-    if (exit === undefined) {
-      // KDP.Init 在调用正常激活服务前抛出时，不能使用未经验证的 Exit。
-      // 必须重新确认安装信任，再以已选 Order 0 Host 进入历史清理。
-      let trusted: Awaited<ReturnType<typeof verifyInstallTrust>>;
-      try {
-        trusted = await verifyInstallTrust(boundContext);
-      } catch {
-        return 'UNSAFE';
-      }
-      if (!trusted.ok) return 'UNSAFE';
-      try {
-        const packages = new PackageSystem(
-          trusted.value.context.installRoot, trusted.value.lock, trusted.value.context.hostPorts,
-        );
-        packages.recordSelectedKernelHostEntry();
-        exit = () => packages.runExit();
-      } catch {
-        return 'UNSAFE';
-      }
-    }
-    try {
-      await exit();
-      return 'DONE';
-    } catch {
-      return 'FAILED';
-    }
-  };
-  return {
-    context: boundContext,
-    cleanup: () => (cleanupFlight ??= runFallback()),
-  };
-}
 
 /**
- * 单一 KDP Host Init 专用的启动后半段：调用者已经是由 Boot 选定并导入的
- * KDP Package.Init，故这里只登记其一次真实进入并递归其余 Core，而不再调用 Kernel.Init。
- * Host FunctionRef/Target 与 Pin/Lock 身份在 Boot 侧绑定；本服务仅接管后半段调度。
+ * 唯一 KDP Host Init 的真实实现（kernelLifecycle Init Element）：
+ * 先复核安装信任，再创建 PackageSystem 并把一次性逆序 Exit 责任登记给 Boot 的
+ * Host Exit 栅栏；随后的调度、Hook、Workflow 与 App 创建全部由本 KDP 私有代码执行。
+ * 栅栏缺失（直接激活路径）不改变信任阶梯；不存在第二条 Kernel 执行路径。
  */
-export async function activateSelectedKdpHostInit(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
-  // 此调用本身已进入受选的 KDP Host Init：在第一次 await 之前登记退出责任。
-  // 此处不加载文件或执行 Exit；后续仅在验证可信安装来源之后转交 PackageSystem。
-  const enteredHost: { readonly entered: true } = { entered: true };
-  return activateKernel(context, enteredHost);
-}
-
-/**
- * KDP 单次激活：Host 已进入责任必须在调用者首次 await 前建立。
- * 不受信 Lock/Record/Pin 时禁止尝试加载任意 Exit，明确 CLEANUP_NOT_SAFE；
- * 可信安装已核实后立刻登记 Kernel Exit，再执行任何 Target/Descriptor/资源验证。
- */
-async function activateKernel(
-  context: KdpBootstrapContext,
-  enteredHost: { readonly entered: true },
-): Promise<KdpBootstrapResult> {
-  // 由受选 Host KDP.Init 在首次 await 前建立的进入责任，不存在旧 bootstrap 路径。
-  void enteredHost;
+export async function activateKernelLifecycle(context: KdpBootstrapContext): Promise<KdpBootstrapResult> {
   let trust: Awaited<ReturnType<typeof verifyInstallTrust>>;
   try {
     trust = await verifyInstallTrust(context);
@@ -196,10 +134,12 @@ async function activateKernel(
     // 必须紧接首次可信 Lock 获取后转交已经进入的 Host Kernel；后面的所有早期失败
     // 都通过同一个 catch/Exit 处理，绝不能通过 return 绕过 Exit。
     packages.recordSelectedKernelHostEntry();
-    const hostFence = (context as KdpBootstrapContext & {
-      readonly [HOST_EXIT_FENCE]?: HostExitRegistration;
-    })[HOST_EXIT_FENCE];
+    // 与 Boot 的一次性清理交接：真实逆序 Exit 仍由本 KDP 的 PackageSystem 执行。
+    const hostFence = (context as unknown as Record<string, unknown>)[DH_KDP_HOST_EXIT_FENCE_KEY] as
+      | KdpHostExitFence
+      | undefined;
     hostFence?.registerExit(() => packages.runExit());
+    lifecycleEvents().push({ phase: 'init', packageId: lock.selectedKdpHost.kdpPackageId });
 
     const profile: string = lock.target.profile;
     if (profile !== NODE22_ESM_PROFILE) {

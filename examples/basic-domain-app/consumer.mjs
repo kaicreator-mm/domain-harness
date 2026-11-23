@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { appendFile, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -218,12 +219,17 @@ async function authoring(label, rule, options = {}) {
   await write(dirs['rules-package'], 'dist/rules.mjs',
     rulesModule(options.workflow === true, options.workflowFatalAt ?? ''));
   await write(dirs['app-business'], 'dist/app.mjs', businessModule(options.unsupportedEffect === true, options.initThrows === true, options.initDegraded === true));
+  // 受选 Host Target = 真实 r41-kdp 引擎 bundle；dist/index.js 只是本夹具的可观测桥，
+  // 引擎（PackageSystem/Workflow/App/Exit）在 kernel-primary 包私有文件内执行。
+  const kdpEngineBundle = join(dirname(fileURLToPath(import.meta.url)),
+    '..', 'reference-domain-app', 'packages', 'r41-kdp', 'dist', 'index.mjs');
+  await write(dirs['kernel-primary'], 'dist/engine.mjs', await readFile(kdpEngineBundle));
   await write(dirs['kernel-primary'], 'dist/index.js', [
-    "import { activateSelectedKdpHostInit } from '@kaicreator/domain-harness-microkernel';",
+    "import { init as kernelInit } from './engine.mjs';",
     'const events = (globalThis.__domainHarnessT05Events ??= []);',
     'export async function init(context) {',
     "  events.push({ event: 'package-init', package: 'kernel-primary', initFrom: [{ type: 'Boot' }] });",
-    '  return activateSelectedKdpHostInit(context);',
+    '  return kernelInit(context);',
     '}',
     '',
   ].join('\n'));
@@ -531,6 +537,10 @@ async function authoring(label, rule, options = {}) {
       ...Object.fromEntries(Object.keys(dirs).map((id) => [id, 'dist/index.mjs'])),
       ...(standardRoot ? { [standardPkgId]: 'dist/index.mjs' } : {}),
     },
+    generatedResources: [{
+      packageId: 'kernel-primary', path: 'dist/engine.mjs',
+      digest: await fileDigest(join(dirs['kernel-primary'], 'dist/engine.mjs')),
+    }],
   };
   return {
     root, dirs, input, descriptor, definitions,
@@ -752,11 +762,12 @@ async function runWorkflowE2E() {
         `one selected FunctionRef for ${fnName}, reusable across distinct data Elements`);
     }
     const installed = await materialize('workflow-real-install', first);
-    for (const pkg of ['xstate', 'yaml']) {
-      const resolved = require.resolve(`${pkg}/package.json`, { paths: [installed.installRoot] });
-      assert.ok(resolved.startsWith(join(installed.installRoot, 'node_modules')),
-        `${pkg} must be installed in the exact composed consumer root`);
-    }
+    // R130：引擎 XState 随受选 KDP 自含闭包执行，组合 App 只安装声明的 yaml 第三方运行时。
+    const yamlResolved = require.resolve('yaml/package.json', { paths: [installed.installRoot] });
+    assert.ok(yamlResolved.startsWith(join(installed.installRoot, 'node_modules')),
+      'yaml must be installed in the exact composed consumer root');
+    assert.equal(existsSync(join(installed.installRoot, 'node_modules', 'xstate')), false,
+      'composed App must not carry a separate xstate install; the engine closure owns it');
     globalThis.__domainHarnessT05Events = [];
     const booted = await boot(installed.pin, installed.context);
     assert.equal(booted.status, 'BOOTED', JSON.stringify(booted));
@@ -1282,7 +1293,7 @@ async function prepareRegistryWorkflowFixture() {
     assert.equal(built.lock.selectedElements.filter((item) =>
       item.ref.id.startsWith('basic.data_')).length, 4);
     assert.deepEqual(built.lock.trustedRuntimeIntegrity?.map((entry) =>
-      [entry.name, entry.version]), [['xstate', '5.33.2'], ['yaml', '2.9.1']]);
+      [entry.name, entry.version]), [['yaml', '2.9.1']]);
     const installRoot = join(consumerRoot, 'registry-workflow-app');
     for (const file of built.appPackage.files) await write(installRoot, file.path, file.bytes);
     assert.equal(JSON.parse(await readFile(join(installRoot, 'package.json'), 'utf8'))

@@ -8,6 +8,14 @@ import { refusal } from './refusal.js';
 import { resolveExportedModule } from './app-package.js';
 
 const SAFE_BUILTINS = new Set(['node:buffer', 'node:crypto', 'node:path', 'node:url', 'node:util']);
+/**
+ * 受信 Kernel Profile（唯一 KDP 引擎载体）的独立静态准入（L2 A2.6）：
+ * 引擎物理职责包含封存字节读取（node:fs/promises）、选定模块装载（动态 import 与
+ * 导出名解析）、JSON 原型完整性检查（Object.getPrototypeOf）与 Node 进程生命周期
+ * （process）。封存字节完整性由运行期 Lock 逐字核验兜底；静态准入继续拒绝真正的
+ * 代码求值/逃逸向量（require/eval/Function/Reflect、裸 npm 能力、未声明跨包入口）。
+ */
+const KERNEL_PROFILE_BUILTINS = new Set([...SAFE_BUILTINS, 'node:fs/promises']);
 const OPAQUE_IDENTIFIERS = new Set(['require', 'eval', 'Function', 'Worker', 'Reflect']);
 // 仅为当前受信任 Node Package 的静态准入拒绝，不构成任意代码的沙箱证明。
 const AMBIENT_EFFECT_GLOBALS = new Set(['fetch', 'process', 'WebSocket', 'XMLHttpRequest', 'navigator', 'Deno', 'Bun']);
@@ -183,20 +191,9 @@ export function verifyGeneratedPackageImports(
       throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `module '${key}' has no selected Package owner`);
     }
     const allowed = new Set(consumer.dependsOn.map((dep) => dep.package));
+    // 受信 Kernel Profile：唯一 Order 0 KDP 引擎载体按其独立准入集检查。
+    const kernelProfile = consumer.role === 'primary' && consumer.layer === 'kernel' && consumer.order === 0;
     const inspectModule = (specifier: string, declaration?: ts.ImportDeclaration, dynamic = false): string => {
-      // 唯一受信 KDP Host Profile 只允许精确的 SDK Host 激活端口。
-      // 这是生成期许可，不能借此导入任何其他 SDK 能力、动态模块或任意包。
-      if (consumer.role === 'primary' && consumer.layer === 'kernel' && consumer.order === 0 &&
-          specifier === '@kaicreator/domain-harness-microkernel' && !dynamic &&
-          declaration?.importClause && !declaration.importClause.name &&
-          declaration.importClause.namedBindings &&
-          ts.isNamedImports(declaration.importClause.namedBindings) &&
-          declaration.importClause.namedBindings.elements.length === 1 &&
-          declaration.importClause.namedBindings.elements[0]?.name.text === 'activateSelectedKdpHostInit' &&
-          (declaration.importClause.namedBindings.elements[0]?.propertyName?.text ??
-            declaration.importClause.namedBindings.elements[0]?.name.text) === 'activateSelectedKdpHostInit') {
-        return 'node:builtin';
-      }
       if (specifier === 'yaml') {
         // 仅所选且显式声明精确版本的 SDK/Business Package 可导入受信第三方库。
         // 此范围只支持预先审核并具有受控 SRI 的 Node ESM 子集。
@@ -212,7 +209,8 @@ export function verifyGeneratedPackageImports(
         return 'node:builtin';
       }
       if (specifier.startsWith('node:')) {
-        if (!SAFE_BUILTINS.has(specifier)) {
+        const allowedBuiltins = kernelProfile ? KERNEL_PROFILE_BUILTINS : SAFE_BUILTINS;
+        if (!allowedBuiltins.has(specifier)) {
           throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
             `Package '${ref.packageId}' uses unapproved Node capability '${specifier}'`);
         }
@@ -291,6 +289,8 @@ export function verifyGeneratedPackageImports(
       throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
         `module '${key}' passes raw cross-Package handle '${name}' through ${where}`);
     };
+    const opaqueForProfile = (name: string): boolean =>
+      OPAQUE_MEMBERS.has(name) && !(kernelProfile && name === 'getPrototypeOf');
 
     const foreignHandles = new Set<string>();
     for (const statement of source.statements) {
@@ -326,6 +326,7 @@ export function verifyGeneratedPackageImports(
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `opaque code-loading identifier '${node.text}' in '${key}'`);
       }
       if (ts.isIdentifier(node) && AMBIENT_EFFECT_GLOBALS.has(node.text) &&
+          !(kernelProfile && node.text === 'process') &&
           !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) &&
           !(ts.isPropertyAssignment(node.parent) && node.parent.name === node)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
@@ -337,21 +338,22 @@ export function verifyGeneratedPackageImports(
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `unapproved ambient process/network access in '${key}'`);
       }
-      if (ts.isElementAccessExpression(node) &&
+      if (!kernelProfile && ts.isElementAccessExpression(node) &&
           !ts.isStringLiteral(node.argumentExpression) &&
           !ts.isNumericLiteral(node.argumentExpression)) {
         // 即便尚未调用，计算得出的属性也可能是 Function/createRequire 等动态加载器。
+        // Kernel Profile 例外仅覆盖其物理职责（选定导出名解析），见模块头准入说明。
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `computed member access in '${key}' is not in the statically provable ESM subset`);
       }
-      if (ts.isComputedPropertyName(node) && !ts.isStringLiteral(node.expression) &&
+      if (!kernelProfile && ts.isComputedPropertyName(node) && !ts.isStringLiteral(node.expression) &&
           !ts.isNumericLiteral(node.expression)) {
         throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
           `computed property declaration in '${key}' is not statically provable`);
       }
       if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))) {
         const name = propertyName(node);
-        if (name !== null && OPAQUE_MEMBERS.has(name)) {
+        if (name !== null && opaqueForProfile(name)) {
           throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `opaque reflective member '${name}' in '${key}'`);
         }
       }
@@ -392,33 +394,42 @@ export function verifyGeneratedPackageImports(
       }
       if (ts.isCallExpression(node)) {
         if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-          // KDP 必须在首次 ESM 求值前完成闭包验证，延迟 import 即使字面量也不可出现。
-          // 普通 Business/SDK 仍按各自受选静态子集规则处理，不能用 KDP 权限放行。
-          if (consumer.role === 'primary' && consumer.layer === 'kernel' && consumer.order === 0) {
-            throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
-              `selected KDP module '${key}' cannot use dynamic import (including literal imports)`);
+          if (kernelProfile) {
+            // 受信 Kernel Profile：唯一引擎装载器 import 已核验的封存字节路径；
+            // 运行期在首次求值前枚举并逐字核验完整可执行闭包（verifySelectedArtifacts）。
+            // 裸 npm 能力仍无条件拒绝，不能用 Kernel 权限放行未封存依赖。
+            const arg = node.arguments[0];
+            if (arg && ts.isStringLiteral(arg)) {
+              if (!arg.text.startsWith('node:') || !KERNEL_PROFILE_BUILTINS.has(arg.text)) {
+                throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED',
+                  `selected KDP module '${key}' cannot dynamically import an unpinned capability`);
+              }
+            }
+          } else {
+            const arg = node.arguments[0];
+            if (!arg || !ts.isStringLiteral(arg)) {
+              throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `dynamic import with nonliteral target in '${key}'`);
+            }
+            inspectModule(arg.text, undefined, true);
           }
-          const arg = node.arguments[0];
-          if (!arg || !ts.isStringLiteral(arg)) {
-            throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `dynamic import with nonliteral target in '${key}'`);
-          }
-          inspectModule(arg.text, undefined, true);
         } else {
-          if (ts.isElementAccessExpression(node.expression) && !ts.isStringLiteral(node.expression.argumentExpression)) {
+          if (!kernelProfile && ts.isElementAccessExpression(node.expression) &&
+              !ts.isStringLiteral(node.expression.argumentExpression)) {
             throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `computed call target in '${key}' is not statically provable`);
           }
           const name = callableName(node.expression);
-          if (name !== null && OPAQUE_MEMBERS.has(name)) {
+          if (name !== null && opaqueForProfile(name)) {
             throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `opaque code-loading call '${name}' in '${key}'`);
           }
         }
       }
       if (ts.isNewExpression(node)) {
-        if (ts.isElementAccessExpression(node.expression) && !ts.isStringLiteral(node.expression.argumentExpression)) {
+        if (!kernelProfile && ts.isElementAccessExpression(node.expression) &&
+            !ts.isStringLiteral(node.expression.argumentExpression)) {
           throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `computed constructor target in '${key}' is not statically provable`);
         }
         const name = callableName(node.expression);
-        if (name !== null && OPAQUE_MEMBERS.has(name)) {
+        if (name !== null && opaqueForProfile(name)) {
           throw refusal('DH_BUILD_DEPENDS_ON_UNSELECTED', `opaque code constructor '${name}' in '${key}'`);
         }
       }

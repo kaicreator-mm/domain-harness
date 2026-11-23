@@ -1,0 +1,9 @@
+{
+  "kind": "Element",
+  "schemaVersion": "dh.element/0.11",
+  "id": "r41.workflowRuntime",
+  "version": "1.0.0",
+  "description": "R41 KDP-owned Workflow/XState runtime: bounded node semantics, root WorkflowRun budget and real Promise Actor execution live in this Package's private sources.",
+  "content": [],
+  "functions": []
+}

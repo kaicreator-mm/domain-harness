@@ -25,8 +25,11 @@ const MICROKERNEL_DIST = fileURLToPath(new URL('../../../dist/', import.meta.url
 const CONTRACTS_DIST = fileURLToPath(
   new URL('../../../../contracts/dist/', import.meta.url),
 );
-const XSTATE_DIR = dirname(fileURLToPath(import.meta.resolve('xstate/package.json')));
-const YAML_DIR = dirname(fileURLToPath(import.meta.resolve('yaml/package.json')));
+// 真实 KDP 引擎闭包：fixture-kernel 的受选 Host Target 直接承载已 bundle 的引擎字节，
+// 不再生成把激活委托回 SDK microkernel 的壳（Foundation A6/R130）。
+const KDP_ENGINE_BUNDLE = fileURLToPath(
+  new URL('../../../../../examples/reference-domain-app/packages/r41-kdp/dist/index.mjs', import.meta.url),
+);
 
 export const KDP_PACKAGE_ID = 'fixture-kernel';
 export const TARGET: ResolvedTarget = {
@@ -61,7 +64,6 @@ export interface FixtureScenario {
   readonly init: FixtureInit;
   readonly functions: Readonly<Record<string, FunctionBehavior>>;
   readonly readResource?: string;
-  readonly kernelDisposeThrow?: boolean;
   readonly sdkInitThrow?: boolean;
 }
 
@@ -150,22 +152,14 @@ function behave(name) {
 `;
 }
 
-function kernelModuleSource(scenario: FixtureScenario): string {
+function kernelModuleSource(): string {
+  // fixture-kernel 的普通 Kernel 实现只承载可观测 Exit；受选 Host Init 由
+  // dist/index.js 的真实引擎 bundle 承载，不再存在第二条 Kernel 入口。
   return `
 const events = (globalThis.__domainHarnessEvents ??= []);
 events.push({ event: 'module-evaluated', package: '${FIXTURE_KERNEL}' });
-export async function init(ctx) {
-  events.push({ event: 'package-init', package: '${FIXTURE_KERNEL}', initFrom: ctx.InitFrom, hostPortCount: (ctx.hostPorts ?? []).length, visibleFunctions: [...ctx.functions.keys()] });
-  return ctx.nextCore?.init();
-}
-export async function hold(ctx) {
-  events.push({ event: 'package-init', package: '${FIXTURE_KERNEL}', droppedNextCore: true });
-}
-export async function exit(ctx) {
+export function exit(ctx) {
   events.push({ event: 'package-exit', package: '${FIXTURE_KERNEL}' });
-  if (${JSON.stringify(scenario.kernelDisposeThrow ?? false)}) {
-    throw new Error('fixture kernel Exit threw TOKEN_SECRET_CANARY_8029');
-  }
 }
 `;
 }
@@ -347,7 +341,7 @@ export async function buildFixtureInstall(
       exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
     }),
   );
-  // KDP Package 是真正的 Host 选定目标，而非把 Microkernel 拷到 KDP 包下假装拥有 Init。
+  // KDP Package 是真正的 Host 选定目标：受选 Target 物理承载真实引擎 bundle。
   const microkernelPackageDir = join(installRoot, 'node_modules', '@kaicreator', 'domain-harness-microkernel');
   await mkdir(microkernelPackageDir, { recursive: true });
   await writeFile(join(microkernelPackageDir, 'package.json'), JSON.stringify({
@@ -356,21 +350,10 @@ export async function buildFixtureInstall(
     exports: { '.': { import: './dist/index.js' } },
   }));
   await cp(MICROKERNEL_DIST, join(microkernelPackageDir, 'dist'), { recursive: true });
-  // 夹具中的普通 Kernel Init 兼容分支仅服务旧生命周期单元测试，
-  // 真正 Boot 通过同一受选 Host target 调用受限 KDP Init（没有下一 Core 句柄）。
-  await write(`node_modules/${KDP_PACKAGE_ID}/dist/index.js`, [
-    "import { activateSelectedKdpHostInit } from '@kaicreator/domain-harness-microkernel';",
-    'const events = (globalThis.__domainHarnessEvents ??= []);',
-    'export async function init(context) {',
-    '  if (context?.nextCore && typeof context.nextCore.init === "function") {',
-    '    events.push({ event: "package-init", package: "fixture-kernel", hostPortCount: (context.hostPorts ?? []).length });',
-    '    return context.nextCore.init();',
-    '  }',
-    '  events.push({ event: "host-init", package: "fixture-kernel" });',
-    '  return activateSelectedKdpHostInit(context);',
-    '}',
-    '',
-  ].join('\n'));
+  // 受选 Host Target = 真实 r41-kdp 引擎闭包（自含 PackageSystem/Workflow/App/Exit）。
+  const engineTarget = join(installRoot, ...`node_modules/${KDP_PACKAGE_ID}/dist/index.js`.split('/'));
+  await mkdir(dirname(engineTarget), { recursive: true });
+  await writeFile(engineTarget, await readFile(KDP_ENGINE_BUNDLE));
 
   const contractsPackageDir = join(installRoot, 'node_modules', '@kaicreator/domain-harness-contracts');
   await mkdir(contractsPackageDir, { recursive: true });
@@ -385,10 +368,9 @@ export async function buildFixtureInstall(
   );
   await cp(CONTRACTS_DIST, join(contractsPackageDir, 'dist'), { recursive: true });
   // 手工安装器也必须包含 Microkernel 的精确 XState/YAML 生产依赖。
-  await cp(XSTATE_DIR, join(installRoot, 'node_modules', 'xstate'), { recursive: true });
-  await cp(YAML_DIR, join(installRoot, 'node_modules', 'yaml'), { recursive: true });
+  // 引擎已 bundle 进受选 KDP 闭包；手工安装器不再需要复制第三方 xstate/yaml 目录。
 
-  const kernelPath = await write(`node_modules/${FIXTURE_KERNEL}/dist/index.mjs`, kernelModuleSource(scenario));
+  const kernelPath = await write(`node_modules/${FIXTURE_KERNEL}/dist/index.mjs`, kernelModuleSource());
   const sdkPath = await write(`node_modules/${FIXTURE_SDK}/dist/index.mjs`, sdkModuleSource(scenario));
   const businessPath = await write(`node_modules/${FIXTURE_BUSINESS}/dist/index.mjs`, businessModuleSource(scenario));
   const extPath = await write(`node_modules/${FIXTURE_EXT}/dist/index.mjs`, extensionModuleSource());

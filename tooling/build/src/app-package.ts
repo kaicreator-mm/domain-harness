@@ -255,8 +255,9 @@ export function composeAppPackage(
     const installed = parsePackageJson(scope.read(pkg.packageId, 'package.json'), pkg.packageId);
     return (installed.dependencies as Readonly<Record<string, unknown>> | undefined)?.['yaml'] === '2.9.1';
   });
-  const needsWorkflowRuntime = (lock.selectedWorkflows?.length ?? 0) > 0 || trustedYaml;
-  if (needsWorkflowRuntime) {
+  // R130：受控第三方安装器只在 App 真正声明 yaml 时生成；引擎 XState 随 KDP 闭包自带。
+  const needsTrustedRuntimeInstall = trustedYaml;
+  if (needsTrustedRuntimeInstall) {
     const pins = TRUSTED_WORKFLOW_NPM_ARCHIVES.map((item) => ({ ...item }));
     if (canonicalJson(lock.trustedRuntimeIntegrity) !==
         canonicalJson(pins)) {
@@ -289,7 +290,7 @@ export function composeAppPackage(
     scripts: { start: 'node ./boot.mjs' },
     dependencies,
   }));
-  add('boot.mjs', new TextEncoder().encode(BOOT_MODULE(needsWorkflowRuntime)));
+  add('boot.mjs', new TextEncoder().encode(BOOT_MODULE(needsTrustedRuntimeInstall)));
   // 不论调用方使用何种 npm 安装命令，组合包默认禁止在 Boot 之前执行依赖安装 Hook。
   add('.npmrc', new TextEncoder().encode('ignore-scripts=true\naudit=false\nfund=false\n'));
   files.sort((a, b) => a.path.localeCompare(b.path));

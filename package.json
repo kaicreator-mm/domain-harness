@@ -12,10 +12,10 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present && node scripts/bundle-kdp-packages.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p examples/reference-domain-app/packages/r41-kdp/tsconfig.json --noEmit",
     "lint": "node scripts/check-source-quality.mjs && eslint .",
-    "test": "npm run test:typecheck --workspaces && node --import tsx --test packages/contracts/tests/core/*.test.ts tooling/build/tests/core/*.test.ts packages/microkernel/tests/core/*.test.ts packages/domain-harness/tests/core/*.test.ts",
+    "test": "npm run test:typecheck --workspaces && node --import tsx --test packages/contracts/tests/core/*.test.ts tooling/build/tests/core/*.test.ts packages/microkernel/tests/core/*.test.ts packages/domain-harness/tests/core/*.test.ts examples/reference-domain-app/packages/r41-kdp/tests/core/*.test.ts",
     "test:demo": "node examples/basic-domain-app/verify-clean-install.mjs",
     "verify": "npm run build && npm run typecheck && npm run lint && npm test && npm run test:demo",
     "test:registry": "node scripts/verify-single-sdk-registry-install.mjs",
@@ -28,6 +28,7 @@
     "tsx": "^4.0.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.70.0",
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "xstate": "5.33.2"
   }
 }

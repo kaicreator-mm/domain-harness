@@ -1,15 +1,13 @@
 /**
- * 固定经审核的两个 Workflow 依赖 npm 压缩包字节，SHA-512 SRI 来自单仓已审查的锁文件。
+ * 固定经审核的第三方运行时依赖 npm 压缩包字节，SHA-512 SRI 来自单仓已审查的锁文件。
+ * Foundation A6/R130 起引擎 XState 由受选 KDP 包的自含闭包承载，App 层不再安装 xstate；
+ * 唯一剩余的第三方运行时依赖是显式声明精确版本的 Standard Reader yaml。
  * 所有第三方可执行依赖必须通过校验完整性的 npm 客户端安装；
  * App Boot 前还必须按 BUILD 封存的清单独立核对，业务 Package 无权改变这些固定值。
  */
 import { canonicalJson, type JsonValue } from '@kaicreator/domain-harness-contracts';
 
 export const TRUSTED_WORKFLOW_NPM_ARCHIVES = Object.freeze([
-  Object.freeze({
-    name: 'xstate', version: '5.33.2',
-    integrity: 'sha512-8tC7yXgeCvpT8gKEeEje6ikJJG1wpnoLiXe+HfECW8m10ubMd3QxKOwWA8KxPJVBcLwfdRoMKYxIBGYKmo37/A==',
-  }),
   Object.freeze({
     name: 'yaml', version: '2.9.1',
     integrity: 'sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==',
@@ -47,7 +45,7 @@ const npmLock = await readJson('package-lock.json');
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 if (manifest.kind !== 'DomainHarnessTrustedRuntime' ||
     manifest.schemaVersion !== 'dh.runtime-integrity/0.11' ||
-    !Array.isArray(manifest.archives) || manifest.archives.length !== 2 ||
+    !Array.isArray(manifest.archives) || manifest.archives.length !== 1 ||
     !equal(manifest.archives, sealedLock.trustedRuntimeIntegrity)) {
   fail('DH_TRUSTED_RUNTIME_LOCK_MISMATCH');
 }
@@ -61,7 +59,7 @@ const allowedExternal = new Set([
   '@kaicreator/domain-harness',
   '@kaicreator/domain-harness-microkernel',
   '@kaicreator/domain-harness-contracts',
-  'xstate', 'yaml',
+  'yaml',
 ]);
 const approved = new Set([...owned, ...allowedExternal]);
 const supplied = Object.keys(app.dependencies ?? {});
@@ -105,7 +103,7 @@ const approvedOrigin = (resolvedUrl) => {
   }
 };
 for (const [index, archive] of manifest.archives.entries()) {
-  if (archive.name !== ['xstate', 'yaml'][index] ||
+  if (archive.name !== ['yaml'][index] ||
       typeof archive.integrity !== 'string' ||
       !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(archive.integrity)) {
     fail('DH_TRUSTED_RUNTIME_PIN_INVALID');
@@ -171,7 +169,7 @@ if (!equivalent(manifest.archives, sealedLock.trustedRuntimeIntegrity)) {
 }
 if (manifest.kind !== 'DomainHarnessTrustedRuntime' ||
     manifest.schemaVersion !== 'dh.runtime-integrity/0.11' ||
-    !Array.isArray(manifest.archives) || manifest.archives.length !== 2) {
+    !Array.isArray(manifest.archives) || manifest.archives.length !== 1) {
   throw new Error('DH_TRUSTED_RUNTIME_MANIFEST_INVALID');
 }
 let lock;
@@ -184,7 +182,7 @@ if (lock.lockfileVersion !== 3 || typeof lock.packages !== 'object' || !lock.pac
   throw new Error('DH_TRUSTED_RUNTIME_INSTALL_LOCK_INVALID');
 }
 for (const [index, archive] of manifest.archives.entries()) {
-  if (archive.name !== ['xstate', 'yaml'][index]) {
+  if (archive.name !== ['yaml'][index]) {
     throw new Error('DH_TRUSTED_RUNTIME_PIN_NAME_MISMATCH');
   }
   if (typeof archive.name !== 'string' || typeof archive.version !== 'string' ||

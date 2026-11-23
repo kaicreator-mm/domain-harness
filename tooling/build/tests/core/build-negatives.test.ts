@@ -534,6 +534,53 @@ test('Foundation L2-1: Order-0 Kernel refuses literal dynamic import before seal
   expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
 });
 
+test('Foundation A6: Order-0 Kernel cannot re-import the SDK microkernel delegation port', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const kdp = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'kdp-kernel') as DomainPackageManifest;
+  const target = writeRaw(scenario.ws.packageRoots['kdp-kernel']!, 'dist/kdp.mjs',
+    new TextEncoder().encode([
+      "import { activateSelectedKdpHostInit } from '@kaicreator/domain-harness-microkernel';",
+      'export async function init(context) { return activateSelectedKdpHostInit(context); }',
+      'export function exit() {}',
+      '',
+    ].join('\n')));
+  const patched = {
+    ...kdp,
+    targetVariants: kdp.targetVariants.map((variant) => ({
+      ...variant,
+      implementations: variant.implementations.map((binding) => ({
+        ...binding,
+        entry: { ...binding.entry, module: target },
+      })),
+    })),
+  };
+  const packages = input.packages.map((pkg) => pkg === kdp ? patched : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
+test('Foundation A6: Order-0 Kernel refuses unpinned bare dynamic import (including literals)', (t) => {
+  const scenario = standardCase();
+  t.after(scenario.ws.dispose);
+  const { input } = scenario.finalize();
+  const kdp = input.packages.find((pkg) => (pkg as DomainPackageManifest).id === 'kdp-kernel') as DomainPackageManifest;
+  const target = writeRaw(scenario.ws.packageRoots['kdp-kernel']!, 'dist/kdp.mjs',
+    new TextEncoder().encode('export async function init() { return await import("xstate"); }\nexport function exit() {}\n'));
+  const patched = {
+    ...kdp,
+    targetVariants: kdp.targetVariants.map((variant) => ({
+      ...variant,
+      implementations: variant.implementations.map((binding) => ({
+        ...binding,
+        entry: { ...binding.entry, module: target },
+      })),
+    })),
+  };
+  const packages = input.packages.map((pkg) => pkg === kdp ? patched : pkg);
+  expectRefusal(buildApp({ ...input, packages }), 'DH_BUILD_DEPENDS_ON_UNSELECTED');
+});
+
 function generatedLoaderCase(label: string, body: string, code: BuildErrorCode = 'DH_BUILD_DEPENDS_ON_UNSELECTED'): void {
   test(`B0 selected ESM proof: ${label}`, (t) => {
     const scenario = standardCase();
