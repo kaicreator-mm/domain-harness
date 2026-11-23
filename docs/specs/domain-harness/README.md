@@ -1,6 +1,6 @@
 # DomainHarness · 唯一规范目录
 
-> 设计基线：**Language-Native Domain SDK**；Owner 决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。这是唯一多文件规范，人和 Agent 读同一正文。**新设计确认不等于源码已迁移**。
+> 设计基线：**Language-Native Domain SDK**；Owner 决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。这是唯一多文件规范，人和 Agent 读同一正文。**设计已确认；v0.11.1 原生 SDK 源码已在 R160 接受并经 PR #1694 合入版本列车**，其余 v0.11.x 阶段需各自验证。
 
 ## 阅读路径
 
@@ -23,4 +23,4 @@
 
 DIS 保留跨语言领域语义；本规范只确定 DomainHarness SDK 的语言原生映射。0.11.0–0.11.9 是同一次完全重写，不要求兼容 0.10.x；v0.11.1 的基础缺陷在本版本修复，不推给 v0.11.2。
 
-旧 R90、历史 L2/PRD、Exact-SHA CI 与 Release 收据仅作可追溯历史，**不再作为与新决议冲突时可选的当前权威合同**。源代码与机器 ABI 仍待按新规范实现并独立验收，不得因 docs-only 改动宣称通过。
+旧 R90、历史 L2/PRD、Exact-SHA CI 与 Release 收据仅作可追溯历史，**不再作为与新决议冲突时可选的当前权威合同**。原生 v0.11.1 源码依 PR #1694 Exact-SHA + Woodpecker #3151 + R160 复审接受；历史旧 ABI 不再在版本列车执行。单独的文档状态更新不构成新的源码 CI/功能验收，也不表示整个 0.11.x 已发布。

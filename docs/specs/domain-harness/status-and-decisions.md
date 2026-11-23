@@ -1,31 +1,31 @@
 # DomainHarness · 设计现状与迁移清单
 
-> [权威目录](./README.md) · Owner 新决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。**本规范是设计和验收权威；代码迁移在 Draft #1694 的候选树中完成，但在该 PR 正式合并前不属于版本列车。**
+> [权威目录](./README.md) · Owner 现行新架构决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。本文件同时保留 R151 初审 REWORK 与后续 R160 通过的时间顺序；历史状态不得覆盖新收据。
 
-> **R160 当前状态（R151 P1/P2 整改已提交，独立限定复审待完成）**：新语言原生规范 R140、KDP/XState R143、Reader R145、Workflow R154、生成期 R158 均有各自 Exact-SHA 的限定独立审核。**R140、R145 原审核各保留一个 P2**（R140 GEN-08 后由 R145 合入处置；R145 Reader 边界测试后续扩展）；不得改写原始审核数量。
->
-> - **已合并的版本列车**：Workflow [PR #1692](https://github.com/kaicreator-mm/domain-harness/pull/1692) R154 `ACCEPT_SCOPED P0/P1/P2=0`，merge `b88137c7b2b2e1a5b6676a7a86a715458ac05ac4`；作者侧生成工具 [PR #1693](https://github.com/kaicreator-mm/domain-harness/pull/1693) R158 同样 `ACCEPT_SCOPED 0/0/0`，merge `caea4cc0ce0a206c92748074c72d39322e56a9e7`。历史 #3147 被取消，等价源 Blob #3148 SUCCESS 的区别已由 R158 明确。
-> - **原生 SDK 完整替换** [Draft PR #1694](https://github.com/kaicreator-mm/domain-harness/pull/1694)：以已接受的版本列车为父提交，候选已物理删除旧 Contracts/Microkernel/BUILD/Boot/PackageSystem/FunctionRef/Target/Lock/Pin 相关 151 个文件路径，保留单 SDK Workspace、五个生产 TS 模块、标准 Workflow/Reader、最小 KDP 与真实仓外仅直接依赖 SDK 的 npm 消费者。此删除**尚未合并到版本列车**。
-> - **R151 完整独立审核结论是 REWORK P0=0/P1=2/P2=5**，Exact `aaf6c930f9541768119991500c7bc7811898e18d`。两个 P1 为 Workflow 构造/运行预算不同快照、仓外 Domain App 四次 Reader 漏记根预算。新版修复已在 Draft 提交 `5b56a89743a10c2271b435879115dc2b32c734c2`，Woodpecker [#3150](https://ci.kaicreator.com/repos/18/pipeline/3150/1) **SUCCESS**：预算构造时复制/验证一致、Reader 在真实业务 ctx.invoke 计费，仓外 App 有足额/Reader 拒绝/Hook 拒绝/步骤拒绝的正负例。
-> - **五项 P2 处置**：Windows npm.cmd 改成 process.execPath 驱动 npm CLI（**Windows 真机验证尚未做，不声明 Windows PASS**）；当前英文/原生 App README 和旧路线图标记/链接纠正；开发 CI Node 下限 >=22.13 与 SDK 消费者 >=22.12 分离；Writer getter/own-enumerable/动态 Proxy 快照回归恢复；SDK 包根 12 个运行时导出及类型入口文档列出。合并前必须经新 SHA 的独立限定审核确认是否全部可接受。
-> - **最终门槛**：对本轮整改的实际 Diff 独立非 Writer 复审，接受后才允许将 Draft 转 Ready、合并与关闭 #1682/#1668。旧架构历史只能作带 SHA 的证据，不是当前可执行合同。
+## R161 · v0.11.1 语言原生 SDK 源码交付已完成（不是正式 Release）
+
+- 新架构 Canonical R140、KDP/XState R143、Reader/App R145、Workflow R154 和作者侧生成 R158 均已分批审核合并。R140 与 R145 原审各有 1 项 P2，历史数字保留并分别有后续处置，**不得追改旧审查结果**。
+- R151 对完整 180 路径（151 删除）的旧运行栈物理替换在 `aaf6c930f9541768119991500c7bc7811898e18d` 提出 **REWORK P0=0/P1=2/P2=5**。两项 P1 是根 Workflow 预算快照 TOCTOU 和仓外 App 四次 Reader 根预算漏计；五项 P2 涉及 Windows npm CLI、README/历史状态、Node 下限、Writer 行为回归、SDK 类型/值导出文档。
+- [R160 独立复审](https://github.com/kaicreator-mm/domain-harness/pull/1694#pullrequestreview-6025797181) 针对 R151 后 2 个提交/15 文件结论 **ACCEPT_SCOPED P0=0/P1=0/P2=0**；受审 HEAD `0477edf9070c05ec3c89c46fb1aaa43cf2f850a3`，对应 [Woodpecker #3151](https://ci.kaicreator.com/repos/18/pipeline/3151/1) **SUCCESS**。保留 `WINDOWS_REAL_E2E=NOT_RUN` 与 `EXACT_NODE_22_12_RUNTIME=NOT_VERIFIED`。
+- [PR #1694](https://github.com/kaicreator-mm/domain-harness/pull/1694) 已 **MERGED** 到 `version/v0.11.x@452e2212fb8a25168ee62d4e793897d77416cb92`，新旧 SHA 比较 **0 个文件差异**。旧 Contracts/Microkernel/Boot/BUILD/FunctionRef/Target/Pin/Lock/PackageSystem 的运行实现不再在此列车；单 SDK Workspace、原生 KDP、Standard Workflow/Reader、真实外部 SDK-only npm 安装消费者已提交并接受。
+- **阶段边界**：v0.11.1 源码任务 #1682、Foundation #1668 可按 R161 完成；不创建 v0.11.1 单独 Tag/npm 发布/GitHub Release，也不合并 main。0.11.0–0.11.9 属于一次完全重写，待整个系列完成最终组合验收后统一发布。R161 文档提交本身不代表新增源码测试通过。
 
 ## 新架构状态
 
-| 切面 | 状态 | 待办 |
+| 切面 | 状态 | 当前验收边界 |
 |---|---|---|
-| Package=静态 ESM 插件、Element=Class、Function=普通函数/方法 | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | 删除旧独立 FunctionRef/Target/Adapter 执行机制 |
-| Standard=SDK 内置应用级复用、Business 优先使用 Standard | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | Standard Workflow/XState 和真实业务消费 |
-| KDP/SDK/App 全都使用同一模型 | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | 最小 KDP，去除旧三套职责/执行混合 |
-| Metadata 是框架读取的可执行代码，Skill+TSDoc 面向 Agent | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | packageMeta/Class 静态字段 |
-| Order 唯一、KDP=0、可选 Init/Exit | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | 生成期错误检测、生命周期根/逆序退出 |
-| 静态可信，无自建 Runtime Lock/Pin/权限证明 | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | 移除旧受选 KDP Host、Lock/Pin/Record |
-| Workflow/Reader/UNKNOWN/Hook/退出语义 | **保留有价值的行为，机器实现待迁移** | 按应用级 Standard 与原生 Class 重新实现 |
-| Node >=22.12.0、v0.11.x 完全重写 | **CONFIRMED** | 不要求 Node24；不保留 v0.10.x ABI |
+| Package=静态 ESM 插件、Element=Class、Function=普通函数/方法 | **SOURCE_ACCEPTED / MERGED** | 旧执行层已物理删除；生成期正确性由作者负责 |
+| Standard=SDK 内置应用级复用、Business 优先使用 Standard | **SOURCE_ACCEPTED / MERGED** | 原生 Workflow/Reader 与已安装 App 正反例已验收 |
+| KDP/SDK/App 全都使用同一模型 | **SOURCE_ACCEPTED / MERGED** | 最小 KDP 和单一 SDK 已受审合入 |
+| Metadata 是框架读取的可执行代码，Skill+TSDoc 面向 Agent | **SOURCE_ACCEPTED / MERGED** | 代码元数据与 TS Profile 已实施 |
+| Order 唯一、KDP=0、可选 Init/Exit | **SOURCE_ACCEPTED / MERGED** | 生成期 Order NEG、KDP 退出回归已通过 |
+| 静态可信，无自建 Runtime Lock/Pin/权限证明 | **SOURCE_ACCEPTED / MERGED** | 旧自建运行时路径已删除 |
+| Workflow/Reader/UNKNOWN/Hook/退出语义 | **SOURCE_ACCEPTED / MERGED（限定验收）** | Reader/Workflow/Hook/预算保留回归已验收 |
+| Node >=22.12.0、v0.11.x 完全重写 | **SOURCE_ACCEPTED / MERGED** | SDK 消费者 >=22.12；开发工具链 >=22.13；不保留 v0.10.x ABI |
 
-## 旧架构替换（不是并行维护两套实现）
+## 旧架构替换（R161 已执行；不是并行维护两套实现）
 
-| HISTORICAL / 待删除 | 新版 |
+| HISTORICAL / 已删除的旧执行机制 | 新版 |
 |---|---|
 | K/S/B 固定 Package 技术体系 | Kernel/SDK/App 是不同业务角色，Package/Element 技术统一 |
 | JSON ElementDefinition 作为运行时可执行对象 | TS Class + 必需 Code Metadata |
@@ -59,7 +59,7 @@
 ## 历史与证据
 
 - 旧 #1681 R129 Review Exact `c87b45e4d30bbd28dd0ea06395fecdfb06f557c8`、Woodpecker #3090 SUCCESS；旧 #1684 R131 Review Exact `1fc0c0820b1633d824672816fb91ec50bbb87eed`、Woodpecker #3091 SUCCESS；R131 旧机器修复合入 `a159f17fecf0431cf4cf41c4c8e892b574f1afc8`。它们都是**历史限定证据**，不是新执行模型已验证。
-- [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)、[#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)、[#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)、[#1682](https://github.com/kaicreator-mm/domain-harness/issues/1682) 继续追踪实现；旧文档/PRD/L2 只记录历史，不可对抗新规范。
+- [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)、[#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)、[#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)、[#1682](https://github.com/kaicreator-mm/domain-harness/issues/1682) 保留各自历史任务及完成收据；旧文档/PRD/L2 只记录历史，不可对抗新规范。
 
 ## R139 · 全体系独立审查后整改状态
 
