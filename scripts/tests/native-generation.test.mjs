@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -164,5 +165,47 @@ test('R149 P2：相对目录不是有效模块，NodeNext TS 源码 .js 输出�
     writeFileSync(core,
       "import './helper.js'; export const packageMeta={id:'business',role:'core',order:2} as const;");
     assert.equal(validateNativeApp(x.manifest,[x.kdp,core]).checked,2);
+  });
+});
+
+test('R155 元数据括号别名不得静态 PASS，CLI 必须返回人工复核状态', () => {
+  for (const expression of ['(packageMeta)','((packageMeta))']) {
+    runCase({business:`export const packageMeta={id:'business',role:'core',order:2};
+      const alias=${expression}; alias.order=0;`}, x => {
+      assert.deepEqual(validateNativeApp(x.manifest,[x.kdp,x.business]).manualReviewPackages,
+        ['business']);
+      const run=spawnSync(process.execPath,[
+        new URL('../validate-native-generation.mjs',import.meta.url).pathname,
+        '--manifest',x.manifest,'--core',x.kdp,'--core',x.business,
+      ],{encoding:'utf8',timeout:12000});
+      assert.equal(run.status,3,run.stderr);
+      assert.equal(JSON.parse(run.stdout).status,'GEN_PARTIAL_REVIEW_REQUIRED');
+    });
+  }
+});
+
+test('R155 TypeScript 类型包装后的简单元数据别名必须人工复核', () => {
+  runCase({}, x => {
+    const core=join(x.root,'packages/business.mts');
+    for (const expression of [
+      '(packageMeta)',
+      '(packageMeta as typeof packageMeta)',
+      '((packageMeta as typeof packageMeta) satisfies typeof packageMeta)',
+      'packageMeta!',
+      '(<typeof packageMeta>packageMeta)',
+    ]) {
+      writeFileSync(core,`export const packageMeta={id:'business',role:'core',order:2} as const;
+        const alias=${expression}; alias.order=0;`);
+      assert.deepEqual(validateNativeApp(x.manifest,[x.kdp,core]).manualReviewPackages,
+        ['business'],expression);
+    }
+  });
+});
+
+test('R155 非元数据普通括号别名不触发手动复核', () => {
+  runCase({business:"const source={order:7}; const alias=(source); alias.order=0; export const packageMeta={id:'business',role:'core',order:2};"}, x => {
+    assert.deepEqual(validateNativeApp(x.manifest,[x.kdp,x.business]),{
+      packages:[{id:'kdp',order:0},{id:'business',order:2}],checked:2,
+    });
   });
 });
