@@ -8,17 +8,22 @@ VERSION_ISSUE=#1612
 PRODUCT_PR=#1702
 R20_REVIEW=REWORK_P0_0_P1_3_P2_2
 R20_REVIEW_EXACT_HEAD=eca31549cde5f4d17470ea4cd35f8303fbfe35f1
-DOCUMENT_AUTHORITY=SOLE_CONSOLIDATED_PRODUCT_L1_CANDIDATE
-STATUS=R22_ACCEPTED_R23_SCOPE_DIRECTION_SELECTED_PENDING_OWNER_FREEZE
+DOCUMENT_AUTHORITY=SOLE_CONSOLIDATED_PRODUCT_L1_CONTENT_UNDER_R25_FREEZE
+STATUS=FROZEN_BY_R25_SCOPE
 R22_REVIEW=ACCEPT_SCOPED_DESIGN_ONLY_P0_0_P1_0_P2_0
+R24_REVIEW=ACCEPT_SCOPED_SCOPE_AND_VERSION_ONLY_P0_0_P1_0_P2_0
+R25_SCOPE_FREEZE=YES
+L2=ADMITTED_DESIGN_ONLY
 L2=NOT_STARTED
 IMPLEMENTATION=ON_HOLD
 CI=NOT_RUN_DOC_ONLY
 ```
 
-> **权限边界：** 本文件是将 R8–R19 和 R20 的全部产品要求收敛后的**唯一当前 Product/L1 候选入口**；此前 R8–R19 文档作为推导与历史证据，**不得把旧版冲突 AC 与本文件并行当成必选交付门**。R20 的正式结论是 `REWORK`，但 R21 已由 R22 **`ACCEPT_SCOPED_DESIGN_ONLY`**（仅设计，P0/P1/P2=0）接受；R23 新范围选项仍待最终 Owner Freeze。下列具体产品能力及把 #1614 归入 #1612 的版本调整为 **RECOMMENDED_PENDING_OWNER**，在 Owner 明确选定并审查通过之前不能标注 Product/L1 FROZEN 或启动源码。现有 v0.11.1 的核心规范/Workflow API 仍保持权威。
+> **权限边界：** 本文件是将 R8–R19 和 R20 的全部产品要求收敛后的**唯一当前 Product/L1 候选入口**；此前 R8–R19 文档作为推导与历史证据，**不得把旧版冲突 AC 与本文件并行当成必选交付门**。R20 的正式结论是 `REWORK`，但 R21 已由 R22 **`ACCEPT_SCOPED_DESIGN_ONLY`**（仅设计，P0/P1/P2=0）接受；R23 新范围选项仍待最终 Owner Freeze。下列产品能力及把 #1614 完整归入 #1612 的范围，现由 **R25 Product/L1 Freeze** 正式选定。尚未完成 L2 独立审核，故**不能开始 SDK 源码实施**。现有 v0.11.1 的核心规范/Workflow API 仍保持权威。
 
-> **R23 当前范围建议入口：** [R23 Owner 选项建议与跨版本归属](./DomainHarness_v0.11.2_R23_SCOPE_SELECTION_AND_VERSION_CONSOLIDATION.md) 已根据此前 SQLite/SQL/Vector/Graph/Expression 要求和 Authorized Action 合并方向作产品选择准备。R22 对旧 R21 的 `ACCEPT_SCOPED_DESIGN_ONLY` 仍是独立审核事实；**本次新增选择并未获得该旧 SHA 的覆盖**。本文件是当前唯一完整 L1 合同候选；**最终 Owner Freeze 与新范围复核均未完成，禁止提前开始 L2/源码**。
+> **R23 当前范围建议入口：** [R23 Owner 选项建议与跨版本归属](./DomainHarness_v0.11.2_R23_SCOPE_SELECTION_AND_VERSION_CONSOLIDATION.md) 已根据此前 SQLite/SQL/Vector/Graph/Expression 要求和 Authorized Action 合并方向作产品选择准备。R22 对旧 R21 的 `ACCEPT_SCOPED_DESIGN_ONLY` 仍是独立审核事实；**本次新增选择并未获得该旧 SHA 的覆盖**。本文件是当前唯一完整 L1 合同候选；**新增范围已由 R24 限定独立审核接受；R25 已完成范围冻结，仅允许启动 L2 设计，不允许提前开发源码**。
+
+> **CURRENT · R25 PRODUCT/L1 FROZEN SCOPE（2026-11-24）：** [R25 正式范围冻结](./DomainHarness_v0.11.2_R25_PRODUCT_L1_SCOPE_FREEZE.md) 已采纳 R22、R24 通过的 R21+R23 设计；下列仍标“建议/若选入/待裁定”的历史描述只有在 R25 未覆盖的情况下可做来源参考。选定：通用有界 Query + SQLite/SQL/Vector/Graph/Expression + 0.11.4 全量 Authorized Action 同归 0.11.2，具体唯一验收 DI-L1-01–12。本文件原 R20/21/23 审核状态作为真实时间线，**不代表 L2/API/源码或 CI 已通过**。
 
 ## 1. 一句话产品目标
 
@@ -61,7 +66,7 @@ User/Host request
 
 ## 4. 0.11.2 SDK 交付边界：一个明确的能力选择表（R20 P1-1 修正）
 
-**下表是本轮单一推荐基线，供 Owner 直接裁定，并非已确认 L1 冻结。** 必选项不得被“只写两份业务常量+复用 0.11.1 Workflow”替代；不能在实现时按 R10/R11 的旧表暗中把全部查询产品也恢复为强制项。
+**本表的最终选项由 [R25 正式范围冻结](./DomainHarness_v0.11.2_R25_PRODUCT_L1_SCOPE_FREEZE.md) 确认，旧“推荐/待裁定”的标签为历史候选文字。** 必选项不得被“只写两份业务常量+复用 0.11.1 Workflow”替代；不能在实现时按 R10/R11 的旧表暗中把全部查询产品也恢复为强制项。
 
 | 能力 | R21 推荐状态 | 正确的必选产品行为与禁止项 |
 |---|---|---|
@@ -110,9 +115,9 @@ Selected, valid business intent
 - **SESSION = 批准可覆盖多次新命令**，但必须在已同意的主体、租户、目标资源、操作种类、参数边界与明确有效期内；提交时仍检查当前 Business Guard、真实权限、资源版本及排他提交条件。撤回/过期/关键条件变化则不授权后续调用。
 - 未确认返回 ASK/WAIT、用户明确拒绝返回 REJECT、已提交但未知返回 UNKNOWN。完整 UI/对话框/多轮确认由 **0.11.3**，跨进程持久等待由 **0.11.6**，本版只需要可工作的一次确认/结果接线（若 Slice B 入本版）。
 
-## 7. v0.11.x 版本依赖裁决清单（仍待 Owner）
+## 7. v0.11.x 版本归属（经 R25 冻结）
 
-**推荐合并 #1614 Authorized Action 全量进入 #1612**，并在此内部按 Slice A(Static Knowledge/Recognition/Read-only) → Slice B(Authorized Handling/Effect) 两批独立评审；不额外创造两个运行时/另一个产品阶段。此建议沿用 Owner 在 R16 讨论中的方向，但没有把建议当成正式审批。
+**R25 已确定 #1614 Authorized Action 全量并入 #1612**，并在此内部按 Slice A(Static Knowledge/Recognition/Read-only) → Slice B(Authorized Handling/Effect) 两批独立评审；不额外创造两个运行时/另一个产品阶段。此建议沿用 Owner 在 R16 讨论中的方向，但没有把建议当成正式审批。
 
 | 版本 | 若 Owner 采用合并，必须同步的正式范围 |
 |---|---|
@@ -123,7 +128,7 @@ Selected, valid business intent
 | 0.11.6 #1616 | Durable TaskRun / checkpoint / pause/resume/cancel / 高级失联恢复；复用真实 Effect provider 已保存的 attempt/receipt，不再假设 `KDP` 自己记录全体 EffectJournal |
 | 0.11.7–0.11.9 | Execution evidence、Client Experience、Server Evolution 依旧独立，不将运行学习/热改知识塞入 0.11.2 |
 
-**R23 明确推荐的 Owner 选择（仍待最终 Freeze）：** (A) 静态有界 Query + SQLite + SQL + 有界 Vector + 有界 Graph + 有界 Expression 为本版必选；JSON-LD/FTS 不作为本版必选；(B) 完整吸收原 #1614；(C) 0.11.4 编号/Issue 历史保留、不重复实施、不自动重排 0.11.5–0.11.9。详情见 [R23 范围选择记录](./DomainHarness_v0.11.2_R23_SCOPE_SELECTION_AND_VERSION_CONSOLIDATION.md)。选择完成后需要更新唯一 Roadmap、#1563 和 #1612–#1616 的版本归属、原 #1614 AC1–AC3 映射并在 GitHub 留痕。**在此之前不把旧 #1614 的实施门设为已关闭。**
+**R25 正式采纳的 Owner 范围选择：** (A) 静态有界 Query + SQLite + SQL + 有界 Vector + 有界 Graph + 有界 Expression 为本版必选；JSON-LD/FTS 不作为本版必选；(B) 完整吸收原 #1614；(C) 0.11.4 编号/Issue 历史保留、不重复实施、不自动重排 0.11.5–0.11.9。详情见 [R23 范围选择记录](./DomainHarness_v0.11.2_R23_SCOPE_SELECTION_AND_VERSION_CONSOLIDATION.md)。选择完成后需要更新唯一 Roadmap、#1563 和 #1612–#1616 的版本归属、原 #1614 AC1–AC3 映射并在 GitHub 留痕。**原 #1614 的功能尚未实施，不能以“已移交”冒称动作功能已通过；其独立任务入场门被 R25 正式取代。**
 
 ## 8. 新统一 L1 验收候选（替代历次并列 DI-AC01–60；全部 NOT_RUN）
 
@@ -133,12 +138,12 @@ Selected, valid business intent
 | **DI-L1-02** | 内聚 Element 负责状态，两个并发请求/不同租户与 Element 实例状态不串扰；真正持久/跨进程状态从对应资源读取 |
 | **DI-L1-03** | 同一真实新增 SDK 有界 Query 实现在两个不同领域的直接函数调用和 Workflow 调用中复用，限额/来源/范围/版本/时点/缺失/冲突均有正反例；既不能依赖未选动态知识 Registry，也不能仅重复 0.11.1 Reader |
 | **DI-L1-04** | SQLite/SQL **若选入**：真正读写动态数据、关闭重开、参数查询、事务回滚、版本竞争/资源拒绝；任何查询都不能热修改旧 Business Package 的静态 Knowledge |
-| **DI-L1-05** | **R23 选中的 Vector、Graph、Expression**：有界 Top-K/非法维度、关系方向/环与多跳限额、受限表达式/资源失败正反例；跨域真实消费并保持不可变知识。**未选** JSON-LD/FTS 不能冒充已实现；所有选项仍待 Owner Freeze |
+| **DI-L1-05** | **R23 选中的 Vector、Graph、Expression**：有界 Top-K/非法维度、关系方向/环与多跳限额、受限表达式/资源失败正反例；跨域真实消费并保持不可变知识。**未选** JSON-LD/FTS 不能冒充已实现；所有选项已由 R25 正式冻结，仍待 L2/实施验收 |
 | **DI-L1-06** | 同一业务根在 Intent Recognition + Handling 间共享预算，识别额度耗尽或失败时 Handling/Host 副作用计数为零；处理器静态选定且无未知名称动态加载；两角色业务 I/O 可不同 |
 | **DI-L1-07** | 现有六态 Outcome 按真实业务语义保留，`invoke` 不把非成功包成 COMPLETE；同次决策保留真实使用的事实/规则/来源，未验证事实不能当确定真值 |
-| **DI-L1-08** | **R23 推荐纳入 Slice B（待 Owner Freeze）**：预授权 Tool 实际零次用户询问，需批准 Tool 的 PER_CALL 仅对同一逻辑命令消费一次，SESSION 在明确范围内可多次，确认不足/过期/跨租户/变参不得 Effect |
-| **DI-L1-09** | **R23 推荐纳入 Slice B（待 Owner Freeze）**：相同命令/摘要重复投递不重复 Effect，修改摘要同 ID 拒绝；不同 ID/同资源/同版本竞争时 Host **至多一次实际提交**；先具权威排他准入/条件提交，后触发不可逆动作 |
-| **DI-L1-10** | **R23 推荐纳入 Slice B（待 Owner Freeze）**：真实 Host ACK、丢 ACK、读回失败、提交后本地记录失败/恢复、权限撤销、实际被拒绝；没有可靠事实只能 UNKNOWN，绝不乐观 COMPLETE 或无脑重新执行 |
+| **DI-L1-08** | **R25 已纳入 Slice B**：预授权 Tool 实际零次用户询问，需批准 Tool 的 PER_CALL 仅对同一逻辑命令消费一次，SESSION 在明确范围内可多次，确认不足/过期/跨租户/变参不得 Effect |
+| **DI-L1-09** | **R25 已纳入 Slice B**：相同命令/摘要重复投递不重复 Effect，修改摘要同 ID 拒绝；不同 ID/同资源/同版本竞争时 Host **至多一次实际提交**；先具权威排他准入/条件提交，后触发不可逆动作 |
+| **DI-L1-10** | **R25 已纳入 Slice B**：真实 Host ACK、丢 ACK、读回失败、提交后本地记录失败/恢复、权限撤销、实际被拒绝；没有可靠事实只能 UNKNOWN，绝不乐观 COMPLETE 或无脑重新执行 |
 | **DI-L1-11** | 外部 Node >=22.12 ESM 干净安装同一个正式 SDK 包，基于 **真实 Skill+公开 API/类型/TSDoc 与两份不同领域资料**生成两份 Business Package，包含一个新领域、正确 I/O/知识/Workflow/正反例，SDK 无领域代码变更/私有路径依赖 |
 | **DI-L1-12** | 真实日志/可复核正反例/所用完整 Exact SHA，受影响范围验证及独立增量评审；只复用不变的 0.11.0/0.11.1 已接受证据，不以过去 CI 验收本提交 |
 
@@ -146,5 +151,5 @@ Selected, valid business intent
 
 - **R20 原结论**：`REWORK P0=0 P1=3 P2=2`，R21 按 P1-1、P1-2、P1-3、P2-1、P2-2 分别给出统一合同/修改路线，**不等于修复已被独立接受**。
 - **本次修订**：R21 曾完成 Product/L1 收敛并经 R22 有限独立设计审核 ACCEPT；新增 R23 范围选择建议和对应 L1 选项变更仍需再次有限审核与 Owner 最终冻结；原 R8–R19 仅保留历史推导/兼容说明。
-- **待 Owner**：审定第 4、7 节内的 SDK 能力和跨版本归属；将已选项按本文件编号写回正式 Roadmap / Issue。若未选 Tool/Effect 合并，DI-L1-08–10 转交 #1614，不能虚报 0.11.2 支持真实动作。
+- **R25 范围已冻结**：SQL/Vector/Graph/Expression、SQLite、通用 Query 和原 #1614 全部动作验收都归 #1612；DI-L1-08–10 是本版必选。正式 Roadmap/Issue 同步须完成，不能虚报实际功能已经可用。
 - **下一步**：R21 增量设计独立复审 → 处理剩余 P0/P1 → Owner 选定、更新统一版本文档并冻结 Product/L1 → L2（接口/运行时职责）独立审核 → 最小 Task DAG、真实 SDK-only Consumer、Exact-SHA QA/增量审核后才可解除实施暂停。
