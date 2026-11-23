@@ -5,7 +5,6 @@ import { InventoryElement } from './inventory.mjs';
 
 /** 真正的原生 Core：Package.Init 可以选择在初始化期间运行业务 Workflow。 */
 export const packageMeta = {id:'reference-workflow-init',role:'core',order:3};
-export const initResults = [];
 
 const policyFiles = {
   normal: new URL('../data/order-policy.json',import.meta.url),
@@ -74,6 +73,7 @@ export class Init {
     const inventory=await runInventoryPolicy();
     const single=await new StandardWorkflowSession({maxCalls:1,maxSteps:2,maxDepth:0})
       .run(root=>root.invoke(()=>42));
-    initResults.push({normal,strict,inventory,single,normalTrace,strictTrace});
+    // 仅将本次激活的结果交给 App 所有者；不把状态藏到共享 ESM 单例中。
+    context.onInitResult?.({normal,strict,inventory,single,normalTrace,strictTrace});
   }
 }

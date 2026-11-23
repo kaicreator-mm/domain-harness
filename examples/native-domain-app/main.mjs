@@ -83,10 +83,14 @@ assert.equal(blockedStep.outcome.reason.code,'WORKFLOW_STEP_BUDGET');
 
 /** 旧 AC06/AC11/AC19/AC20 的语义在新 SDK 原生代码中重新执行，不恢复旧 Boot/Lock。 */
 const initApp = new KernelLifecycle([workflowInit,kdp]);
+const initReceipts = [];
 let actualInit;
-await initApp.run({appId:'native-domain-app'},()=>{
-  assert.equal(workflowInit.initResults.length,1);
-  actualInit=workflowInit.initResults[0];
+await initApp.run({
+  appId:'native-domain-app',
+  onInitResult:receipt=>{ initReceipts.push(receipt); },
+},()=>{
+  assert.equal(initReceipts.length,1,'completed Init belongs to this Domain App activation');
+  actualInit=initReceipts[0];
   assert.deepEqual(actualInit.normal,{status:'COMPLETE',value:{
     policyId:'order-policy-allow',total:10,approved:true,
   }});
