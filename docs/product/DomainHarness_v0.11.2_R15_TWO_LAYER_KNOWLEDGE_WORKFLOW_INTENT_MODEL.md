@@ -17,6 +17,8 @@ CI=NOT_RUN_DOC_ONLY
 
 > **R16 后续 Owner 提议：** R15 中将 Recognizer + Validator 放在 Workflow 外的示意，已被新的 [R16「Intent Recognition Workflow + Intent Handling Workflow」候选](./DomainHarness_v0.11.2_R16_TWO_WORKFLOWS_AUTHORIZED_ACTION_SCOPE_CONSOLIDATION.md)具体化：两者共用已有 Workflow API，无第三层或第二执行器。R16 同时建议将 0.11.4 Authorized Action（Business State、Capability、Tool、Host、Effect、Receipt/Journal/Readback）完整归入 0.11.2，Knowledge 存语义描述/规则，Workflow 负责编排实际授权行动；**授权不能由 Knowledge 声明或 Workflow 单独自授予**。原 R15 的图与范围界定作为本轮设计演进记录，R16 的版本合并**仍待 Owner 最终裁决，尚未修改正式 Roadmap**。
 
+> **R18 · Knowledge 类型收敛：** 最新 [DataKnowledge + FunctionKnowledge 两基本类别，以及 FunctionKnowledge 的 stateful/external 两个独立属性](./DomainHarness_v0.11.2_R18_DATA_FUNCTION_KNOWLEDGE_TWO_AXES.md)作为更简单的抽象候选。Concept、Entity、Relation、Rule 条件、Intent 定义等均是**类型化 DataKnowledge**；Recognizer、Validator、Rule 求值、Decision、Tool 等对应的已选可信函数由 **FunctionKnowledge** 描述。函数知识查询只返回操作声明/引用，真正执行由外部 Business 静态 import 的 TS Function/Element 完成，不从数据库或 LLM 文本执行 JS。两个 Workflow 角色及 R17 用户确认策略均保持不变，不能依 stateful/external 自动推导授权。
+
 ## 1. Domain Intelligence 的最小闭环
 
 ```text
