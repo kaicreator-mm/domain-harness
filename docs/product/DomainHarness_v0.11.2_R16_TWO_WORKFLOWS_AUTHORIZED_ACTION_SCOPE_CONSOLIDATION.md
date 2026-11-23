@@ -18,6 +18,8 @@ CI=NOT_RUN_DOC_ONLY
 
 > 根据 Owner 新提问，**建议合并** v0.11.4 原定 Authorized Action 到 v0.11.2，使 Domain Intelligence 在一个内部阶段同时具备领域理解/确定性决策和真实受权行动。**本文件是架构与版本调整建议，尚不是 Owner 对合并的最终授权，也不改写已确认的权威版本 Roadmap。** 不先启动 L2 或代码。R15 两层模型延续，R14 四层 Semantic Port/Graph 方案保持 superseded。
 
+> **R17 Tool 授权模型修订（优先于本 R16 中一律运行期 Capability 授权的表述）：** [R17 两类 Tool 调用：系统预授权 / 用户确认](./DomainHarness_v0.11.2_R17_TOOL_PREAUTHORIZED_USER_APPROVAL_TWO_MODE_POLICY.md)。由可信 Business Package/生成及部署配置选择 Tool 能力和用户确认策略。**PREAUTHORIZED Tool 不需要独立的人机授权或 DomainHarness 中央 Permit 调用；USER_APPROVAL Tool 才要通过本次操作/范围绑定的用户同意**。两者仍遵守真实 OS/DB/Host 对资源的实际访问权限和 Business Guard。Knowledge 可描述审批要求，**不能通过不可信数据将 USER_APPROVAL 降级为 PREAUTHORIZED**。原 R16 “执行前都需要实时 Capability permit”不应解释成每次都新增一轮用户授权。新的 DI-AC42–47 属于待审核候选。本版合并 #1614 的提议仍待 Owner 正式确认。
+
 ## 1. 最简单的两层模型 + 两类 Workflow
 
 ```text
