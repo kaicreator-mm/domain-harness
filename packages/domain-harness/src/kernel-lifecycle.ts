@@ -220,7 +220,7 @@ export class KernelLifecycle<Context extends DomainAppContext = DomainAppContext
         await Promise.allSettled([...this.businessFlights]);
       }
 
-      const disposed = new Set<PackageInitElement>();
+      const disposed = new Set<PackageInitElement<Context>>();
       for (let i = this.entered.length - 1; i >= 0; i--) {
         const record = this.entered[i];
         if (record === undefined || disposed.has(record.element)) continue;
