@@ -49,7 +49,7 @@ test('start/end Hook 的额度在副作用前预留；异步 end 完成后才交
       end: () => { events.push('unexpected:end'); },
     }));
   assert.equal(denied.status, 'FAILED');
-  assert.deepEqual(events, []);
+  assert.equal(events.length, 0);
 
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
