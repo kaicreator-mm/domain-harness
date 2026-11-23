@@ -1,4 +1,7 @@
 <!-- DH_V0111_R161_SOURCE_CLOSEOUT_ROADMAP_CURRENT_STATUS -->
+
+> **CURRENT · R25 FROZEN PRODUCT SCOPE（2026-11-24）**：[R25 0.11.2 正式 Product/L1 范围冻结](./DomainHarness_v0.11.2_R25_PRODUCT_L1_SCOPE_FREEZE.md) 采纳 [R22](https://github.com/kaicreator-mm/domain-harness/issues/1612#issuecomment-7116194117) 与 [R24](https://github.com/kaicreator-mm/domain-harness/issues/1612#issuecomment-7116430682) 已接受的设计范围，固定 **通用有界 Query + SQLite + SQL/Vector/Graph + 有界 Expression + 原 #1614 Authorized Action 全量并入 #1612**。原 .4 编号/Issue 保留为历史迁移索引，.3 多轮交互、.5 LLM、.6 durable 按原编号；不新建 KDP Tool/Permit Runtime。**这是 Product/L1 scope 决策，并非 L2、实现、CI、PR 合并或发布**；本路线图所在 PR #1702 合并前，train 分支仍是旧文件快照。后面的 R23 proposal 文句仅历史沿革。
+
 > **ARCHIVED DESIGN HISTORY — superseded for v0.11.1 implementation.** 下文 R29/R37/R74/R82/R84 的 CURRENT 均是各自旧 SHA 历史快照；旧 Reference App、Boot/Lock/Target/BUILD、四 Workspace 与动态 FunctionRef 不是现行架构。当前规范：[Canonical](../specs/domain-harness/README.md)，源码交付：[PR #1694](https://github.com/kaicreator-mm/domain-harness/pull/1694)，任务：[Issue #1682](https://github.com/kaicreator-mm/domain-harness/issues/1682)。
 >
 > **R161 v0.11.1 内部阶段交付**：R151 原评审 REWORK 2 P1/5 P2，R160 对 2 P1/5 P2 限定独审 `ACCEPT_SCOPED P0/P1/P2=0`；受审 PR Head `0477edf9070c05ec3c89c46fb1aaa43cf2f850a3`、Woodpecker [#3151](https://ci.kaicreator.com/repos/18/pipeline/3151/1) SUCCESS。#1694 合入 `version/v0.11.x@452e2212fb8a25168ee62d4e793897d77416cb92`，合并树文件差异为零。**Windows 真机 E2E、精确 Node22.12 消费者尚未单独证明**；内部阶段不单独 Tag/Release，待 0.11.0–0.11.9 整体验收后才统一 main/正式发布。历史 Stage Ledger 原文固定在 [旧 SHA](https://github.com/kaicreator-mm/domain-harness/blob/62885289f4236051fa9d3d0f67b968004c5259b2/examples/reference-domain-app/stages.json)。
@@ -110,16 +113,16 @@ NODE_MINIMUM=22.12.0
 |---|---|---|---|
 | **0.11.0 — Foundation** | 新架构能定义、装配、运行一个 Domain App（**已通过 Scoped 验收**） | Element/Content/Function；K/S/B Package；BUILD/AOT/Lock；Boot→唯一 KDP→App Init；clean public SDK；Selected no-effect Function | 历史四工作区 clean-packed SDK Consumer 能构建、启动（R53/R58 后公开产品仅一个 SDK）、执行实际已选 Knowledge/Rule 改变结果的 Function；AC01–AC10 Scoped PASS |
 | **0.11.1 — Task Execution** | 使用 Workflow + State Machine 实现**确定性 Task Execution Loop** | Goal/TaskRun、Workflow Step/Branch、Task/Domain 状态机合同、Guard、Bounded Coordinator/Observation/Outcome；选定 Function 的步骤执行 | 无 LLM/外部 Effect 的多步真实任务，能 COMPLETE、ASK/WAIT、REJECT/UNKNOWN，不能非法转移或无限循环；简单 Function 仍可直接调用 |
-| **0.11.2 — Domain Intelligence** | 把 0.11.1 的结构性流程**领域语义化** | Domain concepts/objects、Knowledge/Rule/Recognizer/Validator/Decision、Intent/Applicability、必要最小 Reader/Query、领域策略选择和 UNKNOWN | 同一 Goal 在不同领域事实、版本、适用性条件下可选择正确的规则、流程与结果；知识不足或冲突时不编造结论 |
-| **0.11.3 — Semantic Interaction** | 领域语义驱动的**自适应交互**，而不是“动态表单引擎” | typed Intent/Requirement/Interaction model、基于任务现有事实连续澄清、交互类型与成熟 UI 组件适配（Form、Selector、Table、Wizard、Chat 等）、确认后继续 Workflow | 用户表达不完整需求时，系统根据理解选择合适确定性 UI 交互；反复补齐事实后得到有类型/可校验的意图，未经确认不得执行敏感操作 |
-| **0.11.4 — Authorized Action** | 从“理解并决策”升级为**可信真实行动** | Business State/CAS、声明式 Capability/Tool/Operation、KDP Permit/Host/Effect、Journal/Outcome、必要读回与失败分类 | 已授权真实操作后业务状态与 Host 结果一致；越权、错误权限或 UNKNOWN 不得虚报成功；不建立第二 Effect Authority |
-| **0.11.5 — Bounded Reasoning** | 已编译知识、规则、复用流程不足时，使用**可选受限 LLM** | Provider-neutral LLM/Context、选定模型能力、步数/时间/费用预算、model→selected tool→observation→verify 的有界循环、结构化模型提案校验 | 已知情形不必调用模型；未知情形完成一次真实有界推理与受控工具调用；非法 Tool、预算耗尽与无效输出必须停下 |
-| **0.11.6 — Durable Execution** | 可暂停、恢复、取消并保持执行结果正确的 Agent Task | durable TaskRun/checkpoint、已授权异步/延迟执行、pause/resume/cancel/timeout、必要幂等和恢复/观察、按需事件互操作 | 中断后恢复不重复提交历史 Effect；取消、未知完成状态与失败有明确结果；不复制 KDP 既有 Journal |
+| **0.11.2 — Domain Intelligence + Authorized Action（R25 FROZEN SCOPE）** | 单一 Knowledge + Workflow 语义/行为闭环，真实受控业务动作同版实现 | 生成期不可变 Data Knowledge、原生 Function Knowledge/内聚 Business Element、Intent Recognition/Handling 两类 Workflow 用途；有界 Query、SQLite DB、参数化 SQL、Vector、Graph、Expression 普通 Standard 能力；State/CAS、静态已选 Tool/Host、PREAUTHORIZED/USER_APPROVAL、最小可靠 Effect/Journal/readback/UNKNOWN | 两个真实领域的静态知识改变决策与公共 Query 复用；真实 Host 预授权及需要用户确认两条 Effect 路径、并发条件提交、丢 ACK/UNKNOWN、重复请求安全；不复活 KDP Permit/第二 Runtime |
+| **0.11.3 — Semantic Interaction** | 领域语义驱动的自适应交互与多轮意图澄清 | 消费 0.11.2 已有 Recognition/Handling 与最小批准回调；提供 Goal/Intent/Requirement/多轮确认、UI-neutral Interaction 接口和 Form/Selector/Table/Wizard/Chat Adapter | 用户缺失信息的多轮澄清成功与拒绝；无需重建 0.11.2 Tool/Host 授权或实际 Effect 机制 |
+| **0.11.4 — RESERVED/HISTORICAL（R25 scope）** | 原 Authorized Action 内容建议并入 #1612，本内部阶段编号保留追踪，不再独立实现同一内容 | #1614 保留历史原 AC1–AC3、对应 0.11.2 DI-L1-08–10；如未来需要为 .4 分配其他正式产品能力应由 Owner 单独重新裁决；**不因此自动重排 0.11.5–0.11.9** | 审核确认不存在第二套受权 Tool/Host/Effect 或重复实施工作包；本行表示历史编号保留，不表示本阶段需独立实现或已经发布 |
+| **0.11.5 — Bounded Reasoning** | 已选知识与业务 Workflow 不足时调用可选有界 LLM，受控提案而非自授权 | Provider-neutral LLM/Context、选定模型能力、步数/时间/费用预算；复用 0.11.2 已受信的 Tool/Effect 与业务状态，按实际业务消费 0.11.3 交互 | 已知问题零 LLM；未知问题一次真实有界模型提案/已选 Tool 观察；越权、非法 Tool、预算耗尽不得提交 Effect 或虚报 COMPLETE |
+| **0.11.6 — Durable Execution** | 持久 TaskRun/checkpoint、暂停恢复与可靠控制 | 复用 0.11.2 由真实资源/Effect provider 维护的 attempt/journal/receipt；实现完整 TaskRun checkpoint、pause/resume/cancel/timeout、跨进程恢复与 callback | 重启恢复不重复 Effect；UNKNOWN 未确认保留；不假设最小化 KDP 负责所有 Journal 或重复构建动作执行器 |
 | **0.11.7 — Execution Evidence** | 收集任务执行信息，为两层反馈提供事实 | Task/Workflow/Step/Tool/LLM selected path、Package/Strategy pins、Goal/Outcome/失败原因/耗时/用户反馈，最小授权脱敏记录及 Client/Server 可交换摘要 | 对一次实际任务能确定“做过什么、走了哪条策略、为何调用 LLM、结果是什么”；未经授权数据不上传 |
 | **0.11.8 — Client Experience** | **Client 端轻量学习/经验复用**，独立离线任务亦可受益 | 本地已验证纯语义计算结果精确复用、轻量任务经验、LLM 解题结果留作候选、按当前 Package/域/版本/权限判断适用性；Client 在已授权任务内优化选择 | 同等条件下纯决策无需重复 LLM；不同版本/租户/失效条件拒绝命中，不能重放 Effect；未经验证的 LLM 解法不能自动写成 Rule/Workflow |
 | **0.11.9 — Server Meta Evolution** | **Server 端定时跨任务汇总与流程优化**，可接收授权 Client 摘要 | 可配置周期/手动触发汇总、跨任务失败与 LLM fallback/成本分析、发现共性问题、Workflow/Rule/Interaction 改进候选；与既有 Forge/Validator/批准/未来 BUILD 适配 | 对多次任务生成可复核分析与一个明确流程优化候选；有真实外部验证和授权时由新 Package/BUILD 生效，旧 Client Pin 不变；无权威时只保持候选/NOT_RUN |
 
-**结构机制与产品价值的关系**：0.11.1 的 Workflow/StateMachine 是 Task Loop 基础，0.11.2 将其语义化，0.11.3 负责用户持续表达和澄清，0.11.4–0.11.6 使 Task 能执行、推理和恢复，0.11.7–0.11.9 用真实反馈改进未来能力。它们都是同一 DomainHarness 的扩展，不是并列工具产品。
+**R25 冻结后的结构机制与产品价值关系：** 0.11.1 的 Workflow/StateMachine 是 Task Loop 基础；0.11.2 将其语义化并增加完整受权实际行动；0.11.3 负责多轮用户表达/交互；原 0.11.4 功能已确定在 Product/L1 归属 0.11.2（实际实施待 L2 审核），编号保留历史；0.11.5 的有界 LLM 与 0.11.6 的持久 TaskRun 分别使用前述已有能力；0.11.7–0.11.9 用真实反馈改进未来能力。它们是同一 DomainHarness SDK 的按阶段扩展，不是多个并行 Runtime。
 
 ## 4. Experience & Evolution：保留原始双层多级反馈，拒绝过度设计
 
@@ -155,9 +158,9 @@ NODE_MINIMUM=22.12.0
 |---|---|---|---|
 | **0.11.0** | [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | Foundation | Stage-0 accepted; internal only |
 | **0.11.1** | [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) | Task Execution | R27 Product/L1/L2 ACCEPT_SCOPED，T11–T14 合入，#1605/#1608 已关闭；内部阶段完成 |
-| **0.11.2** | [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Domain Intelligence | Scope assigned, Product/L2/implementation pending |
+| **0.11.2** | [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Domain Intelligence + Authorized Action | R25 Product/L1 scope FROZEN，L2 design admitted，源码/CI/功能验收未开始 |
 | **0.11.3** | [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | Semantic Interaction | Scope assigned, Product/L2/implementation pending |
-| **0.11.4** | [#1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | Authorized Action | Scope assigned, Product/L2/implementation pending |
+| **0.11.4** | [#1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | Authorized Action historical transfer index | 全部原内容/AC 已按 R25 Product/L1 归属 #1612，不单独启动独立版本实现；号保留 |
 | **0.11.5** | [#1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | Bounded Reasoning | Scope assigned, Product/L2/implementation pending |
 | **0.11.6** | [#1616](https://github.com/kaicreator-mm/domain-harness/issues/1616) | Durable Execution | Scope assigned, Product/L2/implementation pending |
 | **0.11.7** | [#1617](https://github.com/kaicreator-mm/domain-harness/issues/1617) | Execution Evidence | Scope assigned, Product/L2/implementation pending |
@@ -165,6 +168,8 @@ NODE_MINIMUM=22.12.0
 | **0.11.9** | [#1619](https://github.com/kaicreator-mm/domain-harness/issues/1619) | Server Meta Evolution | Scope assigned, Product/L2/implementation pending |
 
 **执行规则**：各版本 Issue 包含目标/需求/独立可证伪 AC/非目标/历史参考、阶段 L1/L2/Native DAG/实现 PR/审核与实际 CI 的增量状态；阶段推进与正式 Release 是不同的资格。0.11.x 是**彻底重写**，不得用历史源码、旧 ABI、旧业务功能全等或旧版 CI 冒充新版能力已实现。0.11.0 成果仅在其已验收范围内复用。
+
+> **R25 历史映射覆盖规则：** 下方 Fxx 和 44 项原本是在 2026-11-21 创建的阶段索引；本次仅改变 **F14 / FR03 / FR04 / FR14 / HF19 / HF23 / HF29 / FR08-P-SD2 / FR08-N-SD2** 的有效交付责任，从 #1614 迁移到 #1612。保留原 #1614 链接用于 provenance，不再由其实施。其它旧 Stage-0/1 已验收事实不变，所有 FRxx 未实施的功能不得因为迁移而宣称合格。
 
 ### F01–F19 全局功能盘点的主归属
 
@@ -174,12 +179,12 @@ NODE_MINIMUM=22.12.0
 |---|---|---|
 | F01–F06 | [0.11.0 #1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | Element/Package/BUILD/Boot/Function/Consumer 结构子项已纳入 Stage-0；领域语义、真实 Effect、复杂任务等不倒填为已完成 |
 | F07 | [0.11.5 #1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | 全面 Domain Harness/LLM；Task Loop 在 #1605、语义在 #1612，恢复/证据/经验跨 #1616–#1618 |
-| F08 | [0.11.2 #1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Knowledge Reader/Query 和适用性；不强制 SQLite |
-| F09–F10 | [0.11.3 #1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | 交互意图和选路；真实 Tool/Effect 在 #1614 |
+| F08 | [0.11.2 #1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Knowledge Query/Applicability + 通用 SQLite/SQL/Vector/Graph/Expression，静态 Data Knowledge 不热写 DB |
+| F09–F10 | [0.11.3 #1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | 领域 UI/多轮澄清归 #1613；结构化 Intent 识别/处理以及真实 Tool/Effect 归 #1612 |
 | F11 | [0.11.5 #1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | Provider/Harness；旧 Provider HTTP 通过不等于新 Provider/LLM E2E 完成 |
 | F12 | [0.11.9 #1619](https://github.com/kaicreator-mm/domain-harness/issues/1619) | 双层多级反馈总体闭环；确定性解析、精确经验、执行采集分别归 #1612/#1618/#1617 |
 | F13 | [0.11.2 #1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Forge 产物的消费边界；Forge/KG 生产和符号化验证不属本仓库重写 |
-| F14 | [0.11.4 #1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | Tool/Host/Effect 基础；高级传输按用例 |
+| F14 | [0.11.2 #1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | 原 #1614 归属迁移：真实 Tool/Host/Effect/最小 Attempt/Receipt 与安全边界在 #1612；完整 Durable/高级互操作看 #1616 |
 | F15 | [0.11.6 #1616](https://github.com/kaicreator-mm/domain-harness/issues/1616) | 真实必要的 Event、Callback、互操作；通用 Event Bus 非默认必做 |
 | F16–F17 | [0.11.0 #1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | 新 SDK/命名/一个真实消费者完成 Stage-0；后续复用场景，不强制重建旧多业务 App |
 | F18 | [0.11.9 #1619](https://github.com/kaicreator-mm/domain-harness/issues/1619) | DomainHarness 自举的小型 Consumer 仅可选；完整自举不能凭本规划自动成为发布门 |
@@ -193,9 +198,9 @@ NODE_MINIMUM=22.12.0
 |---|---|
 | 0.11.0 / [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | FR06, FR13, HF22, HF25, HF28, HF30, HF31, HF33, HF34, NEW-FUNCTION-01, NEW-FUNCTION-02, NEW-FUNCTION-03, NEW-FUNCTION-04 |
 | 0.11.1 / [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) | FR01 |
-| 0.11.2 / [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | FR02, FR05, FR11, HF24, FR08-P-SD1, NEW-FUNCTION-05 |
+| 0.11.2 / [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | FR02, FR05, FR11, HF24, FR08-P-SD1, NEW-FUNCTION-05; **from historic #1614:** FR03, FR04, FR14, HF19, HF23, HF29, FR08-P-SD2, FR08-N-SD2 |
 | 0.11.3 / [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | FR10, FR15 |
-| 0.11.4 / [#1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | FR03, FR04, FR14, HF19, HF23, HF29, FR08-P-SD2, FR08-N-SD2 |
+| 0.11.4 / [#1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | **HISTORICAL ONLY**：上述八项已转归 #1612 的实际实施与验收；本行不再另行分配 ID/任务 |
 | 0.11.5 / [#1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | FR07, FR08-N-SD1 |
 | 0.11.6 / [#1616](https://github.com/kaicreator-mm/domain-harness/issues/1616) | HF16, HF17, HF18, HF20, HF27, HF32 |
 | 0.11.7 / [#1617](https://github.com/kaicreator-mm/domain-harness/issues/1617) | HF26, NEW-FUNCTION-06 |
