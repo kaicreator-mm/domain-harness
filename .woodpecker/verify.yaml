@@ -9,6 +9,7 @@ when:
         - 'tooling/**'
         - 'scripts/**'
         - 'examples/basic-domain-app/**'
+        - 'examples/native-domain-app/**'
         - 'examples/selected-packages/**'
         - 'examples/reference-domain-app/**'
         - '.agents/**'
@@ -35,6 +36,7 @@ clone:
         - tooling
         - scripts
         - examples/basic-domain-app
+        - examples/native-domain-app
         - examples/selected-packages
         - examples/reference-domain-app
         - .agents

@@ -46,6 +46,12 @@ test('SDK root 在迁移期同时精确导出已审旧 API 和原生 Standard/KD
       'KernelLifecycle',
       'WorkflowElement',
       'XStateWorkflowElement',
+      'JsonReader',
+      'YamlReader',
+      'readJson',
+      'readYaml',
+      'writeJson',
+      'writeYaml',
     ]));
   assert.equal(sdk.boot, runtime.boot);
   assert.equal('bootstrap' in sdk, false, 'root SDK must not expose direct KDP bootstrap');
