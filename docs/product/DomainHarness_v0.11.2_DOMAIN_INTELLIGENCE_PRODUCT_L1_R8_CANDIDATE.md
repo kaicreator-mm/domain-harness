@@ -156,9 +156,9 @@ Query 的领域查询结果与 Workflow 的六种现有运行终态并非必须�
 
 ## 8. 审核、L2 与实施门禁
 
-1. **R8 Product/L1：** Owner 审核 D01–D07、DI-AC01–14、范围与不做项；有冲突则修订本文件；当前 `PROPOSED`，不得因文档创建自动冻结。
-2. **R9 L2：** Owner 对 WHAT 范围确认后，比较“只用 Business 原生代码”“有限共享 Standard 类型/Query”“复用第三方库”方案；冻结最小 TypeScript/文件/Function/领域数据和读取边界，并作独立非 Writer 设计审核。不可根据旧 PR #1667 中专用机器合同偷渡 L2。
-3. **R10 Task：** 整理 #1666/#1667 旧候选，确立一个最小有界新 Task/PR；基于当前 train / 当前 native-domain-app 做 2 领域实际消费，必须执行生成期验证、严格 Types、阴性与阳性业务测试、clean-pack 外部消费者。
-4. **R11 QA/Review/Integration：** 新 Exact HEAD Woodpecker 成功及必要非 Writer 独立增量审核后受控合并 `version/v0.11.x`，对比受审树/合并树，回写 #1612/#1563 Stage 证据。不得提前合并 main、Tag、npm Release。
+1. **R8/R9 Product/L1：** Owner 审核 D01–D07、DI-AC01–14、范围与不做项；有冲突则修订本文件；当前 `PROPOSED`，不得因文档创建自动冻结。
+2. **Owner 明确确认后 · L2：** Owner 对 WHAT 范围确认后，比较“只用 Business 原生代码”“有限共享 Standard 类型/Query”“复用第三方库”方案；冻结最小 TypeScript/文件/Function/领域数据和读取边界，并作独立非 Writer 设计审核。不可根据旧 PR #1667 中专用机器合同偷渡 L2。
+3. **L2 独立审核通过后 · Task：** 整理 #1666/#1667 旧候选，确立一个最小有界新 Task/PR；基于当前 train / 当前 native-domain-app 做 2 领域实际消费，必须执行生成期验证、严格 Types、阴性与阳性业务测试、clean-pack 外部消费者。
+4. **Task 实施完成后 · QA/Review/Integration：** 新 Exact HEAD Woodpecker 成功及必要非 Writer 独立增量审核后受控合并 `version/v0.11.x`，对比受审树/合并树，回写 #1612/#1563 Stage 证据。不得提前合并 main、Tag、npm Release。
 
 **正式状态：仅 Product/L1 候选，0.11.2 尚未获得 L1 Owner Freeze、L2 独审或源码实施资格。**
