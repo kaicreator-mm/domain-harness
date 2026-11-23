@@ -61,6 +61,7 @@ export class OrderService {
 - 可选 `AsyncDisposable` 的 `async [Symbol.asyncDispose](): Promise<void>` 作为 Exit。KDP/实例所有者在应用终止时按实际进入逆序显式调用，清理失败继续其它 Exit，不遮盖原始异常。
 - `await using` 只用于短作用域；不能在长期运行的 `start()` 内将活跃资源提前 Dispose。断电/强杀不承诺退出钩子。
 - Package 自主决定重复 Init 的共享/去重，不强制全局 once。Core 在自己的 Init 中使用普通 TS 调用准备直接依赖，完成后才进入下个 Core；无需第二 Extension Init Registry。
+- 关闭请求生效后须拒绝新的 Core/嵌套依赖/业务进入，待在途 Init 收敛且 Exit 完成后才能报告关闭；并发/同步重入关闭只允许每个拥有实例清理一次，Hook 不能等待其自身正在执行的同一轮关闭。行为 Oracle 见 [LIFE-10](./lifecycle-workflow.md)。
 
 ## TS-05 · Workflow/XState Standard Element
 
@@ -84,6 +85,8 @@ export class OrderWorkflow extends XStateWorkflowElement<Order, Receipt> {}
 ```
 
 通用 Workflow 定义与执行实现分离：XState 是下层库，`XStateWorkflowElement` 是 SDK 应用级标准能力，Domain App 或 Kernel Business 可以直接 import 使用；KDP 不垄断执行引擎。Reader/Storage 等同理，只有 Domain App 常用且有实际复用价值的能力才成为 Standard。
+
+**类型约束与执行终态**：公开 `run(input)` 的 TypeScript 输入类型必须与实际 Actor Logic 输入类型安全兼容，不得以不受约束的 `AnyActorLogic` 让错型通过 strict TS；成功 mapper 只能在确认 Actor 已 `done` 后使用它的输出类型，或从 `unknown` 明确收窄，不以强制断言/缺失值自动成功。必须验证错型输入编译失败、合法输入和合法 `void` 正例，以及 [LIFE-11](./lifecycle-workflow.md) 的同步/异步异常及 Actor stop。
 
 ## TS-06 · Business 组合
 

@@ -29,3 +29,7 @@ Domain App 显式 import 需要的 Package、标准 Element/业务 Class，使�
 ## GEN-07 · 不引入新强制工具
 
 不因新映射而建立独立 Package Assembly 服务器、Forge、第二语言 Runtime、强制 Manifest 生成器或生成期专用自制 JS 子集解析器。静态质量可用成熟 TS/npm 工具与具体场景需要的轻量检查；修改规范不得将工作转移到 v0.11.2。
+
+## GEN-08 · 模块函数与领域 Function 合同
+
+原生 `export function` 可直接调用，但这本身不证明 DIS 的正式领域 Function 在结果、版本/兼容性及验证上已符合全部义务。作者在生成期按实际应用明确这些合同，并执行类型、功能和领域验收；SDK 运行时不建立 FunctionRef/Target 分派。见 [核心规范 DIS 适用表](./core.md)，也不允许借 DIS 候选要求第二轮 Init。

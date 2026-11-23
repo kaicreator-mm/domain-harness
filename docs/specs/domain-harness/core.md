@@ -35,3 +35,17 @@
 3. **运行**：框架读取执行元数据，按 Order 启动并在退出时清理，业务调用 Elements/Workflow；框架只处理最后未捕获故障。运行期不重扫源码、不动态选择 Function、不审查权限/安装证据。
 
 原 `FunctionRef → ImplementationBinding → Target`、自有 PackageSystem 分派、Boot Pin、App Lock/InstalledRecord 属于 **HISTORICAL 旧执行系统**。历史实现和审计可继续追溯，不再作为新版 Runtime 的要求。术语使用准确的“生成”“生成期验证”“静态组合”“编译打包”“运行”，不以含糊 BUILD 一词替代全部阶段。
+
+## DIS 语义与 TS Profile 的适用边界（R139 P1-5）
+
+DIS v0.2.0 当前引用的是**候选研究文本**；下表是 DomainHarness 0.11.x 的限定采用和差异声明，**并不构成 DIS FULL_CONFORMANCE**。不能将 TypeScript 实现反向宣布为 DIS 语言中立定义的唯一形态。
+
+| 对象/责任 | 沿用的 DIS 领域语义 | 本版 TypeScript 限定实施及验证 |
+|---|---|---|
+| Package / Element | 职责内聚、领域能力和资源复用；DIS-LANG-01..03 的单语言/Runtime 执行闭包 | Package=静态 ESM 插件模块集合，Element=Class，Standard/Business=用途类别；直接依赖与行为由生成期验证 |
+| Function | 正式领域 Function 的输入/输出、结果、兼容性及可验证义务，见 DIS v0.2.0 候选 §§3–5 | 普通 TS `export function` **不自动满足全部 DIS 领域 Function 合同**。确实要发布领域 Function 时，作者应明确业务输入/输出/结果、版本兼容与测试；无需将所有函数包装 Class/FunctionRef |
+| 启动 | 有单根入口与可选业务 Init/Exit 的语义 | **只按 KDP Order=0 开始执行一轮 Core Init 链**；不机械照搬 DIS 候选 §6 中 Package 链之后的第二轮 Business App Init |
+| 可信组成 | 依赖和交付可审计 | 以静态可信 npm/ESM、生成期检查和交付证据实现；取消 DH 特有运行时 Lock/Pin/Target 证明 |
+| 多语言 | 可针对不同语言 Profile 表达同一领域含义 | 一个 Package/Domain App 直接执行闭包使用同一种语言和 Runtime；异语言通过 FFI/进程边界明确隔离 |
+
+Owner [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685) 为本版适用裁决来源；DIS 仍有独立候选/裁定程序。不要以本映射跳过 DIS 原始领域合同验证，也不因“DIS 兼容”恢复两轮 Init 或动态函数装载平台。

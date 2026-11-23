@@ -14,7 +14,7 @@
 | [core.md](./core.md) | CORE-01..12 语言中立的职责和产品不变量 |
 | [typescript-profile.md](./typescript-profile.md) | TS-01..08 ESM/Module/Class/Function、静态元数据、原生依赖、组合、生命周期 |
 | [element-package.md](./element-package.md) | EL-01..07 Package 插件、Element/Function、Standard/Business 与组合 |
-| [lifecycle-workflow.md](./lifecycle-workflow.md) | LIFE-01..09 Order、可选 Init/Exit、Workflow/Outcome、最终错误兜底 |
+| [lifecycle-workflow.md](./lifecycle-workflow.md) | LIFE-01..12 Order、可选 Init/Exit、关闭并发、Actor done/error/stopped、Workflow/Reader 保留验收 |
 | [composition-trust.md](./composition-trust.md) | GEN-01..07 生成期正确性、静态组合、npm 交付、非运行时校验 |
 | [architecture.md](./architecture.md) | ARCH-01..09 SDK/KDP/Standard/Business 拓扑、禁止重复系统 |
 | [identity-naming.md](./identity-naming.md) | ID-01..06 身份、代码元数据、命名 |
