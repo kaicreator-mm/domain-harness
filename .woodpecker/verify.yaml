@@ -1,17 +1,13 @@
-# 单一 sparse checkout、单一 npm ci、单一共享工作区。
+# 仅检出本版原生 SDK 与真实消费者；一个 Clone、一次 npm ci。
 when:
   - event: pull_request
     branch: 'version/v0.11.*'
     path:
       include:
         - '.woodpecker/**'
-        - 'packages/**'
-        - 'tooling/**'
+        - 'packages/domain-harness/**'
         - 'scripts/**'
-        - 'examples/basic-domain-app/**'
         - 'examples/native-domain-app/**'
-        - 'examples/selected-packages/**'
-        - 'examples/reference-domain-app/**'
         - '.agents/**'
         - 'package.json'
         - 'package-lock.json'
@@ -32,13 +28,9 @@ clone:
       lfs: false
       recursive: false
       sparse:
-        - packages
-        - tooling
+        - packages/domain-harness
         - scripts
-        - examples/basic-domain-app
         - examples/native-domain-app
-        - examples/selected-packages
-        - examples/reference-domain-app
         - .agents
 steps:
   - name: verify
@@ -51,6 +43,5 @@ steps:
       - npm run typecheck
       - npm run lint
       - npm test
-      - npm run perf:profile
-      - DH_T05_ALREADY_BUILT=1 DH_T05_NPM_REGISTRY=http://host.docker.internal:14873 npm run test:demo
-      - DH_T05_NPM_REGISTRY=http://host.docker.internal:14873 npm run test:registry
+      - npm run test:demo
+      - DH_NATIVE_NPM_REGISTRY=http://host.docker.internal:14873 npm run test:consumer

@@ -18,4 +18,4 @@ export class OrderService {
     return documents.map(doc => doc.value);
   }
 }
-export class Init { start() {} }
+

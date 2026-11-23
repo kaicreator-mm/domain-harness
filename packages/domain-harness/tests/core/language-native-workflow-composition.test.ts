@@ -7,6 +7,11 @@ import {
 import type { WorkflowRoutes } from '../../src/native-workflow-composition.js';
 import type { StandardWorkflowOutcome } from '../../src/standard-workflow.js';
 import { JsonReader, YamlReader } from '../../src/standard-files.js';
+import type { StandardJsonValue } from '../../src/standard-files.js';
+
+function isJsonRecord(value: StandardJsonValue): value is Readonly<Record<string, StandardJsonValue>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 test('共享根调用预算：Guard/Reader/子 Workflow 不重置，额度不足不执行副作用', async () => {
   const actions: string[] = [];
@@ -127,7 +132,7 @@ test('业务上下文使用相同 Reader 处理两 JSON / 两 YAML，不复制 P
         return {status:'FAILED', reason:{code:'READ_FAILED',message:'unexpected'}};
       }
       const record = outcome.value.value;
-      if (typeof record !== 'object' || record === null || Array.isArray(record)) {
+      if (!isJsonRecord(record)) {
         return {status:'FAILED',reason:{code:'INVALID',message:'expected record'}};
       }
       const n = record['k'];

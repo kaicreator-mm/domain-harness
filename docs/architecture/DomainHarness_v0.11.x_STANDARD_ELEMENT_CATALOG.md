@@ -1,5 +1,9 @@
 # DomainHarness 0.11.x — Standard Element Catalog（首版 R29）
 
+> **HISTORICAL / SUPERSEDED BY Language-Native DomainHarness**：本文记录旧 Element-First/Lock/Pin/FunctionRef/Target/BUILD 设计及当时 Exact-SHA 审查，只供历史追溯；**不是当前 v0.11.1 SDK 的规范、API、安装方式或新功能准入证明**。
+现行唯一规范见 [Canonical](../specs/domain-harness/README.md)。当前 Standard Reader、Workflow 与 KDP 以 [#1682](https://github.com/kaicreator-mm/domain-harness/issues/1682) 的新 SHA 源码与消费者验收为准；旧 R60/R74 的 CURRENT 仅对应其原时间点。
+
+
 > **【CURRENT · v0.11.1 R74 · 已受审合入版本列车】** [Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656) 的普通标准 File Element `dh.std.file.json` / `dh.std.file.yaml` 已在 [集成 PR #1663](https://github.com/kaicreator-mm/domain-harness/pull/1663) 按已审 HEAD `030032416c684d066daa1f8c5a2e50d60c41c779` squash 合入 `version/v0.11.x@9f53c6e17d7a854fb57b2e1232702af15e6defe8`。独立 [R72 ACCEPT_SCOPED P0=0/P1=0/P2=1](https://github.com/kaicreator-mm/domain-harness/pull/1663#pullrequestreview-6012506153)，[Woodpecker #2979](https://ci.kaicreator.com/repos/18/pipeline/2979/1) 同 Exact-SHA SUCCESS。**以下两项正式获准 `STANDARD_ACCEPTED`，仅限本版 Node22 ESM Target 和实际受选 Package/Lock/Consumer，不表示已经正式 npm Release、任意语言运行时或全生态发布。** 原 [#1644](https://github.com/kaicreator-mm/domain-harness/issues/1644) 实施责任由本版 #1656 完成，0.11.2 #1612 不承接此 File Element 提取。
 
 > Catalog 是随单一 Git monorepo 版本演化的资产清单，不是新的服务、运行时注册表或对 BUILD/Lock 的替代。准入规则见 [Standard Element 体系规范](./DomainHarness_v0.11.x_STANDARD_ELEMENT_SYSTEM.md)。仅标记为 `STANDARD_ACCEPTED` 且与受选目标、版本及 FunctionRef 一致的资产才有已审实现可供复用；其他条目继续是候选，不能当作已合格组件依赖。

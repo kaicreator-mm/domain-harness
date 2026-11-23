@@ -1,6 +1,13 @@
 # DomainHarness · 设计现状与迁移清单
 
-> [权威目录](./README.md) · Owner 新决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。**本规范更新为 docs-only；不表示旧 SDK Contracts、Runtime 或 Domain App 已完成代码迁移。**
+> [权威目录](./README.md) · Owner 新决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。**本规范是设计和验收权威；代码迁移在 Draft #1694 的候选树中完成，但在该 PR 正式合并前不属于版本列车。**
+
+> **R159 当前状态（完整替换待最终独立审核）**：Canonical R140、原生 KDP/XState R143、Standard Reader R145、Workflow R154、生成期检查 R158 均按准确 SHA 独立 **ACCEPT_SCOPED P0/P1/P2=0**（R140 有已随 R145 合并的 GEN-08 P2）。
+>
+> - **已合并版本列车**：Workflow [PR #1692](https://github.com/kaicreator-mm/domain-harness/pull/1692) R154 通过，合并 `b88137c7b2b2e1a5b6676a7a86a715458ac05ac4`；生成期 [PR #1693](https://github.com/kaicreator-mm/domain-harness/pull/1693) R158 通过，合并 `caea4cc0ce0a206c92748074c72d39322e56a9e7`。
+> - R158 对 `const alias=(packageMeta)` 与 TS `as`/`satisfies` 的非误判修复在 Exact `473917c4f25eea50d6e2764e22861d7a27d6d032` 接受；该 PR 自己的 #3147 为 **CANCELED**，等价源 Blob 在 Draft #1694 的 [#3148](https://ci.kaicreator.com/repos/18/pipeline/3148/1) **SUCCESS**，不可改称前者 CI 成功。
+> - **完整 SDK 替换 [Draft PR #1694](https://github.com/kaicreator-mm/domain-harness/pull/1694)**：候选树已经删除旧 Contracts/Microkernel/BUILD/Boot 等 151 个旧文件路径，单 SDK、原生 KDP/Reader/Workflow、作者侧生成验证及仓外仅直接依赖 SDK 的真实 npm 安装验证已在历史候选 SHA 经 CI 通过。**这仅是未合并的候选，不表示版本列车已删除旧执行体系。**
+> - 当前门槛是从已合并 `version/v0.11.x@caea4cc0...` 上重建 Draft #1694 的新父提交、取得新 Exact-SHA 验证，然后 R151 对完整架构、质量、可维护性、业务行为、npm 消费者及物理删除开展独立审核。R151 通过前不发布、不关闭 #1682/v0.11.1。
 
 ## 新架构状态
 
@@ -55,4 +62,4 @@
 
 ## R139 · 全体系独立审查后整改状态
 
-[#1689](https://github.com/kaicreator-mm/domain-harness/issues/1689) 的旧规范 SHA `80f5af907c07a9930aeb05aa24280dbe542ef3aa` 结论为 `REWORK P0=0/P1=5/P2=4`。新增 LIFE-10/11/12、TS-04/05、QA-04A/04B/06、DIS 适用表、历史 R119 对照是 Writer 的**整改候选，仍需独立 Exact-SHA 复审**；不得因此宣称源码 [#1688](https://github.com/kaicreator-mm/domain-harness/pull/1688) R138 的 `REWORK P1=4/P2=4` 自动解除。原生完整 Domain App、旧执行系统物理清理及最终消费者仍由 #1682 验收。
+[#1689](https://github.com/kaicreator-mm/domain-harness/issues/1689) 初始 SHA `80f5af907c07a9930aeb05aa24280dbe542ef3aa` 的 R139 `REWORK P1=5/P2=4` 已由 R140 [PR #1690](https://github.com/kaicreator-mm/domain-harness/pull/1690) 独立审查 **ACCEPT_SCOPED P1=0/P2=1** 并合入，唯一 GEN-08 导航 P2 随 R145 [PR #1691](https://github.com/kaicreator-mm/domain-harness/pull/1691) 合入。R138 源码 4 项 P1、4 项 P2 由 R143 独立复审 **ACCEPT_SCOPED P0/P1/P2=0**，随后合并 [PR #1688](https://github.com/kaicreator-mm/domain-harness/pull/1688)。以上限定事实并不代表 #1682 完整旧执行层删除、外部 SDK 消费者与版本发布已通过。

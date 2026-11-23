@@ -1,6 +1,6 @@
 # DomainHarness · TypeScript/Node Language-Native Profile
 
-> Owner [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685) 新设计 **CONFIRMED**；示意类型/路径不是现有 SDK API，旧 Contracts/消费者仍 **MIGRATION_REQUIRED**。
+> Owner [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685) 新设计 **CONFIRMED**。下面的 SDK API 与当前原生实现候选对应；历史 Contracts/Runtime 的物理移除仅在 Draft #1694，未合并前不得宣称版本列车已迁移完成。
 
 ## TS-01 · 三个固定映射
 
@@ -18,12 +18,13 @@ Class PascalCase、Element 逻辑 id camelCase、Package id kebab-case。一个�
 ## TS-02 · 元数据即代码
 
 ```ts
-// index.ts：建议目标结构，示意类型由后续源码实现
+// 普通业务 Core 模块；Metadata 是框架实际读取的代码
+import type { CorePackageMetadata } from '@kaicreator/domain-harness';
 export const packageMeta = {
   id: "order-business",
   role: "core",
   order: 2,
-} as const satisfies PackageMeta;
+} as const satisfies CorePackageMetadata;
 export { OrderInit as Init } from "./elements/order-init.js";
 export { OrderService } from "./elements/order-service.js";
 export { createOrderId } from "./functions/create-order-id.js";
@@ -66,22 +67,22 @@ export class OrderService {
 ## TS-05 · Workflow/XState Standard Element
 
 ```ts
-// 示意 API：目标模型，非当前已构建 SDK 导出
-export abstract class WorkflowElement<I, O> {
-  abstract run(input: I): Promise<WorkflowOutcome<O>>;
-}
+import { fromPromise } from 'xstate';
+import { XStateWorkflowElement, StandardWorkflowSession } from '@kaicreator/domain-harness';
 
-export class XStateWorkflowElement<I, O> extends WorkflowElement<I, O> {
-  constructor(private readonly definition: WorkflowDefinition<I, O>) {
-    super();
-  }
-  async run(input: I): Promise<WorkflowOutcome<O>> {
-    throw new Error("示意实现，后续重构使用 XState");
-  }
-}
+// 真实 SDK API：XState Actor Logic 的输入、输出类型由逻辑本身确定。
+const logic = fromPromise<number, number>(async ({ input }) => input * 2);
+const workflow = new XStateWorkflowElement<typeof logic, number>(
+  logic,
+  output => ({ status: 'COMPLETE', value: output }),
+);
+const actorOutcome = await workflow.run(3);
 
-// Business 可持有自己的 Workflow 定义并复用标准实现
-export class OrderWorkflow extends XStateWorkflowElement<Order, Receipt> {}
+// 普通业务可不使用 XState，通过原生 TS 回调共享根预算。
+const session = new StandardWorkflowSession({ maxCalls: 2, maxSteps: 3, maxDepth: 0 });
+const businessOutcome = await session.run(ctx => ctx.invoke(() => 42));
+void actorOutcome;
+void businessOutcome;
 ```
 
 通用 Workflow 定义与执行实现分离：XState 是下层库，`XStateWorkflowElement` 是 SDK 应用级标准能力，Domain App 或 Kernel Business 可以直接 import 使用；KDP 不垄断执行引擎。Reader/Storage 等同理，只有 Domain App 常用且有实际复用价值的能力才成为 Standard。

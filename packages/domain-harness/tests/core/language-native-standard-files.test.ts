@@ -39,3 +39,68 @@ test('超过 1MiB 输入在解析前失败', () => {
   assert.equal(outcome.kind,'FAILED');
   if (outcome.kind === 'FAILED') assert.equal(outcome.failure.code,'DH_STD_FILE_SIZE');
 });
+
+test('R145 P2：Getter 只捕获一次；Getter/Proxy 抛错不泄漏原始异常', () => {
+  let reads = 0;
+  const safe: Record<string, unknown> = {};
+  Object.defineProperty(safe,'value',{
+    enumerable:true,
+    get() { reads++; return 'yes'; },
+  });
+  const valid = writeJson(safe as never);
+  assert.equal(valid.kind,'SUCCEEDED');
+  assert.equal(reads,1);
+
+  const secretGetter: Record<string, unknown> = {};
+  Object.defineProperty(secretGetter,'value',{
+    enumerable:true,
+    get() { throw new Error('SECRET_GETTER_MARKER'); },
+  });
+  const badGetter=writeJson(secretGetter as never);
+  assert.equal(badGetter.kind,'FAILED');
+  assert.equal(JSON.stringify(badGetter).includes('SECRET_GETTER_MARKER'),false);
+
+  const badProxy=new Proxy({}, {
+    ownKeys() { throw new Error('SECRET_PROXY_MARKER'); },
+  });
+  const bad=writeYaml(badProxy as never);
+  assert.equal(bad.kind,'FAILED');
+  assert.equal(JSON.stringify(bad).includes('SECRET_PROXY_MARKER'),false);
+});
+
+test('R145 P2：深度、节点、序列化输出上限和非有限数受控失败', () => {
+  let nested: unknown = null;
+  for(let i=0;i<68;i++) nested={child:nested};
+  const deep=writeJson(nested as never);
+  assert.equal(deep.kind,'FAILED');
+  if (deep.kind==='FAILED') assert.equal(deep.failure.code,'DH_STD_FILE_SIZE');
+
+  const wide=writeJson(Array(32_769).fill(null));
+  assert.equal(wide.kind,'FAILED');
+  if (wide.kind==='FAILED') assert.equal(wide.failure.code,'DH_STD_FILE_SIZE');
+
+  const expanded=writeJson({text:'\u0000'.repeat(200_000)});
+  assert.equal(expanded.kind,'FAILED');
+  if(expanded.kind==='FAILED') assert.equal(expanded.failure.code,'DH_STD_FILE_SIZE');
+
+  const notNumber=writeYaml({n:Number.NaN});
+  assert.equal(notNumber.kind,'FAILED');
+  if(notNumber.kind==='FAILED') assert.equal(notNumber.failure.code,'DH_STD_FILE_INVALID');
+});
+
+test('R145 P2：YAML 自引用与密集别名、错误 API 输入和原始输入不变', () => {
+  const self=readYaml('a: &self\n  b: *self\n');
+  assert.equal(self.kind,'FAILED');
+  const aliases='a: &shared [1]\nb: ['+Array(80).fill('*shared').join(', ')+']\n';
+  assert.equal(readYaml(aliases).kind,'FAILED');
+  const readUnknown=readJson(undefined as never);
+  const writeUnknown=writeYaml(undefined as never);
+  assert.equal(readUnknown.kind,'UNKNOWN');
+  assert.equal(writeUnknown.kind,'UNKNOWN');
+  if(readUnknown.kind==='UNKNOWN') assert.equal(readUnknown.unknownReason.code,'DH_STD_FILE_INPUT');
+
+  const nested=Object.freeze([1,2,3]);
+  const source=Object.freeze({items:nested});
+  assert.equal(writeJson(source).kind,'SUCCEEDED');
+  assert.deepEqual(source,{items:[1,2,3]});
+});

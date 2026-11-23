@@ -1,1 +1,0 @@
-{"dependencies":{"@kaicreator/domain-harness":"0.11.0"},"engines":{"node":">=22.12.0"},"name":"dh-reference-domain-app","private":true,"scripts":{"start":"node main.mjs"},"type":"module","version":"1.0.0"}

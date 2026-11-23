@@ -1,5 +1,9 @@
 # DomainHarness 0.11.0 · Element-First Foundation 实际调用流程
 
+> **HISTORICAL / SUPERSEDED BY Language-Native DomainHarness**：本文记录旧 Element-First/Lock/Pin/FunctionRef/Target/BUILD 设计及当时 Exact-SHA 审查，只供历史追溯；**不是当前 v0.11.1 SDK 的规范、API、安装方式或新功能准入证明**。
+现行唯一规范见 [Canonical](../specs/domain-harness/README.md)。当前 Standard Reader、Workflow 与 KDP 以 [#1682](https://github.com/kaicreator-mm/domain-harness/issues/1682) 的新 SHA 源码与消费者验收为准；旧 R60/R74 的 CURRENT 仅对应其原时间点。
+
+
 > **权威边界**：本指南说明 B0-01–B0-08 候选源码及其待验证的运行路径。其验收资格由 [#1624](https://github.com/kaicreator-mm/domain-harness/issues/1624) 与真实 Exact-SHA CI/独立审核决定；**不能将文档视为已经验收或合并的证明**。历史 PRD/L2 中的 `EntryRef`、`technicalInit`、`businessAppInit`、`ingress`、`suppressedIngress` 被本次 Element-First 裁决覆盖。0.11.1 Workflow 不属于本阶段。
 
 ## 唯一四层源码

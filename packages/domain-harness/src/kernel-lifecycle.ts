@@ -62,6 +62,7 @@ export class KernelLifecycle {
   private readonly pending = new Set<Promise<void>>();
   private phase: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' = 'created';
   private initFlight: Promise<void> | undefined;
+  private businessFlight: Promise<unknown> | undefined;
   private exitFlight: Promise<void> | undefined;
 
   constructor(
@@ -146,8 +147,17 @@ export class KernelLifecycle {
   public async run<T>(context: DomainAppContext, business: () => T | Promise<T>): Promise<T> {
     await this.start(context);
     if (this.phase !== 'running') throw new LifecycleClosingError();
+    // 只登记实际业务回调，不等待整个 run（后者在 finally 中等待 Exit）。
+    // 外部请求关闭须等业务体收敛后才能释放所持有的资源。
+    let flight: Promise<T>;
     try {
-      return await business();
+      flight = Promise.resolve(business());
+    } catch (error) {
+      flight = Promise.resolve().then((): T => { throw error; });
+    }
+    this.businessFlight = flight;
+    try {
+      return await flight;
     } catch (error) {
       this.log({
         event: 'DH_KDP_UNHANDLED',
@@ -157,6 +167,7 @@ export class KernelLifecycle {
       throw error;
     } finally {
       await this[Symbol.asyncDispose]();
+      this.businessFlight = undefined;
     }
   }
 
@@ -182,6 +193,12 @@ export class KernelLifecycle {
       while (this.pending.size > 0) {
         await Promise.allSettled([...this.pending]);
       }
+      // 不等待 run() 外层 Promise，否则它在 finally 中等待本次 Exit 会自死锁。
+      // 业务回调自身也不得等待正在清理它持有资源的同一轮关闭。
+      await this.businessFlight?.then(
+        () => undefined,
+        () => undefined,
+      );
 
       const disposed = new Set<PackageInitElement>();
       for (let i = this.entered.length - 1; i >= 0; i--) {

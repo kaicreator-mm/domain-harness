@@ -1,17 +1,11 @@
-# DomainHarness 0.11.x · 单一嵌入式 SDK（全量重写）
+# DomainHarness 0.11.x · Language-Native Domain SDK
 
-纯净 Element-First Git monorepo：内部有 Contracts、私有 Composition 实现 `tooling/build`、Microkernel 和公开 SDK 四个 Workspace；**Consumer 只声明一个公开产品 `@kaicreator/domain-harness`**，通过 `/runtime` 与 `/composition` 使用能力，不能再显式安装独立 BUILD。Domain Package 是可由人工/ChatGPT/Agent 直接编写的合规文件集合，Forge/Generator/独立 Assembly 不是前置。旧版源码只在 Git 历史中。
+DomainHarness 0.11.x 采用 TypeScript/Node 原生语言机制重新实现，**没有旧 Boot/PackageSystem/Lock/Pin/FunctionRef/Target 执行系统，不保留 0.10.x 兼容入口**。Package 是普通静态 ESM 插件模块集合，Element 是可复用的 Class；普通 Function 直接通过 import/export 调用。Metadata 是框架读取的代码，Skill/TSDoc 是 Agent 辅助文档。
 
-**统一规范入口**：[模块化规范目录](docs/specs/domain-harness/README.md) · [核心规范](docs/specs/domain-harness/core.md) · [LLM/Agent 规范 Skill](.agents/skills/domain-harness-spec/SKILL.md)。基础设计、实施细节和历史证据按模块分别查阅；Canonical 旧单文件路径只用于跳转。
+SDK 唯一公开产品为 `@kaicreator/domain-harness`，包含最小生命周期 `KernelLifecycle`、可选 XState Standard Workflow、原生 Hook/预算/具名路由组合以及 JSON/YAML Standard Readers；底层 Node API 不需要全部包成 Element。
 
-最低 Node.js 22.12.0。运行 `npm ci && npm run verify`，执行完整的单一 Domain App Demo `examples/basic-domain-app`。
+Node.js >=22.12.0。仓库采用单 SDK Workspace 的 Git monorepo。运行 `npm ci && npm run verify` 验证 TypeScript/ESM、生成期负例、真实 Domain App 和独立 npm SDK-only 安装。
 
-[源码架构与完整调用流程](docs/architecture/DOMAIN_HARNESS_V0110_CODE_AND_CALL_FLOW.md) · [0.11.0 产品 PRD](docs/product/DomainHarness_v0.11.0_ELEMENT_FIRST_PRODUCT_PRD_CANDIDATE.md) · [L2](docs/architecture/DomainHarness_v0.11.0_L2_ARCHITECTURE_CANDIDATE.md) · [TypeScript Skill](.agents/skills/typescript-quality/SKILL.md) · [重构工程经验](docs/engineering/DOMAIN_HARNESS_V0110_REFACTOR_LESSONS.md) · [后续版本防回归手册](docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)
+权威规范：[Canonical 目录](docs/specs/domain-harness/README.md) · [TypeScript Profile](docs/specs/domain-harness/typescript-profile.md) · [Agent Skill](.agents/skills/domain-harness-spec/SKILL.md)。
 
-当前内部阶段：v0.11.1 T11–T14、R53/R58 和 [R60 W01–W08 集成 PR #1663](https://github.com/kaicreator-mm/domain-harness/pull/1663) 已受审合入 `version/v0.11.x`（[Task #1656](https://github.com/kaicreator-mm/domain-harness/issues/1656)，R72 `ACCEPT_SCOPED` P0=0/P1=0/P2=1，[CI #2979 SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2979/1)）；两个普通 Standard File Element `dh.std.file.json/yaml@1.0.0` 已在 [Catalog](docs/architecture/DomainHarness_v0.11.x_STANDARD_ELEMENT_CATALOG.md) 以 Node22 ESM `STANDARD_ACCEPTED` 限定准入，剩余非阻塞 P2 的预分配边界见 Catalog。0.11.2 不承接本次强制优化；整个 0.11.x 尚未对外 Release。
-
-
-**【R82 · 真实 Reference App】**：[独立多文件参考 Domain App](examples/reference-domain-app/README.md) 经 [R81 独立 ACCEPT_SCOPED](https://github.com/kaicreator-mm/domain-harness/pull/1665#pullrequestreview-6012849208)（P0=0/P1=0/P2=1）与同 SHA [CI #2981 SUCCESS](https://ci.kaicreator.com/repos/18/pipeline/2981/1) 后合入 [PR #1665](https://github.com/kaicreator-mm/domain-harness/pull/1665)。后续 0.11.2–0.11.9 **持续扩展同一个 Reference Domain App**，每次版本结束验证新功能与必要历史组合；已受审 Package/SDK/Workflow 的旧证据不重复跑全量 CI。完整阶段索引见 [stages.json](examples/reference-domain-app/stages.json)，首个 E2E 原始 Lock/AppPackage Digest 已由 R83 归档至 Stage Index，不冒称最终 Release。
-
-
-**【v0.11.1 版本复盘】**：[已完成阶段总结、R72/R81 残余 P2 与后续版准入/验收经验](docs/engineering/DOMAIN_HARNESS_V0111_VERSION_RETROSPECTIVE.md)。仅记录受审历史，不改变当前内部版本代码或后续阶段职责。
+`docs/architecture` 下早期 Boot/BUILD/Pin/FunctionRef 文档仅用于历史审计，不是现行可执行规范。完整 0.11.1 仍须通过最终 Exact-SHA 独立审核后才能宣布完成或发布。
