@@ -1,27 +1,25 @@
-/** Core 插件执行元数据；唯一 Order 由生成者在生成期保证。 */
+/** Core 插件的执行元数据；顺序的结构合法性由生成者检查。 */
 export interface CorePackageMetadata {
   readonly id: string;
   readonly role: 'core';
   readonly order: number;
 }
 
-/** 业务应用已有的启动上下文。 */
 export interface DomainAppContext {
   readonly appId: string;
 }
 
-/** 进入登记只用于生命周期记录；直接依赖由 Package 原生代码自行调用。 */
+/** Package 通过原生 Class 引用初始化直接依赖；KDP 只登记真实生命周期进入。 */
 export interface LifecycleInitContext extends DomainAppContext {
-  readonly enter: (element: PackageInitElement) => Promise<void>;
+  readonly enter: (element: PackageInitElement, componentId?: string) => Promise<void>;
 }
 
-/** 可选的 Package Init Element；Exit 由实际资源拥有者提供。 */
 export interface PackageInitElement {
   start(context: LifecycleInitContext): void | Promise<void>;
   [Symbol.asyncDispose]?(): void | Promise<void>;
 }
 
-/** 一个静态导入的 ESM Core Package，不是额外的执行对象。 */
+/** 静态导入的 ESM Package 模块形状，而不是运行时插件管理对象。 */
 export interface StaticCorePackage {
   readonly packageMeta: CorePackageMetadata;
   readonly Init?: new () => PackageInitElement;
@@ -31,19 +29,39 @@ export interface LifecycleLogRecord {
   readonly event: 'DH_KDP_UNHANDLED' | 'DH_KDP_EXIT_FAILED';
   readonly stage: 'init' | 'business' | 'exit';
   readonly message: string;
+  readonly componentId?: string;
+  readonly entryIndex?: number;
+  readonly reasonCode?: 'EXIT_HOOK_FAILED';
 }
 
 export interface LifecycleLogger {
   error(record: LifecycleLogRecord): void;
 }
 
+interface EnteredInit {
+  readonly element: PackageInitElement;
+  readonly id: string;
+  readonly index: number;
+}
+
+/** 正常关闭的执行中断，不是 Package/Element 运行时结构验证。 */
+export class LifecycleClosingError extends Error {
+  constructor() {
+    super('The Domain App lifecycle is closing');
+    this.name = 'LifecycleClosingError';
+  }
+}
+
 /**
- * KDP 的生命周期协调 Element。
- * 仅按代码元数据 Order 执行静态 Core，不加载/扫描插件或验证 Pin/Lock。
+ * 最小 KDP 生命周期 Element：
+ * 静态 Core.Order、可选 Init、真实进入记录、逆序 Exit、未处理错误最后兜底。
+ * 关闭屏障与等待在途 Init 是资源正确释放所必需，不重新验证 Package 正确性。
  */
 export class KernelLifecycle {
-  private readonly entered: PackageInitElement[] = [];
+  private readonly entered: EnteredInit[] = [];
+  private readonly pending = new Set<Promise<void>>();
   private phase: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' = 'created';
+  private initFlight: Promise<void> | undefined;
   private exitFlight: Promise<void> | undefined;
 
   constructor(
@@ -51,37 +69,82 @@ export class KernelLifecycle {
     private readonly logger: LifecycleLogger = console,
   ) {}
 
-  public async start(context: DomainAppContext): Promise<void> {
+  /** 异步启动执行之前先建立 initFlight，避免同步用户代码抢在关闭屏障前运行。 */
+  public start(context: DomainAppContext): Promise<void> {
     if (this.phase !== 'created') {
-      throw new Error('Domain App lifecycle can only start once');
+      return Promise.reject(new Error('Domain App lifecycle can only start once'));
     }
     this.phase = 'starting';
-    const initContext: LifecycleInitContext = {
-      ...context,
-      enter: async (element) => {
-        // Package 自行调用直接依赖；KDP 只跟踪真实进入实例。
-        this.entered.push(element);
-        await element.start(initContext);
-      },
-    };
-    try {
-      for (const core of [...this.cores].sort((a, b) => a.packageMeta.order - b.packageMeta.order)) {
-        if (core.Init === undefined) continue;
-        const element = new core.Init();
-        // Core 与嵌套直接依赖使用同一进入记录，不建立新的插件分派器。
-        await initContext.enter(element);
+    const flight = Promise.resolve().then(() => this.startCores(context));
+    this.initFlight = flight;
+    return flight.catch(async (error: unknown) => {
+      if (!(error instanceof LifecycleClosingError)) {
+        this.log({
+          event: 'DH_KDP_UNHANDLED',
+          stage: 'init',
+          message: 'A Core Init raised an unhandled error',
+        });
       }
-      this.phase = 'running';
-    } catch (error) {
-      this.log({ event: 'DH_KDP_UNHANDLED', stage: 'init', message: 'A Core Init raised an unhandled error' });
       await this[Symbol.asyncDispose]();
       throw error;
-    }
+    });
   }
 
-  /** 业务的整个有效作用域由 KDP 持有，业务完成或异常后退出。 */
+  private async startCores(context: DomainAppContext): Promise<void> {
+    const initContext: LifecycleInitContext = {
+      ...context,
+      enter: (element, componentId) => this.enter(element, initContext, componentId),
+    };
+
+    for (const core of [...this.cores].sort((a, b) => a.packageMeta.order - b.packageMeta.order)) {
+      this.ensureStarting();
+      if (core.Init === undefined) continue;
+      await initContext.enter(new core.Init(), core.packageMeta.id);
+    }
+    this.ensureStarting();
+    this.phase = 'running';
+  }
+
+  private ensureStarting(): void {
+    if (this.phase !== 'starting') throw new LifecycleClosingError();
+  }
+
+  private enter(
+    element: PackageInitElement,
+    context: LifecycleInitContext,
+    componentId: string | undefined,
+  ): Promise<void> {
+    if (this.phase !== 'starting') {
+      return Promise.reject(new LifecycleClosingError());
+    }
+
+    const id = componentId ?? element.constructor.name;
+    const record: EnteredInit = {
+      element,
+      id: /^[a-zA-Z0-9._-]{1,100}$/u.test(id) ? id : 'unknown-component',
+      index: this.entered.length,
+    };
+    this.entered.push(record);
+
+    let flight: Promise<void>;
+    try {
+      flight = Promise.resolve(element.start(context));
+    } catch (error) {
+      flight = Promise.reject(error);
+    }
+    this.pending.add(flight);
+    // 允许一个父 Init 并发进入直接依赖；关闭时全部在途操作都要收敛。
+    void flight.then(
+      () => { this.pending.delete(flight); },
+      () => { this.pending.delete(flight); },
+    );
+    return flight;
+  }
+
+  /** 业务仅在初始化真正完成且尚未收到关闭请求时才可启动。 */
   public async run<T>(context: DomainAppContext, business: () => T | Promise<T>): Promise<T> {
     await this.start(context);
+    if (this.phase !== 'running') throw new LifecycleClosingError();
     try {
       return await business();
     } catch (error) {
@@ -96,39 +159,58 @@ export class KernelLifecycle {
     }
   }
 
-  /** 根据真实进入历史逆序 Exit；清理失败不掩盖主错误。 */
+  /**
+   * 同步关闭屏障先于用户 Hook 执行；共享一条关闭 Promise，
+   * 防止同步重入导致重复资源释放。
+   */
   public [Symbol.asyncDispose](): Promise<void> {
     if (this.exitFlight !== undefined) return this.exitFlight;
-    this.exitFlight = this.exitEntered();
-    return this.exitFlight;
+    this.phase = 'stopping';
+    const flight = Promise.resolve().then(() => this.closeEntered());
+    this.exitFlight = flight;
+    return flight;
   }
 
-  private async exitEntered(): Promise<void> {
-    this.phase = 'stopping';
-    const disposed = new Set<PackageInitElement>();
-    for (let i = this.entered.length - 1; i >= 0; i--) {
-      const element = this.entered[i];
-      if (element === undefined || disposed.has(element)) continue;
-      disposed.add(element);
-      try {
-        await element[Symbol.asyncDispose]?.();
-      } catch {
-        this.log({
-          event: 'DH_KDP_EXIT_FAILED',
-          stage: 'exit',
-          message: 'An Exit Hook failed; continuing cleanup',
-        });
+  private async closeEntered(): Promise<void> {
+    try {
+      // 等待 Core Init 收敛以及同一父 Init 并行进入的直接依赖。
+      await this.initFlight?.then(
+        () => undefined,
+        () => undefined,
+      );
+      while (this.pending.size > 0) {
+        await Promise.allSettled([...this.pending]);
       }
+
+      const disposed = new Set<PackageInitElement>();
+      for (let i = this.entered.length - 1; i >= 0; i--) {
+        const record = this.entered[i];
+        if (record === undefined || disposed.has(record.element)) continue;
+        disposed.add(record.element);
+        try {
+          await record.element[Symbol.asyncDispose]?.();
+        } catch {
+          this.log({
+            event: 'DH_KDP_EXIT_FAILED',
+            stage: 'exit',
+            message: 'An Exit Hook failed; continuing cleanup',
+            componentId: record.id,
+            entryIndex: record.index,
+            reasonCode: 'EXIT_HOOK_FAILED',
+          });
+        }
+      }
+      this.entered.length = 0;
+    } finally {
+      this.phase = 'stopped';
     }
-    this.entered.length = 0;
-    this.phase = 'stopped';
   }
 
   private log(record: LifecycleLogRecord): void {
     try {
       this.logger.error(record);
     } catch {
-      // 日志自身故障不覆盖 Init / 业务抛出的根因。
+      // 记录日志的故障不能覆盖业务/Init 原始异常。
     }
   }
 }
