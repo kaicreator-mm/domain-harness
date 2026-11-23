@@ -14,6 +14,34 @@ IMPLEMENTATION=NOT_STARTED
 
 > 本文根据 Owner 四个设计问题说明**候选抽象方向**，与 [R10 存储/查询功能](./DomainHarness_v0.11.2_STORAGE_QUERY_SCOPE_R10_PROPOSAL.md) 一起交付 Owner 进行 Product/L1 澄清。类型名、表名、包名与代码片段均为**讨论样例，不是当前 SDK 已公开 API 或正式 L2 合同**。先确认领域功能 WHAT 与边界，再开展 L2 比较和独审。
 
+## 0. Owner 澄清：DomainHarness 是**领域无关 SDK**，不是任何具体领域的实现
+
+**架构基本约束（Owner 已明确，R11 必须遵守）：**
+
+- DomainHarness 0.11.2 **仅实现领域共性抽象和通用机制**：Domain/Concept/Entity/Relation/Knowledge/Fact/Rule/Recognizer/Validator/Decision/Intent/Applicability 的可复用语义合同，领域数据的存储、查询、适用性、来源、规则/决策组合及 Workflow 接线；对任意领域均成立。
+- **不在 SDK 内定义实际行业概念、业务实体、政策、阈值、识别标准、验证条件、Rule/Decision 业务算法或领域特定数据表**。`Order`、`Inventory`、SKU/补货等仅是仓内外 Consumer/测试夹具，用于证明 SDK 的通用能力，并非 SDK 产品对象、依赖或默认逻辑。
+- **业务 Domain Package 由 SDK 消费者/作者实现**。其领域专属 Concept、Relation、Knowledge、Recognizer、Validator、Rule、Decision 具体内容和策略归消费者，不得反向写入 `@kaicreator/domain-harness` 的公共核心。Business Element 可以复用 SDK 的通用能力，但 SDK 不依赖任一 Business Package。
+- “通用抽象”不等于所有名词必须变成抽象 Class。可用**参数化 TypeScript 数据合同、结构化 Function 签名、内聚的 Standard Element、组合工具**共同提供。对于 Recognizer/Validator/Rule/Decision，SDK 可以提供通用的输入/输出/上下文/证据/拒绝合同与可复用组合机制，**具体 Function 必须由业务注入或直接调用**，不得硬编码行业知识。
+- SQLite/JSON-LD/YAML 与 SQL/属性/文本/向量/图 Query 的数据模型也必须是**领域中立、可扩展、可限定版本/范围**的；例如使用通用 Entity/Property/Relation/Fact/Source/Vector 引用，不在 SDK 中创建固定的订单表、库存表或面向某行业的 SQL。特定领域可自定义投影/索引，但必须留在外部领域 Package。
+- KDP 仍只有最小生命周期/最终兜底；不新增领域调度 Runtime、集中 Rule VM、运行期业务插件发现或必须依赖 Forge。独立可用的普通 TS/Node/SQLite 方案优先。现有 Element-First 合同不改变。
+
+**产品检验口径：** 只替换 Domain Package 提供的概念/规则/知识/函数及数据，**不修改 SDK 源码、公共数据表或通用查询实现**，即可在两个语义不同的领域完成读写、检索、适用性、规则评估、Decision Evidence 与 Workflow 组合。至少一个“从零创建的新领域”消费者应仅依赖发布的公开 SDK，避免以 SDK 内特制订单/库存逻辑假装通用性。
+
+### 各项真正由 SDK 提供的通用抽象
+
+| 领域对象/能力 | SDK 通用合同/机制 | 具体业务 Domain Package 提供 |
+|---|---|---|
+| Domain/Concept/Object/Relation | 稳定语义引用、类型/属性与关系描述、范围/版本、通用图存取 | 实际行业概念、实体结构、关系名称和业务含义 |
+| Knowledge/Fact | 数据/来源/证据/快照模型、读写/查询/过滤、冲突与有效性语义 | 真实知识内容、数据来源、信任规则与领域数据 |
+| Rule | 通用规则描述、选定、版本、Applicability、条件表达式/函数协议、结果/冲突组合语义 | 领域政策、规则定义、业务 Function、优先级 |
+| Recognizer | 泛型输入→候选/匹配/歧义的结构化合同及可选组合工具 | 哪些模式代表该领域对象的识别器 |
+| Validator | 泛型输入→合法/缺失/违反约束的结果合同和通用类型/范围工具 | 实际领域约束/拒绝条件 |
+| Decision | 泛型事实/规则结果→决定/未知/证据的结果合同、可复现引用机制 | 实际判断逻辑与业务结论 |
+| Intent | 通用 Goal/Operation 引用与领域映射接口，本版不实现完整意图交互 | 本领域能处理的具体意图、参数及操作；交互逻辑归 0.11.3 |
+| Applicability | 通用时间、主体、地域、版本、来源等维度的筛选组合语义 | 特定领域的适用条件与解析 |
+
+**API 方向：** 为独立使用的 Business Function 提供可选的**结构化泛型协议**，而不是要求 `extends DomainRule`、`implements DomainRecognizer` 或经过 SDK 调度才能被调用。例如 `(input: I, context: C) => DomainOutcome<O>` 属于可能的公共类型约定，实际函数实现归 Domain Package。若业务无需通用包装，依然可用原生函数与标准 Workflow 直接组合。此处为 Product/L1 约束，不锁死确切签名。
+
 ## 1. 十个领域概念的正确抽象层次
 
 | 概念 | 主要载体 | 典型 Business 职责 | SDK 可能提供的共享能力 |
@@ -52,7 +80,7 @@ type DomainDecision<T> =
 
 - **A / 每个 Business 自行处理 SQLite/Scope/Rule：** 首版代码少，但订单和库存反复实现相同索引、范围过滤、证据语义，不符合跨 Domain 共性验收。
 - **B / SDK 大型 DomainEngine + 十个 `I*` 根接口 + 规则 VM：** 表面统一，但与 Element-First 原生 TS、Package 静态直接调用、最小 SDK 原则冲突，且扩大调试/运行风险，不推荐。
-- **C / 原生 TypeScript 数据合同 + 少量 Standard Store/Query Element + Business 自有规则/判断：首选候选。** 只抽真正跨订单/库存重复的访问能力；复杂 Rule 和领域 Recognizer/Validator 用原生函数和 Class。具体哪一个成为公开 Standard Class，待 L2 两消费者实证后确认。
+- **C / 原生 TypeScript 数据合同 + 少量 Standard Store/Query Element + Business 自有规则/判断：首选候选。** 只抽跨**任意领域**确有复用性的能力；实际领域 Rule、Recognizer、Validator 由外部 Business Package 以原生函数和 Class 实现。订单/库存只是可替换测试消费者，不能成为 SDK 内部功能。具体哪一个成为公开 Standard Class，待 L2 两消费者实证后确认。
 
 建议使用一份明确已选的 `DomainScope = DomainRef + KnowledgeSnapshot + subject/region/asOf/limits` 作为**查询调用参数**，而非所有 Element/Package 的强制基类 Context。请求读取的 Domain、语义版本、知识快照、适用时间、来源应由查询本身验证；不可仅靠上游 Recognizer 保证。
 
@@ -98,7 +126,7 @@ export function evaluateRestock(facts: StockFacts, policy: StockPolicy) {
 
 ## 5. Element-First 实际组合路线
 
-建议在真实 Business 使用 `OrderPolicyElement`、`InventoryElement` 等内聚 Class，直接组合可选通用的 SQLite/Query/Applicability helper；Business Recognizer/Validator/Rule/Decision 可以是其方法或拆出的纯函数。**一个“业务智能组合 Element”仅在有复用价值时创建**，不是框架强制命名容器。
+外部 Domain App 可在测试示例中使用 `OrderPolicyElement`、`InventoryElement` 等内聚 Class，直接组合可选通用的 SQLite/Query/Applicability helper；Business Recognizer/Validator/Rule/Decision 可以是其方法或拆出的纯函数。**一个“业务智能组合 Element”仅在有复用价值时创建**，不是框架强制命名容器。
 
 典型路径：
 
@@ -125,7 +153,7 @@ Package (ESM imports)
 
 ## 7. Owner 产品澄清还需确认的四项选择
 
-1. **抽象原则：** 认可“数据合同 + 少量真实可复用 Standard Elements + Business 原生函数/Class”，不设十种强制根类型。
+1. **抽象原则：** **SDK 绝不包含任何具体领域业务实现**；提供跨任意领域的语义/存储/查询/处理/结果通用合同与组合机制，实际 Business Function/Class 由 SDK 外部 Domain Package 编写；不设十种强制根类型。
 2. **查询：** SQLite 属性/字符串/向量/图检索必须都在本版可运行；String 包括 exact/prefix/substring/full-text，Vector 明确输入向量 Top-K，不要求 Embedding Model。
 3. **规则：** 原生 TS Function 为主体，有限可序列化/可持久化的条件可由 AST 表达；不引入通用 DSL/VM。
 4. **Element-First：** Store/Query/Workflow 为能力 Element，领域 Business Class 直接组合；Knowledge/Rule/Applicability 等领域数据无需强制单独 Element；Intent 全量处理归 0.11.3。
