@@ -27,6 +27,8 @@ RELEASE=NO
 
 > **R15 · Owner 简化后的首选产品模型：** [Knowledge 语义层 + Workflow 执行层（通过 Recognizer/Validator 得到 Intent 并显式关联业务 Workflow）](./DomainHarness_v0.11.2_R15_TWO_LAYER_KNOWLEDGE_WORKFLOW_INTENT_MODEL.md)。所有 Domain Concept、Object、Relation、Fact、Rule、Intent、Applicability 统一归 Knowledge 的**类型化语义数据内容**，但不抹平类型、作用域和 Source；Recognizer/Validator/Business Workflow 读取 Knowledge 提供依据。具体业务仍归外部 Package；SDK 只提供通用抽象、Store/Query/Expression 和现有 Workflow 组合。R14 的四层 Semantic Workflow / SemanticPort / Data-Control-Evidence Edge **作为架构候选已被 R15 取代**，不得按旧方案新增语义图执行器或强制 Port/Edge 模型。建议替代验收为 DI-AC29R–34R。仍属 Product/L1 候选，未 Owner Freeze、未实施。
 
+> **R16 产品/版本边界最新讨论（尚待 Owner 裁决）：** [统一两类 Workflow 并将 0.11.4 Authorized Action 全量纳入 0.11.2 的候选](./DomainHarness_v0.11.2_R16_TWO_WORKFLOWS_AUTHORIZED_ACTION_SCOPE_CONSOLIDATION.md)：（1）Intent Recognition Workflow 组合 Recognizer + Validator，从 Knowledge 产生确定的 ValidatedIntent；（2）Intent Handling Workflow 消费已批准 Intent，按需读取 Knowledge/Business State、执行 Rule/Decision，并在真实 Capability 授权下调用 Tool/Host Effect。Knowledge 存 State/Capability/Tool 的**语义定义与规则**，不冒充最新状态/实际权限；真实状态来自权威 State Store，真实授权由可信 Host/Capability Owner 检查；不能以 Workflow 自行决定权限或凭计划性模型提案执行 Effect。**0.11.4 #1614 合并只是 R16 的建议，版本官方 Roadmap / #1614 尚未变更。** 仍保持 L1 候选、L2/源码/CI 未开始。
+
 ## 1. 产品目的与实际消费场景
 
 DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范围**内，利用可追溯且有适用边界的领域事实、知识与规则，形成可解释、可复现的确定性业务判断，并将判断作为 0.11.1 已有 Workflow/Task 的输入/分支依据。**领域知识必须改变真实业务结果**；“把 JSON 解析出来”、一次成功 Demo 或给一个示例写死政策分数，不构成本版本的通用领域智能。
