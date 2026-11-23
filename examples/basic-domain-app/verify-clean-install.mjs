@@ -209,6 +209,7 @@ const packages = [
     root: { types: './dist/index.d.ts', import: './dist/index.js' },
     dependencies: {
       '@kaicreator/domain-harness-contracts': '0.11.0', '@kaicreator/domain-harness-microkernel': '0.11.0',
+      xstate: '5.33.2',
     },
   },
   {
@@ -297,6 +298,24 @@ assert.equal(root.buildApp, buildApp);
 assert.equal(root.boot, boot);
 assert.equal(typeof buildApp, 'function');
 assert.equal(typeof BuildRefusal, 'function');
+// 外部真实安装包也必须直接提供新增的语言原生生命周期和 Standard。
+assert.equal(typeof root.KernelLifecycle, 'function');
+assert.equal(typeof root.WorkflowElement, 'function');
+assert.equal(typeof root.XStateWorkflowElement, 'function');
+const events = [];
+const nativeKernel = new root.KernelLifecycle([{
+  packageMeta: { id: 'kdp', role: 'core', order: 0 },
+  Init: class {
+    start() { events.push('init'); }
+    [Symbol.asyncDispose]() { events.push('exit'); }
+  },
+}]);
+const value = await nativeKernel.run({ appId: 'installed-consumer' }, () => {
+  events.push('business');
+  return 17;
+});
+assert.equal(value, 17);
+assert.deepEqual(events, ['init', 'business', 'exit']);
 `], {
     cwd: consumerRoot, encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024,
     env: installEnv,

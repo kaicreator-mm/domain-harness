@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as facade from '@kaicreator/domain-harness';
 
-test('SDK facade exposes selected public contracts, BUILD and Boot but not internal bootstrap', async () => {
+test('SDK facade 精确导出已有接口和新增原生 KDP / Standard Elements', async () => {
   const contracts = await import('@kaicreator/domain-harness-contracts');
   const build = await import('@kaicreator/domain-harness-build');
   const microkernel = await import('@kaicreator/domain-harness-microkernel');
@@ -12,6 +12,9 @@ test('SDK facade exposes selected public contracts, BUILD and Boot but not inter
     ...Object.keys(contracts),
     ...Object.keys(build),
     ...Object.keys(microkernel).filter((name) => name !== 'bootstrap' && name !== 'activateSelectedKdpHostInit'),
+    'KernelLifecycle',
+    'WorkflowElement',
+    'XStateWorkflowElement',
   ]);
   const actual = new Set<string>(Object.keys(facade));
 
@@ -20,7 +23,7 @@ test('SDK facade exposes selected public contracts, BUILD and Boot but not inter
   assert.deepEqual(
     { missing, unexpected },
     { missing: [], unexpected: [] },
-    'facade must re-export exactly the real composition modules (a missing name means an export-* collision or a facade drift)',
+    'SDK root must exactly expose existing and newly implemented native modules without collisions',
   );
   assert.ok(actual.size > 0);
   assert.equal('bootstrap' in facade, false, 'internal KDP bootstrap must not be public');
