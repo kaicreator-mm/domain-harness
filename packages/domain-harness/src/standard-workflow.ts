@@ -28,18 +28,20 @@ export class XStateWorkflowElement<Input, Output> extends WorkflowElement<Input,
 
   public async run(input: Input): Promise<StandardWorkflowOutcome<Output>> {
     // 标准能力直接使用 XState Actor；不借道 Kernel FunctionRef/Target。
-    const actor = createActor(this.logic, { input });
     try {
-      actor.start();
-      return this.mapOutput(await toPromise(actor));
+      const actor = createActor(this.logic, { input });
+      try {
+        actor.start();
+        return this.mapOutput(await toPromise(actor));
+      } finally {
+        actor.stop();
+      }
     } catch {
-      // Actor 失败是本次 Workflow 的失败结果；不把它改写为 COMPLETE。
+      // Actor 创建、执行或输出映射失败均不得改写为 COMPLETE。
       return {
         status: 'FAILED',
         reason: { code: 'DH_WORKFLOW_EXECUTION_FAILED', message: 'Workflow execution failed' },
       };
-    } finally {
-      actor.stop();
     }
   }
 }

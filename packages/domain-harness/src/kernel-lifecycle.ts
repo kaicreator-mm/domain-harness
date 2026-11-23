@@ -10,9 +10,14 @@ export interface DomainAppContext {
   readonly appId: string;
 }
 
+/** 进入登记只用于生命周期记录；直接依赖由 Package 原生代码自行调用。 */
+export interface PackageInitContext extends DomainAppContext {
+  readonly enter: (element: PackageInitElement) => Promise<void>;
+}
+
 /** 可选的 Package Init Element；Exit 由实际资源拥有者提供。 */
 export interface PackageInitElement {
-  start(context: DomainAppContext): void | Promise<void>;
+  start(context: PackageInitContext): void | Promise<void>;
   [Symbol.asyncDispose]?(): void | Promise<void>;
 }
 
@@ -51,13 +56,20 @@ export class KernelLifecycle {
       throw new Error('Domain App lifecycle can only start once');
     }
     this.phase = 'starting';
+    const initContext: PackageInitContext = {
+      ...context,
+      enter: async (element) => {
+        // Package 自行调用直接依赖；KDP 只跟踪真实进入实例。
+        this.entered.push(element);
+        await element.start(initContext);
+      },
+    };
     try {
       for (const core of [...this.cores].sort((a, b) => a.packageMeta.order - b.packageMeta.order)) {
         if (core.Init === undefined) continue;
         const element = new core.Init();
-        // 在调用 start 前记录真实进入，部分初始化失败仍应清理。
-        this.entered.push(element);
-        await element.start(context);
+        // Core 与嵌套直接依赖使用同一进入记录，不建立新的插件分派器。
+        await initContext.enter(element);
       }
       this.phase = 'running';
     } catch (error) {

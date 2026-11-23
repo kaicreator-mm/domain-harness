@@ -9,6 +9,8 @@ import * as composition from '@kaicreator/domain-harness/composition';
 import * as contracts from '@kaicreator/domain-harness-contracts';
 import * as microkernel from '@kaicreator/domain-harness-microkernel';
 import * as build from '@kaicreator/domain-harness-build';
+import * as nativeLifecycle from '../../src/kernel-lifecycle.js';
+import * as standardWorkflow from '../../src/standard-workflow.js';
 
 test('R43: runtime subpath supplies Contracts/Boot but no BUILD or Package authoring API', () => {
   const expected = new Set([
@@ -38,9 +40,14 @@ test('R52: composition is bundled inside the SDK, preserving exported API withou
     new build.BuildRefusal('DH_BUILD_SCHEMA_INVALID', 'R52').code);
 });
 
-test('R43: root facade stays one public SDK product and reuses both existing implementations', () => {
+test('SDK root 在迁移期同时精确导出已审旧 API 和原生 Standard/KDP API', () => {
   assert.deepEqual(new Set(Object.keys(sdk)),
-    new Set([...Object.keys(runtime), ...Object.keys(composition)]));
+    new Set([
+      ...Object.keys(runtime),
+      ...Object.keys(composition),
+      ...Object.keys(nativeLifecycle),
+      ...Object.keys(standardWorkflow),
+    ]));
   assert.equal(sdk.boot, runtime.boot);
   assert.equal('bootstrap' in sdk, false, 'root SDK must not expose direct KDP bootstrap');
   assert.equal(sdk.buildApp, composition.buildApp);

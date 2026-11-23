@@ -6,6 +6,7 @@ import {
 import type {
   LifecycleLogRecord,
   PackageInitElement,
+  PackageInitContext,
   StaticCorePackage,
 } from '../../src/kernel-lifecycle.js';
 
@@ -108,4 +109,52 @@ test('普通业务公开函数和 Element 方法无需 FunctionRef 适配器', (
   const service = new BusinessElement();
   assert.equal(service.calculate(3), 7);
   assert.equal(BusinessElement.id(), 'businessElement');
+});
+
+test('Core 直接依赖的 Extension 通过进入记录获得逆序 Exit', async () => {
+  const events: string[] = [];
+  class ExtensionInit implements PackageInitElement {
+    public start(): void { events.push('extension:init'); }
+    public [Symbol.asyncDispose](): void { events.push('extension:exit'); }
+  }
+  class BusinessInit implements PackageInitElement {
+    public async start(ctx: PackageInitContext): Promise<void> {
+      events.push('business:init');
+      await ctx.enter(new ExtensionInit());
+    }
+    public [Symbol.asyncDispose](): void { events.push('business:exit'); }
+  }
+  const kernel = new KernelLifecycle([
+    { packageMeta: { id: 'kdp', role: 'core', order: 0 } },
+    { packageMeta: { id: 'business', role: 'core', order: 2 }, Init: BusinessInit },
+  ]);
+  await kernel.run(context, () => { events.push('business:run'); });
+  assert.deepEqual(events, [
+    'business:init', 'extension:init', 'business:run',
+    'extension:exit', 'business:exit',
+  ]);
+});
+
+test('嵌套 Init 失败仍逆真实进入退出并保留最初错误', async () => {
+  const events: string[] = [];
+  const root = new Error('nested Init failed');
+  class NestedInit implements PackageInitElement {
+    public start(): void { events.push('child:init'); throw root; }
+    public [Symbol.asyncDispose](): void { events.push('child:exit'); }
+  }
+  class ParentInit implements PackageInitElement {
+    public async start(ctx: PackageInitContext): Promise<void> {
+      events.push('parent:init');
+      await ctx.enter(new NestedInit());
+    }
+    public [Symbol.asyncDispose](): void { events.push('parent:exit'); }
+  }
+  const kernel = new KernelLifecycle([
+    { packageMeta: { id: 'kdp', role: 'core', order: 0 }, Init: ParentInit },
+  ], { error: (record) => { events.push(record.event); } });
+  await assert.rejects(kernel.start(context), (error: unknown) => error === root);
+  assert.deepEqual(events, [
+    'parent:init', 'child:init', 'DH_KDP_UNHANDLED',
+    'child:exit', 'parent:exit',
+  ]);
 });
