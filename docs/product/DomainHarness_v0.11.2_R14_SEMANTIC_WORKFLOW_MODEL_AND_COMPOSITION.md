@@ -14,6 +14,8 @@ CI=NOT_RUN_DOC_ONLY
 
 > **纠正 R13 缺口：** 单纯说“Recognizer→Query→Rule→Decision 走 Workflow”并没有建立 Domain Intelligence。本方案提出真正能连接**领域语义、领域能力、数据流、控制流、证据流、已存在的 Workflow API**的建模合同。所有 TS 类型/函数名是待评审**候选示意**，不是已实现 SDK API；依现行 `standard-workflow.ts`、`native-workflow-composition.ts` 真正支持的原生语义设计。不得新建 Workflow DAG Runtime、中央 Rule/Function Registry、FunctionRef/Target/Lock 或 KDP 领域调度。
 
+> **HISTORICAL / SUPERSEDED BY R15：** Owner 指出本文件提出的四层 Semantic Workflow Model、SemanticPort、Data/Control/Evidence Edge 作为额外框架过于复杂。**当前应以 [R15 Knowledge + Workflow 两层模型](./DomainHarness_v0.11.2_R15_TWO_LAYER_KNOWLEDGE_WORKFLOW_INTENT_MODEL.md) 为新 Product/L1 候选。** R14 仅保留为历史推导/风险清单，DI-AC29–34 不再作为必须实现的产品门；取代为 R15 DI-AC29R–34R。仍保留跨域/版本、事实冲突、Outcome 传播及证据可复现等真实性要求。不需要创建语义图 Runtime 或强制 Workflow 端口验证器。本次简化仍待 Owner 正式 L1 Freeze，不能称代码已实现。
+
 ## 1. 四个模型，明确彼此关系
 
 1. **Domain Semantic Model（领域语义模型）**：DomainRef、Concept、Entity、Relation、Property/Fact、Knowledge、Rule、Applicability 与 Source/Version，回答“字段/关系/断言**意味着什么**，其来源和适用性是什么”。外部 Business 定义具体领域实例；SDK 提供通用合同与 Store/Query。
