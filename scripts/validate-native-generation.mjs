@@ -41,6 +41,7 @@ export function validateNativeApp(manifestPath, corePaths) {
   const seenOrders = new Set(), seenIds = new Set();
   let kdpCount = 0;
   const report = [];
+  const manualReview = [];
 
   for (const givenPath of corePaths) {
     const path = resolve(givenPath);
@@ -68,15 +69,18 @@ export function validateNativeApp(manifestPath, corePaths) {
         imports.add(node.moduleSpecifier.text);
       }
     }
-    let dynamic = false;
-    function findDynamicImport(node) {
+    // 原生 import() 是语言能力，不能一律当作不合法的代码子集。
+    // 字面量目标与静态 import 同样核对直接依赖；计算得到的目标仅标记待作者复核。
+    let unresolvedImport = false;
+    function inspectDynamicImport(node) {
       if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-        dynamic = true;
+        const target = node.arguments[0];
+        if (target && ts.isStringLiteralLike(target)) imports.add(target.text);
+        else unresolvedImport = true;
       }
-      ts.forEachChild(node, findDynamicImport);
+      ts.forEachChild(node, inspectDynamicImport);
     }
-    ts.forEachChild(file, findDynamicImport);
-    if (dynamic) refuse('GEN_DYNAMIC_IMPORT');
+    ts.forEachChild(file, inspectDynamicImport);
     if (!metadata) refuse('GEN_MISSING_METADATA');
 
     const idNode = readProperty(metadata, 'id');
@@ -102,9 +106,14 @@ export function validateNativeApp(manifestPath, corePaths) {
           !existsSync(resolve(dirname(path), specifier))) refuse('GEN_MISSING_DIRECT_IMPORT');
     }
     report.push({ id, order });
+    if (unresolvedImport) manualReview.push(id);
   }
   if (kdpCount !== 1) refuse('GEN_KDP_ORDER_ZERO_MISSING');
-  return { packages: report.sort((a, b) => a.order - b.order), checked: report.length };
+  return {
+    packages: report.sort((a, b) => a.order - b.order),
+    checked: report.length,
+    ...(manualReview.length > 0 ? { manualReviewPackages: manualReview } : {}),
+  };
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
@@ -121,7 +130,12 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
   } else {
     try {
       const result = validateNativeApp(manifest, cores);
-      console.log(JSON.stringify({status:'GEN_VALIDATED', ...result}));
+      const partial = 'manualReviewPackages' in result;
+      console.log(JSON.stringify({
+        status: partial ? 'GEN_PARTIAL_REVIEW_REQUIRED' : 'GEN_VALIDATED',
+        ...result,
+      }));
+      if (partial) process.exitCode = 3;
     } catch (error) {
       const code = error instanceof Error ? error.message : 'GEN_FAILED';
       console.error(/^GEN_[A-Z_]+$/u.test(code) ? code : 'GEN_FAILED');

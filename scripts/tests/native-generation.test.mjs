@@ -47,8 +47,8 @@ test('动态或缺失 Metadata 必须在生成期拒绝，Runtime 不重复证�
     x => assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),/GEN_NONSTATIC_CORE/u));
   runCase({ business:"export const other={id:'business',role:'core',order:2};" },
     x => assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),/GEN_MISSING_METADATA/u));
-  runCase({ business:"export const packageMeta={id:'b',role:'core',order:2}; import('./unsafe.mjs');" },
-    x => assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),/GEN_DYNAMIC_IMPORT/u));
+  runCase({ business:"export const packageMeta={id:'b',role:'core',order:2}; import('./missing.mjs');" },
+    x => assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),/GEN_MISSING_DIRECT_IMPORT/u));
 });
 
 test('跨 Package 的第三方直接 import 必须存在于应用直接依赖', () => {
@@ -61,4 +61,21 @@ test('跨 Package 的第三方直接 import 必须存在于应用直接依赖', 
 test('Core Order 与 Package ID 均唯一，不需要 Dummy Init 或自定义 Loader', () => {
   runCase({ business:"export const packageMeta={id:'kdp',role:'core',order:2};" },
     x => assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),/GEN_DUPLICATE_PACKAGE/u));
+});
+
+test('原生字面量 import() 允许正常使用，但仍验证直接依赖与文件存在', () => {
+  runCase({business:"export const packageMeta={id:'b',role:'core',order:2}; void import('@kaicreator/domain-harness');"},
+    x => assert.equal(validateNativeApp(x.manifest,[x.kdp,x.business]).checked,2));
+  runCase({business:"export const packageMeta={id:'b',role:'core',order:2}; void import('undeclared-third-party');"},
+    x => assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),
+      /GEN_UNDECLARED_DIRECT_DEPENDENCY/u));
+});
+
+test('计算的 import() 不是框架禁用语法，作者必须复核不确定依赖', () => {
+  runCase({business:"const specifier = getPluginName(); export const packageMeta={id:'b',role:'core',order:2}; void import(specifier);"},
+    x => {
+      const checked=validateNativeApp(x.manifest,[x.kdp,x.business]);
+      assert.deepEqual(checked.manualReviewPackages,['b']);
+      assert.equal(checked.checked,2);
+    });
 });
