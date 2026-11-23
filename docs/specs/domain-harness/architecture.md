@@ -140,7 +140,7 @@ SDK 产品层：唯一 @kaicreator/domain-harness（作者期 + 运行期入口�
 
 **严格 Boot 禁区**：遍历业务 Package DAG、创建 PackageSystem、运行 Workflow/Actor/Task、解释规则、裁定 READY/DEGRADED/BLOCKED/FAILED、业务 Function 路由、执行业务 Init、调用第二次 App Init、组织 Exit、运行时重新生成 App 或静态验证，**以及每次启动重新解析选定 JavaScript/ESM 源码、推导静态导入图或验证 Package/Element 正确性**。仅保留受信锚、身份、Pin/Lock 和必要字节完整性的最小核验。
 
-**当前具体差距（MIGRATION_REQUIRED，按切面拆分）**：#1681 的 R127 候选源码将参考 KDP 的 re-export `bootstrap.js` 删除并换为由自身 `dist/index.mjs` 直接持有的 `init` Target，Boot 依据唯一 Host FunctionRef 调用；此切片还需要独立审核与版本分支集成。真正的 PackageSystem/Actor 代码仍位于 `packages/microkernel/src/*` 物理 SDK 模块，必须继续核查与迁移至真实 KDP Package/Element 的实现所有权；不能用“调用了 KDP-owned 入口”冒充全部私有 Runtime 都归属 KDP。任何 KDP 入口在 Boot 核验安装信任、Lock/Pin/Target 与字节前均不得 import/执行。
+**当前具体差距（MIGRATION_REQUIRED，按切面拆分）**：#1681 已经 R129 独立限定接受并合入 `version/v0.11.x@8c0a1138b5629d3d10de76f33f87eb1572a53687`：参考 KDP 删除 `bootstrap.js`，由自身 `dist/index.mjs` 直接持有受选 `init` Target，Boot 按唯一 Host FunctionRef 调用且在 Host 已进入后经私有单次交接清理。**这只是受选 Host 机器 ABI 切片通过**。真正的 PackageSystem/Actor/Workflow/DomainApp 代码仍位于 `packages/microkernel/src/*` 物理 SDK 模块，须在 #1682 真实迁至 KDP Package/Element；已知 ESM import 后求值异常的 FAILED/REFUSED 分类 P2 单列 #1683。不能用“调用了 KDP-owned 入口”冒充全部私有 Runtime 都归属 KDP。任何 KDP 入口在 Boot 核验安装信任、Lock/Pin/Target 与字节前均不得 import/执行。
 
 ### 5.1 单一受选 KDP Host 机器合同（R127 目标；验收仍需 Exact-SHA 独审）
 
