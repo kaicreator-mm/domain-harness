@@ -14,6 +14,8 @@ NO_MAIN_RELEASE=TRUE
 
 > **R10 是针对 R8/R9 未考虑领域持久化及多查询的功能范围补充，不是 L1 Freeze、L2 设计或已完成代码。** 本文若与 [R8/R9 L1](./DomainHarness_v0.11.2_DOMAIN_INTELLIGENCE_PRODUCT_L1_R8_CANDIDATE.md) 的“SQLite 非必需”“不要求向量和图查询”等旧假设冲突，**R10 的新增产品建议优先供 Owner 裁决**；实际获批后再统一修订主 L1 及版本规划。
 
+> **R19 业务静态知识对旧 R10 的限定覆盖：** [R19 不可变 DataKnowledge/原生 FunctionKnowledge](./DomainHarness_v0.11.2_R19_STATIC_KNOWLEDGE_BUSINESS_ELEMENT_WORKFLOW_GENERATION_CONTRACT.md)明确：最终 Business Package 的 DataKnowledge 是**生成时写进源码、运行时不可变的对象**，不是必须 SQLite CRUD、重启更新/热替换的知识数据库。因而本 R10 “全部 Domain/Fact/Rule 必须写/更新 SQLite、SQLite 更改 Rule 应即时改变已生成业务决策”等范围及相应旧 DI-AC15/20/21 中**动态知识持久化作为必需项**的说法均待裁剪，不可与 R19 同时作为实施门。**SQLite Database Element、SQL/Vector/Graph 查询仍可作为通用业务数据/状态/索引/资源能力在 Product/L1 明确决定范围，不等于取消数据库功能。** SQLite 中运行时业务状态/外部数据不自动变成已编译不可变 DataKnowledge；原 R10 为历史讨论、待统一决议，未触发源码实现。
+
 ## 1. 为什么要前移
 
 0.11.2 的 Domain Semantics、Concept/Entity/Relation、Fact、Source/Provenance、Knowledge、Rule、Decision 要能**存储、更新、重新打开、查询和复现**，不能仅是一组进程内静态文件和内存对象。后续 0.11.3–0.11.9 需要消费稳定的已选知识版本。为此把 **Domain Data Persistence & Query** 放到 0.11.2；但不迁移 0.11.6 的 TaskRun/Checkpoint/暂停恢复和 Effect 幂等。
