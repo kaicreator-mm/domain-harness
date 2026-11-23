@@ -33,6 +33,8 @@ RELEASE=NO
 
 > **R18 Knowledge 统一抽象最新候选：** [Data Knowledge（返回结构化数据）+ Function Knowledge（返回操作描述/引用）；Function Knowledge 按业务状态依赖 stateful 与是否外部调用 external 两个独立维度分类](./DomainHarness_v0.11.2_R18_DATA_FUNCTION_KNOWLEDGE_TWO_AXES.md)。Concept、Entity、Relation、Fact、Rule 声明、Intent、Applicability、State schema 属 DataKnowledge；Recognizer、Validator、Rule evaluator、Decision、Tool 的功能描述属 FunctionKnowledge，真实代码依然由可信 Business Package 静态 import/执行。两个维度不等于 user approval 与资源权限；R17 PREAUTHORIZED/USER_APPROVAL 仍是独立业务策略。R18 不创建第三层语义体系、动态代码执行注册表或四套 Element 基类。DI-AC48–54 属拟验收且全部 NOT_RUN。
 
+> **R19 最新 Owner 三项纠偏（待 Product/L1 冻结）：** [静态 DataKnowledge + 原生 FunctionKnowledge + 内聚 Business Element + Workflow 生成期业务合同](./DomainHarness_v0.11.2_R19_STATIC_KNOWLEDGE_BUSINESS_ELEMENT_WORKFLOW_GENERATION_CONTRACT.md)。DataKnowledge 是生成时硬编码、运行时不可变的对象，不必额外 Knowledge Store/Schema Registry；FunctionKnowledge 是访问 DataKnowledge 的真实 TS Function/Element 方法，内部状态由 Function/Element 自己维护，共享状态先内聚组合；Intent Recognition/Handling Workflow 继续复用已存在 SDK 执行机制，业务参数、输入、输出、交互完全由生成期定义，**不强制统一领域 Intent/Decision/DomainResult**。R18 的 OperationDescriptor/OperationId/动态映射、stateAccess 等强制要求被 R19 取代，R10 的“静态 DataKnowledge 必须运行时 SQLite CRUD”建议不再适用；通用数据库 Element/查询能力仍待产品范围裁决。DI-AC55–60 仅为新候选，不是已验收源码。R16 合并旧 0.11.4 的建议仍待决议。
+
 ## 1. 产品目的与实际消费场景
 
 DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范围**内，利用可追溯且有适用边界的领域事实、知识与规则，形成可解释、可复现的确定性业务判断，并将判断作为 0.11.1 已有 Workflow/Task 的输入/分支依据。**领域知识必须改变真实业务结果**；“把 JSON 解析出来”、一次成功 Demo 或给一个示例写死政策分数，不构成本版本的通用领域智能。
