@@ -31,12 +31,12 @@
 
 ## 历史 CORE 条款编号对照（R135 P2-01）
 
-> **禁止无版本地复用 CORE-11/CORE-12 引用。** 旧 R90/R118 与 R134 采用了相同编号但不同内容；旧 Issue/L2/Review 原句仅保留历史含义，不得按新条款解释。
+> **禁止无版本地复用 CORE-11/CORE-12 引用。** 旧 R118/R119 与 R134 采用了相同编号但不同内容；旧 Issue/L2/Review 原句仅保留历史含义，不得按新条款解释。
 
 | 旧历史引用及含义 | 现行唯一权威 | 说明 |
 |---|---|---|
-| `CORE-11@R90/R118`：Package/Element 正确性由生成者负责，SDK 仅兜底 | [GEN-02](./composition-trust.md)、[CORE-07](./core.md)、[QA-01](./engineering-quality.md) | **不是**现行 CORE-11；旧链涉及 Pin/Lock 的 runtime fallback 已废止 |
-| `CORE-12@R90/R118`：区分生成、生成期验证、App 组合/封存、编译与运行等阶段 | [core.md 三阶段](./core.md)、[GEN-02..05](./composition-trust.md) | **不是**现行 CORE-12；旧独立 Lock/Pin 封存被静态 npm 组合取代 |
+| `CORE-11@R118`：Package/Element 正确性由生成者负责，SDK 仅兜底 | [GEN-02](./composition-trust.md)、[CORE-07](./core.md)、[QA-01](./engineering-quality.md) | **不是**现行 CORE-11；旧链涉及 Pin/Lock 的 runtime fallback 已废止 |
+| `CORE-12@R119`：区分生成、生成期验证、App 组合/封存、编译与运行等阶段 | [core.md 三阶段](./core.md)、[GEN-02..05](./composition-trust.md) | **不是**现行 CORE-12；旧独立 Lock/Pin 封存被静态 npm 组合取代 |
 | `CORE-11@R134+`：单 Package/App 同一语言与 Runtime | [CORE-11](./core.md) | 新编号，只适用于新规范 |
 | `CORE-12@R134+`：Exact-SHA 测试与审查证据 | [CORE-12](./core.md)、[QA-03](./engineering-quality.md) | 新编号，只适用于新规范 |
 
@@ -52,3 +52,7 @@
 
 - 旧 #1681 R129 Review Exact `c87b45e4d30bbd28dd0ea06395fecdfb06f557c8`、Woodpecker #3090 SUCCESS；旧 #1684 R131 Review Exact `1fc0c0820b1633d824672816fb91ec50bbb87eed`、Woodpecker #3091 SUCCESS；R131 旧机器修复合入 `a159f17fecf0431cf4cf41c4c8e892b574f1afc8`。它们都是**历史限定证据**，不是新执行模型已验证。
 - [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)、[#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)、[#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)、[#1682](https://github.com/kaicreator-mm/domain-harness/issues/1682) 继续追踪实现；旧文档/PRD/L2 只记录历史，不可对抗新规范。
+
+## R139 · 全体系独立审查后整改状态
+
+[#1689](https://github.com/kaicreator-mm/domain-harness/issues/1689) 的旧规范 SHA `80f5af907c07a9930aeb05aa24280dbe542ef3aa` 结论为 `REWORK P0=0/P1=5/P2=4`。新增 LIFE-10/11/12、TS-04/05、QA-04A/04B/06、DIS 适用表、历史 R119 对照是 Writer 的**整改候选，仍需独立 Exact-SHA 复审**；不得因此宣称源码 [#1688](https://github.com/kaicreator-mm/domain-harness/pull/1688) R138 的 `REWORK P1=4/P2=4` 自动解除。原生完整 Domain App、旧执行系统物理清理及最终消费者仍由 #1682 验收。
