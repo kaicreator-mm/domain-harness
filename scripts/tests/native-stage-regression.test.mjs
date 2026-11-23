@@ -67,3 +67,23 @@ test('0.11.1 AC12/14: REJECT/ASK/WAIT/UNKNOWN/FAILED routes cannot silently beco
   assert.equal(outcome.status,'FAILED');
   assert.equal(outcome.reason.code,'WORKFLOW_CALL_BUDGET');
 });
+
+test('0.11.1 AC17: optional InitFrom caller trace and repeated Init are owned by the Package',async()=>{
+  const ledger=[];
+  class Extension {
+    constructor(caller){this.caller=caller;}
+    start(){ledger.push('init:'+this.caller);}
+    [Symbol.asyncDispose](){ledger.push('exit:'+this.caller);}
+  }
+  class AppInit {
+    async start(ctx){
+      await ctx.enter(new Extension('first'),'extension');
+      await ctx.enter(new Extension('second'),'extension');
+    }
+  }
+  const kernel=new KernelLifecycle([{
+    packageMeta:{id:'owned-kdp',role:'core',order:0},Init:AppInit,
+  }]);
+  await kernel.run({appId:'native-domain-app'},()=>42);
+  assert.deepEqual(ledger,['init:first','init:second','exit:second','exit:first']);
+});

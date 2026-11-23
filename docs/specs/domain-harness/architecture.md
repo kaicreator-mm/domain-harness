@@ -1,6 +1,6 @@
 # DomainHarness · Language-Native SDK 架构
 
-> [权威目录](./README.md) · 新设计 **CONFIRMED**；旧 microkernel/PackageSystem/Boot/Workflow 所有权 **MIGRATION_REQUIRED**。
+> [权威目录](./README.md) · 新设计 **CONFIRMED**；旧 microkernel/PackageSystem/Boot/Workflow 所有权 **SOURCE_REPLACED / MERGED**（PR #1694，R160 限定验收）；完整旧功能场景回归由 #1696 跟踪。
 
 ## ARCH-01 · 总体架构
 

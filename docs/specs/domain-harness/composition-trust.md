@@ -1,6 +1,6 @@
 # DomainHarness · 生成期、静态组合与交付
 
-> [权威目录](./README.md) · 静态可信设计 **CONFIRMED**，旧 Lock/Pin/安装 Record 机器实现 **MIGRATION_REQUIRED**。
+> [权威目录](./README.md) · 静态可信设计 **CONFIRMED**，旧 Lock/Pin/安装 Record 自建运行时已按新规范 **SOURCE_REMOVED / MERGED**（PR #1694）；仍使用标准 npm 锁和可信交付。
 
 ## GEN-01 · 信任前提
 

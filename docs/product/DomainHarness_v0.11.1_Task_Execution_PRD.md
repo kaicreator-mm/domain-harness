@@ -1,34 +1,65 @@
-# DomainHarness v0.11.1 — Task + Execution Loop · Product/L1 R26
+# DomainHarness v0.11.1 — Task + Execution Loop（原生重构后功能与验收映射）
 
-> **当前实现对齐候选（非自签 Freeze）**。基于 Product #1605 的 F01–F10 与 AC11–AC20 原文、R17 的设计限定接受、T11–T14 已独立审核并合入的真实 0.11.x 源码。此文代替 #1626 仍记载“未实施”的旧候选状态；不重写已经接受的产品语义。
+> **当前规范优先**：[#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)、[Canonical Core](../specs/domain-harness/core.md) 与 [TypeScript Profile](../specs/domain-harness/typescript-profile.md)。本文件保留历史产品 F01–F10 / AC11–AC20 的行为目标，不再把旧 Contracts / Microkernel / BUILD / Lock / Pin / FunctionRef 当作新版源码或验收机制。R26 的旧实现矩阵属于 **HISTORICAL / SUPERSEDED**，不再是现行源码路径。
 
-~~~ini
-OUTPUT_LABEL=DH_V0111_R26_PRODUCT_L1_SOURCE_ALIGNED
-REPO=kaicreator-mm/domain-harness
-VERSION_ISSUE=#1605
-L2_ISSUE=#1608
-MASTER_ISSUE=#1563
-TRAIN_EXACT_SHA=639de32c98b8bbb40d34000d8c9b230be3759884
-T11=#1627_CLOSED_SCOPED_ACCEPTED
-T12=#1628_CLOSED_R13_ACCEPT_SCOPED
-T13=#1629_CLOSED_R4_ACCEPT_SCOPED
-T14=#1630_CLOSED_R25_ACCEPT_SCOPED
-T14_CI=WOODPECKER_2917_SUCCESS_AT_SOURCE_HEAD
-QUALITY_PR=#1637_MERGED_R24_ACCEPT_SCOPED
-SOURCE_STATUS=MERGED_TO_VERSION_TRAIN
-L1_FREEZE=INDEPENDENT_VERSION_REVIEW_PENDING
-L2_FREEZE=INDEPENDENT_VERSION_REVIEW_PENDING
-MAIN_RELEASE=NO
-~~~
+```ini
+OUTPUT_LABEL=DH_V011X_R163_NATIVE_STAGE_FUNCTION_CROSSWALK
+ISSUE=#1696
+VERSION_ISSUES=#1564;#1605
+SOURCE_TRAIN_BASE=version/v0.11.x@0dc8c0f888bcfd46beeeb4c93606f74dae78f2eb
+SOURCE_REWRITE_PR=#1694_R160_ACCEPT_SCOPED
+SOURCE_REWRITE_CI=WOODPECKER_3151_SUCCESS_ON_0477edf9070c05ec3c89c46fb1aaa43cf2f850a3
+R163_MISSING_SCENARIO_TESTS=IMPLEMENTED_PENDING_NEW_EXACT_SHA_CI_AND_INDEPENDENT_REVIEW
+FORMAL_STAGE_FUNCTIONAL_ACCEPTANCE=NOT_YET_SIGNED
+MAIN_TAG_RELEASE=NO
+```
 
-## 产品目标与版本前提
+## 1. 最新产品解释：保留行为，不恢复废弃的执行层
 
-0.11.x 完全重写、不要求旧 v0.10.x 兼容。0.11.1 的**正常启动和执行链为 `Package.Init → Workflow → Element.Function`**：Package 自己已存在的 Init Element 可在初始化期间按其选定业务定义**启动相应 Workflow**；不能再出现 READY 后的第二次 BusinessAppInit、重复的 `technicalInit` 或所谓 Init Router。某 Package 无业务 Workflow 时，其 Init 仍可只处理 Package 自身初始化。0.11.0 的 Core.Order/KDP 0 与 Extension 直接依赖及 Init/Exit 由 [新版 0.11.0 规范 #1621](https://github.com/kaicreator-mm/domain-harness/pull/1621) 负责，0.11.1 不另外规定 Core 调度或 Init 的顺序；#1621/#1622/#1625 已合并版本列车并限定验收，后续不会重建该基础。
+- 0.11.0：Package 为静态 ESM 插件，Element 为内聚 TS Class，普通 Function 可独立导出；Core.Order、可选 Init/Exit、直接依赖与生成期正确性继续成立。原来的 ElementRef/Target/Lock/Pin/Boot/PackageSystem 不是要求保留的 ABI；结构化领域知识仍应能通过普通 Reader/Class/Function **实际改变业务结果**。
+- 0.11.1：Workflow 是 SDK Standard 能力，可在 Package.Init 内发起，也可被业务在其它合法时机直接使用，**不得恢复“唯一 Init Router”**。原产品要求的多节点/单节点、嵌套、具名 Switch、UNKNOWN/ASK/WAIT/REJECT/FAILED、Reader 复用、业务 Hook start/end、预算和 Exit 分离等**行为语义**继续保留。
+- Package 和 Element 的正确性由作者/生成期与普通工具负责，SDK Runtime 只运行已安装的可信代码及必要的最终退出兜底。没有额外自建 Package Loader、动态 FunctionRef 或业务 Schema Runtime 验证。
+- 非业务的 AppStatus、可选 InitFrom 原始调用者日志由具体 Domain App/Package 所有；不虚构 SDK 全局 AppStatus Registry 或通用 InitFrom 自动记录机制。
 
-`Package.Exit` 和 `InitFrom` **分别可选**，由 Package 自己决定；`InitFrom` 未启用不要求创建数组，启用时须保留每次直接 Init 调用者及重复/失败、激活隔离。业务 Workflow 的一次结束不等于整个 Package.Exit。业务异常由 Element/Package 自行处理，Kernel 只在未处理/不可继续的错误时做最小日志和退出，不负责通用重试、异常映射或跨包业务回滚。
+## 2. 现行源码位置（替换旧 R26 失效的实施矩阵）
 
-## F01–F10 产品能力与可观察结果
+| 功能 | 当前实现位置 | 现行复核证据 |
+|---|---|---|
+| Package/Element/Function 与代码元数据 | `packages/domain-harness/src/kernel-lifecycle.ts`; `examples/native-domain-app/packages/*.mjs` | `language-native-lifecycle.test.ts`; `scripts/tests/native-generation.test.mjs` |
+| 可选 Init、唯一有序 Core、真实逆序 Exit、异常/并发关闭 | `packages/domain-harness/src/kernel-lifecycle.ts` | `language-native-lifecycle.test.ts` |
+| 生成期静态 Order 与直接依赖检查 | `scripts/validate-native-generation.mjs`（**作者侧可选工具，不是 SDK Runtime**） | `scripts/tests/native-generation.test.mjs`；部分动态依赖须人工复核 |
+| XState Actor 工作流及状态 | `packages/domain-harness/src/standard-workflow.ts` | `language-native-workflow.test.ts` |
+| 根共享预算、子 Workflow、Hook、具名路由 | `packages/domain-harness/src/native-workflow-composition.ts` | `language-native-workflow-composition.test.ts` |
+| JSON/YAML Reader、Writer | `packages/domain-harness/src/standard-files.ts` | `language-native-standard-files.test.ts` |
+| 结构化规则驱动业务 Function、多节点 Switch 与单节点 | `examples/native-domain-app/packages/{business,workflow-init}.mjs`; `data/order-policy*.json` | `scripts/tests/native-stage-regression.test.mjs`; `examples/native-domain-app/main.mjs` |
+| 第二领域库存业务、标准 YAML Reader 复用 | `examples/native-domain-app/packages/inventory.mjs`; `data/inventory-policy.yaml` | 同上 |
+| 真实独立 npm SDK-only 消费者 | `scripts/verify-native-sdk-clean-install.mjs` | `npm run test:consumer`（真实受控 npm Registry / CI 依赖） |
+| 固定 SDK 根入口与 TypeScript 类型 | `packages/domain-harness/src/index.ts`、`packages/domain-harness/package.json` | `facade-surface.test.ts`、`sdk-roles.test.ts`、仓外 TypeScript 消费者 |
 
+旧 R26 矩阵中 `packages/microkernel/src/package-system.ts`、`workflow-execution.ts`、`packages/contracts/src/workflow-contracts.ts`、`basic-domain-app/workflow-fixture.mjs` 等均已在 #1694 **物理删除**。**旧 SHA #2917 的 PASS 不能代表这些路径在新分支可运行。**新源码场景需以新 Exact SHA 的测试与审查独立验收。
+
+## 3. AC11–AC20 旧业务结果与新代码对应
+
+| AC | 必须保留的可观察行为 | 现行验证（R163 补测提交后仍需同 SHA 运行） |
+|---|---|---|
+| AC11 | Init 内发起至少两节点及子 Workflow；单节点另行成功 | `workflow-init.mjs::Init.start` + `native-stage-regression.test.mjs` |
+| AC12 | 具名分支选择下一 Node；拒绝/未选分支不执行 | `runOrderPolicy` 的 COMPLETE→finalize，REJECT 终止；`routeWorkflowOutcome` 路由测试 |
+| AC13 | ASK/WAIT 是本轮终态，不冒充持久 Resume | `standard-workflow.ts`、`language-native-workflow.test.ts`、路由测试 |
+| AC14 | COMPLETE 与 REJECT/UNKNOWN/FAILED 不混淆 | `language-native-workflow*.test.ts` + 业务 Policy REJECT |
+| AC15 | 生成期非法引用/依赖拒绝 | `validate-native-generation.mjs` 对原生静态 Core 的限定检查；**旧自定义 Lock/FunctionRef 正反例 SUPERSEDED**。完整多文件语义正确性仍归作者 |
+| AC16 | Guard/Reader/Hook 共享根调用预算、祖先深度生效 | `language-native-workflow-composition.test.ts`、`main.mjs` 的真实预算负例 |
+| AC17 | 可选 Exit/InitFrom 与业务 end 分离 | `language-native-lifecycle.test.ts`、`native-stage-regression.test.mjs`；InitFrom 为 Package 可选业务记录 |
+| AC18 | Core.Order、Init/Exit 基础可用，无二次 Business App Init | `language-native-lifecycle.test.ts`、`native-generation.test.mjs` |
+| AC19 | 同一 Element 多次使用结果独立；最终错误由 KDP 兜底 | `runOrderPolicy` 复用一个 `OrderPolicyElement` 的两独立 Session；KDP 单测 |
+| AC20 | 仓外真实 SDK 安装；JSON×2/YAML×2；Workflow/Hook/预算正反例 | `verify-native-sdk-clean-install.mjs` + `main.mjs`；本轮再加入内容选定、Init Workflow、库存领域 |
+
+**判定原则**：源码实现、测试源存在、CI 通过、独立 Reviewer 接受是四个不同事实。本文件不因存在测试就自动宣告所有 AC PASS。状态与完整 0.11.0 / AC60 跨阶段表见 [R163 回归台账](../engineering/DomainHarness_v0.11.0_v0.11.1_NATIVE_REGRESSION_CROSSWALK.md)。
+
+## 4. 历史 F01–F10 / AC11–AC20 产品原文（保留作为需求来源，旧技术名不复活）
+
+> 以下是重构前 R26 Product 文本。旧文中的 BUILD、Lock、FunctionRef、独占 Init 入口、K/S/B 固定装载含义被新 Canonical 裁决取代；表中的**业务行为目标**仍按上面的原生等价性表核对。
+
+### 历史 F01–F10 与 AC11–AC20
 | ID | 需求 |
 |---|---|
 | F01 | Package 的既有 Init Element 作为**启动自己选定 Workflow 的唯一入口**，不单独创建第二个业务 Init/Router；普通业务路径为 Init→Workflow→Function |
@@ -57,33 +88,6 @@ MAIN_RELEASE=NO
 | AC19 | 相同构建选定的 Element 定义在多个 Workflow 引用位点复用时，状态、结果与节点路径独立、确定性流程可复现；业务未处理错误由 Kernel 最小兜底退出 |
 | AC20 | clean-packed App 中真实 Package.Init→Workflow→Function；至少 2 份 JSON 数据共用 JsonReader、2 份 YAML 共用 YamlReader，Switch 与 start/end、子 Workflow/预算正反例非 Mock |
 
-## 内容 Schema 与 BUILD 的范围
+## 5. 不扩大到后续版本
 
-0.11.0 已有 `ContentBlock.contentKind='workflow-definition'`、`schemaRef`、`ElementDefinition.content[]/functions[]/dependencies[]`。0.11.1 **为该内容块增加实际 Workflow 内容格式/机器 Schema**，而非改造 Element 根对象、增加一个 `ElementDefinition.nesting` 顶层字段。JSON/YAML Reader 只涉及业务文件数据格式，不要求 ElementDefinition 文件本身采用 YAML。
-
-**构建保证**：Workflow、Reader、Guard、Switch/Hook 引用与真实生成调用边必须纳入 0.11.0 的**完整组合 Package BUILD** 和每个 Package **直接声明 Extension** 的访问规则；不能用第二套 Lock/动态加载绕开。Runtime 保留必要可信安装 Pin/产物完整性，正常业务 Schema/异常逻辑由 Element/已选编译入口拥有；Kernel 不新增业务校验体系。
-
-## v0.11.1 实施完成矩阵（R26 源码与独立验收来源）
-
-| 产品能力 | 本版实现位置 | 原始验收来源 |
-|---|---|---|
-| F01 Init 唯一业务启动入口 | packages/microkernel/src/package-system.ts; contracts WorkflowStarter | T11 #1631 + T13 #1639 |
-| F02 单节点/递归、独立 Actor | packages/microkernel/src/workflow-run.ts 与 workflow-execution.ts | T13 R4; T14 R25 AC11/AC19 |
-| F03 严格具名 Switch | packages/contracts/src/workflow-contracts.ts; workflow-validate.ts | T11 独审; T14 R25 AC12 |
-| F04 两份 JSON/两份 YAML + Reader 复用 | workflow-execution.ts; basic-domain-app/workflow-fixture.mjs | T14 R25 AC20 |
-| F05 ASK/WAIT | WorkflowOutcome，明确本次运行终态 | T14 R25 AC13 |
-| F06 REJECT != COMPLETE | workflow-execution.ts fail-closed 转移 | T14 R25 AC14 |
-| F07 UNKNOWN/FAILED 保持原 Reason | workflow-execution.ts | T13 R4; T14 R25 AC14 |
-| F08 根共享调用预算 + 逐祖先深度 | workflow-contracts.ts; workflow-execution.ts | T13 R4; T14 R25 AC16 |
-| F09 await start/end + 致命清理 | workflow-execution.ts; package-system.ts | T13 R4; T14 R25 AC17/AC19 |
-| F10 继承 0.11.0 Element-First BUILD/KDP/Init/Exit | 0.11.0 Foundation、T12 单 BUILD/Lock | #1625 Foundation; T12 R13; T14 R25 AC18 |
-
-**AC11–AC20 实证**：#1630 的 R25 独立报告对每一项均列示具体源码与 E2E 或已接受 upstream 测试；#1640 的消费者输出 `consumer-result.json` 与本页正式 AC 编号完全一致，区分 `PASS_E2E` 与 `PASS_E2E_WITH_UPSTREAM`，不重复声明旧测试在当前审核中重跑。T14 最终来源 HEAD `1afa40e6163b83d06fdc2a2e38842a6966bf9ddd`，同 SHA [Woodpecker #2917](https://ci.kaicreator.com/repos/18/pipeline/2917/1) SUCCESS；版本列车 squash HEAD `639de32c98b8bbb40d34000d8c9b230be3759884`。源码级独审与合并事件已经成立，**版本级 L1/L2 Freeze 仍须独立确认集成后内容和文档正确性**。
-
-## 排除范围与风险记录
-
-- 0.11.x **完全重写**；不为 0.10.x 提供旧 ingress/EntryRef/technicalInit 兼容层。
-- 不包含 0.11.4 Host/Effects、0.11.5 LLM、0.11.6 Durable Resume、Experience & Evolution Loop。ASK/WAIT **不是**暂停后恢复能力。
-- 0.11.0 的可选 Package.Exit/InitFrom、Core.Order=0→KDP、直接 Extension 权限沿用现有已接受基础，不创建第二个 Kernel/BUILD/Lock。
-- T12 R13 唯一非阻断 P2：受控本地 HTTP Registry 使用 IPv6 loopback `[::1]` 的 URL.hostname 误拒绝（fail closed，非放权），可后续限定修复；不得因此把已审安全边界改成任意 HTTP。
-- 此文只作为 v0.11.1 **最终源代码对齐的版本收尾候选**，不代替另一对话的版本级 Product/L1/L2 独立确认，不自动合并 main 或发布。
+本版不实现 Host/Effect、LLM、Durable Resume 或 Experience/Evolution；ASK/WAIT 不承诺续跑。新实现不维护 0.10.x 或已废弃旧 0.11.x ABI。所有 R163 功能差异按 #1696 在 v0.11.0/0.11.1 对应阶段处理，不推到 0.11.2。整个 0.11.x 统一正式发布，当前不合并 main、不创建 Tag/Release。
