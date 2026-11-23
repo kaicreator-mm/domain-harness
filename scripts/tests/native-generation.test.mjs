@@ -98,7 +98,7 @@ test('TypeScript 原生 as const satisfies PackageMeta 可静态解析', () => {
     writeFileSync(tsCore, [
       'interface CoreMeta { readonly id: string; readonly role: "core"; readonly order: number }',
       'export const packageMeta = ({ id: "business", role: "core", order: 2 } as const) satisfies CoreMeta;',
-    ].join('\\n'));
+    ].join('\n'));
     assert.deepEqual(validateNativeApp(x.manifest,[x.kdp,tsCore]),{
       packages:[{id:'kdp',order:0},{id:'business',order:2}],checked:2,
     });
