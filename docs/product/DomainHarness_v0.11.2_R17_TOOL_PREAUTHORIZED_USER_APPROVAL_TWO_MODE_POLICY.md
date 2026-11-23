@@ -1,5 +1,8 @@
 # DomainHarness v0.11.2 · R17 Tool 两种调用模式：系统预授权 vs 用户确认（Owner 候选）
 
+> **CURRENT PRODUCT/L1 SINGLE CANDIDATE = [R21 consolidated after R20 REWORK](./DomainHarness_v0.11.2_R21_CONSOLIDATED_PRODUCT_L1_AFTER_R20_REWORK.md)**. **R17 原 AC46 的批准复用合同有 P1-3 缺陷**：按 R21 第 6 节，PER_CALL 只覆盖同一个逻辑命令 ID 的原处置/读回，同参数的另一条新命令必须取得新批准；SESSION 才可以在明确有效范围内支持多次命令。原示意 approval 对象不能视为完整实现。 R21 仍为 Product/L1 候选、未 Owner 冻结、未实施或运行 CI。\n\n
+
+
 ```ini
 OUTPUT_LABEL=DH_V0112_R17_PREAUTHORIZED_TOOL_VS_USER_APPROVAL_PRODUCT_CLARIFICATION
 REPO=kaicreator-mm/domain-harness
