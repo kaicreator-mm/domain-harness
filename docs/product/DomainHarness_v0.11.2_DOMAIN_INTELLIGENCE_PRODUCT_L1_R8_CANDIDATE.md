@@ -1,7 +1,7 @@
-# DomainHarness 0.11.2 · Domain Intelligence Product/L1 功能澄清候选（R8）
+# DomainHarness 0.11.2 · Domain Intelligence Product/L1 功能澄清候选（R8 + R9）
 
 ```ini
-OUTPUT_LABEL=DH_V0112_R8_PRODUCT_L1_FUNCTIONAL_CLARIFICATION_CANDIDATE
+OUTPUT_LABEL=DH_V0112_R9_DOMAIN_INTELLIGENCE_PRODUCT_L1_ARCHITECTURE_AMENDMENT
 REPO=kaicreator-mm/domain-harness
 VERSION_ISSUE=#1612
 MASTER_ISSUE=#1563
@@ -79,6 +79,37 @@ DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范
 
 Query 的领域查询结果与 Workflow 的六种现有运行终态并非必须使用同一类型；映射须**显式且不提升成功**，交由后续 L2 决定最小合同形式。不得向 Core/KDP 注入强制业务字段。
 
+## 4A. R9 · 跨版本架构审核补足的产品裁决条件（仍为 Owner 候选）
+
+这部分补充 R8 D01–D07 的**可观察语义与准入约束**，不是预先指定 TS Interface、JSON Schema、Rule VM、Package 生成器或独立 Runtime。保留七项 Owner 决议，不增加不必要的新产品决策门。
+
+### D01/D02 · Domain 边界、引用与最小关系
+
+- `DomainId` 代表稳定的业务语义命名空间；`DomainVersion` 代表已明确选定的语义合同版本，不等于 npm Package 版本、知识数据集版本、Rule 版本或 Git SHA。一个 Domain 可以由多个直接选定的 Package 供给知识/规则，一个 Package 也可以导出多个领域能力；无隐式全局 Domain Registry、运行时热发现。
+- Fact/Rule/Concept/Entity/Relation 的引用必须能明确其 Domain 和命名范围；同名 Entity、Concept、谓词、Rule ID 在另一 Domain 下**不自动等价**。确需跨域消费时，由业务显式选定映射或转换及其出处、版本、适用条件；不存在映射就返回非成功，不依靠名称相似或跨域扫库。
+- v0.11.2 **至少实测一个有实际业务意义的 Relation 或 Constraint**（例如订单是否满足与库存可用性的已声明约束），不强制实体图数据库或通用推理。该关联不赋予任一 Domain 隐式读取另一 Domain 任意事实的权限。
+
+### D03/D05 · 已选知识快照、来源等级与冲突
+
+- App/Package 作者显式选定本次可用的数据源/规则集合及其版本或等价不可变快照；Source ID、Fact ID、Rule ID、知识版本、领域语义版本、包版本须保持不同身份。**相同业务请求只有在已选输入和快照相同**时才承诺决定可复现；运行时不得无声明地切换到新版本/新来源。
+- 区分**应用明确选定**、**内容完整性得到检查**、**来源声称可追溯**、**真实性/授权经外部证据确认**四种不同事实。仅被静态 import 或记录 SHA256 的知识，不自动具备真实世界权威；是否足以支持某项业务规则由该 Rule 的显式信任要求裁定。缺必要信任等级返回 UNKNOWN_UNVERIFIED（或稳定等价原因），不能假造认证。
+- 多来源查询先按请求 Domain、所选版本和有效范围过滤，再识别同一语义键下相互排斥的有效 Fact；**不能靠导入顺序、数组下标、最后写入者或隐式优先级**消除冲突。选定的权威顺序/优先级若存在，必须是领域规则的一部分并在 Decision Evidence 中明示；无可用裁决规则则 UNKNOWN_CONFLICT。
+- 区分：没有事实（MISSING / ASK 或 UNKNOWN）、事实存在但不适用（NOT_APPLICABLE 原因）、存在互斥事实（CONFLICT）、已选事实不满足信任要求（UNVERIFIED）、数据文件/Reader 技术损坏（FAILED）。非成功不得被包装成 `COMPLETE`。
+
+### D04/D06 · Rule 选择、解释与 Workflow 接线
+
+- Rule 评估对输入的知识、上下文、版本和受约束的事实集负责；业务阈值/库存策略存在**唯一可追溯权威源**，不能在 Fact 和业务 Function 中同时维护相互独立的数值。变更选定的知识或适用范围必须真实改变 `OrderPolicyElement` / `InventoryElement` 决策结果。
+- 多条规则同范围命中时：若规则明确声明优先顺序/组合策略且前提均可判定，按可解释策略产出结果；否则互斥结论返回 UNKNOWN_CONFLICT，不以第一条命中或成功默认值掩盖冲突。Rule 无权自行执行未经许可的 Effect、调用 LLM 或加载其它 Package。
+- 每次 Decision 只引用**实际用于本次判断**的 Fact、Rule、Source 和所选版本/适用范围；Query 命中但未参与决策的内容不得伪装为已使用证据。证据不表示业务外部 Effect 的执行回执。
+- Query/Decision 的领域结果到 `StandardWorkflowSession` 的映射必须显式：`ASK / WAIT / UNKNOWN / REJECT / FAILED` 不提升为 `COMPLETE`。使用 0.11.1 已有 `invokeOutcome` / `leaf` 和共享根预算，不新建 Task/Workflow 执行器。
+
+### D05/D07 · 有界读取与两领域复用的验收口径
+
+- Query 在使用前有明确有限的**输入/来源/事实候选规模、返回条数、证据规模和调用预算**；不能先无界分配或扫描未知大数据，再以超限错误宣称资源有界。允许由受选 Package 自己限制内容大小，或利用现成 Reader 上限；不要求 SDK 声称可对任意恶意 JS 对象实现沙箱级限制。
+- Query 作为可独立调用的普通函数/Element 能力，必须自行验证本次请求依赖的 Domain、语义版本、日历日期及范围；不把唯一正确性守门放在上游 Recognizer。业务输入为非法日历日期或非数字阈值时不得完成决定；时间比较明确评价时点与时区/日历约定，不把字符串字典序当日期合法性。
+- Order 与 Inventory 应在**同一个现有 native-domain-app** 下使用相同的通用 Query/Fact 适用性/来源/证据处理实现（不是分别复制两个实现）；领域专属规则仍位于各自业务 Element/Package。若复用只由一个小型普通 TS 工具/可组合 Package 满足，不为“标准化”强行新增 SDK public 根接口；若确有跨域应用级复用收益，L2 说明为何升级为 Standard。
+- 两个领域都必须有改变选定知识/范围而改变结果的正例和至少一个业务相关非成功/冲突负例；还须验证直接 Query、完整 Workflow 两个入口。保持当前 AC01–AC20 的真实可观察行为与单公开 SDK clean consumer。
+
 ## 5. Product/L1 验收标准（后续 L2 应保留，不是已运行证据）
 
 | ID | 观测场景 / 最低门槛 |
@@ -97,6 +128,8 @@ Query 的领域查询结果与 Workflow 的六种现有运行终态并非必须�
 | **DI-AC12** | 原始 Evidence、Actual CI 与 Exact SHA、独立非 Writer Review、Stage Index 只在实际通过后记 ACCEPT；失败、未运行、无可信来源分别明确记录 |
 | **DI-AC13** | 真实事实/规则完整性、来源真实性、权限/运行条件分开说明；SHA256 摘要不得在文档/代码命名中冒充“经证书签名的政策权威” |
 | **DI-AC14** | 缺失领域语义、规则冲突或无法判定时不能隐式触发 LLM/Effect，也不能代替 0.11.4 Host 授权或 0.11.5 bounded reasoning |
+
+**R9 对 DI-AC01–14 的验收细化**：DI-AC01/02/10 必须证明领域标识不等于 Package 标识、跨域不自动匹配、两领域共享**同一**查询实现且存在有意义的关系/约束；DI-AC03/04 应对明确选定的同一快照重复运行得到相同结果与证据，并展示单一业务阈值来源；DI-AC05/06 应把 MISSING、NOT_APPLICABLE、UNVERIFIED、CONFLICT、技术 FAILED 逐类区分，补多 Rule 冲突负例；DI-AC07 应直接 Query 拒绝非法真实日历/跨域/版本；DI-AC08 应观察 Reader/Rule 调用次数以及超限**前**副作用；DI-AC09/11/12/13/14 仍按 R8 原验收，不能以 L1 文档代替运行、CI、独审或授权证明。
 
 **负例级别应覆盖两个调用入口**：完整 Domain App/Workflow 消费、以及未来合法的直接业务 Query/Decision Function 消费。不能仅凭上游 Recognizer 做了验证，就允许独立 Query 跨 Domain 读取来源（旧 R6 P1）。
 
