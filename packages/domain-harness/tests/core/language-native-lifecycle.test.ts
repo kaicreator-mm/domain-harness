@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { calculateAmount, InvoiceElement, packageMeta } from '../fixtures/native-business-package.js';
 import test from 'node:test';
 import {
   KernelLifecycle,
@@ -296,4 +297,10 @@ test('R139 P2: 多个退出异常留下可区分的组件位置与脱敏原因',
     ['kdp', 0, 'EXIT_HOOK_FAILED'],
   ]);
   assert.ok(!JSON.stringify(logs).includes('sensitive'));
+});
+
+test('R138 P2: Business Package Function 跨越真正独立 ESM 模块导出边界', () => {
+  assert.equal(packageMeta.id, 'native-business-fixture');
+  assert.equal(calculateAmount(10), 20);
+  assert.equal(new InvoiceElement().calculate(10), 21);
 });
