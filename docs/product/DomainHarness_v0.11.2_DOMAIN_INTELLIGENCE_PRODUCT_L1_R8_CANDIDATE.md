@@ -19,6 +19,8 @@ RELEASE=NO
 
 > **R10 新增产品范围澄清（尚待 Owner 认可）：** [Domain Storage & Multi-Query R10](./DomainHarness_v0.11.2_STORAGE_QUERY_SCOPE_R10_PROPOSAL.md) 提议把 SQLite 本地持久化、YAML/JSON-LD 双向读写、SQL/Vector/Graph Query 纳入 0.11.2，保留 0.11.6 的 TaskRun/Checkpoint/恢复职责。**本文件原 R8/R9 的“不强制 SQLite/向量查询”是旧提案，不可再直接视为有效范围结论。** R10 新增 DI-AC15–21，仍是 PROPOSED，不是已批准/已实现。
 
+> **Owner 最新 SDK 边界明确：** DomainHarness 是**不含任何具体领域业务**的 SDK。0.11.2 的 Product 包括跨任意 Domain 的语义抽象、Knowledge/Fact/Rule/Recognizer/Validator/Decision/Intent/Applicability 通用合同、SQLite/YAML/JSON-LD 领域中立存储及属性/字符串/向量/图查询、与原生 Element/Workflow 的通用组合机制。**具体业务概念/实体/知识内容/阈值/Rule/Recognizer/Validator/Decision 函数全部属于 SDK 外部的 Domain Package 或 Domain App；订单和库存只是消费者测试用例，不能影响 SDK Schema 或成为 SDK 依赖。** 相关细节见 [R11 领域无关 SDK 与 Element-First 边界](./DomainHarness_v0.11.2_ELEMENT_FIRST_INTELLIGENCE_R11_DESIGN_OPTIONS.md)。R8/R9 关于两个领域的论述仅作为通用性的跨域验收，不能曲解为 SDK 要实现两个领域的业务。
+
 ## 1. 产品目的与实际消费场景
 
 DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范围**内，利用可追溯且有适用边界的领域事实、知识与规则，形成可解释、可复现的确定性业务判断，并将判断作为 0.11.1 已有 Workflow/Task 的输入/分支依据。**领域知识必须改变真实业务结果**；“把 JSON 解析出来”、一次成功 Demo 或给一个示例写死政策分数，不构成本版本的通用领域智能。
