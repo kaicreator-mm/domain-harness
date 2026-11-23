@@ -23,6 +23,8 @@ RELEASE=NO
 
 > **R13 新增语义化 SDK 抽象与 LLM Authoring 澄清候选：** 详见 [R13：语义/Element/Function/Workflow/DB 能力/表达式/Skill 统一架构](./DomainHarness_v0.11.2_R13_SEMANTIC_ELEMENT_WORKFLOW_DB_EXPRESSION_SKILL_PRODUCT_CLARIFICATION.md)。R13 复查 v0.10.3 实际源码，确认历史表达式引擎为 JSONata；提出基础 Database Element 与 SQL/Text/Vector/Graph 可选能力的组合，Workflow 基于业务原生调用不新增执行平台，Skill/能力说明以真实 TypeScript exports、TSDoc 和规范为唯一可信接口来源。**所有候选名称、功能入口及 Skill 新目录均未实施、未验收，等待 Product/L1 Owner 裁决。**
 
+> **R14 语义 Workflow 正式建模候选（待 Owner 裁决）：** [Semantic Workflow Model · R14](./DomainHarness_v0.11.2_R14_SEMANTIC_WORKFLOW_MODEL_AND_COMPOSITION.md) 纠正 R13“把 Function 接进 Workflow 就等于领域智能”的不足：明确 Domain Semantic Model → Semantic Capability Model → Semantic Workflow Model（语义 Port / Data、Control、Evidence 三类连接）→ **现有** StandardWorkflowSession/XState 执行。语义兼容、必需事实、Scope/Snapshot、来源及 Outcome 传播需要可验证；不建立第二执行 Runtime，具体领域 Function 均由外部 Business 提供。新增 DI-AC29–34 仍是拟验收、NOT_RUN。
+
 ## 1. 产品目的与实际消费场景
 
 DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范围**内，利用可追溯且有适用边界的领域事实、知识与规则，形成可解释、可复现的确定性业务判断，并将判断作为 0.11.1 已有 Workflow/Task 的输入/分支依据。**领域知识必须改变真实业务结果**；“把 JSON 解析出来”、一次成功 Demo 或给一个示例写死政策分数，不构成本版本的通用领域智能。
