@@ -2,8 +2,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as facade from '@kaicreator/domain-harness';
-import * as nativeLifecycle from '../../src/kernel-lifecycle.js';
-import * as standardWorkflow from '../../src/standard-workflow.js';
 
 test('SDK facade 精确导出已有接口和新增原生 KDP / Standard Elements', async () => {
   const contracts = await import('@kaicreator/domain-harness-contracts');
@@ -14,8 +12,9 @@ test('SDK facade 精确导出已有接口和新增原生 KDP / Standard Elements
     ...Object.keys(contracts),
     ...Object.keys(build),
     ...Object.keys(microkernel).filter((name) => name !== 'bootstrap' && name !== 'activateSelectedKdpHostInit'),
-    ...Object.keys(nativeLifecycle),
-    ...Object.keys(standardWorkflow),
+    'KernelLifecycle',
+    'WorkflowElement',
+    'XStateWorkflowElement',
   ]);
   const actual = new Set<string>(Object.keys(facade));
 
