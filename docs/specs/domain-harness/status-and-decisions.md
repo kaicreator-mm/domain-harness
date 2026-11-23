@@ -1,64 +1,54 @@
-# DomainHarness · 实施现状、未决事项、来源和规范变更
+# DomainHarness · 设计现状与迁移清单
 
-> **权威**：本文件是 [DomainHarness 规范集](./README.md) 的组成模块；所有模块共同构成**一套**规范，不是独立规范版本。
-> **状态**：`CONFIRMED`=已确定原则；`MIGRATION_REQUIRED`=目标明确但机器合同/源码未迁移；`CANDIDATE`=待决策。不得从规范条款推导源码或 CI 已 PASS。
-> **条款编号**：保留原 R90 单文件规范的编号以便 GitHub Issue、Review 和旧链接溯源；跨文件引用以目录索引为准。
+> [权威目录](./README.md) · Owner 新决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。**本规范更新为 docs-only；不表示旧 SDK Contracts、Runtime 或 Domain App 已完成代码迁移。**
 
-本模块保留原已受审的证据限定、仍待实现的架构目标与历史来源。它不是新功能开发排期，也不修改其他版本的 Task。
+## 新架构状态
 
-## 10. 适用与迁移表：哪些已做到、哪些仍需做
-
-| 合同切面 | 状态 | 证据或受控下一步 |
+| 切面 | 状态 | 待办 |
 |---|---|---|
-| Element 统一根类型、0..N Function、typed Content、FunctionRef/Target/显式依赖 | **CONFIRMED / v0.11.0 scoped** | #1564/#1624；现行 TypeScript Contract |
-| Core.Order=0 KDP、单轮 Init、直接 Extension、可选 Exit/InitFrom、真实逆序 Exit | **CONFIRMED / v0.11.0 scoped** | #1621/#1622/#1625 及受影响源码 |
-| Init→Workflow→Function、标准 JSON/YAML、单公开 SDK、真实 Reference App | **CONFIRMED / v0.11.1 scoped** | #1605/#1656/#1664；R72/#2979、R81/#2981 |
-| Boot 按受选 KDP.Init Host ABI 单次委托，Lock/Pin/Record 新身份链 | **R129 ACCEPT_SCOPED / 已合入版本列车** | #1681：R129 独审 `ACCEPT_SCOPED P0=0/P1=0/P2=1`，Exact HEAD `c87b45e4d30bbd28dd0ea06395fecdfb06f557c8`，CI #3090 SUCCESS，合并 `8c0a1138b5629d3d10de76f33f87eb1572a53687`；仍有 import 失败分类 P2 #1683 与 KDP 真正引擎归属 #1682，不代表 A6/A7 完成 |
-| KDP Element 真正拥有 PackageSystem、Workflow Runtime/DomainApp 全部实现 | **MIGRATION_REQUIRED** | 机器调用入口 ≠ 全部私有实现归属；#1668 A6/A7 必须继续推进 |
-| 作者期 App 组合与封存执行能力由真实 SDK Package/Element 拥有 | **MIGRATION_REQUIRED** | 与未来 App 还未生成的自举问题在 #1668 L2 明确 |
-| 新 Package kebab-case、Element camelCase/Namespace 独立、自动化合法性 | **MIGRATION_REQUIRED** | Schema/生成期验证/组合封存/Lock/Pin/Consumer 全链迁移和新摘要 |
-| 旧 0.11.1 P2 | **KNOWN_NOT_FIXED** | 如真影响产品边界再做定点修复，不冒充已解决 |
-| 完整 0.11.x 主线、跨语言单 App/Forge/正式发布 | **NOT_DELIVERED / OUT_OF_SCOPE** | 不能从 0.11.1 资格推断完成 |
+| Package=静态 ESM 插件、Element=Class、Function=普通函数/方法 | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | 删除旧独立 FunctionRef/Target/Adapter 执行机制 |
+| Standard=SDK 内置应用级复用、Business 优先使用 Standard | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | Standard Workflow/XState 和真实业务消费 |
+| KDP/SDK/App 全都使用同一模型 | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | 最小 KDP，去除旧三套职责/执行混合 |
+| Metadata 是框架读取的可执行代码，Skill+TSDoc 面向 Agent | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | packageMeta/Class 静态字段 |
+| Order 唯一、KDP=0、可选 Init/Exit | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | 生成期错误检测、生命周期根/逆序退出 |
+| 静态可信，无自建 Runtime Lock/Pin/权限证明 | **CONFIRMED / SOURCE MIGRATION_REQUIRED** | 移除旧受选 KDP Host、Lock/Pin/Record |
+| Workflow/Reader/UNKNOWN/Hook/退出语义 | **保留有价值的行为，机器实现待迁移** | 按应用级 Standard 与原生 Class 重新实现 |
+| Node >=22.12.0、v0.11.x 完全重写 | **CONFIRMED** | 不要求 Node24；不保留 v0.10.x ABI |
 
-## 11. 一次限定 Foundation 重构（不是重做 0.11.1）
+## 旧架构替换（不是并行维护两套实现）
 
-**需要进行一次范围明确的结构修正，理由是当前代码与已确定的统一 Package + Element 所有权、最小 Boot 目标有可观察不一致。** 该工作归 **Foundation 0.11.0 / #1668**，受影响的 v0.11.1 SDK/Reference App **增量复验**，而不是将已关闭 0.11.1 T11–T14/R60/R81 全部推倒重写。
+| HISTORICAL / 待删除 | 新版 |
+|---|---|
+| K/S/B 固定 Package 技术体系 | Kernel/SDK/App 是不同业务角色，Package/Element 技术统一 |
+| JSON ElementDefinition 作为运行时可执行对象 | TS Class + 必需 Code Metadata |
+| FunctionRef → ImplementationBinding → Target | 原生 TS 模块/类函数调用 |
+| PackageSystem Loader/Extension Registry | 静态 import/export、普通 Class 组合和直接 npm 依赖 |
+| boot(pin, context) / kdp-host-init/1 动态受选 Host | 静态入口、最小 KDP 顺序和退出 |
+| 自建 App Lock/Boot Pin/InstalledRecord/Runtime Digest | 标准 npm 锁和可信交付过程 |
+| 每包强制 Init/独立 Exit Element | 可选 Init.start()/Symbol.asyncDispose |
+| KDP 独占 XState/Workflow 与业务转发 | SDK Standard Workflow，可供任何业务直接使用 |
+| 给 Agent 的元数据与框架元数据两份 | Metadata 属于代码；Skill+TSDoc 是 Agent 指导 |
 
-推荐先后顺序：
+## 历史 CORE 条款编号对照（R135 P2-01）
 
-1. 先冻结本规范集相关模块与 L2 接线：列出 Boot 前验证的最小字段、KDP.Init 的真实可执行 Target、PackageSystem 与 Workflow Engine 的 Element Owner、SDK 作者期组合与封存的无循环装载解法。
-2. 把独立 Microkernel 实现转为真实 KDP Package 所有的私有源码/选定 Element Function，不删除真正的 XState 能力或重建第二套引擎；压缩 Boot 为预校验/单次调用。
-3. 对作者期组合、Contracts、SDK 公共接口明确真实 Package/Element 所有权，进行新 Namespace + camelCase ID 命名迁移；可选 Element/Package 内部多 Element 结构验证，不强制“一 helper 一 Element”。
-4. 检查现有 Standard/Business/Reference Manifest/Target/Lock/Pin/WorkflowRoots/资源、直接 Extension；重新封存新字节和生成**新的** AppPackage/Lock Digest。
-5. 仅运行真正受影响的正/UNKNOWN/拒绝/致命退出/干净安装 E2E、Typecheck/Lint 和真实必要 CI；独立 Reviewer 复审改动 HEAD。历史 0.11.1 原始 StageIndex 不改写，追加新 Foundation 技术基线收据。
+> **禁止无版本地复用 CORE-11/CORE-12 引用。** 旧 R90/R118 与 R134 采用了相同编号但不同内容；旧 Issue/L2/Review 原句仅保留历史含义，不得按新条款解释。
 
-**禁止事项**：不新建第二 KDP、不能把所有私有 helper 元素化、不重做已经合格的 Workflow/Reader 功能、不能引入 Forge/生成器、不能把此修正推给 0.11.2、不因旧 R41 收据留存就保留产品层不规范命名、不得未审即覆盖稳定历史。
-
-## 12. 规范依据、下位文件与变更办法
-
-> **R90 补充索引**：原 §13 的横切条款现分布于身份、生命周期、信任与工程模块；本模块 §14 列出尚未实施的接口/迁移问题。条款状态比文本存在与否更重要。
-
-
-来源（按后续已确认裁决筛选，不机械继承旧候选）：
-
-- [#1563 R5 Element/Package 组织讨论](https://github.com/kaicreator-mm/domain-harness/issues/1563#issuecomment-7020667768)；[DIS #1496](https://github.com/kaicreator-mm/domain-harness/issues/1496)；[Package #1480](https://github.com/kaicreator-mm/domain-harness/issues/1480)；[Boot/KDP #1484](https://github.com/kaicreator-mm/domain-harness/issues/1484)。
-- [v0.11.0 生命周期规范](../DomainHarness_v0.11.0_PACKAGE_CORE_LIFECYCLE_AND_BUILD_SPEC.md)、[#1624 B0](https://github.com/kaicreator-mm/domain-harness/issues/1624)；[KDP/XState Owner 决议](https://github.com/kaicreator-mm/domain-harness/issues/1563#issuecomment-7054968780)。
-- [SDK/Package/Forge 边界](../DomainHarness_v0.11.x_SDK_FORGE_ECOSYSTEM_BOOTSTRAP.md)、[多语言单闭包](../DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)、[Standard Element 系统](../../architecture/DomainHarness_v0.11.x_STANDARD_ELEMENT_SYSTEM.md)。
-- [v0.11.1 PRD](../../product/DomainHarness_v0.11.1_Task_Execution_PRD.md)、[#1656 R60](https://github.com/kaicreator-mm/domain-harness/issues/1656)、[v0.11.1 事后复盘](../../engineering/DOMAIN_HARNESS_V0111_VERSION_RETROSPECTIVE.md)、[Reference StageIndex](../../../examples/reference-domain-app/stages.json)。
-- [R87 Element/Package 组织分析](../DomainHarness_v0.11.x_ELEMENT_PACKAGE_ORGANIZATION_STANDARD.md)、[命名分析和迁移表](../DomainHarness_v0.11.x_NAMING_STANDARD.md)、[Boot/KDP 源码差距审计](../../architecture/DomainHarness_v0.11.x_ELEMENT_FIRST_BOOTSTRAP_OWNERSHIP_REVIEW.md)、[交付质量手册](../../engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)。
-
-**维护规则**：以后任何 Product、L2、生成者、Agent、PR 想增加基础规范，应**首先修改规范集对应的唯一权威模块**，说明状态由何证据从 CANDIDATE→CONFIRMED 或 MIGRATION_REQUIRED→已实现、受影响 ABI/Schema 与验证范围；其它文档只保留参考链接或具体实现决议。不允许出现另外一份自称“当前唯一规则”且内容相反的基础规范，也不以文档修改等价代码已完成。
-
-## 14. 规范仍缺哪些决策（设计候选，不得冒充强制 ABI）
-
-| 优先级 | 待冻结的关键设计问题 | 原因与正确归口 |
+| 旧历史引用及含义 | 现行唯一权威 | 说明 |
 |---|---|---|
-| **P0 / Foundation 先行** | R87 `ElementDefinition.id` camelCase、`namespace` 独立后的完整机器身份和 canonical digest、Package Owner/重复定义冲突、旧 Lock/Pin/Target 的迁移规则 | 影响引用唯一性与所有已选权限，归 #1668 L2；当前点分 ID 仍在代码中 |
-| **P0 / Foundation 先行** | Boot 到真实 KDP.Init 的唯一 Target/Pin、入口执行前字节验证与文件替换/TOCTOU、KDP 实现代码归属与失败清理顺序 | 影响自举正确性和受信边界，归 #1668 L2；不能将验证移到未验证的 KDP 自己 |
-| **P0 / Foundation 先行** | 作者期 Composition/Contracts 如何有真实 Package+Element 所有权，怎样通过已安装 SDK 固定入口组合并封存尚未启动的 App | 不能产生第二套 App 组合机制或自举环，归 #1668 L2 |
-| **P1 / 真实用例驱动** | 通用 Resource/HostPort/Effect 能力约束、动态权限/资源消耗范围、失败原因与 KDP 技术兜底接口 | 仅对具体新能力/Host/Target 需求进行 L1/L2，不提前实现通用 Effect 平台 |
-| **P1 / 真实用例驱动** | 公共 Schema/Definition/Function/Package 的发布后演化、破坏性兼容与跨版本消费矩阵；多 Target 的物理实现差异 | 内部 0.11.x 当前不承诺 ABI 兼容，正式 Release 前由 Product/L2 确定；不得自行假设跨语言 ABI |
-| **P1 / 真实用例驱动** | 未来持久化、ASK/WAIT 恢复、取消/并发/超时以及业务状态恢复的完整合同 | 不是 0.11.1 已实现能力，待拥有该 Product 范围的阶段设计，不因此提前改后续版本 |
-| **P2 / 按风险选择** | 大对象预枚举/严格内存预算、规则事实源单一性、性能与可诊断性基准 | 当前 v0.11.1 有非阻塞 P2 和真实边界；只有目标能力需要更强保证时才新增代码验收 |
+| `CORE-11@R90/R118`：Package/Element 正确性由生成者负责，SDK 仅兜底 | [GEN-02](./composition-trust.md)、[CORE-07](./core.md)、[QA-01](./engineering-quality.md) | **不是**现行 CORE-11；旧链涉及 Pin/Lock 的 runtime fallback 已废止 |
+| `CORE-12@R90/R118`：区分生成、生成期验证、App 组合/封存、编译与运行等阶段 | [core.md 三阶段](./core.md)、[GEN-02..05](./composition-trust.md) | **不是**现行 CORE-12；旧独立 Lock/Pin 封存被静态 npm 组合取代 |
+| `CORE-11@R134+`：单 Package/App 同一语言与 Runtime | [CORE-11](./core.md) | 新编号，只适用于新规范 |
+| `CORE-12@R134+`：Exact-SHA 测试与审查证据 | [CORE-12](./core.md)、[QA-03](./engineering-quality.md) | 新编号，只适用于新规范 |
 
-**规范维护准则**：这份表是**差距/设计议题登记**，不是向其它版本下发实现任务，更不自动重开已完成的 v0.11.1。每项在有实际 Product/Owner 决议、L2 和必要源码/消费者证据后，才能提升为正式机器合同。凡是 DIS 自有规范，应链接其适用条款，**不要用 DomainHarness 文档重新定义一份相互冲突的 DIS**。
+## 迁移次序与验收
+
+1. **#1685** 冻结 Canonical Spec + TS Profile + Agent Skill，经独立文档审查。
+2. **#1668 / #1682** 停止“旧 PackageSystem 全量搬进 KDP”路线。实现原生 Package 插件 + Standard Workflow/Reader + 业务 Element + 最小 KDP；同步修订版本 L2。
+3. 重建旧 Contracts/SDK/Composition/Boot/Reference App/npm Consumer，明确新公开 API、Order/Init/Exit、静态依赖、功能行为；直接删除无价值旧执行层，不做兼容桥。
+4. 生成期负例、真实业务正反/UNKNOWN/ASK/WAIT、退出、Node22/独立 npm 消费者、必要同 SHA CI/独立 Review。
+5. 在 **v0.11.1** 完成受影响 Foundation 修正，不拖到 0.11.2；任何未完成必须标记 BLOCKED 而非宣称完成。
+
+## 历史与证据
+
+- 旧 #1681 R129 Review Exact `c87b45e4d30bbd28dd0ea06395fecdfb06f557c8`、Woodpecker #3090 SUCCESS；旧 #1684 R131 Review Exact `1fc0c0820b1633d824672816fb91ec50bbb87eed`、Woodpecker #3091 SUCCESS；R131 旧机器修复合入 `a159f17fecf0431cf4cf41c4c8e892b574f1afc8`。它们都是**历史限定证据**，不是新执行模型已验证。
+- [#1563](https://github.com/kaicreator-mm/domain-harness/issues/1563)、[#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605)、[#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)、[#1682](https://github.com/kaicreator-mm/domain-harness/issues/1682) 继续追踪实现；旧文档/PRD/L2 只记录历史，不可对抗新规范。

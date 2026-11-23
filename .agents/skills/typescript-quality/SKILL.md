@@ -1,47 +1,25 @@
 ---
 name: typescript-quality
-description: DomainHarness 的 TypeScript 源码设计、重构、审查、中文注释及质量检查约束。
+description: DomainHarness TypeScript/Node Language-Native Profile 的生成、重构、代码注释、测试与工程质量辅助 Skill；不定义第二套执行规范。
 ---
 
-# TypeScript 编码规范 Skill
+# TypeScript 工程质量 Skill
 
-先使用 [DomainHarness 规范 Skill](../domain-harness-spec/SKILL.md) 阅读 [核心规范](../../../docs/specs/domain-harness/core.md) 和相关模块；本 Skill 只提供 TypeScript 任务执行提示，规范条款以 [工程质量](../../../docs/specs/domain-harness/engineering-quality.md) 和其他对应主题文件为准。
+**权威正文**：[核心规范](../../../docs/specs/domain-harness/core.md)、[TypeScript Profile](../../../docs/specs/domain-harness/typescript-profile.md)、[工程质量](../../../docs/specs/domain-harness/engineering-quality.md)。本 Skill 只给 Agent 编写/审查源码的操作提示，不修改任何规范。先读取 [domain-harness-spec](../domain-harness-spec/SKILL.md)，按任务进入 [Element/Package](../../../docs/specs/domain-harness/element-package.md)、[架构](../../../docs/specs/domain-harness/architecture.md) 与 [静态组合](../../../docs/specs/domain-harness/composition-trust.md)。
 
-参考 Apache-2.0 的 [TypeScript Best Practices](https://github.com/gohypergiant/agent-skills/blob/main/skills/accelint-ts-best-practices/SKILL.md) 和 [typescript-eslint 官方规则](https://typescript-eslint.com/users/configs/)。本 Skill 为本仓库自行编写的具体要求。
+## 生成/修改时执行
 
-- **架构**：物理 Contracts/BUILD/Microkernel/SDK Workspace 不等于逻辑 Package/Element 所有权；按 [架构规范](../../../docs/specs/domain-harness/architecture.md) 保持最小 Boot + 真正 KDP Element + 唯一 SDK/BUILD/Runtime，不引入兼容或平行内核。
-- **命名**：统一遵循 [身份与命名规范](../../../docs/specs/domain-harness/identity-naming.md)、[Element/Package 组织规范](../../../docs/specs/domain-harness/element-package.md) 与 [domain-naming Skill](../domain-naming/SKILL.md)。**Package.id 小写 kebab-case，ElementDefinition.id 变量式 camelCase，namespace 是独立字段**；Function/变量 camelCase、类型 PascalCase。禁止以 `r41`、`r60`、`V011` 等任务轮次/内部版本作新的永久 ID。新 Element ID 的机器 Schema/BUILD 落地尚待 #1668 Owner/L2 审查。既有已审 Reference App/StageIndex 必须保留历史 SHA/Digest，重命名属于受控迁移而非文字替换；npm SemVer 和机器 schemaVersion 合法。
-- **类型**：严格 TypeScript；`unknown` 收敛输入，尽量采用只读数据、判别联合、确定性错误码；不得通过 `any`、粗暴断言或默认成功掩盖未知条件。
-- **选型与复用**：先用 Node.js/JavaScript 原生能力和仓库现有可信依赖，再评估成熟、维护活跃、许可证合适且兼容 Node 22/ESM 的库；不自行实现通用解析器、加密、Schema 验证或状态机来替代合适的成熟方案。新依赖与自实现均遵循 [防回归手册 §1.1](../../../docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md) 的取舍和验证要求，避免不必要的依赖/框架。
-- **边界**：BUILD 负责编译与封存，Runtime 只读取 Pin/Lock 中选定资源；禁止运行期二次构建和未声明资源执行。
-- **注释**：全部新代码、改动代码的注释和 JSDoc 必须为中文。解释不变量、生命周期与失败理由；不能保留与当前实现不符的旧版本注释。编译器指令 `@ts-expect-error` 保持语法，说明文字使用中文。
-- **日志**：固定事件名、分级、有限状态；不得记录 Token、凭据、原始错误和未验证的用户字段。
-- **验证**：`npm ci && npm run build && npm run typecheck && npm run lint && npm test && npm run test:demo`。对真实外部安装包执行同一个 Demo；发现失败修复根因，不弱化测试。
-- **审核**：只有完整独立重构模块完成并验证时，或者遇到真实高风险阻塞时，才做一次必要的独立审核。
+1. **原生语言优先**：Package 是 ESM 模块集合/静态插件，Element 是内聚 Class，Function 是模块函数/类实例与静态方法。优先复用 SDK 内置 Standard Elements，再用 TS/Node 及维护良好的第三方库解决实际业务，避免新建函数分派器、Plugin Loader 或全覆盖 Node API 包装。
+2. **职责和命名**：使用 [domain-naming](../domain-naming/SKILL.md)；Package kebab-case、Element 逻辑 ID camelCase、Class PascalCase、Function camelCase、文件/目录 kebab-case。不将 R41/v011 等迭代号写入新永久标识符；已有历史源码/StageIndex 的字节和审核 SHA 保持可追溯。
+3. **代码元数据与 Agent 文档分离**：Module `packageMeta` / Class `static metadata` 是框架和业务读取的**可执行代码合同**。TSDoc/JSDoc 和 Skill 给 Agent 理解，不生成一份竞争的运行时 Metadata；只保留框架实际需要的字段（例如 Core.Order）。
+4. **静态依赖**：正常 `import/export`、`package.json#dependencies/exports`。直接使用外部 Package 就在生成期声明直接依赖；对未声明依赖、非法 Order、模块公开入口等用 TypeScript/ESLint/真实测试验证，**SDK Runtime 不重复验证**。
+5. **生命周期**：唯一 KDP Order=0，Core Order 非负互异可跳号，框架读取元数据排序；无 Init/Exit 跳过，有 Init 则显式 `start()`，可选 `Symbol.asyncDispose` 由生命周期拥有者执行退出。ESM import 求值不等于业务 Init。
+6. **类型和质量**：严格 TypeScript，`unknown` 先收敛，尽量 readonly、判别联合、显式错误与结果；禁止无理由 `any` / 粗断言 / 默认成功。注释与 JSDoc 中文，解释最新职责、失败与清理，不留旧 ABI 说明。注意 Error 自继承、NodeNext 第三方导入、测试源码类型检查与 `package.json#exports` 对公开入口的限制。
+7. **业务 vs 框架错误**：预期业务失败由业务 Element 处理，KDP 最终未捕获错误只记录脱敏日志、尝试已进入实例的 Exit Hook、失败退出。技术失败仍可能发生；不可假设生成阶段能保证运行永不出错。
+8. **验证闭环**：提交前执行适用语法/Typecheck/Lint/受影响测试、实际外部 npm consumer；能本地等价执行优先本地，仅真实必要时调用一次 Woodpecker。独立审核只查实际新 SHA 变更，报告不能运行项为 NOT_RUN；不要开展持续 Agent 任务。
 
+## 历史规范与警戒
 
-## 实际重构反例与审核清单
+**HISTORICAL / 不得在新 v0.11.1 代码实施**：旧 `Contracts/BUILD/Microkernel/SDK` 分层不等于现行 Package 架构；旧 `SelectedFunction.resources`、`FunctionRef/Target/ImplementationBinding`、`Pin/Lock`、Boot 可信入口字节检查、静态 JS 子集 guard、强制每 Package `Init`、KDP 独占 Workflow Engine，均属于待删除的旧执行模型。有关旧 L2/质量手册仍可查看故障根因/历史 SHA，但若与新规范冲突则不可作为当前实现要求。
 
-参见 [0.11.0 重构过程与工程经验](../../../docs/engineering/DOMAIN_HARNESS_V0110_REFACTOR_LESSONS.md)。在代码迁移和大规模清理时，还须落实以下要求：
-
-1. **批量改名先检验语义**：不得把 `V011Error` 简单替换成 `Error` 造成 `class Error extends Error` 自继承；标准错误以 `globalThis.Error` 作为基类，领域错误使用不混淆的 `DomainHarnessError`。
-2. **生产和测试各自类型检查**：测试 Fixture 与静态非法类型负例留在 `tests/`，不能作为 SDK 根出口发布；NodeNext 对第三方导入和测试相对路径的解析必须单独通过。
-3. **版本字符串分类**：仅清除版本化内部路径、TS 标识符与旧版兼容导出；协议 `schemaVersion`、npm SemVer、被锁定的 Target profile 不得机械重写。
-4. **代码注释采用中文并描述真实机制**；删除旧版注释后，应补回关键方法的职责、不变量与回滚原因，而非统一贴一行没有信息量的模板注释。
-5. **切勿为通过 lint 弱化契约**：`Promise.resolve` 保持异步接口、Unicode 字符串按码点计数、`globalThis.structuredClone` 显式表达 Node 环境；忽略清理异常必须说明保留原始异常的理由。
-6. **真实 Node.js 包导出检查**：具备 `exports` 的包拒绝未公开路径时通常是 `ERR_PACKAGE_PATH_NOT_EXPORTED`，不能强行要求 `ERR_MODULE_NOT_FOUND` 或通过开放兼容出口来通过测试。
-7. **完整验证链**：`npm ci`、四包 build、源码与测试 typecheck、lint、必要单测、单一四 tarball clean-install Demo 对应不同关口。失败时记录首个真实失败和 NOT_RUN 的依赖项，禁止把前置失败变成虚假下游失败。
-8. **单独模块一次最终独审**：源码质量的 ACCEPT 只能由完整闭环与适当独立审核得出；CI 重复触发、历史 Demo 成功或删除文件数量都不足以授予资格。
-
-## 0.11.x 增量交付：从 0.11.0 R12/R15 复盘继承的强制工程做法
-
-先阅读 [增量交付质量防回归手册](../../../docs/engineering/DOMAIN_HARNESS_V011X_DELIVERY_QUALITY_PLAYBOOK.md)。进入 0.11.1+ 实施前，在**原有 Task Issue** 简要列出当前改动的职责所有者、信任边界、资源/Effect 权限、状态副作用以及必测 POS/NEG/ERR；不要把这个步骤扩展成额外审批链。
-
-1. **先证伪，再提交**：新增 Schema/Hook/Function、资源授权、入口 ID、Pin/Lock、生命周期、对外 Snapshot 等边界，必须同时具备该边界的拒绝或 UNKNOWN 反例。输入未验证、重复 ID、越权资源、非规范 JSON/错误 Digest、恶意修改共享引用属于真实历史反例，不可只测 READY/SUCCEEDED。
-2. **防止类型/Fixture 旧路径回归**：修改 exports、ESM 构建产物或第三方依赖时，同改真实包根 Consumer 和测试 Fixture；测试非法值仅在 tests 局部构造，公共 ABI 继续 readonly。四包测试 Typecheck 已由 `npm test` 和 lint 静态结构闸门覆盖；不得删除步骤或手动跳过。
-3. **运行时不替 BUILD 选实现**：BUILD 校验所有被选 Schema 的 inline/ref、依赖/唯一性和 Resource Digest；App Init 权限来自 `SelectedFunction.resources`，不返回全 Lock；Boot 先拒绝再 import，App 失败保持清理/UNKNOWN/FAILED 语义。
-4. **提交前验证优先**：本地能执行等价检查时先验证受影响代码、测试和质量扫描；跨包/安装改动再用一次 `npm run verify`，不要先推 PR 跑多轮昂贵 CI。不要为每个 TypeScript 小修复单独安排独立审查。
-5. **失败时一批闭环**：真实 CI FAIL 从 GitHub Exact SHA 和 Drive Logs 取第一失败步骤，收集同批问题去重；需本地环境时单次委派 Agent 完成诊断、必要修复、验证和提交，限轮次停止。其它会话独立审核只复核新增/变更边界，合并前检查当前 HEAD、base、CI、Review。
-6. **P2 只在触及风险时带入**：RV-5～RV-9 为 0.11.0 已知未解决限制，不得静默写为 PASS；未触及的内容不额外阻断新功能。
-
-具体命令、反例证据和 Issue 输出字段均以防回归手册为准，避免在多个 Skill 中维护两份易漂移的完整清单。
+保留有价值的工程经验：`globalThis.Error` 避免误自继承、`@ts-expect-error` 必须有解释、`globalThis.structuredClone`、Unicode 字符计数、`Promise.resolve` 异步合同、错误日志不泄漏 Token/密钥。旧 CI 测试路径/四 tarball 示例不是新静态插件必须保留的工程拓扑，迁移后实际消费者需重新验证。
