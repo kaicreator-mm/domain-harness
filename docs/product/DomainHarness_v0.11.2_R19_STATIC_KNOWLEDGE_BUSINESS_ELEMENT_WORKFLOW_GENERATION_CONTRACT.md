@@ -1,5 +1,8 @@
 # DomainHarness 0.11.2 · R19：不可变 Data Knowledge + 原生 Function Knowledge，组成 Business Element，Workflow 的业务接口由生成期定义
 
+> **CURRENT PRODUCT/L1 SINGLE CANDIDATE = [R21 consolidated after R20 REWORK](./DomainHarness_v0.11.2_R21_CONSOLIDATED_PRODUCT_L1_AFTER_R20_REWORK.md)**. **R19 不是最新独立 Product/L1 合同**：R20 发现其缺少深层可变引用的负例、两租户并发隔离和两个 Workflow 共享预算，已由 R21 第 2–3 节与 DI-L1-01/02/06/07 补齐。其示例仅作业务组合说明。 R21 仍为 Product/L1 候选、未 Owner 冻结、未实施或运行 CI。\n\n
+
+
 ```ini
 OUTPUT_LABEL=DH_V0112_R19_STATIC_DATA_NATIVE_FUNCTION_BUSINESS_ELEMENT_WORKFLOW_BOUNDARY
 REPO=kaicreator-mm/domain-harness
