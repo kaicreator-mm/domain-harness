@@ -68,12 +68,31 @@ export class NativeWorkflowContext {
     public readonly depth: number,
   ) {}
 
-  /** Reader/Guard 等普通复用调用同样消耗根调用预算。 */
+  /**
+   * 仅处理普通值（包括 Reader 返回的普通数据对象）；任何返回的业务
+   * Outcome 都会作为 value 被包装，不能用本方法传播业务 REJECT/UNKNOWN/FAILED。
+   */
   public async invoke<T>(action: () => T | Promise<T>): Promise<Result<T>> {
     const refused = this.budget.reserve(1, 1);
     if (refused !== undefined) return failure(refused);
     try {
       return { status: 'COMPLETE', value: await action() };
+    } catch {
+      return failure('WORKFLOW_EXECUTION_FAILED');
+    }
+  }
+
+  /**
+   * 直接调用已经返回 WorkflowOutcome 的业务 Function，保留所有终态，
+   * 同样在副作用前收取一次根调用/步骤预算；不把 FAILED 包成 COMPLETE。
+   */
+  public async invokeOutcome<T>(
+    action: () => Result<T> | Promise<Result<T>>,
+  ): Promise<Result<T>> {
+    const refused = this.budget.reserve(1, 1);
+    if (refused !== undefined) return failure(refused);
+    try {
+      return await action();
     } catch {
       return failure('WORKFLOW_EXECUTION_FAILED');
     }
