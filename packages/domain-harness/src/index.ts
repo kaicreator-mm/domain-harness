@@ -9,3 +9,5 @@ export * from './kernel-lifecycle.js';
 export * from './standard-workflow.js';
 // SDK 内置的应用级 JSON/YAML 标准复用组件。
 export * from './standard-files.js';
+// 以原生业务回调组合根预算、Hook 与具名 Switch，不引入第二套运行时。
+export * from './native-workflow-composition.js';
