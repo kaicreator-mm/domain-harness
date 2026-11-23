@@ -15,6 +15,8 @@ CI=NOT_RUN_DOC_ONLY
 
 > **Owner 精简要求优先：** R14 曾提出 Domain Semantic / Semantic Capability / Semantic Workflow / Existing Workflow 四层及独立 SemanticPort、Data/Control/Evidence Edge。Owner 指出复杂度高且对 Domain Intelligence 的增量价值不清晰。R15 采用**两层**：语义层 Knowledge 和执行层 Workflow，Recognizer/Validator 作为形成合法 Intent 的通用能力，不设第三语义流程层。R14 的四层及独立 Graph/Port/Edge **不作为本版必须交付的架构、SDK 接口或验收门**；既有业务案例及“语义不兼容不能默许成功、结果不能误映射 COMPLETE”等正确性不变量保留。
 
+> **R16 后续 Owner 提议：** R15 中将 Recognizer + Validator 放在 Workflow 外的示意，已被新的 [R16「Intent Recognition Workflow + Intent Handling Workflow」候选](./DomainHarness_v0.11.2_R16_TWO_WORKFLOWS_AUTHORIZED_ACTION_SCOPE_CONSOLIDATION.md)具体化：两者共用已有 Workflow API，无第三层或第二执行器。R16 同时建议将 0.11.4 Authorized Action（Business State、Capability、Tool、Host、Effect、Receipt/Journal/Readback）完整归入 0.11.2，Knowledge 存语义描述/规则，Workflow 负责编排实际授权行动；**授权不能由 Knowledge 声明或 Workflow 单独自授予**。原 R15 的图与范围界定作为本轮设计演进记录，R16 的版本合并**仍待 Owner 最终裁决，尚未修改正式 Roadmap**。
+
 ## 1. Domain Intelligence 的最小闭环
 
 ```text
