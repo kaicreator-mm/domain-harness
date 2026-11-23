@@ -39,3 +39,30 @@ export class OrderService {
     return {status:'COMPLETE',value:values};
   }
 }
+
+/** 一个普通业务 Element，规则来自领域持有的结构化 JSON 内容，而非 SDK 内置知识引擎。 */
+export class OrderPolicyElement {
+  evaluate(rule, amounts) {
+    if (!rule || typeof rule !== 'object' || Array.isArray(rule) ||
+        typeof rule.id !== 'string' ||
+        typeof rule.minimumTotal !== 'number' || !Number.isFinite(rule.minimumTotal)) {
+      return {status:'UNKNOWN',reason:{code:'ORDER_POLICY_UNKNOWN',message:'Policy is incomplete'}};
+    }
+    const total=sumAmounts(amounts);
+    if(total < rule.minimumTotal) {
+      return {status:'REJECT',reason:{code:'ORDER_POLICY_THRESHOLD',message:'Order below policy minimum'}};
+    }
+    return {status:'COMPLETE',value:{policyId:rule.id,total}};
+  }
+  finalize(decision) {
+    return {status:'COMPLETE',value:{...decision,approved:true}};
+  }
+}
+
+/** 0-Function 的结构化知识 Element：数据由业务 Package 持有，不是自制 Runtime Schema。 */
+export class OrderPolicyKnowledgeElement {
+  static metadata = {id:'orderPolicyKnowledge'};
+  constructor(content) {
+    this.content=Object.freeze({...content});
+  }
+}

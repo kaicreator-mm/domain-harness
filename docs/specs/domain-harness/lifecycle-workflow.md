@@ -1,6 +1,6 @@
 # DomainHarness · Order、Init/Exit、Workflow、最终兜底
 
-> [权威目录](./README.md) · 新设计 **CONFIRMED**；旧 Boot Host 与动态 PackageSystem **MIGRATION_REQUIRED**。
+> [权威目录](./README.md) · 新设计 **CONFIRMED**；旧 Boot Host 与动态 PackageSystem **SOURCE_REPLACED / MERGED**（PR #1694）；旧业务功能场景由 #1696 做有限等价性回归。
 
 ## LIFE-01 · Order
 

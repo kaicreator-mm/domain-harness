@@ -1,6 +1,6 @@
 # DomainHarness · TypeScript/Node Language-Native Profile
 
-> Owner [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685) 新设计 **CONFIRMED**。下面的 SDK API 与当前原生实现候选对应；历史 Contracts/Runtime 的物理移除仅在 Draft #1694，未合并前不得宣称版本列车已迁移完成。
+> Owner [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685) 新设计 **CONFIRMED**。新版 SDK 已经 PR #1694 的 R160 ACCEPT_SCOPED 受审并合入版本列车；历史 Contracts/Runtime 执行层已物理删除。当前 R163 对 0.11.0/0.11.1 的旧业务场景进行补充验证，见 [#1696](https://github.com/kaicreator-mm/domain-harness/issues/1696)。
 
 ## TS-01 · 三个固定映射
 
