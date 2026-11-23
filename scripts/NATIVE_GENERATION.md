@@ -11,3 +11,5 @@ node scripts/validate-native-generation.mjs --manifest examples/native-domain-ap
 它只验证此小型静态组合 Profile 的确定条件；正式领域 Function 的 DIS 业务合同、行为、TypeScript 类型、外部真实 npm 安装与版本交付证据仍由生成者分别完成，并不因此被自动标记 PASS。
 
 纯静态依赖闭包才可得到 `GEN_VALIDATED`；出现运行时计算的导入时工具报告 `manualReviewPackages`，CLI 返回非零退出码，不将无法静态证明的依赖冒称通过。作者可采用项目适用的 npm/TypeScript/ESLint 工具和代码审查补足证据，这不是一套 JS 语法白名单。
+
+对执行元数据要求纯字面量语义，不允许重复字段、展开或 getter 覆盖 Order；普通 TypeScript 的 `as const`、`satisfies` 及括号表达式合法。检查 `.ts/.mts/.cts` 使用 TypeScript AST，不据此限制普通业务 Class/Function 使用标准语言特性。

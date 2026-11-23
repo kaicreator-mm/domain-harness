@@ -22,12 +22,30 @@ function externalName(specifier) {
   return specifier.split('/')[0];
 }
 
-function readProperty(object, key) {
-  const entry = object.properties.find((item) =>
-    ts.isPropertyAssignment(item) &&
-    (ts.isIdentifier(item.name) || ts.isStringLiteral(item.name)) &&
-    item.name.text === key);
-  return entry?.initializer;
+function staticMetadataObject(expression) {
+  let current = expression;
+  // 普通 TS 的 as const / satisfies / 括号不应被误判为动态 Metadata。
+  while (current && (ts.isAsExpression(current) ||
+          ts.isSatisfiesExpression(current) || ts.isParenthesizedExpression(current))) {
+    current = current.expression;
+  }
+  if (!current || !ts.isObjectLiteralExpression(current)) refuse('GEN_NONSTATIC_METADATA');
+  return current;
+}
+
+function staticMetadataFields(metadata) {
+  const fields = new Map();
+  for (const property of metadata.properties) {
+    // 只限制需要执行的 Metadata；Package 的其余 TypeScript 代码保持原生能力。
+    if (!ts.isPropertyAssignment(property) ||
+        !(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))) {
+      refuse('GEN_NONSTATIC_METADATA');
+    }
+    const name = property.name.text;
+    if (fields.has(name)) refuse('GEN_DUPLICATE_METADATA_FIELD');
+    fields.set(name, property.initializer);
+  }
+  return fields;
 }
 
 /**
@@ -46,7 +64,8 @@ export function validateNativeApp(manifestPath, corePaths) {
   for (const givenPath of corePaths) {
     const path = resolve(givenPath);
     const source = readFileSync(path, 'utf8');
-    const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+    const kind = /\\.(?:ts|mts|cts)$/u.test(path) ? ts.ScriptKind.TS : ts.ScriptKind.JS;
+    const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, kind);
     if (file.parseDiagnostics.length) refuse('GEN_SYNTAX_INVALID');
 
     let metadata;
@@ -57,10 +76,7 @@ export function validateNativeApp(manifestPath, corePaths) {
         for (const declaration of node.declarationList.declarations) {
           if (ts.isIdentifier(declaration.name) && declaration.name.text === 'packageMeta') {
             if (metadata) refuse('GEN_DUPLICATE_METADATA');
-            if (!declaration.initializer || !ts.isObjectLiteralExpression(declaration.initializer)) {
-              refuse('GEN_NONSTATIC_METADATA');
-            }
-            metadata = declaration.initializer;
+            metadata = staticMetadataObject(declaration.initializer);
           }
         }
       }
@@ -83,9 +99,10 @@ export function validateNativeApp(manifestPath, corePaths) {
     ts.forEachChild(file, inspectDynamicImport);
     if (!metadata) refuse('GEN_MISSING_METADATA');
 
-    const idNode = readProperty(metadata, 'id');
-    const roleNode = readProperty(metadata, 'role');
-    const orderNode = readProperty(metadata, 'order');
+    const fields = staticMetadataFields(metadata);
+    const idNode = fields.get('id');
+    const roleNode = fields.get('role');
+    const orderNode = fields.get('order');
     if (!idNode || !ts.isStringLiteral(idNode) ||
         !roleNode || !ts.isStringLiteral(roleNode) || roleNode.text !== 'core' ||
         !orderNode || !ts.isNumericLiteral(orderNode)) refuse('GEN_NONSTATIC_CORE');

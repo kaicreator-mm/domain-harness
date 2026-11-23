@@ -79,3 +79,28 @@ test('计算的 import() 不是框架禁用语法，作者必须复核不确定�
       assert.equal(checked.checked,2);
     });
 });
+
+test('Metadata 字段重复或展开覆盖必须拒绝，不能用旧 Order 伪报通过', () => {
+  runCase({business:"export const packageMeta={id:'b',role:'core',order:2,order:0};"},
+    x => assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),
+      /GEN_DUPLICATE_METADATA_FIELD/u));
+  runCase({business:"const overrides={order:0}; export const packageMeta={id:'b',role:'core',order:2,...overrides};"},
+    x => assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),
+      /GEN_NONSTATIC_METADATA/u));
+  runCase({business:"export const packageMeta={id:'b',role:'core',get order(){return 2;}};"},
+    x => assert.throws(() => validateNativeApp(x.manifest,[x.kdp,x.business]),
+      /GEN_NONSTATIC_METADATA/u));
+});
+
+test('TypeScript 原生 as const satisfies PackageMeta 可静态解析', () => {
+  runCase({}, x => {
+    const tsCore = join(x.root,'packages/business.mts');
+    writeFileSync(tsCore, [
+      'interface CoreMeta { readonly id: string; readonly role: "core"; readonly order: number }',
+      'export const packageMeta = ({ id: "business", role: "core", order: 2 } as const) satisfies CoreMeta;',
+    ].join('\\n'));
+    assert.deepEqual(validateNativeApp(x.manifest,[x.kdp,tsCore]),{
+      packages:[{id:'kdp',order:0},{id:'business',order:2}],checked:2,
+    });
+  });
+});
