@@ -12,11 +12,12 @@
     "build": "npm run build --workspace=@kaicreator/domain-harness",
     "typecheck": "npm run typecheck --workspace=@kaicreator/domain-harness",
     "lint": "node scripts/check-source-quality.mjs && eslint .",
-    "test:generation": "node --test scripts/tests/native-generation.test.mjs && node scripts/validate-native-generation.mjs --manifest examples/native-domain-app/package.json --core examples/native-domain-app/packages/kdp.mjs --core examples/native-domain-app/packages/business.mjs",
-    "test": "npm run test:typecheck --workspace=@kaicreator/domain-harness && node --import tsx --test packages/domain-harness/tests/core/*.test.ts && npm run test:generation",
+    "test:generation": "node --test scripts/tests/native-generation.test.mjs && node scripts/validate-native-generation.mjs --manifest examples/native-domain-app/package.json --core examples/native-domain-app/packages/kdp.mjs --core examples/native-domain-app/packages/business.mjs --core examples/native-domain-app/packages/workflow-init.mjs",
+    "test": "npm run test:typecheck --workspace=@kaicreator/domain-harness && node --import tsx --test packages/domain-harness/tests/core/*.test.ts && npm run test:generation && npm run test:regression",
     "test:demo": "node examples/native-domain-app/main.mjs",
     "test:consumer": "node scripts/verify-native-sdk-clean-install.mjs",
-    "verify": "npm run build && npm run typecheck && npm run lint && npm test && npm run test:demo && npm run test:consumer"
+    "verify": "npm run build && npm run typecheck && npm run lint && npm test && npm run test:demo && npm run test:consumer",
+    "test:regression": "node --test scripts/tests/native-stage-regression.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

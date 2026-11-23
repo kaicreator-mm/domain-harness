@@ -75,11 +75,17 @@ try {
   assert.ok(existsSync(join(installed,'dist/index.js')));
 
   cpSync(join(root,'examples/native-domain-app/packages'),join(consumer,'packages'),{recursive:true});
+  cpSync(join(root,'examples/native-domain-app/data'),join(consumer,'data'),{recursive:true});
   cpSync(join(root,'examples/native-domain-app/main.mjs'),join(consumer,'main.mjs'));
   const appResult=run('RUN',process.execPath,['main.mjs'],consumer);
   const app=JSON.parse(appResult.trim());
   assert.deepEqual({status:app.status,count:app.count,total:app.total,firstId:app.firstId},
     {status:'PASS',count:4,total:10,firstId:'a'});
+  assert.deepEqual(app.retainedBehavior,{
+    initWorkflow:true,policySelectedByData:'order-policy-allow',
+    strictPolicyStatus:'REJECT',multiNodeNormal:5,rejectedBranchNodes:4,
+    inventoryReusesStandardReader:true,singleNode:'COMPLETE',
+  });
   // 明确锁定已安装 App 的跨 Reader/Guard/子 Hook 共享预算结果。
   assert.deepEqual(app.budget,{
     successReads:4,

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { KernelLifecycle, StandardWorkflowSession, routeWorkflowOutcome } from '@kaicreator/domain-harness';
 import * as kdp from './packages/kdp.mjs';
 import * as business from './packages/business.mjs';
+import * as workflowInit from './packages/workflow-init.mjs';
 
 async function executeCase(limits) {
   const events = [];
@@ -79,10 +80,43 @@ assert.deepEqual(blockedStep.events,['guard','json-a','json-b']);
 assert.equal(blockedStep.outcome.status,'FAILED');
 assert.equal(blockedStep.outcome.reason.code,'WORKFLOW_STEP_BUDGET');
 
+
+/** 旧 AC06/AC11/AC19/AC20 的语义在新 SDK 原生代码中重新执行，不恢复旧 Boot/Lock。 */
+const initApp = new KernelLifecycle([workflowInit,kdp]);
+let actualInit;
+await initApp.run({appId:'native-domain-app'},()=>{
+  assert.equal(workflowInit.initResults.length,1);
+  actualInit=workflowInit.initResults[0];
+  assert.deepEqual(actualInit.normal,{status:'COMPLETE',value:{
+    policyId:'order-policy-allow',total:10,approved:true,
+  }});
+  assert.equal(actualInit.strict.status,'REJECT');
+  assert.equal(actualInit.strict.reason.code,'ORDER_POLICY_THRESHOLD');
+  assert.deepEqual(actualInit.normalTrace,[
+    'policy:read','policy:start','policy:evaluate','policy:end','policy:finalize',
+  ]);
+  assert.deepEqual(actualInit.strictTrace,[
+    'policy:read','policy:start','policy:evaluate','policy:end',
+  ]);
+  assert.deepEqual(actualInit.inventory,{status:'COMPLETE',value:{
+    policyId:'inventory-stock',sku:'SKU-001',available:5,replenish:false,
+  }});
+  assert.deepEqual(actualInit.single,{status:'COMPLETE',value:42});
+});
+
 console.log(JSON.stringify({
   app:'native-domain-app',
   status:'PASS',
   ...result,
+  retainedBehavior:{
+    initWorkflow:true,
+    policySelectedByData:actualInit.normal.value.policyId,
+    strictPolicyStatus:actualInit.strict.status,
+    multiNodeNormal:actualInit.normalTrace.length,
+    rejectedBranchNodes:actualInit.strictTrace.length,
+    inventoryReusesStandardReader:true,
+    singleNode:actualInit.single.status,
+  },
   budget:{
     successReads:4,
     deniedReaderReads:2,
