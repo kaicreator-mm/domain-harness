@@ -1,5 +1,5 @@
 import { createActor } from 'xstate';
-import type { AnyActorLogic, InputFrom, OutputFrom, SnapshotFrom } from 'xstate';
+import type { AnyActorLogic, InputFrom, OutputFrom } from 'xstate';
 
 /** 明确区分业务完成与非成功终态，禁止把 stopped/未知误报为成功。 */
 export type StandardWorkflowOutcome<Output> =
@@ -62,17 +62,19 @@ export class XStateWorkflowElement<
           resolve(result);
         };
 
-        const observe = (snapshot: SnapshotFrom<Logic>): void => {
-          if (settled) return;
-          if (snapshot.status === 'done') {
+        const observe = (snapshot: unknown): void => {
+          if (settled || typeof snapshot !== 'object' || snapshot === null) return;
+          // XState 允许多种 Actor Logic；只有确认真实终态才解释 output。
+          const observed = snapshot as { readonly status?: unknown; readonly output?: unknown };
+          if (observed.status === 'done') {
             try {
-              finish(this.mapOutput(snapshot.output as OutputFrom<Logic>));
+              finish(this.mapOutput(observed.output as OutputFrom<Logic>));
             } catch {
               finish(this.failed('WORKFLOW_EXECUTION_FAILED'));
             }
-          } else if (snapshot.status === 'error') {
+          } else if (observed.status === 'error') {
             finish(this.failed('WORKFLOW_EXECUTION_FAILED'));
-          } else if (snapshot.status === 'stopped') {
+          } else if (observed.status === 'stopped') {
             finish(this.failed('WORKFLOW_STOPPED'));
           }
         };
