@@ -1,6 +1,6 @@
 # DomainHarness · 核心规范
 
-> [唯一规范](./README.md) 的根原则。新架构 **CONFIRMED**，机器代码 **MIGRATION_REQUIRED**。DIS 跨语言语义不因 TS Profile 改动。
+> [唯一规范](./README.md) 的根原则。新架构 **CONFIRMED**，v0.11.1 原生 SDK 源码 **SOURCE_ACCEPTED/MERGED（R160 / PR #1694）**；后续内部阶段仍须逐项实现/验收。DIS 跨语言语义不因 TS Profile 改动。
 
 ## 核心架构不变量
 
