@@ -234,9 +234,7 @@ test('R147 P2：REJECT/ASK/WAIT/UNKNOWN/FAILED 在异步 end 失败后仍保留�
       }));
     assert.equal(completed,true);
     assert.equal(outcome.status,status);
-    if(outcome.status!=='COMPLETE') {
-      assert.equal(outcome.reason.code,'BUSINESS_'+status);
-      assert.equal(JSON.stringify(outcome).includes('PRIVATE_END_FAILURE'),false);
-    }
+    assert.equal(outcome.reason.code,'BUSINESS_'+status);
+    assert.equal(JSON.stringify(outcome).includes('PRIVATE_END_FAILURE'),false);
   }
 });
