@@ -1,6 +1,14 @@
 # DomainHarness · 设计现状与迁移清单
 
-> [权威目录](./README.md) · Owner 新决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。**本规范更新为 docs-only；不表示旧 SDK Contracts、Runtime 或 Domain App 已完成代码迁移。**
+> [权威目录](./README.md) · Owner 新决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。**本规范是设计和验收权威；代码迁移在 Draft #1694 的候选树中完成，但在该 PR 正式合并前不属于版本列车。**
+
+> **R160 当前状态（R151 P1/P2 整改已提交，独立限定复审待完成）**：新语言原生规范 R140、KDP/XState R143、Reader R145、Workflow R154、生成期 R158 均有各自 Exact-SHA 的限定独立审核。**R140、R145 原审核各保留一个 P2**（R140 GEN-08 后由 R145 合入处置；R145 Reader 边界测试后续扩展）；不得改写原始审核数量。
+>
+> - **已合并的版本列车**：Workflow [PR #1692](https://github.com/kaicreator-mm/domain-harness/pull/1692) R154 `ACCEPT_SCOPED P0/P1/P2=0`，merge `b88137c7b2b2e1a5b6676a7a86a715458ac05ac4`；作者侧生成工具 [PR #1693](https://github.com/kaicreator-mm/domain-harness/pull/1693) R158 同样 `ACCEPT_SCOPED 0/0/0`，merge `caea4cc0ce0a206c92748074c72d39322e56a9e7`。历史 #3147 被取消，等价源 Blob #3148 SUCCESS 的区别已由 R158 明确。
+> - **原生 SDK 完整替换** [Draft PR #1694](https://github.com/kaicreator-mm/domain-harness/pull/1694)：以已接受的版本列车为父提交，候选已物理删除旧 Contracts/Microkernel/BUILD/Boot/PackageSystem/FunctionRef/Target/Lock/Pin 相关 151 个文件路径，保留单 SDK Workspace、五个生产 TS 模块、标准 Workflow/Reader、最小 KDP 与真实仓外仅直接依赖 SDK 的 npm 消费者。此删除**尚未合并到版本列车**。
+> - **R151 完整独立审核结论是 REWORK P0=0/P1=2/P2=5**，Exact `aaf6c930f9541768119991500c7bc7811898e18d`。两个 P1 为 Workflow 构造/运行预算不同快照、仓外 Domain App 四次 Reader 漏记根预算。新版修复已在 Draft 提交 `5b56a89743a10c2271b435879115dc2b32c734c2`，Woodpecker [#3150](https://ci.kaicreator.com/repos/18/pipeline/3150/1) **SUCCESS**：预算构造时复制/验证一致、Reader 在真实业务 ctx.invoke 计费，仓外 App 有足额/Reader 拒绝/Hook 拒绝/步骤拒绝的正负例。
+> - **五项 P2 处置**：Windows npm.cmd 改成 process.execPath 驱动 npm CLI（**Windows 真机验证尚未做，不声明 Windows PASS**）；当前英文/原生 App README 和旧路线图标记/链接纠正；开发 CI Node 下限 >=22.13 与 SDK 消费者 >=22.12 分离；Writer getter/own-enumerable/动态 Proxy 快照回归恢复；SDK 包根 12 个运行时导出及类型入口文档列出。合并前必须经新 SHA 的独立限定审核确认是否全部可接受。
+> - **最终门槛**：对本轮整改的实际 Diff 独立非 Writer 复审，接受后才允许将 Draft 转 Ready、合并与关闭 #1682/#1668。旧架构历史只能作带 SHA 的证据，不是当前可执行合同。
 
 ## 新架构状态
 
@@ -55,4 +63,4 @@
 
 ## R139 · 全体系独立审查后整改状态
 
-[#1689](https://github.com/kaicreator-mm/domain-harness/issues/1689) 的旧规范 SHA `80f5af907c07a9930aeb05aa24280dbe542ef3aa` 结论为 `REWORK P0=0/P1=5/P2=4`。新增 LIFE-10/11/12、TS-04/05、QA-04A/04B/06、DIS 适用表、历史 R119 对照是 Writer 的**整改候选，仍需独立 Exact-SHA 复审**；不得因此宣称源码 [#1688](https://github.com/kaicreator-mm/domain-harness/pull/1688) R138 的 `REWORK P1=4/P2=4` 自动解除。原生完整 Domain App、旧执行系统物理清理及最终消费者仍由 #1682 验收。
+[#1689](https://github.com/kaicreator-mm/domain-harness/issues/1689) 初始 SHA `80f5af907c07a9930aeb05aa24280dbe542ef3aa` 的 R139 `REWORK P1=5/P2=4` 已由 R140 [PR #1690](https://github.com/kaicreator-mm/domain-harness/pull/1690) 独立审查 **ACCEPT_SCOPED P1=0/P2=1** 并合入，唯一 GEN-08 导航 P2 随 R145 [PR #1691](https://github.com/kaicreator-mm/domain-harness/pull/1691) 合入。R138 源码 4 项 P1、4 项 P2 由 R143 独立复审 **ACCEPT_SCOPED P0/P1/P2=0**，随后合并 [PR #1688](https://github.com/kaicreator-mm/domain-harness/pull/1688)。以上限定事实并不代表 #1682 完整旧执行层删除、外部 SDK 消费者与版本发布已通过。

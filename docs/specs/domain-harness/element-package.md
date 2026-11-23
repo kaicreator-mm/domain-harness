@@ -16,7 +16,7 @@ Package 顶层公开函数直接 `export function`；Element 则通过实例/静
 
 ## EL-04 · Standard Element
 
-Standard 是 SDK 内置、在 TS/Node/第三方基础能力之上封装的 **Domain App 常用应用能力**。例如 Workflow/XState、领域 Reader 或真实应用中通用的任务协调。Standard 按需经同一公开 SDK 的子模块使用，不是所有 Node API 的外壳，不需要强制多 npm 包安装；是否“标准”由稳定、可复用和实际价值决定。
+Standard 是 SDK 内置、在 TS/Node/第三方基础能力之上封装的 **Domain App 常用应用能力**。例如 Workflow/XState、领域 Reader 或真实应用中通用的任务协调。Standard 经同一 SDK 已公开的入口使用（当前实现仅公开包根；未来子路径需另行声明并验收），不是所有 Node API 的外壳，不需要强制多 npm 包安装；是否“标准”由稳定、可复用和实际价值决定。
 
 ## EL-05 · Business Element
 

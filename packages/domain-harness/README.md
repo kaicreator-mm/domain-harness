@@ -1,37 +1,26 @@
-# @kaicreator/domain-harness
+# @kaicreator/domain-harness · Native SDK public API
 
-DomainHarness v0.11.x 是**嵌入 Domain App 的单一 SDK 产品**。Boot 位于 Package 外，KDP 是稳定 Kernel 部分；每个 App 从已有多文件 SDK/Business Domain Packages 中选定所需能力。不引入 Forge、Package Generator、独立的 BUILD 产品或第二 Runtime。
+单一嵌入式 TypeScript/Node SDK；Package 是原生 ESM 插件文件组合，Element 是可复用 Class，Function 是普通模块函数或 Class 方法。无旧 v0.10.x ABI、Boot/PackageSystem/FunctionRef/Target/Lock/Pin 运行时兼容层。
 
-## 唯一安装入口与公共 API
+## 唯一公开入口
 
-Consumer **只安装一个公开产品 `@kaicreator/domain-harness`**。正常的 npm 传递依赖（Contracts、Microkernel）由 SDK 自动管理；无需也**不得要求 Consumer 显式安装 `@kaicreator/domain-harness-build`**。
+`import { KernelLifecycle, JsonReader, StandardWorkflowSession } from '@kaicreator/domain-harness'`
 
-- `@kaicreator/domain-harness/runtime`：运行中的 Domain App 使用；只导出 Contracts 与 Boot/KDP，不加载 Package 组合功能。依赖信任与已锁定资源由 Boot 执行。
-- `@kaicreator/domain-harness/composition`：同一 SDK 内置能力，直接选择、验证、封存**现成的 Domain Packages**，提供 `buildApp`、构建错误和资源 digest。无需安装第二个 BUILD 包，不负责生成 Domain Package。
-- `@kaicreator/domain-harness`：相同 SDK 的统一公共入口，可以访问运行和组合功能。
+`package.json#exports` **只有 `.` 包根**，没有 `./runtime`、`./composition` 或其它内部子路径。
 
-```js
-import { boot } from '@kaicreator/domain-harness/runtime';
-import { buildApp } from '@kaicreator/domain-harness/composition';
+| 运行时 Value 导出（固定 12 个，独立测试枚举） | 职责 |
+| --- | --- |
+| `KernelLifecycle` | 最小 KDP，静态 Core 初始化、资源进入记录和最终逆序 Exit |
+| `WorkflowElement`、`XStateWorkflowElement` | Standard 业务工作流抽象和 XState Actor Logic 适配 |
+| `NativeWorkflowContext`、`StandardWorkflowSession` | 原生业务 Callback/Guard/Reader/Hook 的共享根预算 |
+| `routeWorkflowOutcome` | COMPLETE、REJECT、ASK、WAIT、UNKNOWN、FAILED 的完整具名分支 |
+| `JsonReader`、`YamlReader` | 可复用 JSON/YAML Class Element |
+| `readJson`、`readYaml`、`writeJson`、`writeYaml` | 不强制包装成 Class 的原生 Module Functions |
 
-// 两项能力都来自同一个已安装的 @kaicreator/domain-harness。
-```
+公开的 **TypeScript 类型入口（不构成 JS 运行时导出）**：`CorePackageMetadata`、`DomainAppContext`、`LifecycleInitContext`、`PackageInitElement`、`StaticCorePackage`、`LifecycleLogRecord`、`LifecycleLogger`、`StandardWorkflowOutcome<T>`、`WorkflowLimits`、`WorkflowRoutes<T,R>`、`StandardJsonValue`、`StandardFileOutcome<T>`。根入口导出的类还可用于 TS 类型。
 
-组合的内部实现仍由 Monorepo `tooling/build/src` 持有，经 SDK 的构建步骤**直接打包进 `dist/composition.js`**，构成**单一对外交付产物**。内部 BUILD 仅为实现阶段，不是单独可安装的产品。构建工具 `esbuild` 仅属于仓库开发环境；`ajv`、`typescript` 等所需实现随组合模块封入 SDK 的发布制品，不要求 Consumer 再安装它们。导入 `/runtime` 不求值组合代码。
+SDK 直接运行依赖只有 `xstate@5.33.2` 与 `yaml@2.9.1`。SDK **消费者** Node >=22.12.0；本仓库的完整开发工具链因 ESLint 10.11 要求 >=22.13.0，不应将二者混为一谈。SDK 不做 Package/Element 生成期静态正确性验证，作者可按需执行 `scripts/validate-native-generation.mjs`，不强制 Forge 或任何 Package 生成器。
 
-如果未来需要进一步优化 SDK tarball 的组合模块体积，可以在保持单 SDK 对外合同的前提下改进内部模块组织；**不能**重新建立外部 BUILD Peer、第二 Package Generator 或独立 Assembly Service。
+## 交付验证
 
-## 验收范围
-
-当前外部 clean-packed Consumer 在仓库未发布 registry 时，从单 SDK 产物及其 Contracts/Microkernel 内部依赖 tarball 安装，验证仅三个受控 tarball、无 `-build` 包/TypeScript/Ajv 外部安装、实际 `/runtime` 与 `/composition` 都可用、统一包根等价与原有 Boot/Function/Workflow 正反测试。正式发行后 Consumer 只需声明 `@kaicreator/domain-harness` 一项**直接依赖**，npm 负责它的普通传递依赖。
-
-## 阅读入口
-
-[源码逻辑与完整调用流程](../../docs/architecture/DOMAIN_HARNESS_V0110_CODE_AND_CALL_FLOW.md) · [Package/SDK 分层](../../docs/specs/DomainHarness_v0.11.x_DOMAIN_HARNESS_SDK_PACKAGE_FILES.md)
-
-## R55：Domain App 运行入口和受信任代码边界
-
-- 由 SDK 内置 Package 组合 API 输出的 Domain App 只声明 `@kaicreator/domain-harness` 这一项 SDK **直接运行时依赖**；`boot.mjs` 从公开 `@kaicreator/domain-harness/runtime` 调用 Boot。Microkernel、Contracts 和特定 Workflow 实现由 SDK 的受审 npm 传递闭包承接。
-- `BuildInput` 不再要求 Consumer 输入内部 npm `runtimeDependencies`；用户提供的 Package 文件、Descriptor、KDP Artifact 和 Target 均须经现有静态验收及 Lock/Pin 封存。
-- 当前只承诺 **受信任、受控的 Node ESM Package**。BUILD 对常见全局网络及进程访问执行有限 AST 拒绝，但它既不是完整的 JavaScript 沙箱，也不能证明任意原生代码没有外部副作用。`effects: 'none'` 不等于已运行在强隔离环境中；不可信代码的执行隔离必须由另行设计且明确授权的 Runtime/Host 边界承担。
-- 公开 `composition-types.ts` 与唯一内部组合算法的原始类型文件在每次 SDK 构建前必须**字节完全一致**，不同步即构建失败；不得制造两套自由演进的合同。
+`npm run verify` 在开发 Node >=22.13 环境中执行构建、类型检查、Lint、Standard/生成期正反例及原生 Domain App。仓外 `scripts/verify-native-sdk-clean-install.mjs` 会通过 `npm pack` 安装**唯一直接依赖 SDK** 的新项目、检查 TypeScript/ESM/私有路径，并验收 Guard、两份 JSON + 两份 YAML Reader 和子 Hook **确实共享根预算**。Windows npm CLI 通过 `process.execPath` 调用，独立 Windows 真实验证应单独记录，不得引用 Linux CI 冒充跨平台 PASS。

@@ -1,13 +1,5 @@
-// 同一个嵌入式 SDK 的公共入口：运行与应用组合分别位于可独立加载的子模块。
-// 保持当前 v0.11.x 包根既有导出，避免已验收的 Domain App Consumer 发生无关变化。
-export * from './runtime.js';
-export * from './composition.js';
-
-// 语言原生 KDP 生命周期 Element；迁移期间旧 ABI 仍未删除。
+/** DomainHarness 是语言原生 SDK，不提供自定义 Package Loader / 旧版 Boot。 */
 export * from './kernel-lifecycle.js';
-// Standard Workflow Element 可由任何 Business 使用，不依赖 KDP。
 export * from './standard-workflow.js';
-// SDK 内置的应用级 JSON/YAML 标准复用组件。
 export * from './standard-files.js';
-// 以原生业务回调组合根预算、Hook 与具名 Switch，不引入第二套运行时。
 export * from './native-workflow-composition.js';

@@ -3,7 +3,7 @@ import { parseDocument, stringify } from 'yaml';
 /** 可复用 Standard 负责解析业务数据，不赋予 SDK 业务文件读写权限。 */
 export type StandardJsonValue =
   | null | boolean | number | string
-  | StandardJsonValue[]
+  | readonly StandardJsonValue[]
   | { readonly [key: string]: StandardJsonValue };
 
 export type StandardFileOutcome<T> =

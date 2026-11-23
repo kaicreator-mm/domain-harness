@@ -7,6 +7,11 @@ import {
 import type { WorkflowRoutes } from '../../src/native-workflow-composition.js';
 import type { StandardWorkflowOutcome } from '../../src/standard-workflow.js';
 import { JsonReader, YamlReader } from '../../src/standard-files.js';
+import type { StandardJsonValue } from '../../src/standard-files.js';
+
+function isJsonRecord(value: StandardJsonValue): value is Readonly<Record<string, StandardJsonValue>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 test('共享根调用预算：Guard/Reader/子 Workflow 不重置，额度不足不执行副作用', async () => {
   const actions: string[] = [];
@@ -127,7 +132,7 @@ test('业务上下文使用相同 Reader 处理两 JSON / 两 YAML，不复制 P
         return {status:'FAILED', reason:{code:'READ_FAILED',message:'unexpected'}};
       }
       const record = outcome.value.value;
-      if (typeof record !== 'object' || record === null || Array.isArray(record)) {
+      if (!isJsonRecord(record)) {
         return {status:'FAILED',reason:{code:'INVALID',message:'expected record'}};
       }
       const n = record['k'];
@@ -237,4 +242,51 @@ test('R147 P2：REJECT/ASK/WAIT/UNKNOWN/FAILED 在异步 end 失败后仍保留�
     assert.equal(outcome.reason.code,'BUSINESS_'+status);
     assert.equal(JSON.stringify(outcome).includes('PRIVATE_END_FAILURE'),false);
   }
+});
+
+test('R151 P1：构造时配置快照与执行时共享预算一致，拒绝 NaN → 1 绕过', async () => {
+  const mutable = {maxCalls:Number.NaN,maxSteps:10,maxDepth:1};
+  const session = new StandardWorkflowSession(mutable);
+  mutable.maxCalls = 1;
+  let effects = 0;
+  const result = await session.run(async ctx => {
+    for (let i=0; i<4; i++) await ctx.invoke(() => { effects++; return i; });
+    return {status:'COMPLETE',value:effects};
+  });
+  assert.equal(result.status,'FAILED');
+  if(result.status==='FAILED') assert.equal(result.reason.code,'WORKFLOW_INVALID_LIMIT');
+  assert.equal(effects,0);
+});
+
+test('R151 P1：构造后扩大预算或深度不能越过已取得的原始上限', async () => {
+  const mutable={maxCalls:1,maxSteps:3,maxDepth:0};
+  const session=new StandardWorkflowSession(mutable);
+  mutable.maxCalls=999;
+  mutable.maxSteps=999;
+  mutable.maxDepth=99;
+  let effects=0;
+  const result=await session.run(async ctx => {
+    const first=await ctx.invoke(() => { effects++; return 'first'; });
+    assert.equal(first.status,'COMPLETE');
+    const second=await ctx.invoke(() => { effects++; return 'must-not-run'; });
+    return second;
+  });
+  assert.equal(result.status,'FAILED');
+  if(result.status==='FAILED') assert.equal(result.reason.code,'WORKFLOW_CALL_BUDGET');
+  assert.equal(effects,1);
+
+  const denied=await new StandardWorkflowSession({maxCalls:3,maxSteps:4,maxDepth:0})
+    .run(ctx => ctx.child(99, () => ({status:'COMPLETE',value:1})));
+  assert.equal(denied.status,'FAILED');
+  if(denied.status==='FAILED') assert.equal(denied.reason.code,'WORKFLOW_DEPTH_LIMIT');
+});
+
+test('R151 P1：独立拷贝调用/步骤/深度三个数值，后续缩小原对象也不改变运行配置', async () => {
+  const mutable={maxCalls:2,maxSteps:3,maxDepth:1};
+  const session=new StandardWorkflowSession(mutable);
+  mutable.maxCalls=0; mutable.maxSteps=0; mutable.maxDepth=0;
+  let count=0;
+  const outcome=await session.run(ctx => ctx.child(0, child => child.invoke(() => ++count)));
+  assert.deepEqual(outcome,{status:'COMPLETE',value:1});
+  assert.equal(count,1);
 });

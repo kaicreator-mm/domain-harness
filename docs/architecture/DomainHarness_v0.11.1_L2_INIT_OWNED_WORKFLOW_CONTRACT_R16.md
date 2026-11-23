@@ -1,5 +1,9 @@
 # DomainHarness v0.11.1 — L2 R26：已合入源码的 Workflow 执行合同
 
+> **HISTORICAL / SUPERSEDED BY Language-Native DomainHarness**：本文记录旧 Element-First/Lock/Pin/FunctionRef/Target/BUILD 设计及当时 Exact-SHA 审查，只供历史追溯；**不是当前 v0.11.1 SDK 的规范、API、安装方式或新功能准入证明**。
+现行唯一规范见 [Canonical](../specs/domain-harness/README.md)。当前 Standard Reader、Workflow 与 KDP 以 [#1682](https://github.com/kaicreator-mm/domain-harness/issues/1682) 的新 SHA 源码与消费者验收为准；旧 R60/R74 的 CURRENT 仅对应其原时间点。
+
+
 > **最终实现对齐候选，不代签 L2 Freeze。** 产品 WHAT 以 [L1 R26](../product/DomainHarness_v0.11.1_Task_Execution_PRD.md) 和 Issue #1605 F01–F10/AC11–AC20 为准。本文件按 `version/v0.11.x@639de32c98b8bbb40d34000d8c9b230be3759884` 的 **实际代码**复核早期 #1626/R17 文档；旧 #1607/#1611 和 R16“尚未实施”描述只作历史，不作为运行时合同。R17 已受审且仍成立的设计要求均按现有实现保留。
 
 ~~~ini

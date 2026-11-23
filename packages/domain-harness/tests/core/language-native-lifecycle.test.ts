@@ -307,3 +307,74 @@ test('R138 P2: Business Package Function 跨越真正独立 ESM 模块导出边�
   assert.equal(calculateAmount(10), 20);
   assert.equal(new InvoiceElement().calculate(10), 21);
 });
+
+test('K3-D: 外部关闭必须等待正在执行的业务收敛后才逆序 Exit', async () => {
+  const events: string[] = [];
+  let notifyBusiness!: () => void;
+  let releaseBusiness!: () => void;
+  const entered = new Promise<void>((resolve) => { notifyBusiness = resolve; });
+  const gate = new Promise<void>((resolve) => { releaseBusiness = resolve; });
+  class KdpInit implements PackageInitElement {
+    public start(): void { events.push('kdp:init'); }
+    public [Symbol.asyncDispose](): void { events.push('kdp:exit'); }
+  }
+  const kernel = new KernelLifecycle([{
+    packageMeta: { id: 'kdp', role: 'core', order: 0 }, Init: KdpInit,
+  }]);
+  const running = kernel.run(context, async () => {
+    events.push('business:start');
+    notifyBusiness();
+    await gate;
+    events.push('business:end');
+    return 42;
+  });
+  await entered;
+  let closed = false;
+  const externalClose = kernel[Symbol.asyncDispose]().then(() => { closed = true; });
+  await Promise.resolve();
+  assert.equal(closed, false);
+  assert.deepEqual(events, ['kdp:init', 'business:start']);
+  releaseBusiness();
+  assert.equal(await running, 42);
+  await externalClose;
+  assert.deepEqual(events, [
+    'kdp:init', 'business:start', 'business:end', 'kdp:exit',
+  ]);
+  await kernel[Symbol.asyncDispose]();
+  assert.equal(events.filter((event) => event === 'kdp:exit').length, 1);
+});
+
+test('K3-D: 外部关闭与异步业务错误同时发生时保留主因且延迟 Exit', async () => {
+  const events: string[] = [];
+  const rootCause = new Error('business private root failure');
+  let notifyBusiness!: () => void;
+  let releaseBusiness!: () => void;
+  const started = new Promise<void>((resolve) => { notifyBusiness = resolve; });
+  const gate = new Promise<void>((resolve) => { releaseBusiness = resolve; });
+  class Resource implements PackageInitElement {
+    public start(): void { events.push('resource:init'); }
+    public [Symbol.asyncDispose](): void { events.push('resource:exit'); }
+  }
+  const kernel = new KernelLifecycle([{
+    packageMeta: { id: 'kdp', role: 'core', order: 0 }, Init: Resource,
+  }], {error: (log) => { events.push(log.event); }});
+  const running = kernel.run(context, async () => {
+    events.push('business:started');
+    notifyBusiness();
+    await gate;
+    throw rootCause;
+  });
+  const captured = running.then(
+    () => new Error('unexpected business success'),
+    (error: unknown) => error,
+  );
+  await started;
+  const closing = kernel[Symbol.asyncDispose]();
+  assert.equal(events.includes('resource:exit'), false);
+  releaseBusiness();
+  await closing;
+  assert.equal(await captured, rootCause);
+  assert.deepEqual(events, [
+    'resource:init', 'business:started', 'DH_KDP_UNHANDLED', 'resource:exit',
+  ]);
+});

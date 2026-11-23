@@ -1,21 +1,41 @@
 import { JsonReader, YamlReader } from '@kaicreator/domain-harness';
 
-export const packageMeta = { id:'reference-business', role:'core', order:2 };
-/** Package 原生模块公开函数，直接供消费者调用。 */
-export function sumAmounts(values) { return values.reduce((acc, n) => acc + n, 0); }
+export const packageMeta = { id: 'reference-business', role: 'core', order: 2 };
 
+/** 普通 Package Function，不通过 FunctionRef 或 Target 转发。 */
+export function sumAmounts(values) {
+  return values.reduce((accumulator, value) => accumulator + value, 0);
+}
+
+/** 同一 JSON/YAML Reader 实例各自复用两次，解析操作显式消耗根预算。 */
 export class OrderService {
   #json = new JsonReader();
   #yaml = new YamlReader();
-  readFour() {
-    const documents = [
-      this.#json.read('{"id":"a","amount":1}'),
-      this.#json.read('{"id":"b","amount":2}'),
-      this.#yaml.read('id: c\namount: 3\n'),
-      this.#yaml.read('id: d\namount: 4\n'),
+
+  async readFour(context, onRead = () => {}) {
+    const inputs = [
+      {id:'json-a', kind:'json', source:'{"id":"a","amount":1}'},
+      {id:'json-b', kind:'json', source:'{"id":"b","amount":2}'},
+      {id:'yaml-c', kind:'yaml', source:'id: c\namount: 3\n'},
+      {id:'yaml-d', kind:'yaml', source:'id: d\namount: 4\n'},
     ];
-    if (documents.some(doc => doc.kind !== 'SUCCEEDED')) throw new Error('Invalid business data');
-    return documents.map(doc => doc.value);
+    const values = [];
+    for (const entry of inputs) {
+      const observed = await context.invoke(() => {
+        onRead(entry.id);
+        return entry.kind === 'json'
+          ? this.#json.read(entry.source)
+          : this.#yaml.read(entry.source);
+      });
+      if (observed.status !== 'COMPLETE') return observed;
+      if (observed.value.kind !== 'SUCCEEDED') {
+        return {
+          status: 'FAILED',
+          reason: {code:'BUSINESS_DOCUMENT_INVALID',message:'Business document not readable'},
+        };
+      }
+      values.push(observed.value.value);
+    }
+    return {status:'COMPLETE',value:values};
   }
 }
-export class Init { start() {} }

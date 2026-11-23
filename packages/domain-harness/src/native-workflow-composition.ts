@@ -143,8 +143,17 @@ export class StandardWorkflowSession {
   private readonly budget: RootBudget;
   private started = false;
 
-  constructor(private readonly limits: WorkflowLimits) {
-    this.budget = new RootBudget(limits);
+  private readonly limits: WorkflowLimits;
+
+  constructor(limits: WorkflowLimits) {
+    // 同一时点读取不可变快照；验证、余额和祖先深度必须使用同一份值。
+    // 不能信任调用方后续对原始 limits 对象的修改。
+    this.limits = {
+      maxCalls: limits.maxCalls,
+      maxSteps: limits.maxSteps,
+      maxDepth: limits.maxDepth,
+    };
+    this.budget = new RootBudget(this.limits);
   }
 
   public async run<T>(action: WorkflowHandler<T>): Promise<Result<T>> {
