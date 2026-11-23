@@ -22,13 +22,21 @@ function externalName(specifier) {
   return specifier.split('/')[0];
 }
 
-function staticMetadataObject(expression) {
+function unwrapNativeExpression(expression) {
   let current = expression;
-  // 普通 TS 的 as const / satisfies / 括号不应被误判为动态 Metadata。
-  while (current && (ts.isAsExpression(current) ||
-          ts.isSatisfiesExpression(current) || ts.isParenthesizedExpression(current))) {
-    current = current.expression;
-  }
+  // 仅解包不改变值语义的 TypeScript/ESM 表达式，不限制普通业务语法。
+  while (current && (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isNonNullExpression(current)
+  )) current = current.expression;
+  return current;
+}
+
+function staticMetadataObject(expression) {
+  const current = unwrapNativeExpression(expression);
   if (!current || !ts.isObjectLiteralExpression(current)) refuse('GEN_NONSTATIC_METADATA');
   return current;
 }
@@ -88,10 +96,11 @@ function fileExists(path, sourceKind) {
 }
 
 function modifiesMetadataTarget(target) {
-  if (ts.isParenthesizedExpression(target)) return modifiesMetadataTarget(target.expression);
-  if (ts.isIdentifier(target)) return target.text === 'packageMeta';
-  if (ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)) {
-    return modifiesMetadataTarget(target.expression);
+  const current = unwrapNativeExpression(target);
+  if (!current) return false;
+  if (ts.isIdentifier(current)) return current.text === 'packageMeta';
+  if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
+    return modifiesMetadataTarget(current.expression);
   }
   return false;
 }
@@ -100,8 +109,10 @@ function inspectMetadataMutation(file) {
   let mutation = false;
   let alias = false;
   function visit(node) {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.initializer) &&
-        node.initializer.text === 'packageMeta') alias = true;
+    if (ts.isVariableDeclaration(node)) {
+      const initial = unwrapNativeExpression(node.initializer);
+      if (initial && ts.isIdentifier(initial) && initial.text === 'packageMeta') alias = true;
+    }
     if (ts.isBinaryExpression(node) &&
         node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
         node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
