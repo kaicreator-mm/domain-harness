@@ -11,6 +11,41 @@ import { StandardWorkflowSession } from '../../src/native-workflow-composition.j
 
 type Owned = DomainAppContext & { readonly onInitResult: (value: string) => void };
 
+/**
+ * R173 P1-01 类型负例只供编译器读取，永不执行非法接线。
+ * Class 仍可用普通方法实现函数值属性合同。
+ */
+function verifyInvalidAppContextConnections(): void {
+  class RequiresOwned implements PackageInitElement<Owned> {
+    public start(ctx: LifecycleInitContext<Owned>): void {
+      ctx.onInitResult('required');
+    }
+  }
+  class BaseInit implements PackageInitElement<DomainAppContext> {
+    public async start(ctx: LifecycleInitContext<DomainAppContext>): Promise<void> {
+      // @ts-expect-error Base App 的 Extension 不可要求缺失的 Owned Context
+      await ctx.enter(new RequiresOwned(), 'invalid-extension');
+    }
+  }
+  const ownedCore: StaticCorePackage<Owned> = {
+    packageMeta: { id:'owned',role:'core',order:0 },
+    Init: RequiresOwned,
+  };
+  // @ts-expect-error Owned Init 不能隐式降级为 Base Init
+  const wrongInit: PackageInitElement<DomainAppContext> = new RequiresOwned();
+  // @ts-expect-error Owned Core 不能隐式降级为 Base Core
+  const wrongCore: StaticCorePackage<DomainAppContext> = ownedCore;
+  // @ts-expect-error Base Kernel 不能包含依赖 Owned Context 的 Core
+  const wrongKernel = new KernelLifecycle<DomainAppContext>([ownedCore]);
+  const wrongDefaultCore: StaticCorePackage = {
+    packageMeta: { id:'wrong-default',role:'core',order:0 },
+    // @ts-expect-error 默认 Base Core 不能安装 Owned-only Init
+    Init: RequiresOwned,
+  };
+  void BaseInit; void wrongInit; void wrongCore; void wrongKernel; void wrongDefaultCore;
+}
+void verifyInvalidAppContextConnections;
+
 test('R169 A01: typed App-owned Context reaches Core Init and direct Extension', async () => {
   const seen: string[] = [];
   class Child implements PackageInitElement<Owned> {

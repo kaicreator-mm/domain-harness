@@ -20,7 +20,12 @@ export type LifecycleInitContext<Context extends DomainAppContext = DomainAppCon
   };
 
 export interface PackageInitElement<Context extends DomainAppContext = DomainAppContext> {
-  start(context: LifecycleInitContext<Context>): void | Promise<void>;
+  /**
+   * 用函数值属性（而非 method signature）保留严格的参数逆变检查：
+   * 需要更具体 App Context 的 Init 不得被接入只有 appId 的 Core。
+   * 具体 Element 仍可用普通 class start() 方法实现本接口。
+   */
+  readonly start: (context: LifecycleInitContext<Context>) => void | Promise<void>;
   [Symbol.asyncDispose]?(): void | Promise<void>;
 }
 

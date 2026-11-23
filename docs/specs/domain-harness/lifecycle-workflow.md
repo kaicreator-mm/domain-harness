@@ -89,3 +89,7 @@ Standard Workflow 必须在**执行任何用户 entry/action 和启动 Actor 前
 3. `NativeWorkflowContext.invoke` 面向普通值，像 JSON/YAML Reader 的 `{kind:'SUCCEEDED'|...}` 也属于被包裹的值，不会被 SDK 改写成 Workflow Outcome。已经返回 `WorkflowOutcome` 的业务 Function 应使用 `invokeOutcome` 或 `leaf`；必须保留 REJECT/ASK/WAIT/UNKNOWN/FAILED，不能因为外层 wrapper 是 COMPLETE 就把内部失败当成成功。它们复用同一个根预算，不创建独立 Workflow Executor。
 4. 后续 0.11.4 Host/Effect 的批准、确认及 Journal，0.11.5 的选定 Model/Tool Loop，0.11.6 的 durable checkpoint/取消，0.11.7 的 evidence 归各阶段的专用 Element/Package。KDP 只提供基础生命周期与最终兜底，**不内置业务授权与状态持久化**。一个正在执行的业务回调自身不能同步等待由它触发且需要等待该回调结束的同一关闭 Promise。
 5. SDK 的基础 Context 传播不负责生成期 Package/Element 的正确性；具体业务/权限/生命周期依赖由 Domain Package 作者/生成者确保，并经真实 TS/SDK Consumer 正反例核验。
+
+### LIFE-13 · R173 类型闭包补充
+
+`PackageInitElement<Context>` 的 `start` 采用 **函数值属性类型**，使 `--strictFunctionTypes` 对所需 Context 进行逆变检查；实现者仍可使用普通 `class Init { start(ctx) {} }` 方法，不引入 Element 包装类。生成期 TypeScript 应拒绝：拥有特定字段的 Init/StaticCorePackage 被错接给 Base Context、Base Kernel 选择仅接受专有 Context 的 Core，以及 Base Extension 进入仅接受专有 Context 的 Init。仓内编译期 `@ts-expect-error` 与仓外真实 npm SDK 的 TypeScript 负例共同验证；JavaScript 仍由 Package 作者按适用类型保证正确性，SDK Runtime 不进行新的 Package 结构正确性验证。
