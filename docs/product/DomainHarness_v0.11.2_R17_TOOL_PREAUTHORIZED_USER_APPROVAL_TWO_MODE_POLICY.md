@@ -14,6 +14,8 @@ CI=NOT_RUN_DOCS_ONLY
 
 > **Owner 新的边界**：不应该对所有 Tool 无差别引入运行时单独授权。以可信静态 Domain App / Business Package 为前提，区分 **系统预授权 Tool 调用** 与 **需要用户批准的 Tool 调用**。用户批准是有些操作的业务交互条件，不是 SDK 对已编译可信代码的结构正确性再做一次验证。以下名称和接口都是候选，不是现有 SDK API。
 
+> **R18 两类 Knowledge 的关联：** [R18 DataKnowledge / FunctionKnowledge 与 stateful/external 两维分类](./DomainHarness_v0.11.2_R18_DATA_FUNCTION_KNOWLEDGE_TWO_AXES.md)。这些属性仅描述 Function 的状态依赖和外部调用边界，**与本文件的 PREAUTHORIZED / USER_APPROVAL 是独立维度**；不能据 “stateless/internal” 直接忽略用户确认，也不能因为 “stateful/external” 就要求所有 Tool 强制用户批准。Tool 的真实调用仍按可信 Business 已选 Policy 和实际 OS/DB/Host 资源权限执行。
+
 ## 1. 两种执行模式
 
 | 模式 | 何时可以调用 | 运行时行为 | 审查要求 |
