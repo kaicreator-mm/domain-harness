@@ -17,6 +17,8 @@ RELEASE=NO
 
 > **本文件是供 Owner 审核的产品需求候选，不代表 L1 已冻结，也不是 L2 或实现许可。** 先澄清产品 WHAT 和可观察结果，再做方案比较、L2 独立审核、任务最小化和真实实现。优先于 #1666/#1667 旧机制中的任何设计假设；保留其真实负例与历史证据，但不移植已删除的代码接口。
 
+> **R10 新增产品范围澄清（尚待 Owner 认可）：** [Domain Storage & Multi-Query R10](./DomainHarness_v0.11.2_STORAGE_QUERY_SCOPE_R10_PROPOSAL.md) 提议把 SQLite 本地持久化、YAML/JSON-LD 双向读写、SQL/Vector/Graph Query 纳入 0.11.2，保留 0.11.6 的 TaskRun/Checkpoint/恢复职责。**本文件原 R8/R9 的“不强制 SQLite/向量查询”是旧提案，不可再直接视为有效范围结论。** R10 新增 DI-AC15–21，仍是 PROPOSED，不是已批准/已实现。
+
 ## 1. 产品目的与实际消费场景
 
 DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范围**内，利用可追溯且有适用边界的领域事实、知识与规则，形成可解释、可复现的确定性业务判断，并将判断作为 0.11.1 已有 Workflow/Task 的输入/分支依据。**领域知识必须改变真实业务结果**；“把 JSON 解析出来”、一次成功 Demo 或给一个示例写死政策分数，不构成本版本的通用领域智能。
@@ -38,7 +40,7 @@ DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范
 | **D02 结构化语义范围** | 最小描述 Concept/Entity、Attribute、Relation、Fact、Constraint 与可选业务 Goal/Operation 关联；真正需要这些关系时才声明，且可由普通 TS/数据表达 | 强制完整知识图谱、Ontology Server、全局动态 Schema 或将任意 helper 变成 Element |
 | **D03 Source/Truth** | Source/Provenance、数据版本、证据身份、观察与有效期、地域/主体/场景 Applicability 必须可表示、可追溯；内容完整性、来源声称和来源真实性 **三者分开**，SHA256 不能单独证明签名或业务真伪 | 将开发者声明的 `source` 字符串当权威认证，或直接把命中规则等同外部世界真实事实 |
 | **D04 领域能力职责** | Knowledge 查询、Recognizer 识别、Validator 校验、Rule 评估、Decision 输出是**可观察的职责/组合方式**，可由普通 Element Class/Function 实现；同类通用机制可复用，业务策略留在领域 Package | 强制建立五种 SDK 根接口/Element.role 全局枚举、另一套 Rule VM 或 KDP 领域调度中心 |
-| **D05 范围内 Query** | 只读取已静态选择、适用、可核验来源的有限知识集合；过滤 Domain/Concept/Subject/Time/Scope/Version，返回有界结果与来源引用；支持必要的多来源冲突检测，不强制 SQLite/RAG | 运行时自动下载未知知识、任意网络搜索或无界拼接证据 |
+| **D05 范围内 Query** | 只读取已静态选择、适用、可核验来源的有限知识集合；过滤 Domain/Concept/Subject/Time/Scope/Version，返回有界结果与来源引用；支持必要的多来源冲突检测；SQLite/SQL/向量/图查询新增需求见 R10 候选，仍不强制 RAG | 运行时自动下载未知知识、任意网络搜索或无界拼接证据 |
 | **D06 决策/Task 分界** | 0.11.2 提供领域判断及明确依据、必要时选定已声明的 Workflow/业务分支；执行、预算/Hook/生命周期由 0.11.1 既有能力承担，业务 Effect 权限归 0.11.4 | 在本版直接执行真实 Host Effect、构建独立任务引擎、自动选择未安装 Package |
 | **D07 共性验收** | 订单和库存**至少两个真实不同领域 Consumer**共同验证通用事实/来源/范围/查询语义，且分别拥有不同政策与失败案例；一个合成数字阈值实例只能作为局部证据 | 只有单一 Reference Score 数据集的 10–11 个测试就声称领域通用 SDK 已完成 |
 
@@ -150,13 +152,13 @@ Query 的领域查询结果与 Workflow 的六种现有运行终态并非必须�
 
 - 不开发通用 Knowledge Graph/RAG 引擎、知识爬取/生产、训练和自我进化；这些不属于 0.11.2 产品验收。
 - 不构建 DomainForge、Package 生成平台、专用 Runtime Package Loader、独立 Domain Container、统一权限调度器或第二 Workflow VM。
-- 不要求 SQLite/向量库、LLM、动态数据库和网络资源才能判断；额外存储索引仅在可证实规模需求下作为可选实现。
+- R10 提议 SQLite 本地领域持久化及 SQL/向量/图查询为本版必需；不要求独立向量数据库/图数据库、外部 DB 服务、LLM 或网络下载。具体引擎与索引在 Owner 确认后进入 L2 比较。
 - **0.11.3** 才负责交互式 Goal 理解及 UI；**0.11.4** 才负责 Host/Capability/Effect/授权；**0.11.5** 才负责有界 LLM/Tool；**0.11.6–0.11.9** 才负责持久任务、执行证据、Client 经验与 Server 进化。
 - 领域包可由人/Agent 手工编写；作者/生成期保证 Package/Element 规范，SDK Runtime 仅做已有兜底，不增加“来源摘要验证器就是可信来源裁定器”。
 
 ## 8. 审核、L2 与实施门禁
 
-1. **R8/R9 Product/L1：** Owner 审核 D01–D07、DI-AC01–14、范围与不做项；有冲突则修订本文件；当前 `PROPOSED`，不得因文档创建自动冻结。
+1. **R8/R9/R10 Product/L1：** Owner 审核 D01–D07、DI-AC01–14 和 R10 新增 DI-AC15–21、范围与不做项；有冲突则修订本文件；当前 `PROPOSED`，不得因文档创建自动冻结。
 2. **Owner 明确确认后 · L2：** Owner 对 WHAT 范围确认后，比较“只用 Business 原生代码”“有限共享 Standard 类型/Query”“复用第三方库”方案；冻结最小 TypeScript/文件/Function/领域数据和读取边界，并作独立非 Writer 设计审核。不可根据旧 PR #1667 中专用机器合同偷渡 L2。
 3. **L2 独立审核通过后 · Task：** 整理 #1666/#1667 旧候选，确立一个最小有界新 Task/PR；基于当前 train / 当前 native-domain-app 做 2 领域实际消费，必须执行生成期验证、严格 Types、阴性与阳性业务测试、clean-pack 外部消费者。
 4. **Task 实施完成后 · QA/Review/Integration：** 新 Exact HEAD Woodpecker 成功及必要非 Writer 独立增量审核后受控合并 `version/v0.11.x`，对比受审树/合并树，回写 #1612/#1563 Stage 证据。不得提前合并 main、Tag、npm Release。
