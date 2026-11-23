@@ -19,3 +19,5 @@ node scripts/validate-native-generation.mjs --manifest examples/native-domain-ap
 元数据必须由 `export const packageMeta` 的直接字面量提供。验证器拒绝明显的直接属性赋值、重新赋值、`Object.assign` 改写与非常量绑定；发现简单别名时要求作者复核（`GEN_PARTIAL_REVIEW_REQUIRED`），不将无法证明的动态 Order 冒称确定。此工具**不是通用 JS/TS 数据流证明器**，更不在 SDK Runtime 重做正确性检查。
 
 `import type`、纯 `type` 重导出可使用直接声明的 `devDependencies`；值导入仍需直接运行依赖。相对导入只确认实际文件，TS NodeNext 明确扩展名的 `.js → .ts/.tsx`、`.mjs → .mts`、`.cjs → .cts` 允许源码验证；不是完整 TypeScript 编译器或全图 npm Resolver。对于其他未遍历文件的依赖行为，生成者继续用项目 Typecheck、ESLint 和实际 App 测试验证。
+
+R155 定点修复：对 `const alias=(packageMeta)`、多层括号及 TypeScript 的 `as`、`satisfies`、非空断言、类型断言包装做不改变值语义的 AST 解包。简单别名被识别时，静态检查只返回 `GEN_PARTIAL_REVIEW_REQUIRED`（CLI 退出码 3），绝不宣称动态变更后的 Core.Order 已得到静态证明。这是生成者侧的限定辅助工具，不引入 SDK 运行时正确性校验，也不承诺全程序数据流分析。
