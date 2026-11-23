@@ -1,5 +1,8 @@
 # DomainHarness v0.11.2 · R18：Data Knowledge + Function Knowledge 两类知识与函数两维分类
 
+> **CURRENT PRODUCT/L1 SINGLE CANDIDATE = [R21 consolidated after R20 REWORK](./DomainHarness_v0.11.2_R21_CONSOLIDATED_PRODUCT_L1_AFTER_R20_REWORK.md)**. **R18 的强制 Descriptor/OperationId/两布尔矩阵已被 R19 退役**，同时 R20 指出 stateful 定义不一致：现行函数内部状态语义看 R19/R21，不把真实持久业务状态自动视为函数内部变量。 R21 仍为 Product/L1 候选、未 Owner 冻结、未实施或运行 CI。\n\n
+
+
 ```ini
 OUTPUT_LABEL=DH_V0112_R18_DATA_FUNCTION_KNOWLEDGE_TWO_AXES_PRODUCT_CLARIFICATION
 REPO=kaicreator-mm/domain-harness
