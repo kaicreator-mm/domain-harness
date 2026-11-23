@@ -14,10 +14,15 @@ type WorkflowHandler<T> = (context: NativeWorkflowContext) => Result<T> | Promis
 type WorkflowFailureCode =
   | 'WORKFLOW_CALL_BUDGET' | 'WORKFLOW_STEP_BUDGET'
   | 'WORKFLOW_DEPTH_LIMIT' | 'WORKFLOW_EXECUTION_FAILED'
-  | 'WORKFLOW_HOOK_END_FAILED' | 'WORKFLOW_ALREADY_RUN';
+  | 'WORKFLOW_HOOK_END_FAILED' | 'WORKFLOW_ALREADY_RUN'
+  | 'WORKFLOW_INVALID_LIMIT';
 
 function failure<T>(code: WorkflowFailureCode): Result<T> {
   return { status: 'FAILED', reason: { code, message: 'Workflow could not complete' } };
+}
+
+function validLimit(value: number): boolean {
+  return Number.isSafeInteger(value) && value >= 0;
 }
 
 /** 以普通 TypeScript 函数显式声明全部结果分支，无中央 FunctionRef/Target。 */
@@ -79,6 +84,8 @@ export class NativeWorkflowContext {
     maxDescendantDepth: number,
     action: WorkflowHandler<T>,
   ): Promise<Result<T>> {
+    // 不可信数值只验证当前 Workflow 的业务参数，不复查 Package 结构。
+    if (!validLimit(maxDescendantDepth)) return failure('WORKFLOW_INVALID_LIMIT');
     const nextDepth = this.depth + 1;
     if (this.ancestors.some((item) => nextDepth - item.depth > item.descendants)) {
       return failure('WORKFLOW_DEPTH_LIMIT');
@@ -143,6 +150,10 @@ export class StandardWorkflowSession {
   public async run<T>(action: WorkflowHandler<T>): Promise<Result<T>> {
     if (this.started) return failure('WORKFLOW_ALREADY_RUN');
     this.started = true;
+    if (![this.limits.maxCalls, this.limits.maxSteps, this.limits.maxDepth]
+      .every(validLimit)) {
+      return failure('WORKFLOW_INVALID_LIMIT');
+    }
     const refused = this.budget.reserve(0, 1);
     if (refused !== undefined) return failure(refused);
     const root = new NativeWorkflowContext(this.budget, [
