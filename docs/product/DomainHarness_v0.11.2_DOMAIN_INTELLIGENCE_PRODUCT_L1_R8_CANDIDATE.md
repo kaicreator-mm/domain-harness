@@ -21,6 +21,8 @@ RELEASE=NO
 
 > **Owner 最新 SDK 边界明确：** DomainHarness 是**不含任何具体领域业务**的 SDK。0.11.2 的 Product 包括跨任意 Domain 的语义抽象、Knowledge/Fact/Rule/Recognizer/Validator/Decision/Intent/Applicability 通用合同、SQLite/YAML/JSON-LD 领域中立存储及属性/字符串/向量/图查询、与原生 Element/Workflow 的通用组合机制。**具体业务概念/实体/知识内容/阈值/Rule/Recognizer/Validator/Decision 函数全部属于 SDK 外部的 Domain Package 或 Domain App；订单和库存只是消费者测试用例，不能影响 SDK Schema 或成为 SDK 依赖。** 相关细节见 [R11 领域无关 SDK 与 Element-First 边界](./DomainHarness_v0.11.2_ELEMENT_FIRST_INTELLIGENCE_R11_DESIGN_OPTIONS.md)。R8/R9 关于两个领域的论述仅作为通用性的跨域验收，不能曲解为 SDK 要实现两个领域的业务。
 
+> **R13 新增语义化 SDK 抽象与 LLM Authoring 澄清候选：** 详见 [R13：语义/Element/Function/Workflow/DB 能力/表达式/Skill 统一架构](./DomainHarness_v0.11.2_R13_SEMANTIC_ELEMENT_WORKFLOW_DB_EXPRESSION_SKILL_PRODUCT_CLARIFICATION.md)。R13 复查 v0.10.3 实际源码，确认历史表达式引擎为 JSONata；提出基础 Database Element 与 SQL/Text/Vector/Graph 可选能力的组合，Workflow 基于业务原生调用不新增执行平台，Skill/能力说明以真实 TypeScript exports、TSDoc 和规范为唯一可信接口来源。**所有候选名称、功能入口及 Skill 新目录均未实施、未验收，等待 Product/L1 Owner 裁决。**
+
 ## 1. 产品目的与实际消费场景
 
 DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范围**内，利用可追溯且有适用边界的领域事实、知识与规则，形成可解释、可复现的确定性业务判断，并将判断作为 0.11.1 已有 Workflow/Task 的输入/分支依据。**领域知识必须改变真实业务结果**；“把 JSON 解析出来”、一次成功 Demo 或给一个示例写死政策分数，不构成本版本的通用领域智能。
