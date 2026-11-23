@@ -256,25 +256,26 @@ test('R138 P1: 并行直接依赖失败后关闭屏障拒绝孙组件且保留�
 
 test('R138 P1: Exit 同步重入 + 并发关闭只释放每个实例一次', async () => {
   const events: string[] = [];
-  let kernel!: KernelLifecycle;
+  const owner: { kernel?: KernelLifecycle } = {};
   class A implements PackageInitElement {
     public start(): void { events.push('A:init'); }
     public [Symbol.asyncDispose](): void {
       events.push('A:exit');
-      void kernel[Symbol.asyncDispose]();
+      void owner.kernel?.[Symbol.asyncDispose]();
     }
   }
   class B implements PackageInitElement {
     public start(): void { events.push('B:init'); }
     public [Symbol.asyncDispose](): void {
       events.push('B:exit');
-      void kernel[Symbol.asyncDispose]();
+      void owner.kernel?.[Symbol.asyncDispose]();
     }
   }
-  kernel = new KernelLifecycle([
+  const kernel = new KernelLifecycle([
     { packageMeta: { id: 'kdp', role: 'core', order: 0 }, Init: A },
     { packageMeta: { id: 'business', role: 'core', order: 2 }, Init: B },
   ]);
+  owner.kernel = kernel;
   await kernel.start(context);
   await Promise.all([
     kernel[Symbol.asyncDispose](),
