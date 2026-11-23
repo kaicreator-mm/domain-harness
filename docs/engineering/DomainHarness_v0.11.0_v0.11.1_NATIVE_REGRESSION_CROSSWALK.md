@@ -11,7 +11,7 @@
 
 | AC | 裁决 | 现行证据 / 适用边界 |
 |---|---|---|
-| AC01 0-Function 知识及 2-Function Element | `SUPERSEDED + NATIVE_R163_TEST` | 静态内容由业务文件/模块管理；Element=Class；`OrderPolicyElement.evaluate/finalize` 两方法真实使用规则，不再强制 JSON ElementDefinition |
+| AC01 0-Function 知识及 2-Function Element | `SUPERSEDED + NATIVE_R163_TEST` | 静态内容由业务文件/模块管理；零公开方法的 `OrderPolicyKnowledgeElement` 保存规则，`OrderPolicyElement.evaluate/finalize` 两方法真实使用它，不再强制 JSON ElementDefinition |
 | AC02 Content Schema/ref/语义环/依赖环区分 | `SUPERSEDED + AUTHOR_OWNED` | 业务结构化数据经 JSON/YAML Reader；生成者检查适用 Schema/静态依赖，SDK 不维护自定义领域语义图/动态 Loader |
 | AC03 一个 Package 多 Element/公开 Function/Owner | `NATIVE_RETAINED` | `business.mjs` 导出 OrderService、OrderPolicyElement、sumAmounts；ESM exports 和 npm 直接依赖，而非自有 Owner Registry |
 | AC04 固定 K/S/B Primary 和 Init plan | `SUPERSEDED + NATIVE_RETAINED` | 单 SDK + Order=0 KDP + ESM 静态 Core；`kernel-lifecycle.ts` 按 Order，生成期 Order 验证器 |

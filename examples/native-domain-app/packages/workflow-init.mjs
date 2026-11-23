@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { JsonReader, StandardWorkflowSession, routeWorkflowOutcome } from '@kaicreator/domain-harness';
-import { OrderPolicyElement } from './business.mjs';
+import { OrderPolicyElement, OrderPolicyKnowledgeElement } from './business.mjs';
 import { InventoryElement } from './inventory.mjs';
 
 /** 真正的原生 Core：Package.Init 可以选择在初始化期间运行业务 Workflow。 */
@@ -30,9 +30,10 @@ export async function runOrderPolicy(which, trace = [], policy = new OrderPolicy
     if(selected.value.kind!=='SUCCEEDED') {
       return {status:'FAILED',reason:{code:'ORDER_POLICY_UNREADABLE',message:'Policy could not be read'}};
     }
+    const knowledge = new OrderPolicyKnowledgeElement(selected.value.value);
     const outcome = await child.leaf({
       start:()=>{trace.push('policy:start');},
-      run:()=>{trace.push('policy:evaluate');return policy.evaluate(selected.value.value,[1,2,3,4]);},
+      run:()=>{trace.push('policy:evaluate');return policy.evaluate(knowledge.content,[1,2,3,4]);},
       end:async()=>{await Promise.resolve();trace.push('policy:end');},
     });
     // 具名 Switch：只允许 COMPLETE 进入下一个 Node；拒绝时不能执行 finalize。

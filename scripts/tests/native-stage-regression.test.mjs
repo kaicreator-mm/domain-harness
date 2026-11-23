@@ -87,3 +87,17 @@ test('0.11.1 AC17: optional InitFrom caller trace and repeated Init are owned by
   await kernel.run({appId:'native-domain-app'},()=>42);
   assert.deepEqual(ledger,['init:first','init:second','exit:second','exit:first']);
 });
+
+test('0.11.0 AC01/AC03: zero-Function knowledge Element + multi-Function Element share Package exports',()=>{
+  const knowledge=new business.OrderPolicyKnowledgeElement({
+    id:'order-policy-allow',minimumTotal:10,
+  });
+  assert.deepEqual(Object.getOwnPropertyNames(business.OrderPolicyKnowledgeElement.prototype),
+    ['constructor'],'the knowledge Element does not gain meaningless Functions');
+  assert.equal(knowledge.content.minimumTotal,10);
+  assert.equal(Object.isFrozen(knowledge.content),true);
+  const service=new business.OrderPolicyElement();
+  assert.equal(typeof service.evaluate,'function');
+  assert.equal(typeof service.finalize,'function');
+  assert.equal(business.sumAmounts([1,2,3,4]),10,'ordinary package-level Function remains callable');
+});

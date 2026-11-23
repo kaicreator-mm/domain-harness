@@ -58,3 +58,11 @@ export class OrderPolicyElement {
     return {status:'COMPLETE',value:{...decision,approved:true}};
   }
 }
+
+/** 0-Function 的结构化知识 Element：数据由业务 Package 持有，不是自制 Runtime Schema。 */
+export class OrderPolicyKnowledgeElement {
+  static metadata = {id:'orderPolicyKnowledge'};
+  constructor(content) {
+    this.content=Object.freeze({...content});
+  }
+}
