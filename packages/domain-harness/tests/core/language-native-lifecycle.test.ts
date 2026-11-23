@@ -248,8 +248,10 @@ test('R138 P1: 并行直接依赖失败后关闭屏障拒绝孙组件且保留�
   release();
   await close;
   assert.equal(await observed, cause);
-  assert.deepEqual(events, [
-    'parent:init', 'failed:init', 'slow:init', 'DH_KDP_UNHANDLED',
+  assert.equal(events.filter((event) => event === 'DH_KDP_UNHANDLED').length, 1);
+  // 并行分支与日志的微任务调度不约定先后，但资源顺序必须确定。
+  assert.deepEqual(events.filter((event) => event !== 'DH_KDP_UNHANDLED'), [
+    'parent:init', 'failed:init', 'slow:init',
     'grand:rejected', 'slow:exit', 'failed:exit', 'parent:exit',
   ]);
 });
