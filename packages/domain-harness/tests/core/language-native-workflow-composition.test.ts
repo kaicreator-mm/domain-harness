@@ -211,7 +211,7 @@ test('R147 P2：未类型检查的 JS 缺路由抛错，不回退成功路径', 
     "const incomplete = { COMPLETE:()=> 'wrong-success' };",
     "try { await routeWorkflowOutcome(outcome, incomplete); process.exitCode = 2; }",
     "catch (error) { if (!(error instanceof TypeError)) process.exitCode = 3; else console.log('MISSING_EXIT_REJECTED'); }",
-  ].join('\\n');
+  ].join('\n');
   const child = spawnSync(process.execPath,
     ['--import','tsx','--input-type=module','--eval',code],
     {encoding:'utf8',timeout:12000});
