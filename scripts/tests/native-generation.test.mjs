@@ -132,19 +132,19 @@ test('R149 P1：TypeScript 纯类型依赖允许 devDependencies，值导入必�
       devDependencies:{'types-only':'1.0.0'},
     }));
     const core=join(x.root,'packages/business.mts');
-    const metadata="export const packageMeta={id:'business',role:'core',order:2} as const;\\n";
+    const metadata="export const packageMeta={id:'business',role:'core',order:2} as const;\n";
     writeFileSync(core,
-      "import type { Foo } from 'types-only';\\nexport type {Foo} from 'types-only';\\n"+metadata);
+      "import type { Foo } from 'types-only';\nexport type {Foo} from 'types-only';\n"+metadata);
     assert.equal(validateNativeApp(x.manifest,[x.kdp,core]).checked,2);
     writeFileSync(core,
-      "import { type Foo } from 'types-only';\\n"+metadata);
+      "import { type Foo } from 'types-only';\n"+metadata);
     assert.equal(validateNativeApp(x.manifest,[x.kdp,core]).checked,2);
     writeFileSync(core,
-      "import { type Foo, realValue } from 'types-only';\\n"+metadata);
+      "import { type Foo, realValue } from 'types-only';\n"+metadata);
     assert.throws(() => validateNativeApp(x.manifest,[x.kdp,core]),
       /GEN_UNDECLARED_DIRECT_DEPENDENCY/u);
     writeFileSync(core,
-      "import { realValue } from 'types-only';\\n"+metadata);
+      "import { realValue } from 'types-only';\n"+metadata);
     assert.throws(() => validateNativeApp(x.manifest,[x.kdp,core]),
       /GEN_UNDECLARED_DIRECT_DEPENDENCY/u);
   });
