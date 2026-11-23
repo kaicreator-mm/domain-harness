@@ -64,7 +64,7 @@ export function validateNativeApp(manifestPath, corePaths) {
   for (const givenPath of corePaths) {
     const path = resolve(givenPath);
     const source = readFileSync(path, 'utf8');
-    const kind = /\\.(?:ts|mts|cts)$/u.test(path) ? ts.ScriptKind.TS : ts.ScriptKind.JS;
+    const kind = /\.(?:ts|mts|cts)$/u.test(path) ? ts.ScriptKind.TS : ts.ScriptKind.JS;
     const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, kind);
     if (file.parseDiagnostics.length) refuse('GEN_SYNTAX_INVALID');
 
