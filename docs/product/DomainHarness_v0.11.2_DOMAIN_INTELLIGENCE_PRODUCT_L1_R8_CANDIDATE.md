@@ -1,5 +1,8 @@
 # DomainHarness 0.11.2 · Domain Intelligence Product/L1 功能澄清候选（R8 + R9）
 
+> **CURRENT PRODUCT/L1 SINGLE CANDIDATE = [R21 consolidated after R20 REWORK](./DomainHarness_v0.11.2_R21_CONSOLIDATED_PRODUCT_L1_AFTER_R20_REWORK.md)**. **R8/R9 原主 L1 现为历史候选**，正文中旧 DI-AC01–14 等需按 R21 第 8 节的统一验收表采用；尤其不要将 R10 与 R19 相反的 Knowledge CRUD 要求同时作为必选。 R21 仍为 Product/L1 候选、未 Owner 冻结、未实施或运行 CI。\n\n
+
+
 ```ini
 OUTPUT_LABEL=DH_V0112_R9_DOMAIN_INTELLIGENCE_PRODUCT_L1_ARCHITECTURE_AMENDMENT
 REPO=kaicreator-mm/domain-harness
