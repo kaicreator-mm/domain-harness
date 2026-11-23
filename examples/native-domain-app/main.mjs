@@ -3,36 +3,93 @@ import { KernelLifecycle, StandardWorkflowSession, routeWorkflowOutcome } from '
 import * as kdp from './packages/kdp.mjs';
 import * as business from './packages/business.mjs';
 
-const app = new KernelLifecycle([business, kdp]);
-const hookEvents = [];
-const result = await app.run({appId:'native-domain-app'}, async () => {
-  const values = new business.OrderService().readFour();
-  const session = new StandardWorkflowSession({maxCalls:4,maxSteps:6,maxDepth:1});
-  const outcome = await session.run(async root => {
-    const guard = await root.invoke(() => values.length === 4);
-    if (guard.status !== 'COMPLETE' || !guard.value) {
-      return {status:'UNKNOWN',reason:{code:'NO_DOCUMENTS',message:'Business inputs unavailable'}};
-    }
-    return root.child(0, child => child.leaf({
-      start: async () => { hookEvents.push('start'); },
-      run: async () => {
-        hookEvents.push('run');
-        return {status:'COMPLETE',value:business.sumAmounts(values.map(value => value.amount))};
-      },
-      end: async () => { await Promise.resolve(); hookEvents.push('end'); },
-    }));
+async function executeCase(limits) {
+  const events = [];
+  const app = new KernelLifecycle([business, kdp]);
+  const outcome = await app.run({appId:'native-domain-app'}, async () => {
+    const service = new business.OrderService();
+    const session = new StandardWorkflowSession(limits);
+    return session.run(async root => {
+      const guard = await root.invoke(() => {
+        events.push('guard');
+        return true;
+      });
+      if (guard.status !== 'COMPLETE') return guard;
+      if (!guard.value) {
+        return {status:'UNKNOWN',reason:{code:'NO_DOCUMENTS',message:'Missing documents'}};
+      }
+      return root.child(0, async child => {
+        const read = await service.readFour(child, id => events.push(id));
+        if (read.status !== 'COMPLETE') return read;
+        return child.leaf({
+          start: async () => { events.push('hook:start'); },
+          run: async () => {
+            events.push('hook:run');
+            return {
+              status:'COMPLETE',
+              value:{
+                count:read.value.length,
+                total:business.sumAmounts(read.value.map(value => value.amount)),
+                firstId:read.value[0].id,
+              },
+            };
+          },
+          end: async () => { await Promise.resolve(); events.push('hook:end'); },
+        });
+      });
+    });
   });
-  const routes = {
-    COMPLETE: value => value.value,
-    REJECT: () => { throw new Error('Business rejected'); },
-    ASK: () => { throw new Error('Business requested input'); },
-    WAIT: () => { throw new Error('Business awaiting condition'); },
-    UNKNOWN: () => { throw new Error('Business outcome unknown'); },
-    FAILED: () => { throw new Error('Workflow failed'); },
-  };
-  const total = await routeWorkflowOutcome(outcome, routes);
-  return {count:values.length,total,firstId:values[0].id};
-});
-assert.deepEqual(hookEvents, ['start','run','end']);
+  return {outcome,events};
+}
+
+// 1 root step + 1 Guard + 1 child + 4 Reader + 3 Hook/function steps = 10。
+// 调用预算为 1 Guard + 4 Reader + 3 Hook/function = 8。
+const positive = await executeCase({maxCalls:8,maxSteps:10,maxDepth:1});
+assert.deepEqual(positive.events, [
+  'guard','json-a','json-b','yaml-c','yaml-d',
+  'hook:start','hook:run','hook:end',
+]);
+const routes = {
+  COMPLETE: result => result.value,
+  REJECT: () => { throw new Error('Business rejected'); },
+  ASK: () => { throw new Error('Business requires input'); },
+  WAIT: () => { throw new Error('Business is waiting'); },
+  UNKNOWN: () => { throw new Error('Business status unknown'); },
+  FAILED: () => { throw new Error('Business execution failed'); },
+};
+const result = await routeWorkflowOutcome(positive.outcome, routes);
 assert.deepEqual(result,{count:4,total:10,firstId:'a'});
-console.log(JSON.stringify({app:'native-domain-app',status:'PASS',...result}));
+
+// Guard + 前两次 Reader 用完 3 个 calls，第三次 Reader 必须在解析前拒绝。
+const blockedReader = await executeCase({maxCalls:3,maxSteps:10,maxDepth:1});
+assert.deepEqual(blockedReader.events,['guard','json-a','json-b']);
+assert.equal(blockedReader.outcome.status,'FAILED');
+assert.equal(blockedReader.outcome.reason.code,'WORKFLOW_CALL_BUDGET');
+
+// Guard + 全部 Reader 消耗 5 个 calls，只剩 1；叶子 start/run/end
+// 必须预留 3 个 calls，失败前不得执行任何 Hook 或业务计算。
+const blockedHook = await executeCase({maxCalls:6,maxSteps:10,maxDepth:1});
+assert.deepEqual(blockedHook.events,['guard','json-a','json-b','yaml-c','yaml-d']);
+assert.equal(blockedHook.outcome.status,'FAILED');
+assert.equal(blockedHook.outcome.reason.code,'WORKFLOW_CALL_BUDGET');
+
+// 根步骤额度也应拒绝未计费的第四次 Reader。
+const blockedStep = await executeCase({maxCalls:8,maxSteps:5,maxDepth:1});
+assert.deepEqual(blockedStep.events,['guard','json-a','json-b']);
+assert.equal(blockedStep.outcome.status,'FAILED');
+assert.equal(blockedStep.outcome.reason.code,'WORKFLOW_STEP_BUDGET');
+
+console.log(JSON.stringify({
+  app:'native-domain-app',
+  status:'PASS',
+  ...result,
+  budget:{
+    successReads:4,
+    deniedReaderReads:2,
+    deniedReaderCode:blockedReader.outcome.reason.code,
+    deniedHookReads:4,
+    deniedHookCode:blockedHook.outcome.reason.code,
+    deniedStepReads:2,
+    deniedStepCode:blockedStep.outcome.reason.code,
+  },
+}));

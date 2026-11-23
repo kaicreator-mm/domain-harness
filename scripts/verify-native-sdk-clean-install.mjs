@@ -11,7 +11,16 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const work = mkdtempSync(join(tmpdir(), 'dh-native-sdk-only-'));
 const packs = join(work, 'packs');
 const consumer = join(work, 'consumer');
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+// Windows 上直接 spawn npm.cmd 会产生 EINVAL；改为 Node 执行 npm CLI。
+const npmCli = [
+  process.env.npm_execpath,
+  resolve(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js'),
+  resolve(dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js'),
+  resolve(dirname(process.execPath), '../node_modules/npm/bin/npm-cli.js'),
+].find(candidate => candidate && existsSync(candidate));
+if (!npmCli) throw new Error('NATIVE_CONSUMER_NPM_CLI_NOT_FOUND');
+const npm = process.execPath;
+const npmArgs = args => [npmCli, ...args];
 const registry = process.env.DH_NATIVE_NPM_REGISTRY;
 if(registry && !/^https?:\/\//u.test(registry)) throw new Error('NATIVE_REGISTRY_INVALID');
 const npmEnv = {...process.env, npm_config_ignore_scripts:'true'};
@@ -23,8 +32,12 @@ function run(step, command, args, cwd, env = {}) {
     env:{...npmEnv,...env},windowsHide:true,
   });
   if(result.error || result.status !== 0) {
-    // 不在 CI 中直接转储可能含 registry token 的 npm stderr。
-    throw new Error('NATIVE_CONSUMER_'+step+'_FAILED exit='+String(result.status));
+    // 不输出可能含 token 的 npm stderr；保留可诊断的受控 OS 错误码。
+    const code = result.error?.code;
+    const safeCode = typeof code === 'string' && /^[A-Z0-9_]+$/u.test(code)
+      ? code : 'NONE';
+    throw new Error('NATIVE_CONSUMER_'+step+'_FAILED exit='+
+      String(result.status)+' spawnCode='+safeCode);
   }
   return result.stdout;
 }
@@ -36,9 +49,9 @@ try {
   if(!existsSync(join(packageDir,'dist/index.js'))) {
     throw new Error('NATIVE_CONSUMER_MISSING_SDK_BUILD');
   }
-  const details=JSON.parse(run('PACK',npm,[
+  const details=JSON.parse(run('PACK',npm,npmArgs([
     'pack',packageDir,'--json','--ignore-scripts','--pack-destination',packs,
-  ],root))[0];
+  ]),root))[0];
   const tgz=join(packs,details.filename);
   const binary=readFileSync(tgz);
   const sha256=createHash('sha256').update(binary).digest('hex');
@@ -50,8 +63,8 @@ try {
     dependencies:{'@kaicreator/domain-harness':'file:'+tgz},
   };
   writeFileSync(join(consumer,'package.json'),JSON.stringify(manifest,null,2)+'\n');
-  run('LOCK',npm,['install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund'],consumer);
-  run('CLEAN_INSTALL',npm,['ci','--ignore-scripts','--no-audit','--no-fund'],consumer);
+  run('LOCK',npm,npmArgs(['install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund']),consumer);
+  run('CLEAN_INSTALL',npm,npmArgs(['ci','--ignore-scripts','--no-audit','--no-fund']),consumer);
   const installed=realpathSync(join(consumer,'node_modules/@kaicreator/domain-harness'));
   assert.notEqual(installed.startsWith(root),true,'must not be a workspace symlink');
   const installedPkg=JSON.parse(readFileSync(join(installed,'package.json'),'utf8'));
@@ -67,6 +80,16 @@ try {
   const app=JSON.parse(appResult.trim());
   assert.deepEqual({status:app.status,count:app.count,total:app.total,firstId:app.firstId},
     {status:'PASS',count:4,total:10,firstId:'a'});
+  // 明确锁定已安装 App 的跨 Reader/Guard/子 Hook 共享预算结果。
+  assert.deepEqual(app.budget,{
+    successReads:4,
+    deniedReaderReads:2,
+    deniedReaderCode:'WORKFLOW_CALL_BUDGET',
+    deniedHookReads:4,
+    deniedHookCode:'WORKFLOW_CALL_BUDGET',
+    deniedStepReads:2,
+    deniedStepCode:'WORKFLOW_STEP_BUDGET',
+  });
 
   writeFileSync(join(consumer,'probe.mts'),[
     "import { KernelLifecycle, JsonReader, StandardWorkflowSession } from '@kaicreator/domain-harness';",
@@ -94,7 +117,8 @@ try {
 
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
-    api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true}));
+    api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
+    rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true}));
 } finally {
   if (process.env.DH_NATIVE_KEEP_EVIDENCE !== '1') rmSync(work,{recursive:true,force:true});
   else console.error('NATIVE_CONSUMER_EVIDENCE_DIR='+work);
