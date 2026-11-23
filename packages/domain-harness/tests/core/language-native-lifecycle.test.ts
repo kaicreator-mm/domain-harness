@@ -6,7 +6,7 @@ import {
 import type {
   LifecycleLogRecord,
   PackageInitElement,
-  PackageInitContext,
+  LifecycleInitContext,
   StaticCorePackage,
 } from '../../src/kernel-lifecycle.js';
 
@@ -118,7 +118,7 @@ test('Core 直接依赖的 Extension 通过进入记录获得逆序 Exit', async
     public [Symbol.asyncDispose](): void { events.push('extension:exit'); }
   }
   class BusinessInit implements PackageInitElement {
-    public async start(ctx: PackageInitContext): Promise<void> {
+    public async start(ctx: LifecycleInitContext): Promise<void> {
       events.push('business:init');
       await ctx.enter(new ExtensionInit());
     }
@@ -143,7 +143,7 @@ test('嵌套 Init 失败仍逆真实进入退出并保留最初错误', async ()
     public [Symbol.asyncDispose](): void { events.push('child:exit'); }
   }
   class ParentInit implements PackageInitElement {
-    public async start(ctx: PackageInitContext): Promise<void> {
+    public async start(ctx: LifecycleInitContext): Promise<void> {
       events.push('parent:init');
       await ctx.enter(new NestedInit());
     }

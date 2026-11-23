@@ -11,13 +11,13 @@ export interface DomainAppContext {
 }
 
 /** 进入登记只用于生命周期记录；直接依赖由 Package 原生代码自行调用。 */
-export interface PackageInitContext extends DomainAppContext {
+export interface LifecycleInitContext extends DomainAppContext {
   readonly enter: (element: PackageInitElement) => Promise<void>;
 }
 
 /** 可选的 Package Init Element；Exit 由实际资源拥有者提供。 */
 export interface PackageInitElement {
-  start(context: PackageInitContext): void | Promise<void>;
+  start(context: LifecycleInitContext): void | Promise<void>;
   [Symbol.asyncDispose]?(): void | Promise<void>;
 }
 
@@ -56,7 +56,7 @@ export class KernelLifecycle {
       throw new Error('Domain App lifecycle can only start once');
     }
     this.phase = 'starting';
-    const initContext: PackageInitContext = {
+    const initContext: LifecycleInitContext = {
       ...context,
       enter: async (element) => {
         // Package 自行调用直接依赖；KDP 只跟踪真实进入实例。
