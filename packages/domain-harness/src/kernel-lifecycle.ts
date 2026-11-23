@@ -130,7 +130,8 @@ export class KernelLifecycle {
     try {
       flight = Promise.resolve(element.start(context));
     } catch (error) {
-      flight = Promise.reject(error);
+      // 保存原始抛出值，通过普通 Promise 链传递，避免强制转换根因。
+      flight = Promise.resolve().then(() => { throw error; });
     }
     this.pending.add(flight);
     // 允许一个父 Init 并发进入直接依赖；关闭时全部在途操作都要收敛。
