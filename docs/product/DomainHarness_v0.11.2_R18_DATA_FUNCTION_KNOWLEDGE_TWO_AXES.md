@@ -14,6 +14,8 @@ CI=NOT_RUN_DOC_ONLY
 
 > Owner 提案：Knowledge 只保留两种**基本类别**：**Data Knowledge** 返回数据，**Function Knowledge** 返回操作；Function Knowledge 通过**是否有业务状态**与**是否调用外部**两种独立属性分类。R18 精简顶层知识类型，但保留必要的语义、来源、类型、快照与真实执行权限边界。下面所有名称和类型是**设计示意，不是 SDK 已公开 API**。SDK 始终**领域无关**，真实业务 Concept、Rule、Function/Tool、State schema 等属于外部 Business Package。
 
+> **R19 SUPERSEDED / 历史候选：** [R19 Owner 最新明确方案](./DomainHarness_v0.11.2_R19_STATIC_KNOWLEDGE_BUSINESS_ELEMENT_WORKFLOW_GENERATION_CONTRACT.md)已将 DataKnowledge 收敛为**生成期硬编码的不可变业务对象**，FunctionKnowledge 收敛为可直接访问 DataKnowledge 的**原生 Function/Element 方法**，二者连同业务代码构成内聚的 Business Element。R18 的强制 KnowledgeRef/SnapshotId/contentKind、OperationDescriptor/OperationId/动态知识存储、stateAccess、统一知识查询接口**不再是必需产品合同**；函数的 stateful/external 仅可选说明，状态由 Function/Element 自行管理，共享状态先在 Business 内聚封装。Workflow 的具体业务输入输出由生成期定义，复用已有 SDK 基础执行抽象。旧 DI-AC48–54 不应当作强制实现门，新的候选以 R19 DI-AC55–60 为准。**仍为 Product/L1 待审，非已发布 SDK。**
+
 ## 1. 统一 Knowledge 之下的两个类别
 
 | 知识类别 | 定义 | 典型内容 | 读取产物 |
