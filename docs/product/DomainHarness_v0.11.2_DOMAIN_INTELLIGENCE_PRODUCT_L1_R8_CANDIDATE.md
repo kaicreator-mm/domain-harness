@@ -25,6 +25,8 @@ RELEASE=NO
 
 > **R14 语义 Workflow 正式建模候选（待 Owner 裁决）：** [Semantic Workflow Model · R14](./DomainHarness_v0.11.2_R14_SEMANTIC_WORKFLOW_MODEL_AND_COMPOSITION.md) 纠正 R13“把 Function 接进 Workflow 就等于领域智能”的不足：明确 Domain Semantic Model → Semantic Capability Model → Semantic Workflow Model（语义 Port / Data、Control、Evidence 三类连接）→ **现有** StandardWorkflowSession/XState 执行。语义兼容、必需事实、Scope/Snapshot、来源及 Outcome 传播需要可验证；不建立第二执行 Runtime，具体领域 Function 均由外部 Business 提供。新增 DI-AC29–34 仍是拟验收、NOT_RUN。
 
+> **R15 · Owner 简化后的首选产品模型：** [Knowledge 语义层 + Workflow 执行层（通过 Recognizer/Validator 得到 Intent 并显式关联业务 Workflow）](./DomainHarness_v0.11.2_R15_TWO_LAYER_KNOWLEDGE_WORKFLOW_INTENT_MODEL.md)。所有 Domain Concept、Object、Relation、Fact、Rule、Intent、Applicability 统一归 Knowledge 的**类型化语义数据内容**，但不抹平类型、作用域和 Source；Recognizer/Validator/Business Workflow 读取 Knowledge 提供依据。具体业务仍归外部 Package；SDK 只提供通用抽象、Store/Query/Expression 和现有 Workflow 组合。R14 的四层 Semantic Workflow / SemanticPort / Data-Control-Evidence Edge **作为架构候选已被 R15 取代**，不得按旧方案新增语义图执行器或强制 Port/Edge 模型。建议替代验收为 DI-AC29R–34R。仍属 Product/L1 候选，未 Owner Freeze、未实施。
+
 ## 1. 产品目的与实际消费场景
 
 DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范围**内，利用可追溯且有适用边界的领域事实、知识与规则，形成可解释、可复现的确定性业务判断，并将判断作为 0.11.1 已有 Workflow/Task 的输入/分支依据。**领域知识必须改变真实业务结果**；“把 JSON 解析出来”、一次成功 Demo 或给一个示例写死政策分数，不构成本版本的通用领域智能。
