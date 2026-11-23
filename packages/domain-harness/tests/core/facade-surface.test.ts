@@ -21,6 +21,9 @@ test('SDK facade 精确导出已有接口和新增原生 KDP / Standard Elements
     'readYaml',
     'writeJson',
     'writeYaml',
+    'NativeWorkflowContext',
+    'StandardWorkflowSession',
+    'routeWorkflowOutcome',
   ]);
   const actual = new Set<string>(Object.keys(facade));
 
