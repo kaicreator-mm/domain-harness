@@ -74,9 +74,9 @@ function fileExists(path, sourceKind) {
   // TypeScript NodeNext 使用 .js/.mjs/.cjs specifier 指向生成后的文件。
   if (sourceKind !== ts.ScriptKind.TS) return false;
   const mappings = [
-    [/\\.js$/u, ['.ts', '.tsx']],
-    [/\\.mjs$/u, ['.mts']],
-    [/\\.cjs$/u, ['.cts']],
+    [/\.js$/u, ['.ts', '.tsx']],
+    [/\.mjs$/u, ['.mts']],
+    [/\.cjs$/u, ['.cts']],
   ];
   for (const [suffix, candidates] of mappings) {
     if (!suffix.test(path)) continue;
