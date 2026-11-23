@@ -10,19 +10,24 @@ export interface DomainAppContext {
 }
 
 /** Package 通过原生 Class 引用初始化直接依赖；KDP 只登记真实生命周期进入。 */
-export interface LifecycleInitContext extends DomainAppContext {
-  readonly enter: (element: PackageInitElement, componentId?: string) => Promise<void>;
-}
+/** 透传应用自有 Context 类型，SDK 不要求额外的 Context 容器或固定业务字段。 */
+export type LifecycleInitContext<Context extends DomainAppContext = DomainAppContext> =
+  Context & {
+    readonly enter: (
+      element: PackageInitElement<Context>,
+      componentId?: string,
+    ) => Promise<void>;
+  };
 
-export interface PackageInitElement {
-  start(context: LifecycleInitContext): void | Promise<void>;
+export interface PackageInitElement<Context extends DomainAppContext = DomainAppContext> {
+  start(context: LifecycleInitContext<Context>): void | Promise<void>;
   [Symbol.asyncDispose]?(): void | Promise<void>;
 }
 
 /** 静态导入的 ESM Package 模块形状，而不是运行时插件管理对象。 */
-export interface StaticCorePackage {
+export interface StaticCorePackage<Context extends DomainAppContext = DomainAppContext> {
   readonly packageMeta: CorePackageMetadata;
-  readonly Init?: new () => PackageInitElement;
+  readonly Init?: new () => PackageInitElement<Context>;
 }
 
 export interface LifecycleLogRecord {
@@ -38,8 +43,8 @@ export interface LifecycleLogger {
   error(record: LifecycleLogRecord): void;
 }
 
-interface EnteredInit {
-  readonly element: PackageInitElement;
+interface EnteredInit<Context extends DomainAppContext> {
+  readonly element: PackageInitElement<Context>;
   readonly id: string;
   readonly index: number;
 }
@@ -57,21 +62,21 @@ class LifecycleClosingError extends Error {
  * 静态 Core.Order、可选 Init、真实进入记录、逆序 Exit、未处理错误最后兜底。
  * 关闭屏障与等待在途 Init 是资源正确释放所必需，不重新验证 Package 正确性。
  */
-export class KernelLifecycle {
-  private readonly entered: EnteredInit[] = [];
+export class KernelLifecycle<Context extends DomainAppContext = DomainAppContext> {
+  private readonly entered: EnteredInit<Context>[] = [];
   private readonly pending = new Set<Promise<void>>();
+  private readonly businessFlights = new Set<Promise<unknown>>();
   private phase: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' = 'created';
   private initFlight: Promise<void> | undefined;
-  private businessFlight: Promise<unknown> | undefined;
   private exitFlight: Promise<void> | undefined;
 
   constructor(
-    private readonly cores: readonly StaticCorePackage[],
+    private readonly cores: readonly StaticCorePackage<Context>[],
     private readonly logger: LifecycleLogger = console,
   ) {}
 
   /** 异步启动执行之前先建立 initFlight，避免同步用户代码抢在关闭屏障前运行。 */
-  public start(context: DomainAppContext): Promise<void> {
+  public start(context: Context): Promise<void> {
     if (this.phase !== 'created') {
       return Promise.reject(new Error('Domain App lifecycle can only start once'));
     }
@@ -91,8 +96,8 @@ export class KernelLifecycle {
     });
   }
 
-  private async startCores(context: DomainAppContext): Promise<void> {
-    const initContext: LifecycleInitContext = {
+  private async startCores(context: Context): Promise<void> {
+    const initContext: LifecycleInitContext<Context> = {
       ...context,
       enter: (element, componentId) => this.enter(element, initContext, componentId),
     };
@@ -111,8 +116,8 @@ export class KernelLifecycle {
   }
 
   private enter(
-    element: PackageInitElement,
-    context: LifecycleInitContext,
+    element: PackageInitElement<Context>,
+    context: LifecycleInitContext<Context>,
     componentId: string | undefined,
   ): Promise<void> {
     if (this.phase !== 'starting') {
@@ -120,7 +125,7 @@ export class KernelLifecycle {
     }
 
     const id = componentId ?? element.constructor.name;
-    const record: EnteredInit = {
+    const record: EnteredInit<Context> = {
       element,
       id: /^[a-zA-Z0-9._-]{1,100}$/u.test(id) ? id : 'unknown-component',
       index: this.entered.length,
@@ -143,19 +148,23 @@ export class KernelLifecycle {
     return flight;
   }
 
-  /** 业务仅在初始化真正完成且尚未收到关闭请求时才可启动。 */
-  public async run<T>(context: DomainAppContext, business: () => T | Promise<T>): Promise<T> {
-    await this.start(context);
+  /**
+   * 允许一个已启动的 Domain App 承载多个独立业务调用。
+   * 关闭屏障前登记在途 Promise；不派发 Task/Workflow，也不管理业务权限。
+   */
+  public async execute<T>(business: () => T | Promise<T>): Promise<T> {
     if (this.phase !== 'running') throw new LifecycleClosingError();
-    // 只登记实际业务回调，不等待整个 run（后者在 finally 中等待 Exit）。
-    // 外部请求关闭须等业务体收敛后才能释放所持有的资源。
     let flight: Promise<T>;
     try {
       flight = Promise.resolve(business());
     } catch (error) {
       flight = Promise.resolve().then((): T => { throw error; });
     }
-    this.businessFlight = flight;
+    this.businessFlights.add(flight);
+    void flight.then(
+      () => { this.businessFlights.delete(flight); },
+      () => { this.businessFlights.delete(flight); },
+    );
     try {
       return await flight;
     } catch (error) {
@@ -165,9 +174,16 @@ export class KernelLifecycle {
         message: 'An unhandled business execution error reached KDP',
       });
       throw error;
+    }
+  }
+
+  /** 单轮 App 便捷入口：Init → 一次业务调用 → 关闭（旧行为不变）。 */
+  public async run<T>(context: Context, business: () => T | Promise<T>): Promise<T> {
+    await this.start(context);
+    try {
+      return await this.execute(business);
     } finally {
       await this[Symbol.asyncDispose]();
-      this.businessFlight = undefined;
     }
   }
 
@@ -193,12 +209,11 @@ export class KernelLifecycle {
       while (this.pending.size > 0) {
         await Promise.allSettled([...this.pending]);
       }
-      // 不等待 run() 外层 Promise，否则它在 finally 中等待本次 Exit 会自死锁。
-      // 业务回调自身也不得等待正在清理它持有资源的同一轮关闭。
-      await this.businessFlight?.then(
-        () => undefined,
-        () => undefined,
-      );
+      // 等待所有已登记业务体，而非等待包含 finally→Exit 的外层 run()。
+      // 业务体不得 await 自身触发的关闭 Promise（由 Host/外层发起关闭）。
+      while (this.businessFlights.size > 0) {
+        await Promise.allSettled([...this.businessFlights]);
+      }
 
       const disposed = new Set<PackageInitElement>();
       for (let i = this.entered.length - 1; i >= 0; i--) {
