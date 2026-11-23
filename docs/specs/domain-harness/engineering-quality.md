@@ -1,6 +1,6 @@
 # DomainHarness · 工程质量、日志、配置与证据
 
-> [权威目录](./README.md) · 工程质量 **CONFIRMED**，旧 Target/Pin 框架相关历史测试待迁移。
+> [权威目录](./README.md) · 工程质量 **CONFIRMED**；v0.11.1 已删除旧 Target/Pin 实现及其专属测试，保留适用的行为回归并通过 R160 独立复审。
 
 ## QA-01 · 正确性在生成期
 
