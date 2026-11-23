@@ -9,8 +9,6 @@ import * as composition from '@kaicreator/domain-harness/composition';
 import * as contracts from '@kaicreator/domain-harness-contracts';
 import * as microkernel from '@kaicreator/domain-harness-microkernel';
 import * as build from '@kaicreator/domain-harness-build';
-import * as nativeLifecycle from '../../src/kernel-lifecycle.js';
-import * as standardWorkflow from '../../src/standard-workflow.js';
 
 test('R43: runtime subpath supplies Contracts/Boot but no BUILD or Package authoring API', () => {
   const expected = new Set([
@@ -45,8 +43,9 @@ test('SDK root 在迁移期同时精确导出已审旧 API 和原生 Standard/KD
     new Set([
       ...Object.keys(runtime),
       ...Object.keys(composition),
-      ...Object.keys(nativeLifecycle),
-      ...Object.keys(standardWorkflow),
+      'KernelLifecycle',
+      'WorkflowElement',
+      'XStateWorkflowElement',
     ]));
   assert.equal(sdk.boot, runtime.boot);
   assert.equal('bootstrap' in sdk, false, 'root SDK must not expose direct KDP bootstrap');
