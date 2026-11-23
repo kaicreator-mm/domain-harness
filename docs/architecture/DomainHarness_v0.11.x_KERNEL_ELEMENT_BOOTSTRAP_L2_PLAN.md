@@ -1,5 +1,6 @@
 # DomainHarness v0.11.x · Kernel Package 真正自举与统一身份迁移 L2 接线方案
 
+> **SUPERSEDED DESIGN / HISTORICAL ONLY** — 原 R107/R118 的 Boot Pin/Lock、Target/FunctionRef、KDP 独占 Workflow/PackageSystem 与安全导入方案已被 Owner #1685 的 Language-Native Domain SDK 决议取代，**不再是现行实施 L2**；当前权威是 [核心规范](../specs/domain-harness/core.md)、[TS Profile](../specs/domain-harness/typescript-profile.md)、[架构](../specs/domain-harness/architecture.md) 与 [迁移状态](../specs/domain-harness/status-and-decisions.md)。保留此文件下文原文仅供历史追溯。实施 #1668/#1682 前必须重写 L2；不得继续按此文件构建旧引擎。
 > **归口**：Foundation Issue [#1668](https://github.com/kaicreator-mm/domain-harness/issues/1668)，不是 v0.11.2 功能。**状态：R107 ACCEPT_L2_SCOPED（设计范围 P0/P1=0）；源码实施与验收未完成**。本文件是具体实施细节，不是第二套规范。权威规范以 [目录](../specs/domain-harness/README.md)、[核心](../specs/domain-harness/core.md)、[架构](../specs/domain-harness/architecture.md)、[对象](../specs/domain-harness/element-package.md)、[生命周期](../specs/domain-harness/lifecycle-workflow.md)、[身份](../specs/domain-harness/identity-naming.md) 和 [信任](../specs/domain-harness/composition-trust.md) 为准。
 
 ## R118. Owner 职责裁决：生成期负责 Package/Element 正确性，SDK 只做最小兜底
