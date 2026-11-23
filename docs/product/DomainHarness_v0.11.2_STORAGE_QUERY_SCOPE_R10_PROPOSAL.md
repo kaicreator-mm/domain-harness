@@ -30,7 +30,7 @@ NO_MAIN_RELEASE=TRUE
 | Q03 Graph | Concept/Entity/Relation 的节点/边查询、指定类型和方向的邻居、有界多跳/路径/依赖 | 不要求独立图数据库、无界图遍历或完整 Cypher/SPARQL/OWL |
 | D01 一致决策 | SQL/Graph/Vector 在同一已选知识快照上配合 Domain Knowledge/Rule/Decision；向量只召回候选，再由事实/版本/适用性和规则做确定性裁决 | 不以检索得分包装 COMPLETE，不静默跨 Domain 或知识版本 |
 
-SQLite 作为默认本地持久化与查询引擎，关系用索引表 + 有界递归 SQL 即可，向量可在 L2 比较 SQLite 扩展与适合较小集合的有界算法。要求本版实际跑通向量 Top-K，不得以“日后可装扩展”代替功能实现。具体 Node22 驱动、原生扩展分发和跨平台组合属于 L2，而不是 L1 限定。
+**YAML 和 JSON-LD 除导入/导出外，还必须能在加载已选文件后直接进行有界的领域语义/事实/关系查询**，无需为了单次查询强制先导入 SQLite。SQL 只对 SQLite 数据源运行；Vector/Graph 的领域查询应能对 SQLite 和已加载的受选文件保持相同 Domain/Version/Applicability/Evidence 语义，不强制相同的底层加速策略。若 YAML/JSON-LD 的已选内容要持久更新，文件写入须遵守明确的覆盖/版本策略，避免破坏原快照。\n\nSQLite 作为默认本地持久化与查询引擎，关系用索引表 + 有界递归 SQL 即可，向量可在 L2 比较 SQLite 扩展与适合较小集合的有界算法。要求本版实际跑通向量 Top-K，不得以“日后可装扩展”代替功能实现。具体 Node22 驱动、原生扩展分发和跨平台组合属于 L2，而不是 L1 限定。
 
 ## 3. 数据治理与运行职责
 
@@ -47,7 +47,7 @@ SQLite 作为默认本地持久化与查询引擎，关系用索引表 + 有界�
 | 验收 | 可证伪的真实功能场景 |
 |---|---|
 | DI-AC15 | SQLite 写入 Domain、Fact、Relation、Rule、Source、Version 后真正关闭并重开仍可查询并作同一业务判断；事务失败回滚，版本冲突拒绝 |
-| DI-AC16 | YAML、JSON-LD 的双向导入/导出真实覆盖订单与库存；稳定 ID、关系、版本、Source 未丢失；坏数据或不可信 Context 拒绝 |
+| DI-AC16 | YAML、JSON-LD 的读写、直接加载文件后的有界领域事实/关系查询、SQLite 双向导入/导出真实覆盖订单与库存；稳定 ID、关系、版本、Source 未丢失；坏数据或不可信 Context 拒绝 |
 | DI-AC17 | 参数化 SQL 完成跨表查询、过滤、聚合和有界结果；非可信字符串不能执行任意 SQL/写入；跨 Domain/过期不提升成功 |
 | DI-AC18 | 已存储向量按输入向量 Top-K 返回候选及可核验得分，维度不符拒绝，Domain/Version/Scope 精确过滤后才参与 Rule 判断 |
 | DI-AC19 | 真实关系图上完成方向/关系类型过滤、多跳路径查询；图环及超限可终止，不越过 Domain/Scope |
