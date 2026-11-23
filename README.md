@@ -8,4 +8,4 @@ SDK **消费者**支持 Node.js >=22.12.0；仓库 **开发/完整验收工具�
 
 权威规范：[Canonical 目录](docs/specs/domain-harness/README.md) · [TypeScript Profile](docs/specs/domain-harness/typescript-profile.md) · [Agent Skill](.agents/skills/domain-harness-spec/SKILL.md)。
 
-`docs/architecture` 下早期 Boot/BUILD/Pin/FunctionRef 文档仅用于历史审计，不是现行可执行规范。完整 0.11.1 仍须通过最终 Exact-SHA 独立审核后才能宣布完成或发布。
+`docs/architecture` 下早期 Boot/BUILD/Pin/FunctionRef 文档仅用于历史审计，不是现行可执行规范。v0.11.1 原生 SDK 源码已在 PR #1694 经 R151 + R160 独立审核 `ACCEPT_SCOPED P0/P1/P2=0`，Woodpecker #3151 对应 PR Exact HEAD，合入 `version/v0.11.x@452e2212fb8a25168ee62d4e793897d77416cb92`（合并树文件差异为零）。**这是内部阶段源码交付，不是 main 合并/Tag/GitHub Release；整个 0.11.x 完成后才统一发行。**
