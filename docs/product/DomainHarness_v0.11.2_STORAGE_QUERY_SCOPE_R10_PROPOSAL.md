@@ -1,5 +1,8 @@
 # DomainHarness 0.11.2 · R10 Domain Storage & Multi-Query 功能澄清候选
 
+> **CURRENT PRODUCT/L1 SINGLE CANDIDATE = [R21 consolidated after R20 REWORK](./DomainHarness_v0.11.2_R21_CONSOLIDATED_PRODUCT_L1_AFTER_R20_REWORK.md)**. **R10 属历史方案**，原知识热更新/静态 Knowledge 必选 SQLite CRUD 已被 R19 取代，SQLite+SQL 是否作为本版必选按 R21 第 4 节推荐表及 Owner 最终产品裁决。 R21 仍为 Product/L1 候选、未 Owner 冻结、未实施或运行 CI。\n\n
+
+
 ```ini
 OUTPUT_LABEL=DH_V0112_R10_DOMAIN_PERSISTENCE_SQL_VECTOR_GRAPH_PRODUCT_CLARIFICATION
 REPO=kaicreator-mm/domain-harness
