@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -175,7 +176,7 @@ test('R155 元数据括号别名不得静态 PASS，CLI 必须返回人工复核
       assert.deepEqual(validateNativeApp(x.manifest,[x.kdp,x.business]).manualReviewPackages,
         ['business']);
       const run=spawnSync(process.execPath,[
-        new URL('../validate-native-generation.mjs',import.meta.url).pathname,
+        fileURLToPath(new URL('../validate-native-generation.mjs',import.meta.url)),
         '--manifest',x.manifest,'--core',x.kdp,'--core',x.business,
       ],{encoding:'utf8',timeout:12000});
       assert.equal(run.status,3,run.stderr);
