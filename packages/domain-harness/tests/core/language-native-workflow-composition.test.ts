@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 import {
   StandardWorkflowSession, routeWorkflowOutcome,
 } from '../../src/native-workflow-composition.js';
+import type { WorkflowRoutes } from '../../src/native-workflow-composition.js';
 import type { StandardWorkflowOutcome } from '../../src/standard-workflow.js';
 import { JsonReader, YamlReader } from '../../src/standard-files.js';
 
@@ -146,4 +148,95 @@ test('根 Workflow Session 不能被重复启动并重置预算', async () => {
   const repeat = await flow.run(() => ({status:'COMPLETE',value:'second'}));
   assert.equal(repeat.status,'FAILED');
   assert.equal(repeat.status === 'FAILED' && repeat.reason.code,'WORKFLOW_ALREADY_RUN');
+});
+
+test('R147 P1：不合法根预算/深度不执行任何业务，返回稳定 FAILED', async () => {
+  const invalid = [Number.NaN, Infinity, -Infinity, -1, 0.5, Number.MAX_SAFE_INTEGER + 1];
+  for (const value of invalid) {
+    for (const key of ['maxCalls', 'maxSteps', 'maxDepth'] as const) {
+      let effects = 0;
+      const limits = {maxCalls:3,maxSteps:5,maxDepth:2, [key]:value};
+      const actual = await new StandardWorkflowSession(limits).run(ctx =>
+        ctx.invoke(() => { effects++; return 'must-not-run'; }));
+      assert.equal(actual.status,'FAILED');
+      if (actual.status === 'FAILED') {
+        assert.equal(actual.reason.code,'WORKFLOW_INVALID_LIMIT');
+      }
+      assert.equal(effects,0, key+' '+String(value));
+    }
+  }
+});
+
+test('R147 P1：非法子级深度拒绝进入，合法零深度只允许自身调用', async () => {
+  const invalid = [Number.NaN, Infinity, -Infinity, -1, 0.5, Number.MAX_SAFE_INTEGER + 1];
+  for (const value of invalid) {
+    let effects = 0;
+    const result = await new StandardWorkflowSession({maxCalls:3,maxSteps:4,maxDepth:2})
+      .run(ctx => ctx.child(value, () => {
+        effects++;
+        return {status:'COMPLETE',value:1};
+      }));
+    assert.equal(result.status,'FAILED');
+    if(result.status==='FAILED') assert.equal(result.reason.code,'WORKFLOW_INVALID_LIMIT');
+    assert.equal(effects,0);
+  }
+  const atZero = await new StandardWorkflowSession({maxCalls:0,maxSteps:1,maxDepth:0})
+    .run(ctx => ctx.invoke(() => 'should-not-invoke'));
+  assert.equal(atZero.status,'FAILED');
+  if(atZero.status==='FAILED') assert.equal(atZero.reason.code,'WORKFLOW_CALL_BUDGET');
+
+  const legal = await new StandardWorkflowSession({maxCalls:1,maxSteps:3,maxDepth:1})
+    .run(root => root.child(0, child => child.invoke(() => 1)));
+  assert.deepEqual(legal,{status:'COMPLETE',value:1});
+  const nestedDenied = await new StandardWorkflowSession({maxCalls:2,maxSteps:4,maxDepth:2})
+    .run(root => root.child(0, child => child.child(2, () =>
+      ({status:'COMPLETE',value:'unexpected'}))));
+  assert.equal(nestedDenied.status,'FAILED');
+  if(nestedDenied.status==='FAILED') assert.equal(nestedDenied.reason.code,'WORKFLOW_DEPTH_LIMIT');
+});
+
+test('R147 P2：严格 TS 不准缺省 Switch 路由', () => {
+  // @ts-expect-error: 缺 REJECT/ASK/WAIT/UNKNOWN/FAILED 必须导致编译错误。
+  const missing: WorkflowRoutes<number,string> = {
+    COMPLETE: () => 'wrong',
+  };
+  void missing;
+});
+
+test('R147 P2：未类型检查的 JS 缺路由抛错，不回退成功路径', () => {
+  const moduleUrl = new URL('../../src/native-workflow-composition.ts', import.meta.url).href;
+  const code = [
+    `import {routeWorkflowOutcome} from ${JSON.stringify(moduleUrl)};`,
+    "const outcome = {status:'UNKNOWN',reason:{code:'NO_EVIDENCE',message:'unknown'}};",
+    "const incomplete = { COMPLETE:()=> 'wrong-success' };",
+    "try { await routeWorkflowOutcome(outcome, incomplete); process.exitCode = 2; }",
+    "catch (error) { if (!(error instanceof TypeError)) process.exitCode = 3; else console.log('MISSING_EXIT_REJECTED'); }",
+  ].join('\\n');
+  const child = spawnSync(process.execPath,
+    ['--import','tsx','--input-type=module','--eval',code],
+    {encoding:'utf8',timeout:12000});
+  assert.equal(child.status,0,child.stderr);
+  assert.equal(child.stdout.trim(),'MISSING_EXIT_REJECTED');
+});
+
+test('R147 P2：REJECT/ASK/WAIT/UNKNOWN/FAILED 在异步 end 失败后仍保留原状态', async () => {
+  const statuses = ['REJECT','ASK','WAIT','UNKNOWN','FAILED'] as const;
+  for (const status of statuses) {
+    let completed = false;
+    const outcome = await new StandardWorkflowSession({maxCalls:2,maxSteps:3,maxDepth:0})
+      .run(ctx => ctx.leaf<number>({
+        run: () => ({status,reason:{code:'BUSINESS_'+status,message:'expected business outcome'}}),
+        end: async () => {
+          await Promise.resolve();
+          completed = true;
+          throw new Error('PRIVATE_END_FAILURE');
+        },
+      }));
+    assert.equal(completed,true);
+    assert.equal(outcome.status,status);
+    if(outcome.status!=='COMPLETE') {
+      assert.equal(outcome.reason.code,'BUSINESS_'+status);
+      assert.equal(JSON.stringify(outcome).includes('PRIVATE_END_FAILURE'),false);
+    }
+  }
 });
