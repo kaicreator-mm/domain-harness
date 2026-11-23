@@ -2,12 +2,13 @@
 
 > [权威目录](./README.md) · Owner 新决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。**本规范是设计和验收权威；代码迁移在 Draft #1694 的候选树中完成，但在该 PR 正式合并前不属于版本列车。**
 
-> **R159 当前状态（完整替换待最终独立审核）**：Canonical R140、原生 KDP/XState R143、Standard Reader R145、Workflow R154、生成期检查 R158 均有按准确 SHA 的限定独立审核：R143/R154/R158 为 **P0/P1/P2=0**；R140、R145 原始审核各有 **1 项 P2**，其中 R140 GEN-08 已随 R145 合入；R145 Reader 输入边界测试已在 Draft 原生回归扩展，不得将原始 P2 伪写成 0。
+> **R160 当前状态（R151 P1/P2 整改已提交，独立限定复审待完成）**：新语言原生规范 R140、KDP/XState R143、Reader R145、Workflow R154、生成期 R158 均有各自 Exact-SHA 的限定独立审核。**R140、R145 原审核各保留一个 P2**（R140 GEN-08 后由 R145 合入处置；R145 Reader 边界测试后续扩展）；不得改写原始审核数量。
 >
-> - **已合并版本列车**：Workflow [PR #1692](https://github.com/kaicreator-mm/domain-harness/pull/1692) R154 通过，合并 `b88137c7b2b2e1a5b6676a7a86a715458ac05ac4`；生成期 [PR #1693](https://github.com/kaicreator-mm/domain-harness/pull/1693) R158 通过，合并 `caea4cc0ce0a206c92748074c72d39322e56a9e7`。
-> - R158 对 `const alias=(packageMeta)` 与 TS `as`/`satisfies` 的非误判修复在 Exact `473917c4f25eea50d6e2764e22861d7a27d6d032` 接受；该 PR 自己的 #3147 为 **CANCELED**，等价源 Blob 在 Draft #1694 的 [#3148](https://ci.kaicreator.com/repos/18/pipeline/3148/1) **SUCCESS**，不可改称前者 CI 成功。
-> - **完整 SDK 替换 [Draft PR #1694](https://github.com/kaicreator-mm/domain-harness/pull/1694)**：候选树已经删除旧 Contracts/Microkernel/BUILD/Boot 等 151 个旧文件路径，单 SDK、原生 KDP/Reader/Workflow、作者侧生成验证及仓外仅直接依赖 SDK 的真实 npm 安装验证已在历史候选 SHA 经 CI 通过。**这仅是未合并的候选，不表示版本列车已删除旧执行体系。**
-> - 当前门槛是从已合并 `version/v0.11.x@caea4cc0...` 上重建 Draft #1694 的新父提交、取得新 Exact-SHA 验证，然后 R151 已于 Exact `aaf6c930f9541768119991500c7bc7811898e18d` 得出 **REWORK P0=0/P1=2/P2=5**：预算可变引用校验与扣减不一致、仓外 App Reader 未纳入根预算。当前 K3-D 须定点修复全部 P1、处置 5 项 P2、以新 Exact SHA 复审；通过前不发布、不关闭 #1682/v0.11.1。
+> - **已合并的版本列车**：Workflow [PR #1692](https://github.com/kaicreator-mm/domain-harness/pull/1692) R154 `ACCEPT_SCOPED P0/P1/P2=0`，merge `b88137c7b2b2e1a5b6676a7a86a715458ac05ac4`；作者侧生成工具 [PR #1693](https://github.com/kaicreator-mm/domain-harness/pull/1693) R158 同样 `ACCEPT_SCOPED 0/0/0`，merge `caea4cc0ce0a206c92748074c72d39322e56a9e7`。历史 #3147 被取消，等价源 Blob #3148 SUCCESS 的区别已由 R158 明确。
+> - **原生 SDK 完整替换** [Draft PR #1694](https://github.com/kaicreator-mm/domain-harness/pull/1694)：以已接受的版本列车为父提交，候选已物理删除旧 Contracts/Microkernel/BUILD/Boot/PackageSystem/FunctionRef/Target/Lock/Pin 相关 151 个文件路径，保留单 SDK Workspace、五个生产 TS 模块、标准 Workflow/Reader、最小 KDP 与真实仓外仅直接依赖 SDK 的 npm 消费者。此删除**尚未合并到版本列车**。
+> - **R151 完整独立审核结论是 REWORK P0=0/P1=2/P2=5**，Exact `aaf6c930f9541768119991500c7bc7811898e18d`。两个 P1 为 Workflow 构造/运行预算不同快照、仓外 Domain App 四次 Reader 漏记根预算。新版修复已在 Draft 提交 `5b56a89743a10c2271b435879115dc2b32c734c2`，Woodpecker [#3150](https://ci.kaicreator.com/repos/18/pipeline/3150/1) **SUCCESS**：预算构造时复制/验证一致、Reader 在真实业务 ctx.invoke 计费，仓外 App 有足额/Reader 拒绝/Hook 拒绝/步骤拒绝的正负例。
+> - **五项 P2 处置**：Windows npm.cmd 改成 process.execPath 驱动 npm CLI（**Windows 真机验证尚未做，不声明 Windows PASS**）；当前英文/原生 App README 和旧路线图标记/链接纠正；开发 CI Node 下限 >=22.13 与 SDK 消费者 >=22.12 分离；Writer getter/own-enumerable/动态 Proxy 快照回归恢复；SDK 包根 12 个运行时导出及类型入口文档列出。合并前必须经新 SHA 的独立限定审核确认是否全部可接受。
+> - **最终门槛**：对本轮整改的实际 Diff 独立非 Writer 复审，接受后才允许将 Draft 转 Ready、合并与关闭 #1682/#1668。旧架构历史只能作带 SHA 的证据，不是当前可执行合同。
 
 ## 新架构状态
 
