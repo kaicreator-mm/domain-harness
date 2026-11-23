@@ -45,7 +45,7 @@ interface EnteredInit {
 }
 
 /** 正常关闭的执行中断，不是 Package/Element 运行时结构验证。 */
-export class LifecycleClosingError extends Error {
+class LifecycleClosingError extends Error {
   constructor() {
     super('The Domain App lifecycle is closing');
     this.name = 'LifecycleClosingError';
