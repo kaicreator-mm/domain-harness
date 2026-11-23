@@ -18,6 +18,8 @@ NO_MAIN_RELEASE=TRUE
 
 0.11.2 的 Domain Semantics、Concept/Entity/Relation、Fact、Source/Provenance、Knowledge、Rule、Decision 要能**存储、更新、重新打开、查询和复现**，不能仅是一组进程内静态文件和内存对象。后续 0.11.3–0.11.9 需要消费稳定的已选知识版本。为此把 **Domain Data Persistence & Query** 放到 0.11.2；但不迁移 0.11.6 的 TaskRun/Checkpoint/暂停恢复和 Effect 幂等。
 
+> **SDK 领域无关边界：** 这里的 Domain/Knowledge/Fact/Rule/Decision 均指跨领域通用的语义数据模型、存储及查询机制；SQLite Schema 和 SQL/属性/文本/向量/图 Query **不得硬编码任何具体行业、订单、库存或其它业务领域概念**。真实领域数据、规则函数、分类识别器和决策策略只能由外部 Business Domain Package/Domain App 定义；订单/库存仅为可替换消费者验收样例。评估标准：换掉外部 Domain Package，不修改 SDK/通用表/查询函数，仍能消费不同的领域。进一步分层见 [R11 SDK 抽象与 Element-First 澄清](./DomainHarness_v0.11.2_ELEMENT_FIRST_INTELLIGENCE_R11_DESIGN_OPTIONS.md)。
+
 ## 2. 0.11.2 新增必选功能候选
 
 | 功能 | 可观察产品行为 | 禁止误解 |
