@@ -31,6 +31,8 @@ RELEASE=NO
 
 > **R17 · Tool 用户授权策略澄清（Owner 新建议）：** [系统预授权 Tool 与用户确认型 Tool 两模式](./DomainHarness_v0.11.2_R17_TOOL_PREAUTHORIZED_USER_APPROVAL_TWO_MODE_POLICY.md)。已在生成/部署期选定并配置好的 **PREAUTHORIZED** Tool，Workflow 可按 Business Guard 直接调用，**不需要另一个 DomainHarness 用户审批或 KDP Permit**；仅 **USER_APPROVAL** Tool 必须取得绑定真实操作/参数/目标的有效用户确认后提交 Effect。二者均应遵守真实 DB/OS/Host 本身的资源权限，不能由 Knowledge/LLM/用户输入擅自降低审批等级。仍是 Knowledge 语义层 + 两个 Workflow 角色的执行层，0.11.4→0.11.2 全量合并建议尚未正式裁定。DI-AC42–47 为新增拟验收。
 
+> **R18 Knowledge 统一抽象最新候选：** [Data Knowledge（返回结构化数据）+ Function Knowledge（返回操作描述/引用）；Function Knowledge 按业务状态依赖 stateful 与是否外部调用 external 两个独立维度分类](./DomainHarness_v0.11.2_R18_DATA_FUNCTION_KNOWLEDGE_TWO_AXES.md)。Concept、Entity、Relation、Fact、Rule 声明、Intent、Applicability、State schema 属 DataKnowledge；Recognizer、Validator、Rule evaluator、Decision、Tool 的功能描述属 FunctionKnowledge，真实代码依然由可信 Business Package 静态 import/执行。两个维度不等于 user approval 与资源权限；R17 PREAUTHORIZED/USER_APPROVAL 仍是独立业务策略。R18 不创建第三层语义体系、动态代码执行注册表或四套 Element 基类。DI-AC48–54 属拟验收且全部 NOT_RUN。
+
 ## 1. 产品目的与实际消费场景
 
 DomainHarness 0.11.2 应让 Domain App 在一个**明确受选的领域语义范围**内，利用可追溯且有适用边界的领域事实、知识与规则，形成可解释、可复现的确定性业务判断，并将判断作为 0.11.1 已有 Workflow/Task 的输入/分支依据。**领域知识必须改变真实业务结果**；“把 JSON 解析出来”、一次成功 Demo 或给一个示例写死政策分数，不构成本版本的通用领域智能。
