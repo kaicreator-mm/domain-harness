@@ -7,3 +7,5 @@ export * from './composition.js';
 export * from './kernel-lifecycle.js';
 // Standard Workflow Element 可由任何 Business 使用，不依赖 KDP。
 export * from './standard-workflow.js';
+// Application-level reusable JSON/YAML Standard Elements.
+export * from './standard-files.js';

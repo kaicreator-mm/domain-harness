@@ -15,6 +15,12 @@ test('SDK facade 精确导出已有接口和新增原生 KDP / Standard Elements
     'KernelLifecycle',
     'WorkflowElement',
     'XStateWorkflowElement',
+    'JsonReader',
+    'YamlReader',
+    'readJson',
+    'readYaml',
+    'writeJson',
+    'writeYaml',
   ]);
   const actual = new Set<string>(Object.keys(facade));
 
