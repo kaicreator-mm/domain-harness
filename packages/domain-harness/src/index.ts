@@ -5,3 +5,5 @@ export * from './composition.js';
 
 // 语言原生 KDP 生命周期 Element；迁移期间旧 ABI 仍未删除。
 export * from './kernel-lifecycle.js';
+// Standard Workflow Element 可由任何 Business 使用，不依赖 KDP。
+export * from './standard-workflow.js';
