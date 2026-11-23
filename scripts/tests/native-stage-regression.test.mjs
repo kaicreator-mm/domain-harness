@@ -21,15 +21,18 @@ test('0.11.0 AC06: two selected structured business policies change real Functio
 });
 
 test('0.11.1 AC11/AC19/AC20: real Core.Init starts nested two-node and single-node Workflows',async()=>{
-  const before=workflowInit.initResults.length;
+  const receipts=[];
   const app=new KernelLifecycle([workflowInit,kdp]);
   let businessReached=false;
-  await app.run({appId:'native-domain-app'},()=>{
+  await app.run({
+    appId:'native-domain-app',
+    onInitResult:receipt=>{ receipts.push(receipt); },
+  },()=>{
     businessReached=true;
-    assert.equal(workflowInit.initResults.length,before+1,'Init must complete before business callback');
+    assert.equal(receipts.length,1,'Init must complete before business callback');
   });
   assert.equal(businessReached,true);
-  const receipt=workflowInit.initResults.at(-1);
+  const receipt=receipts[0];
   assert.deepEqual(receipt.normalTrace,[
     'policy:read','policy:start','policy:evaluate','policy:end','policy:finalize',
   ]);
@@ -100,4 +103,27 @@ test('0.11.0 AC01/AC03: zero-Function knowledge Element + multi-Function Element
   assert.equal(typeof service.evaluate,'function');
   assert.equal(typeof service.finalize,'function');
   assert.equal(business.sumAmounts([1,2,3,4]),10,'ordinary package-level Function remains callable');
+});
+
+test('R166: two Domain App activations keep Init results separate, without a module-global registry', async()=>{
+  const left=[],right=[];
+  const leftApp=new KernelLifecycle([workflowInit,kdp]);
+  const rightApp=new KernelLifecycle([workflowInit,kdp]);
+  await Promise.all([
+    leftApp.run({appId:'native-domain-app',onInitResult:r=>{left.push(r);}},()=>42),
+    rightApp.run({appId:'native-domain-app',onInitResult:r=>{right.push(r);}},()=>43),
+  ]);
+  assert.equal(left.length,1);
+  assert.equal(right.length,1);
+  assert.notStrictEqual(left[0],right[0]);
+  assert.notStrictEqual(left[0].normalTrace,right[0].normalTrace);
+  assert.deepEqual(left[0].normal,right[0].normal);
+  left[0].normalTrace.push('left-only');
+  assert.equal(right[0].normalTrace.includes('left-only'),false);
+  assert.equal('initResults' in workflowInit,false,'a module-global mutable receipt is not a Package state contract');
+});
+
+test('R166: the optional application-owned result observer is not required for Init', async()=>{
+  const app=new KernelLifecycle([workflowInit,kdp]);
+  assert.equal(await app.run({appId:'native-domain-app'},()=>31),31);
 });

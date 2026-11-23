@@ -6,7 +6,7 @@
 
 1. 必读 [核心规范](./core.md)，确定 Package 插件、Element 复用、Standard/Business 与静态可信边界。
 2. TS 实现读 [TypeScript Profile](./typescript-profile.md)，然后读取实际涉及的主题细则。
-3. 读 [迁移状态](./status-and-decisions.md)，区分 `CONFIRMED` 新设计、`MIGRATION_REQUIRED` 现有实现、`HISTORICAL` 已取代模型与 `CANDIDATE` 未裁决建议。
+3. 读 [迁移状态](./status-and-decisions.md)，区分 `CONFIRMED` 新设计、`SOURCE_ACCEPTED / MERGED` 当前代码、`HISTORICAL` 已取代模型与 `CANDIDATE` 未裁决建议；`MIGRATION_REQUIRED` 仅用于确有尚未迁移的范围。
 4. Agent 通过 [domain-harness-spec Skill](../../../.agents/skills/domain-harness-spec/SKILL.md) 导航；Skill 不复制规范、不供运行时执行。
 
 | 权威文件 | 责任 |
@@ -24,3 +24,9 @@
 DIS 保留跨语言领域语义；本规范只确定 DomainHarness SDK 的语言原生映射。0.11.0–0.11.9 是同一次完全重写，不要求兼容 0.10.x；v0.11.1 的基础缺陷在本版本修复，不推给 v0.11.2。
 
 旧 R90、历史 L2/PRD、Exact-SHA CI 与 Release 收据仅作可追溯历史，**不再作为与新决议冲突时可选的当前权威合同**。原生 v0.11.1 源码依 PR #1694 Exact-SHA + Woodpecker #3151 + R160 复审接受；历史旧 ABI 不再在版本列车执行。单独的文档状态更新不构成新的源码 CI/功能验收，也不表示整个 0.11.x 已发布。
+
+## 已验收版本阶段与抽象纪律
+
+0.11.0 / 0.11.1 现行功能通过 [R164 限定独审](https://github.com/kaicreator-mm/domain-harness/pull/1697#pullrequestreview-6026833143) 与 [PR #1697](https://github.com/kaicreator-mm/domain-harness/pull/1697) 源码合并；完整对应见 [回归台账](../../engineering/DomainHarness_v0.11.0_v0.11.1_NATIVE_REGRESSION_CROSSWALK.md)。这并非 main/Release、全部 DIS 资格、Windows E2E 或精确 Node22.12 证书。
+
+工程抽象优先**职责内聚、激活状态归属、标准能力真实复用**：已存在的 KDP 生命周期、Standard Workflow/XState、Standard Reader 与业务 Element 各司其职；未经重复代码和跨领域证据，不增加统一 Element 超类、第二 Workflow 引擎、DI Container/Registry、App Global State 或把所有 npm/Node API 包装成 Element。见 [EL-08](./element-package.md)。
