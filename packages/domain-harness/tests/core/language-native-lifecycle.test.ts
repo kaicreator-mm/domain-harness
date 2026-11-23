@@ -158,3 +158,142 @@ test('嵌套 Init 失败仍逆真实进入退出并保留最初错误', async ()
     'child:exit', 'parent:exit',
   ]);
 });
+
+test('R138 P1: 在途 Init 收敛前关闭不完成，后续 Core 与业务不启动', async () => {
+  const events: string[] = [];
+  let release!: () => void;
+  let notifyStarted!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const entered = new Promise<void>((resolve) => { notifyStarted = resolve; });
+
+  class SuspendedInit implements PackageInitElement {
+    public async start(): Promise<void> {
+      events.push('A:start');
+      notifyStarted();
+      await gate;
+      events.push('A:finish');
+    }
+    public [Symbol.asyncDispose](): void { events.push('A:exit'); }
+  }
+
+  const kernel = new KernelLifecycle([
+    { packageMeta: { id: 'kdp', role: 'core', order: 0 }, Init: SuspendedInit },
+    core(1, 'B', events),
+  ]);
+  const running = kernel.run(context, () => { events.push('business'); });
+  const failure = running.then(
+    () => new Error('business unexpectedly started'),
+    (error: unknown) => error,
+  );
+  await entered;
+
+  let closed = false;
+  const closing = kernel[Symbol.asyncDispose]().then(() => { closed = true; });
+  await Promise.resolve();
+  assert.equal(closed, false, 'closing cannot finish before in-flight Init converges');
+
+  release();
+  await closing;
+  const result = await failure;
+  assert.match(String(result), /closing/u);
+  assert.deepEqual(events, ['A:start', 'A:finish', 'A:exit']);
+});
+
+test('R138 P1: 并行直接依赖失败后关闭屏障拒绝孙组件且保留原始异常', async () => {
+  const events: string[] = [];
+  const cause = new Error('first nested failure');
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let entered!: () => void;
+  const childStarted = new Promise<void>((resolve) => { entered = resolve; });
+  class FailedChild implements PackageInitElement {
+    public start(): void { events.push('failed:init'); throw cause; }
+    public [Symbol.asyncDispose](): void { events.push('failed:exit'); }
+  }
+  class GrandChild implements PackageInitElement {
+    public start(): void { events.push('grand:init'); }
+  }
+  class SuspendedChild implements PackageInitElement {
+    public async start(ctx: LifecycleInitContext): Promise<void> {
+      events.push('slow:init');
+      entered();
+      await gate;
+      try {
+        await ctx.enter(new GrandChild(), 'grand-child');
+        events.push('grand:accepted');
+      } catch {
+        events.push('grand:rejected');
+      }
+    }
+    public [Symbol.asyncDispose](): void { events.push('slow:exit'); }
+  }
+  class Parent implements PackageInitElement {
+    public start(ctx: LifecycleInitContext): Promise<void> {
+      events.push('parent:init');
+      return Promise.all([
+        ctx.enter(new FailedChild(), 'failed-child'),
+        ctx.enter(new SuspendedChild(), 'slow-child'),
+      ]).then(() => undefined);
+    }
+    public [Symbol.asyncDispose](): void { events.push('parent:exit'); }
+  }
+  const kernel = new KernelLifecycle([{
+    packageMeta: { id: 'kdp', role: 'core', order: 0 }, Init: Parent,
+  }], { error: (record) => { events.push(record.event); } });
+  const starting = kernel.start(context);
+  const observed = starting.then(() => undefined, (error: unknown) => error);
+  await childStarted;
+  const close = kernel[Symbol.asyncDispose]();
+  release();
+  await close;
+  assert.equal(await observed, cause);
+  assert.deepEqual(events, [
+    'parent:init', 'failed:init', 'slow:init', 'DH_KDP_UNHANDLED',
+    'grand:rejected', 'slow:exit', 'failed:exit', 'parent:exit',
+  ]);
+});
+
+test('R138 P1: Exit 同步重入 + 并发关闭只释放每个实例一次', async () => {
+  const events: string[] = [];
+  let kernel!: KernelLifecycle;
+  class A implements PackageInitElement {
+    public start(): void { events.push('A:init'); }
+    public [Symbol.asyncDispose](): void {
+      events.push('A:exit');
+      void kernel[Symbol.asyncDispose]();
+    }
+  }
+  class B implements PackageInitElement {
+    public start(): void { events.push('B:init'); }
+    public [Symbol.asyncDispose](): void {
+      events.push('B:exit');
+      void kernel[Symbol.asyncDispose]();
+    }
+  }
+  kernel = new KernelLifecycle([
+    { packageMeta: { id: 'kdp', role: 'core', order: 0 }, Init: A },
+    { packageMeta: { id: 'business', role: 'core', order: 2 }, Init: B },
+  ]);
+  await kernel.start(context);
+  await Promise.all([
+    kernel[Symbol.asyncDispose](),
+    kernel[Symbol.asyncDispose](),
+    kernel[Symbol.asyncDispose](),
+  ]);
+  assert.deepEqual(events, ['A:init', 'B:init', 'B:exit', 'A:exit']);
+});
+
+test('R139 P2: 多个退出异常留下可区分的组件位置与脱敏原因', async () => {
+  const logs: LifecycleLogRecord[] = [];
+  const events: string[] = [];
+  const kernel = new KernelLifecycle([
+    core(0, 'kdp', events, { failExit: true }),
+    core(1, 'business', events, { failExit: true }),
+  ], { error: (record) => { logs.push(record); } });
+  await kernel.run(context, () => undefined);
+  assert.deepEqual(logs.map((r) => [r.componentId, r.entryIndex, r.reasonCode]), [
+    ['business', 1, 'EXIT_HOOK_FAILED'],
+    ['kdp', 0, 'EXIT_HOOK_FAILED'],
+  ]);
+  assert.ok(!JSON.stringify(logs).includes('sensitive'));
+});
