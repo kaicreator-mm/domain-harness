@@ -19,6 +19,8 @@ CI=NOT_RUN_DOC_ONLY
 
 > **R18 · Knowledge 类型收敛：** 最新 [DataKnowledge + FunctionKnowledge 两基本类别，以及 FunctionKnowledge 的 stateful/external 两个独立属性](./DomainHarness_v0.11.2_R18_DATA_FUNCTION_KNOWLEDGE_TWO_AXES.md)作为更简单的抽象候选。Concept、Entity、Relation、Rule 条件、Intent 定义等均是**类型化 DataKnowledge**；Recognizer、Validator、Rule 求值、Decision、Tool 等对应的已选可信函数由 **FunctionKnowledge** 描述。函数知识查询只返回操作声明/引用，真正执行由外部 Business 静态 import 的 TS Function/Element 完成，不从数据库或 LLM 文本执行 JS。两个 Workflow 角色及 R17 用户确认策略均保持不变，不能依 stateful/external 自动推导授权。
 
+> **R19 最新 Owner 收敛方案：** [R19 静态 DataKnowledge + 原生 FunctionKnowledge 共同组成 Business Element；Workflow 业务接口生成期定义](./DomainHarness_v0.11.2_R19_STATIC_KNOWLEDGE_BUSINESS_ELEMENT_WORKFLOW_GENERATION_CONTRACT.md)。本 R15 中若将 Knowledge 描述为**运行时独立 Store/Registry、必须公共 KnowledgeSelection/ValidatedIntent/DomainDecision**，均只作历史候选；现阶段“两层”仅是语义知识与 Workflow 行为的**责任划分**，不是额外 Knowledge Runtime。DataKnowledge 硬编码不可变，FunctionKnowledge 可直接访问并自己维护状态；共享状态先组合到内聚 Element。业务具体 Workflow 输入输出无需统一，只有现有 SDK 标准 Workflow 的基础运行 Outcome 保留。
+
 ## 1. Domain Intelligence 的最小闭环
 
 ```text
