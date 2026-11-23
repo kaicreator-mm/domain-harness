@@ -1,4 +1,4 @@
-# DomainHarness v0.11.2 · R26 Native Domain Intelligence + Authorized Action L2 Design (Candidate)
+# DomainHarness v0.11.2 · R28 corrective revision of R26 Native Domain Intelligence + Authorized Action L2 (Candidate)
 
 ```ini
 OUTPUT_LABEL=DH_V0112_R26_FROZEN_L1_NATIVE_DOMAIN_INTELLIGENCE_L2_DESIGN
@@ -9,6 +9,9 @@ L2_ISSUE=#1703
 FROZEN_L1_PR=#1702
 FROZEN_L1_TRAIN_MERGE=72b38dff418d43ba35d8c89ef7edd59152460031
 PRODUCT_L1=FROZEN_SCOPE
+R27_REVIEW=REWORK_P0_0_P1_2_P2_2
+R27_REVIEW_HEAD=45cbdddcc3761aee2985b3da8991e1d69ffaee1f
+R28_CORRECTION=DESIGN_REWORK_PENDING_SQLITE_WINDOWS_LINUX_WITNESS_AND_SCOPED_REVIEW
 DESIGN_L2=CANDIDATE_NOT_INDEPENDENTLY_REVIEWED
 SDK_SOURCE=NOT_CHANGED
 TESTS_CI=NOT_RUN_DOC_ONLY
@@ -16,6 +19,8 @@ IMPLEMENTATION=ON_HOLD_PENDING_L2_REVIEW
 ```
 
 > **范畴：只设计，不编写 SDK 功能代码。** 唯一需求依据：[R25 Scope Freeze](../product/DomainHarness_v0.11.2_R25_PRODUCT_L1_SCOPE_FREEZE.md) + [R21 DI-L1-01–12](../product/DomainHarness_v0.11.2_R21_CONSOLIDATED_PRODUCT_L1_AFTER_R20_REWORK.md)。当前真实基线 API：`index.ts` 导出 `WorkflowElement<Input,Output>` / `StandardWorkflowOutcome` / `StandardWorkflowSession` / `NativeWorkflowContext.invoke/invokeOutcome/child/leaf`、标准 JSON/YAML Reader、生命周期 KDP。下述新类/接口是**L2 候选**，不可当作现有 SDK 或已运行通过的 TypeScript API。
+
+> **R28 补正（R27 REWORK, P1=2/P2=2）**：优先以本文件修正后的 §3、§4、§6 作为 L2 设计合同。SQLite 驱动的**唯一当前优先候选**是 `@photostructure/sqlite@2.5.0`，严格 `npm ci --ignore-scripts`，须以 Node22.12 Windows/Linux 真实 witness 判断能否纳入。Expression 正式选择**SDK 自带的无依赖、有限语法、只读 JSON AST 计算**（不采用 JSONata 作为默认引擎，不承诺 arbitrary-code wall-clock 硬停止）。同步事务的 Promise 拒绝和 Query 完整性边界已明确。**未验证的驱动资格、Win/Linux 结果仍标 BLOCKED，不得凭文档修正宣布 R27 P1-01 已关闭，也不能开展 SDK 源码实施**。
 
 ## 1. 物理模块和不新增的东西
 
@@ -57,58 +62,83 @@ class EligibilityElement {
 - SDK 自身不强制任何 `ValidatedIntent/DomainDecision/Result/Evidence` 业务结构，具体 Business 接口由生成期 TypeScript 类型与测试决定。所有六态仍保留：普通值经 `invoke`，已返回 WorkflowOutcome 的 Function 经 `invokeOutcome/leaf`，**UNKNOWN/REJECT/ASK/WAIT/FAILED 不能成为 COMPLETE.value**。
 - 只有已确定/验证的业务 Intent 进入 Handling；歧义与缺失停下，不能默认调用第一个 Tool。State/Capability/Effect 提交前若预算用尽不能触发业务副作用。
 
-## 3. BoundedQueryElement L2 最小公共 API 候选
+## 3. BoundedQueryElement · R28 P2-02 精确可观察合同
 
 ```ts
 type QueryLimits = Readonly<{ maxVisited: number; maxReturned: number }>;
 type QueryResult<T> = Readonly<{
-  items: readonly T[]; visited: number; truncated: boolean;
+  items: readonly T[];
+  visited: number;
+  complete: boolean; // **是否已遍历输入的全部记录并判断完所有 predicate**
+  truncated: boolean; // 与 complete 严格互补
+  truncationReason?: 'VISIT_LIMIT' | 'RESULT_LIMIT';
 }>;
 
-// 以下 T / 业务 predicate 必须来自生成期可信业务代码。
 class BoundedQueryElement {
+  // 可信业务生成期提供 predicate、源顺序；不得把字符串表达式 eval。
   select<T>(
     source: readonly T[],
     predicate: (item: T) => boolean,
-    limits: QueryLimits
+    limits: QueryLimits,
   ): QueryResult<T>;
 }
 ```
 
-- 限制必须是安全非负整数（业务可以选择 maxReturned=0 返回空）；**超 maxVisited 的 scan 不得先调用后续 predicate**，超 maxReturned 的额外命中必须按明确截断策略处理（不能默默当完整事实）。若业务需要“不能截断仍做确定决定”，应按 `truncated` 返回业务 UNKNOWN，而不是把部分列表当完备结论。
-- Query 不拥有 Domain/Version/Source/Time schema。**由 Business 提供类型化 predicate、来源/适用范围与可信排序函数**，SDK 提供可复用的上限/稳定顺序/失败边界；不能要求业务数据先注册在 SDK 语义表。
-- 运行时只验证真实的调用输入/限额，不复查已生成 Package/Element 的静态正确性。trusted `predicate` 可能抛异常，按普通函数错误向业务 Workflow 映射 FAILED；不执行动态 eval/predicate 文本。
-- 多领域直调 Query 与 Workflow 调用必须真正使用**同一 SDK 实现**；测试缺失/矛盾/失效/超时范围、无效日期和未知来源由各 Business 确切语义负责，SDK 不把未知事实神奇当真。
-- 如果后续数据规模较大，可用 Iterator/limit 扩展，但 v0.11.2 不引入通用数据库游标注册表或工作线程池。
+**输入**：`source` 是当前调用可完整枚举的只读数组，采用**调用方现有稳定顺序**（无隐式排序）；业务如需自定义全局稳定排序，须在调用前使用可信业务 comparator 排序，且该排序操作/成本不被 SDK scan limit 包装为“免费”，L2 对内存上限必须如实限定。所有上限为安全非负整数，单次调用是同步只读过程，不修改源或 Domain Knowledge。断言业务传入真实 Array 或不可变可枚举 Array；不接受不可信 Proxy/getter 或 async predicate，后者返回 Thenable 应作为 invalid callback 拒绝。函数抛错直接以安全、受控错误传播给业务映射为 FAILED，而不是返回部分成功。
 
-## 4. SQLite Store + 受控 SQL（硬实施可行性门）
+**停止/完整性的唯一规则**：
+- 按源顺序读取每个元素，然后每项**最多调用一次** predicate；`visited` 是实际已求值条数，绝不超过 `maxVisited`。
+- 每次访问之前，如果 `visited === maxVisited` 且尚有未访问元素，立即以 `complete=false,truncated=true,reason=VISIT_LIMIT` 停止；绝不执行下一条 predicate。
+- 若 `maxReturned>0` 且新匹配项使 `items.length === maxReturned`，只有**当前项正好是源数组最后一项**时才 `complete=true`；否则立即停止，`complete=false,truncated=true,reason=RESULT_LIMIT`。不多访问一条未知项来证明“后续无其他匹配”。
+- 若扫描完 `source.length` 且尚未触发上限，`complete=true,truncated=false`，包括正好 `maxVisited=source.length`、正好 `maxReturned=匹配总数` 且最后一项匹配。
+- `maxReturned=0`：如果 `source.length=0`，`complete=true` 且 `visited=0`；非空源不调用 predicate，立即 `complete=false,reason=RESULT_LIMIT,visited=0`。若 `maxVisited=0` 且输入非空而 `maxReturned>0`，为 `VISIT_LIMIT`；所有上限=0 时优先 `RESULT_LIMIT`（明确固定）。
+- 任何 `complete=false` 代表**候选/适用范围判断不完整**；对于需要完备事实才可授权/变更的业务，必须由该业务返回 UNKNOWN 或拒绝。SDK 不发明业务真值，不隐式增加预算，不使用“空结果=不存在”的推理。
 
-### 4.1 后端选择事实与初步结论
+**最小边界负例**：空源和 0/0，1 项源和 1/1 且匹配，2 项源和 maxReturned=1（第二项是否匹配不得被预先判断），2 项源和 maxVisited=1（第二项绝不被调用），输入顺序保持、非法 limit/同步抛错、同领域数据来自不同来源/失效由业务回调决定；在两个实际不同 Business Package 中复用同一 Standard Function/Element。
 
-**最低 Node `>=22.12.0`、无额外启动配置、Windows/Linux。** [Node 22.12 的官方 SQLite API 文档](https://nodejs.org/download/release/v22.12.0/docs/api/sqlite.html) 显示 `node:sqlite` 在该精确版本需 `--experimental-sqlite`；不能直接选它作为所有环境的**无启动参数**唯一 Provider。Node22.13+ 不要求该 flag 也不代表可以悄悄提高 SDK Node 最小版本。候选：
-- **首选评估** `@photostructure/sqlite`：宣称 Node22+、Windows/Linux 预编译库随 npm 包提供、不依赖安装期下载，参考 [其使用文档](https://photostructure.github.io/node-sqlite/) 和 [library comparison](https://photostructure.github.io/node-sqlite/documents/library-comparison.html)。**尚未在项目 Node22.12 Windows/Linux clean install 实测**；必须核对 lockfile、npm pack、原生模块 License/供应链、无未允许 npm lifecycle、副本 ABI、可运行的 file-backed transaction/CAS。不得把供应商宣称当 PASS。
-- **候选备选** `better-sqlite3` 最新支持版本：API 成熟，但可能带 node-gyp/install scripts 与平台二进制分发差异；如不符合既定生成/交付策略不可擅自增加 postinstall。
-- **条件备选** Node 内置 `node:sqlite`：只在已选运行环境和启动合同允许时；不能对所有 Node22.12 用户偷偷要求 flag。
-- WASM SQLite（如 `@sqlite.org/sqlite-wasm`）可作无 addon 候选，但**文件 VFS 持久化、跨进程 CAS/锁、事务语义必须真实验证**；单纯数据库序列化为文件不是可靠的跨进程事务边界。
+## 4. SQLite Store + 受控 SQL（R28 P1-01、P2-01）
 
-**L2 入场阻断条件**：选定 provider 不经过真实 Node22.12 clean packed SDK 的 Win/Linux 安装、启动、重开和双连接版本冲突试验前只能称 `PROVIDER_CANDIDATE_UNVERIFIED`。能由当前 Cloud/Linux 环境完成的测试先自行执行；只有必须 Windows 的有限环境结果才由一次性本地任务补证。若没有任何候选能满足目标环境，L2 必须 REWORK 或向 Owner 报明确产品约束冲突；不得不告知而降低/提高 Node 门槛、添加配置文件或取消 CAS。
+### 4.1 当前受控驱动选择 · 必须有可重复证据的 admission
 
-### 4.2 API、生命周期与事务
+**本版最低 `Node >=22.12.0`、Windows/Linux、无需额外启动参数、不需要预置配置文件；安装脚本默认不获批。** 22.12 的 `node:sqlite` 需要 `--experimental-sqlite`，不得偷偷升级 Node 最低版本。R27 核实 `@photostructure/sqlite@0.5.0` 元数据包含 `"install":"node-gyp-build"`，即“随包 prebuild”并不等于生命周期脚本自动符合政策。同期 `@appthreat/sqlite3` 最新已提升到 Node>=24，不符合本版最低 Node 限定，不能据“bundled no-install”说明直接采用。
+
+**唯一第一轮受控候选：`@photostructure/sqlite@2.5.0`（npm 发布确切版本，正式依赖必须经 lockfile 完整 pin；当前还不是 SDK 已接入依赖）**。目标仅验证 `win32-x64` 和 `linux-x64 + glibc >=2.31` 的预编译分发 profile；Windows ARM64、Linux ARM64/musl、旧 glibc 和其他 Target 在真实见证前不能宣称完整兼容，若现有产品范围被理解为需要这些平台本版强制交付，则须在范围冲突记录中裁定，不可静默降级。GitHub 上的 [Node >=22 声明](https://photostructure.github.io/node-sqlite/) 和 [GLIBC 门槛](https://photostructure.github.io/node-sqlite/documents/getting-started.html) 仅用于候选选择。
+
+**安装策略（先于 SDK 实施）**：在隔离临时项目用 exact `Node v22.12.0`、npm CLI、`npm install --save-exact --ignore-scripts @photostructure/sqlite@2.5.0`，然后从完整真实 `package-lock.json` 用 `npm ci --ignore-scripts` 重装；不执行任何传递依赖 install/prepack/prepare，不需要 `--experimental-*`。核对实际 npm pack/lock integrity、manifest 所有 lifecycle、实际 `prebuilds/`、已装载的 .node 对应 OS/arch/ABI 及开源许可/依赖，不允许静默触发源编译或外部二进制下载。**包的元数据含 install 字段可以记录为被忽略，不算满足“无脚本被执行”的反证**；若无脚本时预编译模块无法载入，候选就不合格，不能暗中放开脚本。
+
+**两种平台必须实际通过一份同样的验收程序**：
+1. 精确 Node22.12、环境（OS、arch、Linux libc）、实际 install 命令/exit、lock hash、package 版本、已安装二进制 digest、`--ignore-scripts` witness；
+2. 实际 ESM `import { DatabaseSync } from '@photostructure/sqlite'` 无 flags，真实基于临时路径的 DB 文件 open/create/commit/close/reopen/readback；
+3. 同一 file-backed DB **两个独立连接**竞争更新相同 resource/version：`UPDATE ... SET version=version+1 WHERE id=? AND version=?` 的 affected changes 总和恰为 1，另一方没有提交真实 Effect；独立事务失败触发 ROLLBACK；busy/locked 与权限错误分类可观察；
+4. 清理临时文件，输出脱敏日志与 SHA256，不回写仓库源码，不写密钥。生成的二进制和第三方代码不可当作 SDK 已验收发行产物。
+
+**证据门**：一份 Windows + 一份 Linux 的原始执行回执和必要的精确 lock/tarball/二进制 SHA256 才能将 `PROVIDER_ADMISSION` 提升至 `QUALIFIED`；现阶段 `UNVERIFIED_WINDOWS_LINUX_NODE2212`。如果只能证明一边，记录 `PARTIAL`、继续阻断 R27 P1-01。无法满足时优先评估合法的无脚本预编译替代；仅在 Owner **明确批准**时才允许针对一个确定版本/OS/脚本效果例外。WASM 候选必须提供跨进程文件 VFS/事务/CAS 真实证据；不以导入导出 SQLite 文件当可靠多进程原子事务。
+
+### 4.2 SQLite 同步事务 API · R28 P2-01
+
+以 `DatabaseSync` 驱动作为**本版最小确定性合同**，不提供伪 async transaction：
 
 ```ts
-// L2 轮廓，类型细节/同步或异步择一仍须真实 driver spike 验证。
+type NonThenable<T> = T extends PromiseLike<unknown> ? never : T;
+type SQLiteScalar = string | number | bigint | Uint8Array | null;
+interface SQLiteTransaction {
+  readonly active: boolean;
+  // 仅可信调用方/业务声明的 SQL 与 bind 值；tx 失效后立即拒绝。
+  run(sql: string, parameters: readonly SQLiteScalar[]): { changes: number };
+  get<T>(sql: string, parameters: readonly SQLiteScalar[]): T | undefined;
+}
 interface SQLiteConnection {
-  select<T>(staticSql: string, parameters: readonly SQLiteScalar[], limit: number): T[];
-  transaction<T>(work: (tx: SQLiteTransaction) => T): T;
+  select<T>(trustedSql: string, params: readonly SQLiteScalar[], limit: number): readonly T[];
+  transaction<T>(work: (tx: SQLiteTransaction) => NonThenable<T>): T;
   close(): void;
 }
-type SQLiteScalar = string | number | bigint | Uint8Array | null;
 ```
 
-- 连接由明确创建的 **SDK Standard SQLite Element 实例** 拥有；Business 创建/传递，不由 KDP 统一注册 DB。真实资源关闭由实例的 `Symbol.asyncDispose` 或明确 `close` 处理，服从已选 App 生命周期。若 driver 只有 sync API，不能把同步阻塞伪装成异步；长事务上限要受控制。
-- 只在受信任业务代码中选 SQL 文本/表名/列名，运行时不接受客户端提交的任意 SQL；**参数值使用 prepared/bind**，SQL query 模块只读，写操作封装在业务 Store/显式 transaction。禁止把对象键/字段名作为 SQL 字符串直接拼接。
-- SQLite 侧 state version compare-and-set 通过单个 **条件 UPDATE/INSERT + affected rows/unique key** 达成；BUSY/LOCKED/READONLY/CONSTRAINT 分类必须映射实际失败，不能捏造成功。事务回滚+重开读回+两个不同连接并发负例是硬 Oracle。
-- 可选择 WAL 与 busy timeout，但默认值/路径/并发范围受 Business 文件所有权约束，**首次应用启动不需要预制配置文件**；DB 文件路径可在启动后由 App 提供，未配置时不得未经允许创建业务文件。
+**硬执行顺序**：`BEGIN IMMEDIATE` → 同步 callback → 如果返回 `PromiseLike` / thenable，**在 COMMIT 之前同步拒绝并 ROLLBACK** → 普通结果才 COMMIT；callback throw/SQLite 错误先 ROLLBACK，记录原始主因并做脱敏错误分类。遇到同期激活 transaction 的嵌套/重入按明确业务合同拒绝或受控 SAVEPOINT，不能默默共享。回调返回后 Tx 对象即标为 inactive，之后任何 `run/get` 必须拒绝；检查 Node TypeScript `async () => ...`、返回真实 Promise、伪装 thenable、抛错/回滚、use-after-close 的正反例。静态 `NonThenable` 约束只是方便性，`any/unknown/JS` 必须依赖运行时 PromiseLike 拒绝。
+
+- 连接由普通应用实例拥有、可选 Exit/close，不由 KDP 调用中心创建。同步 DB 操作阻塞 Node JS 线程，事务设计需短、有限，不把已运行的数据库 IO 假装 async。业务持久状态/Attempt CAS 从真实 SQLite/Host 读取，生成期不可变 Data Knowledge 不得被 UPDATE 热改。
+- 只允许受信任 Business 提供 SQL 文本与选定表/列；参数使用预编译绑定，SQL Query 能力默认仅已解析的 readonly SELECT，写入在明确业务 Store/transaction；不要相信前缀 `SELECT` 的简单字符串判断即可隔离全部写副作用，必须依赖 prepared statement readonly/SQLite authorizer/可信 SQL 固定集合并测试侧效应。
+- 真实文件权限、BUSY/LOCKED/READONLY/CONSTRAINT/SQLITE_IOERR 按故障类型分类，不返回假 COMPLETE。开启 WAL 或 busy timeout 是 Resource Owner 明确选择，不强制业务启动前预置配置文件。
 
 ## 5. Vector 与 Graph Query 不另造 DBMS
 
@@ -133,12 +163,38 @@ type GraphLimits = { maxDepth: number; maxVisited: number; maxReturned: number }
 - 对生成期显式边/SQLite 有界查询结果运行 BFS/DFS 之一；按 from/to/type 和方向筛选，`visited` 集合限制环路和重复节点，每一 hop 在访问前检查预算；方向/关系类型必须由调用者确定，不把图路径推导成新领域真值。
 - 用真实负例：图环、逆向边、type 错配、无路径、非法上限/节点数量。不能从静态知识自动导出“有权写入新关系”。
 
-## 6. Expression：选择受限库与实际取消边界
+## 6. Expression · R28 P1-02 选择有限、纯 JSON AST，不引入默认 JSONata
 
-- 由 Business 生成期选定表达式并在函数/Workflow 中显式调用；不允许把外部模型返回的任意 JS/TS 源码当作可执行表达式。输入限定 JSON-compatible plain data，限制体积、深度、表达式复杂度及输出大小。无系统 FS、网络、Host Function 注册或不受限任意回调。
-- JSONata 可作为现有来源候选，但 JSONata 2.x `evaluate()` 是 async（[官方文档](https://docs.jsonata.org/2.1.0/using-nodejs)），当前 2026 年安全修复要参考 [GHSA-66mm-25pp-rfff](https://github.com/jsonata-js/jsonata/security/advisories/GHSA-66mm-25pp-rfff)：**不能继承旧 2.0.0 版本作为无需补丁的默认安全方案**；L2 选实际受维护并已修复版本，或选择等价更小的表达式库。
-- 若需向应用承诺真正的墙钟强制停止，必须采用**可终止的实际 Worker/子进程隔离执行**并测试同步 CPU 密集表达式、memory limit、并发、超时 terminate 和清理；单纯 `Promise.race` 或内部 `Date.now` 检查不等于硬取消。若不做隔离，明确仅支持可信有限表达式与协作预算，不能宣称 arbitrary untrusted expression hard kill。L1 `bounded` 的可观察测试必须与真实隔离能力匹配，不能缺省吞异常。
-- 性能优化/缓存仅属于这个 Element 实例，不改变 DataKnowledge，不创建 Global Expression Registry。Expression 结果返回业务值或明确的受控失败，不强制业务 `DomainResult` 结构。
+**最终 L2 选择**：SDK Standard `BoundedExpressionElement` 提供**语义明确、无循环/无函数调用的只读 JSON AST 运算**。Domain Package 在生成期写死 AST/纯数据；允许 Consumer 将通过上述**同一严格验证器**检查的纯 JSON AST 作为输入，但**不能**包含 JS function、getter、Proxy、Promise、可执行源码、callback、远端 API 或未选 Tool。实际业务复杂 Rule 仍是直接调用的原生 TS Function；本版绝不把全部 Rule 迁移到表达式 DSL，不建立第二 Workflow VM。
+
+```ts
+type Literal = string | number | boolean | null;
+// L2 示例，最终公开 names 以真实 SDK 的 TS 类型与测试为准。
+type Expr =
+  | { op: 'literal'; value: Literal }
+  | { op: 'get'; path: readonly string[] }
+  | { op: 'not'; arg: Expr }
+  | { op: 'and' | 'or' | 'eq' | 'ne' | 'lt' | 'le' | 'gt' | 'ge'
+      | 'add' | 'sub' | 'mul' | 'div'; args: readonly Expr[] };
+type ExpressionLimits = {
+  maxAstNodes: number;
+  maxAstDepth: number;
+  maxInputBytes: number;
+  maxOperations: number;
+  maxPathSegments: number;
+  maxStringBytes: number;
+};
+```
+
+**允许语法最小集**：literal/get/not、and/or 的短路、eq/ne 类型严格相同的标量比较、lt/le/gt/ge 有限数字比较、add/sub/mul/div 有限数字操作（div 除零拒绝、禁止 NaN/Infinity），不包含字符串拼接、regex、遍历、map/filter/transform、Lambda、函数/外部 Host 调用、任意原型查找、对象写入或用户自定义扩展。每种 op 限定 arity（not=1，and/or 1..8，比较/四则=2），严格标量类型，查找只允许当前 Plain JSON 输入自身显式拥有的字段（不走 prototype/getter，`__proto__`/`prototype`/`constructor` 永远拒绝）。缺失字段明确 INVALID_INPUT/UNKNOWN，不默认 0 或 false。接口只返回标量或受控错误；不能将不完整计算当确定结果。
+
+**有界执行方式**：先深度/广度检查整棵 AST，循环、自引用、过长字段与已知不支持的 op 立即 INVALID_EXPRESSION；输入受 `maxInputBytes` JSON-compatible 纯数据和 `maxStringBytes` 限制；递归 AST 只在 maxAstDepth 之内（也可实现迭代），每个 AST 节点及每一段 `get.path` 消耗 operation budget，在读取和计算**之前**检查剩余额度。预算必须有内置最大硬上限：默认 maxAstNodes<=128、maxAstDepth<=16、maxOperations<=256、maxPathSegments<=8、maxInputBytes<=32KiB、maxStringBytes<=4KiB；业务可选择更小但不能通过选项升高超过内建最大。所有 JS Number 有限且正确拒绝负零/安全精度损失时按具体算术 contract 处理。结果为单个纯标量，string <=maxStringBytes，不允许动态巨大对象/数组输出。
+
+**同步与终止**：所有操作无异步、等待、用户 callback、I/O 或 unbounded loop，因此在接受的 AST+Input 受控范围内以**有限节点/路径次数**确定终止。明确**不承诺面对任意恶意 JS 代码/Proxy/Getter 的抢占式 wall-clock CPU 强制杀死**；没有 Worker，也不对不可信任意表达式做 `Promise.race` 虚假超时。业务原生 TS Function 不受此受限表达式的运行预算保护。若未来要 JSONata/第三方表达式、递归/数组处理、hard timeouts，必须另行 L2 设计与真实隔离测试；JSONata <2.2.1 已有 [GHSA-66mm-25pp-rfff](https://github.com/jsonata-js/jsonata/security/advisories/GHSA-66mm-25pp-rfff)，**本阶段 SDK 不默认依赖 JSONata**，因此无需为本次新增安全依赖。
+
+**可证伪负例**：未知 `op`、非法 arity、嵌套超过 16、129 个 AST nodes、257 个操作步骤、过长输入、16KiB 字符串、除零、NaN、非 JSON getter/Proxy、async/Promise/返回 thenable、constructor/prototype path、无字段、循环 AST、短路路径没有调用不必要分支、无任何外部副作用/文件变化。永不允许改动任何生成期 Data Knowledge；输出错误码 `EXPRESSION_INVALID`、`EXPRESSION_LIMIT`、`EXPRESSION_INPUT`、`EXPRESSION_EVALUATION` 稳定且信息脱敏。
+
+**跨平台**：这是独立于 SQLite addon 的 TypeScript/Node22 同构 Standard Element，不引入 npm install scripts、特定 Host OS 或第二 Language Runtime。其真实 TS/Node 测试仍留待 L2 独立 ACCEPT 后的实施任务 T04。
 
 ## 7. Authorized Action 的可信边界（全部在 0.11.2）
 
@@ -180,6 +236,8 @@ type AttemptDisposition = 'NOT_SUBMITTED' | 'ADMITTED' | 'APPLIED' | 'REJECTED' 
 - **效果事实**只以真实 Host 回复或权威 readback 为准；丢 ACK、提交后本地日志断电/隔离、失联时保留 UNKNOWN 或相同 Attempt 查询。若远端可证明 ALREADY_APPLIED，返回已知事实而不重播。使用本地 SQLite 的业务示例可把条件提交、状态写入和 attempt journal 放入一个真实原子事务；另一个真实远端 Host 示例须证明相同不变量，不能假设跨系统 ACID。
 - 若普通 `invokeOutcome` 遇逃逸异常会映射成 `FAILED`，**可能已提交的 Host 异常必须在实际 Provider 边界先捕获并转 UNKNOWN**，不能让 Workflow 无法区分“失败前未提交”和“提交后 ACK 丢失”。
 - SDK 提供通用 DB/Workflow 机制而非统一域权限中央系统；领域级 Agent/LLM 始终没有自授工具权限。0.11.3 UI 只作为确认接口的可选实现，0.11.6 TaskRun checkpoint/异步恢复与本版基本 Attempt/Receipt 分离。
+
+> **R27 所指出的真正 L2 阻断项**：P1-02 Expression 在本 R28 文本中已选择具体可反证的 AST profile（不再等实现时选 JSONata/worker）；P2-01 同步事务和 P2-02 Query 完整性也有精确合同。**P1-01 仍存在真实 Win/Linux Node22.12 / ignore-scripts provider witness 未取得的阻断**；此设计明确了精确版本/平台/回执步骤，但不应在没有实际执行原始产物时直接申请无条件 `ACCEPT_SCOPED_L2_DESIGN`。
 
 ## 8. 最小任务 DAG、真实 Consumer 与否定证据
 
