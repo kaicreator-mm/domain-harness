@@ -130,3 +130,30 @@ test('T03 graph: invalid edge and negative budgets fail closed', () => {
   assert.throws(() => graph.search(edges, { start: 'A', direction: 'OUT',
     limits: { maxDepth: 1, maxVisited: -1, maxReturned: 1 } }), /DH_STD_QUERY_GRAPH_INPUT/u);
 });
+
+test('T03: query budgets are snapped once even if caller getters change values', () => {
+  const got: number[] = [];
+  let vReads = 0;
+  const options = {
+    topK: 1, dimension: 1, metric: 'L2' as const,
+    get maxVisited() { vReads += 1; return vReads === 1 ? 1 : 999; },
+  };
+  const vectorResult = vector.search([
+    { id: '1', vector: [1], item: 1 }, { id: '2', vector: [2], item: 2 },
+  ], [1], item => { got.push(item); return true; }, options);
+  assert.deepEqual(got, [1]);
+  assert.equal(vReads, 1);
+  assert.equal(vectorResult.visited, 1);
+  assert.equal(vectorResult.truncationReason, 'VISIT_LIMIT');
+  let gReads = 0;
+  const graphResult = graph.search(edges, {
+    start: 'A', direction: 'OUT',
+    limits: {
+      maxDepth: 3, maxReturned: 9,
+      get maxVisited() { gReads += 1; return gReads === 1 ? 1 : 999; },
+    },
+  });
+  assert.equal(gReads, 1);
+  assert.equal(graphResult.visited, 1);
+  assert.equal(graphResult.truncationReason, 'VISIT_LIMIT');
+});
