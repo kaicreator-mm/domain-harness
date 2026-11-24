@@ -34,12 +34,15 @@ function run(step, command, args, cwd, env = {}) {
   if(result.error || result.status !== 0) {
     // 不输出可能含 token 的 npm stderr；保留可诊断的受控 OS 错误码。
     // 仅保留受控 Business TypeScript 编译诊断，不输出 npm stderr 或环境。
-    if (step === 'INTENT_TYPECHECK' && typeof result.stdout === 'string') {
+    if ((step === 'INTENT_TYPECHECK' || step === 'ACTION_TYPECHECK') && typeof result.stdout === 'string') {
       const diagnostic = result.stdout.split(/\r?\n/u)
         .map(line => line.replaceAll(cwd,'<consumer>').replaceAll(root,'<workspace>'))
-        .filter(line => /^(?:(?:intent|node_modules)\/[A-Za-z0-9_@./-]+\(\d+,\d+\): )?error TS\d{4}: /u.test(line))
+        .filter(line => /^(?:(?:intent|action|node_modules)\/[A-Za-z0-9_@./-]+\(\d+,\d+\): )?error TS\d{4}: /u.test(line))
         .slice(0,40);
       for(const line of diagnostic) console.error('NATIVE_CONSUMER_TS_DIAGNOSTIC '+line.slice(0,1000));
+    }
+    if (step === 'ACTION_PROBE' && typeof result.stdout === 'string') {
+      for(const line of result.stdout.split(/\r?\n/u).filter(line => /^SDK_ACTION_CASE_FAILED \d{1,2}$/u.test(line)).slice(0,1)) console.error(line);
     }
     const code = result.error?.code;
     const safeCode = typeof code === 'string' && /^[A-Z0-9_]+$/u.test(code)
@@ -318,12 +321,34 @@ try {
     '--unhandled-rejections=strict','--input-type=module','--eval',intentProbe,
   ],consumer).trim(),'SDK_INTENT_PROBE_PASS 8');
 
+  // T06：正式 SDK 与相同业务源码，在仓外独立进程中验证真实 Host 和持久 Receipt。
+  cpSync(join(root,'examples/native-domain-app/action'),join(consumer,'action'),{recursive:true});
+  writeFileSync(join(consumer,'tsconfig-action.json'),JSON.stringify({
+    compilerOptions:{target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',
+      strict:true,noUnusedLocals:true,noUnusedParameters:true,noImplicitReturns:true,
+      exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,verbatimModuleSyntax:true,
+      skipLibCheck:true,types:['node'],typeRoots:[join(root,'node_modules/@types')],
+      lib:['ES2022','DOM','ESNext.Disposable'],rootDir:'action',outDir:'action-dist'},
+    include:['action/**/*.ts'],
+  },null,2));
+  run('ACTION_TYPECHECK',process.execPath,[
+    join(root,'node_modules/typescript/bin/tsc'),'--pretty','false','-p',join(consumer,'tsconfig-action.json'),
+  ],consumer);
+  const actionProbe=[
+    "import { actionCases } from './action-dist/verify.js';",
+    "for (const [i, [, verify]] of actionCases.entries()) { try { await verify(); } catch { console.log('SDK_ACTION_CASE_FAILED '+i); throw Error('ACTION_CASE_FAILED'); } }",
+    "console.log('SDK_ACTION_PROBE_PASS '+actionCases.length);",
+  ].join('\n');
+  assert.equal(run('ACTION_PROBE',process.execPath,[
+    '--unhandled-rejections=strict','--input-type=module','--eval',actionProbe,
+  ],consumer).trim(),'SDK_ACTION_PROBE_PASS 8');
+
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
     api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
     rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
     sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
-    noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true,intentWorkflows:true}));
+    noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true,intentWorkflows:true,authorizedAction:true}));
 } finally {
   if (process.env.DH_NATIVE_KEEP_EVIDENCE !== '1') rmSync(work,{recursive:true,force:true});
   else console.error('NATIVE_CONSUMER_EVIDENCE_DIR='+work);
