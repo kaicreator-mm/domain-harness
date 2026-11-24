@@ -33,9 +33,10 @@ function invalid(message: string): never {
 }
 function norm(vector: readonly number[], dimension: number): number {
   if (!Array.isArray(vector) || vector.length !== dimension) return invalid('VECTOR_DIMENSION');
+  const values = vector as readonly number[];
   let result = 0;
   for (let i = 0; i < dimension; i += 1) {
-    const value = vector[i];
+    const value = values[i];
     if (typeof value !== 'number' || !Number.isFinite(value)) return invalid('VECTOR_VALUE');
     result = Math.hypot(result, value);
   }
@@ -67,6 +68,7 @@ export class VectorQueryElement {
     if (!Array.isArray(source) || typeof inScope !== 'function' || types.isAsyncFunction(inScope) ||
         options === null || typeof options !== 'object') return invalid('VECTOR_INPUT');
     // 配额在调用任何业务 Scope 之前一次性快照并校验，后续回调不能修改本次上限。
+    const typedSource = source as readonly VectorCandidate<T>[];
     const { topK, maxVisited, dimension, metric } = options;
     if (!budget(topK) || !budget(maxVisited) || !Number.isSafeInteger(dimension) || dimension <= 0 ||
         (metric !== 'COSINE' && metric !== 'L2')) return invalid('VECTOR_INPUT');
@@ -80,11 +82,11 @@ export class VectorQueryElement {
         ? { matches: selected, visited, complete, truncated: false }
         : { matches: selected, visited, complete, truncated: true, truncationReason: reason };
     };
-    if (source.length === 0) return finish(true);
+    if (typedSource.length === 0) return finish(true);
     if (topK === 0) return finish(false, 'RESULT_LIMIT');
-    for (let i = 0; i < source.length; i += 1) {
+    for (let i = 0; i < typedSource.length; i += 1) {
       if (visited >= maxVisited) return finish(false, 'VISIT_LIMIT');
-      const candidate = source[i];
+      const candidate = typedSource[i];
       if (!candidate || typeof candidate !== 'object') return invalid('VECTOR_CANDIDATE');
       visited += 1;
       const decision: unknown = inScope(candidate.item);
@@ -140,6 +142,7 @@ export class GraphQueryElement {
   public search(edges: readonly TypedGraphEdge[], options: GraphQueryOptions): GraphQueryResult {
     if (!Array.isArray(edges) || !options || typeof options !== 'object') return invalid('GRAPH_INPUT');
     // 路径和边预算同样只接纳一份快照，避免重复 getter 读取带来不同合同。
+    const typedEdges = edges as readonly TypedGraphEdge[];
     const { start, target, direction, limits, relationTypes } = options;
     if (typeof start !== 'string' || start.length === 0 ||
         (target !== undefined && (typeof target !== 'string' || target.length === 0)) ||
@@ -166,7 +169,7 @@ export class GraphQueryElement {
       paths.push(Object.freeze({ nodes: Object.freeze([start]), edgeTypes: Object.freeze([]) }));
       return finish(true);
     }
-    if (edges.length === 0 || maxDepth === 0) return finish(true);
+    if (typedEdges.length === 0 || maxDepth === 0) return finish(true);
     if (maxReturned === 0) return finish(false, 'RESULT_LIMIT');
     const seen = new Set<string>([start]);
     const queue: Array<{ readonly node: string; readonly path: readonly string[]; readonly types: readonly string[] }> = [
@@ -175,9 +178,9 @@ export class GraphQueryElement {
     for (let index = 0; index < queue.length; index += 1) {
       const item = queue[index] as (typeof queue)[number];
       if (item.types.length >= maxDepth) continue;
-      for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
+      for (let edgeIndex = 0; edgeIndex < typedEdges.length; edgeIndex += 1) {
         if (visited >= maxVisited) return finish(false, 'VISIT_LIMIT');
-        const edge = edges[edgeIndex];
+        const edge = typedEdges[edgeIndex];
         visited += 1;
         if (!edge || typeof edge.from !== 'string' || !edge.from ||
             typeof edge.to !== 'string' || !edge.to || typeof edge.type !== 'string' || !edge.type) {
