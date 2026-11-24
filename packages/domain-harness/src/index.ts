@@ -3,3 +3,4 @@ export * from './kernel-lifecycle.js';
 export * from './standard-workflow.js';
 export * from './standard-files.js';
 export * from './native-workflow-composition.js';
+export * from './standard-query.js';
