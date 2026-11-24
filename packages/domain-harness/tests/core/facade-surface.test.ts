@@ -8,6 +8,8 @@ const expected = [
   'WorkflowElement',
   'XStateWorkflowElement',
   'BoundedQueryElement',
+  'SQLiteDatabaseElement',
+  'SQLiteDatabaseError',
   'JsonReader',
   'YamlReader',
   'readJson',

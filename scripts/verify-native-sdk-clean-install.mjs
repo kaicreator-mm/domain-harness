@@ -68,11 +68,33 @@ try {
   const installed=realpathSync(join(consumer,'node_modules/@kaicreator/domain-harness'));
   assert.notEqual(installed.startsWith(root),true,'must not be a workspace symlink');
   const installedPkg=JSON.parse(readFileSync(join(installed,'package.json'),'utf8'));
-  assert.deepEqual(Object.keys(installedPkg.dependencies).sort(),['xstate','yaml']);
+  assert.deepEqual(Object.keys(installedPkg.dependencies).sort(),['@photostructure/sqlite','xstate','yaml']);
   assert.deepEqual(Object.keys(installedPkg.exports),['.']);
   assert.deepEqual(Object.keys(manifest.dependencies),['@kaicreator/domain-harness']);
   assert.ok(existsSync(join(installed,'dist/index.d.ts')));
   assert.ok(existsSync(join(installed,'dist/index.js')));
+
+  // T02：正式包不得携带任何事务控制替换入口。tarball 清单、已安装的模块文件与模块命名空间三层核对；
+  // 仓内测试用的 instrumented 副本只存在于测试进程内，不得被打包。
+  const packedPaths=(details.files||[]).map(file=>file.path);
+  assert.ok(packedPaths.includes('dist/standard-sqlite.js'),'NATIVE_CONSUMER_PACK_LIST_INCOMPLETE');
+  assert.deepEqual(packedPaths.filter(path=>/INSTRUMENTED/iu.test(path)),[],'NATIVE_CONSUMER_INSTRUMENTED_FILE_PACKED');
+  const shippedControl=readFileSync(join(installed,'dist/standard-sqlite.js'),'utf8');
+  for(const marker of ['controlRunner','replaceControlRunnerForTests','runRealControl',
+    'sqliteDriverTestHooks','sqliteControlHooks','export default']) {
+    assert.equal(shippedControl.includes(marker),false,'NATIVE_CONSUMER_CONTROL_HOOK:'+marker);
+  }
+  assert.equal(shippedControl.split('this.#db.exec(sql)').length-1,1,'NATIVE_CONSUMER_CONTROL_SITE');
+  writeFileSync(join(consumer,'no-hook-probe.mjs'),[
+    "import assert from 'node:assert/strict';",
+    "import * as sdk from '@kaicreator/domain-harness';",
+    "const mod=await import(new URL('./standard-sqlite.js',import.meta.resolve('@kaicreator/domain-harness')));",
+    "assert.equal('default' in sdk,false);",
+    "assert.equal('default' in mod,false);",
+    "assert.deepEqual(Object.keys(mod).sort(),['SQLiteDatabaseElement','SQLiteDatabaseError']);",
+    "console.log('NO_CONTROL_HOOK');",
+  ].join('\n'));
+  assert.equal(run('NO_CONTROL_HOOK',process.execPath,['no-hook-probe.mjs'],consumer).trim(),'NO_CONTROL_HOOK');
 
   cpSync(join(root,'examples/native-domain-app/packages'),join(consumer,'packages'),{recursive:true});
   cpSync(join(root,'examples/native-domain-app/data'),join(consumer,'data'),{recursive:true});
@@ -98,7 +120,7 @@ try {
   });
 
   writeFileSync(join(consumer,'probe.mts'),[
-    "import { KernelLifecycle, JsonReader, StandardWorkflowSession } from '@kaicreator/domain-harness';",
+    "import { KernelLifecycle, JsonReader, SQLiteDatabaseElement, StandardWorkflowSession } from '@kaicreator/domain-harness';",
     "const life = new KernelLifecycle([]);",
     "const file = new JsonReader().read('{\"x\":1}');",
     "const flow = new StandardWorkflowSession({maxCalls:1,maxSteps:2,maxDepth:0});",
@@ -128,7 +150,17 @@ try {
     "void typedLife.execute(async () => 42);",
     "void new StandardWorkflowSession({maxCalls:1,maxSteps:2,maxDepth:0})",
     "  .run(ctx => ctx.invokeOutcome<number>(() => ({status:'REJECT',reason:{code:'DENIED',message:'denied'}})));",
-    "void life; void file; void flow;",
+    "const sqlite = new SQLiteDatabaseElement(':memory:');",
+    "const inserted = sqlite.transaction(tx => tx.run('CREATE TABLE s (v INTEGER)', []).changes);",
+    "const picked = sqlite.select<{ v: number }>('SELECT v FROM s', [], 1);",
+    "// @ts-expect-error async callbacks cannot drive a synchronous transaction",
+    "sqlite.transaction(async () => 1);",
+    "// @ts-expect-error a returned Promise must be rejected before commit",
+    "sqlite.transaction(() => Promise.resolve(1));",
+    "// @ts-expect-error a Promise-carrying union is rejected as a transaction value",
+    "sqlite.transaction(() => Math.random() > 0.5 ? 1 : Promise.resolve(2));",
+    "sqlite.close();",
+    "void life; void file; void flow; void inserted; void picked; void sqlite;",
   ].join('\n'));
   writeFileSync(join(consumer,'tsconfig.json'),JSON.stringify({
     compilerOptions:{strict:true,noEmit:true,target:'ES2022',module:'NodeNext',
@@ -147,10 +179,62 @@ try {
   ].join('\n');
   run('PRIVATE_EXPORT',process.execPath,['--input-type=module','--eval',deny],consumer);
 
+  // T02：安装树必须携带 tarball 自带的原生 prebuild（lifecycle 全程被忽略）。
+  const prebuildDir=join(consumer,'node_modules/@photostructure/sqlite/prebuilds');
+  assert.ok(existsSync(prebuildDir),'NATIVE_CONSUMER_MISSING_SQLITE_PREBUILDS');
+
+  // T02：干净安装的 packed SDK 上跑真实文件 DB：rollback/reopen/两连接 CAS。
+  writeFileSync(join(consumer,'sqlite-probe.mjs'),[
+    "import assert from 'node:assert/strict';",
+    "import { mkdtempSync, rmSync } from 'node:fs';",
+    "import { tmpdir } from 'node:os';",
+    "import { join } from 'node:path';",
+    "import { SQLiteDatabaseElement, SQLiteDatabaseError } from '@kaicreator/domain-harness';",
+    "const folder=mkdtempSync(join(tmpdir(),'dh-sdk-sqlite-'));",
+    "const file=join(folder,'store.sqlite');",
+    "const first=new SQLiteDatabaseElement(file);",
+    "const second=new SQLiteDatabaseElement(file);",
+    "try {",
+    "  first.transaction(tx=>{",
+    "    tx.run('CREATE TABLE resource (id INTEGER PRIMARY KEY, version INTEGER NOT NULL)', []);",
+    "    tx.run('INSERT INTO resource VALUES (1, 0)', []);",
+    "  });",
+    "  assert.throws(()=>first.transaction(tx=>{",
+    "    tx.run('UPDATE resource SET version=5 WHERE id=1', []);",
+    "    throw Error('business-rollback');",
+    "  }), /business-rollback/u);",
+    "  const sql='UPDATE resource SET version=version+1 WHERE id=? AND version=?';",
+    "  const applied=first.transaction(tx=>tx.run(sql,[1,0]).changes);",
+    "  const refused=second.transaction(tx=>tx.run(sql,[1,0]).changes);",
+    "  assert.equal(applied+refused,1);",
+    "  assert.equal(second.select('SELECT version FROM resource WHERE id=1',[],1)[0]?.version,1);",
+    "  try { new SQLiteDatabaseElement(join(folder,'missing','x.sqlite'));",
+    "    assert.fail('open must fail');",
+    "  } catch (error) {",
+    "    if (!(error instanceof SQLiteDatabaseError && error.code==='OPEN' &&",
+    "        !error.message.includes(folder))) throw error;",
+    "  }",
+    "  first.close();",
+    "  const reopened=new SQLiteDatabaseElement(file);",
+    "  assert.equal(reopened.select('SELECT version FROM resource WHERE id=1',[],1)[0]?.version,1);",
+    "  reopened.close();",
+    "  second.close();",
+    "  console.log('SDK_SQLITE_PROBE_PASS');",
+    "} finally {",
+    "  try { first.close() } catch {}",
+    "  try { second.close() } catch {}",
+    "  rmSync(folder,{recursive:true,force:true});",
+    "}",
+  ].join('\n'));
+  const sqliteResult=run('SQLITE_PROBE',process.execPath,['sqlite-probe.mjs'],consumer);
+  assert.equal(sqliteResult.trim(),'SDK_SQLITE_PROBE_PASS');
+
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
     api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
-    rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true}));
+    rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
+    sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
+    noTransactionControlHook:true}));
 } finally {
   if (process.env.DH_NATIVE_KEEP_EVIDENCE !== '1') rmSync(work,{recursive:true,force:true});
   else console.error('NATIVE_CONSUMER_EVIDENCE_DIR='+work);
