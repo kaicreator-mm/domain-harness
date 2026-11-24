@@ -408,6 +408,24 @@ test('T02: terminal transaction failures are typed, poisoned and sanitized (cont
       ['ROLLBACK_FAILED_BUSINESS', 'ROLLBACK_FAILED', 'transaction', 'BUSINESS', 'BUSY', true, false, []],
       ['ROLLBACK_FAILED_SDK', 'ROLLBACK_FAILED', 'transaction', 'CONSTRAINT', 'LOCKED', true, false, []],
     ])
+  // 终态元数据只来自 SDK 内部的可信快照：公开构造器给的 code/stage、嵌套 cause、伪造原型、Proxy、
+  // 被改写的公开属性都不会进入终态错误；SDK 自建实例的诊断语义保持。
+  const business = ['ROLLBACK_FAILED', 'BUSINESS', 'BUSY', { code: 'SQL', message: 'DH_STD_SQLITE_SQL (callback)' }, []]
+  assert.deepEqual(
+    evidence.filter(item => item.event === 'PROVENANCE').map(item => [item.scenario, item.code,
+      item.primaryCode, item.rollbackCode, item.cause, item.leaks]),
+    [
+      ['PUBLIC_CTOR_SENSITIVE_STAGE', ...business],
+      ['PUBLIC_CTOR_INVALID_CODE', ...business],
+      ['PUBLIC_CTOR_NESTED_CAUSE', ...business],
+      ['FORGED_INSTANCE', ...business],
+      ['PROXY_WRAPPED_SDK_ORIGIN', ...business],
+      ['PROVIDER_ERROR_PASSTHROUGH', ...business],
+      ['SDK_ORIGIN_MUTATED', 'ROLLBACK_FAILED', 'CONSTRAINT', 'LOCKED',
+        { code: 'CONSTRAINT', message: 'DH_STD_SQLITE_CONSTRAINT (write)' }, []],
+      ['COMMIT_UNKNOWN_PUBLIC_ERROR', 'COMMIT_UNKNOWN', 'BUSINESS', undefined,
+        { code: 'SQL', message: 'DH_STD_SQLITE_SQL (callback)' }, []],
+    ])
 })
 
 // 静态类型负例仅编译，不执行非法回调。

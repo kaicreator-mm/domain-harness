@@ -275,6 +275,129 @@ try {
       persistedVersion: 0, poisoned: true, staleActive: stale.active, leaks: leaks(caught) })
   }
 
+  // 4. 终态元数据只来自 SDK 内部的可信快照。公开构造器的 code/stage 是调用方给的任意值，
+  //    不是信任来源：以下反例各自在真实事务 + ROLLBACK 注入失败的路径上核对。
+  const failRollback = code => (target, sql) => {
+    if (sql === 'ROLLBACK') throw injected({ errcode: code, sqliteCode: code, sqliteExtendedCode: code })
+    target.exec(sql)
+  }
+  const provenance = [
+    // R37 的反例：业务用公开构造器给出敏感 stage。
+    ['PUBLIC_CTOR_SENSITIVE_STAGE', tx => {
+      tx.run('UPDATE resource SET version=1 WHERE id=1', [])
+      throw new SQLiteDatabaseError('SQL', `SECRET_STAGE ${sentinels.path} ${sentinels.sql}`)
+    }],
+    ['PUBLIC_CTOR_INVALID_CODE', tx => {
+      tx.run('UPDATE resource SET version=1 WHERE id=1', [])
+      throw new SQLiteDatabaseError(`SECRET_CODE ${sentinels.token}`, `SECRET_STAGE ${sentinels.path}`)
+    }],
+    ['PUBLIC_CTOR_NESTED_CAUSE', tx => {
+      tx.run('UPDATE resource SET version=1 WHERE id=1', [])
+      throw new SQLiteDatabaseError('SQL', 'looks harmless', {},
+        { cause: new Error(`SECRET_NESTED ${sentinels.token} ${sentinels.path}`) })
+    }],
+    // 只伪造原型以通过 instanceof，并不是 SDK 创建的实例。
+    ['FORGED_INSTANCE', tx => {
+      tx.run('UPDATE resource SET version=1 WHERE id=1', [])
+      const forged = new Error(`SECRET_FORGED ${sentinels.path}`)
+      Object.setPrototypeOf(forged, SQLiteDatabaseError.prototype)
+      throw forged
+    }],
+    ['PROXY_WRAPPED_SDK_ORIGIN', tx => {
+      let origin
+      assert.throws(() => tx.run("INSERT INTO resource VALUES (1, 0, 'duplicate')", []),
+        error => { origin = error; return true })
+      throw new Proxy(origin, {})
+    }],
+    // 业务自建实例经参数 getter 抛出后会原样穿过 SDK 的归类函数：原样返回不等于被登记为可信。
+    ['PROVIDER_ERROR_PASSTHROUGH', tx => {
+      const own = new SQLiteDatabaseError('SQL', `SECRET_PASSTHROUGH ${sentinels.sql}`)
+      const hostile = []
+      Object.defineProperty(hostile, 0, { get() { throw own } })
+      assert.throws(() => tx.run('UPDATE resource SET version=1 WHERE id=?', hostile), error => error === own)
+      throw own
+    }],
+  ]
+  for (const [scenario, work] of provenance) {
+    const { folder, file, db } = createStore()
+    const { stale, caught } = attempt(db, failRollback(5), work)
+    assert.ok(caught instanceof SQLiteDatabaseError)
+    assert.equal(caught.code, 'ROLLBACK_FAILED')
+    assert.equal(caught.stage, 'transaction')
+    assert.equal(caught.primaryCode, 'BUSINESS')
+    assert.equal(caught.rollbackCode, 'BUSY')
+    assert.ok(caught.cause instanceof SQLiteDatabaseError)
+    assert.equal(caught.cause.code, 'SQL')
+    assert.equal(caught.cause.message, 'DH_STD_SQLITE_SQL (callback)')
+    assert.equal(caught.cause.cause, undefined)
+    assert.deepEqual(leaks(caught), [])
+    assertPoisoned(db, stale)
+    assert.deepEqual(readBack(file), { version: 0, rows: 1 })
+    rmSync(folder, { recursive: true, force: true })
+    evid({ event: 'PROVENANCE', scenario, testType: 'CONTROLLED_FAULT_INJECTION', code: caught.code,
+      primaryCode: caught.primaryCode, rollbackCode: caught.rollbackCode,
+      cause: { code: caught.cause.code, message: caught.cause.message }, leaks: leaks(caught) })
+  }
+
+  // SDK 自己创建的实例被 JS 改写后：终态仍使用创建时的可信快照，而不是被改写的公开属性。
+  {
+    const { folder, file, db } = createStore()
+    const { stale, caught } = attempt(db, failRollback(0x106), tx => {
+      let origin
+      assert.throws(() => tx.run("INSERT INTO resource VALUES (1, 0, 'duplicate')", []),
+        error => { origin = error; return true })
+      assert.ok(origin instanceof SQLiteDatabaseError)
+      origin.code = `SECRET_CODE ${sentinels.token}`
+      origin.stage = `SECRET_STAGE ${sentinels.path}`
+      origin.message = `SECRET_MESSAGE ${sentinels.sql}`
+      origin.cause = new Error(`SECRET_CAUSE ${sentinels.token}`)
+      origin.primaryCode = 'BUSINESS'
+      throw origin
+    })
+    assert.ok(caught instanceof SQLiteDatabaseError)
+    assert.equal(caught.code, 'ROLLBACK_FAILED')
+    assert.equal(caught.primaryCode, 'CONSTRAINT')
+    assert.equal(caught.rollbackCode, 'LOCKED')
+    assert.ok(caught.cause instanceof SQLiteDatabaseError)
+    assert.equal(caught.cause.code, 'CONSTRAINT')
+    assert.equal(caught.cause.message, 'DH_STD_SQLITE_CONSTRAINT (write)')
+    assert.equal(caught.cause.cause, undefined)
+    assert.equal(caught.cause.primaryCode, undefined)
+    assert.deepEqual(leaks(caught), [])
+    assertPoisoned(db, stale)
+    assert.deepEqual(readBack(file), { version: 0, rows: 1 })
+    rmSync(folder, { recursive: true, force: true })
+    evid({ event: 'PROVENANCE', scenario: 'SDK_ORIGIN_MUTATED', testType: 'CONTROLLED_FAULT_INJECTION',
+      code: caught.code, primaryCode: caught.primaryCode, rollbackCode: caught.rollbackCode,
+      cause: { code: caught.cause.code, message: caught.cause.message }, leaks: leaks(caught) })
+  }
+
+  // COMMIT 返回丢失时抛出的是公开类实例：同样不信任其字段。
+  {
+    const { folder, file, db } = createStore()
+    const { stale, caught } = attempt(db, (target, sql) => {
+      if (sql === 'COMMIT') {
+        target.exec(sql)
+        throw new SQLiteDatabaseError('SQL', `SECRET_COMMIT ${sentinels.path}`, {},
+          { cause: new Error(`SECRET_NESTED ${sentinels.token}`) })
+      }
+      target.exec(sql)
+    }, tx => tx.run('UPDATE resource SET version=version+1 WHERE id=1', []).changes)
+    assert.ok(caught instanceof SQLiteDatabaseError)
+    assert.equal(caught.code, 'COMMIT_UNKNOWN')
+    assert.equal(caught.primaryCode, 'BUSINESS')
+    assert.ok(caught.cause instanceof SQLiteDatabaseError)
+    assert.equal(caught.cause.message, 'DH_STD_SQLITE_SQL (callback)')
+    assert.equal(caught.cause.cause, undefined)
+    assert.deepEqual(leaks(caught), [])
+    assertPoisoned(db, stale)
+    assert.deepEqual(readBack(file), { version: 1, rows: 1 })
+    rmSync(folder, { recursive: true, force: true })
+    evid({ event: 'PROVENANCE', scenario: 'COMMIT_UNKNOWN_PUBLIC_ERROR', testType: 'CONTROLLED_FAULT_INJECTION',
+      code: caught.code, primaryCode: caught.primaryCode, rollbackCode: caught.rollbackCode,
+      cause: { code: caught.cause.code, message: caught.cause.message }, leaks: leaks(caught) })
+  }
+
   // 错误分类：只在 BEGIN IMMEDIATE 上注入受控 SQLite 码，验证 SDK 归类与前置拒绝后的连接状态。
   // 受控注入不等于真实 IO/LOCKED 环境故障；真实触发方式本版没有。
   for (const [fields, expected] of [
