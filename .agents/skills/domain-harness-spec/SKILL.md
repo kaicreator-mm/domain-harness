@@ -18,6 +18,7 @@ description: DomainHarness v0.11.x 唯一规范导航；TypeScript 原生 Packag
 ## 生成/审查要点
 
 - Package 是静态 ESM 插件集合；Element 是一个内聚 Class；Function 是模块函数/类方法。优先复用 SDK Standard Elements；Business 不够用再自定义。
+- 按 [CORE-13/14](../../../docs/specs/domain-harness/core.md) 与 [QA-09](../../../docs/specs/domain-harness/engineering-quality.md)：优先使用 SDK 的实际 Standard 实现，不重复生成通用机制；先分析真实领域需求，再辨识领域专有规则和通用职责。遇到共同能力缺口，记录真实用途、重复实现及 SDK 改进候选，不虚构已有 API，不为省代码降低业务正确性。SDK 设计/审查优先验证 Agent 凭公开入口、类型、规范和本 Skill 可完成真实任务，并兼顾人类用同一 API 手工实现；不强制另设 DSL、生成器或 Runtime。
 - 元数据是框架读取的普通 TS 代码（如 Order）；TSDoc/JSDoc 与本 Skill 说明责任，不产生独立运行时选择/权限模型。
 - 静态 import 与 npm 直接依赖；KDP Order=0，Core Order 互异。生成期检查结构/TS 类型/必要测试，不让 SDK 运行期重建依赖、Lock/Pin、函数分派。
 - Init/Exit 可选，无则跳过；框架按 Order 正常启动并在未捕获异常时打印脱敏日志、执行可行 Exit、失败退出。
