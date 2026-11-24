@@ -18,7 +18,6 @@
 | CORE-10 | 业务自行处理预期业务错误；非业务的代码/结构缺陷在生成期尽可能消除；未捕获异常时 KDP 最终兜底：脱敏日志、实际 Exit Hook、失败退出。 |
 | CORE-11 | 一个 Package/Domain App 的直接执行闭包只有同一种语言与 Runtime。不同语言使用 DIS 语义与各自语言 Profile，不建立多语言混合执行 VM。 |
 | CORE-12 | GitHub Exact SHA 与实际测试/审核才是交付证据。规范、源码、CI/Review 资格分开；不虚报 PASS，不因旧 SHA 通过就断言新代码已实现。 |
-
 | CORE-13 | **标准实现优先（Standard Implementation First）**：对有明确、可观察的跨用途复用价值的非领域专有重复性应用能力，SDK 应提供真正可直接使用的 Standard 实现，而非仅接口、抽象类、示例或要求每个 Business 重写。让生成者聚焦领域知识、规则、专业计算及业务组合；不重复包装已足够便利的原生语言/运行时能力，不将领域政策硬编码为标准。具体职责见 [EL-04/EL-08](./element-package.md) 与 [QA-09](./engineering-quality.md)。 |
 | CORE-14 | **Agent First, Human Compatible**：SDK 的核心设计目标之一是优先降低 LLM/Agent 理解、生成、组合、验证、修改及维护 Domain App 的成本，同时兼顾人类手工编程。采用清晰一致的原生语言 API、明确的类型/语义/边界、可直接复用的实现、可发现的规范与 Skill 导航及真实用例；不为 Agent 另建必需 DSL、执行 Runtime、专用生成器或第二套 API，不把生成者的正确性义务转移给 SDK Runtime。 |
 
