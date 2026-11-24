@@ -10,6 +10,8 @@ const expected = [
   'BoundedQueryElement',
   'SQLiteDatabaseElement',
   'SQLiteDatabaseError',
+  'VectorQueryElement',
+  'GraphQueryElement',
   'JsonReader',
   'YamlReader',
   'readJson',
