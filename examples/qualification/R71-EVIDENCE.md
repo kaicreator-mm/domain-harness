@@ -1,0 +1,23 @@
+# R71 · R70 remaining two P1 / one P2 targeted correction
+Task #1720, PR #1721, review base 0c48b0ee4f8aabc86b279276c0e6c4fa34f496d7; [R70 review](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7142835802). No SDK change; retain R70 closed-scoped findings. Author execution only, independent review pending.
+
+## Scope / root cause
+- R70-P1-01: source and derivative still use supported square-pixel/nonrotated video geometry. Actual ffmpeg scale now setsar=1 after even-dimension scaling; source 640x478 -> 320x240, real ffprobe SAR 1:1, existing pixel tolerance and track duration comparison retained. Distinguish selected video seconds and containerSeconds; require finite positive full-container duration, reject if either exceeds original policy 10s. Actual video1s/audio11s/container11s REJECT DURATION_LIMIT. Not a new policy or audio preservation requirement. MOV and truncated input negatives preserved.
+- R70-P1-02: application shared CLI is trusted foreground tool adapter, on Linux own process group; same-group processes get SIGKILL once when stopping or immediately on direct exit (including normal success). No repeated/delayed group signaling after reap, ESRCH means already absent; other signal errors CLI_CLEANUP_FAILED; missing exit after 250ms grace CLI_REAP_TIMEOUT, not successful cleanup. Successful output drains before resolution. Direct PID ESRCH and absent late marker tested for inherited-pipe timeout and nonzero/signal/overflow/success same-group descendants without inherited pipes. The successful tool witness deliberately unrefs the background child; first test attempt failed because a ref'd child kept the foreground parent alive until marker was written, fixed test fixture, not claimed first-pass. Does not prove containment of escaped process groups, arbitrary untrusted tools, all PID reuse races, or non-Linux group management; other platforms direct-child only.
+- R70-P2-01: move strict source decode to explicit stage inside same already-budgeted conversion step (previous derive performed it internally), keep conversion and derivative validation distinct. Safe reason.code remains CLI_EXIT_<code>, reason.message includes fixed stage plus code, no raw stderr or input path. Actual strict truncated-source FFmpeg exit183 matched SOURCE_DECODE; deliberately inject real failing subprocess at conversion with private stderr marker, assert exact MEDIA_CONVERSION: CLI_EXIT_7 and zero new catalog rows. No alteration to SDK generic fallback, no claim raw stderr safe to print. Workflow still 19 calls/24 steps/depth2, no added root.
+
+## Exact execution
+Linux Debian13 x64 Node22.16.0; existing R69 isolated retained installation trees copied separately, not fresh npm install. Same SDK bytes in both trees (diff -qr equal); previous R63/R69 retained SDK qualification reused; no new SDK/solver/config/dependency changes. Strict TS skipLibCheck:false, actual FFmpeg/ffprobe, Sharp/libvips, SQLite, independent HTTP Host and SciPy. Final commands in separate applications: env -u NODE_PATH -u NODE_OPTIONS npm run verify (pipefail), media EXIT0, workshop EXIT0. Additional workshop with PATH=/nonexistent and explicit resolved Node/Python paths EXIT0; first command used wrong /usr/bin/node (exit127), corrected to actual Node path; final no-media log identical to R69. No root CI/lint or Windows claim; CI path excluded, new lock/clean install still UNKNOWN (R69 ENOTCACHED). R70 ruled those not standalone blockers for limited Linux retained-dependency qualification.
+- [R71-media.stdout.txt](R71-media.stdout.txt): 1704 bytes, SHA256 d9b826da83e12e71cf174afecf21933785e049fb979a2014bf898450b93c8a72
+- [R71-workshop.stdout.txt](R71-workshop.stdout.txt): 852 bytes, SHA256 4f74f46cd99237672e6c339e14b3177abfd20c22ed9d1610818ced13b1269cf2
+- [R71-workshop-no-media-tools.stdout.txt](R71-workshop-no-media-tools.stdout.txt): 756 bytes, SHA256 bddc71f4c50315609e888489538d3ec6eb8d5aefe542590f89922709c7399de2
+Workshop logs are byte-identical to R69 after actual new execution. Media 30 negative labels; rounding and foreground-success cleanup positive witnesses, four actual archived files, two tenants, readback without write approval and staging clean.
+
+## Exact source/log Git blobs (local computed, GitHub verified)
+shared/cli.ts bdb16311e56a2a129cb0ebb0e87936bd41c84ef6
+media-archive/media.ts c08390dc4a91917c643728de55cc451d481d179d
+media-archive/archive.ts dfd7b1cb41df5b43957a86d28738b7872cf708e3
+media-archive/verify.ts 7ae3c561f6c3e6ece6566c9bab0e8e16f9153bc0
+R71-media.stdout.txt ab005e91626732b198fbd82b6cc156c3bba04ed1
+R71-workshop.stdout.txt 76731f30c1fe67bf2a5f5bc6a5cdd9131b5c34a4
+R71-workshop-no-media-tools.stdout.txt 2fc37a7dcce5109cb7c29c7d3f0f82c5c03111e0

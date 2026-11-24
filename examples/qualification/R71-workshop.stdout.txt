@@ -1,0 +1,5 @@
+
+> verify
+> tsc -p tsconfig.json && node --unhandled-rejections=strict dist/workshop/verify.js
+
+{"status":"WORKSHOP_PROBE_PASS","baseline":{"starts":{"a-inspect":1,"a-repair":3,"a-qc":6,"b-inspect":0,"b-repair":1,"b-qc":3},"makespan":7,"solver":"1.17.0","revision":"shop-v1","impact":["a-repair","a-qc"]},"revision":{"starts":{"a-inspect":2,"a-repair":6,"a-qc":9,"b-inspect":0,"b-repair":1,"b-qc":7},"makespan":10,"solver":"1.17.0","revision":"shop-v2","impact":["a-repair","a-qc"]},"referenceMakespans":[7,10],"solverCalls":4,"negative":["infeasible","call-budget","depth-budget","missing","duplicate","cycle","missing-predecessor","malformed-solver","missing-cli","total-call-budget","total-step-budget","required-edge","unknown-stage","invalid-policy","invalid-solver-starts","nonoptimal","solver-timeout"],"orderIndependent":true,"immutable":true}

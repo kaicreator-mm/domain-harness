@@ -74,20 +74,41 @@ try{
   assert.deepEqual(await app.plan([image,disguised],limits),{status:'REJECT',reason:{code:'VIDEO_CONTAINER',message:'VIDEO_CONTAINER'}});
   await cli.run('ffmpeg',['-nostdin','-v','error','-f','lavfi','-i','color=c=blue:s=640x480:r=10','-t','2','-c:v','mpeg4','-movflags','faststart',full]);
   const bytes=await readFile(full);await writeFile(truncated,bytes.subarray(0,Math.floor(bytes.length*.65)));
-  const broken=await app.plan([image,truncated],limits);assert.notEqual(broken.status,'COMPLETE');assert.equal(catalog.count('a'),2);assert.equal(catalog.count('b'),1);
+  let decodeCode='';await assert.rejects(cli.run('ffmpeg',['-nostdin','-v','error','-xerror','-i',truncated,'-f','null','-']),error=>{assert.ok(error instanceof Error);decodeCode=error.message;return /^CLI_EXIT_\d+$/.test(decodeCode);});
+  const broken=await app.plan([image,truncated],limits);assert.deepEqual(broken,{status:'UNKNOWN',reason:{code:decodeCode,message:`SOURCE_DECODE: ${decodeCode}`}});
+  const rounded=join(root,'rounded.mp4');await cli.run('ffmpeg',['-nostdin','-v','error','-f','lavfi','-i','color=c=blue:s=640x478:r=10:d=1','-c:v','mpeg4',rounded]);
+  const roundedPlan=await app.plan([image,rounded],limits);assert.equal(roundedPlan.status,'COMPLETE');if(roundedPlan.status!=='COMPLETE')throw Error('ROUNDED_PLAN');
+  const roundedAsset=roundedPlan.value.assets[1]!;assert.deepEqual([roundedAsset.source.width,roundedAsset.source.height,roundedAsset.output.width,roundedAsset.output.height],[640,478,320,240]);
+  const sar=(await cli.run('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=sample_aspect_ratio','-of','default=nw=1:nk=1',roundedAsset.derivativePath])).trim();assert.equal(sar,'1:1');await roundedPlan.value.dispose();
+  const longAudio=join(root,'long-audio.mp4');await cli.run('ffmpeg',['-nostdin','-v','error','-f','lavfi','-i','color=c=blue:s=64x48:r=10:d=1','-f','lavfi','-i','sine=frequency=1000:sample_rate=8000:duration=11','-c:v','mpeg4','-c:a','aac',longAudio]);
+  const longInfo=await new VideoElement(cli).inspect(longAudio);assert.equal(longInfo.seconds,1);assert.ok(longInfo.containerSeconds!>10);
+  assert.deepEqual(await app.plan([image,longAudio],limits),{status:'REJECT',reason:{code:'DURATION_LIMIT',message:'DURATION_LIMIT'}});
+  // Real failed subprocess injected only at conversion, not a fake successful decode.
+  class ConversionFailureCli extends CliElement {override run(file:string,args:readonly string[]):Promise<string>{return args.includes('-vf')?super.run(process.execPath,['-e','console.error("PRIVATE_INPUT_MARKER");process.exit(7)']):super.run(file,args);}}
+  const failedConversion=await new ArchiveElement(new VideoElement(new ConversionFailureCli()),policy,root).plan([image,video],limits);
+  assert.deepEqual(failedConversion,{status:'UNKNOWN',reason:{code:'CLI_EXIT_7',message:'MEDIA_CONVERSION: CLI_EXIT_7'}});assert.equal(catalog.count('a'),2);assert.equal(catalog.count('b'),1);
   const thin=join(root,'thin.png');await sharp({create:{width:640,height:7,channels:3,background:'#abc'}}).png().toFile(thin);const thinResult=await app.plan([thin,video],limits);assert.equal(thinResult.status,'COMPLETE');if(thinResult.status==='COMPLETE'){assert.equal(thinResult.value.assets[0]!.output.width,320);await thinResult.value.dispose();}
   const revised=await new ArchiveElement(new VideoElement(cli),policyV2,root).plan([image,video],limits);assert.equal(revised.status,'COMPLETE');if(revised.status!=='COMPLETE')throw Error('REVISED');const revisedImage=revised.value.assets[0]!;assert.equal(revisedImage.output.width,160);assert.equal(revisedImage.original,a.original);
   await writeFile(manifest,JSON.stringify({...owner,approved:true,asset:revisedImage}));assert.equal((await client.register('a',revisedImage)).status,'REJECT');await revised.value.dispose();
-  await assert.rejects(cli.run('dh-no-such-executable-1720',[]),/CLI_SPAWN/);await assert.rejects(cli.run(process.execPath,['-e','process.exit(7)']),/CLI_EXIT/);await assert.rejects(new CliElement(100).run(process.execPath,['-e','setInterval(()=>{},1000)']),/CLI_TIMEOUT/);await assert.rejects(new CliElement(5000,32).run(process.execPath,['-e','console.log("x".repeat(200))']),/CLI_OUTPUT_LIMIT/);
+  await assert.rejects(cli.run('dh-no-such-executable-1720',[]),/CLI_SPAWN/);await assert.rejects(cli.run(process.execPath,['-e','process.exit(7)']),/CLI_EXIT_7/);await assert.rejects(new CliElement(100).run(process.execPath,['-e','setInterval(()=>{},1000)']),/CLI_TIMEOUT/);await assert.rejects(new CliElement(5000,32).run(process.execPath,['-e','console.log("x".repeat(200))']),/CLI_OUTPUT_LIMIT/);
   if(process.platform==='linux'){
     const marker=join(root,'descendant-marker'),pidFile=join(root,'direct-pid');const start=Date.now();
     const childCode='const {spawn}=require("node:child_process");require("node:fs").writeFileSync(process.argv[3],String(process.pid));spawn(process.execPath,["-e",process.argv[1],process.argv[2]],{stdio:"inherit"});setInterval(()=>{},1000)';
     const grandCode='setTimeout(()=>require("node:fs").writeFileSync(process.argv[1],"survived"),1200)';
     await assert.rejects(new CliElement(200).run(process.execPath,['-e',childCode,grandCode,marker,pidFile]),/CLI_TIMEOUT/);assert.ok(Date.now()-start<900);
     const directPid=Number(await readFile(pidFile,'utf8'));assert.throws(()=>process.kill(directPid,0),/ESRCH/);
-    await new Promise(r=>setTimeout(r,1400));await assert.rejects(stat(marker),/ENOENT/);
+    const markers=[marker];
+    for(const kind of ['nonzero','signal','success','overflow'] as const){
+      const late=join(root,`${kind}-descendant`),pid=join(root,`${kind}-pid`);markers.push(late);
+      const action={nonzero:'process.exit(7)',signal:'process.kill(process.pid,"SIGTERM")',success:'console.log("foreground")',overflow:'console.log("x".repeat(200));setInterval(()=>{},1000)'}[kind];
+      const code='const {spawn}=require("node:child_process");require("node:fs").writeFileSync(process.argv[3],String(process.pid));spawn(process.execPath,["-e",process.argv[1],process.argv[2]],{stdio:"ignore"}).unref();'+action;
+      const run=new CliElement(2000,kind==='overflow'?32:65536).run(process.execPath,['-e',code,grandCode,late,pid]);
+      if(kind==='success')assert.equal((await run).trim(),'foreground');else await assert.rejects(run,{message:{nonzero:'CLI_EXIT_7',signal:'CLI_EXIT_SIGNAL',overflow:'CLI_OUTPUT_LIMIT'}[kind]});
+      const endedPid=Number(await readFile(pid,'utf8'));assert.throws(()=>process.kill(endedPid,0),/ESRCH/);
+    }
+    await new Promise(r=>setTimeout(r,1400));for(const late of markers)await assert.rejects(stat(late),/ENOENT/);
   }
   assert.equal((await readdir(root)).filter(n=>n.startsWith('archive-')).length,0);
   await closeHost();assert.equal((await client.register('a',a)).status,'UNKNOWN');
-  console.log(JSON.stringify({status:'MEDIA_PROBE_PASS',node:process.version,sharp:sharp.versions.sharp,vips:sharp.versions.vips,assets:result.value.assets.map(asset=>({original:asset.original,derivative:asset.derivative,source:asset.source,output:asset.output,revision:asset.revision})),policyRevision:revisedImage.revision,negative:['duplicate','corrupt','missing-item','unsupported','size-limit','duration-limit','final-call-budget','call-budget','depth-budget','step-budget','approval','wrong-token','wrong-tenant','wrong-derivative','conflict','host-unavailable','cli-spawn','cli-exit','cli-timeout','cli-output','mov-disguised','truncated-mp4','failed-pair','cross-tenant-read','readback-after-reopen','inherited-pipe-timeout'],archivedFilesVerified:4,secondTenant:true,readbackWithoutWriteApproval:true,independentHost:true,stagingClean:true}));
+  console.log(JSON.stringify({status:'MEDIA_PROBE_PASS',node:process.version,sharp:sharp.versions.sharp,vips:sharp.versions.vips,assets:result.value.assets.map(asset=>({original:asset.original,derivative:asset.derivative,source:asset.source,output:asset.output,revision:asset.revision})),policyRevision:revisedImage.revision,negative:['duplicate','corrupt','missing-item','unsupported','size-limit','duration-limit','final-call-budget','call-budget','depth-budget','step-budget','approval','wrong-token','wrong-tenant','wrong-derivative','conflict','host-unavailable','cli-spawn','cli-exit','cli-timeout','cli-output','mov-disguised','truncated-mp4','failed-pair','cross-tenant-read','readback-after-reopen','inherited-pipe-timeout','long-audio-container','conversion-stage','nonzero-descendant','signal-descendant','output-limit-descendant'],roundedVideo:{width:roundedAsset.output.width,height:roundedAsset.output.height,sar},sourceDecodeCode:decodeCode,containerDuration:longInfo.containerSeconds,foregroundCleanup:process.platform==='linux',archivedFilesVerified:4,secondTenant:true,readbackWithoutWriteApproval:true,independentHost:true,stagingClean:true}));
 }finally{if(host&&host.exitCode===null){const ended=once(host,'exit');host.kill();await ended;}catalog.close();await rm(root,{recursive:true,force:true});}

@@ -5,9 +5,9 @@ import type { NativeWorkflowContext, WorkflowLimits, StandardWorkflowOutcome } f
 import { FixityElement, ImageElement, VideoElement, type Policy, type MediaInfo } from './media.js';
 export type Result<T> = StandardWorkflowOutcome<T>;
 export type Asset = { original:string; derivative:string; source:MediaInfo; output:MediaInfo; revision:string; originalPath:string; derivativePath:string };
-const mediaCall=async<T>(fn:()=>Promise<T>,stage:string):Promise<Result<T>>=>{try{return {status:'COMPLETE',value:await fn()};}catch(error){const code=error instanceof Error&&/^(FILE_LIMIT|IMAGE_FORMAT|VIDEO_[A-Z_]+|CLI_[A-Z0-9_-]+)$/.test(error.message)?error.message:stage;return stop(code==='FILE_LIMIT'||code==='IMAGE_FORMAT'||code==='VIDEO_CONTAINER'?'REJECT':'UNKNOWN',code);}};
+const mediaCall=async<T>(fn:()=>Promise<T>,stage:string):Promise<Result<T>>=>{try{return {status:'COMPLETE',value:await fn()};}catch(error){const code=error instanceof Error&&/^(FILE_LIMIT|IMAGE_FORMAT|VIDEO_[A-Z_]+|CLI_[A-Z0-9_-]+)$/.test(error.message)?error.message:stage;return stop(code==='FILE_LIMIT'||code==='IMAGE_FORMAT'||code==='VIDEO_CONTAINER'?'REJECT':'UNKNOWN',code,code.startsWith('CLI_')?stage:undefined);}};
 const ok=<T>(value:T):Result<T>=>({status:'COMPLETE',value});
-const stop=(status:'REJECT'|'ASK'|'UNKNOWN'|'FAILED',code:string):Result<never>=>({status,reason:{code,message:code}});
+const stop=(status:'REJECT'|'ASK'|'UNKNOWN'|'FAILED',code:string,stage?:string):Result<never>=>({status,reason:{code,message:stage?`${stage}: ${code}`:code}});
 export class ArchiveElement {
   private readonly fixity=new FixityElement();
   private readonly image=new ImageElement();
@@ -24,8 +24,11 @@ export class ArchiveElement {
       const snapshot=await child.invoke(()=>this.fixity.digest(originalPath,this.policy.maxBytes));if(snapshot.status!=='COMPLETE')return snapshot;
       if(snapshot.value!==hash.value)return stop('UNKNOWN','SOURCE_CHANGED');
       const info=await child.invokeOutcome(()=>mediaCall(()=>element.inspect(originalPath),'SOURCE_METADATA'));if(info.status!=='COMPLETE')return info;
-      if(info.value.seconds>this.policy.maxSeconds)return stop('REJECT','DURATION_LIMIT');
-      const converted=await child.invokeOutcome(()=>mediaCall(()=>element.derive(originalPath,target,this.policy),'MEDIA_CONVERSION'));if(converted.status!=='COMPLETE')return converted;
+      if(Math.max(info.value.seconds,info.value.containerSeconds??0)>this.policy.maxSeconds)return stop('REJECT','DURATION_LIMIT');
+      const converted=await child.invokeOutcome(async()=>{
+        if(ext==='.mp4'){const verified=await mediaCall(()=>element.verify(originalPath),'SOURCE_DECODE');if(verified.status!=='COMPLETE')return verified;}
+        return mediaCall(()=>element.derive(originalPath,target,this.policy),'MEDIA_CONVERSION');
+      });if(converted.status!=='COMPLETE')return converted;
       const output=await child.invokeOutcome(()=>mediaCall(()=>element.inspect(target),'DERIVATIVE_METADATA'));if(output.status!=='COMPLETE')return output;
       const maxW=ext==='.mp4'?this.policy.videoWidth:this.policy.imageEdge;const maxH=ext==='.mp4'?this.policy.videoHeight:this.policy.imageEdge;
       if(output.value.width>maxW||output.value.height>maxH||Math.abs(output.value.width*info.value.height-output.value.height*info.value.width)>2*Math.max(info.value.width,info.value.height)||Math.abs(output.value.seconds-info.value.seconds)>Math.max(0.001,info.value.frameSeconds??0,output.value.frameSeconds??0)+0.001)return stop('FAILED','DERIVATIVE_INVALID');

@@ -1,3 +1,5 @@
+> R71 current: [R71 correction and actual execution](R71-EVIDENCE.md) supersedes R69 only for the two P1/one P2 findings in R70. Original complete-container 10-second admission remains; square-pixel video derivative and track duration validated. CLI is a foreground adapter, Linux same-group cleanup on all exits, not general process-tree containment. Independent review pending.
+
 # R69 · 需求驱动架构资格 Demo Suite
 唯一任务 #1720，历史需求、R67A/B 和 R68 记录不变。当前是针对 [R68](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7142394342) 的修正候选，不是独审通过。
 
