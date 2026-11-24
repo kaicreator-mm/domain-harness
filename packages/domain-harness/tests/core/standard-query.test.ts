@@ -116,7 +116,9 @@ test('T01: existing Standard Workflow runs the same Query without new runtime', 
 test('R32 P1-01: admitted limits cannot grow, shrink or become invalid during predicate', () => {
   for (const [admitted, changed] of [[1, 3], [2, 0], [2, NaN], [2, Infinity]] as const) {
     for (const matches of [true, false]) {
-      const limits = { maxVisited: admitted, maxReturned: admitted };
+      const limits: { maxVisited: number; maxReturned: number } = {
+        maxVisited: admitted, maxReturned: admitted,
+      };
       const seen: number[] = [];
       const result = query.select([1, 2, 3], item => {
         seen.push(item);
