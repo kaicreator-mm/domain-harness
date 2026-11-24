@@ -86,17 +86,34 @@ export class SQLiteDatabaseElement {
     finally { this.#mode = 'idle' }
   }
 
-  #statement<T>(mode: 'read' | 'write', sql: string, use: (statement: Statement) => T): T {
+  #statement<T>(
+    mode: 'read' | 'write', sql: string, parameters: readonly SQLiteScalar[],
+    use: (statement: Statement, values: readonly SQLiteScalar[]) => T,
+  ): T {
     // 权限模式切换前先拒绝一切重入，防止覆盖正在进行的 authorizer 模式。
     if (this.#mode !== 'idle') throw new SQLiteDatabaseError('REENTRANT', 'statement')
+    // 单语句 SQL 合同：driver 只编译第一个分号或 NUL 之前的文本，其余部分被静默丢弃，
+    // 所以在 prepare 之前按文本拒绝。这里不解析 SQL，分号出现在任何位置都算违规。
+    if (typeof sql !== 'string' || sql.length === 0 || sql.trim().length === 0 ||
+        sql.includes(';') || sql.includes('\0')) {
+      throw new SQLiteDatabaseError('INVALID_INPUT', 'statement')
+    }
     this.#mode = mode
     let statement: Statement | undefined
     try {
+      // 参数只读取一次，随后绑定的就是这里校验过的值。driver 把含 NUL 的绑定字符串在 NUL 处
+      // 静默截断，这是值域上与多语句文本同类的部分执行，同样在执行前拒绝。
+      const values: SQLiteScalar[] = [...parameters]
+      for (const value of values) {
+        if (typeof value === 'string' && value.includes('\0')) {
+          throw new SQLiteDatabaseError('INVALID_INPUT', 'statement')
+        }
+      }
       statement = this.#db.prepare(sql)
-      const value = use(statement)
+      const result = use(statement, values)
       statement.close()
       statement = undefined
-      return value
+      return result
     } catch (error) {
       try { statement?.close() } catch { /* 不覆盖原 SQL 错误。 */ }
       throw providerError(error, mode)
@@ -109,8 +126,8 @@ export class SQLiteDatabaseElement {
     if (!Number.isSafeInteger(limit) || limit < 0) throw new SQLiteDatabaseError('INVALID_INPUT', 'select')
     this.#busy = true
     try {
-      return this.#statement('read', sql, statement => {
-        const iterator: Iterator<unknown> = statement.iterate(...parameters)
+      return this.#statement('read', sql, parameters, (statement, values) => {
+        const iterator: Iterator<unknown> = statement.iterate(...values)
         const rows: T[] = []
         try {
           for (;;) {
@@ -140,15 +157,16 @@ export class SQLiteDatabaseElement {
       get active() { return isActive() },
       run: (sql: string, parameters: readonly SQLiteScalar[]) => {
         ensureActive()
-        return this.#statement('write', sql, statement => {
-          const count = Number(statement.run(...parameters).changes)
+        return this.#statement('write', sql, parameters, (statement, values) => {
+          const count = Number(statement.run(...values).changes)
           if (!Number.isSafeInteger(count) || count < 0) throw new SQLiteDatabaseError('SQL', 'changes')
           return { changes: count }
         })
       },
       get: <R>(sql: string, parameters: readonly SQLiteScalar[]): R | undefined => {
         ensureActive()
-        return this.#statement('read', sql, statement => statement.get(...parameters) as R | undefined)
+        return this.#statement('read', sql, parameters,
+          (statement, values) => statement.get(...values) as R | undefined)
       },
     })
     try {

@@ -57,7 +57,7 @@ db.close(); // 业务显式 close；关闭后所有操作按 CLOSED 拒绝
 
 - 连接由业务实例显式拥有：构造即打开真实文件（import 不建库、无配置文件、无全局路径），`close()` 显式释放；关闭/失活连接一律拒绝。本版未提供 `Symbol.dispose`，使用显式 `close()`。
 - `transaction()` 是同步事务：`BEGIN IMMEDIATE` → 同步回调 → `COMMIT`；异步回调/`Promise`/thenable 结果在 COMMIT 前拒绝并回滚，不撤销已发生的任意业务副作用。事务对象回调结束后立即失活，重用与重入一律拒绝；事务控制 SQL（`BEGIN`/`COMMIT`/`ROLLBACK`/`SAVEPOINT`/`ATTACH`/`PRAGMA`）由 SQLite authorizer 实际拒绝，不以 `SELECT` 前缀字符串判断隔离；一条 Statement 处理中再次进入 `run`/`get` 不得改变 authorizer 模式。
-- **每条 `run`/`get`/`select` 的 SQL 文本只编译并执行第一条语句**：`@photostructure/sqlite@2.5.0` 的 `prepare` 忽略第一个分号之后的文本（不执行、不报错），SDK 不另造 SQL parser 去识别尾部。业务不得在一条文本里书写多条语句；该语义由回归测试钉住，驱动升级若改变它会立即失败。
+- **单语句 SQL 限制合同**：每条 `run`/`get`/`select` 只接受一条 SQL 语句 —— 非空字符串，且文本中**不得出现分号 `;` 或 NUL**，无论它位于末尾、注释、引号字面量/标识符还是触发器体内；否则在 `prepare` 之前以 `INVALID_INPUT (statement)` 同步拒绝，不会只执行第一条就返回成功。这是可信 SQL 的限制合同，不是通用 SQL 解析：本版因此不支持带分号的 `CREATE TRIGGER` 定义与尾随分号；需要分号的数据请用绑定参数传递（`'a;b'` 合法）。绑定字符串含 NUL 时同样拒绝（driver 会在 NUL 处静默截断该值），BLOB 不受影响。
 - 错误按 SQLite 主码分类为 `BUSY/LOCKED/READONLY/CONSTRAINT/IO/OPEN/AUTH/SQL` 等脱敏码；消息不含路径、SQL 文本、绑定值。提交失败会先回滚再抛出；回滚失败或提交状态不明时连接保守隔离（poisoned）。
 - CAS 是业务自己的参数化 `UPDATE … WHERE version=?` 加 `changes` 计数；SDK 不造通用 Domain State Schema，不强制每表 version 字段。`PRAGMA` 与必须在事务外执行的维护语句（如 `VACUUM`）不在本 Element 能力内。
 - 平台范围：driver tarball 内含 darwin、linux-arm64、win32-arm64 预编译文件和 musl 变体，但**真实见证只覆盖 Windows x64 与 Linux x64 glibc 2.36（均为 Node 22.12.0）**；其余 OS/arch、musl 与更旧的 glibc 未经见证，不得宣称兼容。`select` 只是 L2 连接级基础读取（受 `limit` 约束），完整 SQL/Vector/Graph Query 能力属于后续任务。

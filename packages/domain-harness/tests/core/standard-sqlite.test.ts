@@ -233,20 +233,96 @@ test('T02: re-entry during statement processing cannot corrupt or escalate the a
   } finally { db.close() }
 })
 
-test('T02: text after the first statement is never executed by the pinned driver', () => {
+test('T02: SQL text that is not one admitted statement is rejected before anything executes', () => {
   const db = new SQLiteDatabaseElement(':memory:')
   try {
     initialize(db)
-    db.transaction(tx => { tx.run("INSERT INTO resource VALUES (2, 0, 'keep')", []) })
-    // 2.5.0 的 prepare 只编译第一条语句：尾部的写语句不得生效。
-    assert.deepEqual(db.select<{ id: number }>('SELECT id FROM resource ORDER BY id; DELETE FROM resource', [], 5).map(row => row.id), [1, 2])
-    // 尾部的事务控制不得提前提交：回调抛错后整体回滚。
-    assert.throws(() => db.transaction(tx => {
-      tx.run('UPDATE resource SET version=5 WHERE id=1; COMMIT', [])
-      throw Error('rollback-everything')
-    }), /rollback-everything/u)
-    assert.equal(version(db), 0)
-    assert.equal(db.select<{ n: number }>('SELECT COUNT(*) AS n FROM resource', [], 1)[0]?.n, 2)
+    db.transaction(tx => tx.run('CREATE TABLE journal (id INTEGER PRIMARY KEY, note TEXT NOT NULL)', []))
+    const invalid = (error: unknown): boolean => error instanceof SQLiteDatabaseError &&
+      error.code === 'INVALID_INPUT' && error.stage === 'statement' &&
+      error.message === 'DH_STD_SQLITE_INVALID_INPUT (statement)'
+    // 每次拒绝后：库无变化、连接可用、同一连接上的合法显式事务可以完成。
+    const intact = (): void => {
+      assert.equal(version(db), 0)
+      assert.equal(db.select<{ n: number }>('SELECT COUNT(*) AS n FROM journal', [], 1)[0]?.n, 0)
+      assert.equal(db.transaction(tx => tx.run('UPDATE resource SET label=label WHERE id=?', [1])).changes, 1)
+    }
+    const paths: Record<string, (sql: unknown, parameters?: readonly SQLiteScalar[]) => void> = {
+      select: (sql, parameters = []) => { db.select(sql as string, parameters, 5) },
+      'tx.run': (sql, parameters = []) => { db.transaction(tx => { tx.run(sql as string, parameters) }) },
+      'tx.get': (sql, parameters = []) => { db.transaction(tx => { tx.get(sql as string, parameters) }) },
+    }
+    const update = 'UPDATE resource SET version=1 WHERE id=1'
+    const rejected: [string, unknown, (readonly SQLiteScalar[])?][] = [
+      // 读通道后接写语句
+      ['select', 'SELECT id FROM resource; DELETE FROM resource'],
+      ['select', 'SELECT id FROM resource WHERE id=1\0; DELETE FROM resource'],
+      // 写 + 写：首条 UPDATE 不得随事务提交
+      ['tx.run', `${update}; INSERT INTO journal VALUES (1, ?)`, ['journal-row']],
+      // 写 + 事务控制
+      ['tx.run', `${update}; COMMIT`],
+      ['tx.run', `${update}; ROLLBACK`],
+      // 读通道后接写
+      ['tx.get', 'SELECT version FROM resource WHERE id=1; UPDATE resource SET version=99 WHERE id=1'],
+      // 尾部分隔符（含其后带注释）
+      ['select', 'SELECT id FROM resource ORDER BY id;'],
+      ['select', 'SELECT id FROM resource ORDER BY id; -- trailing comment'],
+      ['tx.run', 'UPDATE resource SET label=label WHERE id=1;'],
+      ['tx.get', 'SELECT ? AS v;', ['value']],
+      // 分号位于注释或引号内：本版不解析 SQL，一律拒绝
+      ['select', 'SELECT id FROM resource -- note; here'],
+      ['select', 'SELECT id /* a;b */ FROM resource'],
+      ['select', "SELECT 'a;b' AS v"],
+      ['select', 'SELECT [a;b] FROM (SELECT 1 AS "a;b")'],
+      ['tx.get', "SELECT 'a;b' AS v"],
+      // 含分号的多段触发器定义：本版不支持
+      ['tx.run', 'CREATE TRIGGER note_change AFTER UPDATE ON resource BEGIN UPDATE journal SET note=note WHERE id=1; END'],
+      // SQL 文本中的 NUL：driver 只编译 NUL 之前的文本
+      ['select', 'SELECT id FROM resource WHERE id=1\0'],
+      ['tx.run', `${update}\0`],
+      // 空文本、纯空白与非字符串
+      ['select', ''],
+      ['select', '   '],
+      ['tx.run', null],
+      ['tx.get', 42],
+      // 绑定字符串含 NUL：driver 会在 NUL 处静默截断该值，执行前拒绝
+      ['select', 'SELECT ? AS v', ['a\0b']],
+      ['tx.run', 'INSERT INTO journal VALUES (?, ?)', [1, 'a\0b']],
+    ]
+    for (const [path, sql, parameters] of rejected) {
+      assert.throws(() => paths[path]?.(sql, parameters), invalid, `${path}: ${String(sql)}`)
+      intact()
+    }
+    // 被拒绝的语句对同一事务里的后续合法语句没有影响。
+    db.transaction(tx => {
+      assert.throws(() => tx.run(`${update}; INSERT INTO journal VALUES (1, ?)`, ['journal-row']), invalid)
+      assert.throws(() => tx.get('SELECT version FROM resource WHERE id=1;', []), invalid)
+      assert.equal(tx.run('UPDATE resource SET label=label WHERE id=?', [1]).changes, 1)
+    })
+    intact()
+    // 分号在绑定参数里是数据而不是 SQL 文本：保持合法并原样往返。
+    assert.equal(db.select<{ v: string }>('SELECT ? AS v', ['a;b'], 1)[0]?.v, 'a;b')
+    db.transaction(tx => tx.run('INSERT INTO journal VALUES (?, ?)', [1, 'a;b']))
+    assert.equal(db.select<{ note: string }>('SELECT note FROM journal WHERE id=?', [1], 1)[0]?.note, 'a;b')
+    db.transaction(tx => tx.run('DELETE FROM journal WHERE id=?', [1]))
+    // BLOB 按长度存储，零字节不受影响。
+    assert.equal(db.select<{ h: string }>('SELECT hex(?) AS h', [new Uint8Array([0x61, 0, 0x62])], 1)[0]?.h, '610062')
+    // 参数只读取一次：随后绑定的就是校验过的那批值。
+    let reads = 0
+    const changing: SQLiteScalar[] = []
+    Object.defineProperty(changing, 0, { get() { reads += 1; return reads === 1 ? 'first' : 'a\0b' } })
+    assert.equal(db.select<{ v: string }>('SELECT ? AS v', changing, 1)[0]?.v, 'first')
+    assert.equal(reads, 1)
+    // 只有注释的文本由 driver 以“无语句”拒绝，SDK 归类为 SQL。
+    for (const text of ['-- only comment', '/* only */']) {
+      assert.throws(() => db.select(text, [], 1),
+        (error: unknown) => error instanceof SQLiteDatabaseError && error.code === 'SQL')
+      intact()
+    }
+    // 单条建表、CTE 与参数化 CAS 等合法单语句不退化。
+    assert.equal(db.select<{ v: number }>('WITH value(v) AS (SELECT 3) SELECT v FROM value', [], 1)[0]?.v, 3)
+    assert.equal(db.transaction(tx => tx.run('UPDATE resource SET version=version+1 WHERE id=? AND version=?', [1, 0])).changes, 1)
+    assert.equal(version(db), 1)
   } finally { db.close() }
 })
 
