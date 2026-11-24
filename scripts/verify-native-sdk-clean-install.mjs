@@ -229,12 +229,43 @@ try {
   const sqliteResult=run('SQLITE_PROBE',process.execPath,['sqlite-probe.mjs'],consumer);
   assert.equal(sqliteResult.trim(),'SDK_SQLITE_PROBE_PASS');
 
+  // T03：从唯一真实打包 SDK 根导入，验证跨领域 Scope/有向图与访问预算。
+  writeFileSync(join(consumer,'vector-graph-probe.mjs'),[
+    "import assert from 'node:assert/strict';",
+    "import { VectorQueryElement, GraphQueryElement } from '@kaicreator/domain-harness';",
+    "const candidates=[",
+    "  {id:'r2',vector:[0,1],item:{domain:'repair'}},",
+    "  {id:'secret',vector:[1],item:{domain:'inventory'}},",
+    "  {id:'r1',vector:[1,0],item:{domain:'repair'}},",
+    "];",
+    "const v=new VectorQueryElement().search(candidates,[1,0],x=>x.domain==='repair',",
+    "  {topK:1,maxVisited:3,dimension:2,metric:'COSINE'});",
+    "assert.equal(v.matches[0]?.id,'r1');",
+    "assert.equal(v.complete,true);",
+    "const g=new GraphQueryElement().search([",
+    "  {from:'A',to:'B',type:'PART'},{from:'B',to:'C',type:'PART'},",
+    "  {from:'C',to:'A',type:'PART'},{from:'A',to:'X',type:'FOREIGN'},",
+    "],{start:'A',target:'C',direction:'OUT',relationTypes:['PART'],",
+    "limits:{maxDepth:2,maxVisited:12,maxReturned:1}});",
+    "assert.deepEqual(g.paths[0]?.nodes,['A','B','C']);",
+    "assert.equal(g.complete,true);",
+    "const partial=new GraphQueryElement().search([",
+    "  {from:'A',to:'B',type:'PART'},{from:'B',to:'C',type:'PART'},",
+    "],{start:'A',target:'C',direction:'OUT',",
+    "limits:{maxDepth:2,maxVisited:1,maxReturned:1}});",
+    "assert.equal(partial.complete,false);",
+    "assert.equal(partial.truncationReason,'VISIT_LIMIT');",
+    "console.log('SDK_VECTOR_GRAPH_PROBE_PASS');",
+  ].join('\\n'));
+  const queryResult=run('VECTOR_GRAPH_PROBE',process.execPath,['vector-graph-probe.mjs'],consumer);
+  assert.equal(queryResult.trim(),'SDK_VECTOR_GRAPH_PROBE_PASS');
+
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
     api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
     rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
     sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
-    noTransactionControlHook:true}));
+    noTransactionControlHook:true,vectorGraphRuntime:true}));
 } finally {
   if (process.env.DH_NATIVE_KEEP_EVIDENCE !== '1') rmSync(work,{recursive:true,force:true});
   else console.error('NATIVE_CONSUMER_EVIDENCE_DIR='+work);
