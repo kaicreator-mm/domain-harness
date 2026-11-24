@@ -33,6 +33,14 @@ function run(step, command, args, cwd, env = {}) {
   });
   if(result.error || result.status !== 0) {
     // 不输出可能含 token 的 npm stderr；保留可诊断的受控 OS 错误码。
+    // 仅保留受控 Business TypeScript 编译诊断，不输出 npm stderr 或环境。
+    if (step === 'INTENT_TYPECHECK' && typeof result.stdout === 'string') {
+      const diagnostic = result.stdout.split(/\r?\n/u)
+        .map(line => line.replaceAll(cwd,'<consumer>').replaceAll(root,'<workspace>'))
+        .filter(line => /^(?:(?:intent|node_modules)\/[A-Za-z0-9_@./-]+\(\d+,\d+\): )?error TS\d{4}: /u.test(line))
+        .slice(0,40);
+      for(const line of diagnostic) console.error('NATIVE_CONSUMER_TS_DIAGNOSTIC '+line.slice(0,1000));
+    }
     const code = result.error?.code;
     const safeCode = typeof code === 'string' && /^[A-Z0-9_]+$/u.test(code)
       ? code : 'NONE';
@@ -298,7 +306,7 @@ try {
       rootDir:'intent',outDir:'intent-dist'},include:['intent/**/*.ts'],
   },null,2));
   run('INTENT_TYPECHECK',process.execPath,[
-    join(root,'node_modules/typescript/bin/tsc'),'-p',join(consumer,'tsconfig-intent.json'),
+    join(root,'node_modules/typescript/bin/tsc'),'--pretty','false','-p',join(consumer,'tsconfig-intent.json'),
   ],consumer);
   const intentProbe=[
     "import { intentCases } from './intent-dist/verify.js';",
