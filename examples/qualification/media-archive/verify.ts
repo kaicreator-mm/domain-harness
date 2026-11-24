@@ -7,7 +7,7 @@ import { once } from 'node:events';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { CliElement } from '../shared/cli.js';
+import { CliElement } from '@kaicreator/domain-harness';
 import { VideoElement, policy, policyV2, FixityElement } from './media.js';
 import { ArchiveElement } from './archive.js';
 import { CatalogElement } from './catalog.js';

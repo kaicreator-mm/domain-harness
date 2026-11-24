@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { CliElement } from '../shared/cli.js';
+import { CliElement } from '@kaicreator/domain-harness';
 import { baseline, downtime, WorkshopElement, SolverElement, validateSchedule, type Task, type Policy } from './plan.js';
 const tasks:readonly Task[]=Object.freeze([
   {id:'a-inspect',machine:'inspection',duration:2,after:[]},

@@ -7,3 +7,4 @@ export * from './standard-query.js';
 export * from './standard-sqlite.js';
 export * from './standard-vector-graph.js';
 export * from './standard-expression.js';
+export * from './standard-cli.js';

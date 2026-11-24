@@ -1,4 +1,4 @@
-import type { CliElement } from '../shared/cli.js';
+import type { CliElement } from '@kaicreator/domain-harness';
 import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import sharp from 'sharp';
