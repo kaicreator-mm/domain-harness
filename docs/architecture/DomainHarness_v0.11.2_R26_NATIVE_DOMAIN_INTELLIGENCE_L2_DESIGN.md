@@ -11,7 +11,10 @@ FROZEN_L1_TRAIN_MERGE=72b38dff418d43ba35d8c89ef7edd59152460031
 PRODUCT_L1=FROZEN_SCOPE
 R27_REVIEW=REWORK_P0_0_P1_2_P2_2
 R27_REVIEW_HEAD=45cbdddcc3761aee2985b3da8991e1d69ffaee1f
-R28_CORRECTION=DESIGN_REWORK_PENDING_SQLITE_WINDOWS_LINUX_WITNESS_AND_SCOPED_REVIEW
+R28_CORRECTION=DESIGN_REWORK_WITH_SQLITE_2_OF_2_PLATFORM_WITNESS_PENDING_R29_SCOPED_REVIEW
+PROVIDER_PREFLIGHT=REPORTED_PASS_WIN32_X64_LINUX_X64_GLIBC_2_36_NODE2212
+PROVIDER_WITNESS_ISSUE=#1705
+R29_INDEPENDENT_REVIEW=PENDING
 DESIGN_L2=CANDIDATE_NOT_INDEPENDENTLY_REVIEWED
 SDK_SOURCE=NOT_CHANGED
 TESTS_CI=NOT_RUN_DOC_ONLY
@@ -20,7 +23,7 @@ IMPLEMENTATION=ON_HOLD_PENDING_L2_REVIEW
 
 > **范畴：只设计，不编写 SDK 功能代码。** 唯一需求依据：[R25 Scope Freeze](../product/DomainHarness_v0.11.2_R25_PRODUCT_L1_SCOPE_FREEZE.md) + [R21 DI-L1-01–12](../product/DomainHarness_v0.11.2_R21_CONSOLIDATED_PRODUCT_L1_AFTER_R20_REWORK.md)。当前真实基线 API：`index.ts` 导出 `WorkflowElement<Input,Output>` / `StandardWorkflowOutcome` / `StandardWorkflowSession` / `NativeWorkflowContext.invoke/invokeOutcome/child/leaf`、标准 JSON/YAML Reader、生命周期 KDP。下述新类/接口是**L2 候选**，不可当作现有 SDK 或已运行通过的 TypeScript API。
 
-> **R28 补正（R27 REWORK, P1=2/P2=2）**：优先以本文件修正后的 §3、§4、§6 作为 L2 设计合同。SQLite 驱动的**唯一当前优先候选**是 `@photostructure/sqlite@2.5.0`，严格 `npm ci --ignore-scripts`，须以 Node22.12 Windows/Linux 真实 witness 判断能否纳入。Expression 正式选择**SDK 自带的无依赖、有限语法、只读 JSON AST 计算**（不采用 JSONata 作为默认引擎，不承诺 arbitrary-code wall-clock 硬停止）。同步事务的 Promise 拒绝和 Query 完整性边界已明确。**未验证的驱动资格、Win/Linux 结果仍标 BLOCKED，不得凭文档修正宣布 R27 P1-01 已关闭，也不能开展 SDK 源码实施**。
+> **R28 补正（R27 REWORK, P1=2/P2=2）**：优先以本文件修正后的 §3、§4、§6 作为 L2 设计合同。SQLite 驱动的**唯一当前优先候选**是 `@photostructure/sqlite@2.5.0`，严格 `npm ci --ignore-scripts`，须以 Node22.12 Windows/Linux 真实 witness 判断能否纳入。Expression 正式选择**SDK 自带的无依赖、有限语法、只读 JSON AST 计算**（不采用 JSONata 作为默认引擎，不承诺 arbitrary-code wall-clock 硬停止）。同步事务的 Promise 拒绝和 Query 完整性边界已明确。**Issue #1705 现已有 Windows/Linux x64 双平台 Node22.12.0 的实际 PASS 回执，已满足限定平台的 Provider preflight 证据门；仍须 R29 非 Writer 独立审核判断 R27 P1-01 是否正式 CLOSED。不得把 preflight 当成 SDK npm pack/实施/CI PASS，也不能在 R29 前开展 SDK 源码实施**。
 
 ## 1. 物理模块和不新增的东西
 
@@ -112,7 +115,7 @@ class BoundedQueryElement {
 3. 同一 file-backed DB **两个独立连接**竞争更新相同 resource/version：`UPDATE ... SET version=version+1 WHERE id=? AND version=?` 的 affected changes 总和恰为 1，另一方没有提交真实 Effect；独立事务失败触发 ROLLBACK；busy/locked 与权限错误分类可观察；
 4. 清理临时文件，输出脱敏日志与 SHA256，不回写仓库源码，不写密钥。生成的二进制和第三方代码不可当作 SDK 已验收发行产物。
 
-**证据门**：一份 Windows + 一份 Linux 的原始执行回执和必要的精确 lock/tarball/二进制 SHA256 才能将 `PROVIDER_ADMISSION` 提升至 `QUALIFIED`；现阶段 `UNVERIFIED_WINDOWS_LINUX_NODE2212`。如果只能证明一边，记录 `PARTIAL`、继续阻断 R27 P1-01。无法满足时优先评估合法的无脚本预编译替代；仅在 Owner **明确批准**时才允许针对一个确定版本/OS/脚本效果例外。WASM 候选必须提供跨进程文件 VFS/事务/CAS 真实证据；不以导入导出 SQLite 文件当可靠多进程原子事务。
+**证据门 R28 已取得限定资格回执**：[#1705 原始测试回执](https://github.com/kaicreator-mm/domain-harness/issues/1705#issuecomment-7117468436) 报告 Windows x64 Node22.12 与 Linux x64/glibc 2.36 Node22.12 **2/2 PASS**；`npm ci --ignore-scripts`（manifest 存在 install hook 但被禁止）、无启动 flags、原生打包预构建文件加载、真实 SQLite DB reopen/rollback、不同独立进程同一资源版本 CAS 最终 `version=1,effect_count=1` 均有原始脚本/Hash/日志摘要。详见 [R28 Provider 证据索引](./DomainHarness_v0.11.2_R28_SQLITE_PROVIDER_QUALIFICATION_EVIDENCE.md)。**针对这两个精确平台/版本，设计层 Provider Feasibility=PRECHECK_PASS_REPORTED，未取得独立 R29 复审；SDK npm pack/clean Consumer、其它 OS/arch/较旧 glibc/远程 Host 仍 NOT_RUN。** 若其它平台后续入必选范围，需补相应证据；如新 SDK 集成违反 no-hidden-script、版本/ABI 或 CAS 不变量则实际实现 REWORK。
 
 ### 4.2 SQLite 同步事务 API · R28 P2-01
 
@@ -237,7 +240,7 @@ type AttemptDisposition = 'NOT_SUBMITTED' | 'ADMITTED' | 'APPLIED' | 'REJECTED' 
 - 若普通 `invokeOutcome` 遇逃逸异常会映射成 `FAILED`，**可能已提交的 Host 异常必须在实际 Provider 边界先捕获并转 UNKNOWN**，不能让 Workflow 无法区分“失败前未提交”和“提交后 ACK 丢失”。
 - SDK 提供通用 DB/Workflow 机制而非统一域权限中央系统；领域级 Agent/LLM 始终没有自授工具权限。0.11.3 UI 只作为确认接口的可选实现，0.11.6 TaskRun checkpoint/异步恢复与本版基本 Attempt/Receipt 分离。
 
-> **R27 所指出的真正 L2 阻断项**：P1-02 Expression 在本 R28 文本中已选择具体可反证的 AST profile（不再等实现时选 JSONata/worker）；P2-01 同步事务和 P2-02 Query 完整性也有精确合同。**P1-01 仍存在真实 Win/Linux Node22.12 / ignore-scripts provider witness 未取得的阻断**；此设计明确了精确版本/平台/回执步骤，但不应在没有实际执行原始产物时直接申请无条件 `ACCEPT_SCOPED_L2_DESIGN`。
+> **R27 所指出的真正 L2 阻断项**：P1-02 Expression 在本 R28 文本中已选择具体可反证的 AST profile（不再等实现时选 JSONata/worker）；P2-01 同步事务和 P2-02 Query 完整性也有精确合同。**#1705 双平台 SQLite preflight 已按所选 profile 报告 PASS，并有可重放原脚本、依赖锁与 SHA256**；其证据被收录在 [R28 资格索引](./DomainHarness_v0.11.2_R28_SQLITE_PROVIDER_QUALIFICATION_EVIDENCE.md)；但 **R29 独立审查未完成，不提前把 R27 P1-01 宣告 CLOSED 或称完整 L2 ACCEPT**。SDK 源码、真实 SDK 消费者/CI 和独立远端 Host Effect 测试仍未开始。
 
 ## 8. 最小任务 DAG、真实 Consumer 与否定证据
 
