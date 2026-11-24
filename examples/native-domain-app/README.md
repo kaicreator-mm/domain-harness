@@ -22,3 +22,13 @@
 - AQI 规则来源为 [AirNow AQI Basics](https://www.airnow.gov/aqi/aqi-basics/) 与 [AirNow National Maps](https://www.airnow.gov/national-maps/)（采集日期 2026-11-24）。六个整数分类区间为 0–50、51–100、101–150、151–200、201–300、301–500；本例仅接受 US EPA AQI 0–500，超过示例范围返回 UNKNOWN。输入观测是合成 fixture，不计算污染物浓度、不获取实时观测、不提供健康建议；规则来源与观测来源分别保留。
 - 每个连续请求只建立一个 StandardWorkflowSession，Recognition 与 Handling 为两个静态子角色；通过 invokeOutcome 传播终态，完整识别后方可调用 Handling。精确正常额度 calls=2/steps=5/depth=1；额度不足时没有 Handling 入口调用。实例计数仅供示例见证，不是实际持久状态、权限或 Host Effect；T06 另行完成真实授权动作。
 - `intent/verify.ts` 的八组验证由仓内 node:test 与仓外已安装 SDK Consumer 共用。Consumer 复制实际 TS 源码、严格编译成 ESM、运行相同验证，无新增直接 npm 依赖或私有 SDK 路径。T05 不冒称 T07 独立双领域生成/双平台完整 E2E。
+
+## v0.11.2 T06：真实库存资源授权动作
+
+`action/authority.ts` 是业务拥有的 SQLite 库存权威方；`action/host.ts` 仅监听 loopback，以独立 Node 进程提供实际 HTTP reserve/原尝试 readback；`action/client.ts` 是同一公开 SDK 的业务 Workflow/Tool 组合，独立持久 attempt DB。没有 SDK 变更、动态 Tool Registry 或中央 KDP Permit。库存实际扣减、版本递增、Effect 计数和权威 Receipt 均可从 SQLite 文件读回；这是业务示例的真实数据变更，不是生产商业系统。
+
+- Owner 可信管理入口直接设置资源策略、凭据范围、批准和撤销，不对 HTTP 客户端暴露管理操作。Host 按真实 bearer 凭据哈希、主体、租户、资源及当前有效访问授权决定；请求不能选择 PREAUTHORIZED。PER_CALL 批准与固定 reserve 参数摘要匹配，原子绑定一个 command ID；SESSION 批准仅覆盖主体/租户/资源、单次数量上限、有效期及未撤销状态。批准不替代 Host 访问授权。缺批准返回 ASK，批准后是新的待提交命令 ID；原 ID 与原摘要仅返回原处置。
+- Host 在同一真实 `BEGIN IMMEDIATE` 事务中检查权限/批准和资源版本，绑定批准、执行条件库存扣减，然后写 Effect 及 attempt/receipt；任一步失败不宣称 COMPLETE。同 ID/同摘要返回原处置，同 ID/异摘要拒绝。不同客户端、独立 Host 进程可竞争同一个 DB 资源；不是本地进程锁或事后 CAS。
+- 客户端 Recognition/Handling 共享一根 Workflow 预算。R58 明确要求可信业务调用者使用 `ReservationElement.run(input, limits, 'FIRST_SUBMIT' | 'RECOVER')`：只有明确的新逻辑命令（新 ID）才选择 FIRST_SUBMIT；缺失或非法模式在 Recognition 拒绝且无网络请求。同一账本已记录的 ID/摘要永远只读回；RECOVER 即使账本丢失/为空也预记后仅发送 readback，未观察到原尝试保持 UNKNOWN。空账本不能证明这是首次提交；错误地向全新账本声明 FIRST_SUBMIT 不在恢复保证之内。Host 对已观察的重复首次交付仍去重，不宣称能从未观察到的 ID 推断历史。若响应丢失、记录失败或无法读回，返回 UNKNOWN，不盲目重播。当前权限或协议拒绝（HOST_ACCESS_DENIED / READBACK_NOT_AUTHORIZED / HOST_REQUEST_DENIED / HOST_INPUT_INVALID）仅说明本次请求被拒绝且无法确认历史处置，不能当作逻辑命令已 REJECT，也不泄露历史是否存在。已证明的 Receipt 不被后续 UNKNOWN 覆盖；同主体重新获得当前访问权后可恢复精确历史 Receipt，批准撤销阻止新动作但不阻止有当前访问权的历史读回。真正的权威拒绝/ASK 和命令身份冲突仍保留。两个库不具备分布式 ACID，不提供全局识别错误重投意图或自动重试未知动作。
+- `action/verify.ts` 八组实际进程/网络/SQLite 负例和正例由仓内 node:test 与真实仓外 SDK-only Consumer 共用；故障代理只在测试中转发实际 HTTP 后断开 ACK 或转发前断开，亦通过关闭真实客户端连接触发本地记录失败。正式 Host 无故障注入入口。Consumer 编译所需 Node 类型来自仓库开发工具链，运行依赖仍只有 SDK；T05 原 SDK 声明门不变。
+- 边界：可信 Owner 管理接口与本地 loopback HTTP 仅作最小真实授权/资源协议，生产部署需 TLS、可信身份/批准 UI、运维与长期恢复机制。未实现第三方不可事务化 Effect 的原子性，不承诺通用分布式 exactly-once、任意恶意进程沙箱或真实物理故障注入。T07 才做完整双平台和陌生领域生成验收。
