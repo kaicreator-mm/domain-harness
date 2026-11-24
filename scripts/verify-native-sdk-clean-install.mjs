@@ -33,6 +33,14 @@ function run(step, command, args, cwd, env = {}) {
   });
   if(result.error || result.status !== 0) {
     // 不输出可能含 token 的 npm stderr；保留可诊断的受控 OS 错误码。
+    // 仅保留受控 Business TypeScript 编译诊断，不输出 npm stderr 或环境。
+    if (step === 'INTENT_TYPECHECK' && typeof result.stdout === 'string') {
+      const diagnostic = result.stdout.split(/\r?\n/u)
+        .map(line => line.replaceAll(cwd,'<consumer>').replaceAll(root,'<workspace>'))
+        .filter(line => /^(?:(?:intent|node_modules)\/[A-Za-z0-9_@./-]+\(\d+,\d+\): )?error TS\d{4}: /u.test(line))
+        .slice(0,40);
+      for(const line of diagnostic) console.error('NATIVE_CONSUMER_TS_DIAGNOSTIC '+line.slice(0,1000));
+    }
     const code = result.error?.code;
     const safeCode = typeof code === 'string' && /^[A-Z0-9_]+$/u.test(code)
       ? code : 'NONE';
@@ -288,12 +296,34 @@ try {
   ].join('\n'));
   assert.equal(run('EXPRESSION_PROBE',process.execPath,['expression-probe.mjs'],consumer).trim(),'SDK_EXPRESSION_PROBE_PASS');
 
+  // T05：编译同一份 Business 源码及验证，不引入额外消费者直接依赖。
+  cpSync(join(root,'examples/native-domain-app/intent'),join(consumer,'intent'),{recursive:true});
+  writeFileSync(join(consumer,'tsconfig-intent.json'),JSON.stringify({
+    compilerOptions:{target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',
+      strict:true,noUnusedLocals:true,noUnusedParameters:true,noImplicitReturns:true,
+      exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,verbatimModuleSyntax:true,
+      // 与仓内 TS Profile 一致；依赖声明的完整检查仍由上方独立 TYPECHECK 执行。
+      skipLibCheck:true,types:[],lib:['ES2022','DOM','ESNext.Disposable'],
+      rootDir:'intent',outDir:'intent-dist'},include:['intent/**/*.ts'],
+  },null,2));
+  run('INTENT_TYPECHECK',process.execPath,[
+    join(root,'node_modules/typescript/bin/tsc'),'--pretty','false','-p',join(consumer,'tsconfig-intent.json'),
+  ],consumer);
+  const intentProbe=[
+    "import { intentCases } from './intent-dist/verify.js';",
+    "for (const [, verify] of intentCases) await verify();",
+    "console.log('SDK_INTENT_PROBE_PASS '+intentCases.length);",
+  ].join('\n');
+  assert.equal(run('INTENT_PROBE',process.execPath,[
+    '--unhandled-rejections=strict','--input-type=module','--eval',intentProbe,
+  ],consumer).trim(),'SDK_INTENT_PROBE_PASS 8');
+
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
     api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
     rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
     sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
-    noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true}));
+    noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true,intentWorkflows:true}));
 } finally {
   if (process.env.DH_NATIVE_KEEP_EVIDENCE !== '1') rmSync(work,{recursive:true,force:true});
   else console.error('NATIVE_CONSUMER_EVIDENCE_DIR='+work);
