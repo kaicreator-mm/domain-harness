@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { InventoryAuthority, payloadDigest } from './authority.js';
 import type { ApprovalGrant, Policy, Reply, ReserveCommand } from './authority.js';
 import { ReservationElement } from './client.js';
+import type { ReservationMode } from './client.js';
 import { SQLiteDatabaseElement } from '@kaicreator/domain-harness';
 
 const limits = { maxCalls: 2, maxSteps: 5, maxDepth: 1 };
@@ -126,41 +127,43 @@ async function proxy(base: string, mode: { dropSubmit?: 'before' | 'after'; drop
 export const actionCases: readonly [string, () => Promise<void>][] = [
   ['preauthorized real effect, receipt, durable replay and changed digest', () => fixture(async f => {
     f.resource('stock', 'PREAUTHORIZED'); const h = await f.host(); const c = f.client('one', h.base);
-    const input = command('one', 'stock'); const first = await c.run(input, limits);
+    const input = command('one', 'stock'); const first = await c.run(input, limits, 'FIRST_SUBMIT');
     expect(first, 'COMPLETE'); f.state('stock', 1, 18, 1);
     c.close(); await h.close(); const nextHost = await f.host(); const reopened = f.client('one', nextHost.base);
-    assert.deepEqual(await reopened.run(input, limits), first);
-    expect(await reopened.run({ ...input, quantity: 3 }, limits), 'REJECT', 'COMMAND_ID_CONFLICT');
+    assert.deepEqual(await reopened.run(input, limits, 'RECOVER'), first);
+    expect(await reopened.run({ ...input, quantity: 3 }, limits, 'RECOVER'), 'REJECT', 'COMMAND_ID_CONFLICT');
     const fresh = f.client('other-ledger', nextHost.base);
-    assert.deepEqual(await fresh.run(input, limits), first);
-    expect(await f.client('third-ledger', nextHost.base).run({ ...input, quantity: 3 }, limits), 'REJECT', 'COMMAND_ID_CONFLICT');
+    assert.deepEqual(await fresh.run(input, limits, 'RECOVER'), first);
+    expect(await f.client('third-ledger', nextHost.base).run({ ...input, quantity: 3 }, limits, 'RECOVER'), 'REJECT', 'COMMAND_ID_CONFLICT');
     f.state('stock', 1, 18, 1);
     const secondHost = await f.host(); const repeated = command('duplicate', 'stock', 1);
-    const same = await Promise.all([f.client('dup1', nextHost.base).run(repeated, limits), f.client('dup2', secondHost.base).run(repeated, limits)]);
+    const same = await Promise.all([f.client('dup1', nextHost.base).run(repeated, limits, 'FIRST_SUBMIT'), f.client('dup2', secondHost.base).run(repeated, limits, 'FIRST_SUBMIT')]);
     expect(same[0] as Reply, 'COMPLETE'); assert.deepEqual(same[0], same[1]); f.state('stock', 2, 16, 2);
   })],
   ['authority credential, principal, tenant and resource scope; root budget no submit', () => fixture(async f => {
     f.resource('stock', 'PREAUTHORIZED'); const h = await f.host(); const p = await proxy(h.base, {});
     try {
       const c = f.client('one', p.base);
-      for (const l of [{ ...limits, maxCalls: 1 }, { ...limits, maxSteps: 4 }, { ...limits, maxDepth: 0 }]) expect(await c.run(command('budget', 'stock'), l), 'FAILED', l.maxCalls === 1 ? 'WORKFLOW_CALL_BUDGET' : l.maxSteps === 4 ? 'WORKFLOW_STEP_BUDGET' : 'WORKFLOW_DEPTH_LIMIT');
-      expect(await c.run({ ...command('invalid', 'stock'), quantity: 0 }, limits), 'REJECT', 'COMMAND_INPUT_INVALID');
+      for (const l of [{ ...limits, maxCalls: 1 }, { ...limits, maxSteps: 4 }, { ...limits, maxDepth: 0 }]) expect(await c.run(command('budget', 'stock'), l, 'FIRST_SUBMIT'), 'FAILED', l.maxCalls === 1 ? 'WORKFLOW_CALL_BUDGET' : l.maxSteps === 4 ? 'WORKFLOW_STEP_BUDGET' : 'WORKFLOW_DEPTH_LIMIT');
+      expect(await c.run({ ...command('invalid', 'stock'), quantity: 0 }, limits, 'FIRST_SUBMIT'), 'REJECT', 'COMMAND_INPUT_INVALID');
+      expect(await c.run(command('mode', 'stock'), limits, undefined as unknown as ReservationMode), 'REJECT', 'COMMAND_MODE_REQUIRED');
+      expect(await c.run(command('recover-budget', 'stock'), { ...limits, maxCalls: 1 }, 'RECOVER'), 'FAILED', 'WORKFLOW_CALL_BUDGET');
       assert.deepEqual(p.counts, { submit: 0, readback: 0 });
       const direct = await fetch(h.base + '/submit', { method: 'POST', headers: { authorization: 'Bearer ' + f.token, 'x-principal': 'alice' },
         body: JSON.stringify({ ...command('forged', 'stock'), policy: 'PREAUTHORIZED' }) });
-      expect(await direct.json() as Reply, 'REJECT', 'HOST_INPUT_INVALID');
-      expect(await c.run({ ...command('tenant', 'stock'), tenant: 'shop-b' }, limits), 'REJECT', 'HOST_ACCESS_DENIED');
-      expect(await c.run(command('resource', 'unselected'), limits), 'REJECT', 'HOST_ACCESS_DENIED');
-      expect(await f.client('wrong-token', p.base, 'alice', randomBytes(32).toString('hex')).run(command('token', 'stock'), limits), 'REJECT', 'HOST_ACCESS_DENIED');
-      expect(await f.client('wrong-principal', p.base, 'alice', f.otherToken).run(command('principal', 'stock'), limits), 'REJECT', 'HOST_ACCESS_DENIED');
+      expect(await direct.json() as Reply, 'UNKNOWN', 'HOST_INPUT_INVALID');
+      expect(await c.run({ ...command('tenant', 'stock'), tenant: 'shop-b' }, limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'HOST_ACCESS_DENIED');
+      expect(await c.run(command('resource', 'unselected'), limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'HOST_ACCESS_DENIED');
+      expect(await f.client('wrong-token', p.base, 'alice', randomBytes(32).toString('hex')).run(command('token', 'stock'), limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'HOST_ACCESS_DENIED');
+      expect(await f.client('wrong-principal', p.base, 'alice', f.otherToken).run(command('principal', 'stock'), limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'HOST_ACCESS_DENIED');
       f.state('stock', 0, 20, 0);
       f.owner.revoke(f.token, 'shop-a', 'stock');
-      expect(await c.run(command('revoked', 'stock'), limits), 'REJECT', 'HOST_ACCESS_DENIED'); f.state('stock', 0, 20, 0);
+      expect(await c.run(command('revoked', 'stock'), limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'HOST_ACCESS_DENIED'); f.state('stock', 0, 20, 0);
     } finally { await p.close(); }
   })],
   ['two independent Host processes compete on same resource version', () => fixture(async f => {
     f.resource('stock', 'PREAUTHORIZED'); const a = await f.host(); const b = await f.host(); assert.notEqual(a.pid, b.pid);
-    const results = await Promise.all([f.client('a', a.base).run(command('a', 'stock'), limits), f.client('b', b.base).run(command('b', 'stock'), limits)]);
+    const results = await Promise.all([f.client('a', a.base).run(command('a', 'stock'), limits, 'FIRST_SUBMIT'), f.client('b', b.base).run(command('b', 'stock'), limits, 'FIRST_SUBMIT')]);
     assert.equal(results.filter(x => x.status === 'COMPLETE').length, 1);
     assert.equal(results.filter(x => x.status === 'REJECT' && x.reason.code === 'RESOURCE_CONFLICT').length, 1);
     f.state('stock', 1, 18, 1);
@@ -168,40 +171,68 @@ export const actionCases: readonly [string, () => Promise<void>][] = [
   ['per-call approval exact parameter digest and atomic single consumption', () => fixture(async f => {
     f.resource('stock', 'PER_CALL'); const a = await f.host(); const b = await f.host();
     const c = f.client('a', a.base); const other = f.client('b', b.base);
-    expect(await c.run(command('missing', 'stock'), limits), 'ASK', 'APPROVAL_REQUIRED');
+    const missing = command('missing', 'stock');
+    const asked = await c.run(missing, limits, 'FIRST_SUBMIT'); expect(asked, 'ASK', 'APPROVAL_REQUIRED');
+    assert.deepEqual(await f.client('recover-asked', a.base).run(missing, limits, 'RECOVER'), asked);
     const first = command('first', 'stock', 0, 2, 'grant'); f.grant('grant', 'PER_CALL', first);
-    expect(await c.run({ ...first, id: 'changed', quantity: 1 }, limits), 'REJECT', 'APPROVAL_DENIED');
-    expect(await f.client('bob', a.base, 'bob', f.otherToken).run({ ...first, id: 'foreign' }, limits), 'REJECT', 'APPROVAL_DENIED');
+    const changed = { ...first, id: 'changed', quantity: 1 };
+    const rejected = await c.run(changed, limits, 'FIRST_SUBMIT'); expect(rejected, 'REJECT', 'APPROVAL_DENIED');
+    assert.deepEqual(await f.client('recover-rejected', a.base).run(changed, limits, 'RECOVER'), rejected);
+    expect(await f.client('bob', a.base, 'bob', f.otherToken).run({ ...first, id: 'foreign' }, limits, 'FIRST_SUBMIT'), 'REJECT', 'APPROVAL_DENIED');
     f.grant('expired', 'PER_CALL', first, { expires: Date.now() - 1 });
-    expect(await c.run({ ...first, id: 'expired', grant: 'expired' }, limits), 'REJECT', 'APPROVAL_DENIED');
+    expect(await c.run({ ...first, id: 'expired', grant: 'expired' }, limits, 'FIRST_SUBMIT'), 'REJECT', 'APPROVAL_DENIED');
     f.grant('revoked', 'PER_CALL', first); f.owner.revokeGrant('revoked');
-    expect(await c.run({ ...first, id: 'revoked', grant: 'revoked' }, limits), 'REJECT', 'APPROVAL_DENIED');
+    expect(await c.run({ ...first, id: 'revoked', grant: 'revoked' }, limits, 'FIRST_SUBMIT'), 'REJECT', 'APPROVAL_DENIED');
     assert.equal(f.owner.bound('grant'), null); f.state('stock', 0, 20, 0);
     const second = { ...first, id: 'second' };
-    const results = await Promise.all([c.run(first, limits), other.run(second, limits)]);
+    const results = await Promise.all([c.run(first, limits, 'FIRST_SUBMIT'), other.run(second, limits, 'FIRST_SUBMIT')]);
     const index = results.findIndex(x => x.status === 'COMPLETE'); assert.ok(index >= 0);
     assert.equal(results.filter(x => x.status === 'COMPLETE').length, 1);
     assert.equal(results.filter(x => x.status === 'REJECT').length, 1);
     const winner = index === 0 ? first : second; assert.equal(f.owner.bound('grant'), winner.id);
-    expect(await c.run(command('again', 'stock', 1, 2, 'grant'), limits), 'REJECT', 'APPROVAL_DENIED');
-    assert.deepEqual(await f.client('read-original', a.base).run(winner, limits), results[index]);
+    expect(await c.run(command('again', 'stock', 1, 2, 'grant'), limits, 'FIRST_SUBMIT'), 'REJECT', 'APPROVAL_DENIED');
+    assert.deepEqual(await f.client('read-original', a.base).run(winner, limits, 'RECOVER'), results[index]);
     f.state('stock', 1, 18, 1);
   })],
   ['session approval bounded scope, repeated use, expiry and revocation', () => fixture(async f => {
     f.resource('stock', 'SESSION'); f.resource('other', 'SESSION'); const h = await f.host(); const c = f.client('a', h.base);
     const first = command('first', 'stock', 0, 2, 'session'); f.grant('session', 'SESSION', first, { maxQuantity: 3 });
-    expect(await c.run(command('over', 'stock', 0, 4, 'session'), limits), 'REJECT', 'APPROVAL_DENIED');
-    expect(await c.run(command('cross-resource', 'other', 0, 2, 'session'), limits), 'REJECT', 'APPROVAL_DENIED');
+    expect(await c.run(command('over', 'stock', 0, 4, 'session'), limits, 'FIRST_SUBMIT'), 'REJECT', 'APPROVAL_DENIED');
+    expect(await c.run(command('cross-resource', 'other', 0, 2, 'session'), limits, 'FIRST_SUBMIT'), 'REJECT', 'APPROVAL_DENIED');
     f.grant('expired', 'SESSION', first, { expires: Date.now() - 1 });
-    expect(await c.run(command('expired', 'stock', 0, 2, 'expired'), limits), 'REJECT', 'APPROVAL_DENIED');
-    expect(await c.run(first, limits), 'COMPLETE');
-    expect(await c.run(command('second', 'stock', 1, 3, 'session'), limits), 'COMPLETE');
+    expect(await c.run(command('expired', 'stock', 0, 2, 'expired'), limits, 'FIRST_SUBMIT'), 'REJECT', 'APPROVAL_DENIED');
+    expect(await c.run(first, limits, 'FIRST_SUBMIT'), 'COMPLETE');
+    expect(await c.run(command('second', 'stock', 1, 3, 'session'), limits, 'FIRST_SUBMIT'), 'COMPLETE');
     f.owner.revokeGrant('session');
-    expect(await c.run(command('revoked', 'stock', 2, 2, 'session'), limits), 'REJECT', 'APPROVAL_DENIED');
+    const historical = await c.run(first, limits, 'RECOVER'); expect(historical, 'COMPLETE');
+    assert.deepEqual(await f.client('grant-revoked-readback', h.base).run(first, limits, 'RECOVER'), historical);
+    expect(await c.run(command('revoked', 'stock', 2, 2, 'session'), limits, 'FIRST_SUBMIT'), 'REJECT', 'APPROVAL_DENIED');
     f.grant('new', 'SESSION', first); f.owner.revoke(f.token, 'shop-a', 'stock');
-    expect(await c.run(command('revoked-access', 'stock', 2, 2, 'new'), limits), 'REJECT', 'HOST_ACCESS_DENIED');
-    expect(await c.run(first, limits), 'UNKNOWN', 'READBACK_NOT_AUTHORIZED');
-    assert.equal((f.receipt('a', first.id) as Reply).status, 'COMPLETE');
+    expect(await c.run(command('revoked-access', 'stock', 2, 2, 'new'), limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'HOST_ACCESS_DENIED');
+    expect(await c.run(first, limits, 'RECOVER'), 'UNKNOWN', 'READBACK_NOT_AUTHORIZED');
+    assert.deepEqual(f.receipt('a', first.id), historical);
+    const p = await proxy(h.base, {});
+    try {
+      const fresh = f.client('fresh-recovery', p.base);
+      expect(await fresh.run(first, limits, 'RECOVER'), 'UNKNOWN', 'READBACK_NOT_AUTHORIZED');
+      // 即使调用者错误地声明首次提交，当前访问拒绝也不会成为历史拒绝。
+      expect(await f.client('fresh-submit', p.base).run(first, limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'HOST_ACCESS_DENIED');
+      const early = f.client('early-denied', p.base, 'alice', 'malformed');
+      expect(await early.run(first, limits, 'RECOVER'), 'UNKNOWN', 'HOST_REQUEST_DENIED');
+      const directlyDenied = await fetch(h.base + '/readback', { method: 'POST', body: JSON.stringify(first) });
+      expect(await directlyDenied.json() as Reply, 'UNKNOWN', 'HOST_REQUEST_DENIED');
+      for (const name of ['fresh-recovery', 'fresh-submit', 'early-denied']) {
+        assert.equal((f.receipt(name, first.id) as Reply).status, 'UNKNOWN');
+      }
+      f.state('stock', 2, 15, 2);
+      const replacement = randomBytes(32).toString('hex'); f.owner.allow(replacement, 'alice', 'shop-a', 'stock');
+      for (const name of ['a', 'fresh-recovery', 'fresh-submit', 'early-denied']) {
+        assert.deepEqual(await f.client(name, p.base, 'alice', replacement).run(first, limits, 'RECOVER'), historical);
+        assert.deepEqual(f.receipt(name, first.id), historical);
+      }
+      expect(await f.client('new-command', p.base, 'alice', replacement).run(command('after-revoke', 'stock', 2, 2, 'session'), limits, 'FIRST_SUBMIT'), 'REJECT', 'APPROVAL_DENIED');
+      assert.deepEqual(p.counts, { submit: 2, readback: 6 });
+    } finally { await p.close(); }
     f.state('stock', 2, 15, 2); f.state('other', 0, 20, 0);
   })],
   ['lost ACK after actual commit, readback unavailable then restart recovery', () => fixture(async f => {
@@ -209,20 +240,41 @@ export const actionCases: readonly [string, () => Promise<void>][] = [
     const mode = { dropSubmit: 'after' as const, dropReadback: true }; const p = await proxy(h.base, mode);
     try {
       const c = f.client('one', p.base); const input = command('lost', 'stock');
-      expect(await c.run(input, limits), 'UNKNOWN', 'HOST_RESPONSE_UNAVAILABLE'); f.state('stock', 1, 18, 1);
-      expect(await c.run(input, limits), 'UNKNOWN', 'HOST_RESPONSE_UNAVAILABLE'); assert.deepEqual(p.counts, { submit: 1, readback: 1 });
+      expect(await c.run(input, limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'HOST_RESPONSE_UNAVAILABLE'); f.state('stock', 1, 18, 1);
+      expect(await c.run(input, limits, 'RECOVER'), 'UNKNOWN', 'HOST_RESPONSE_UNAVAILABLE'); assert.deepEqual(p.counts, { submit: 1, readback: 1 });
+      const fresh = f.client('fresh-after-ack', p.base);
+      expect(await fresh.run(input, limits, 'RECOVER'), 'UNKNOWN', 'HOST_RESPONSE_UNAVAILABLE');
+      mode.dropReadback = false;
+      const across = await fresh.run(input, limits, 'RECOVER'); expect(across, 'COMPLETE');
+      assert.deepEqual(f.receipt('fresh-after-ack', input.id), across);
+      assert.deepEqual(p.counts, { submit: 1, readback: 3 });
+      f.state('stock', 1, 18, 1);
       c.close(); await h.close(); const restarted = await f.host(); const reopened = f.client('one', restarted.base);
-      const recovered = await reopened.run(input, limits); expect(recovered, 'COMPLETE');
+      const recovered = await reopened.run(input, limits, 'RECOVER'); expect(recovered, 'COMPLETE');
+      assert.deepEqual(recovered, across);
       assert.deepEqual(f.receipt('one', input.id), recovered); f.state('stock', 1, 18, 1);
     } finally { await p.close(); }
   })],
   ['lost before submission never replays unknown attempt', () => fixture(async f => {
-    f.resource('stock', 'PREAUTHORIZED'); const h = await f.host(); const p = await proxy(h.base, { dropSubmit: 'before' });
+    f.resource('stock', 'PREAUTHORIZED'); const h = await f.host();
+    const mode: { dropSubmit?: 'before' } = { dropSubmit: 'before' }; const p = await proxy(h.base, mode);
     try {
       const c = f.client('one', p.base); const input = command('never', 'stock');
-      expect(await c.run(input, limits), 'UNKNOWN', 'HOST_RESPONSE_UNAVAILABLE');
-      expect(await c.run(input, limits), 'UNKNOWN', 'ATTEMPT_UNOBSERVED');
-      assert.deepEqual(p.counts, { submit: 1, readback: 1 }); f.state('stock', 0, 20, 0);
+      expect(await c.run(input, limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'HOST_RESPONSE_UNAVAILABLE');
+      // 网络恢复后任何错误的 submit 都会真正到达 Host；零 Effect 不依赖持续阻断网络。
+      delete mode.dropSubmit;
+      expect(await c.run(input, limits, 'RECOVER'), 'UNKNOWN', 'ATTEMPT_UNOBSERVED');
+      const fresh = f.client('fresh-before-submit', p.base);
+      expect(await fresh.run(input, limits, 'RECOVER'), 'UNKNOWN', 'ATTEMPT_UNOBSERVED');
+      expect(await fresh.run(input, limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'ATTEMPT_UNOBSERVED');
+      assert.equal((f.receipt('fresh-before-submit', input.id) as Reply).status, 'UNKNOWN');
+      // 真实关闭连接使首次本地预记失败；新账本也只能显式恢复，而非推测首次提交。
+      const closed = f.client('closed-before-attempt', p.base); closed.close();
+      const unrecorded = command('unrecorded', 'stock');
+      expect(await closed.run(unrecorded, limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'CLIENT_ATTEMPT_UNAVAILABLE');
+      expect(await f.client('recover-unrecorded', p.base).run(unrecorded, limits, 'RECOVER'), 'UNKNOWN', 'ATTEMPT_UNOBSERVED');
+      assert.deepEqual(p.counts, { submit: 1, readback: 4 }); f.state('stock', 0, 20, 0);
+
     } finally { await p.close(); }
   })],
   ['actual commit plus local receipt write failure recovers through original readback', () => fixture(async f => {
@@ -230,8 +282,8 @@ export const actionCases: readonly [string, () => Promise<void>][] = [
     const p = await proxy(h.base, { afterSubmit: () => client?.close() });
     try {
       client = f.client('one', p.base); const input = command('local-fail', 'stock');
-      expect(await client.run(input, limits), 'UNKNOWN', 'CLIENT_RECEIPT_UNAVAILABLE'); f.state('stock', 1, 18, 1);
-      const reopened = f.client('one', p.base); const recovered = await reopened.run(input, limits); expect(recovered, 'COMPLETE');
+      expect(await client.run(input, limits, 'FIRST_SUBMIT'), 'UNKNOWN', 'CLIENT_RECEIPT_UNAVAILABLE'); f.state('stock', 1, 18, 1);
+      const reopened = f.client('one', p.base); const recovered = await reopened.run(input, limits, 'RECOVER'); expect(recovered, 'COMPLETE');
       assert.deepEqual(f.receipt('one', input.id), recovered);
       assert.deepEqual(p.counts, { submit: 1, readback: 1 }); f.state('stock', 1, 18, 1);
     } finally { await p.close(); }

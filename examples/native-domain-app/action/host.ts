@@ -17,7 +17,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== 'POST' || (req.url !== '/submit' && req.url !== '/readback') ||
       typeof token !== 'string' || !/^Bearer [a-f0-9]{64}$/u.test(token) ||
       typeof principal !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/u.test(principal)) {
-    respond(res, stop('REJECT', 'HOST_REQUEST_DENIED')); return;
+    respond(res, stop('UNKNOWN', 'HOST_REQUEST_DENIED')); return;
   }
   const chunks: Buffer[] = [];
   let size = 0;
@@ -29,9 +29,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   let raw: unknown;
   try { raw = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown; }
-  catch { respond(res, stop('REJECT', 'HOST_INPUT_INVALID')); return; }
+  catch { respond(res, stop('UNKNOWN', 'HOST_INPUT_INVALID')); return; }
   const command = commandOf(raw);
-  if (!command) { respond(res, stop('REJECT', 'HOST_INPUT_INVALID')); return; }
+  if (!command) { respond(res, stop('UNKNOWN', 'HOST_INPUT_INVALID')); return; }
   const reply = req.url === '/submit' ? authority.submit(token.slice(7), principal, command) : authority.readback(token.slice(7), principal, command);
   respond(res, reply);
 }

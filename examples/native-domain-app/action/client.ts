@@ -3,7 +3,9 @@ import type { WorkflowLimits } from '@kaicreator/domain-harness';
 import { commandDigest, commandOf, stop } from './authority.js';
 import type { Reply, ReserveCommand } from './authority.js';
 
-/** 客户端尝试账本独立于 Host；持久预记后才允许首次提交，重投只读回。 */
+export type ReservationMode = 'FIRST_SUBMIT' | 'RECOVER';
+
+/** 客户端账本独立于 Host；可信调用者须显式区分新命令和原命令恢复，不能以空账本推断首次提交。 */
 export class ReservationElement {
   readonly #db: SQLiteDatabaseElement;
   readonly #principal: string;
@@ -32,12 +34,17 @@ export class ReservationElement {
       }
       if (result.status === 'REJECT' || result.status === 'ASK' || result.status === 'WAIT' || result.status === 'UNKNOWN' || result.status === 'FAILED') {
         if (!result.reason || typeof result.reason.code !== 'string' || !/^[A-Z_]{1,80}$/u.test(result.reason.code)) return stop('UNKNOWN', 'HOST_RESPONSE_INVALID');
-        return stop(result.status === 'FAILED' ? 'UNKNOWN' : result.status, result.reason.code);
+        // 只有权威命令处置或明确的身份冲突才可视为终态；请求拒绝不能证明历史 Effect 不存在。
+        const code = result.reason.code;
+        if (result.status === 'REJECT' && ['COMMAND_ID_CONFLICT', 'RESOURCE_MISSING', 'RESOURCE_CONFLICT',
+          'POLICY_INVALID', 'APPROVAL_DENIED'].includes(code)) return stop('REJECT', code);
+        if (result.status === 'ASK' && code === 'APPROVAL_REQUIRED') return stop('ASK', code);
+        return stop('UNKNOWN', code);
       }
       return stop('UNKNOWN', 'HOST_RESPONSE_INVALID');
     } catch { return stop('UNKNOWN', 'HOST_RESPONSE_UNAVAILABLE'); }
   }
-  async #dispatch(c: ReserveCommand): Promise<Reply> {
+  async #dispatch(c: ReserveCommand, mode: ReservationMode): Promise<Reply> {
     const digest = commandDigest(this.#principal, c);
     let action: 'submit' | 'readback' | 'conflict';
     try {
@@ -45,7 +52,8 @@ export class ReservationElement {
         const old = tx.get<{ digest: string }>('SELECT digest FROM attempts WHERE id=?', [c.id]);
         if (old) return old.digest === digest ? 'readback' : 'conflict';
         tx.run('INSERT INTO attempts VALUES (?,?,NULL)', [c.id, digest]);
-        return 'submit';
+        // 恢复时即使此前账本丢失或未观察到提交，也绝不走 submit。
+        return mode === 'RECOVER' ? 'readback' : 'submit';
       });
     } catch { return stop('UNKNOWN', 'CLIENT_ATTEMPT_UNAVAILABLE'); }
     if (action === 'conflict') return stop('REJECT', 'COMMAND_ID_CONFLICT');
@@ -62,14 +70,15 @@ export class ReservationElement {
     } catch { return stop('UNKNOWN', 'CLIENT_RECEIPT_UNAVAILABLE'); }
     return reply;
   }
-  async run(input: unknown, limits: WorkflowLimits): Promise<Reply> {
+  async run(input: unknown, limits: WorkflowLimits, mode: ReservationMode): Promise<Reply> {
     return new StandardWorkflowSession(limits).run(async root => {
       const recognized = await root.child(0, child => child.invokeOutcome(() => {
+        if (mode !== 'FIRST_SUBMIT' && mode !== 'RECOVER') return stop('REJECT', 'COMMAND_MODE_REQUIRED');
         const command = commandOf(input);
         return command ? { status: 'COMPLETE', value: command } : stop('REJECT', 'COMMAND_INPUT_INVALID');
       }));
       if (recognized.status !== 'COMPLETE') return recognized;
-      return root.child(0, child => child.invokeOutcome(() => this.#dispatch(recognized.value)));
+      return root.child(0, child => child.invokeOutcome(() => this.#dispatch(recognized.value, mode)));
     });
   }
   close(): void { this.#db.close(); }

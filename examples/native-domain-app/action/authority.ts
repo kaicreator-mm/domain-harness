@@ -114,7 +114,8 @@ export class InventoryAuthority {
     try {
       return this.#db.transaction<Reply>(tx => {
         const principal = this.#principal(tx, token, c);
-        if (!principal || principal !== expectedPrincipal) return stop('REJECT', 'HOST_ACCESS_DENIED');
+        // 当前访问拒绝不证明该命令此前未提交，也不能泄露历史记录。
+        if (!principal || principal !== expectedPrincipal) return stop('UNKNOWN', 'HOST_ACCESS_DENIED');
         const digest = commandDigest(principal, c);
         const previous = this.#existing(tx, principal, c, digest);
         if (previous) return previous;
