@@ -2,6 +2,15 @@
 
 > [权威目录](./README.md) · Owner 现行新架构决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。本文件同时保留 R151 初审 REWORK 与后续 R160 通过的时间顺序；历史状态不得覆盖新收据。
 
+## R65 · 0.11.2 内部阶段完成（2026-11-25）
+
+- **COMPLETED_SCOPED / MERGED**：[#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) T01–T07 全部合入；[R64 最终独立审核](https://github.com/kaicreator-mm/domain-harness/issues/1718#issuecomment-7141467905) ACCEPT_SCOPED，DI-L1-01–12 全部 PASS，P0/P1/P2=0。
+- 受审 HEAD `566cd3129a6ef51bfc40e7d4a018530cabd965a8`，[Woodpecker #3184](https://ci.kaicreator.com/repos/18/pipeline/3184/1) SUCCESS；127/127 core、16/16 generation、8/8 regression。 [PR #1719](https://github.com/kaicreator-mm/domain-harness/pull/1719) expected-head 合并至 `version/v0.11.x@18384259e36ba56d937416ed5262bac1de6689ae`，审核树与合并树均为 `a45f8cd6337b929e5e4fac887e665dbb5f86d39d`（完全相同）。
+- SDK 0.11.2 单一公开根入口；生成期不可变知识、BoundedQuery、SQLite/SQL、Vector/Graph、Expression、双角色 Workflow、真实 Host 授权/CAS/attempt/receipt/readback/UNKNOWN 均在 R25 冻结范围内接受。原 #1614 的全部范围已由 DI-L1-08–10 交付，保留历史编号，不再次实现。
+- [R62 独立领域生成](https://github.com/kaicreator-mm/domain-harness/issues/1718#issuecomment-7138623305) 与 [R63 实际外部消费者](https://github.com/kaicreator-mm/domain-harness/issues/1718#issuecomment-7140817171) 通过；Windows x64 / Linux x64 glibc 2.36 实际 Node22.12.0/npm10.9.0；CI Node24.21.0。三处 SDK tarball SHA256 相同 `a3cd22d2a514fb2f6321218b1dba27b9bd5b17b6fac7bbe2daf00b02cc25a5ff`，20/20 安装成员匹配；[原始证据](https://drive.google.com/drive/folders/1Z7sdh4fNC2kxgActEtaeT4e00tTNvUIX)。Windows 初次 LOCK 的 IPv6 缓存连接失败经单次基础设施修正通过，保留失败历史。
+- 资格仅为已审范围、已实际见证平台；不声称全平台、强盲生成、生产级任意外部动作 exactly-once 或完整 DIS 合规。R64 核验实际关键字节与日志，未独立重跑 CI/平台或逐一核验 268 项索引文件。
+- 本归档仅更新文档状态，无产品源码、依赖、测试或包内容变更；不重新运行 CI，不将历史 CI 绑定到文档提交。**按 Owner 指令在 0.11.2 结束，不启动 0.11.3，不合并 main，不创建 Tag/Release，不发布 npm。** 下列旧状态均为历史快照，不覆盖本段。
+
 ## R161 · v0.11.1 语言原生 SDK 源码交付已完成（不是正式 Release）
 
 - 新架构 Canonical R140、KDP/XState R143、Reader/App R145、Workflow R154 和作者侧生成 R158 均已分批审核合并。R140 与 R145 原审各有 1 项 P2，历史数字保留并分别有后续处置，**不得追改旧审查结果**。
