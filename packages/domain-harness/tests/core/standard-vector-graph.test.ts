@@ -157,3 +157,11 @@ test('T03: query budgets are snapped once even if caller getters change values',
   assert.equal(graphResult.visited, 1);
   assert.equal(graphResult.truncationReason, 'VISIT_LIMIT');
 });
+
+test('T03 graph: explicitly empty relation type filter proves no match without scanning', () => {
+  const result = graph.search(edges, { start: 'A', direction: 'OUT', relationTypes: [],
+    limits: { maxDepth: 2, maxVisited: 0, maxReturned: 1 } });
+  assert.deepEqual(result.paths, []);
+  assert.equal(result.complete, true);
+  assert.equal(result.visited, 0);
+});
