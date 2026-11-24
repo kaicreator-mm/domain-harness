@@ -21,9 +21,59 @@
 | `VectorQueryElement`、`GraphQueryElement` | v0.11.2 T03：显式 Scope 的有限 Top-K、单边类型图有界路径；完整性可观察 |
 | `BoundedExpressionElement` | v0.11.2 T04：纯 JSON AST 的有界同步标量计算 |
 
-公开的 **TypeScript 类型入口（不构成 JS 运行时导出）**：`CorePackageMetadata`、`DomainAppContext`、`LifecycleInitContext`、`PackageInitElement`、`StaticCorePackage`、`LifecycleLogRecord`、`LifecycleLogger`、`StandardWorkflowOutcome<T>`、`WorkflowLimits`、`WorkflowRoutes<T,R>`、`StandardJsonValue`、`StandardFileOutcome<T>`、`BoundedQueryLimits`、`BoundedQueryTruncationReason`、`BoundedQueryResult<T>`、`SQLiteScalar`、`SQLiteNonThenable<T>`、`SQLiteTransaction`、`SQLiteDatabaseOptions`、`SQLiteErrorCode`、`SQLiteFailureOrigin`、`SQLiteTerminalFailureDetails`。根入口导出的类还可用于 TS 类型。
+### 公开 TypeScript 类型（33 个独立 type/interface，按职责索引）
+
+| 模块职责 | 类型入口（从同一包根 `import type`） |
+| --- | --- |
+| 生命周期 | `CorePackageMetadata`、`DomainAppContext`、`LifecycleInitContext`、`PackageInitElement`、`StaticCorePackage`、`LifecycleLogRecord`、`LifecycleLogger` |
+| Workflow | `StandardWorkflowOutcome`、`WorkflowLimits`、`WorkflowRoutes` |
+| JSON/YAML | `StandardJsonValue`、`StandardFileOutcome` |
+| Bounded Query | `BoundedQueryLimits`、`BoundedQueryTruncationReason`、`BoundedQueryResult` |
+| SQLite | `SQLiteScalar`、`SQLiteNonThenable`、`SQLiteTransaction`、`SQLiteDatabaseOptions`、`SQLiteErrorCode`、`SQLiteFailureOrigin`、`SQLiteTerminalFailureDetails` |
+| Vector | `VectorCandidate`、`VectorQueryOptions`、`VectorMatch`、`VectorQueryResult` |
+| Graph | `TypedGraphEdge`、`GraphQueryLimits`、`GraphQueryOptions`、`GraphPath`、`GraphQueryResult` |
+| Expression | `ExpressionScalar`、`ExpressionLimits` |
+
+以上类型不构成 JS 运行时导出；根入口导出的 Class 亦可作类型。实际泛型参数、方法和选项以安装的 `dist/index.d.ts` 及其关联声明/TSDoc 为准，不依赖内部模块路径。
 
 SDK 直接运行依赖只有 `xstate@5.33.2`、`yaml@2.9.1` 与 `@photostructure/sqlite@2.5.0`（exact pin；tarball 自带预编译二进制，npm lifecycle 全程保持被忽略）。SDK **消费者** Node >=22.12.0；本仓库的完整开发工具链因 ESLint 10.11 要求 >=22.13.0，不应将二者混为一谈。SDK 不做 Package/Element 生成期静态正确性验证，作者可按需执行 `scripts/validate-native-generation.mjs`，不强制 Forge 或任何 Package 生成器。
+
+## 人与 Agent 的消费入口
+
+安装的是单一 SDK；先检查实际 `node_modules/@kaicreator/domain-harness/package.json`、本 README 和公开 `dist/index.d.ts`。使用根入口，不需要 Forge、额外生成器、特殊 DSL 或第二个 Runtime。
+
+本 README 的配套规范快照：`f54d5e17683a6f79812c7d1c6c44ebb1325abae9`（0.11.2 已交付 SDK + R9 冻结原则；该快照是导航依据，不是当前 tarball 的源码运行证书）。以下为不可变 Git 提交链接，而非浮动分支：
+
+1. [权威规范目录](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/docs/specs/domain-harness/README.md) → [核心原则 CORE-01..14](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/docs/specs/domain-harness/core.md) → [TypeScript Profile](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/docs/specs/domain-harness/typescript-profile.md)。
+2. [Agent Skill](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/.agents/skills/domain-harness-spec/SKILL.md) 与 [需求驱动应用资格实践](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/.agents/skills/domain-harness-spec/references/application-qualification.md)；按需读 [Element/Package](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/docs/specs/domain-harness/element-package.md)、[Lifecycle/Workflow](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/docs/specs/domain-harness/lifecycle-workflow.md)、[QA](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/docs/specs/domain-harness/engineering-quality.md)。
+3. [真实原生应用](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/examples/native-domain-app/main.mjs)、[0.11.2 领域应用](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/examples/qualification/README.md)、[状态与验收证据](https://github.com/kaicreator-mm/domain-harness/blob/f54d5e17683a6f79812c7d1c6c44ebb1325abae9/docs/specs/domain-harness/status-and-decisions.md)。
+
+仓库可能需要授权访问。离线时本 README 与安装的声明仍可用于已公开 API 的基本消费；完整规范和 Skill 不在当前包内，不能把摘要当完整规范或假定已读。需要规范生成/审核时取得匹配快照（可使用已授权 Git checkout）；不要切换到未知的新分支来猜测 API。后续 SDK 改变规范或公开合同，应同步更新此固定快照与 API 文档，保留证据归属。
+
+开发顺序：先分析领域需求、知识、约束、异常与验收；查现有 Standard，直接复用已有实现；用原生 TS 函数/Class/静态模块实现领域专有部分；验证类型、业务正反例与资源所有权。缺少共同能力时记录实际用途、重复职责和缺口，不虚构接口或把通用实现反复生成。正确性仍由生成者在生成阶段负责，KDP 只提供生命周期与最后兜底。
+
+### 最短使用路径
+
+以下为原生 TypeScript ESM 示例（`.mts` 或 `type: module` 工程，使用正常 TypeScript 工具编译；不是新的 DSL）：
+
+```ts
+import { BoundedQueryElement, StandardWorkflowSession } from '@kaicreator/domain-harness';
+
+const query = new BoundedQueryElement();
+const session = new StandardWorkflowSession({ maxCalls: 1, maxSteps: 2, maxDepth: 0 });
+const outcome = await session.run(root => root.invoke(() =>
+  query.select([{ id: 'A', available: true }], item => item.available,
+    { maxVisited: 2, maxReturned: 2 }),
+));
+if (outcome.status === 'COMPLETE' && outcome.value.complete) {
+  console.log(outcome.value);
+}
+// COMPLETE 只是 Workflow 调用成功；查询完整性仍按业务判断。
+```
+
+- 不需要完整 App 生命周期时可直接使用 Standard；有 Core/Init/Exit 的应用使用 `KernelLifecycle`，静态导入实际 Core，唯一 Order=0 KDP，生成期保证结构。一次业务用 `run`；长期 App 用 `start`、多个 `execute`，外层最终 `[Symbol.asyncDispose]()`。关闭需等待已进入业务收敛；业务体不可等待依赖自身结束的关闭操作。
+- 普通值用 `root.invoke`；已经返回 `StandardWorkflowOutcome` 的业务函数用 `invokeOutcome` 或 `leaf`，保留 REJECT/ASK/WAIT/UNKNOWN/FAILED。子 Workflow 用 `child` 共享根预算；固定业务阶段全量前置条件由业务负责。每个独立根创建自己的 Session，`run` 单次；ASK/WAIT 本身不提供恢复，不将 .3/.6 尚未交付能力当作现有 API。
+- JSON/YAML Reader 处理文本与数据；文件 I/O、路径及业务权限由调用方负责。查询结果不完整不能当作不存在；数据库显式管理连接、事务与资源；领域知识、规则、授权与真实 Effect 由应用/资源所有者负责，不调用不存在的统一 Intent 或 Tool Runtime。
 
 ## 交付验证
 
@@ -41,7 +91,7 @@ const result = new BoundedQueryElement().select(
 // result.complete=false: 第一条即满足结果上限，不能据此认定余项已判断。
 ```
 
-T01 使用现有公开 SDK 根入口，不依赖动态 Knowledge Store，也不要求所有 Business Function 返回统一领域 Outcome。一次 Query 的 `complete=false` 时，实际业务必须根据需要拒绝或输出 UNKNOWN，不能把部分结果当完整事实。此处仅为 T01 源码增量，正式 Node 22 clean SDK-only 与 Woodpecker 验收仍取决于当前 Exact HEAD 的真实执行记录。
+T01 使用现有公开 SDK 根入口，不依赖动态 Knowledge Store，也不要求所有 Business Function 返回统一领域 Outcome。一次 Query 的 `complete=false` 时，实际业务必须根据需要拒绝或输出 UNKNOWN，不能把部分结果当完整事实。T01–T07 已在 0.11.2 R65 限定接受；证据只绑定受审工件/平台，不表示新 SHA 自动通过。
 
 ## v0.11.2 T02：SQLite Database Element（同步连接、显式事务与 CAS）
 
@@ -62,10 +112,10 @@ db.close(); // 业务显式 close；关闭后所有操作按 CLOSED 拒绝
 - **单语句 SQL 限制合同**：每条 `run`/`get`/`select` 只接受一条 SQL 语句 —— 非空字符串，且文本中**不得出现分号 `;` 或 NUL**，无论它位于末尾、注释、引号字面量/标识符还是触发器体内；否则在 `prepare` 之前以 `INVALID_INPUT (statement)` 同步拒绝，不会只执行第一条就返回成功。这是可信 SQL 的限制合同，不是通用 SQL 解析：本版因此不支持带分号的 `CREATE TRIGGER` 定义与尾随分号；需要分号的数据请用绑定参数传递（`'a;b'` 合法）。绑定字符串含 NUL 时同样拒绝（driver 会在 NUL 处静默截断该值），BLOB 不受影响。
 - 错误按 SQLite 主码分类为 `BUSY/LOCKED/READONLY/CONSTRAINT/IO/OPEN/AUTH/SQL` 等脱敏码；消息不含路径、SQL 文本、绑定值。可回滚的失败先回滚，再把原始业务错误原样抛给调用方。回滚失败（`ROLLBACK_FAILED`）或提交结果不明（`COMMIT_UNKNOWN`）是终态故障：抛出带 `primaryCode`（SDK 归类码或 `BUSINESS`）与 `rollbackCode` 的 `SQLiteDatabaseError`，`cause` 只含脱敏描述，不保留业务或驱动的原始错误对象；连接随即隔离（只允许 `close()`），SDK 不会自动重试，提交结果不明时由业务重新读取后自行决定。
 - CAS 是业务自己的参数化 `UPDATE … WHERE version=?` 加 `changes` 计数；SDK 不造通用 Domain State Schema，不强制每表 version 字段。`PRAGMA` 与必须在事务外执行的维护语句（如 `VACUUM`）不在本 Element 能力内。
-- 平台范围：driver tarball 内含 darwin、linux-arm64、win32-arm64 预编译文件和 musl 变体，但**真实见证只覆盖 Windows x64 与 Linux x64 glibc 2.36（均为 Node 22.12.0）**；其余 OS/arch、musl 与更旧的 glibc 未经见证，不得宣称兼容。`select` 只是 L2 连接级基础读取（受 `limit` 约束），完整 SQL/Vector/Graph Query 能力属于后续任务。
+- 平台范围：driver tarball 内含 darwin、linux-arm64、win32-arm64 预编译文件和 musl 变体，但**真实见证只覆盖 Windows x64 与 Linux x64 glibc 2.36（均为 Node 22.12.0）**；其余 OS/arch、musl 与更旧的 glibc 未经见证，不得宣称兼容。`select` 提供受 `limit` 约束的 SQL 读取；T03 复用该方法并提供独立 Vector/Graph 查询，不是通用 ORM、向量或图数据库。
 - driver `@photostructure/sqlite@2.5.0` 以 exact 版本锁入 workspace lockfile；安装脚本（`node-gyp-build`）保持被 `--ignore-scripts` 忽略，不执行源码编译或外部下载。
 
-## v0.11.2 T03：Vector / Graph 有界查询（实现中的模块）
+## v0.11.2 T03：Vector / Graph 有界查询
 
 `VectorQueryElement.search(candidates, query, inScope, {topK,maxVisited,dimension,metric})` 先调用可信业务 Scope，再计算 COSINE 距离（1−cos）或 L2；按距离、id、原始位置稳定排序，只保留 Top-K 候选。每次访问都计入 `visited`；预算不足时 `complete=false`、`truncationReason='VISIT_LIMIT'`，不能把未找到当成事实。空源可为完整；非空源 `topK=0` 明确非完整。
 
@@ -73,7 +123,7 @@ db.close(); // 业务显式 close；关闭后所有操作按 CLOSED 拒绝
 
 `GraphQueryElement.search(edges, {start,target?,direction,relationTypes?,limits})` 使用 BFS 和 cycle visited 集合。图遍历预算 `maxVisited` 指实际检查的原始边次数（同一条边在不同扩展重复检查仍计费）；`maxDepth` 限路径 hops，`maxReturned` 限返回路径。若指定 target，则第一条找到的最短路径能完成“存在”查询；无路径但 `complete=false` 不等同不存在。**不**自动推导业务权限或事实，不创建向量/图数据库。对外可信 TypeScript 业务数据并非恶意 Proxy 沙箱。
 
-T03 SQL 部分**复用**已通过 T02 的 `SQLiteDatabaseElement.select(fixedSql, parameters, limit)` 与 SQLite authorizer，不另做 SQL parser/ORM。SQL + Vector/Graph 整体 SDK packed consumer/CI 仍须以 T03 新 Exact SHA 验收，不把独立纯算法测试当正式 SQL 集成。
+T03 SQL 部分**复用**已通过 T02 的 `SQLiteDatabaseElement.select(fixedSql, parameters, limit)` 与 SQLite authorizer，不另做 SQL parser/ORM。SQL + Vector/Graph 的 R65 组合 SDK 验收见下方证据；不把独立算法测试或历史证据当新 SHA 的集成资格。
 
 ## v0.11.2 T04：有界 Expression
 
@@ -95,4 +145,10 @@ const available = expr.evaluate(
 
 ## v0.11.2 T07：生成新 Business Package 与最低消费者 Node
 
-生成者先读仓库真实 `.agents/skills/domain-harness-spec/SKILL.md` 及其规范目录，再以本公开 API README、根入口导出的声明/TSDoc 和实际领域资料编写普通 TS ESM 模块；SDK 不承担 Package 生成或正确性验证。两个新领域的源码、资料到规则映射和组合验收见 `examples/native-domain-app/combined/`。开发 Node >=22.13 不改变 SDK 消费者 Node >=22.12.0。真实仓外消费脚本支持独立消费者 Node/npm 可执行路径，记录实际运行时版本和 tarball SHA256；须有当前 Exact SHA 真实 Windows/Linux witness 才能宣告双平台最低版本通过。
+生成者先读仓库真实 `.agents/skills/domain-harness-spec/SKILL.md` 及其规范目录，再以本公开 API README、根入口导出的声明/TSDoc 和实际领域资料编写普通 TS ESM 模块；SDK 不承担 Package 生成或正确性验证。两个新领域的源码、资料到规则映射和组合验收见 `examples/native-domain-app/combined/`。开发 Node >=22.13 不改变 SDK 消费者 Node >=22.12.0。真实仓外消费脚本支持独立消费者 Node/npm 可执行路径，记录实际运行时版本和 tarball SHA256；须有对应工件的真实 Windows/Linux witness 才能宣告双平台最低版本通过。
+
+### 已接受工件与当前边界
+
+[0.11.2 R65](https://github.com/kaicreator-mm/domain-harness/issues/1612#issuecomment-7141533062) / [R64](https://github.com/kaicreator-mm/domain-harness/issues/1718#issuecomment-7141467905)：受审 `566cd3129a6ef51bfc40e7d4a018530cabd965a8`，Woodpecker #3184 SUCCESS，127 core / 16 generation / 8 regression PASS、DI-L1 12/12。[R63](https://github.com/kaicreator-mm/domain-harness/issues/1718#issuecomment-7140817171) 同一旧 SDK tarball SHA256 `a3cd22d2a514fb2f6321218b1dba27b9bd5b17b6fac7bbe2daf00b02cc25a5ff`，Node22.12.0 Windows x64 / Linux x64 glibc2.36 实际消费者通过。此 README 修改会改变新打包工件字节，不把旧哈希、CI 或平台证据冒充新打包结果。[R73](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7143329514) 两领域资格仅 Linux 留存依赖范围，fresh lock/install UNKNOWN、该资格 Windows NOT_RUN。
+
+[0.11.3 R9](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7145891451) 是冻结产品合同，不是已实现 Interaction API；[SDK 专项 #1724](https://github.com/kaicreator-mm/domain-harness/issues/1724) 期间以实际安装的声明和经审验源码为准。无 .5 LLM/.6 durable 能力声明，不恢复旧 ABI，不表示 npm 正式发布。
