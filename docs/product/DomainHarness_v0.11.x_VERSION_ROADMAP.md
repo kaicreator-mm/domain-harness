@@ -1,3 +1,5 @@
+> **当前 R9：** [0.11.3 Product/L1 正式冻结及 P2 验收补充](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7145891451)；全局 CORE-13/14、QA-09 已接受合并。先完成 [#1724](https://github.com/kaicreator-mm/domain-harness/issues/1724) 再进入 .3 L2。R7 原受审 PRD 内待审措辞以及下方早期状态均为历史快照；不表示 .3 源码已实现或 R65 资格扩大。
+
 ## R65 · 0.11.2 内部阶段完成（2026-11-25）
 
 - **COMPLETED_SCOPED / MERGED**：[#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) T01–T07 全部合入；[R64 最终独立审核](https://github.com/kaicreator-mm/domain-harness/issues/1718#issuecomment-7141467905) ACCEPT_SCOPED，DI-L1-01–12 全部 PASS，P0/P1/P2=0。
@@ -123,7 +125,7 @@ NODE_MINIMUM=22.12.0
 | **0.11.0 — Foundation** | 新架构能定义、装配、运行一个 Domain App（**已通过 Scoped 验收**） | Element/Content/Function；K/S/B Package；BUILD/AOT/Lock；Boot→唯一 KDP→App Init；clean public SDK；Selected no-effect Function | 历史四工作区 clean-packed SDK Consumer 能构建、启动（R53/R58 后公开产品仅一个 SDK）、执行实际已选 Knowledge/Rule 改变结果的 Function；AC01–AC10 Scoped PASS |
 | **0.11.1 — Task Execution** | 使用 Workflow + State Machine 实现**确定性 Task Execution Loop** | Goal/TaskRun、Workflow Step/Branch、Task/Domain 状态机合同、Guard、Bounded Coordinator/Observation/Outcome；选定 Function 的步骤执行 | 无 LLM/外部 Effect 的多步真实任务，能 COMPLETE、ASK/WAIT、REJECT/UNKNOWN，不能非法转移或无限循环；简单 Function 仍可直接调用 |
 | **0.11.2 — Domain Intelligence + Authorized Action（R65 COMPLETED_SCOPED / MERGED）** | 单一 Knowledge + Workflow 语义/行为闭环，真实受控业务动作同版实现 | 生成期不可变 Data Knowledge、原生 Function Knowledge/内聚 Business Element、Intent Recognition/Handling 两类 Workflow 用途；有界 Query、SQLite DB、参数化 SQL、Vector、Graph、Expression 普通 Standard 能力；State/CAS、静态已选 Tool/Host、PREAUTHORIZED/USER_APPROVAL、最小可靠 Effect/Journal/readback/UNKNOWN | 两个真实领域的静态知识改变决策与公共 Query 复用；真实 Host 预授权及需要用户确认两条 Effect 路径、并发条件提交、丢 ACK/UNKNOWN、重复请求安全；不复活 KDP Permit/第二 Runtime |
-| **0.11.3 — Semantic Interaction（R7 L1 候选）** | 领域知识驱动的人机协作与持续意图确定 | 关键决策优先、候选方案优先、动态多步表单、最小确认、单意图多轮与多独立意图局部等待；实际可复用 Standard 实现及 Agent-first 消费，复用 .2 双 Workflow 与授权；程序识别，LLM 可仅接口/mock，真实 LLM 归 .5 | [R7 PRD/L1](./DomainHarness_v0.11.3_R7_PRODUCT_L1_SEMANTIC_INTERACTION.md) SI-L1-01–12（含 09A/09B）；真实两域、两种客户端适配、独立生成者；先冻结 L1 再审核优化 .0–.2，之后 L2 |
+| **0.11.3 — Semantic Interaction（R9 L1 FROZEN_SCOPE）** | 领域知识驱动的人机协作与持续意图确定 | 关键决策优先、候选方案优先、动态多步表单、最小确认、单意图多轮与多独立意图局部等待；实际可复用 Standard 实现及 Agent-first 消费，复用 .2 双 Workflow 与授权；程序识别，LLM 可仅接口/mock，真实 LLM 归 .5 | [R7 PRD/L1](./DomainHarness_v0.11.3_R7_PRODUCT_L1_SEMANTIC_INTERACTION.md) SI-L1-01–12（含 09A/09B）；真实两域、两种客户端适配、独立生成者；先冻结 L1 再审核优化 .0–.2，之后 L2 |
 | **0.11.4 — RESERVED/HISTORICAL（R25 scope）** | 原 Authorized Action 已在 #1612 完成交付并独审通过，本内部阶段编号保留追踪，不再独立实现同一内容 | #1614 保留历史原 AC1–AC3、对应 0.11.2 DI-L1-08–10；如未来需要为 .4 分配其他正式产品能力应由 Owner 单独重新裁决；**不因此自动重排 0.11.5–0.11.9** | 审核确认不存在第二套受权 Tool/Host/Effect 或重复实施工作包；本行表示历史编号保留，不表示本阶段需独立实现或已经发布 |
 | **0.11.5 — Bounded Reasoning** | 已选知识与业务 Workflow 不足时调用可选有界 LLM，受控提案而非自授权 | Provider-neutral LLM/Context、选定模型能力、步数/时间/费用预算；复用 0.11.2 已受信的 Tool/Effect 与业务状态，按实际业务消费 0.11.3 交互 | 已知问题零 LLM；未知问题一次真实有界模型提案/已选 Tool 观察；越权、非法 Tool、预算耗尽不得提交 Effect 或虚报 COMPLETE |
 | **0.11.6 — Durable Execution** | 持久 TaskRun/checkpoint、暂停恢复与可靠控制 | 复用 0.11.2 由真实资源/Effect provider 维护的 attempt/journal/receipt；实现完整 TaskRun checkpoint、pause/resume/cancel/timeout、跨进程恢复与 callback | 重启恢复不重复 Effect；UNKNOWN 未确认保留；不假设最小化 KDP 负责所有 Journal 或重复构建动作执行器 |
@@ -168,7 +170,7 @@ NODE_MINIMUM=22.12.0
 | **0.11.0** | [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | Foundation | Stage-0 accepted; internal only |
 | **0.11.1** | [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) | Task Execution | R27 Product/L1/L2 ACCEPT_SCOPED，T11–T14 合入，#1605/#1608 已关闭；内部阶段完成 |
 | **0.11.2** | [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Domain Intelligence + Authorized Action | R25 Product/L1 scope FROZEN，L2 design admitted，源码/CI/功能验收未开始 |
-| **0.11.3** | [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | Semantic Interaction | R1–R6 需求方向已确认；R7 PRD/L1 候选待独立审核，L2/implementation NOT_STARTED |
+| **0.11.3** | [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | Semantic Interaction | R9 L1 FROZEN_SCOPE；[#1724](https://github.com/kaicreator-mm/domain-harness/issues/1724) 前置专项，L2 ON_HOLD、implementation NOT_STARTED |
 | **0.11.4** | [#1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | Authorized Action historical transfer index | 全部原内容/AC 已按 R25 Product/L1 归属 #1612，不单独启动独立版本实现；号保留 |
 | **0.11.5** | [#1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | Bounded Reasoning | Scope assigned, Product/L2/implementation pending |
 | **0.11.6** | [#1616](https://github.com/kaicreator-mm/domain-harness/issues/1616) | Durable Execution | Scope assigned, Product/L2/implementation pending |
