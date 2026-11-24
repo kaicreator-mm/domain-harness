@@ -169,7 +169,7 @@ export class GraphQueryElement {
       paths.push(Object.freeze({ nodes: Object.freeze([start]), edgeTypes: Object.freeze([]) }));
       return finish(true);
     }
-    if (typedEdges.length === 0 || maxDepth === 0) return finish(true);
+    if (typedEdges.length === 0 || maxDepth === 0 || typesToInclude?.size === 0) return finish(true);
     if (maxReturned === 0) return finish(false, 'RESULT_LIMIT');
     const seen = new Set<string>([start]);
     const queue: Array<{ readonly node: string; readonly path: readonly string[]; readonly types: readonly string[] }> = [
