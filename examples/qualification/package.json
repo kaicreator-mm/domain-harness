@@ -1,5 +1,5 @@
 {
-  "name": "dh-media-qualification",
+  "name": "dh-complex-qualification",
   "private": true,
   "type": "module",
   "dependencies": {
@@ -7,7 +7,7 @@
     "sharp": "0.34.1"
   },
   "scripts": {
-    "verify": "tsc -p tsconfig.json && node --unhandled-rejections=strict dist/verify.js"
+    "verify": "tsc -p tsconfig.json && node --unhandled-rejections=strict dist/media-archive/verify.js && node --unhandled-rejections=strict dist/workshop/verify.js"
   },
   "devDependencies": {
     "@types/node": "22.19.7",

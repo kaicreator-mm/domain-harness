@@ -1,3 +1,5 @@
+> R67A historical first implementation; R67B moved common CLI and manifest to [suite root](../README.md). Follow suite root execution and current evidence; the old standalone path below describes historical R67A.
+
 # R67 · 需求驱动资格验证：数字媒体档案入库
 
 唯一任务 [#1720](https://github.com/kaicreator-mm/domain-harness/issues/1720)；冻结需求先于源码实现，已接受 SDK 0.11.2 不变。不是发布产品，也不是 NARA/LOC 完整合规实现。
