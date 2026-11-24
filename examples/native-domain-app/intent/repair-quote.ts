@@ -1,4 +1,4 @@
-import { BoundedQueryElement, StandardWorkflowSession } from '@kaicreator/domain-harness';
+import { BoundedQueryElement, runRecognitionHandling } from '@kaicreator/domain-harness';
 import type { BoundedQueryLimits, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
 
 export interface RepairRule {
@@ -99,14 +99,12 @@ export class RepairQuoteElement {
   async run(request: RepairRequest, limits: WorkflowLimits, queryLimits?: BoundedQueryLimits) {
     // 一次业务请求仅一个 Root；两个静态选定子角色共享调用/步骤/深度额度。
     let usedRule: RepairRule | undefined;
-    const outcome = await new StandardWorkflowSession(limits).run<RepairDecision>(async root => {
-      const recognized = await root.child(0, child => child.invokeOutcome(() => this.recognize(request, queryLimits)));
-      if (recognized.status !== 'COMPLETE') return recognized;
-      return root.child(0, child => child.invokeOutcome(() => {
-        usedRule = recognized.value.rule;
-        return this.handle(recognized.value);
-      }));
-    });
+    const outcome = await runRecognitionHandling(limits,
+      () => this.recognize(request, queryLimits),
+      intent => {
+        usedRule = intent.rule;
+        return this.handle(intent);
+      });
     // 证据属当前业务调用，不放进实例共享的“最近结果”，也不改变 SDK Outcome。
     return { outcome, usedRule };
   }
