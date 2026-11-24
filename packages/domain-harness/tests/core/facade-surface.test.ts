@@ -7,6 +7,7 @@ const expected = [
   'KernelLifecycle',
   'WorkflowElement',
   'XStateWorkflowElement',
+  'BoundedQueryElement',
   'JsonReader',
   'YamlReader',
   'readJson',
