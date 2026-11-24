@@ -65,10 +65,11 @@ export class VectorQueryElement {
     options: VectorQueryOptions,
   ): VectorQueryResult<T> {
     if (!Array.isArray(source) || typeof inScope !== 'function' || types.isAsyncFunction(inScope) ||
-        options === null || typeof options !== 'object' || !budget(options.topK) ||
-        !budget(options.maxVisited) || !Number.isSafeInteger(options.dimension) || options.dimension <= 0 ||
-        (options.metric !== 'COSINE' && options.metric !== 'L2')) return invalid('VECTOR_INPUT');
+        options === null || typeof options !== 'object') return invalid('VECTOR_INPUT');
+    // 配额在调用任何业务 Scope 之前一次性快照并校验，后续回调不能修改本次上限。
     const { topK, maxVisited, dimension, metric } = options;
+    if (!budget(topK) || !budget(maxVisited) || !Number.isSafeInteger(dimension) || dimension <= 0 ||
+        (metric !== 'COSINE' && metric !== 'L2')) return invalid('VECTOR_INPUT');
     const queryNorm = norm(query, dimension);
     if (metric === 'COSINE' && queryNorm === 0) return invalid('VECTOR_ZERO_NORM');
     const matches: Array<VectorMatch<T> & { readonly sourceIndex: number }> = [];
@@ -137,19 +138,21 @@ export interface GraphQueryResult {
 /** 有向类型关系图的有限 BFS；每个节点最多产出一条最短发现路径。 */
 export class GraphQueryElement {
   public search(edges: readonly TypedGraphEdge[], options: GraphQueryOptions): GraphQueryResult {
-    if (!Array.isArray(edges) || !options || typeof options !== 'object' ||
-        typeof options.start !== 'string' || options.start.length === 0 ||
-        (options.target !== undefined && (typeof options.target !== 'string' || options.target.length === 0)) ||
-        (options.direction !== 'OUT' && options.direction !== 'IN' && options.direction !== 'BOTH') ||
-        !options.limits || !budget(options.limits.maxDepth) || !budget(options.limits.maxVisited) ||
-        !budget(options.limits.maxReturned) ||
-        (options.relationTypes !== undefined && (!Array.isArray(options.relationTypes) ||
-          options.relationTypes.some(type => typeof type !== 'string' || type.length === 0)))) {
+    if (!Array.isArray(edges) || !options || typeof options !== 'object') return invalid('GRAPH_INPUT');
+    // 路径和边预算同样只接纳一份快照，避免重复 getter 读取带来不同合同。
+    const { start, target, direction, limits, relationTypes } = options;
+    if (typeof start !== 'string' || start.length === 0 ||
+        (target !== undefined && (typeof target !== 'string' || target.length === 0)) ||
+        (direction !== 'OUT' && direction !== 'IN' && direction !== 'BOTH') || !limits) {
       return invalid('GRAPH_INPUT');
     }
-    const { start, target, direction, limits } = options;
     const { maxDepth, maxVisited, maxReturned } = limits;
-    const typesToInclude = options.relationTypes === undefined ? undefined : new Set(options.relationTypes);
+    if (!budget(maxDepth) || !budget(maxVisited) || !budget(maxReturned) ||
+        (relationTypes !== undefined && (!Array.isArray(relationTypes) ||
+          relationTypes.some(type => typeof type !== 'string' || type.length === 0)))) {
+      return invalid('GRAPH_INPUT');
+    }
+    const typesToInclude = relationTypes === undefined ? undefined : new Set(relationTypes);
     const paths: GraphPath[] = [];
     let visited = 0;
     const finish = (complete: boolean, reason?: 'VISIT_LIMIT' | 'RESULT_LIMIT'): GraphQueryResult => {
