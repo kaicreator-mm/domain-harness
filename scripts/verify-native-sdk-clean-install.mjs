@@ -6,6 +6,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyS05InstalledStandard } from './verify-s05-installed-standard.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const work = mkdtempSync(join(tmpdir(), 'dh-native-sdk-only-'));
@@ -111,6 +112,7 @@ try {
   // T02：正式包不得携带任何事务控制替换入口。tarball 清单、已安装的模块文件与模块命名空间三层核对；
   // 仓内测试用的 instrumented 副本只存在于测试进程内，不得被打包。
   const packedPaths=(details.files||[]).map(file=>file.path);
+  const standardS05=verifyS05InstalledStandard({packageDir,installed,consumer,consumerNode,packedPaths,run});
   assert.ok(packedPaths.includes('dist/standard-sqlite.js'),'NATIVE_CONSUMER_PACK_LIST_INCOMPLETE');
   assert.deepEqual(packedPaths.filter(path=>/INSTRUMENTED/iu.test(path)),[],'NATIVE_CONSUMER_INSTRUMENTED_FILE_PACKED');
   const shippedControl=readFileSync(join(installed,'dist/standard-sqlite.js'),'utf8');
@@ -207,7 +209,7 @@ try {
     compilerOptions:{strict:true,noEmit:true,target:'ES2022',module:'NodeNext',
       moduleResolution:'NodeNext',skipLibCheck:false,types:[],
       lib:['ES2022','DOM','ESNext.Disposable']},
-    include:['probe.mts'],
+    include:['probe.mts','s05-types.mts'],
   },null,2));
   run('TYPECHECK',process.execPath,[
     join(root,'node_modules/typescript/bin/tsc'),'-p',join(consumer,'tsconfig.json'),
@@ -390,7 +392,7 @@ try {
 
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
-    packageVersion:installedPkg.version,consumerRuntime:runtime,consumerNpmVersion,
+    packageVersion:installedPkg.version,consumerRuntime:runtime,consumerNpmVersion,standardS05,
     api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
     rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
     sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
