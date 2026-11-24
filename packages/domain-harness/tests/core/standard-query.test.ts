@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { BoundedQueryElement, StandardWorkflowSession } from '../../src/index.js';
 
@@ -110,4 +111,73 @@ test('T01: existing Standard Workflow runs the same Query without new runtime', 
       { maxVisited: 3, maxReturned: 2 })));
   assert.equal(denied.status, 'FAILED');
   if (denied.status === 'FAILED') assert.equal(denied.reason.code, 'WORKFLOW_CALL_BUDGET');
+});
+
+test('R32 P1-01: admitted limits cannot grow, shrink or become invalid during predicate', () => {
+  for (const [admitted, changed] of [[1, 3], [2, 0], [2, NaN], [2, Infinity]] as const) {
+    for (const matches of [true, false]) {
+      const limits = { maxVisited: admitted, maxReturned: admitted };
+      const seen: number[] = [];
+      const result = query.select([1, 2, 3], item => {
+        seen.push(item);
+        limits.maxVisited = changed;
+        limits.maxReturned = changed;
+        return matches;
+      }, limits);
+      assert.deepEqual(seen, [1, 2, 3].slice(0, admitted));
+      assert.equal(result.visited, admitted);
+      assert.deepEqual(result.items, matches ? seen : []);
+      assert.equal(result.complete, false);
+      assert.equal(result.truncated, true);
+      assert.equal(result.truncationReason, matches ? 'RESULT_LIMIT' : 'VISIT_LIMIT');
+    }
+  }
+});
+
+test('R32 P1-01: each admitted limit is read once and last item stays complete', () => {
+  let visitedReads = 0, returnedReads = 0;
+  const limits = {
+    get maxVisited() { visitedReads += 1; return 2; },
+    get maxReturned() { returnedReads += 1; return 1; },
+  };
+  const result = query.select([1, 2], item => item === 2, limits);
+  assert.deepEqual(result, { items: [2], visited: 2, complete: true, truncated: false });
+  assert.equal(visitedReads, 1);
+  assert.equal(returnedReads, 1);
+});
+
+test('R32 P1-02: invalid async predicate cannot terminate a strict Node host', () => {
+  // 使用已构建的真实 SDK 包根；子进程严格拒绝未处理 Promise。
+  const program = [
+    "import assert from 'node:assert/strict';",
+    "import { BoundedQueryElement, StandardWorkflowSession } from '@kaicreator/domain-harness';",
+    "const q = new BoundedQueryElement();",
+    "const limits = {maxVisited:1,maxReturned:1};",
+    "let entered = 0;",
+    "assert.throws(() => q.select([1], async () => { entered++; throw Error('async'); }, limits), /DH_STD_QUERY_INVALID_PREDICATE_RESULT/u);",
+    "assert.equal(entered, 0);",
+    "assert.throws(() => q.select([1], () => Promise.reject(Error('native')), limits), /DH_STD_QUERY_INVALID_PREDICATE_RESULT/u);",
+    "const invalid = () => Promise.reject(Error('workflow'));",
+    "const outcome = await new StandardWorkflowSession({maxCalls:1,maxSteps:2,maxDepth:0}).run(ctx => ctx.invoke(() => q.select([1], invalid, limits)));",
+    "assert.equal(outcome.status, 'FAILED');",
+    "assert.equal(outcome.reason.code, 'WORKFLOW_EXECUTION_FAILED');",
+    "await new Promise(resolve => setImmediate(resolve));",
+    "console.log('HOST_SURVIVED');",
+  ].join('\n');
+  const child = spawnSync(process.execPath, [
+    '--unhandled-rejections=strict', '--input-type=module', '--eval', program,
+  ], { encoding: 'utf8', timeout: 10_000, windowsHide: true });
+  assert.equal(child.error, undefined);
+  assert.equal(child.signal, null);
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(child.stdout.trim(), 'HOST_SURVIVED');
+});
+
+test('R32 P1-02: reject arbitrary thenable without reading or calling then', () => {
+  let accesses = 0;
+  const candidate = { get then() { accesses += 1; throw Error('must not read then'); } };
+  const invalid = (() => candidate) as unknown as (item: number) => boolean;
+  assert.throws(() => query.select([1], invalid, { maxVisited: 1, maxReturned: 1 }),
+    /DH_STD_QUERY_INVALID_PREDICATE_RESULT/u);
+  assert.equal(accesses, 0);
 });
