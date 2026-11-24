@@ -1,6 +1,6 @@
 import { GraphQueryElement, StandardWorkflowSession } from '@kaicreator/domain-harness';
 import type { StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
-import { CliElement } from '../shared/cli.js';
+import { CliElement } from '@kaicreator/domain-harness';
 export type Task=Readonly<{id:string;order:string;stage:string;machine:string;duration:number;after:readonly string[]}>;
 export type Policy=Readonly<{revision:string;horizon:number;closed:Readonly<Record<string,readonly number[]>>}>;
 export type Plan={starts:Record<string,number>;makespan:number;solver:string;revision:string;impact:readonly string[]};
