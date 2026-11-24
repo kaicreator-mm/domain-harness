@@ -160,6 +160,13 @@ try {
     "// @ts-expect-error a Promise-carrying union is rejected as a transaction value",
     "sqlite.transaction(() => Math.random() > 0.5 ? 1 : Promise.resolve(2));",
     "sqlite.close();",
+    "import { BoundedExpressionElement } from '@kaicreator/domain-harness';",
+    "import type { ExpressionScalar, ExpressionLimits } from '@kaicreator/domain-harness';",
+    "const expressionLimits: Partial<ExpressionLimits> = {maxOperations:1};",
+    "const expressionValue: ExpressionScalar = new BoundedExpressionElement().evaluate(JSON.stringify({op:'literal',value:1}),'{}',expressionLimits);",
+    "// @ts-expect-error raw object AST is not admitted",
+    "new BoundedExpressionElement().evaluate({op:'literal',value:1},'{}');",
+    "void expressionValue;",
     "void life; void file; void flow; void inserted; void picked; void sqlite;",
   ].join('\n'));
   writeFileSync(join(consumer,'tsconfig.json'),JSON.stringify({
@@ -260,12 +267,33 @@ try {
   const queryResult=run('VECTOR_GRAPH_PROBE',process.execPath,['vector-graph-probe.mjs'],consumer);
   assert.equal(queryResult.trim(),'SDK_VECTOR_GRAPH_PROBE_PASS');
 
+  // T04：实际仓外 SDK 根导入，有限表达式在两个独立业务输入上复用。
+  writeFileSync(join(consumer,'expression-probe.mjs'),[
+    "import assert from 'node:assert/strict';",
+    "import { BoundedExpressionElement } from '@kaicreator/domain-harness';",
+    "const e=new BoundedExpressionElement();",
+    "const lit=value=>({op:'literal',value});",
+    "const get=key=>({op:'get',path:[key]});",
+    "const run=(ast,input,limits)=>e.evaluate(JSON.stringify(ast),JSON.stringify(input),limits);",
+    "assert.equal(run({op:'sub',args:[get('stock'),get('reserved')]},{stock:12,reserved:3}),9);",
+    "assert.equal(run({op:'le',args:[get('quote'),lit(80)]},{quote:50}),true);",
+    "assert.equal(run({op:'and',args:[lit(false),get('missing')]},{},{maxOperations:2}),false);",
+    "assert.throws(()=>run(get('stock'),{stock:12},{maxOperations:1}),/EXPRESSION_LIMIT/u);",
+    "let touched=0;",
+    "const poison={get op(){touched+=1;throw Error('getter');}};",
+    "assert.throws(()=>e.evaluate(poison,'{}'),/EXPRESSION_INVALID/u);",
+    "assert.equal(touched,0);",
+    "assert.throws(()=>e.evaluate('!'.repeat(32769),'{}'),/EXPRESSION_LIMIT/u);",
+    "console.log('SDK_EXPRESSION_PROBE_PASS');",
+  ].join('\n'));
+  assert.equal(run('EXPRESSION_PROBE',process.execPath,['expression-probe.mjs'],consumer).trim(),'SDK_EXPRESSION_PROBE_PASS');
+
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
     api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
     rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
     sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
-    noTransactionControlHook:true,vectorGraphRuntime:true}));
+    noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true}));
 } finally {
   if (process.env.DH_NATIVE_KEEP_EVIDENCE !== '1') rmSync(work,{recursive:true,force:true});
   else console.error('NATIVE_CONSUMER_EVIDENCE_DIR='+work);

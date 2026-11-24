@@ -8,7 +8,7 @@
 
 `package.json#exports` **只有 `.` 包根**，没有 `./runtime`、`./composition` 或其它内部子路径。
 
-| 运行时 Value 导出（0.11.1 原 12 个 + 0.11.2 T01/T02 新增，独立测试枚举） | 职责 |
+| 运行时 Value 导出（0.11.1 原 12 个 + 0.11.2 T01–T04 新增，独立测试枚举） | 职责 |
 | --- | --- |
 | `KernelLifecycle` | 最小 KDP，静态 Core 初始化、资源进入记录和最终逆序 Exit |
 | `WorkflowElement`、`XStateWorkflowElement` | Standard 业务工作流抽象和 XState Actor Logic 适配 |
@@ -19,6 +19,7 @@
 | `BoundedQueryElement` | v0.11.2 T01：有界、同步、类型化只读数据查询；返回 visited/complete/truncated 和原因，领域 predicate 由业务实现 |
 | `SQLiteDatabaseElement`、`SQLiteDatabaseError` | v0.11.2 T02：显式连接生命周期的同步 SQLite Store；真实事务/CAS 与脱敏错误分类 |
 | `VectorQueryElement`、`GraphQueryElement` | v0.11.2 T03：显式 Scope 的有限 Top-K、单边类型图有界路径；完整性可观察 |
+| `BoundedExpressionElement` | v0.11.2 T04：纯 JSON AST 的有界同步标量计算 |
 
 公开的 **TypeScript 类型入口（不构成 JS 运行时导出）**：`CorePackageMetadata`、`DomainAppContext`、`LifecycleInitContext`、`PackageInitElement`、`StaticCorePackage`、`LifecycleLogRecord`、`LifecycleLogger`、`StandardWorkflowOutcome<T>`、`WorkflowLimits`、`WorkflowRoutes<T,R>`、`StandardJsonValue`、`StandardFileOutcome<T>`、`BoundedQueryLimits`、`BoundedQueryTruncationReason`、`BoundedQueryResult<T>`、`SQLiteScalar`、`SQLiteNonThenable<T>`、`SQLiteTransaction`、`SQLiteDatabaseOptions`、`SQLiteErrorCode`、`SQLiteFailureOrigin`、`SQLiteTerminalFailureDetails`。根入口导出的类还可用于 TS 类型。
 
@@ -73,3 +74,21 @@ db.close(); // 业务显式 close；关闭后所有操作按 CLOSED 拒绝
 `GraphQueryElement.search(edges, {start,target?,direction,relationTypes?,limits})` 使用 BFS 和 cycle visited 集合。图遍历预算 `maxVisited` 指实际检查的原始边次数（同一条边在不同扩展重复检查仍计费）；`maxDepth` 限路径 hops，`maxReturned` 限返回路径。若指定 target，则第一条找到的最短路径能完成“存在”查询；无路径但 `complete=false` 不等同不存在。**不**自动推导业务权限或事实，不创建向量/图数据库。对外可信 TypeScript 业务数据并非恶意 Proxy 沙箱。
 
 T03 SQL 部分**复用**已通过 T02 的 `SQLiteDatabaseElement.select(fixedSql, parameters, limit)` 与 SQLite authorizer，不另做 SQL parser/ORM。SQL + Vector/Graph 整体 SDK packed consumer/CI 仍须以 T03 新 Exact SHA 验收，不把独立纯算法测试当正式 SQL 集成。
+
+## v0.11.2 T04：有界 Expression
+
+`new BoundedExpressionElement().evaluate(astJson, inputJson, limits?)` 接收两个原始 JSON 字符串；生成期可信 AST 同样以 JSON 文本消费。不得先对不可信 JS 对象调用 JSON.stringify。非字符串拒绝，不读取 getter、Proxy、Promise 或对象图；limits 只接受普通/空原型对象的已知自有数据属性（未指定使用默认值，不读取未知属性）。SDK 不承诺隔离已经能在同一进程任意执行 JS 的调用方。
+
+AST 原始文本固定上限 32 KiB；输入文本在 JSON.parse 前按 maxInputBytes 检查 UTF-8 字节。采用标准 JSON.parse 语义（重复键以后项为准），不提供自定义 JSON parser。整棵 AST 验证节点数、深度、形状及 arity，包括短路分支。内置最大值：128 节点、深度16（根=1）、输入32768字节、256运算、路径8段、字符串4096 UTF-8字节。调用方可降低限制，不能升高。每个求值节点及每个实际读取的路径段先扣一次运算额度；输入验证独立受原始字节限制，迭代检查。get 只访问非数组 JSON 对象的自有属性；路径非空，拒绝 __proto__/prototype/constructor，输入对象也拒绝这些键。缺失或非标量字段拒绝，不猜测；and/or 短路但不放过非法 AST。支持 literal/get/not、and/or、eq/ne、lt/le/gt/ge、add/sub/mul/div；不做数组遍历运算、字符串拼接、I/O、函数调用或业务权限判断。
+
+返回 ExpressionScalar（string/number/boolean/null）；ExpressionLimits 是可选限制的类型合同。严格同类型 eq/ne，布尔和数字无隐式转换，除零、非有限数字、负零、超安全整数范围拒绝；小数按 JS IEEE-754 有限精度计算，不承诺十进制精确运算或检测所有舍入/下溢。TypeError.message 固定为 EXPRESSION_INVALID/LIMIT/INPUT/EVALUATION（完整前缀 EXPRESSION_），不包含原始输入或异常 cause。同步有限计算不承诺任意 JS 的抢占式墙钟硬终止；不是 Rule VM，也不验证 Package/Element 生成正确性。
+
+```ts
+import { BoundedExpressionElement } from '@kaicreator/domain-harness';
+const expr = new BoundedExpressionElement();
+const available = expr.evaluate(
+  '{"op":"sub","args":[{"op":"get","path":["stock"]},{"op":"get","path":["reserved"]}]}',
+  '{"stock":12,"reserved":3}',
+);
+// available = 9
+```
