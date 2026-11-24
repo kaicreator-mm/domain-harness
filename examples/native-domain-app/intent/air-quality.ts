@@ -1,4 +1,4 @@
-import { BoundedQueryElement, StandardWorkflowSession } from '@kaicreator/domain-harness';
+import { BoundedQueryElement, runRecognitionHandling } from '@kaicreator/domain-harness';
 import type { BoundedQueryLimits, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
 
 type Category = 'GOOD' | 'MODERATE' | 'SENSITIVE' | 'UNHEALTHY' | 'VERY_UNHEALTHY' | 'HAZARDOUS';
@@ -72,10 +72,8 @@ export class AirQualityElement {
   }
 
   run(request: AirRequest, limits: WorkflowLimits, queryLimits?: BoundedQueryLimits): Promise<StandardWorkflowOutcome<AirReport>> {
-    return new StandardWorkflowSession(limits).run<AirReport>(async root => {
-      const recognized = await root.child(0, child => child.invokeOutcome(() => this.recognize(request, queryLimits)));
-      if (recognized.status !== 'COMPLETE') return recognized;
-      return root.child(0, child => child.invokeOutcome(() => this.handle(recognized.value)));
-    });
+    return runRecognitionHandling(limits,
+      () => this.recognize(request, queryLimits),
+      intent => this.handle(intent));
   }
 }

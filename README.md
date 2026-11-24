@@ -2,7 +2,7 @@
 
 DomainHarness 0.11.x 采用 TypeScript/Node 原生语言机制重新实现，**没有旧 Boot/PackageSystem/Lock/Pin/FunctionRef/Target 执行系统，不保留 0.10.x 兼容入口**。Package 是普通静态 ESM 插件模块集合，Element 是可复用的 Class；普通 Function 直接通过 import/export 调用。Metadata 是框架读取的代码，Skill/TSDoc 是 Agent 辅助文档。
 
-SDK 唯一公开产品为 `@kaicreator/domain-harness`，包含最小生命周期 `KernelLifecycle`、可选 XState Standard Workflow、原生 Hook/预算/具名路由组合以及 JSON/YAML Standard Readers、Bounded Query、SQLite/SQL、Vector/Graph Query、Bounded Expression，以及 #1724 S04 新增候选的 `CliElement`（可信前台 CLI 执行，实际新工件验收另记）；领域知识、Recognition/Handling 和真实授权业务动作由应用组合已有能力。底层 Node API 不需要全部包成 Element。
+SDK 唯一公开产品为 `@kaicreator/domain-harness`，包含最小生命周期 `KernelLifecycle`、可选 XState Standard Workflow、原生 Hook/预算/具名路由组合以及 JSON/YAML Standard Readers、Bounded Query、SQLite/SQL、Vector/Graph Query、Bounded Expression，以及 #1724 S04 的 `CliElement`（可信前台 CLI，R9 源码提取已接受）和 `runRecognitionHandling`（固定双角色组合候选，实际新工件验收另记）；领域知识、识别/处理逻辑和真实授权业务动作仍由应用负责。底层 Node API 不需要全部包成 Element。
 
 SDK **消费者**支持 Node.js >=22.12.0；仓库 **开发/完整验收工具链**由于 ESLint 10.11 需要 Node.js >=22.13.0。采用单 SDK Workspace 的 Git monorepo。仓库在 Node >=22.13 执行 `npm ci && npm run verify`；真实外部消费者会独立安装 SDK 并验收 ESM、类型和预算行为。已接受的 0.11.2 R65 消费者实际使用 Node 22.12.0，具体平台和证据见下文；不能将历史证据晋升为新 SHA 的测试结果。
 

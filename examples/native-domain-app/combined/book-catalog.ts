@@ -1,4 +1,4 @@
-import { BoundedExpressionElement, BoundedQueryElement, GraphQueryElement, SQLiteDatabaseElement, StandardWorkflowSession, VectorQueryElement } from '@kaicreator/domain-harness';
+import { BoundedExpressionElement, BoundedQueryElement, GraphQueryElement, SQLiteDatabaseElement, runRecognitionHandling, VectorQueryElement } from '@kaicreator/domain-harness';
 import type { BoundedQueryLimits, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
 
 const source = Object.freeze({ url: 'https://www.isbn-international.org/content/what-isbn/10', revision: 'isbn13-2026-11-24' });
@@ -52,10 +52,8 @@ export class BookCatalogElement {
     return { status: 'COMPLETE', value: { isbn: book.isbn, resource: book.resource, quantity: intent.quantity, totalCents: total, comparable: near.matches.map(m => m.id), predecessor: path.paths.map(p => p.nodes[p.nodes.length - 1] as string), rule: intent.rule } };
   }
   async plan(input: BookRequest, limits: WorkflowLimits, queryLimits?: BoundedQueryLimits): Promise<StandardWorkflowOutcome<Plan>> {
-    return new StandardWorkflowSession(limits).run(async root => {
-      const recognized = await root.child(0, child => child.invokeOutcome(() => this.recognize(input, queryLimits)));
-      if (recognized.status !== 'COMPLETE') return recognized;
-      return root.child(0, child => child.invokeOutcome(() => this.handle(recognized.value)));
-    });
+    return runRecognitionHandling(limits,
+      () => this.recognize(input, queryLimits),
+      intent => this.handle(intent));
   }
 }

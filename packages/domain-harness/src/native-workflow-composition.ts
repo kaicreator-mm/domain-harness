@@ -194,3 +194,20 @@ export class StandardWorkflowSession {
     }
   }
 }
+
+/**
+ * 两个固定叶子角色的便捷组合：识别 COMPLETE 才进入处理，两个角色共享一根额度。
+ * 各角色的输入、输出、领域规则与授权由调用方定义；复杂流程直接组合 Session/Context。
+ * 完整成功路径需要 2 次调用、5 个步骤和 1 层深度；不是业务全量预算预检或等待恢复协议。
+ */
+export function runRecognitionHandling<Intent, Output>(
+  limits: WorkflowLimits,
+  recognize: () => StandardWorkflowOutcome<Intent> | Promise<StandardWorkflowOutcome<Intent>>,
+  handle: (intent: Intent) => StandardWorkflowOutcome<Output> | Promise<StandardWorkflowOutcome<Output>>,
+): Promise<StandardWorkflowOutcome<Output>> {
+  return new StandardWorkflowSession(limits).run(async root => {
+    const recognized = await root.child(0, child => child.invokeOutcome(recognize));
+    if (recognized.status !== 'COMPLETE') return recognized;
+    return root.child(0, child => child.invokeOutcome(() => handle(recognized.value)));
+  });
+}

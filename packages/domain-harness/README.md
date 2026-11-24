@@ -8,12 +8,13 @@
 
 `package.json#exports` **只有 `.` 包根**，没有 `./runtime`、`./composition` 或其它内部子路径。
 
-| 运行时 Value 导出（19 个：0.11.1 原 12 个 + 0.11.2 T01–T04 及 S04 CLI 候选，实际独立测试枚举） | 职责 |
+| 运行时 Value 导出（20 个：0.11.1 原 12 个 + 0.11.2 T01–T04 及 S04 CLI、双角色组合，独立测试预期枚举） | 职责 |
 | --- | --- |
 | `KernelLifecycle` | 最小 KDP，静态 Core 初始化、资源进入记录和最终逆序 Exit |
 | `WorkflowElement`、`XStateWorkflowElement` | Standard 业务工作流抽象和 XState Actor Logic 适配 |
 | `NativeWorkflowContext`、`StandardWorkflowSession` | 原生业务 Callback/Guard/Reader/Hook 的共享根预算 |
 | `routeWorkflowOutcome` | COMPLETE、REJECT、ASK、WAIT、UNKNOWN、FAILED 的完整具名分支 |
+| `runRecognitionHandling` | #1724 S04：固定双叶子角色共享根预算，识别成功后才处理；可选便捷组合 |
 | `JsonReader`、`YamlReader` | 可复用 JSON/YAML Class Element |
 | `readJson`、`readYaml`、`writeJson`、`writeYaml` | 不强制包装成 Class 的原生 Module Functions |
 | `BoundedQueryElement` | v0.11.2 T01：有界、同步、类型化只读数据查询；返回 visited/complete/truncated 和原因，领域 predicate 由业务实现 |
@@ -43,11 +44,11 @@ SDK 直接运行依赖只有 `xstate@5.33.2`、`yaml@2.9.1` 与 `@photostructure
 
 安装的是单一 SDK；先检查实际 `node_modules/@kaicreator/domain-harness/package.json`、本 README 和公开 `dist/index.d.ts`。使用根入口，不需要 Forge、额外生成器、特殊 DSL 或第二个 Runtime。
 
-本 README 的配套规范快照：`9d067697685169bdc9549b0872fe75fc38304579`（0.11.2 已交付 SDK + R9 冻结原则 + S04 CLI 提取候选；该快照是导航依据，不是当前 tarball 的源码运行证书）。以下为不可变 Git 提交链接，而非浮动分支：
+本 README 的配套规范快照：`3161e47ccb5c39843b1bb3593f8b54566a3d4440`（0.11.2 已交付 SDK + R9 冻结原则 + S04 CLI 已接受源码及双角色组合候选；该快照是导航依据，不是当前 tarball 的源码运行证书）。以下为不可变 Git 提交链接，而非浮动分支：
 
-1. [权威规范目录](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/docs/specs/domain-harness/README.md) → [核心原则 CORE-01..14](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/docs/specs/domain-harness/core.md) → [TypeScript Profile](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/docs/specs/domain-harness/typescript-profile.md)。
-2. [Agent Skill](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/.agents/skills/domain-harness-spec/SKILL.md) 与 [需求驱动应用资格实践](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/.agents/skills/domain-harness-spec/references/application-qualification.md)；按需读 [Element/Package](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/docs/specs/domain-harness/element-package.md)、[Lifecycle/Workflow](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/docs/specs/domain-harness/lifecycle-workflow.md)、[QA](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/docs/specs/domain-harness/engineering-quality.md)。
-3. [真实原生应用](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/examples/native-domain-app/main.mjs)、[0.11.2 领域应用（R69/R71 历史，R72/R73 最终裁决及 S04 迁移说明）](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/examples/qualification/README.md)、[状态与验收证据](https://github.com/kaicreator-mm/domain-harness/blob/9d067697685169bdc9549b0872fe75fc38304579/docs/specs/domain-harness/status-and-decisions.md)。
+1. [权威规范目录](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/docs/specs/domain-harness/README.md) → [核心原则 CORE-01..14](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/docs/specs/domain-harness/core.md) → [TypeScript Profile](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/docs/specs/domain-harness/typescript-profile.md)。
+2. [Agent Skill](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/.agents/skills/domain-harness-spec/SKILL.md) 与 [需求驱动应用资格实践](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/.agents/skills/domain-harness-spec/references/application-qualification.md)；按需读 [Element/Package](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/docs/specs/domain-harness/element-package.md)、[Lifecycle/Workflow](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/docs/specs/domain-harness/lifecycle-workflow.md)、[QA](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/docs/specs/domain-harness/engineering-quality.md)。
+3. [真实原生应用](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/examples/native-domain-app/main.mjs)、[0.11.2 领域应用（R69/R71 历史，R72/R73 最终裁决及 S04 迁移说明）](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/examples/qualification/README.md)、[状态与验收证据](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/docs/specs/domain-harness/status-and-decisions.md)。
 
 仓库可能需要授权访问。离线时本 README 与安装的声明仍可用于已公开 API 的基本消费；完整规范和 Skill 不在当前包内，不能把摘要当完整规范或假定已读。需要规范生成/审核时取得匹配快照（可使用已授权 Git checkout）；不要切换到未知的新分支来猜测 API。后续 SDK 改变规范或公开合同，应同步更新此固定快照与 API 文档，保留证据归属。
 
@@ -154,10 +155,28 @@ const available = expr.evaluate(
 
 [0.11.3 R9](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7145891451) 是冻结产品合同，不是已实现 Interaction API；[SDK 专项 #1724](https://github.com/kaicreator-mm/domain-harness/issues/1724) 期间以实际安装的声明和经审验源码为准。无 .5 LLM/.6 durable 能力声明，不恢复旧 ABI，不表示 npm 正式发布。
 
-## S04 · 可信前台 CLI Standard（#1724 提取候选）
+## S04 · 可信前台 CLI Standard（#1724 R9 源码提取已接受）
 
 `import { CliElement } from '@kaicreator/domain-harness'`。直接复用实例的 `run(file, args): Promise<string>`，默认 `new CliElement(10_000, 65_536)`（超时毫秒、stdout/stderr 合计字节）。二者须为 1..2147483647 的安全整数，否则构造抛出 `CLI_INVALID_LIMIT`。独立并发调用的计时、输出、进程归属独立；无 shell、stdin 忽略，成功返回 UTF-8 stdout（不返回 stderr）。调用方明确选择可信程序和参数、安装专业工具及验证结果；继承调用进程环境、工作目录和权限，非沙箱、授权器、通用进程树管理器或领域工具注册中心。
 
 失败 Promise 拒绝，消息为脱敏 `CLI_SPAWN`、`CLI_STREAM`、`CLI_TIMEOUT`、`CLI_OUTPUT_LIMIT`、`CLI_EXIT_<code>`（信号为 `CLI_EXIT_SIGNAL`）、`CLI_CLEANUP_FAILED` 或 `CLI_REAP_TIMEOUT`；不把原始参数、路径、stderr 或驱动异常写入错误。成功 stdout 可能含业务数据，由业务负责使用。输出限制针对累计流字节，不是整个进程内存限制；超时为事件循环上的协作计时，不承诺抢占或硬墙钟。Linux 清理当前命令进程组，包括 leader 正常退出/失败/信号退出；其他平台仅负责直接子进程，不承诺逃离进程组的后代或任意子树，也不承诺后代已全部回收。调用方仍负责业务授权、预算、文件和副作用，按领域语义通过 `invokeOutcome` 映射错误，不用 exit0 代替专业验证。
 
 媒体归档的 FFmpeg/ffprobe、维修排程的 Python/SciPy 已改为使用该根导出，删除旧 shared CLI 实现，领域专业知识/计算与独立 npm 依赖不变。新工件的完整消费、平台范围及实际领域验收以 #1724 后续证据为准；不能使用历史 R63 工件证明新导出。
+
+## S04 · 固定双角色组合（#1724 候选）
+
+当真实业务正好是一次识别和一次处理，且两者各为固定叶子回调时，直接使用根入口的 `runRecognitionHandling(limits, recognize, handle)`；原生 TS 泛型从识别结果与处理结果推导各自领域类型，不要求统一 Intent Schema 或额外 Class。
+
+```ts
+import { runRecognitionHandling } from '@kaicreator/domain-harness';
+// recognize / handle 是应用提供的领域函数，可同步或异步，返回 StandardWorkflowOutcome。
+const outcome = await runRecognitionHandling(
+  { maxCalls: 2, maxSteps: 5, maxDepth: 1 },
+  () => recognize(request),
+  intent => handle(intent),
+);
+```
+
+以上为调用形状，`request`、`recognize`、`handle` 由应用定义。每次调用内部只创建一个 `StandardWorkflowSession`；两个静态 child(0) 各调用一次 `invokeOutcome`。完整路径 2 calls / 5 steps / 1 depth；识别任何非 COMPLETE 终态原样返回，不调用处理；处理终态亦不二次包装。额度按既有逐次预留，识别可能在处理额度不足时已经执行，**不是全业务预算预检**，因此需要全阶段先验额度的业务仍自行检查。异常保留既有脱敏 FAILED 语义；真实授权、命令身份、receipt/readback、UNKNOWN、领域证据仍由应用负责。ASK/WAIT 不自动恢复；复杂分支、并行、额外 child、Hook、多轮 Interaction 直接复用 Session/Context 等现有机制，不强制使用此函数。
+
+[五个实际迁移模块及既有业务验收范围](https://github.com/kaicreator-mm/domain-harness/blob/3161e47ccb5c39843b1bb3593f8b54566a3d4440/examples/native-domain-app/README.md)：维修报价、AQI、图书目录、水硬度和库存 Reservation。无需重复生成固定双角色执行组合；保留真实领域类型、知识、规则、权威 Host 和持久账本。新工件完整验收仍由 #1724 记录，不扩张 R65 历史证据。
