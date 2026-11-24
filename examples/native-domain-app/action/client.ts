@@ -1,4 +1,4 @@
-import { SQLiteDatabaseElement, StandardWorkflowSession } from '@kaicreator/domain-harness';
+import { SQLiteDatabaseElement, runRecognitionHandling } from '@kaicreator/domain-harness';
 import type { WorkflowLimits } from '@kaicreator/domain-harness';
 import { commandDigest, commandOf, stop } from './authority.js';
 import type { Reply, ReserveCommand } from './authority.js';
@@ -71,15 +71,11 @@ export class ReservationElement {
     return reply;
   }
   async run(input: unknown, limits: WorkflowLimits, mode: ReservationMode): Promise<Reply> {
-    return new StandardWorkflowSession(limits).run(async root => {
-      const recognized = await root.child(0, child => child.invokeOutcome(() => {
-        if (mode !== 'FIRST_SUBMIT' && mode !== 'RECOVER') return stop('REJECT', 'COMMAND_MODE_REQUIRED');
-        const command = commandOf(input);
-        return command ? { status: 'COMPLETE', value: command } : stop('REJECT', 'COMMAND_INPUT_INVALID');
-      }));
-      if (recognized.status !== 'COMPLETE') return recognized;
-      return root.child(0, child => child.invokeOutcome(() => this.#dispatch(recognized.value, mode)));
-    });
+    return runRecognitionHandling(limits, () => {
+      if (mode !== 'FIRST_SUBMIT' && mode !== 'RECOVER') return stop('REJECT', 'COMMAND_MODE_REQUIRED');
+      const command = commandOf(input);
+      return command ? { status: 'COMPLETE', value: command } : stop('REJECT', 'COMMAND_INPUT_INVALID');
+    }, command => this.#dispatch(command, mode));
   }
   close(): void { this.#db.close(); }
 }
