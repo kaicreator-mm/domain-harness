@@ -1,4 +1,4 @@
-import { BoundedExpressionElement, BoundedQueryElement, GraphQueryElement, SQLiteDatabaseElement, StandardWorkflowSession, VectorQueryElement } from '@kaicreator/domain-harness';
+import { BoundedExpressionElement, BoundedQueryElement, GraphQueryElement, SQLiteDatabaseElement, runRecognitionHandling, VectorQueryElement } from '@kaicreator/domain-harness';
 import type { BoundedQueryLimits, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
 
 const source = Object.freeze({ url: 'https://www.usgs.gov/water-science-school/science/hardness-water', revision: 'usgs-hardness-2026-11-24', unit: 'mg/L as CaCO3' });
@@ -51,10 +51,8 @@ export class WaterHardnessElement {
     return { status: 'COMPLETE', value: { sample: sample.id, category: rule.category, rule, similar: similar.matches.map(m => m.id), downstream: path.paths.map(p => p.nodes[p.nodes.length - 1] as string) } };
   }
   async classify(input: WaterRequest, limits: WorkflowLimits, queryLimits?: BoundedQueryLimits): Promise<StandardWorkflowOutcome<Report>> {
-    return new StandardWorkflowSession(limits).run(async root => {
-      const recognized = await root.child(0, child => child.invokeOutcome(() => this.recognize(input, queryLimits)));
-      if (recognized.status !== 'COMPLETE') return recognized;
-      return root.child(0, child => child.invokeOutcome(() => this.handle(recognized.value)));
-    });
+    return runRecognitionHandling(limits,
+      () => this.recognize(input, queryLimits),
+      intent => this.handle(intent));
   }
 }
