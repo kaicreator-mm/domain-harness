@@ -165,3 +165,12 @@ test('T03 graph: explicitly empty relation type filter proves no match without s
   assert.equal(result.complete, true);
   assert.equal(result.visited, 0);
 });
+
+test('T03 vector: source mutation never silently declares a shortened source complete', () => {
+  const source = [
+    { id: '1', vector: [1], item: 1 },
+    { id: '2', vector: [2], item: 2 },
+  ];
+  assert.throws(() => vector.search(source, [1], () => { source.pop(); return true; },
+    { metric: 'L2', dimension: 1, topK: 2, maxVisited: 2 }), /DH_STD_QUERY_VECTOR_CANDIDATE/u);
+});
