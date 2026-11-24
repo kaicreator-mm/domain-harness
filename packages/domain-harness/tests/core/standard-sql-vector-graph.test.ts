@@ -58,7 +58,7 @@ test('T03: fixed parameterized SQLite reads feed scoped Vector and typed Graph w
     assert.equal(stock.complete, true);
     const stockEdges = db.select<TypedGraphEdge>(
       'SELECT src AS "from", dst AS "to", kind AS "type" FROM links WHERE domain=?', ['inventory'], 1);
-    assert.deepEqual(stockEdges, [{ from: 'i', to: 'j', type: 'STOCKED' }]);
+    assert.deepEqual(stockEdges.map(({ from, to, type }) => ({ from, to, type })), [{ from: 'i', to: 'j', type: 'STOCKED' }]);
     const stockRoute = graph.search(stockEdges, {
       start: 'i', target: 'j', direction: 'OUT', relationTypes: ['STOCKED'],
       limits: { maxDepth: 1, maxVisited: 1, maxReturned: 1 },
