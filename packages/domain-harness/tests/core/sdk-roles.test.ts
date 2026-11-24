@@ -12,5 +12,5 @@ test('单 SDK 仅有公开包根，不提供旧 runtime/composition 子入口', 
   assert.equal(typeof sdk.StandardWorkflowSession,'function');
   assert.equal(typeof sdk.JsonReader,'function');
   const entry = fileURLToPath(import.meta.resolve('@kaicreator/domain-harness'));
-  assert.ok(entry.endsWith('dist/index.js'));
+  assert.ok(entry.replaceAll('\\','/').endsWith('dist/index.js'));
 });
