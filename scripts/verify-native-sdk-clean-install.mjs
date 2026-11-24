@@ -21,9 +21,23 @@ const npmCli = [
 if (!npmCli) throw new Error('NATIVE_CONSUMER_NPM_CLI_NOT_FOUND');
 const npm = process.execPath;
 const npmArgs = args => [npmCli, ...args];
+// SDK 消费者的最低 Node 版本不同于仓库开发工具链；明确选定实际可执行文件。
+const consumerNode = process.env.DH_NATIVE_CONSUMER_NODE ? resolve(process.env.DH_NATIVE_CONSUMER_NODE) : process.execPath;
+const consumerNpmCli = [
+  process.env.DH_NATIVE_CONSUMER_NPM_CLI,
+  ...(consumerNode === process.execPath ? [npmCli] : []),
+  resolve(dirname(consumerNode), 'node_modules/npm/bin/npm-cli.js'),
+  resolve(dirname(consumerNode), '../lib/node_modules/npm/bin/npm-cli.js'),
+  resolve(dirname(consumerNode), '../node_modules/npm/bin/npm-cli.js'),
+].find(candidate => candidate && existsSync(candidate));
+if (!existsSync(consumerNode) || !consumerNpmCli) throw new Error('NATIVE_CONSUMER_RUNTIME_NOT_FOUND');
+const consumerNpmArgs = args => [consumerNpmCli, ...args];
 const registry = process.env.DH_NATIVE_NPM_REGISTRY;
 if(registry && !/^https?:\/\//u.test(registry)) throw new Error('NATIVE_REGISTRY_INVALID');
 const npmEnv = {...process.env, npm_config_ignore_scripts:'true'};
+// 不继承额外 Node 启动 flag 或外部模块搜索目录，保证最低版本真实 ESM 消费。
+delete npmEnv.NODE_OPTIONS;
+delete npmEnv.NODE_PATH;
 if (registry) npmEnv.npm_config_registry = registry;
 
 function run(step, command, args, cwd, env = {}) {
@@ -34,10 +48,10 @@ function run(step, command, args, cwd, env = {}) {
   if(result.error || result.status !== 0) {
     // 不输出可能含 token 的 npm stderr；保留可诊断的受控 OS 错误码。
     // 仅保留受控 Business TypeScript 编译诊断，不输出 npm stderr 或环境。
-    if ((step === 'INTENT_TYPECHECK' || step === 'ACTION_TYPECHECK') && typeof result.stdout === 'string') {
+    if (['INTENT_TYPECHECK','ACTION_TYPECHECK','COMBINED_TYPECHECK'].includes(step) && typeof result.stdout === 'string') {
       const diagnostic = result.stdout.split(/\r?\n/u)
         .map(line => line.replaceAll(cwd,'<consumer>').replaceAll(root,'<workspace>'))
-        .filter(line => /^(?:(?:intent|action|node_modules)\/[A-Za-z0-9_@./-]+\(\d+,\d+\): )?error TS\d{4}: /u.test(line))
+        .filter(line => /^(?:(?:intent|action|combined|node_modules)\/[A-Za-z0-9_@./-]+\(\d+,\d+\): )?error TS\d{4}: /u.test(line))
         .slice(0,40);
       for(const line of diagnostic) console.error('NATIVE_CONSUMER_TS_DIAGNOSTIC '+line.slice(0,1000));
     }
@@ -60,6 +74,12 @@ try {
   if(!existsSync(join(packageDir,'dist/index.js'))) {
     throw new Error('NATIVE_CONSUMER_MISSING_SDK_BUILD');
   }
+  const runtime=JSON.parse(run('CONSUMER_RUNTIME',consumerNode,['--input-type=module','--eval',
+    "console.log(JSON.stringify({node:process.versions.node,platform:process.platform,arch:process.arch}))",
+  ],consumer));
+  const [major,minor]=runtime.node.split('.').map(Number);
+  assert.ok(major>22 || (major===22 && minor>=12),'NATIVE_CONSUMER_NODE_FLOOR');
+  const consumerNpmVersion=run('CONSUMER_NPM_VERSION',consumerNode,consumerNpmArgs(['--version']),consumer).trim();
   const details=JSON.parse(run('PACK',npm,npmArgs([
     'pack',packageDir,'--json','--ignore-scripts','--pack-destination',packs,
   ]),root))[0];
@@ -74,11 +94,14 @@ try {
     dependencies:{'@kaicreator/domain-harness':'file:'+tgz},
   };
   writeFileSync(join(consumer,'package.json'),JSON.stringify(manifest,null,2)+'\n');
-  run('LOCK',npm,npmArgs(['install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund']),consumer);
-  run('CLEAN_INSTALL',npm,npmArgs(['ci','--ignore-scripts','--no-audit','--no-fund']),consumer);
+  run('LOCK',consumerNode,consumerNpmArgs(['install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund']),consumer);
+  run('CLEAN_INSTALL',consumerNode,consumerNpmArgs(['ci','--ignore-scripts','--no-audit','--no-fund']),consumer);
   const installed=realpathSync(join(consumer,'node_modules/@kaicreator/domain-harness'));
   assert.notEqual(installed.startsWith(root),true,'must not be a workspace symlink');
   const installedPkg=JSON.parse(readFileSync(join(installed,'package.json'),'utf8'));
+  const sourcePkg=JSON.parse(readFileSync(join(packageDir,'package.json'),'utf8'));
+  assert.equal(installedPkg.name,sourcePkg.name);
+  assert.equal(installedPkg.version,sourcePkg.version);
   assert.deepEqual(Object.keys(installedPkg.dependencies).sort(),['@photostructure/sqlite','xstate','yaml']);
   assert.deepEqual(Object.keys(installedPkg.exports),['.']);
   assert.deepEqual(Object.keys(manifest.dependencies),['@kaicreator/domain-harness']);
@@ -105,12 +128,12 @@ try {
     "assert.deepEqual(Object.keys(mod).sort(),['SQLiteDatabaseElement','SQLiteDatabaseError']);",
     "console.log('NO_CONTROL_HOOK');",
   ].join('\n'));
-  assert.equal(run('NO_CONTROL_HOOK',process.execPath,['no-hook-probe.mjs'],consumer).trim(),'NO_CONTROL_HOOK');
+  assert.equal(run('NO_CONTROL_HOOK',consumerNode,['no-hook-probe.mjs'],consumer).trim(),'NO_CONTROL_HOOK');
 
   cpSync(join(root,'examples/native-domain-app/packages'),join(consumer,'packages'),{recursive:true});
   cpSync(join(root,'examples/native-domain-app/data'),join(consumer,'data'),{recursive:true});
   cpSync(join(root,'examples/native-domain-app/main.mjs'),join(consumer,'main.mjs'));
-  const appResult=run('RUN',process.execPath,['main.mjs'],consumer);
+  const appResult=run('RUN',consumerNode,['main.mjs'],consumer);
   const app=JSON.parse(appResult.trim());
   assert.deepEqual({status:app.status,count:app.count,total:app.total,firstId:app.firstId},
     {status:'PASS',count:4,total:10,firstId:'a'});
@@ -195,7 +218,7 @@ try {
     "  process.exitCode=2;",
     "} catch (error) { if (error.code!=='ERR_PACKAGE_PATH_NOT_EXPORTED') process.exitCode=3; }",
   ].join('\n');
-  run('PRIVATE_EXPORT',process.execPath,['--input-type=module','--eval',deny],consumer);
+  run('PRIVATE_EXPORT',consumerNode,['--input-type=module','--eval',deny],consumer);
 
   // T02：安装树必须携带 tarball 自带的原生 prebuild（lifecycle 全程被忽略）。
   const prebuildDir=join(consumer,'node_modules/@photostructure/sqlite/prebuilds');
@@ -244,7 +267,7 @@ try {
     "  rmSync(folder,{recursive:true,force:true});",
     "}",
   ].join('\n'));
-  const sqliteResult=run('SQLITE_PROBE',process.execPath,['sqlite-probe.mjs'],consumer);
+  const sqliteResult=run('SQLITE_PROBE',consumerNode,['sqlite-probe.mjs'],consumer);
   assert.equal(sqliteResult.trim(),'SDK_SQLITE_PROBE_PASS');
 
   // T03：从唯一真实打包 SDK 根导入，验证跨领域 Scope/有向图与访问预算。
@@ -275,7 +298,7 @@ try {
     "assert.equal(partial.truncationReason,'VISIT_LIMIT');",
     "console.log('SDK_VECTOR_GRAPH_PROBE_PASS');",
   ].join('\n'));
-  const queryResult=run('VECTOR_GRAPH_PROBE',process.execPath,['vector-graph-probe.mjs'],consumer);
+  const queryResult=run('VECTOR_GRAPH_PROBE',consumerNode,['vector-graph-probe.mjs'],consumer);
   assert.equal(queryResult.trim(),'SDK_VECTOR_GRAPH_PROBE_PASS');
 
   // T04：实际仓外 SDK 根导入，有限表达式在两个独立业务输入上复用。
@@ -297,7 +320,7 @@ try {
     "assert.throws(()=>e.evaluate('!'.repeat(32769),'{}'),/EXPRESSION_LIMIT/u);",
     "console.log('SDK_EXPRESSION_PROBE_PASS');",
   ].join('\n'));
-  assert.equal(run('EXPRESSION_PROBE',process.execPath,['expression-probe.mjs'],consumer).trim(),'SDK_EXPRESSION_PROBE_PASS');
+  assert.equal(run('EXPRESSION_PROBE',consumerNode,['expression-probe.mjs'],consumer).trim(),'SDK_EXPRESSION_PROBE_PASS');
 
   // T05：编译同一份 Business 源码及验证，不引入额外消费者直接依赖。
   cpSync(join(root,'examples/native-domain-app/intent'),join(consumer,'intent'),{recursive:true});
@@ -317,7 +340,7 @@ try {
     "for (const [, verify] of intentCases) await verify();",
     "console.log('SDK_INTENT_PROBE_PASS '+intentCases.length);",
   ].join('\n');
-  assert.equal(run('INTENT_PROBE',process.execPath,[
+  assert.equal(run('INTENT_PROBE',consumerNode,[
     '--unhandled-rejections=strict','--input-type=module','--eval',intentProbe,
   ],consumer).trim(),'SDK_INTENT_PROBE_PASS 8');
 
@@ -339,16 +362,39 @@ try {
     "for (const [i, [, verify]] of actionCases.entries()) { try { await verify(); } catch { console.log('SDK_ACTION_CASE_FAILED '+i); throw Error('ACTION_CASE_FAILED'); } }",
     "console.log('SDK_ACTION_PROBE_PASS '+actionCases.length);",
   ].join('\n');
-  assert.equal(run('ACTION_PROBE',process.execPath,[
+  assert.equal(run('ACTION_PROBE',consumerNode,[
     '--unhandled-rejections=strict','--input-type=module','--eval',actionProbe,
   ],consumer).trim(),'SDK_ACTION_PROBE_PASS 8');
 
+  // T07：两个新增 Business Package 在同一个外部应用与实际 Host 中组合。
+  cpSync(join(root,'examples/native-domain-app/combined'),join(consumer,'combined'),{recursive:true});
+  writeFileSync(join(consumer,'tsconfig-combined.json'),JSON.stringify({
+    compilerOptions:{target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',
+      strict:true,noUnusedLocals:true,noUnusedParameters:true,noImplicitReturns:true,
+      exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,verbatimModuleSyntax:true,
+      skipLibCheck:true,types:['node'],typeRoots:[join(root,'node_modules/@types')],
+      lib:['ES2022','DOM','ESNext.Disposable'],rootDir:'.',outDir:'combined-dist'},
+    include:['combined/**/*.ts','action/**/*.ts'],
+  },null,2));
+  run('COMBINED_TYPECHECK',process.execPath,[
+    join(root,'node_modules/typescript/bin/tsc'),'--pretty','false','-p',join(consumer,'tsconfig-combined.json'),
+  ],consumer);
+  const combinedProbe=[
+    "import { verifyCombined } from './combined-dist/combined/verify.js';",
+    "await verifyCombined();",
+    "console.log('SDK_COMBINED_PROBE_PASS');",
+  ].join('\n');
+  assert.equal(run('COMBINED_PROBE',consumerNode,[
+    '--unhandled-rejections=strict','--input-type=module','--eval',combinedProbe,
+  ],consumer).trim(),'SDK_COMBINED_PROBE_PASS');
+
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
+    packageVersion:installedPkg.version,consumerRuntime:runtime,consumerNpmVersion,
     api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
     rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
     sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
-    noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true,intentWorkflows:true,authorizedAction:true}));
+    noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true,intentWorkflows:true,authorizedAction:true,combinedProduct:true}));
 } finally {
   if (process.env.DH_NATIVE_KEEP_EVIDENCE !== '1') rmSync(work,{recursive:true,force:true});
   else console.error('NATIVE_CONSUMER_EVIDENCE_DIR='+work);
