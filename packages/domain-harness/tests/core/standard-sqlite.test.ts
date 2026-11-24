@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -330,10 +331,42 @@ test('T02: SQL text that is not one admitted statement is rejected before anythi
   } finally { db.close() }
 })
 
-// CONTROLLED_FAULT_INJECTION：真实 driver + 已编译 SDK 根入口 + 真实临时 DB，故障在事务控制边界注入。
-// 这是分支验证，不是实际磁盘损坏、进程失联或物理 IO/LOCKED 故障的见证。
+// 正式 SDK 不含任何事务控制替换入口。单独运行未 instrumented 的构建：包根与模块文件两个入口
+// 都不得出现 default 或任何替换 hooks；模块文件里的事务控制只直接调用 driver。
+test('T02: the compiled SDK exposes no transaction-control replacement hook', () => {
+  const program = [
+    "import assert from 'node:assert/strict';",
+    "import * as sdk from '@kaicreator/domain-harness';",
+    "const mod = await import(new URL('./standard-sqlite.js', import.meta.resolve('@kaicreator/domain-harness')));",
+    "assert.equal('default' in sdk, false);",
+    "assert.equal('default' in mod, false);",
+    "assert.deepEqual(Object.keys(mod).sort(), ['SQLiteDatabaseElement', 'SQLiteDatabaseError']);",
+    "console.log('NO_CONTROL_HOOK');",
+  ].join('\n')
+  const child = spawnSync(process.execPath, ['--input-type=module', '--eval', program],
+    { encoding: 'utf8', timeout: 15_000, windowsHide: true })
+  assert.equal(child.error, undefined)
+  assert.equal(child.signal, null)
+  assert.equal(child.status, 0, child.stderr)
+  assert.equal(child.stdout.trim(), 'NO_CONTROL_HOOK')
+  const source = readFileSync(new URL('../../src/standard-sqlite.ts', import.meta.url), 'utf8')
+  assert.equal(/controlRunner|TestHooks|export default/u.test(source), false)
+  const shipped = readFileSync(new URL('../../dist/standard-sqlite.js', import.meta.url), 'utf8')
+  for (const marker of ['controlRunner', 'replaceControlRunnerForTests', 'runRealControl',
+    'sqliteDriverTestHooks', 'sqliteControlHooks', 'export default']) {
+    assert.equal(shipped.includes(marker), false, marker)
+  }
+  assert.equal(shipped.split('this.#db.exec(sql)').length - 1, 1)
+})
+
+// CONTROLLED_FAULT_INJECTION：真实 driver + 真实临时 DB，故障在事务控制边界注入。
+// 子进程只对当前实际构建的 dist/standard-sqlite.js 生成用完即删的 instrumented 副本，并只使用副本
+// 导出的类；正式构建不含替换入口。这是分支验证，不是实际磁盘损坏、进程失联或物理 IO/LOCKED 故障的见证。
 test('T02: terminal transaction failures are typed, poisoned and sanitized (controlled fault injection)', () => {
   const probe = fileURLToPath(new URL('../fixtures/sqlite-terminal-failure-probe.mjs', import.meta.url))
+  const formalPath = new URL('../../dist/standard-sqlite.js', import.meta.url)
+  const distDir = fileURLToPath(new URL('../../dist/', import.meta.url))
+  const formalModule = readFileSync(formalPath, 'utf8')
   const child = spawnSync(process.execPath, [probe], { encoding: 'utf8', timeout: 30_000, windowsHide: true })
   assert.equal(child.error, undefined)
   assert.equal(child.signal, null)
@@ -342,8 +375,20 @@ test('T02: terminal transaction failures are typed, poisoned and sanitized (cont
   assert.equal(lines.at(-1), 'TERMINAL_FAILURE_PROBE_PASS')
   const evidence = lines.filter(line => line.startsWith('EVID '))
     .map(line => JSON.parse(line.slice(5)) as Record<string, unknown>)
-  // 内部故障 seam 不经包根公开：源码入口在这里验，已编译根入口由子进程验。
+  // 源码入口不导出任何测试 hooks。
   assert.equal('default' in sdk, false)
+  assert.deepEqual(Object.keys(sdk).filter(key => /hook|runner|inject|control/iu.test(key)), [])
+  // 副本只改了唯一的事务控制位点，且用完即删：正式模块文件自始至终不变，dist 下无残留副本。
+  const instrumentation = evidence.find(item => item.event === 'INSTRUMENTATION')
+  assert.equal(instrumentation?.controlSites, 1)
+  assert.equal(instrumentation?.originalSha256, createHash('sha256').update(formalModule).digest('hex'))
+  assert.deepEqual(evidence.find(item => item.event === 'CLEANUP'),
+    { event: 'CLEANUP', testType: 'CONTROLLED_FAULT_INJECTION', variantRemoved: true, formalModuleUnchanged: true })
+  assert.equal(readFileSync(formalPath, 'utf8'), formalModule)
+  assert.deepEqual(readdirSync(distDir).filter(name => name.startsWith('standard-sqlite.TEST-INSTRUMENTED-')), [])
+  // 未注入故障时，副本与正式构建一样走真实 driver：提交、回滚、业务原错身份都保持。
+  assert.deepEqual(evidence.find(item => item.event === 'UNINJECTED_CONTROL'),
+    { event: 'UNINJECTED_CONTROL', testType: 'REAL_DRIVER_NO_FAULT', persistedVersion: 1, businessIdentityKept: true })
   // 错误分类：受控注入的 SQLite 码与 SDK 归类一一对应，连接保持可用。
   assert.deepEqual(
     evidence.filter(item => item.event === 'CLASSIFICATION')

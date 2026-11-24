@@ -25,7 +25,7 @@ SDK 直接运行依赖只有 `xstate@5.33.2`、`yaml@2.9.1` 与 `@photostructure
 
 ## 交付验证
 
-`npm run verify` 在开发 Node >=22.13 环境中执行构建、类型检查、Lint、Standard/生成期正反例及原生 Domain App。仓外 `scripts/verify-native-sdk-clean-install.mjs` 会通过 `npm pack` 安装**唯一直接依赖 SDK** 的新项目、检查 TypeScript/ESM/私有路径，并验收 Guard、两份 JSON + 两份 YAML Reader 和子 Hook **确实共享根预算**；同一干净安装还会从 SDK 根入口跑真实 SQLite 文件（rollback、两连接 CAS、reopen、脱敏 open 错误）。终态事务故障与 `IO`/`LOCKED` 分类由独立测试进程在真实 SQLite 上做受控故障注入验证（`CONTROLLED_FAULT_INJECTION`），不代表真实磁盘损坏或进程失联的见证。Windows npm CLI 通过 `process.execPath` 调用，独立 Windows 真实验证应单独记录，不得引用 Linux CI 冒充跨平台 PASS。
+`npm run verify` 在开发 Node >=22.13 环境中执行构建、类型检查、Lint、Standard/生成期正反例及原生 Domain App。仓外 `scripts/verify-native-sdk-clean-install.mjs` 会通过 `npm pack` 安装**唯一直接依赖 SDK** 的新项目、检查 TypeScript/ESM/私有路径，并验收 Guard、两份 JSON + 两份 YAML Reader 和子 Hook **确实共享根预算**；同一干净安装还会从 SDK 根入口跑真实 SQLite 文件（rollback、两连接 CAS、reopen、脱敏 open 错误）。终态事务故障与 `IO`/`LOCKED` 分类由独立测试进程在真实 SQLite 上做受控故障注入验证（`CONTROLLED_FAULT_INJECTION`），不代表真实磁盘损坏或进程失联的见证；故障注入只存在于测试专用的临时 instrumented 副本中，正式 SDK 包（根入口与模块文件）不含任何事务控制替换入口。Windows npm CLI 通过 `process.execPath` 调用，独立 Windows 真实验证应单独记录，不得引用 Linux CI 冒充跨平台 PASS。
 
 ## v0.11.2 T01：通用 Bounded Query
 

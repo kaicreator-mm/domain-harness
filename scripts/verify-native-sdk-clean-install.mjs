@@ -74,6 +74,28 @@ try {
   assert.ok(existsSync(join(installed,'dist/index.d.ts')));
   assert.ok(existsSync(join(installed,'dist/index.js')));
 
+  // T02：正式包不得携带任何事务控制替换入口。tarball 清单、已安装的模块文件与模块命名空间三层核对；
+  // 仓内测试用的 instrumented 副本只存在于测试进程内，不得被打包。
+  const packedPaths=(details.files||[]).map(file=>file.path);
+  assert.ok(packedPaths.includes('dist/standard-sqlite.js'),'NATIVE_CONSUMER_PACK_LIST_INCOMPLETE');
+  assert.deepEqual(packedPaths.filter(path=>/INSTRUMENTED/iu.test(path)),[],'NATIVE_CONSUMER_INSTRUMENTED_FILE_PACKED');
+  const shippedControl=readFileSync(join(installed,'dist/standard-sqlite.js'),'utf8');
+  for(const marker of ['controlRunner','replaceControlRunnerForTests','runRealControl',
+    'sqliteDriverTestHooks','sqliteControlHooks','export default']) {
+    assert.equal(shippedControl.includes(marker),false,'NATIVE_CONSUMER_CONTROL_HOOK:'+marker);
+  }
+  assert.equal(shippedControl.split('this.#db.exec(sql)').length-1,1,'NATIVE_CONSUMER_CONTROL_SITE');
+  writeFileSync(join(consumer,'no-hook-probe.mjs'),[
+    "import assert from 'node:assert/strict';",
+    "import * as sdk from '@kaicreator/domain-harness';",
+    "const mod=await import(new URL('./standard-sqlite.js',import.meta.resolve('@kaicreator/domain-harness')));",
+    "assert.equal('default' in sdk,false);",
+    "assert.equal('default' in mod,false);",
+    "assert.deepEqual(Object.keys(mod).sort(),['SQLiteDatabaseElement','SQLiteDatabaseError']);",
+    "console.log('NO_CONTROL_HOOK');",
+  ].join('\n'));
+  assert.equal(run('NO_CONTROL_HOOK',process.execPath,['no-hook-probe.mjs'],consumer).trim(),'NO_CONTROL_HOOK');
+
   cpSync(join(root,'examples/native-domain-app/packages'),join(consumer,'packages'),{recursive:true});
   cpSync(join(root,'examples/native-domain-app/data'),join(consumer,'data'),{recursive:true});
   cpSync(join(root,'examples/native-domain-app/main.mjs'),join(consumer,'main.mjs'));
@@ -211,7 +233,8 @@ try {
     directDependencies:Object.keys(manifest.dependencies),sha256,
     api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
     rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
-    sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true}));
+    sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
+    noTransactionControlHook:true}));
 } finally {
   if (process.env.DH_NATIVE_KEEP_EVIDENCE !== '1') rmSync(work,{recursive:true,force:true});
   else console.error('NATIVE_CONSUMER_EVIDENCE_DIR='+work);

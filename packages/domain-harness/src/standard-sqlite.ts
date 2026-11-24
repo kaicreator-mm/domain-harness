@@ -44,34 +44,6 @@ type Driver = InstanceType<typeof DatabaseSync>
 type Statement = ReturnType<Driver['prepare']>
 type Mode = 'idle' | 'control' | 'read' | 'write'
 type ControlSql = 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK'
-/** 事务控制边界上的真实 driver 连接；内部 seam 只依赖这个结构，不外泄 driver 类型。 */
-interface ControlTarget {
-  exec(sql: string): void
-}
-type ControlRunner = (target: ControlTarget, sql: ControlSql) => void
-
-/** 事务控制语句在真实 driver 上的执行：生产环境的唯一路径。 */
-function runDriverControl(target: ControlTarget, sql: ControlSql): void {
-  target.exec(sql)
-}
-let controlRunner: ControlRunner = runDriverControl
-
-/**
- * 内部故障测试 seam。driver 原型的 exec 不可写且不可配置，测试无法直接包裹，
- * 因此只在事务控制边界保留这一处替换点。包根经 `export *` 不转发 default，
- * 消费者拿不到它；生产调用方不得使用。
- */
-const sqliteDriverTestHooks = Object.freeze({
-  /** 替换事务控制的执行器，传 null 恢复为真实 driver；runner 需自行调用 runRealControl。 */
-  replaceControlRunnerForTests(runner: ControlRunner | null): void {
-    controlRunner = runner ?? runDriverControl
-  },
-  /** 供测试 runner 回到真实 driver。 */
-  runRealControl(target: ControlTarget, sql: ControlSql): void {
-    runDriverControl(target, sql)
-  },
-})
-export default sqliteDriverTestHooks
 
 /** 只取主错误码做分类；驱动消息/路径/绑定值一律不进入 SDK 错误。 */
 function providerError(error: unknown, stage: string): SQLiteDatabaseError {
@@ -139,7 +111,7 @@ export class SQLiteDatabaseElement {
 
   #control(sql: ControlSql): void {
     this.#mode = 'control'
-    try { controlRunner(this.#db, sql) } catch (error) { throw providerError(error, sql) }
+    try { this.#db.exec(sql) } catch (error) { throw providerError(error, sql) }
     finally { this.#mode = 'idle' }
   }
 
