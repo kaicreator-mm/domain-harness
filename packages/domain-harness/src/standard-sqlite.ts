@@ -16,17 +16,62 @@ export type SQLiteErrorCode = 'INVALID_INPUT' | 'CLOSED' | 'BUSY' | 'LOCKED' |
   'READONLY' | 'CONSTRAINT' | 'IO' | 'OPEN' | 'AUTH' | 'SQL' | 'REENTRANT' |
   'INACTIVE_TX' | 'ASYNC_TX' | 'LIMIT' | 'COMMIT_UNKNOWN' | 'ROLLBACK_FAILED'
 
+/** 终态复合故障的起因：SDK 归类码，或业务回调自身的失败。 */
+export type SQLiteFailureOrigin = SQLiteErrorCode | 'BUSINESS'
+export interface SQLiteTerminalFailureDetails {
+  readonly primaryCode?: SQLiteFailureOrigin
+  readonly rollbackCode?: SQLiteErrorCode
+}
+
 /** SDK 只暴露脱敏错误码和操作阶段，不打印路径、SQL 或绑定参数。 */
 export class SQLiteDatabaseError extends Error {
-  constructor(public readonly code: SQLiteErrorCode, public readonly stage: string) {
-    super('DH_STD_SQLITE_' + code + ' (' + stage + ')')
+  public declare readonly primaryCode?: SQLiteFailureOrigin
+  public declare readonly rollbackCode?: SQLiteErrorCode
+  constructor(
+    public readonly code: SQLiteErrorCode,
+    public readonly stage: string,
+    details: SQLiteTerminalFailureDetails = {},
+    options?: ErrorOptions,
+  ) {
+    super('DH_STD_SQLITE_' + code + ' (' + stage + ')', options)
     this.name = 'SQLiteDatabaseError'
+    if (details.primaryCode !== undefined) this.primaryCode = details.primaryCode
+    if (details.rollbackCode !== undefined) this.rollbackCode = details.rollbackCode
   }
 }
 
 type Driver = InstanceType<typeof DatabaseSync>
 type Statement = ReturnType<Driver['prepare']>
 type Mode = 'idle' | 'control' | 'read' | 'write'
+type ControlSql = 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK'
+/** 事务控制边界上的真实 driver 连接；内部 seam 只依赖这个结构，不外泄 driver 类型。 */
+interface ControlTarget {
+  exec(sql: string): void
+}
+type ControlRunner = (target: ControlTarget, sql: ControlSql) => void
+
+/** 事务控制语句在真实 driver 上的执行：生产环境的唯一路径。 */
+function runDriverControl(target: ControlTarget, sql: ControlSql): void {
+  target.exec(sql)
+}
+let controlRunner: ControlRunner = runDriverControl
+
+/**
+ * 内部故障测试 seam。driver 原型的 exec 不可写且不可配置，测试无法直接包裹，
+ * 因此只在事务控制边界保留这一处替换点。包根经 `export *` 不转发 default，
+ * 消费者拿不到它；生产调用方不得使用。
+ */
+const sqliteDriverTestHooks = Object.freeze({
+  /** 替换事务控制的执行器，传 null 恢复为真实 driver；runner 需自行调用 runRealControl。 */
+  replaceControlRunnerForTests(runner: ControlRunner | null): void {
+    controlRunner = runner ?? runDriverControl
+  },
+  /** 供测试 runner 回到真实 driver。 */
+  runRealControl(target: ControlTarget, sql: ControlSql): void {
+    runDriverControl(target, sql)
+  },
+})
+export default sqliteDriverTestHooks
 
 /** 只取主错误码做分类；驱动消息/路径/绑定值一律不进入 SDK 错误。 */
 function providerError(error: unknown, stage: string): SQLiteDatabaseError {
@@ -39,6 +84,18 @@ function providerError(error: unknown, stage: string): SQLiteDatabaseError {
     14: 'OPEN', 23: 'AUTH',
   } as Record<number, SQLiteErrorCode>)[primary]
   return new SQLiteDatabaseError(code ?? (stage === 'open' ? 'OPEN' : 'SQL'), stage)
+}
+
+/** 终态故障的起因码：SDK 归类码，或业务回调自身的失败。 */
+function failureOrigin(error: unknown): SQLiteFailureOrigin {
+  return error instanceof SQLiteDatabaseError ? error.code : 'BUSINESS'
+}
+
+/** 终态故障对外携带的主因描述：只有脱敏码与阶段，不保留原始错误对象及其 cause。 */
+function sanitizedPrimary(error: unknown): SQLiteDatabaseError {
+  return error instanceof SQLiteDatabaseError
+    ? new SQLiteDatabaseError(error.code, error.stage)
+    : new SQLiteDatabaseError('SQL', 'callback')
 }
 
 /** 普通 Standard Element；业务实例显式拥有连接，KDP 不创建全局数据库。 */
@@ -80,9 +137,9 @@ export class SQLiteDatabaseElement {
     if (this.#busy) throw new SQLiteDatabaseError('REENTRANT', 'connection')
   }
 
-  #control(sql: 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK'): void {
+  #control(sql: ControlSql): void {
     this.#mode = 'control'
-    try { this.#db.exec(sql) } catch (error) { throw providerError(error, sql) }
+    try { controlRunner(this.#db, sql) } catch (error) { throw providerError(error, sql) }
     finally { this.#mode = 'idle' }
   }
 
@@ -188,24 +245,27 @@ export class SQLiteDatabaseElement {
       return result
     } catch (error) {
       active = false
+      // 终态复合故障对外只携带脱敏描述：业务原始错误与驱动原始错误都不进入 cause。
+      const primary = { primaryCode: failureOrigin(error) }
+      let terminal: SQLiteDatabaseError | undefined
       if (this.#db.isTransaction) {
-        let rollbackFailure: SQLiteDatabaseError | undefined
+        let rollbackCode: SQLiteErrorCode | undefined
         try { this.#control('ROLLBACK') } catch (rollbackError) {
-          rollbackFailure = providerError(rollbackError, 'ROLLBACK')
+          rollbackCode = providerError(rollbackError, 'ROLLBACK').code
         }
-        if (rollbackFailure) {
+        if (rollbackCode) {
+          // 回滚失败：连接不再接收操作，直到业务显式 close。
           this.#state = 'poisoned'
-          // 主因和脱敏回滚失败同时保留，由业务决定如何记录；连接不再接收操作。
-          throw new AggregateError([error, rollbackFailure],
-            'DH_STD_SQLITE_ROLLBACK_FAILED', { cause: error })
+          terminal = new SQLiteDatabaseError('ROLLBACK_FAILED', 'transaction',
+            { ...primary, rollbackCode }, { cause: sanitizedPrimary(error) })
         }
       } else if (began && committing) {
+        // 提交结果不明：不得自动重试，连接同样隔离。
         this.#state = 'poisoned'
-        // 提交结果不明：保守拒绝并隔离连接；cause 保留原始失败供宿主诊断。
-        const unknown = new SQLiteDatabaseError('COMMIT_UNKNOWN', 'transaction')
-        unknown.cause = error
-        throw unknown
+        terminal = new SQLiteDatabaseError('COMMIT_UNKNOWN', 'transaction', primary,
+          { cause: sanitizedPrimary(error) })
       }
+      if (terminal) throw terminal
       throw error
     } finally { active = false; this.#busy = false }
   }

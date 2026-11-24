@@ -4,9 +4,13 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from '@photostructure/sqlite'
+import * as sdk from '../../src/index.js'
 import { SQLiteDatabaseElement, SQLiteDatabaseError } from '../../src/index.js'
-import type { SQLiteErrorCode, SQLiteScalar, SQLiteTransaction } from '../../src/index.js'
+import type {
+  SQLiteErrorCode, SQLiteFailureOrigin, SQLiteScalar, SQLiteTerminalFailureDetails, SQLiteTransaction,
+} from '../../src/index.js'
 
 const code = (expected: SQLiteErrorCode) => (error: unknown): boolean =>
   error instanceof SQLiteDatabaseError && error.code === expected
@@ -326,6 +330,41 @@ test('T02: SQL text that is not one admitted statement is rejected before anythi
   } finally { db.close() }
 })
 
+// CONTROLLED_FAULT_INJECTION：真实 driver + 已编译 SDK 根入口 + 真实临时 DB，故障在事务控制边界注入。
+// 这是分支验证，不是实际磁盘损坏、进程失联或物理 IO/LOCKED 故障的见证。
+test('T02: terminal transaction failures are typed, poisoned and sanitized (controlled fault injection)', () => {
+  const probe = fileURLToPath(new URL('../fixtures/sqlite-terminal-failure-probe.mjs', import.meta.url))
+  const child = spawnSync(process.execPath, [probe], { encoding: 'utf8', timeout: 30_000, windowsHide: true })
+  assert.equal(child.error, undefined)
+  assert.equal(child.signal, null)
+  assert.equal(child.status, 0, child.stderr)
+  const lines = child.stdout.trim().split('\n')
+  assert.equal(lines.at(-1), 'TERMINAL_FAILURE_PROBE_PASS')
+  const evidence = lines.filter(line => line.startsWith('EVID '))
+    .map(line => JSON.parse(line.slice(5)) as Record<string, unknown>)
+  // 内部故障 seam 不经包根公开：源码入口在这里验，已编译根入口由子进程验。
+  assert.equal('default' in sdk, false)
+  // 错误分类：受控注入的 SQLite 码与 SDK 归类一一对应，连接保持可用。
+  assert.deepEqual(
+    evidence.filter(item => item.event === 'CLASSIFICATION')
+      .map(item => [item.injected, item.classified, item.testType, item.poisoned]),
+    [
+      [{ sqliteCode: 10 }, 'IO', 'CONTROLLED_FAULT_INJECTION', false],
+      [{ errcode: 10, sqliteCode: 10, sqliteExtendedCode: 10 }, 'IO', 'CONTROLLED_FAULT_INJECTION', false],
+      [{ sqliteExtendedCode: 0x106 }, 'LOCKED', 'CONTROLLED_FAULT_INJECTION', false],
+      [{ errcode: 0x106, sqliteCode: 0x106, sqliteExtendedCode: 0x106 }, 'LOCKED', 'CONTROLLED_FAULT_INJECTION', false],
+    ])
+  // 终态故障：类型化 code/stage/primaryCode/rollbackCode，毒化连接，旧 tx 失活，各视图无敏感哨兵。
+  assert.deepEqual(
+    evidence.filter(item => item.event === 'TERMINAL_FAILURE').map(item => [item.scenario, item.code, item.stage,
+      item.primaryCode, item.rollbackCode, item.poisoned, item.staleActive, item.leaks]),
+    [
+      ['COMMIT_UNKNOWN', 'COMMIT_UNKNOWN', 'transaction', 'IO', undefined, true, false, []],
+      ['ROLLBACK_FAILED_BUSINESS', 'ROLLBACK_FAILED', 'transaction', 'BUSINESS', 'BUSY', true, false, []],
+      ['ROLLBACK_FAILED_SDK', 'ROLLBACK_FAILED', 'transaction', 'CONSTRAINT', 'LOCKED', true, false, []],
+    ])
+})
+
 // 静态类型负例仅编译，不执行非法回调。
 function typeOracle(db: SQLiteDatabaseElement): void {
   const count: number = db.transaction(tx => tx.run('DELETE FROM resource WHERE id=?', [1]).changes)
@@ -337,4 +376,13 @@ function typeOracle(db: SQLiteDatabaseElement): void {
   db.transaction(() => Math.random() > 0.5 ? 1 : Promise.resolve(2))
   void count
 }
+// 终态故障的结构化字段对外可见：起因码或 BUSINESS，回滚码为 SDK 归类码。
+function terminalOracle(error: SQLiteDatabaseError): void {
+  const origin: SQLiteFailureOrigin | undefined = error.primaryCode
+  const rollback: SQLiteErrorCode | undefined = error.rollbackCode
+  const details: SQLiteTerminalFailureDetails = origin === undefined ? {} : { primaryCode: origin }
+  void rollback
+  void new SQLiteDatabaseError('ROLLBACK_FAILED', 'transaction', details)
+}
 void typeOracle
+void terminalOracle
