@@ -68,6 +68,8 @@ db.close(); // 业务显式 close；关闭后所有操作按 CLOSED 拒绝
 
 `VectorQueryElement.search(candidates, query, inScope, {topK,maxVisited,dimension,metric})` 先调用可信业务 Scope，再计算 COSINE 距离（1−cos）或 L2；按距离、id、原始位置稳定排序，只保留 Top-K 候选。每次访问都计入 `visited`；预算不足时 `complete=false`、`truncationReason='VISIT_LIMIT'`，不能把未找到当成事实。空源可为完整；非空源 `topK=0` 明确非完整。
 
+调用方须保持源集合成员及顺序、已接纳 item 的业务属性稳定；SDK 不深拷贝业务对象，也不保证检测等长替换。查询向量在入口按分量快照；每个访问候选只读取一次 item，Scope 接纳后才读取一次 id 和向量及其各分量，返回同一接纳 item 引用。观察到源长度变化即抛出 `DH_STD_QUERY_VECTOR_SOURCE_CHANGED`，不返回 COMPLETE；不预扫未访问候选。COSINE 按最大绝对分量缩放后归一化，支持非零有限次正规及大数向量，零向量拒绝；L2 仅在实际距离不可表示时拒绝溢出。距离仍是有限精度浮点数，不承诺任意精度。
+
 `GraphQueryElement.search(edges, {start,target?,direction,relationTypes?,limits})` 使用 BFS 和 cycle visited 集合。图遍历预算 `maxVisited` 指实际检查的原始边次数（同一条边在不同扩展重复检查仍计费）；`maxDepth` 限路径 hops，`maxReturned` 限返回路径。若指定 target，则第一条找到的最短路径能完成“存在”查询；无路径但 `complete=false` 不等同不存在。**不**自动推导业务权限或事实，不创建向量/图数据库。对外可信 TypeScript 业务数据并非恶意 Proxy 沙箱。
 
 T03 SQL 部分**复用**已通过 T02 的 `SQLiteDatabaseElement.select(fixedSql, parameters, limit)` 与 SQLite authorizer，不另做 SQL parser/ORM。SQL + Vector/Graph 整体 SDK packed consumer/CI 仍须以 T03 新 Exact SHA 验收，不把独立纯算法测试当正式 SQL 集成。

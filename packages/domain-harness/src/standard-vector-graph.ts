@@ -31,33 +31,39 @@ function budget(value: number): boolean {
 function invalid(message: string): never {
   throw new TypeError('DH_STD_QUERY_' + message);
 }
-function norm(vector: readonly number[], dimension: number): number {
+function snapshot(vector: readonly number[], dimension: number, metric: 'COSINE' | 'L2'): number[] {
   if (!Array.isArray(vector) || vector.length !== dimension) return invalid('VECTOR_DIMENSION');
   const values = vector as readonly number[];
-  let result = 0;
+  const result: number[] = [];
+  let scale = 0;
   for (let i = 0; i < dimension; i += 1) {
     const value = values[i];
     if (typeof value !== 'number' || !Number.isFinite(value)) return invalid('VECTOR_VALUE');
-    result = Math.hypot(result, value);
+    result.push(value);
+    scale = Math.max(scale, Math.abs(value));
   }
-  if (!Number.isFinite(result)) return invalid('VECTOR_OVERFLOW');
-  return result;
+  if (metric === 'L2') return result;
+  if (scale === 0) return invalid('VECTOR_ZERO_NORM');
+  // 先按最大分量缩放，避免非零次正规数的范数舍入及大数范数溢出。
+  const scaled = result.map(value => value / scale);
+  let norm = 0;
+  for (const value of scaled) norm = Math.hypot(norm, value);
+  return scaled.map(value => value / norm);
 }
-function distance(a: readonly number[], b: readonly number[], metric: 'COSINE' | 'L2', na: number, nb: number): number {
+function distance(a: readonly number[], b: readonly number[], metric: 'COSINE' | 'L2'): number {
   if (metric === 'L2') {
     let result = 0;
     for (let i = 0; i < a.length; i += 1) result = Math.hypot(result, (a[i] as number) - (b[i] as number));
     if (!Number.isFinite(result)) return invalid('VECTOR_OVERFLOW');
     return result;
   }
-  if (na === 0 || nb === 0) return invalid('VECTOR_ZERO_NORM');
   let similarity = 0;
-  for (let i = 0; i < a.length; i += 1) similarity += ((a[i] as number) / na) * ((b[i] as number) / nb);
+  for (let i = 0; i < a.length; i += 1) similarity += (a[i] as number) * (b[i] as number);
   if (!Number.isFinite(similarity)) return invalid('VECTOR_OVERFLOW');
   return 1 - Math.max(-1, Math.min(1, similarity));
 }
 
-/** 有限内存 Top-K；Scope 回调只可为可信同步业务函数，不是安全沙箱。 */
+/** 有限内存 Top-K；可信同步 Scope 不得改变源成员及顺序或 item 的业务属性，不是安全沙箱。 */
 export class VectorQueryElement {
   public search<T>(
     source: readonly VectorCandidate<T>[],
@@ -72,8 +78,12 @@ export class VectorQueryElement {
     const { topK, maxVisited, dimension, metric } = options;
     if (!budget(topK) || !budget(maxVisited) || !Number.isSafeInteger(dimension) || dimension <= 0 ||
         (metric !== 'COSINE' && metric !== 'L2')) return invalid('VECTOR_INPUT');
-    const queryNorm = norm(query, dimension);
-    if (metric === 'COSINE' && queryNorm === 0) return invalid('VECTOR_ZERO_NORM');
+    const inputLength = typedSource.length;
+    const checkSource = (): void => {
+      if (typedSource.length !== inputLength) invalid('VECTOR_SOURCE_CHANGED');
+    };
+    const querySnapshot = snapshot(query, dimension, metric);
+    checkSource();
     const matches: Array<VectorMatch<T> & { readonly sourceIndex: number }> = [];
     let visited = 0;
     const finish = (complete: boolean, reason?: 'VISIT_LIMIT' | 'RESULT_LIMIT'): VectorQueryResult<T> => {
@@ -82,7 +92,6 @@ export class VectorQueryElement {
         ? { matches: selected, visited, complete, truncated: false }
         : { matches: selected, visited, complete, truncated: true, truncationReason: reason };
     };
-    const inputLength = typedSource.length;
     if (inputLength === 0) return finish(true);
     if (topK === 0) return finish(false, 'RESULT_LIMIT');
     for (let i = 0; i < inputLength; i += 1) {
@@ -90,16 +99,20 @@ export class VectorQueryElement {
       const candidate = typedSource[i];
       if (!candidate || typeof candidate !== 'object') return invalid('VECTOR_CANDIDATE');
       visited += 1;
-      const decision: unknown = inScope(candidate.item);
+      const item = candidate.item;
+      const decision: unknown = inScope(item);
       if (typeof decision !== 'boolean') {
         if (types.isPromise(decision)) void Promise.prototype.then.call(decision, undefined, () => undefined);
         return invalid('SCOPE_RESULT');
       }
+      checkSource();
       if (!decision) continue;
-      if (typeof candidate.id !== 'string' || candidate.id.length === 0) return invalid('VECTOR_ID');
-      const candidateNorm = norm(candidate.vector, dimension);
-      const metricDistance = distance(query, candidate.vector, metric, queryNorm, candidateNorm);
-      matches.push({ id: candidate.id, item: candidate.item, distance: metricDistance, sourceIndex: i });
+      const id = candidate.id;
+      if (typeof id !== 'string' || id.length === 0) return invalid('VECTOR_ID');
+      const candidateSnapshot = snapshot(candidate.vector, dimension, metric);
+      checkSource();
+      const metricDistance = distance(querySnapshot, candidateSnapshot, metric);
+      matches.push({ id, item, distance: metricDistance, sourceIndex: i });
       matches.sort((left, right) => left.distance - right.distance ||
         (left.id < right.id ? -1 : left.id > right.id ? 1 : left.sourceIndex - right.sourceIndex));
       if (matches.length > topK) matches.pop();

@@ -172,5 +172,5 @@ test('T03 vector: source mutation never silently declares a shortened source com
     { id: '2', vector: [2], item: 2 },
   ];
   assert.throws(() => vector.search(source, [1], () => { source.pop(); return true; },
-    { metric: 'L2', dimension: 1, topK: 2, maxVisited: 2 }), /DH_STD_QUERY_VECTOR_CANDIDATE/u);
+    { metric: 'L2', dimension: 1, topK: 2, maxVisited: 2 }), /DH_STD_QUERY_VECTOR_SOURCE_CHANGED/u);
 });
