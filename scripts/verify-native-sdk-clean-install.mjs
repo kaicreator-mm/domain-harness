@@ -256,7 +256,7 @@ try {
     "assert.equal(partial.complete,false);",
     "assert.equal(partial.truncationReason,'VISIT_LIMIT');",
     "console.log('SDK_VECTOR_GRAPH_PROBE_PASS');",
-  ].join('\\n'));
+  ].join('\n'));
   const queryResult=run('VECTOR_GRAPH_PROBE',process.execPath,['vector-graph-probe.mjs'],consumer);
   assert.equal(queryResult.trim(),'SDK_VECTOR_GRAPH_PROBE_PASS');
 
