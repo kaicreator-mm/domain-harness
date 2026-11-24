@@ -4,3 +4,4 @@ export * from './standard-workflow.js';
 export * from './standard-files.js';
 export * from './native-workflow-composition.js';
 export * from './standard-query.js';
+export * from './standard-sqlite.js';

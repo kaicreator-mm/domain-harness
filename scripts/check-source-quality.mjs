@@ -31,7 +31,7 @@ for (const path of source) {
 }
 const sdk=JSON.parse(await readFile(new URL('packages/domain-harness/package.json',root),'utf8'));
 assert.deepEqual(Object.keys(sdk.exports), ['.'], '只能导出本版原生 SDK 包根');
-assert.deepEqual(Object.keys(sdk.dependencies).sort(), ['xstate','yaml'],
+assert.deepEqual(Object.keys(sdk.dependencies).sort(), ['@photostructure/sqlite','xstate','yaml'],
   'SDK 不应继续依赖旧 Contracts/Microkernel 或第二组合系统');
 assert.equal(sdk.engines.node, '>=22.12.0');
 const app=JSON.parse(await readFile(new URL('package.json',root),'utf8'));
