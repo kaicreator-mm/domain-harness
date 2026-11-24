@@ -1,0 +1,15 @@
+{
+  "name": "dh-qualification-workshop",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@kaicreator/domain-harness": "0.11.2"
+  },
+  "scripts": {
+    "verify": "tsc -p tsconfig.json && node --unhandled-rejections=strict dist/workshop/verify.js"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.7",
+    "typescript": "5.8.3"
+  }
+}

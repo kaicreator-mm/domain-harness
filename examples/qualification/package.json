@@ -1,0 +1,7 @@
+{
+  "name": "dh-complex-qualification",
+  "private": true,
+  "scripts": {
+    "verify": "npm --prefix media-archive run verify && npm --prefix workshop run verify"
+  }
+}
