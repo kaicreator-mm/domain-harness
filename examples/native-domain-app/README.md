@@ -32,3 +32,11 @@
 - 客户端 Recognition/Handling 共享一根 Workflow 预算。R58 明确要求可信业务调用者使用 `ReservationElement.run(input, limits, 'FIRST_SUBMIT' | 'RECOVER')`：只有明确的新逻辑命令（新 ID）才选择 FIRST_SUBMIT；缺失或非法模式在 Recognition 拒绝且无网络请求。同一账本已记录的 ID/摘要永远只读回；RECOVER 即使账本丢失/为空也预记后仅发送 readback，未观察到原尝试保持 UNKNOWN。空账本不能证明这是首次提交；错误地向全新账本声明 FIRST_SUBMIT 不在恢复保证之内。Host 对已观察的重复首次交付仍去重，不宣称能从未观察到的 ID 推断历史。若响应丢失、记录失败或无法读回，返回 UNKNOWN，不盲目重播。当前权限或协议拒绝（HOST_ACCESS_DENIED / READBACK_NOT_AUTHORIZED / HOST_REQUEST_DENIED / HOST_INPUT_INVALID）仅说明本次请求被拒绝且无法确认历史处置，不能当作逻辑命令已 REJECT，也不泄露历史是否存在。已证明的 Receipt 不被后续 UNKNOWN 覆盖；同主体重新获得当前访问权后可恢复精确历史 Receipt，批准撤销阻止新动作但不阻止有当前访问权的历史读回。真正的权威拒绝/ASK 和命令身份冲突仍保留。两个库不具备分布式 ACID，不提供全局识别错误重投意图或自动重试未知动作。
 - `action/verify.ts` 八组实际进程/网络/SQLite 负例和正例由仓内 node:test 与真实仓外 SDK-only Consumer 共用；故障代理只在测试中转发实际 HTTP 后断开 ACK 或转发前断开，亦通过关闭真实客户端连接触发本地记录失败。正式 Host 无故障注入入口。Consumer 编译所需 Node 类型来自仓库开发工具链，运行依赖仍只有 SDK；T05 原 SDK 声明门不变。
 - 边界：可信 Owner 管理接口与本地 loopback HTTP 仅作最小真实授权/资源协议，生产部署需 TLS、可信身份/批准 UI、运维与长期恢复机制。未实现第三方不可事务化 Effect 的原子性，不承诺通用分布式 exactly-once、任意恶意进程沙箱或真实物理故障注入。T07 才做完整双平台和陌生领域生成验收。
+
+## v0.11.2 T07：同一 SDK 的新领域组合验收
+
+`combined/book-catalog.ts`、`combined/water-hardness.ts` 是两个新 Business Package 的静态模块入口，原生 TS Class 与普通 Function；不引入 Loader、Registry、空 Init、额外 npm 依赖或 SDK 内领域 Schema。生成依据见 [T07 generation and acceptance record](./combined/GENERATION.md)。`combined/verify.ts` 使用同一外部安装的 SDK，同时运行两个领域的 Recognition/Handling 与真实 SQL 目录、Top-K、有向关系图、有界 Expression；独立租户/网络范围、来源修订、时点、缺失/冲突、预算和不可变规则均有断言。
+
+图书计划以 ISBN 校验与当前目录报价选择合成资源和数量；只有可信调用者明确发出另一逻辑命令且 owner 批准后才由未改动的 T06 Host 提交。先创建权威资源和实际独立 Host，验证只读计划与失败路径零 Effect；未批准 ASK，批准后真实库存 5→3、版本 0→1、Effect 恰好 1 次，RECOVER 返回同一 Receipt；另一个领域分类结果不变。两个独立逻辑根不构成同一请求预算重置。组合应用不声称真实图书出版/目录或水体观测，也不提供真实饮水安全结论。
+
+`npm run test:consumer` 仍然在开发工具链 Node >=22.13 中执行编译和 pack，但可显式指定 **实际消费者** 的 Node 可执行文件 `DH_NATIVE_CONSUMER_NODE` 与其兼容的 `DH_NATIVE_CONSUMER_NPM_CLI`（npm CLI JS 文件绝对路径）。未指定使用当前 Node 和 npm；指定不同 Node 时从其发行目录寻找 npm CLI，也可显式指定。锁和 clean install 使用选定消费者 Node/npm，所有 ESM/Host 探针使用消费者 Node，TypeScript 编译继续使用开发工具链。无 Node 额外启动 flag 或 NODE_PATH 注入；输出记录实际 Node/platform/arch、npm 版本、包版本、tarball SHA256 与通过的门禁。Windows/Linux Node22.12.0 最低版本资格必须另取真实执行证据；CI 不能冒充双平台 PASS。SDK 版本标识在本内部阶段候选更新为 0.11.2，不等同正式发布。

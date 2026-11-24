@@ -92,3 +92,7 @@ const available = expr.evaluate(
 );
 // available = 9
 ```
+
+## v0.11.2 T07：生成新 Business Package 与最低消费者 Node
+
+生成者先读仓库真实 `.agents/skills/domain-harness-spec/SKILL.md` 及其规范目录，再以本公开 API README、根入口导出的声明/TSDoc 和实际领域资料编写普通 TS ESM 模块；SDK 不承担 Package 生成或正确性验证。两个新领域的源码、资料到规则映射和组合验收见 `examples/native-domain-app/combined/`。开发 Node >=22.13 不改变 SDK 消费者 Node >=22.12.0。真实仓外消费脚本支持独立消费者 Node/npm 可执行路径，记录实际运行时版本和 tarball SHA256；须有当前 Exact SHA 真实 Windows/Linux witness 才能宣告双平台最低版本通过。
