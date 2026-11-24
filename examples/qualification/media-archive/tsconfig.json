@@ -8,11 +8,11 @@
     "outDir": "dist",
     "types": [
       "node"
-    ]
+    ],
+    "rootDir": ".."
   },
   "include": [
-    "media-archive/*.ts",
-    "shared/*.ts",
-    "workshop/*.ts"
+    "*.ts",
+    "../shared/*.ts"
   ]
 }

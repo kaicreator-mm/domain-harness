@@ -1,3 +1,5 @@
+> R69 current: follow [suite README](../README.md) and [R69 evidence](../R69-EVIDENCE.md); below is historical R67 scope/implementation. R69 corrects R68 findings.
+
 > R67A historical first implementation; R67B moved common CLI and manifest to [suite root](../README.md). Follow suite root execution and current evidence; the old standalone path below describes historical R67A.
 
 # R67 · 需求驱动资格验证：数字媒体档案入库

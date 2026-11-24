@@ -1,16 +1,7 @@
 {
   "name": "dh-complex-qualification",
   "private": true,
-  "type": "module",
-  "dependencies": {
-    "@kaicreator/domain-harness": "0.11.2",
-    "sharp": "0.34.1"
-  },
   "scripts": {
-    "verify": "tsc -p tsconfig.json && node --unhandled-rejections=strict dist/media-archive/verify.js && node --unhandled-rejections=strict dist/workshop/verify.js"
-  },
-  "devDependencies": {
-    "@types/node": "22.19.7",
-    "typescript": "5.8.3"
+    "verify": "npm --prefix media-archive run verify && npm --prefix workshop run verify"
   }
 }

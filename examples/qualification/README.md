@@ -1,22 +1,16 @@
-# DomainHarness 0.11.2 · 需求驱动架构资格 Demo Suite（R67B）
-唯一任务 [#1720](https://github.com/kaicreator-mm/domain-harness/issues/1720)，媒体要求在实现前冻结于 Issue 正文，第二领域需求在 [R67A](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7142166448) 冻结。原 SDK 0.11.2 不改动。当前作者侧 Linux 真实执行通过，待独审；不声称全部架构或所有环境已合格。
+# R69 · 需求驱动架构资格 Demo Suite
+唯一任务 #1720，历史需求、R67A/B 和 R68 记录不变。当前是针对 [R68](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7142394342) 的修正候选，不是独审通过。
 
-## 两个不同领域
-| 领域 | 真实任务 | 自然选取的计算/知识/依赖 |
-|---|---|---|
-| [媒体档案](media-archive/README.md) | 保留原件与访问件，技术元数据、质量检查、批准登记 | Sharp/libvips 直接库调用，FFmpeg/ffprobe CLI，SHA256，文件、SQLite、独立 HTTP Host；分类/政策/版本/关系/数据来源 |
-| [维修车间](workshop/README.md) | 维修工序的依赖、资源互斥和最短完工时间 | Python SciPy MILP 外部求解、TS 穷举 oracle、Graph 多级影响、不可变工序/设备停机政策、可行性与最优性 |
-| shared/cli.ts | 两个实际用途后提取的应用侧 CLI Element | 普通 ESM 模块；两领域共用，未升级成 SDK Standard，未让排程模块依赖 Sharp |
+两个独立应用选择各自的 manifest；shared/cli.ts 是共享 ESM 源模块，shared/package.json 声明 ESM 边界；根 package.json 仅聚合运行。没有改变 SDK。实际依赖见各子目录，维修无需 Sharp/FFmpeg，媒体无需 SciPy。
+## 运行
+从仓库复制整个 qualification 目录到独立位置，保留 shared 与选定应用的相对路径；准备实际 SDK 0.11.2 tgz 和 Node22.13+ 开发工具。进入所选子目录：
+- media-archive: FFmpeg/ffprobe PATH，npm install --ignore-scripts /absolute/path/kaicreator-domain-harness-0.11.2.tgz，然后 npm run verify。
+- workshop: Python + requirements.txt，npm install --ignore-scripts /absolute/path/kaicreator-domain-harness-0.11.2.tgz，python3 -m pip install -r requirements.txt，然后 npm run verify。可指定 DH_PYTHON。
+- 两个独立应用均准备好后，可在 suite 根 npm run verify 聚合；无需在根安装媒体依赖。生成 dist 不入库。
+上述是联网安装指引；本轮 npm cache 缺失，未获得新的 lock/clean install。实际独立执行见 R69-EVIDENCE.md。历史 EVIDENCE.md 与 R67B.stdout.txt 仅对应 R67B。
 
-原 T01–T07 仍为已验收 SDK 能力证据；本套只补组合与工程资格，不重复证明历史未改源码。两个应用同一 TypeScript/Node Profile；外部 Python 是独立进程 Tool，不是 DomainHarness 第二运行时。无动态 registry、强制 loader、中央 Tool Runtime。使用真实公开 SDK 根入口。
-
-## 可复现执行
-复制本目录至独立工作目录；准备实际已验收的 SDK tarball（本版未公开发布），Node>=22.13 的开发环境、FFmpeg/ffprobe、Python 环境和 requirements。根 package.json 声明实际直接 npm 依赖及精确 dev 版本。运行：
-```sh
-npm install --ignore-scripts /absolute/path/kaicreator-domain-harness-0.11.2.tgz
-python3 -m pip install -r workshop/requirements.txt
-npm run verify
-```
-可显式设置 DH_PYTHON 为 Python 可执行路径。安装命令是待联网环境验证的复现指引，不是本轮已运行的命令；本轮使用实际 R63 留存安装树和已安装工具。不要提交本地 tgz、node_modules 或 dist。首次真正新依赖 clean install / lock 与 Windows 未证。
-
-详见 [当前证据与覆盖](EVIDENCE.md)、[实际运行 stdout](R67B.stdout.txt)、媒体 [R67A 历史收据](media-archive/EVIDENCE.md)。R67A 源码与环境历史不冒充 R67B exact 当前状态。
+## 工程经验
+- 固定业务流程若要求总预算不足不能启动外部计算，在业务入口预检完整最小额度；SDK 仅按真实调用和子层保留共享预算，不能推测业务未来调用。
+- 可预期的外部输入/工具错误用 invokeOutcome 返回稳定原因，不把未知包装成 COMPLETE；普通 invoke 保留通用兜底。
+- 跨域复用不仅需要源级共享，还要独立 npm/外部工具依赖闭包；先证明两个用途再抽取，不能把领域依赖强制引入另一领域。
+以上对应 canonical LIFE-09/12/13、CORE-10、GEN-03/04、EL-06，不引入新规范或 SDK 机制。

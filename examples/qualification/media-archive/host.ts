@@ -9,10 +9,12 @@ const server=createServer(async(req,res)=>{
   const respond=(value:unknown)=>{res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(value));};
   try{
     const owner=JSON.parse(await readFile(manifest,'utf8')) as {token:string;approved:boolean;asset:Asset;tenant:string};
-    if(req.method!=='POST'||req.url!=='/register'||req.headers.authorization!==`Bearer ${owner.token}`){respond({status:'REJECT',reason:{code:'HOST_DENIED',message:'HOST_DENIED'}});return;}
+    if(req.method!=='POST'||!['/register','/readback'].includes(req.url??'')||req.headers.authorization!==`Bearer ${owner.token}`){respond({status:'REJECT',reason:{code:'HOST_DENIED',message:'HOST_DENIED'}});return;}
     let size=0;const chunks:Buffer[]=[];for await(const chunk of req){const b=Buffer.from(chunk);size+=b.length;if(size>4096){req.destroy();return;}chunks.push(b);}
     const command=JSON.parse(Buffer.concat(chunks).toString('utf8')) as {tenant:string;hash:string;revision:string;derivative:string};
-    if(command.tenant!==owner.tenant||command.hash!==owner.asset.original||command.revision!==owner.asset.revision||command.derivative!==owner.asset.derivative){respond({status:'REJECT',reason:{code:'HOST_SCOPE',message:'HOST_SCOPE'}});return;}
+    if(command.tenant!==owner.tenant){respond({status:'REJECT',reason:{code:'HOST_SCOPE',message:'HOST_SCOPE'}});return;}
+    if(req.url==='/readback'){respond(await catalog.readback(owner.tenant,command.hash));return;}
+    if(command.hash!==owner.asset.original||command.revision!==owner.asset.revision||command.derivative!==owner.asset.derivative){respond({status:'REJECT',reason:{code:'HOST_SCOPE',message:'HOST_SCOPE'}});return;}
     respond(await catalog.register(owner.tenant,owner.asset,owner.approved));
   }catch{respond({status:'UNKNOWN',reason:{code:'HOST_UNKNOWN',message:'HOST_UNKNOWN'}});}
 });

@@ -14,7 +14,7 @@ export class FixityElement {
     return createHash('sha256').update(bytes).digest('hex');
   }
 }
-export type MediaInfo = { kind:'image'|'video'; width:number; height:number; seconds:number };
+export type MediaInfo = { kind:'image'|'video'; width:number; height:number; seconds:number; frameSeconds?:number };
 export class ImageElement {
   async inspect(path:string):Promise<MediaInfo> {
     const m=await sharp(path,{limitInputPixels:16_000_000}).metadata();
@@ -31,12 +31,17 @@ export class VideoElement {
   async inspect(path:string):Promise<MediaInfo> {
     const raw=JSON.parse(await this.cli.run(this.probe,['-v','error','-show_format','-show_streams','-of','json',path]));
     const s=raw.streams?.find((x:{codec_type:string})=>x.codec_type==='video');
-    const seconds=Number(raw.format?.duration);
-    if(!s||!Number.isSafeInteger(s.width)||s.width<=0||!Number.isSafeInteger(s.height)||s.height<=0||!Number.isFinite(seconds)||seconds<=0||!String(raw.format?.format_name).split(',').includes('mp4'))throw new Error('VIDEO_METADATA');
-    return {kind:'video',width:s.width,height:s.height,seconds};
+    const seconds=Number(s?.duration??raw.format?.duration);
+    const [num,den]=String(s?.avg_frame_rate??'').split('/').map(Number);const frameSeconds=den!/num!;
+    const brand=String(raw.format?.tags?.major_brand??'').trim();
+    if(!['isom','iso2','iso5','iso6','mp41','mp42','avc1'].includes(brand))throw Error('VIDEO_CONTAINER');
+    if((s?.sample_aspect_ratio&& !['1:1','N/A'].includes(s.sample_aspect_ratio))||s?.side_data_list?.some((v:{rotation?:number})=>v.rotation&&v.rotation!==0))throw Error('VIDEO_GEOMETRY_UNSUPPORTED');
+    if(!s||!Number.isSafeInteger(s.width)||s.width<=0||!Number.isSafeInteger(s.height)||s.height<=0||!Number.isFinite(seconds)||seconds<=0||!Number.isFinite(frameSeconds)||frameSeconds<=0||!String(raw.format?.format_name).split(',').includes('mp4'))throw new Error('VIDEO_METADATA');
+    return {kind:'video',width:s.width,height:s.height,seconds,frameSeconds};
   }
   async verify(path:string):Promise<void>{ await this.cli.run(this.convert,['-nostdin','-v','error','-xerror','-i',path,'-f','null','-']); }
   async derive(source:string,target:string,p:Policy):Promise<void>{
-    await this.cli.run(this.convert,['-nostdin','-v','error','-n','-i',source,'-map','0:v:0','-an','-vf',`scale=${p.videoWidth}:${p.videoHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2`,'-c:v','mpeg4',target]);
+    await this.verify(source);
+    await this.cli.run(this.convert,['-nostdin','-v','error','-xerror','-n','-i',source,'-map','0:v:0','-an','-vf',`scale=${p.videoWidth}:${p.videoHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2`,'-c:v','mpeg4',target]);
   }
 }

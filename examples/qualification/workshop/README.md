@@ -1,3 +1,5 @@
+> R69 current: follow [suite README](../README.md) and [R69 evidence](../R69-EVIDENCE.md); below is historical R67 scope/implementation. R69 corrects R68 findings.
+
 # 小型维修车间工序排程（R67B）
 需求来源及冻结：[Issue #1720 R67A](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7142166448)。[Google OR-Tools job shop](https://developers.google.com/optimization/scheduling/job_shop) 为工序先后、机器不重叠与 makespan 问题参考；[SciPy milp](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.milp.html) 为求解技术。两个订单、各三道工序、机器容量1与停机政策为合成数据；不是实际维修业务操作指引。
 - TS 验证工序必备事实、唯一性、依赖、循环；Graph 计算首道工序的下游影响路径；静态 WorkshopElement 两级子 Workflow，根 calls4/steps8/depth2。

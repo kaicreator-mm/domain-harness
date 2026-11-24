@@ -5,6 +5,7 @@ import type { NativeWorkflowContext, WorkflowLimits, StandardWorkflowOutcome } f
 import { FixityElement, ImageElement, VideoElement, type Policy, type MediaInfo } from './media.js';
 export type Result<T> = StandardWorkflowOutcome<T>;
 export type Asset = { original:string; derivative:string; source:MediaInfo; output:MediaInfo; revision:string; originalPath:string; derivativePath:string };
+const mediaCall=async<T>(fn:()=>Promise<T>,stage:string):Promise<Result<T>>=>{try{return {status:'COMPLETE',value:await fn()};}catch(error){const code=error instanceof Error&&/^(FILE_LIMIT|IMAGE_FORMAT|VIDEO_[A-Z_]+|CLI_[A-Z0-9_-]+)$/.test(error.message)?error.message:stage;return stop(code==='FILE_LIMIT'||code==='IMAGE_FORMAT'||code==='VIDEO_CONTAINER'?'REJECT':'UNKNOWN',code);}};
 const ok=<T>(value:T):Result<T>=>({status:'COMPLETE',value});
 const stop=(status:'REJECT'|'ASK'|'UNKNOWN'|'FAILED',code:string):Result<never>=>({status,reason:{code,message:code}});
 export class ArchiveElement {
@@ -17,18 +18,18 @@ export class ArchiveElement {
     const element=ext==='.mp4'?this.video:this.image;
     const originalPath=join(dir,`original-${index}${ext}`);
     const target=join(dir,`derived-${index}${ext==='.mp4'?'.mp4':'.png'}`);
-    const hash=await root.invoke(()=>this.fixity.digest(source,this.policy.maxBytes));if(hash.status!=='COMPLETE')return hash;
+    const hash=await root.invokeOutcome(()=>mediaCall(()=>this.fixity.digest(source,this.policy.maxBytes),'SOURCE_READ'));if(hash.status!=='COMPLETE')return hash;
     return root.child(0,async child=>{
       const copied=await child.invoke(()=>copyFile(source,originalPath));if(copied.status!=='COMPLETE')return copied;
       const snapshot=await child.invoke(()=>this.fixity.digest(originalPath,this.policy.maxBytes));if(snapshot.status!=='COMPLETE')return snapshot;
       if(snapshot.value!==hash.value)return stop('UNKNOWN','SOURCE_CHANGED');
-      const info=await child.invoke(()=>element.inspect(originalPath));if(info.status!=='COMPLETE')return info;
+      const info=await child.invokeOutcome(()=>mediaCall(()=>element.inspect(originalPath),'SOURCE_METADATA'));if(info.status!=='COMPLETE')return info;
       if(info.value.seconds>this.policy.maxSeconds)return stop('REJECT','DURATION_LIMIT');
-      const converted=await child.invoke(()=>element.derive(originalPath,target,this.policy));if(converted.status!=='COMPLETE')return converted;
-      const output=await child.invoke(()=>element.inspect(target));if(output.status!=='COMPLETE')return output;
+      const converted=await child.invokeOutcome(()=>mediaCall(()=>element.derive(originalPath,target,this.policy),'MEDIA_CONVERSION'));if(converted.status!=='COMPLETE')return converted;
+      const output=await child.invokeOutcome(()=>mediaCall(()=>element.inspect(target),'DERIVATIVE_METADATA'));if(output.status!=='COMPLETE')return output;
       const maxW=ext==='.mp4'?this.policy.videoWidth:this.policy.imageEdge;const maxH=ext==='.mp4'?this.policy.videoHeight:this.policy.imageEdge;
-      if(output.value.width>maxW||output.value.height>maxH||Math.abs(output.value.width/output.value.height-info.value.width/info.value.height)>0.03)return stop('FAILED','DERIVATIVE_INVALID');
-      const decoded=await child.invoke(()=>element.verify(target));if(decoded.status!=='COMPLETE')return decoded;
+      if(output.value.width>maxW||output.value.height>maxH||Math.abs(output.value.width*info.value.height-output.value.height*info.value.width)>2*Math.max(info.value.width,info.value.height)||Math.abs(output.value.seconds-info.value.seconds)>Math.max(0.001,info.value.frameSeconds??0,output.value.frameSeconds??0)+0.001)return stop('FAILED','DERIVATIVE_INVALID');
+      const decoded=await child.invokeOutcome(()=>mediaCall(()=>element.verify(target),'DERIVATIVE_DECODE'));if(decoded.status!=='COMPLETE')return decoded;
       const original=await child.invoke(()=>this.fixity.digest(source,this.policy.maxBytes));if(original.status!=='COMPLETE')return original;
       if(original.value!==hash.value)return stop('UNKNOWN','SOURCE_CHANGED');
       const derivative=await child.invoke(()=>this.fixity.digest(target,this.policy.maxBytes));if(derivative.status!=='COMPLETE')return derivative;

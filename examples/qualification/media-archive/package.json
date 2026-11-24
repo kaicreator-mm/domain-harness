@@ -1,0 +1,16 @@
+{
+  "name": "dh-qualification-media-archive",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@kaicreator/domain-harness": "0.11.2",
+    "sharp": "0.34.1"
+  },
+  "scripts": {
+    "verify": "tsc -p tsconfig.json && node --unhandled-rejections=strict dist/media-archive/verify.js"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.7",
+    "typescript": "5.8.3"
+  }
+}
