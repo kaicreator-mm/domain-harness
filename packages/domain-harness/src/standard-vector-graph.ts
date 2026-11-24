@@ -82,9 +82,10 @@ export class VectorQueryElement {
         ? { matches: selected, visited, complete, truncated: false }
         : { matches: selected, visited, complete, truncated: true, truncationReason: reason };
     };
-    if (typedSource.length === 0) return finish(true);
+    const inputLength = typedSource.length;
+    if (inputLength === 0) return finish(true);
     if (topK === 0) return finish(false, 'RESULT_LIMIT');
-    for (let i = 0; i < typedSource.length; i += 1) {
+    for (let i = 0; i < inputLength; i += 1) {
       if (visited >= maxVisited) return finish(false, 'VISIT_LIMIT');
       const candidate = typedSource[i];
       if (!candidate || typeof candidate !== 'object') return invalid('VECTOR_CANDIDATE');
