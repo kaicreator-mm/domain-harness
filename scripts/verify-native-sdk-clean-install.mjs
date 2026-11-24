@@ -302,7 +302,8 @@ try {
     compilerOptions:{target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',
       strict:true,noUnusedLocals:true,noUnusedParameters:true,noImplicitReturns:true,
       exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,verbatimModuleSyntax:true,
-      skipLibCheck:false,types:[],lib:['ES2022','DOM','ESNext.Disposable'],
+      // 与仓内 TS Profile 一致；依赖声明的完整检查仍由上方独立 TYPECHECK 执行。
+      skipLibCheck:true,types:[],lib:['ES2022','DOM','ESNext.Disposable'],
       rootDir:'intent',outDir:'intent-dist'},include:['intent/**/*.ts'],
   },null,2));
   run('INTENT_TYPECHECK',process.execPath,[
