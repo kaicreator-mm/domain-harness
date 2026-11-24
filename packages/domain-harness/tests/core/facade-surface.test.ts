@@ -8,6 +8,7 @@ const expected = [
   'WorkflowElement',
   'XStateWorkflowElement',
   'BoundedQueryElement',
+  'BoundedExpressionElement',
   'SQLiteDatabaseElement',
   'SQLiteDatabaseError',
   'VectorQueryElement',
