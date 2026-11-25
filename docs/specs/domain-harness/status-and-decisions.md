@@ -2,7 +2,12 @@
 
 > [权威目录](./README.md) · Owner 现行新架构决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。本文件同时保留 R151 初审 REWORK 与后续 R160 通过的时间顺序；历史状态不得覆盖新收据。
 
-## R9 · 0.11.3 Product/L1 冻结及前置 SDK 专项
+## R14/R17 · 0.11.3 L2 正式冻结、T30 完成及 T31 候选
+
+- [#1724 R20](https://github.com/kaicreator-mm/domain-harness/issues/1724#issuecomment-7155041545) 前置专项完成；[R14](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7156092250) L2 FROZEN_SCOPE，#1730 合入 6086b5f2ddbb6e87998e8b06edbffda4d11524cc。
+- [T30 R17](https://github.com/kaicreator-mm/domain-harness/issues/1731#issuecomment-7156304129) 完成限定验收并合入 280924fa29b2548cf2028cc47110d834646585d6，R16 0/0/0、CI3191受审HEAD成功。T31 #1733 源码候选（LIFE-14）待独立审核和适用完整验证；T32–35 尚未通过，13 产品 Oracle NOT_RUN。未发布，不扩大旧资格。
+
+## R9 · 0.11.3 Product/L1 冻结及前置 SDK 专项（历史状态）
 
 - [R8 独立文档审核](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7145818088)：#1722 ACCEPT_SCOPED 0/0/0；#1723 ACCEPT_SCOPED 0/0/2（非阻断）。[R9 正式冻结](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7145891451)，train 合并 `162b77e08db2937792f1b163624b3b7502897f06`；实际五个文件 blob 与各自受审版本相同。
 - CORE-13 标准实现优先、CORE-14 Agent First, Human Compatible、QA-09 已生效。0.11.3 PRD/L1 的12需求/13 Oracle 正式冻结，R8 两项 P2 作为验收细化载于 R9；原受审 PRD 的“候选/待审”措辞是历史快照。
