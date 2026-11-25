@@ -22,14 +22,9 @@ export interface ClarificationField<E extends string, V> {
   readonly projectPrefill?: (observation: Known<E, V>) => Prefill | undefined;
   readonly candidates?: Readonly<{ current: Readonly<{ scope: string; revision: string }>; result: CandidatePreparation<unknown> }>;
 }
-/** 当前证据及决策对应的澄清准备。
- * @dhKind type
- * @dhCapability semantic-interaction
- */
-export type ClarificationPreparation<E extends string> =
-  Readonly<{ status: 'failed'; reason: 'LIMIT' | 'INVALID_MAPPING' | 'EVIDENCE_FAILED' | 'DECISION_FAILED' | 'CANDIDATE_FAILED' | 'STALE_CANDIDATES' | 'INVALID_PROMPT' | 'PREFILL_FAILED' }> |
-  Readonly<{ status: 'ready' }> |
-  Readonly<{ status: 'unresolved' | 'blocked' | 'conflict'; reason: 'DECISION' | 'FIELD_APPLICABILITY' | 'EVIDENCE_NOT_APPLICABLE' | 'NO_FIELDS' | 'NO_SUBMISSION' }> |
+/** 内部纯准备结果，保留原始组织与映射测试。 */
+export type RawClarificationPreparation<E extends string> =
+  Exclude<ClarificationPreparation<E>, { status: 'prompt' }> |
   Readonly<{ status: 'prompt'; prompt: InteractionPromptSpec; bindings: readonly Readonly<{ fieldId: string; key: E }>[] }>;
 /** 显式用户响应的映射结果。
  * @dhKind type
@@ -40,7 +35,7 @@ export type ClarificationResponse<E extends string> = Readonly<{ status: 'failed
   Readonly<{ status: 'values'; action: 'submit' | 'revise'; values: readonly Readonly<{ key: E; origin: 'user'; value: Value }>[] }>;
 
 const previewId = '00000000-0000-0000-0000-000000000000';
-const failure = (reason: Extract<ClarificationPreparation<string>, { status: 'failed' }>['reason']) => Object.freeze({ status: 'failed' as const, reason });
+const failure = (reason: Extract<RawClarificationPreparation<string>, { status: 'failed' }>['reason']) => Object.freeze({ status: 'failed' as const, reason });
 function choice(field: InteractionField): field is Choice { return field.kind === 'choice' || field.kind === 'multi-choice'; }
 function currentChoice(field: Choice, value: Value): boolean {
   const has = (id: unknown) => typeof id === 'string' && field.options.some(option => option.id === id);
@@ -49,11 +44,9 @@ function currentChoice(field: Choice, value: Value): boolean {
 }
 
 /** 根据本轮真实证据组织当前必要决策的原生语义表单，不执行领域规则或业务。
- * @dhKind function
- * @dhCapability semantic-interaction
  */
 export function buildClarification<K extends string, E extends string, V>(evidence: EvidenceResolution<E, V>, selection: DecisionSelection<K>,
-  template: Omit<InteractionPromptSpec, 'fields'>, fields: readonly ClarificationField<E, V>[]): ClarificationPreparation<E> {
+  template: Omit<InteractionPromptSpec, 'fields'>, fields: readonly ClarificationField<E, V>[]): RawClarificationPreparation<E> {
   if (!evidence.complete) return failure('EVIDENCE_FAILED');
   if (!selection.complete) return failure('DECISION_FAILED');
   if (selection.status === 'ready') return Object.freeze({ status: 'ready' });
@@ -68,7 +61,7 @@ export function buildClarification<K extends string, E extends string, V>(eviden
   for (const binding of fields) {
     let field = binding.field;
     const key = binding.evidenceKey, item = items.get(key);
-    if (!item || ids.has(field.id) || keys.has(key) || Object.hasOwn(field, 'prefill') ||
+    if (typeof key !== 'string' || !item || ids.has(field.id) || keys.has(key) || Object.hasOwn(field, 'prefill') ||
       !['yes', 'no', 'unknown', 'conflict'].includes(binding.applicable) || !['accepted', 'user'].includes(binding.confirmation)) return failure('INVALID_MAPPING');
     ids.add(field.id); keys.add(key);
     if (binding.applicable === 'no') continue;
@@ -116,10 +109,8 @@ export function buildClarification<K extends string, E extends string, V>(eviden
 }
 
 /** 只映射实际交互当前有效响应的显式字段；不写状态、不授予权威或权限。
- * @dhKind function
- * @dhCapability semantic-interaction
  */
-export function mapClarificationResponse<E extends string>(prepared: Extract<ClarificationPreparation<E>, { status: 'prompt' }>,
+export function mapClarificationResponse<E extends string>(prepared: Extract<RawClarificationPreparation<E>, { status: 'prompt' }>,
   current: InteractionPrompt, event: InteractionEvent): ClarificationResponse<E> {
   const invalid = Object.freeze({ status: 'failed' as const, reason: 'INVALID_RESPONSE' as const });
   if (event.kind !== 'response') return invalid;
@@ -135,4 +126,47 @@ export function mapClarificationResponse<E extends string>(prepared: Extract<Cla
     const values = Object.entries(response.values).map(([id, value]) => Object.freeze({ key: byId.get(id)!, origin: 'user' as const, value }));
     return Object.freeze({ status: 'values', action: response.action, values: Object.freeze(values) });
   } catch { return invalid; }
+}
+
+/** 当前证据及决策对应的澄清准备；表单仅由交互实例实际发布。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
+export type ClarificationPreparation<E extends string> =
+  Readonly<{ status: 'failed'; reason: 'LIMIT' | 'INVALID_MAPPING' | 'EVIDENCE_FAILED' | 'DECISION_FAILED' | 'CANDIDATE_FAILED' | 'STALE_CANDIDATES' | 'INVALID_PROMPT' | 'PREFILL_FAILED' }> |
+  Readonly<{ status: 'ready' }> |
+  Readonly<{ status: 'unresolved' | 'blocked' | 'conflict'; reason: 'DECISION' | 'FIELD_APPLICABILITY' | 'EVIDENCE_NOT_APPLICABLE' | 'NO_FIELDS' | 'NO_SUBMISSION' }> |
+  Readonly<{ status: 'prompt'; clarification: ClarificationElement<E> }>;
+
+const factoryToken = Symbol('clarification-factory');
+/** 仅供 SDK 内部交互边界读取真实不可变绑定，不从包根导出。 */
+export const clarificationData = Symbol('clarification-data');
+type Prepared<E extends string> = Extract<RawClarificationPreparation<E>, { status: 'prompt' }>;
+
+/** 一次不可变澄清准备；由 InteractionElement 绑定实际发布和有效响应，不拥有交互生命周期。
+ * @dhKind standard-element
+ * @dhCapability semantic-interaction
+ */
+export class ClarificationElement<E extends string> {
+  readonly #data: Prepared<E>;
+  // TS 声明发射会擦除 #private 的类型；保留受保护、仅类型层的键约束。
+  // 私有构造禁止继承；不生成运行时字段，也不公开绑定数据。
+  protected declare readonly bindingKeyType: E;
+  private constructor(token: typeof factoryToken, data: Prepared<E>) {
+    if (token !== factoryToken) throw new Error('INTERACTION_INVALID_PROMPT');
+    this.#data = data;
+    Object.freeze(this);
+  }
+
+  static prepare<K extends string, E extends string, V>(evidence: EvidenceResolution<E, V>, selection: DecisionSelection<K>,
+    template: Omit<InteractionPromptSpec, 'fields'>, fields: readonly ClarificationField<E, V>[]): ClarificationPreparation<E> {
+    const prepared = buildClarification(evidence, selection, template, fields);
+    if (prepared.status !== 'prompt') return prepared;
+    return Object.freeze({ status: 'prompt', clarification: new ClarificationElement(factoryToken, prepared) });
+  }
+
+  /** 固定实现读取私有字段；不调用外部对象所提供的同名方法。 */
+  static [clarificationData]<E extends string>(value: ClarificationElement<E>): Prepared<E> {
+    return value.#data;
+  }
 }

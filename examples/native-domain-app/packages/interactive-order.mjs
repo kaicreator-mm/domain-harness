@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { InteractionElement, JsonReader, resolveEvidence, selectNextDecision, prepareCandidates,
-  buildClarification, mapClarificationResponse, invalidateEvidence, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
+  ClarificationElement, invalidateEvidence, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
 import { runOrderPolicyIn } from './workflow-init.mjs';
 
 const ok=value=>({status:'COMPLETE',value});
@@ -37,16 +37,15 @@ function parse(input) {
 
 /** 当前正式策略由 Reference 应用选择；比较仅评估假设规则，不改变正式规则或授予权限。 */
 export function createOrderInteraction(input, onPrompt=()=>{}, budget={maxCalls:22,maxSteps:24,maxDepth:1}) {
-  let binding,prompt;
-  const interaction=new InteractionElement({onPrompt:p=>{prompt=p;return onPrompt(p,interaction);}});
+  const interaction=new InteractionElement({onPrompt});
   const decide=async(state,event,root,signal)=>{
     let choice=state.choice,invalidate;
     if(event.kind==='initial'){
       choice=parse(input);
       if(!choice)return stop('UNKNOWN','UNSUPPORTED_INPUT');
     }else{
-      const mapped=mapClarificationResponse(binding,prompt,event);
-      if(mapped.status==='failed')return stop('FAILED','INVALID_BINDING');
+      const mapped=event.clarification;
+      if(!mapped)return stop('FAILED','INVALID_BINDING');
       if(mapped.status==='other'){
         if((event.response.action==='text'||event.response.action==='revise')&&'text' in event.response){
           choice=parse(event.response.text);
@@ -105,15 +104,14 @@ export function createOrderInteraction(input, onPrompt=()=>{}, budget={maxCalls:
         cells:[entry.value.fact?.id??'Choose policy',String(entry.value.fact?.minimumTotal??'-')]}),
       comparisonLabels:['Policy','Minimum total'],
     },{maxVisited:16,maxReturned:16});
-    const built=buildClarification(evidence,selection,{decisionKey:key,title:key==='goal'?'Select order goal':'Select hypothetical policy',
+    const built=ClarificationElement.prepare(evidence,selection,{decisionKey:key,title:key==='goal'?'Select order goal':'Select hypothetical policy',
       actions:['submit','revise','text','no-fit','reject','cancel']},[
       {field:{id:key,label:key,kind:'choice',required:true,options:[],completeness:'incomplete'},
         evidenceKey:key,applicable:'yes',confirmation:'user',candidates:{current:context,result:candidates},
         ...(key==='goal'?{projectPrefill:observation=>({value:observation.value,source:observation.source.id+'@'+observation.source.revision})}:{})},
     ]);
     if(built.status!=='prompt')return stop('UNKNOWN','CLARIFICATION_'+built.status.toUpperCase());
-    binding=built;
-    return ok({kind:'clarify',state:{choice,round:state.round+1,revision},prompt:built.prompt,...(invalidate?{invalidate}:{})});
+    return ok({kind:'clarify',state:{choice,round:state.round+1,revision},clarification:built.clarification,...(invalidate?{invalidate}:{})});
   };
   // 应用拥有启动时机；构造未执行的意图不消耗业务预算。
   return {interaction,run:()=>runInteractiveRecognitionHandling(interaction,budget,{choice:{},round:0},decide,async(intent,context)=>{

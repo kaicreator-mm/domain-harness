@@ -3,8 +3,11 @@ import { StandardWorkflowSession } from './native-workflow-composition.js';
 import type { NativeWorkflowContext, WorkflowLimits } from './native-workflow-composition.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import { makePrompt, readResponse, responseData } from './interaction-protocol.js';
-import type { InteractionEvent, InteractionPrompt, InteractionPromptSpec, InteractionRecord, InteractionResponse, InteractionSubmitResult } from './interaction-protocol.js';
-export type { InteractionCandidate, InteractionField, InteractionEvent, InteractionPrompt, InteractionPromptSpec, InteractionRecord, InteractionResponse, InteractionSubmitResult } from './interaction-protocol.js';
+import type { InteractionEvent as RawInteractionEvent, InteractionPrompt, InteractionPromptSpec, InteractionRecord, InteractionResponse, InteractionSubmitResult } from './interaction-protocol.js';
+export type { InteractionCandidate, InteractionField, InteractionPrompt, InteractionPromptSpec, InteractionRecord, InteractionResponse, InteractionSubmitResult } from './interaction-protocol.js';
+
+import { ClarificationElement, clarificationData, mapClarificationResponse } from './standard-clarification.js';
+import type { ClarificationResponse, RawClarificationPreparation } from './standard-clarification.js';
 
 type Outcome<T> = StandardWorkflowOutcome<T>;
 type Maybe<T> = T | Promise<T>;
@@ -12,9 +15,18 @@ type Maybe<T> = T | Promise<T>;
  * @dhKind type
  * @dhCapability semantic-interaction
  */
-export type InteractionDecision<S, I> =
+export type InteractionDecision<S, I, E extends string = string> =
   | { readonly kind: 'ready'; readonly intent: I; readonly invalidate?: readonly string[] }
-  | { readonly kind: 'clarify'; readonly state: S; readonly prompt: InteractionPromptSpec; readonly invalidate?: readonly string[] };
+  | { readonly kind: 'clarify'; readonly state: S; readonly prompt: InteractionPromptSpec; readonly clarification?: never; readonly invalidate?: readonly string[] }
+  | { readonly kind: 'clarify'; readonly state: S; readonly clarification: ClarificationElement<E>; readonly prompt?: never; readonly invalidate?: readonly string[] };
+/** 真实分析事件；只有绑定路径交付当前实际用户响应的领域键映射。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
+export type InteractionEvent<E extends string = string> =
+  | { readonly kind: 'initial'; readonly records: readonly InteractionRecord[]; readonly clarification?: never }
+  | { readonly kind: 'response'; readonly response: InteractionResponse; readonly records: readonly InteractionRecord[]; readonly clarification?: never }
+  | { readonly kind: 'response'; readonly response: InteractionResponse; readonly records: readonly InteractionRecord[]; readonly clarification: Exclude<ClarificationResponse<E>, { status: 'failed' }> };
 /** 同一交互根中的分析、处理及取消信号。
  * @dhKind type
  * @dhCapability semantic-interaction
@@ -22,7 +34,7 @@ export type InteractionDecision<S, I> =
 export interface InteractionScope {
   readonly root: NativeWorkflowContext;
   readonly signal: AbortSignal;
-  resolve<S, I>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>): Promise<Outcome<I>>;
+  resolve<S, I, E extends string = string>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent<E>, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I, E>>>): Promise<Outcome<I>>;
   step<T>(action: () => Maybe<Outcome<T>>): Promise<Outcome<T>>;
 }
 function stop(status: 'REJECT' | 'FAILED', code: string): Outcome<never> {
@@ -43,14 +55,14 @@ interface Pending {
 export class InteractionElement {
   readonly #id = randomUUID();
   readonly #abort = new AbortController();
-  readonly #notify: ((prompt: InteractionPrompt) => void) | undefined;
+  readonly #notify: ((prompt: InteractionPrompt, interaction: InteractionElement) => void) | undefined;
   #phase: 'new' | 'running' | 'terminal' = 'new';
   #revision = 0;
   #pending: Pending | undefined;
   #records: InteractionRecord[] = [];
   #resolving = false;
   #active = new Set<Promise<unknown>>();
-  constructor(options?: { readonly onPrompt?: (prompt: InteractionPrompt) => void }) { this.#notify = options?.onPrompt; }
+  constructor(options?: { readonly onPrompt?: (prompt: InteractionPrompt, interaction: InteractionElement) => void }) { this.#notify = options?.onPrompt; }
 
   current(): InteractionPrompt | undefined { return this.#pending?.captured ? undefined : this.#pending?.prompt; }
   cancel(): void {
@@ -87,7 +99,7 @@ export class InteractionElement {
       } };
       this.#pending = pending;
       try {
-        const returned: unknown = this.#notify?.(prompt);
+        const returned: unknown = this.#notify?.(prompt, this);
         if (returned !== undefined) {
           // void 回调允许 async；立即观察拒绝，但不等待可能依赖自身 run 的通知。
           void Promise.resolve(returned).catch(() => undefined);
@@ -105,20 +117,33 @@ export class InteractionElement {
     this.#records = this.#records.map(record => record.valid && (keys === undefined || keys.includes(record.response.decisionKey))
       ? Object.freeze({ response: record.response, valid: false }) : record);
   }
-  #event(response?: InteractionResponse): InteractionEvent {
+  #event(response?: InteractionResponse): RawInteractionEvent {
     const records = Object.freeze([...this.#records]);
     return response ? Object.freeze({ kind: 'response', response, records }) : Object.freeze({ kind: 'initial', records });
   }
-  async #resolve<S, I>(root: NativeWorkflowContext, initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>): Promise<Outcome<I>> {
+  async #resolve<S, I, E extends string = string>(root: NativeWorkflowContext, initial: S, decide: (state: Readonly<S>, event: InteractionEvent<E>, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I, E>>>): Promise<Outcome<I>> {
     if (this.#phase !== 'running') return stop('FAILED', 'INTERACTION_NOT_RUNNING');
     if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
     if (this.#resolving) return stop('FAILED', 'INTERACTION_RESOLVE_ACTIVE');
     this.#resolving = true;
     try {
       let state = initial, event = this.#event();
+      let occurrence: { readonly prepared: Extract<RawClarificationPreparation<E>, { status: 'prompt' }>; readonly prompt: InteractionPrompt } | undefined;
       for (;;) {
         if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
-        const result = await root.invokeOutcome(() => decide(state, event, root, this.#abort.signal));
+        const result = await root.invokeOutcome(() => {
+          if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
+          // 映射仅在本次分析实际预留之后，使用上一次真实发布的局部不可变绑定。
+          const bound = occurrence;
+          occurrence = undefined;
+          if (bound) {
+            const mapped = mapClarificationResponse(bound.prepared, bound.prompt, event);
+            if (mapped.status === 'failed' || event.kind !== 'response') return stop('FAILED', 'INTERACTION_CLARIFICATION_BINDING_FAILED');
+            const delivered: InteractionEvent<E> = Object.freeze({ ...event, clarification: mapped });
+            return decide(state, delivered, root, this.#abort.signal);
+          }
+          return decide(state, event, root, this.#abort.signal);
+        });
         if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
         if (result.status !== 'COMPLETE') return result;
         const decision = result.value;
@@ -127,7 +152,21 @@ export class InteractionElement {
         state = decision.state;
         // 无法发布的表单在等待预留之前拒绝，不额外消耗等待额度。
         let prompt: InteractionPrompt;
-        try { prompt = makePrompt(decision.prompt, this.#id, ++this.#revision); }
+        try {
+          const raw = Object.hasOwn(decision, 'prompt'), bound = Object.hasOwn(decision, 'clarification');
+          if (raw === bound) throw new Error('INTERACTION_INVALID_PROMPT');
+          if (bound) {
+            const chosen = decision.clarification;
+            if (!chosen) throw new Error('INTERACTION_INVALID_PROMPT');
+            const prepared = ClarificationElement[clarificationData](chosen);
+            prompt = makePrompt(prepared.prompt, this.#id, ++this.#revision);
+            occurrence = { prepared, prompt };
+          } else {
+            const chosen = decision.prompt;
+            if (!chosen) throw new Error('INTERACTION_INVALID_PROMPT');
+            prompt = makePrompt(chosen, this.#id, ++this.#revision);
+          }
+        }
         catch { return stop('FAILED', 'INTERACTION_INVALID_PROMPT'); }
         if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
         const response = await root.invokeOutcome(() => this.#wait(prompt));
@@ -157,7 +196,7 @@ export class InteractionElement {
       return await new StandardWorkflowSession(limits).run(async root => {
         const scope: InteractionScope = Object.freeze({
           root, signal: this.#abort.signal,
-          resolve: <S, I>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>) =>
+          resolve: <S, I, E extends string = string>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent<E>, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I, E>>>) =>
             this.#track(this.#resolve(root, initial, decide)),
           step: <R>(action: () => Maybe<Outcome<R>>) => {
             if (this.#phase !== 'running') return Promise.resolve(stop('FAILED', 'INTERACTION_NOT_RUNNING'));

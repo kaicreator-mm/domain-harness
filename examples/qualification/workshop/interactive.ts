@@ -1,5 +1,5 @@
-import { InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, buildClarification, mapClarificationResponse, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
-import type { InteractionPrompt, InteractionEvent, InteractionDecision, ClarificationPreparation, EvidenceObservation, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
+import { InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, ClarificationElement, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
+import type { InteractionPrompt, InteractionEvent, InteractionDecision, EvidenceObservation, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
 import { WorkshopElement, validateTasks, type Task, type Policy, type Plan, type SolverElement } from './plan.js';
 
 type Outcome<T> = StandardWorkflowOutcome<T>;
@@ -28,8 +28,7 @@ export function scheduleInteractively(limits:WorkflowLimits, input:ScheduleInput
   // The caller supplies a trusted immutable snapshot; the current policy is never inferred from scenarios.
   const policies=new Map(facts.scenarios.slice(0,16).map(p=>[p.revision,p]));
   const scopeName='workshop/current';
-  let prepared:Extract<ClarificationPreparation<Key>,{status:'prompt'}>|undefined;
-  const decide=(state:Readonly<State>,event:InteractionEvent):Outcome<InteractionDecision<State,Intent>>=>{
+  const decide=(state:Readonly<State>,event:InteractionEvent<Key>):Outcome<InteractionDecision<State,Intent,Key>>=>{
     if(!current) return stop('UNKNOWN','CURRENT_CALENDAR_UNKNOWN');
     if(policies.size!==facts.scenarios.length||facts.scenarios.length>16) return stop('REJECT','SCENARIO_SET_INVALID');
     const valid=validateTasks(facts.tasks,current);
@@ -48,10 +47,8 @@ export function scheduleInteractively(limits:WorkflowLimits, input:ScheduleInput
         selected=parsed;
       }
     } else {
-      const prompt=lastPrompt;
-      if(!prepared||!prompt) return stop('FAILED','CLARIFICATION_BINDING');
-      const mapped=mapClarificationResponse(prepared,prompt,event);
-      if(mapped.status==='failed')return stop('FAILED','CLARIFICATION_BINDING');
+      const mapped=event.clarification;
+      if(!mapped)return stop('FAILED','CLARIFICATION_BINDING');
       if(mapped.status==='other') {
         if(event.response.action==='revise'&&'text' in event.response) {
           const next=parse(event.response.text);
@@ -111,7 +108,7 @@ export function scheduleInteractively(limits:WorkflowLimits, input:ScheduleInput
       project:entry=>({label:entry.id,...(key==='scenario'?{reason:'Hypothetical calendar, not current facts'}:{}),priority:0,
         cells:[entry.value?.revision??'Choose a scenario',String(entry.value?.horizon??'-'),entry.value?JSON.stringify(entry.value.closed):'-']}),
     },{maxVisited:16,maxReturned:16});
-    const built=buildClarification(evidence,selection,{decisionKey:key,title:key==='scenario'?'Select hypothetical calendar':'Select scheduling goal',
+    const built=ClarificationElement.prepare(evidence,selection,{decisionKey:key,title:key==='scenario'?'Select hypothetical calendar':'Select scheduling goal',
       ...(state.proposal?{description:`Computed ${state.proposal.revision}: makespan ${state.proposal.makespan}; choose the next planning goal`}:{}),actions:['submit','revise','no-fit','cancel']},[
       {field:{id:key,kind:'choice',label:key,required:true,options:[],completeness:'incomplete'},evidenceKey:key,applicable:'yes',confirmation:'user',candidates:{current:candidateContext,result:candidates}},
     ]);
@@ -121,19 +118,16 @@ export function scheduleInteractively(limits:WorkflowLimits, input:ScheduleInput
       return ok({kind:'ready',intent:{goal:selected.goal,policy},...(invalidate?{invalidate}:{})});
     }
     if(built.status!=='prompt')return stop(built.status==='failed'?'FAILED':'UNKNOWN','CLARIFICATION_'+built.status.toUpperCase());
-    prepared=built;
-    return ok({kind:'clarify',state:{...state,choice:selected,round:state.round+1},prompt:built.prompt,...(invalidate?{invalidate}:{})});
+    return ok({kind:'clarify',state:{...state,choice:selected,round:state.round+1},clarification:built.clarification,...(invalidate?{invalidate}:{})});
   };
-  // Capture the actual A prompt before notifying the UI; retain only this invocation's binding.
-  let lastPrompt:InteractionPrompt|undefined;
-  const interaction=new InteractionElement({onPrompt:p=>{lastPrompt=p;return options.onPrompt?.(p,interaction);}});
-  const result=runInteractiveRecognitionHandling<State,Intent,ScheduleResult>(interaction,limits,{choice:{},round:0},decide,async(intent,scope)=>{
+  const interaction=new InteractionElement(options.onPrompt===undefined?undefined:{onPrompt:options.onPrompt});
+  const result=runInteractiveRecognitionHandling<State,Intent,ScheduleResult,Key>(interaction,limits,{choice:{},round:0},decide,async(intent,scope)=>{
     if(scope.signal.aborted)return stop('REJECT','CANCELLED');
     const first=await new WorkshopElement(solver,intent.policy).runIn(scope.root,facts.tasks,scope.signal);
     if(first.status!=='COMPLETE')return first;
     if(!options.review)return ok({goal:intent.goal,plan:first.value});
     // Explicitly requested review of a computed proposal, not a mandatory repeated confirmation.
-    const next=await scope.resolve<State,Intent>({choice:{},round:100,proposal:first.value},decide);
+    const next=await scope.resolve<State,Intent,Key>({choice:{},round:100,proposal:first.value},decide);
     if(next.status!=='COMPLETE')return next;
     if(scope.signal.aborted)return stop('REJECT','CANCELLED');
     if(next.value.policy===intent.policy)return ok({goal:next.value.goal,plan:first.value});

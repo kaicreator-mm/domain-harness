@@ -476,18 +476,12 @@
 
 [适用场景、限制与示例](capabilities/semantic-interaction.md)
 
-### buildClarification
-
-- 分类：`function`；声明：`dist/standard-clarification.d.ts`
-- 职责：根据本轮真实证据组织当前必要决策的原生语义表单，不执行领域规则或业务。
-- 调用签名：`<K extends string, E extends string, V>(evidence: EvidenceResolution<E, V>, selection: DecisionSelection<K>, template: Omit<InteractionPromptSpec, "fields">, fields: readonly ClarificationField<E, V>[]): ClarificationPreparation<E>`
-
 ### CandidateAssessment
 
 - 分类：`type`；声明：`dist/standard-candidates.d.ts`
 - 职责：领域对候选合法性的判断。
 - 类型声明：`type CandidateAssessment = Readonly<{ status: 'eligible'; }> \| Readonly<{ status: 'excluded' \| 'unknown' \| 'failed'; reason: string; }>`
-- `CandidateAssessment#status` · contract property：`"unknown" \| "failed" \| "eligible" \| "excluded"`
+- `CandidateAssessment#status` · contract property：`"failed" \| "unknown" \| "eligible" \| "excluded"`
 
 ### CandidateEntry
 
@@ -505,7 +499,7 @@
 - 职责：有限候选组织、完整性及显示内容。
 - 类型声明：`type CandidatePreparation<T> = Readonly<{ status: 'failed'; complete: false; reason: FailureCode; }> \| Readonly<{ status: 'available' \| 'empty' \| 'unknown'; complete: boolean; visited: number; scope: string; revision: string; entries: readonly CandidateEntry<T>[]; options: readonly InteractionCandidate[]; comparison: Comparison; issues: readonly Readonly<{ id: string; status: 'excluded' \| 'unknown'; reason: string; }>[]; incompleteReasons: readonly IncompleteReason[]; }>`
 - `CandidatePreparation#complete` · contract property：`boolean`
-- `CandidatePreparation#status` · contract property：`"unknown" \| "failed" \| "available" \| "empty"`
+- `CandidatePreparation#status` · contract property：`"failed" \| "unknown" \| "available" \| "empty"`
 
 ### CandidateProjection
 
@@ -526,7 +520,14 @@
 - 类型声明：`type CandidateSource<T> = Readonly<{ scope: string; revision: string; }> & (Readonly<{ status: 'complete' \| 'incomplete'; entries: readonly CandidateEntry<T>[]; }> \| Readonly<{ status: 'failed'; }>)`
 - `CandidateSource#revision` · contract property：`string`
 - `CandidateSource#scope` · contract property：`string`
-- `CandidateSource#status` · contract property：`"complete" \| "incomplete" \| "failed"`
+- `CandidateSource#status` · contract property：`"failed" \| "complete" \| "incomplete"`
+
+### ClarificationElement
+
+- 分类：`standard-element`；声明：`dist/standard-clarification.d.ts`
+- 职责：一次不可变澄清准备；由 InteractionElement 绑定实际发布和有效响应，不拥有交互生命周期。
+- 获取方式：仅 factory / 不可直接 new
+- `ClarificationElement.prepare` · static method：`<K extends string, E extends string, V>(evidence: EvidenceResolution<E, V>, selection: DecisionSelection<K>, template: Omit<InteractionPromptSpec, "fields">, fields: readonly ClarificationField<E, V>[]) => ClarificationPreparation<E>`；调用：`<K extends string, E extends string, V>(evidence: EvidenceResolution<E, V>, selection: DecisionSelection<K>, template: Omit<InteractionPromptSpec, "fields">, fields: readonly ClarificationField<E, V>[]): ClarificationPreparation<E>`
 
 ### ClarificationField
 
@@ -543,16 +544,16 @@
 ### ClarificationPreparation
 
 - 分类：`type`；声明：`dist/standard-clarification.d.ts`
-- 职责：当前证据及决策对应的澄清准备。
-- 类型声明：`type ClarificationPreparation<E extends string> = Readonly<{ status: 'failed'; reason: 'LIMIT' \| 'INVALID_MAPPING' \| 'EVIDENCE_FAILED' \| 'DECISION_FAILED' \| 'CANDIDATE_FAILED' \| 'STALE_CANDIDATES' \| 'INVALID_PROMPT' \| 'PREFILL_FAILED'; }> \| Readonly<{ status: 'ready'; }> \| Readonly<{ status: 'unresolved' \| 'blocked' \| 'conflict'; reason: 'DECISION' \| 'FIELD_APPLICABILITY' \| 'EVIDENCE_NOT_APPLICABLE' \| 'NO_FIELDS' \| 'NO_SUBMISSION'; }> \| Readonly<{ status: 'prompt'; prompt: InteractionPromptSpec; bindings: readonly Readonly<{ fieldId: string; key: E; }>[]; }>`
-- `ClarificationPreparation#status` · contract property：`"ready" \| "conflict" \| "failed" \| "prompt" \| "unresolved" \| "blocked"`
+- 职责：当前证据及决策对应的澄清准备；表单仅由交互实例实际发布。
+- 类型声明：`type ClarificationPreparation<E extends string> = Readonly<{ status: 'failed'; reason: 'LIMIT' \| 'INVALID_MAPPING' \| 'EVIDENCE_FAILED' \| 'DECISION_FAILED' \| 'CANDIDATE_FAILED' \| 'STALE_CANDIDATES' \| 'INVALID_PROMPT' \| 'PREFILL_FAILED'; }> \| Readonly<{ status: 'ready'; }> \| Readonly<{ status: 'unresolved' \| 'blocked' \| 'conflict'; reason: 'DECISION' \| 'FIELD_APPLICABILITY' \| 'EVIDENCE_NOT_APPLICABLE' \| 'NO_FIELDS' \| 'NO_SUBMISSION'; }> \| Readonly<{ status: 'prompt'; clarification: ClarificationElement<E>; }>`
+- `ClarificationPreparation#status` · contract property：`"failed" \| "ready" \| "conflict" \| "unresolved" \| "blocked" \| "prompt"`
 
 ### ClarificationResponse
 
 - 分类：`type`；声明：`dist/standard-clarification.d.ts`
 - 职责：显式用户响应的映射结果。
 - 类型声明：`type ClarificationResponse<E extends string> = Readonly<{ status: 'failed'; reason: 'INVALID_RESPONSE'; }> \| Readonly<{ status: 'other'; action: InteractionResponse['action']; }> \| Readonly<{ status: 'values'; action: 'submit' \| 'revise'; values: readonly Readonly<{ key: E; origin: 'user'; value: Value; }>[]; }>`
-- `ClarificationResponse#status` · contract property：`"values" \| "failed" \| "other"`
+- `ClarificationResponse#status` · contract property：`"failed" \| "other" \| "values"`
 
 ### DecisionCondition
 
@@ -624,7 +625,7 @@
 - 分类：`type`；声明：`dist/standard-evidence.d.ts`
 - 职责：领域声明的证据键及接受来源。
 - 类型声明：`interface EvidenceRequirement<K extends string> { readonly key: K; readonly accepts: readonly Exclude<EvidenceOrigin, 'recommendation'>[]; }`
-- `EvidenceRequirement#accepts` · contract property readonly：`readonly ("authority" \| "user" \| "derived" \| "default")[]`
+- `EvidenceRequirement#accepts` · contract property readonly：`readonly ("user" \| "authority" \| "derived" \| "default")[]`
 - `EvidenceRequirement#key` · contract property readonly：`K`
 
 ### EvidenceResolution
@@ -649,7 +650,7 @@
 
 - 分类：`type`；声明：`dist/standard-interaction.d.ts`
 - 职责：领域分析的继续澄清或已确定意图。
-- 类型声明：`type InteractionDecision<S, I> = { readonly kind: 'ready'; readonly intent: I; readonly invalidate?: readonly string[]; } \| { readonly kind: 'clarify'; readonly state: S; readonly prompt: InteractionPromptSpec; readonly invalidate?: readonly string[]; }`
+- 类型声明：`type InteractionDecision<S, I, E extends string = string> = { readonly kind: 'ready'; readonly intent: I; readonly invalidate?: readonly string[]; } \| { readonly kind: 'clarify'; readonly state: S; readonly prompt: InteractionPromptSpec; readonly clarification?: never; readonly invalidate?: readonly string[]; } \| { readonly kind: 'clarify'; readonly state: S; readonly clarification: ClarificationElement<E>; readonly prompt?: never; readonly invalidate?: readonly string[]; }`
 - `InteractionDecision#invalidate` · contract property readonly optional：`readonly string[]`
 - `InteractionDecision#kind` · contract property readonly：`"ready" \| "clarify"`
 
@@ -658,7 +659,7 @@
 - 分类：`standard-element`；声明：`dist/standard-interaction.d.ts`
 - 职责：一个逻辑意图的运行期交互；领域判断与授权始终由应用负责。
 - 获取方式：public constructor / new
-- 构造声明：`(options?: { readonly onPrompt?: (prompt: InteractionPrompt) => void; } \| undefined): InteractionElement`
+- 构造声明：`(options?: { readonly onPrompt?: (prompt: InteractionPrompt, interaction: InteractionElement) => void; } \| undefined): InteractionElement`
 - `InteractionElement#cancel` · instance method：`() => void`；调用：`(): void`
 - `InteractionElement#current` · instance method：`() => InteractionPrompt \| undefined`；调用：`(): InteractionPrompt \| undefined`
 - `InteractionElement#run` · instance method：`<T>(limits: WorkflowLimits, work: (scope: InteractionScope) => Maybe<Outcome<T>>) => Promise<Outcome<T>>`；调用：`<T>(limits: WorkflowLimits, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>>`
@@ -666,9 +667,10 @@
 
 ### InteractionEvent
 
-- 分类：`type`；声明：`dist/interaction-protocol.d.ts`
-- 职责：领域分析收到的初始或实际响应事件。
-- 类型声明：`type InteractionEvent = ({ readonly kind: 'initial'; } \| { readonly kind: 'response'; readonly response: InteractionResponse; }) & { readonly records: readonly InteractionRecord[]; }`
+- 分类：`type`；声明：`dist/standard-interaction.d.ts`
+- 职责：真实分析事件；只有绑定路径交付当前实际用户响应的领域键映射。
+- 类型声明：`type InteractionEvent<E extends string = string> = { readonly kind: 'initial'; readonly records: readonly InteractionRecord[]; readonly clarification?: never; } \| { readonly kind: 'response'; readonly response: InteractionResponse; readonly records: readonly InteractionRecord[]; readonly clarification?: never; } \| { readonly kind: 'response'; readonly response: InteractionResponse; readonly records: readonly InteractionRecord[]; readonly clarification: Exclude<ClarificationResponse<E>, { status: 'failed'; }>; }`
+- `InteractionEvent#clarification` · contract property readonly optional：`Readonly<{ status: "other"; action: InteractionResponse["action"]; }> \| Readonly<{ status: "values"; action: "submit" \| "revise"; values: readonly Readonly<{ key: E; origin: "user"; value: Value; }>[]; }>`
 - `InteractionEvent#kind` · contract property readonly：`"initial" \| "response"`
 - `InteractionEvent#records` · contract property readonly：`readonly InteractionRecord[]`
 
@@ -729,8 +731,8 @@
 
 - 分类：`type`；声明：`dist/standard-interaction.d.ts`
 - 职责：同一交互根中的分析、处理及取消信号。
-- 类型声明：`interface InteractionScope { readonly root: NativeWorkflowContext; readonly signal: AbortSignal; resolve<S, I>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>): Promise<Outcome<I>>; step<T>(action: () => Maybe<Outcome<T>>): Promise<Outcome<T>>; }`
-- `InteractionScope#resolve` · contract method：`<S, I>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>) => Promise<Outcome<I>>`；调用：`<S, I>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>): Promise<Outcome<I>>`
+- 类型声明：`interface InteractionScope { readonly root: NativeWorkflowContext; readonly signal: AbortSignal; resolve<S, I, E extends string = string>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent<E>, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I, E>>>): Promise<Outcome<I>>; step<T>(action: () => Maybe<Outcome<T>>): Promise<Outcome<T>>; }`
+- `InteractionScope#resolve` · contract method：`<S, I, E extends string = string>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent<E>, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I, E>>>) => Promise<Outcome<I>>`；调用：`<S, I, E extends string = string>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent<E>, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I, E>>>): Promise<Outcome<I>>`
 - `InteractionScope#root` · contract property readonly：`NativeWorkflowContext`
 - `InteractionScope#signal` · contract property readonly：`AbortSignal`
 - `InteractionScope#step` · contract method：`<T>(action: () => Maybe<Outcome<T>>) => Promise<Outcome<T>>`；调用：`<T>(action: () => Maybe<Outcome<T>>): Promise<Outcome<T>>`
@@ -748,12 +750,6 @@
 - 职责：当前意图的显式有限依赖；缺少声明时有变更即保守失效，空列表表示无依赖。
 - 调用签名：`<K extends string>(keys: readonly K[], changed: readonly K[], declarations: readonly EvidenceDependency<K>[], limits: Readonly<{ maxItems: number; maxDependencies: number; }>): EvidenceInvalidation<K>`
 
-### mapClarificationResponse
-
-- 分类：`function`；声明：`dist/standard-clarification.d.ts`
-- 职责：只映射实际交互当前有效响应的显式字段；不写状态、不授予权威或权限。
-- 调用签名：`<E extends string>(prepared: Readonly<{ status: "prompt"; prompt: InteractionPromptSpec; bindings: readonly Readonly<{ fieldId: string; key: E; }>[]; }>, current: InteractionPrompt, event: InteractionEvent): ClarificationResponse<E>`
-
 ### prepareCandidates
 
 - 分类：`function`；声明：`dist/standard-candidates.d.ts`
@@ -770,7 +766,7 @@
 
 - 分类：`function`；声明：`dist/standard-interactive-recognition.d.ts`
 - 职责：同根识别兼分析、必要澄清、处理；复杂业务仍可直接组合原 InteractionScope。
-- 调用签名：`<S, I, O>(interaction: InteractionElement, limits: WorkflowLimits, initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>, handle: (intent: I, scope: InteractionScope) => Maybe<Outcome<O>>): Promise<Outcome<O>>`
+- 调用签名：`<S, I, O, E extends string = string>(interaction: InteractionElement, limits: WorkflowLimits, initial: S, decide: (state: Readonly<S>, event: InteractionEvent<E>, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I, E>>>, handle: (intent: I, scope: InteractionScope) => Maybe<Outcome<O>>): Promise<Outcome<O>>`
 
 ### selectNextDecision
 

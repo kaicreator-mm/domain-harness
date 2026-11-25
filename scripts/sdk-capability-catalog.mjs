@@ -44,7 +44,7 @@ function accessFor(name,decl) {
  return name==='NativeWorkflowContext'?'borrowed':'public';
 }
 function memberRows(checker,type,dir,location,scope,all=false){
- return checker.getPropertiesOfType(type).filter(s=>s.name!=='prototype'&&(s.declarations?.some(d=>own(dir,d)&&visible(d))||(scope==='contract'&&location.name?.getText()==='WorkflowRoutes'&&!s.declarations))).map(s=>{
+ return checker.getPropertiesOfType(type).filter(s=>s.name!=='prototype'&&!(scope==='static'&&location.name?.getText()==='ClarificationElement'&&memberName(s)==='[clarificationData]')&&(s.declarations?.some(d=>own(dir,d)&&visible(d))||(scope==='contract'&&location.name?.getText()==='WorkflowRoutes'&&!s.declarations))).map(s=>{
    const d=s.declarations?.find(x=>own(dir,x)&&visible(x))??location;
    const mt=checker.getTypeOfSymbolAtLocation(s,d??location);
    const nonnull=checker.getNonNullableType(mt);
@@ -76,7 +76,7 @@ export function inventory(entry=join(sdk,'src/index.ts'),{requireTags=true}={}) 
    if(isClass){
     row.access=accessFor(a.name,d);
     const stat=checker.getTypeOfSymbolAtLocation(s,d);
-    row.signatures=stat.getConstructSignatures().map(x=>signature(checker,x));
+    row.signatures=row.access==='factory'?[]:stat.getConstructSignatures().map(x=>signature(checker,x));
     row.members=[...memberRows(checker,checker.getDeclaredTypeOfSymbol(s),dir,d,'instance',true),...memberRows(checker,stat,dir,d,'static',true)];
    }else if(isFunction){
     row.signatures=checker.getTypeOfSymbolAtLocation(s,d).getCallSignatures().map(x=>signature(checker,x));

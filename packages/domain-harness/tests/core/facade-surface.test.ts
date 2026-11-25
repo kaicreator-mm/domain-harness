@@ -29,8 +29,7 @@ const expected = [
   'invalidateEvidence',
   'selectNextDecision',
   'prepareCandidates',
-  'buildClarification',
-  'mapClarificationResponse',
+  'ClarificationElement',
   'runInteractiveRecognitionHandling',
 ].sort();
 

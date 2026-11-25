@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildClarification, mapClarificationResponse } from '../../src/standard-clarification.js';
-import type { ClarificationField, ClarificationPreparation } from '../../src/standard-clarification.js';
+import type { ClarificationField, RawClarificationPreparation } from '../../src/standard-clarification.js';
 import { resolveEvidence, invalidateEvidence } from '../../src/standard-evidence.js';
 import type { EvidenceObservation, EvidenceRequirement } from '../../src/standard-evidence.js';
 import { selectNextDecision } from '../../src/standard-decision.js';
@@ -30,7 +30,7 @@ const choice = <K extends string>(key: K, ids: readonly string[], overrides: Par
 const next = select([decision('choose')]);
 const req = [{ key: 'x', accepts: ['user'] }] as const;
 const missing = resolve(req, []);
-function prompt<K extends string>(result: ClarificationPreparation<K>) { if (result.status !== 'prompt') assert.fail(result.status); return result; }
+function prompt<K extends string>(result: RawClarificationPreparation<K>) { if (result.status !== 'prompt') assert.fail(result.status); return result; }
 function event(response: InteractionResponse, valid = true): InteractionEvent { return { kind: 'response', response, records: [{ response, valid }] }; }
 const ok = <T>(value: T): StandardWorkflowOutcome<T> => ({ status: 'COMPLETE', value });
 const envelope = (p: InteractionPrompt) => ({ intentId: p.intentId, revision: p.revision, decisionKey: p.decisionKey });
@@ -169,7 +169,7 @@ test('媒体：只问第二件，一次选择确定配对，和固定逐项基�
     type K = 'scope' | 'first' | 'second' | 'policy';
     const requirements: EvidenceRequirement<K>[] = [{ key: 'scope', accepts: ['authority'] }, { key: 'first', accepts: ['user'] }, { key: 'second', accepts: ['user'] }, { key: 'policy', accepts: ['authority'] }];
     const observations: EvidenceObservation<K, string>[] = [known<K>('scope', 'tenant-a', 'authority'), known<K>('first', 'photo-a', 'user'), known<K>('policy', 'archive-v1', 'authority'), known<K>('second', 'video-b', complete ? 'user' : 'recommendation')];
-    let prepared: Extract<ClarificationPreparation<K>, { status: 'prompt' }> | undefined, currentPrompt: InteractionPrompt | undefined;
+    let prepared: Extract<RawClarificationPreparation<K>, { status: 'prompt' }> | undefined, currentPrompt: InteractionPrompt | undefined;
     const asked: string[] = [];
     const e = new InteractionElement({ onPrompt: p => { currentPrompt = p; asked.push(...p.fields.map(f => f.id));
       assert.equal(e.submit({ ...envelope(p), action: 'submit', values: { second: 'video-b', scope: 'wrong' } }).accepted, false);
@@ -250,7 +250,7 @@ test('维修：实际前置选择后增加情景字段，revision拒旧，修订
   type K = 'goal' | 'calendar' | 'scenario';
   const requirements: EvidenceRequirement<K>[] = [{ key: 'goal', accepts: ['user'] }, { key: 'calendar', accepts: ['authority'] }, { key: 'scenario', accepts: ['user'] }];
   let observations: EvidenceObservation<K, string>[] = [known<K>('calendar', 'shop-v2', 'authority')];
-  let prepared: Extract<ClarificationPreparation<K>, { status: 'prompt' }> | undefined, p1: InteractionPrompt | undefined, p2: InteractionPrompt | undefined;
+  let prepared: Extract<RawClarificationPreparation<K>, { status: 'prompt' }> | undefined, p1: InteractionPrompt | undefined, p2: InteractionPrompt | undefined;
   const asked: string[][] = [];
   const e = new InteractionElement({ onPrompt: p => { asked.push(p.fields.map(f => f.id));
     if (!p1) { p1 = p; assert.equal(e.submit({ ...envelope(p), action: 'submit', values: { goal: 'what-if' } }).accepted, true); }

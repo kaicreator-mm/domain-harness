@@ -1,4 +1,4 @@
-// Reviewed independent public contract: R75 old API inventory. Update only with approved API delta.
+// Reviewed independent public contract: R75 accepted target API inventory. Update only with approved API delta.
 export const expectedClasses = {
  KernelLifecycle:['kdp-element','public','start','execute','run','[Symbol.asyncDispose]'],
  WorkflowElement:['abstract-contract','abstract','run'],
@@ -15,10 +15,11 @@ export const expectedClasses = {
  BoundedExpressionElement:['standard-element','public','evaluate'],
  CliElement:['standard-element','public','run'],
  InteractionElement:['standard-element','public','current','cancel','submit','run'],
+ ClarificationElement:['standard-element','factory','.prepare'],
 };
 export const expectedFunctions = ['routeWorkflowOutcome','readJson','readYaml','writeJson','writeYaml',
  'runRecognitionHandling','resolveEvidence','invalidateEvidence','selectNextDecision','prepareCandidates',
- 'buildClarification','mapClarificationResponse','runInteractiveRecognitionHandling'];
+ 'runInteractiveRecognitionHandling'];
 export const expectedTypes = [
  'CorePackageMetadata','DomainAppContext','LifecycleInitContext','PackageInitElement','StaticCorePackage','LifecycleLogRecord','LifecycleLogger',
  'StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','StandardJsonValue','StandardFileOutcome',
@@ -44,5 +45,5 @@ export const expectedFamilies={
  database:['SQLiteDatabaseElement','SQLiteDatabaseError','SQLiteScalar','SQLiteNonThenable','SQLiteTransaction','SQLiteDatabaseOptions','SQLiteErrorCode','SQLiteFailureOrigin','SQLiteTerminalFailureDetails'],
  expression:['BoundedExpressionElement','ExpressionScalar','ExpressionLimits'],
  cli:['CliElement'],
- 'semantic-interaction':['InteractionElement','runInteractiveRecognitionHandling','resolveEvidence','invalidateEvidence','selectNextDecision','prepareCandidates','buildClarification','mapClarificationResponse','InteractionCandidate','InteractionField','InteractionEvent','InteractionPrompt','InteractionPromptSpec','InteractionRecord','InteractionResponse','InteractionSubmitResult','InteractionDecision','InteractionScope','EvidenceOrigin','EvidenceObservation','EvidenceRequirement','EvidenceContext','EvidenceResolution','EvidenceDependency','EvidenceInvalidation','DecisionCondition','DecisionDescription','DecisionSelection','CandidateEntry','CandidateSource','CandidateAssessment','CandidateProjection','CandidatePreparation','ClarificationField','ClarificationPreparation','ClarificationResponse'],
+ 'semantic-interaction':['InteractionElement','runInteractiveRecognitionHandling','resolveEvidence','invalidateEvidence','selectNextDecision','prepareCandidates','ClarificationElement','InteractionCandidate','InteractionField','InteractionEvent','InteractionPrompt','InteractionPromptSpec','InteractionRecord','InteractionResponse','InteractionSubmitResult','InteractionDecision','InteractionScope','EvidenceOrigin','EvidenceObservation','EvidenceRequirement','EvidenceContext','EvidenceResolution','EvidenceDependency','EvidenceInvalidation','DecisionCondition','DecisionDescription','DecisionSelection','CandidateEntry','CandidateSource','CandidateAssessment','CandidateProjection','CandidatePreparation','ClarificationField','ClarificationPreparation','ClarificationResponse'],
 };
