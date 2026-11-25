@@ -102,4 +102,16 @@ const missingMinimumRun=startProcurement('补货 10 normal',()=>missingMinimum,l
 });record('maintenance_missing_selected',complete(await missingMinimumRun.result));
 const invalidMinimum=startProcurement({demand:10,service:'normal',plan:'B:2'},()=>({...offers,offers:offers.offers.map(o=>o.id==='B'?{...o,minPacks:0}:o)}),limits());
 const invalidMinimumResult=await invalidMinimum.result;assert.equal(invalidMinimumResult.status,'REJECT');assert.equal(invalidMinimum.handled(),0);record('maintenance_invalid_minimum',invalidMinimumResult);
+// QA-09A follow-up by integrator; original R65 generation/maintenance records are immutable.
+for(const rejects of [false,true]){
+ const invalid=startProcurement('补货 10 normal',()=>offers,limits(),async(p,i)=>{
+  reply(p,i,'B:2');
+  if(rejects)throw Error('PRIVATE_NOTIFICATION_MARKER');
+ });
+ const r=await invalid.result;
+ assert.deepEqual(r,{status:'FAILED',reason:{code:'INTERACTION_NOTIFICATION_FAILED',message:'Interaction could not continue'}});
+ assert.equal(invalid.handled(),0);assert.equal(invalid.interaction.current(),undefined);
+ record(rejects?'notification-rejected-promise':'notification-resolved-promise',r);
+}
+await new Promise<void>(resolve=>setImmediate(resolve));
 console.log('PROCUREMENT_MAINTENANCE_PASS');

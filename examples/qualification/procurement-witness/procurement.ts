@@ -73,7 +73,7 @@ export function startProcurement(input:string|Request,readFacts:()=>OfferSnapsho
   let prepared:Extract<ClarificationPreparation<Key>,{status:'prompt'}>|undefined;
   let snapshot:string|undefined;
   let handling=0;
-  const interaction=new InteractionElement({onPrompt:p=>{prompt=p;onPrompt?.(p,interaction);}});
+  const interaction=new InteractionElement({onPrompt:p=>{prompt=p;return onPrompt?.(p,interaction);}});
   const decide=async(state:Readonly<State>,event:InteractionEvent,root:NativeWorkflowContext,signal:AbortSignal):Promise<Outcome<InteractionDecision<State,Intent>>>=>{
     if(signal.aborted)return stop('REJECT','CANCELLED');
     const fetched=await root.invoke(readFacts);

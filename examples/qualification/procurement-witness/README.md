@@ -17,3 +17,7 @@ Baseline GitHub commit: 0bf119bfcc1a0d79583bbfdd3b218f3b96b9a950; tree 3d3cfd6ab
 Maintenance adds required minPacks to authoritative offers-r2 and one extra hard eligibility predicate. Missing minimum is unknown, not a default; minPacks does not replace maxPacks, cost, delivery or quantity constraints. No SDK/API/lock change. Actual maintained evidence: evidence/maintenance-run.txt SHA256 f57f44a0b6cce8098db435264c3e2c28eb2949742214c473d49cb90a5298a76c; 34 JSON case records, strict TS, JS syntax and canonical ESLint passed. Normal 10: B 2 packs / 10 units / 1600 cents preferred; C remains eligible. Urgent 6 with C minimum 3: C 3 packs / 9 units / 1300 cents only. Missing A minimum: B and C remain legal, A unknown, recommendations suppressed. Original baseline and maintained tests are separate Git checkpoints, not a single overwritten result.
 
 Gateway jobs: initial final verify job_01M89N3RT0008FQHG2PHNVD08N; maintenance verify job_01M89N7AKD00CCM0AJH6SBH9NF; baseline fresh replay job_01M89N7MD000V35X02GZJBCBPT. Actual author execution only; independent evaluator and Windows evidence remain pending. Synthetic domain; no purchase or generalized productivity claim.
+
+## QA-09A 后续整改（非原生成者成果）
+
+#1759：保留首次生成与维护原始提交及原日志；本次仅透传 onPrompt 返回值，补充同步提交后意外返回 resolved/rejected Promise 的两项负对照。实际 Node 22.12.0、原 SDK f81217f5e7c5c17336d1375626f5251287f43847dd356b3438017a90b9fc9616；36 项记录见 evidence/qa09a-notification-run.txt。新 SDK 工件资格另行绑定。
