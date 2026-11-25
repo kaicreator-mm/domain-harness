@@ -116,10 +116,18 @@ Standard Workflow 必须在**执行任何用户 entry/action 和启动 Actor 前
 
 `invalidateEvidence` 使用当前意图全部 key、明确 changed keys 和依赖声明，按有限拓扑传播 stale；任意变更时无声明的 key 保守失效，显式空依赖表示域已经证明无依赖。循环/未知 key/重复声明或边拒绝。域负责在事实、scope/revision 或相关选择变化后先标出全部 changed、移除 stale 证据、重新取证/推导，再调用 resolveEvidence；不自动修改外部状态、不复活 A 的失效用户记录；保留项仍需当前适用性检查。maxItems 每输入数组/来源版本 Map 上限 0..4096，maxDependencies 边总数上限 0..16384，要求调用者显式指定；超限/非法声明/策略异常 complete:false 与稳定原因 LIMIT/INVALID_EVIDENCE/INVALID_DEPENDENCY/POLICY_FAILED，无部分可用结果。B 不建立 Session、不读 I/O；在已计费分析内执行纯计算，实际取证/专业计算由业务按原 root 计费。两域薄接线和独立负例见 #1736；不构成真实专业路径、权限或最终产品资格。
 
-## LIFE-16 · Standard Decision（0.11.3 T31C 候选）
+## LIFE-16 · Standard Decision（0.11.3 T31C 已接受）
 
 `selectNextDecision<K>` 是有限无状态的下一决策选择函数；领域根据当前真实证据、专业规则和意图给出每个稳定 key 的 applicable/required/satisfied（yes/no/unknown/conflict）、dependsOn 与有限 priority，不强制统一 Fact/Intent 类型。每轮重评估，不自行运行领域规则、查询、工作流或 UI；必须按当前有效 B 证据及实际业务重新判断，不将默认/推荐当作必须的明确用户表达或权威事实。
 
 只有适用且必要、依赖全部实际满足、自身明确未满足（no）的项可进入 eligible；优先选择最高 priority，同级按领域声明数组顺序。已满足项必须有已满足依赖才可供下游使用。明确不适用或非必要可跳过；跳过不等于满足，非必要项仅在适用、自身及依赖实际满足时可供下游使用。不适用时不需要求值无关必要性/满足性；适用性未知、必要性未知或必要项满足性未知/冲突不能当 no 或 ready。领域可明确将可由用户确定的问题表示为 satisfied=no，无法通过询问解决的权威未知仍保留 unknown。独立的 eligible 可先推进；没有 eligible 时按 conflict、unresolved、blocked 选择非成功状态，仅剩满足或明确跳过项时为 ready。rows 保留每项 disposition/reason、尚不可用的直接依赖 blockedBy，按领域声明顺序返回；即使跳过也可能列出不可用依赖，不表示该项仍需询问。ready 只说明本次有限声明的必要决策已满足或无需处理，不代表领域 READY、授权或未声明事项已完整。领域需提供完整当前决策集，并在选择/修订后重建适用性和证据、验证最终业务条件。
 
 显式 maxItems 0..4096、maxDependencies 0..16384；先长度/累计边限界，再检查自有索引（拒绝稀疏/继承索引）、重复 key/边、未知依赖、非有限 priority、非法状态及全图循环（包含不适用节点）。失败 complete:false 与 LIMIT/INVALID_DECISION/INVALID_DEPENDENCY，不输出部分 rows/next。结果集合及元数据冻结；调用期间使用可信不可变 TS 数据，不承诺任意 JS 沙箱。有限迭代拓扑不是第二 DAG 执行器；纯计算可在原 root 已计费分析中执行，不建立 Session、不启动 Effect。T31C #1738 与 R25 修订 L2、两域薄接线为实施依据，真实领域消费及专业 Oracle 仍待 T32–35。
+
+## LIFE-17 · Standard Candidates（0.11.3 T31D 候选）
+
+`prepareCandidates<T>` 是同步、无状态的候选组织函数，直接复用 BoundedQueryElement 的 visit/return 限界及完整性，不生成专业候选或求解、不读数据或创建 Session。域给出当前 scope/revision、同范围同版本候选集合及来源 complete/incomplete/failed，候选使用 A 兼容 opaque ID 并关联域内不可变值。域提供可信同步 assess（eligible/excluded/unknown/failed）与 project（显示文本、有限 priority、可选推荐依据及比较单元），先判断真实硬约束，再只投影已证明合法的候选。旧源或已访问的旧候选范围/版本不匹配、重复/非法ID、访问到的稀疏或继承索引拒绝；未访问内容不宣称已验证或唯一。域需在内容/政策/范围变化时更新版本、重新生成候选及重新核验提交的当前适用性、授权和专业规则；A 的关联门禁仍有效。
+
+来源 incomplete、查询截断（VISIT_LIMIT/RESULT_LIMIT）及任一已访问 unknown 都必须传播 incompleteReasons，只有来源与查询均完整且无 unknown 才 complete。已知合法候选存在返回 available（可不完整）；完整零合法候选为 empty，非完整零候选为 unknown；失败返回 failed/complete:false 和稳定 reason，无可用部分。excluded 及 unknown 记录已访问 ID/域给定非敏感原因，不进入 options；评估 failed/异常或无效返回整体 ASSESSMENT_FAILED，不当排除。投影失败/非法比较/异常整体 PROJECTION_FAILED。已声明 async 策略不启动，实际返回真实 Promise 观察拒绝、不等待或接受结果；可信同步回调不得修改输入或隐式执行专业操作，不承诺撤销任意 JS 副作用。
+
+合法候选按有限 priority 降序、平手按来源顺序稳定排序；推荐标记只能由领域提供，且完整集合才保留，不推断全局最优/唯一；不完整局部排序不等于全局结论。comparisonLabels 唯一、每个合法候选提供同数目的字符串 cells，按实际 opaque ID 生成 A comparison，支持不同约束场景的依据展示而非把不同政策视作同一最优化问题。输出 options/comparison 与内部 entries（ID 对应原域值、scope/revision）分离；不得把整个结果或域私有值直接序列化给客户端，域必须提供非敏感显示投影与原因。返回记录/数组/元数据冻结，value 由域保持不可变。maxVisited 0..4096、maxReturned 0..256，源长度≤4096，比较行≤32；显示及 scope/revision 非空文本（比较单元可空）每项≤1024 UTF8 bytes，options+comparison JSON≤64KiB，完整 A prompt 仍须遵守 LIFE-14 限制。超限 LIMIT；非法结构 INVALID_CANDIDATE；过期 STALE_SOURCE/STALE_CANDIDATE；来源 failed 为 SOURCE_FAILED。已访问候选筛选与纯组织在原分析预算内，真实候选生成/查询/解码/求解另在同根计费。T31D #1740 与 R25 修订 L2 为依据，真实两域及 E 的语义表单消费尚待实施。
