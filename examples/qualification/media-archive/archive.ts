@@ -40,15 +40,17 @@ export class ArchiveElement {
     });
   }
   async plan(inputs:readonly string[],limits:WorkflowLimits):Promise<Result<{assets:Asset[];dispose:()=>Promise<void>}>>{
+    return new StandardWorkflowSession(limits).run(root=>this.planIn(root,inputs));
+  }
+  async planIn(root:NativeWorkflowContext,inputs:readonly string[]):Promise<Result<{assets:Asset[];dispose:()=>Promise<void>}>>{
+    if(inputs.length!==2)return stop('ASK','BATCH_REQUIRES_TWO');
     const dir=await mkdtemp(join(this.staging,'archive-'));
     let retained=false;
-    try{const result=await new StandardWorkflowSession(limits).run(async root=>{
-      if(inputs.length!==2)return stop('ASK','BATCH_REQUIRES_TWO');
+    try{
       const results=await Promise.all(inputs.map((input,i)=>root.child(1,child=>this.item(child,input,dir,i))));
       const assets:Asset[]=[];for(const result of results){if(result.status!=='COMPLETE')return result;assets.push(result.value);}
       if(new Set(assets.map(a=>a.original)).size!==assets.length)return stop('REJECT','DUPLICATE_CONTENT');
-      return root.invoke(()=>assets);
-    });if(result.status!=='COMPLETE')return result;
+      const result=await root.invoke(()=>assets);if(result.status!=='COMPLETE')return result;
     retained=true;return ok({assets:result.value,dispose:()=>rm(dir,{recursive:true,force:true})});
     }finally{if(!retained)await rm(dir,{recursive:true,force:true});}
   }
