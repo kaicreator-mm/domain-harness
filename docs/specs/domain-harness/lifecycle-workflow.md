@@ -132,7 +132,7 @@ Standard Workflow 必须在**执行任何用户 entry/action 和启动 Actor 前
 
 合法候选按有限 priority 降序、平手按来源顺序稳定排序；推荐标记只能由领域提供，recommended=true 必须同时提供非空 reason 依据，且完整集合才保留，不推断全局最优/唯一；不完整局部排序不等于全局结论。comparisonLabels 唯一、每个合法候选提供同数目的字符串 cells，按实际 opaque ID 生成 A comparison，支持不同约束场景的依据展示而非把不同政策视作同一最优化问题。输出 options/comparison 与内部 entries（ID 对应原域值、scope/revision）分离；不得把整个结果或域私有值直接序列化给客户端，域必须提供非敏感显示投影与原因。返回记录/数组/元数据冻结，value 由域保持不可变。maxVisited 0..4096、maxReturned 0..256，源长度≤4096，比较行≤32；显示及 scope/revision 非空文本（比较单元可空）每项≤1024 UTF8 bytes，options+comparison JSON≤64KiB，完整 A prompt 仍须遵守 LIFE-14 限制。超限 LIMIT；非法结构 INVALID_CANDIDATE；过期 STALE_SOURCE/STALE_CANDIDATE；来源 failed 为 SOURCE_FAILED。已访问候选筛选与纯组织在原分析预算内，真实候选生成/查询/解码/求解另在同根计费。T31D #1740 与 R25 修订 L2 为依据，R36 已限定验收 D；真实两域尚待 T32/33，E 的候选表单组合见 LIFE-18。
 
-## LIFE-18 · Standard Clarification（0.11.3 T31E 候选）
+## LIFE-18 · Standard Clarification（0.11.3 T31E 已接受）
 
 `buildClarification<K,E,V>` 消费当前 B EvidenceResolution、C DecisionSelection、当前决策的 A InteractionPromptSpec 去 fields 模板及显式 ClarificationField 绑定（原 A 字段、域 evidenceKey、四态 applicable、confirmation、可选安全 prefill 投影与 D 候选）。只组织当前决策，不替领域计算适用性、事实、必要性或最终意图；域从当前事实、确认要求和 B 失效重算 C，不能把待用户确认的默认值标成 C 已满足。B/C 失败返回 failed；C ready 只表示当前声明必要事项已满足/跳过，无 prompt，不是业务 READY/授权；非 next 的 unresolved/blocked/conflict 保留，不自行询问未知权威事实。next 必须匹配模板 decisionKey 与 eligible 行。每个模板绑定显式唯一字段 ID 与证据 key（包括可跳过项），当前 B 需有对应项。明确不适用字段删除，适用性未知/冲突阻断本组，B 明确不适用与当前适用字段矛盾返回 unresolved。
 
@@ -141,3 +141,11 @@ confirmation=accepted 时 B resolved 非选择字段可跳过；confirmation=use
 模板字段≤256、B/C 行≤4096；先限界再检查自有索引，拒绝重复绑定/缺失证据、异常映射。复用原 makePrompt 对完整语义内容验证、深冻结（预留 UUID/安全整数 revision 长度），不另造 schema；64KiB、字段加选项≤256、节点≤4096、深度≤16及结构不可满足门禁不变。已声明 async 投影不启动，实际 Promise 拒绝被观察、不等待，策略异常 PREFILL_FAILED；可信域数据/同步回调不得突变或执行隐式 Effect，不承诺任意 JS 沙箱。失败无部分 prompt。返回 prompt spec 与内部 fieldId→evidenceKey 绑定，客户端仅接收 A 发布的 prompt。真实取证/专业计算同根另计，本函数纯组织不创建 Session、不等待。
 
 `mapClarificationResponse` 只在 A 的当前 decide 收到实际 response event 时消费；域保留**同一次发布**的 preparation、实际 onPrompt 收到的 prompt 和当前 event，不在外部构造或重播 event；函数检查最新有效 record 与 response identity，使用原 makePrompt/readResponse/responseData 验证当前 spec/envelope/字段及动作，映射 submit 或 revise 的实际 values 为领域 key、origin=user、值及原 action。只输出显式提交字段，不自动补预填、不写领域状态、不授予权威/权限。text/no-fit/revise-text 等返回 other，由域处理实际 event；A reject/cancel 不进入后续 decide。A 仍唯一负责捕获、revision、记录失效和等待。域 reducer 重新检查当前事实/候选 scope/revision 与专业规则，处理修订时按 B 依赖失效和 A 有效记录重算；同一显示内容可能对应不同内部 key，必须保留当前绑定，不把映射当作独立防重放/授权 API。最终 READY/真实授权与 Effect 边界不变。#1742 双领域薄接线和真实固定逐项基线仅验证共同标准组织及领域薄意图；实际专业结果、权限、客户端和最终产品资格仍待 T32–35。
+
+## LIFE-19 · Standard Interactive Recognition / Handling（0.11.3 T31F 候选）
+
+`runInteractiveRecognitionHandling<S,I,O>(interaction, limits, initial, decide, handle)` 提供原生短路径：使用调用者提供的新 InteractionElement 运行一次原 A run，在同 scope 中先 resolve(initial,decide)，仅 COMPLETE 才 step 调用 handle(intent,scope)。不增加 Session、解析器、模型、Intent 基类或第二执行机制；旧 runRecognitionHandling 及低级 resolve/step/root 不变。领域在初次 decide 中解析结构化输入或确定性文本，后续根据实际 event 更新状态；优先使用 B–E 组织当前证据、关键决策、候选、必要表单，只有领域核验完成才 ready。未知/不支持的文本按领域决定明确澄清或非成功结果，不能把 ASK/WAIT/REJECT/UNKNOWN/FAILED 包装成 COMPLETE 或自动重试；非成功识别不进入 Handling，实际 Handling 返回的 Outcome 原样保留。
+
+同根预算：root 启动 1 step，分析（含初始识别）与每次等待各 1 call/1 step，Handling 回调由 scope.step 收 1 call/1 step。因此无澄清最短 2calls/3steps/depth0，一轮 4/5/0，两轮 6/7/0。纯 B–E 在已计费分析内，独立识别、专业取证、真实业务操作、子 Workflow、Hook 及后续步骤按原 root 的 invokeOutcome/child/leaf 或 scope.step 实际增加预算；不得隐式免费或重建根。remaining 不是预留。固定专业路径的原门禁与预算表仍由领域维护。
+
+再次澄清是领域在 handle 内明确无已提交效果的下一操作或有实际可保留 receipt 的 checkpoint 中 await 同一 scope.resolve；继续下一操作用原 scope/root，已完成处理不自动重跑。每个追加 resolve、等待、step 均照原合同计费。已进入处理返回的实际 COMPLETE/UNKNOWN 等结果不得被取消或后续澄清伪造覆盖；域须保留已进入实际操作的 receipt，处理下一操作是否可以安全继续、授权及恢复。取消阻止新 scope.resolve/step，调用者必须 await 已进入操作并在直接 root 调用前检查 signal 及业务条件；此为可信协作，不是任意 JS 事务、回滚或重放防护。终止后的真实恢复按原 .2 显式授权/只读读回合同，不自动再次 submit。实际专业业务资格仍待 T32–35；#1744 是 SDK 限定实施，不能把薄意图/内存 checkpoint 测试晋升为实际 Host 或专业求解验收。
