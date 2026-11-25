@@ -9,7 +9,7 @@ const values = [
   'StandardWorkflowSession', 'routeWorkflowOutcome', 'JsonReader', 'YamlReader',
   'readJson', 'readYaml', 'writeJson', 'writeYaml', 'BoundedQueryElement',
   'SQLiteDatabaseElement', 'SQLiteDatabaseError', 'VectorQueryElement', 'GraphQueryElement',
-  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling',
+  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement',
 ].sort();
 const types = [
   'CorePackageMetadata', 'DomainAppContext', 'LifecycleInitContext', 'PackageInitElement',
@@ -21,6 +21,8 @@ const types = [
   'VectorCandidate', 'VectorQueryOptions', 'VectorMatch', 'VectorQueryResult', 'TypedGraphEdge',
   'GraphQueryLimits', 'GraphQueryOptions', 'GraphPath', 'GraphQueryResult',
   'ExpressionScalar', 'ExpressionLimits',
+  'InteractionCandidate', 'InteractionField', 'InteractionEvent', 'InteractionPrompt', 'InteractionPromptSpec',
+  'InteractionRecord', 'InteractionResponse', 'InteractionSubmitResult', 'InteractionDecision', 'InteractionScope',
 ];
 
 /** 安装后检查实际字节、公开根运行行为并准备类型探针；调用者仍须完成原有 TYPECHECK。 */
@@ -28,6 +30,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   assert.ok(packedPaths.includes('README.md'));
   assert.ok(packedPaths.includes('dist/standard-cli.js'));
   assert.ok(packedPaths.includes('dist/standard-cli.d.ts'));
+  for (const path of ['dist/standard-interaction.js', 'dist/standard-interaction.d.ts', 'dist/interaction-protocol.js', 'dist/interaction-protocol.d.ts']) assert.ok(packedPaths.includes(path));
   const readme = readFileSync(join(installed, 'README.md'));
   assert.deepEqual(readme, readFileSync(join(packageDir, 'README.md')));
   const text = readme.toString('utf8');
@@ -45,12 +48,19 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const name of [...values, ...types]) assert.ok(text.includes('`' + name + '`'), 'S05_API_NOT_DOCUMENTED:' + name);
   writeFileSync(join(consumer, 's05-types.mts'), [
     `import type { ${types.join(', ')} } from '@kaicreator/domain-harness';`,
-    "import { CliElement, runRecognitionHandling } from '@kaicreator/domain-harness';",
+    "import { CliElement, runRecognitionHandling, InteractionElement } from '@kaicreator/domain-harness';",
     "const result: Promise<StandardWorkflowOutcome<string>> = runRecognitionHandling({maxCalls:2,maxSteps:5,maxDepth:1}, () => ({status:'COMPLETE',value:{n:2}}), intent => ({status:'COMPLETE',value:String(intent.n)}));",
     "const stdout: Promise<string> = new CliElement().run('trusted-tool', ['--version']);",
     "// @ts-expect-error a number intent is not a string",
     "void runRecognitionHandling({maxCalls:2,maxSteps:5,maxDepth:1}, () => ({status:'COMPLETE',value:1}), (intent: string) => ({status:'COMPLETE',value:intent}));",
-    "void result; void stdout;",
+    "const interaction: Promise<StandardWorkflowOutcome<string>> = new InteractionElement().run({maxCalls:1,maxSteps:2,maxDepth:0}, scope => scope.resolve<number,string>(1,n=>({status:'COMPLETE',value:{kind:'ready',intent:String(n)}})));",
+    "// @ts-expect-error domain intent is number, not string",
+    "void new InteractionElement().run({maxCalls:1,maxSteps:2,maxDepth:0}, scope => scope.resolve<number,string>(1,n=>({status:'COMPLETE',value:{kind:'ready',intent:n}})));",
+    "const immutable = (prompt: InteractionPrompt) => {",
+    "// @ts-expect-error prompt revision is readonly",
+    "prompt.revision = 3;",
+    "};",
+    "void result; void stdout; void interaction; void immutable;",
   ].join('\n'));
   writeFileSync(join(consumer, 's05-standard-probe.mjs'), [
     "import assert from 'node:assert/strict';",
@@ -67,6 +77,9 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "assert.strictEqual(await sdk.runRecognitionHandling(limits,()=>unknown,()=>{handled++;return ok(0)}),unknown);",
     "const denied=await sdk.runRecognitionHandling({...limits,maxCalls:1},()=>ok(2),()=>{handled++;return ok(0)});",
     "assert.equal(denied.status,'FAILED');assert.equal(denied.reason.code,'WORKFLOW_CALL_BUDGET');assert.equal(handled,1);",
+    "let promptCount=0; const interaction=new sdk.InteractionElement({onPrompt:p=>{promptCount++;assert.equal(interaction.submit({intentId:p.intentId,revision:p.revision,decisionKey:p.decisionKey,action:'submit',values:{amount:2}}).accepted,true);}});",
+    "const interactive=await interaction.run({maxCalls:4,maxSteps:5,maxDepth:0},async scope=>{const resolved=await scope.resolve(0,(_state,event)=>event.kind==='initial'?ok({kind:'clarify',state:1,prompt:{decisionKey:'amount',title:'Amount',actions:['submit'],fields:[{kind:'number',id:'amount',label:'Amount',required:true,min:1,max:5}]}}):ok({kind:'ready',intent:event.response.values.amount}));if(resolved.status!=='COMPLETE')return resolved;assert.deepEqual(scope.root.remaining(),{calls:1,steps:1,maxDescendantDepth:0});return scope.step(()=>ok(resolved.value*2));});",
+    "assert.deepEqual(interactive,ok(4));assert.equal(promptCount,1);assert.equal(interaction.current(),undefined);",
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');
