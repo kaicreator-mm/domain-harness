@@ -12,6 +12,7 @@ import { VideoElement, policy, policyV2, FixityElement } from './media.js';
 import { ArchiveElement } from './archive.js';
 import { CatalogElement } from './catalog.js';
 import { RegistrationElement } from './client.js';
+import { verifyMediaInteraction } from './verify-interaction.js';
 const root=await mkdtemp(join(tmpdir(),'dh media '));
 const cli=new CliElement(),db=join(root,'catalog.sqlite'),storage=join(root,'storage'),manifest=join(root,'owner.json');
 const catalog=new CatalogElement(db,storage);
@@ -112,3 +113,4 @@ try{
   await closeHost();assert.equal((await client.register('a',a)).status,'UNKNOWN');
   console.log(JSON.stringify({status:'MEDIA_PROBE_PASS',node:process.version,sharp:sharp.versions.sharp,vips:sharp.versions.vips,assets:result.value.assets.map(asset=>({original:asset.original,derivative:asset.derivative,source:asset.source,output:asset.output,revision:asset.revision})),policyRevision:revisedImage.revision,negative:['duplicate','corrupt','missing-item','unsupported','size-limit','duration-limit','final-call-budget','call-budget','depth-budget','step-budget','approval','wrong-token','wrong-tenant','wrong-derivative','conflict','host-unavailable','cli-spawn','cli-exit','cli-timeout','cli-output','mov-disguised','truncated-mp4','failed-pair','cross-tenant-read','readback-after-reopen','inherited-pipe-timeout','long-audio-container','conversion-stage','nonzero-descendant','signal-descendant','output-limit-descendant'],roundedVideo:{width:roundedAsset.output.width,height:roundedAsset.output.height,sar},sourceDecodeCode:decodeCode,containerDuration:longInfo.containerSeconds,foregroundCleanup:process.platform==='linux',archivedFilesVerified:4,secondTenant:true,readbackWithoutWriteApproval:true,independentHost:true,stagingClean:true}));
 }finally{if(host&&host.exitCode===null){const ended=once(host,'exit');host.kill();await ended;}catalog.close();await rm(root,{recursive:true,force:true});}
+await verifyMediaInteraction();
