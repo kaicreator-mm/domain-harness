@@ -1,6 +1,6 @@
 # DomainHarness 0.11.3 · L2 Semantic Interaction 技术合同候选
 
-> 状态 L2_CANDIDATE_PENDING_INDEPENDENT_REVIEW；Implementation NOT_STARTED；所有 SI-L1 验收 NOT_RUN。唯一版本入口 [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613)。不是新产品需求、已发布 API 或完成证明。
+> **R23 修订候选**：R14 已冻结原 L2；[R22](https://github.com/kaicreator-mm/domain-harness/issues/1733#issuecomment-7157152801) 原 T31 执行层已验收合入（现映射 T31A），T30 已关闭。依据 Owner 要求，增补 [R23 SDK 标准能力与 Task DAG](./DomainHarness_v0.11.3_R23_L2_STANDARD_CAPABILITY_AMENDMENT.md)，只修订 HOW/任务分解，L1 不变。R23 待独审正式冻结，T31B–F/T32–35 暂未准入，所有最终产品 Oracle NOT_RUN。原 R10/R12 受审身份及历史证据保持；新 §6/7 与 R23 为修订候选，其余交互执行、预算、授权、专业业务合同保持。唯一版本入口 [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613)。
 
 ## 1. 基线与设计判断
 
@@ -11,7 +11,7 @@
 
 ## 2. 最小标准 API 和所有权（候选原生 TS 形状）
 
-新增一个内聚 Standard class InteractionElement，建议文件 packages/domain-harness/src/standard-interaction.ts（纯 helper 私有，可按职责拆文件但不拆包）；从同一 @kaicreator/domain-harness 根导出。下面签名是设计合同，具体泛型/命名经实现与独审细化；不承诺兼容尚未存在的 API。
+原 T31A 设计新增一个内聚 Standard class InteractionElement，建议文件 packages/domain-harness/src/standard-interaction.ts（纯 helper 私有，可按职责拆文件但不拆包）；从同一 @kaicreator/domain-harness 根导出。下面签名是设计合同，具体泛型/命名经实现与独审细化；不承诺兼容尚未存在的 API。
 
 ```ts
 // 设计伪签名，复用已有 Outcome、WorkflowLimits、NativeWorkflowContext。
@@ -44,11 +44,11 @@ type InteractionDecision<S, I> =
 
 - 一个实例一次 run；唯一 root 由内部一次创建 StandardWorkflowSession 并直接委托现有 run。调用方在 app.execute 内运行，外层以普通参数/闭包传入用户身份和权威业务服务。无 SDK 全局 map、自动调度、隐藏网络入口或强制 Context。实例与 prompt 唯一关联 ID 可使用 Node randomUUID，revision 单调递增，单一 pending；不把 ID 当用户身份/权限。构造/启动前取消后不启动业务；已终结不复用实例。应用显式拥有 handle/连接，负责把外部请求路由到对应实例并认证会话。
 - resolve 是可重复调用但同一实例同时仅一个活跃澄清循环；初次可直接 ready；若 Handling 发现新意图不确定，仍在相同 scope/root 再调用 resolve（不是 resume 已结束 ASK/WAIT，也不再创建 Session）。同一作用域非法重入或过期调用拒绝，禁止把 scope/root 泄漏给已终结业务。scope.step 是取消检查加原有 invokeOutcome 的薄组合；不替代 root.child/leaf/Reader；业务实际嵌套调用必须使用传入 root，不能为每轮、每次规划另建 Session。取消与权限有不同语义。
-- decide 是领域分析回调，输入 initial 或上一轮 state 与事件；分析阶段通过现有 root.invokeOutcome 计费，允许使用同一 root 调用实际 Query/CLI/专业计算；只返回 ready/clarify 或真实非成功 Outcome，不能把 UNKNOWN 机械改 ASK。READY 的 intent 是领域自己的 TS 类型；所有硬约束及事实时效由领域校验。SDK 不推断意图、自动排序业务问题、替业务确定事实或创建通用 Fact/Goal ABI。
+- decide 是领域分析回调，输入 initial 或上一轮 state 与事件；分析阶段通过现有 root.invokeOutcome 计费，允许使用同一 root 调用实际 Query/CLI/专业计算；只返回 ready/clarify 或真实非成功 Outcome，不能把 UNKNOWN 机械改 ASK。READY 的 intent 是领域自己的 TS 类型；所有硬约束及事实时效由领域校验。SDK 不自行推断专业意图、定义业务排序政策、替业务确定事实或创建强制通用 Fact/Goal ABI；R23 增补可选的标准信息组织、依据域提供的必要性/优先级和依赖选择决策、候选处理及动态表单组织。领域 decide 保持原低级原生入口，优先复用已实际交付的共同机制。
 - 状态在 resolve 内随成功分析结果保存；业务生成者负责不修改传入 state/旧权威对象并返回新状态。SDK 所有可外部见到的 prompt、response 和内部交互记录使用受支持的 JSON 值快照、防止可变引用污染；不深复制任意领域对象/资源。领域私有状态可保留已知事实、依赖和专业对象，不能把旧版本选择当现行确认。无通用事实图、规则引擎或全量知识容器。
 - 不提供强制 SDK 级注册中心或通用 Intent 父类；复杂业务可原生组合现有 SDK 与 InteractionElement，短默认路径由标准实现完成，而非要求生成者重写 Promise Gate/关联/重复校验。
 
-公开入口验收：基线 20 个公开运行时值/33 个独立公开类型保持；T30 仅增加实际需要的只读余额返回形状（优先内联类型，不增加运行时值）。T31 候选新增运行时值 InteractionElement；公共签名需要 InteractionScope、InteractionDecision、InteractionPrompt、InteractionPromptSpec、InteractionEvent、InteractionSubmitResult，及调用方确需直接命名的语义字段/候选/已接受响应/有效记录类型（候选 InteractionField、InteractionCandidate、InteractionResponse、InteractionRecord）。能内联而不妨碍正常消费的类型不强制导出；辅助 resolver、内部状态、校验器、预算对象及私有 helper 不导出。T31 在独立 expected 集合冻结准确公开名称及泛型/负例，T35 仓外真实安装的根运行时值、声明类型和 README/Skill 与该集合一致；不以从被测包自动生成预期名单证明自己。此处为候选公开面，不宣称 0.11.3 API 已存在。
+原 T31（现 T31A）公开入口验收历史：基线 20 个公开运行时值/33 个独立公开类型保持；T30 仅增加实际需要的只读余额返回形状（优先内联类型，不增加运行时值）。T31 候选新增运行时值 InteractionElement；公共签名需要 InteractionScope、InteractionDecision、InteractionPrompt、InteractionPromptSpec、InteractionEvent、InteractionSubmitResult，及调用方确需直接命名的语义字段/候选/已接受响应/有效记录类型（候选 InteractionField、InteractionCandidate、InteractionResponse、InteractionRecord）。能内联而不妨碍正常消费的类型不强制导出；辅助 resolver、内部状态、校验器、预算对象及私有 helper 不导出。T31 在独立 expected 集合冻结准确公开名称及泛型/负例，T35 仓外真实安装的根运行时值、声明类型和 README/Skill 与该集合一致；不以从被测包自动生成预期名单证明自己。此处为原 A 的候选公开面设计历史；A 已按 R22 验收 21 个值/43 个独立类型。B–F 的公开入口按 R23 实际用途及独立 expected 名单更新，尚未冻结，不固定新增数量。
 
 ## 3. 语义交互、候选与确认
 
@@ -112,42 +112,51 @@ Workshop：真实两订单六工序、机器/日历/precedence、明确 policy r
  
 T34 保留同根预算的 exact/差一及在途处理清理 gate；必要的完整处理前置按真实 remaining，旧两角色 standalone 预算不变。T35 验收需实际读取 Host 请求计数、owner.inspect、grant bound、客户端 attempt/receipt 和原命令读回；保留原 T06 全部适用正反例，不以表单状态/模拟批准/独立旧回归替代上述跨等待实证。
 
-## 6. L1 全量追踪与可判别 Oracle（候选）
+## 6. L1 全量追踪与可判别 Oracle（R23 更新 SDK 实施归属）
+
+原验收行为不变；新增 B–F 的具体 Standard 交付及功能覆盖门禁见 [R23 §2–6](./DomainHarness_v0.11.3_R23_L2_STANDARD_CAPABILITY_AMENDMENT.md)。表中 A–F 均为 T31 子任务。
 
 | Oracle | 实际验收 / 负对照 | 实施归属 |
 |---|---|---|
-| SI-L1-01 | 真实完整请求零 prompt；明确选择后直接 Handling；媒体未独立批准无可见写入、库存合法 PREAUTHORIZED 不重复批准 | T31/32/33/34 |
-| SI-L1-02 | 两域由业务知识生成关键决策、预填/候选，一次选择确定多项；前置选择改变后续字段并跳过无关步骤；固定逐项确认基线记录必要/重复/推导/跳过计数（不降低必要决策） | T32/33 |
-| SI-L1-03 | 权威/用户/推荐/默认/推导/未知及冲突的实际路径；超限/非法/无合法候选不能 READY；未知事实不得凭 UI 默认确认 | T31/32/33 |
-| SI-L1-04 | 修订使旧 prompt、候选、确认/计划失效；同 revision 重放、旧 revision、no-fit/拒绝、修订后实际重算；合法新输入可继续 | T31/32/33 |
-| SI-L1-05 | 真实 Sharp/FFmpeg/ffprobe 源和派生 decode/Hash、真实 SciPy 和独立穷举/日历约束；修改适用政策重算，保留旧业务负例 | T32/33 |
-| SI-L1-06 | 真实合法候选/依据/比较，incomplete/UNKNOWN/不可行/技术失败不冒称 COMPLETE；歧义候选实际拒绝在 Host 可见记录前 | T32/33 |
-| SI-L1-07 | CLI 与视觉真实操作同一业务路径、同等语义；模板/动态字段、选项、类型约束、文件引用和不支持/降级 | T34 |
-| SI-L1-08 | 两域确定性文本识别正例和未支持/歧义/不可信文本反例，进入结构化澄清或拒绝；实际无 LLM | T32/33/34 |
-| SI-L1-09A | 连续至少两轮，同 root 等待前已消费、回复后恰好耗尽/调用和步骤不足，实际登记/读回及库存 submit/recover 请求计数和可见 Effect 验证；重放/迟到/错配/取消/拒绝、同步响应、异常通知、异步清理 gate；已进入的事实/UNKNOWN 不被后续额度或取消覆盖 | T31/32/34 |
-| SI-L1-09B | 同一实际 KDP 激活 A 等待、B/C 在真实重叠时间推进，A 恢复/修订/取消，跨 ID 拒绝；依赖 A 的分支保留非成功、无关预算/状态不变；close 先撤 wait 后等全部业务/Hook，拒绝新 run | T31/34 |
-| SI-L1-10 | T32 媒体真实 Owner/token/tenant/content/revision/批准、丢 ACK 与资产 readback；T34 现有库存真实跨等待撤销/过期或变更的 PER_CALL/SESSION、PREAUTHORIZED、version/attempt/receipt/RECOVER、已提交丢 ACK 与取消；真实请求计数和 Effect/账本不变或精确变化，T35 新包组合证据 | T32/34/35 |
-| SI-L1-11 | 两真实域从同一新 packed SDK 根 import 新实现，独立依赖闭包；不复制等待/关联/校验/失效代码，不新增中央 Runtime | T32/33/35 |
-| SI-L1-12 | 独立生成者实际从安装 README/公开类型/Skill/规范发现能力，生成新小业务并局部维护，真实独立 Oracle 覆盖配置/负对照、原版本保留、两平台适用范围；原始结果独立目录留存，不冒称盲或因果效率 | T35 |
+| SI-L1-01 | 真实完整请求零 prompt；明确选择后直接 Handling；媒体未独立批准无可见写入、库存合法 PREAUTHORIZED 不重复批准 | T31A/B/C/E/F、T32/33/34 |
+| SI-L1-02 | 两域由业务知识生成关键决策、预填/候选，一次选择确定多项；前置选择改变后续字段并跳过无关步骤；固定逐项确认基线记录必要/重复/推导/跳过计数（不降低必要决策） | T31B/C/D/E、T32/33 |
+| SI-L1-03 | 权威/用户/推荐/默认/推导/未知及冲突的实际路径；超限/非法/无合法候选不能 READY；未知事实不得凭 UI 默认确认 | T31A/B/C/D/E、T32/33 |
+| SI-L1-04 | 修订使旧 prompt、候选、确认/计划失效；同 revision 重放、旧 revision、no-fit/拒绝、修订后实际重算；合法新输入可继续 | T31A/B/C/D/E/F、T32/33 |
+| SI-L1-05 | 真实 Sharp/FFmpeg/ffprobe 源和派生 decode/Hash、真实 SciPy 和独立穷举/日历约束；修改适用政策重算，保留旧业务负例 | T32/33（真实专业路径，复用 B–F） |
+| SI-L1-06 | 真实合法候选/依据/比较，incomplete/UNKNOWN/不可行/技术失败不冒称 COMPLETE；歧义候选实际拒绝在 Host 可见记录前 | T31B/C/D/E、T32/33 |
+| SI-L1-07 | CLI 与视觉真实操作同一业务路径、同等语义；模板/动态字段、选项、类型约束、文件引用和不支持/降级 | T31A/E/F、T34 |
+| SI-L1-08 | 两域确定性文本识别正例和未支持/歧义/不可信文本反例，进入结构化澄清或拒绝；实际无 LLM | T31F、T32/33/34 |
+| SI-L1-09A | 连续至少两轮，同 root 等待前已消费、回复后恰好耗尽/调用和步骤不足，实际登记/读回及库存 submit/recover 请求计数和可见 Effect 验证；重放/迟到/错配/取消/拒绝、同步响应、异常通知、异步清理 gate；已进入的事实/UNKNOWN 不被后续额度或取消覆盖 | T31A/F、T32/34 |
+| SI-L1-09B | 同一实际 KDP 激活 A 等待、B/C 在真实重叠时间推进，A 恢复/修订/取消，跨 ID 拒绝；依赖 A 的分支保留非成功、无关预算/状态不变；close 先撤 wait 后等全部业务/Hook，拒绝新 run | T31A/F、T34 |
+| SI-L1-10 | T32 媒体真实 Owner/token/tenant/content/revision/批准、丢 ACK 与资产 readback；T34 现有库存真实跨等待撤销/过期或变更的 PER_CALL/SESSION、PREAUTHORIZED、version/attempt/receipt/RECOVER、已提交丢 ACK 与取消；真实请求计数和 Effect/账本不变或精确变化，T35 新包组合证据 | T31F、T32/34/35 |
+| SI-L1-11 | 两真实域从同一新 packed SDK 根 import 新实现，独立依赖闭包；不复制等待/关联/校验/失效代码，不新增中央 Runtime | T31A–F、T32/33/35 |
+| SI-L1-12 | 独立生成者实际从安装 README/公开类型/Skill/规范发现能力，生成新小业务并局部维护，真实独立 Oracle 覆盖配置/负对照、原版本保留、两平台适用范围；原始结果独立目录留存，不冒称盲或因果效率 | T31A–F、T35 |
 
 继承 R9 两 P2 具体 Oracle；[R65](https://github.com/kaicreator-mm/domain-harness/issues/1612#issuecomment-7141533062)、[R73](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7143329514)、[R74](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7143625830) 与 #1724 R17/R19 是前阶段证据，不是 .3 PASS。继承 Roadmap R82/R84 **同一 Reference Domain App** 的现行原生后继 examples/native-domain-app/main.mjs、历史累计证据与原 test:consumer 门禁；两个专业域不能替代受影响 Reference 真实回归。新增同一 Reference 的 .3 交互路径（保持原 Guard/Reader/Hook/Switch/授权语义及旧正反例），不得新造替代 app 就宣布累计通过。所有正例同时验证实际业务输出，不以 UI 状态、生成代码行数、单次模型成功作结论。
 
-## 7. 最小 Task DAG（候选，独审前不实施）
+## 7. 修订 Task DAG（R23 候选，独审前不准入新增任务）
 
 | Task | 依赖 | 写集与退出门禁 |
 |---|---|---|
-| T30 .1 根预算只读查询缝 | L2 独审冻结；按 #1605 归属 | 实际 Workshop 同根完整前置门禁证实需要时，仅增加/验证上述快照；若已有等价缝则 NO_CHANGE_REQUIRED。现有预算/祖先约束原样，耗尽/并发快照非授权负例、公开入口/类型及文档独立审核后合入，再进入 T31；不重开 #1724。 |
-| T31 Standard Interaction 原生实现 | T30 关闭 | SDK standard-interaction、根导出、core 测试、必要 canonical spec/Skill/README 同步。真实可用实现，类型负例、预算与关联/修订/取消/关闭确定性测试及变异；无新的运行时依赖。以两个真实域需要确认最小 API，不先做空壳。 |
-| T32 媒体领域消费及真实授权 | T31 | media-archive 交互及 planIn/registerIn/readbackIn 同根组合；§5.1 全路径预算表及真实请求、可见文件/DB/丢 ACK/原资产 readback 正反例；保留旧入口/原独立 oracle，R9 P2 预算/歧义 Effect 拒绝；不修 SDK 无关历史候选。 |
-| T33 维修排程领域消费 | T31 | workshop 交互、同根专业计算与真实 oracle/原预算、政策修订和候选。与 T32 独立写集可并行。 |
-| T34 客户端与累计 Reference | T31，T32/T33 接口稳定后组合 | CLI + 实际视觉语义适配、Reference App 同一激活 A/B/C、依赖及关闭、文本入口；唯一负责 §5.2 现有库存 action/client 同根入口及真实跨等待授权/取消/恢复见证。客户端/Reference 独立写集可在接口稳定后开始，T34 最终组合通过必须等 T32/T33 真实路径完成；不引入 SDK Web 框架。 |
-| T35 真实新工件/独立生成维护/最终验收 | T30–34 | 新真实 clean-packed、受影响旧回归、实际双域独立依赖及 T34 库存授权见证、最低 Node22.12 Windows/Linux（工具矩阵分开）；陌生 Agent 仅公开入口、独立 Oracle、维护前后/负对照及原始证据；独立最终审查 P0/P1=0、P2 有归属、Exact HEAD 合入。 |
+| T30 .1 根预算只读查询缝 | 已关闭 #1731 | R17 既有资格保留 |
+| T31A Standard Interaction 执行层（原 T31） | T30；已关闭 #1733 | R22 既有资格保留；不等于完整 SDK 功能 |
+| T31B 信息组织与证据状态 | T31A、R23 正式冻结 | R23 §3B 实际标准实现、两个真实用途接线及独立正负验证 |
+| T31C 必要决策及优先选择 | T31B | R23 §3C 实际标准实现、两个真实用途及独审 |
+| T31D 候选组织、筛选、比较 | T31B | R23 §3D 实际标准实现、复用 Query 与真实用途及独审；共享写集顺序集成 |
+| T31E 动态表单与最小确认 | T31C/D | R23 §3E 实际标准组织，复用 A 协议及独审 |
+| T31F Recognition/Interaction/Handling 同根组合 | T31A–E | R23 §3F 实际便捷组合与完整 SDK 受影响测试/安装门禁、独审 |
+| T32 媒体领域消费及真实授权 | T31F | 实际复用 R23 适用 B–F（不复制共同机制）；media-archive 交互及 planIn/registerIn/readbackIn 同根组合；§5.1 全路径预算表及真实请求、可见文件/DB/丢 ACK/原资产 readback 正反例；保留旧入口/原独立 oracle，R9 P2 预算/歧义 Effect 拒绝；不修 SDK 无关历史候选。 |
+| T33 维修排程领域消费 | T31F | 实际复用 R23 适用 B–F（不复制共同机制）；workshop 交互、同根专业计算与真实 oracle/原预算、政策修订和候选。与 T32 独立写集可并行。 |
+| T34 客户端与累计 Reference | T31F，T32/T33 接口稳定后组合 | 实际复用 F/E；CLI + 实际视觉语义适配、Reference App 同一激活 A/B/C、依赖及关闭、文本入口；唯一负责 §5.2 现有库存 action/client 同根入口及真实跨等待授权/取消/恢复见证。客户端/Reference 独立写集可在接口稳定后开始，T34 最终组合通过必须等 T32/T33 真实路径完成；不引入 SDK Web 框架。 |
+| T35 真实新工件/独立生成维护/最终验收 | T30–34（含 T31A–F） | R23 §6 功能覆盖与两个真实调用点证据；新真实 clean-packed、受影响旧回归、实际双域独立依赖及 T34 库存授权见证、最低 Node22.12 Windows/Linux（工具矩阵分开）；陌生 Agent 仅公开入口、独立 Oracle、维护前后/负对照及原始证据；独立最终审查 P0/P1=0、P2 有归属、Exact HEAD 合入。 |
 
-按 ADS 有限任务：实现前 L2 独立审核；必要源码改动前实际语法/Typecheck/Lint/Tests，源切片不是完整包资格；能当前环境完成不重复 CI，真实安装或平台必要才启有限执行任务。任何 T31 发现旧基础缺陷按归属版本修正、独立增量审核，禁止在 .3 建第二运行时规避。T32/T33 实施反馈可触发 T31 最小 API 修订，须更新合同与适用独审，不擅改 L1。最终 #1613 统一控制，不开第二版本总控。实际工件、平台、状态、失败、未执行、证据归属写回 Issue/PR；无主干 release，.5 模型、.6 持久化均不实施。
+B–F 可在确证原有 SDK/原生实现完整满足共同用途时以实际两处复用/负对照及独审 NO_CHANGE_REQUIRED 关闭，不强制一任务一 Class；禁止把未实现的通用行为全部交给 Demo。R23 §4 冻结真实双域薄接线、§5 规定写集与退出门禁、§6 增强实际复用验收。
 
-## 8. 设计取舍与待审风险
+按 ADS 有限任务：实现前 L2 独立审核；必要源码改动前实际语法/Typecheck/Lint/Tests，源切片不是完整包资格；能当前环境完成不重复 CI，真实安装或平台必要才启有限执行任务。任何 T31 发现旧基础缺陷按归属版本修正、独立增量审核，禁止在 .3 建第二运行时规避。T32/T33 实施反馈可触发 T31A–F 最小 API 修订，须更新合同与适用独审，不擅改 L1。最终 #1613 统一控制，不开第二版本总控。实际工件、平台、状态、失败、未执行、证据归属写回 Issue/PR；无主干 release，.5 模型、.6 持久化均不实施。
+
+## 8. 原 R10/R12 设计取舍与待审风险（历史）
 
 - 采用运行期内存 Promise 等待而非持久 resume，满足 R9 和 S03 证据；不强制每个步骤 Workflow，不修改既有 XState 终态。
 - 用户提交与业务确认/真实授权分离，安全边界是当前业务证据/Owner 校验而非客户端、nonce 或 SDK 自签。
 - 表单选择语义有限类型、普通 TS 数据结构，不增加独立 schema/DSL；SDK 实现负责通用交互和失效，业务选择问题、确认适用性。T31 核验异步取消/同步重入/回调通知/重入 resolve/可变引用、实际预算的最小行为；审查如果 API 需要更多能力是否由真实用途证明。
-- 本 L2 选择单 pending、保守修订失效、最小客户端实例及 T30–T35 写集，均为可审核技术决定。未做源码、测试、CI、Agent 或新包。独审后才冻结 L2；具体 fixture、类型声明、业务预算表和实际呈现接线在对应 task 先细化再实现，不以此文宣称产品通过。
+- 原 R10/R12 选择单 pending、保守修订失效及最小客户端实例已按 R14 冻结；T30、原 T31（T31A）按 R17/R22 验收合入。R23 只扩展 SDK Standard 共同职责及实施分解，具体 fixture、类型声明、业务预算表和实际呈现接线仍在对应 task 先细化再实现。R23 文档不构成新源码、测试、CI 或产品通过。
