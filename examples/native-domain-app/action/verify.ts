@@ -10,11 +10,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { InventoryAuthority, payloadDigest } from './authority.js';
+import { InventoryAuthority, payloadDigest, commandDigest } from './authority.js';
 import type { ApprovalGrant, Policy, Reply, ReserveCommand } from './authority.js';
 import { ReservationElement } from './client.js';
 import type { ReservationMode } from './client.js';
-import { SQLiteDatabaseElement } from '@kaicreator/domain-harness';
+import { InteractionElement, SQLiteDatabaseElement, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
+import type { InteractionDecision, InteractionPrompt, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
 
 const limits = { maxCalls: 2, maxSteps: 5, maxDepth: 1 };
 function command(id: string, resource: string, version = 0, quantity = 2, grant: string | null = null): ReserveCommand {
@@ -87,6 +88,19 @@ class Fixture {
       const row = db.select<{ reply: string | null }>('SELECT reply FROM attempts WHERE id=?', [id], 1)[0];
       return row?.reply ? JSON.parse(row.reply) as unknown : undefined;
     } finally { db.close(); }
+  }
+  attempt(path: string, id: string): { digest: string; reply: string | null } | undefined {
+    const db = new SQLiteDatabaseElement(path, { readOnly: true });
+    try { return db.select<{ digest: string; reply: string | null }>('SELECT digest,reply FROM attempts WHERE id=?', [id], 1)[0]; }
+    finally { db.close(); }
+  }
+  grantState(id: string): { revoked: number; bound: string | null; maxQuantity: number } | undefined {
+    const db = new SQLiteDatabaseElement(this.path, { readOnly: true });
+    try {
+      const row = db.select<{ revoked: number; bound: string | null; maxQuantity: number }>('SELECT revoked,bound,maxQuantity FROM grants WHERE id=?', [id], 1)[0];
+      return row === undefined ? undefined : { ...row };
+    }
+    finally { db.close(); }
   }
   async close(): Promise<void> {
     for (const client of this.clients) client.close();
@@ -286,6 +300,173 @@ export const actionCases: readonly [string, () => Promise<void>][] = [
       const reopened = f.client('one', p.base); const recovered = await reopened.run(input, limits, 'RECOVER'); expect(recovered, 'COMPLETE');
       assert.deepEqual(f.receipt('one', input.id), recovered);
       assert.deepEqual(p.counts, { submit: 1, readback: 1 }); f.state('stock', 1, 18, 1);
+    } finally { await p.close(); }
+  })],
+];
+
+/** 在真实等待之后继续同根库存操作；测试驱动只提供用户输入，不替代 Host 授权。 */
+function waitForQuantity(client: ReservationElement, input: ReserveCommand, mode: ReservationMode,
+  budget: WorkflowLimits, onPrompt: (prompt: InteractionPrompt, interaction: InteractionElement) => void) {
+  const interaction = new InteractionElement({ onPrompt: prompt => onPrompt(prompt, interaction) });
+  const result = runInteractiveRecognitionHandling<ReserveCommand, ReserveCommand, Extract<Reply, { status: 'COMPLETE' }>['value']>(
+    interaction, budget, input, (state, event): StandardWorkflowOutcome<InteractionDecision<ReserveCommand, ReserveCommand>> => {
+      if (event.kind === 'initial') return { status: 'COMPLETE', value: {
+        kind: 'clarify', state, prompt: { decisionKey: 'quantity', title: 'Reservation quantity',
+          fields: [{ id: 'quantity', label: 'Quantity', kind: 'number', min: 1, max: 100, required: true }],
+          actions: ['submit', 'cancel'] },
+      } };
+      if (event.response.action !== 'submit' || typeof event.response.values.quantity !== 'number') return { status: 'REJECT', reason: { code: 'QUANTITY_REQUIRED', message: 'Quantity required' } };
+      return { status: 'COMPLETE', value: { kind: 'ready', intent: { ...state, quantity: event.response.values.quantity } } };
+    }, (intent, scope) => client.runIn(scope.root, intent, mode, scope.signal));
+  return { interaction, result };
+}
+function answerQuantity(prompt: InteractionPrompt, interaction: InteractionElement, quantity: number): void {
+  assert.deepEqual(interaction.submit({ intentId: prompt.intentId, revision: prompt.revision, decisionKey: prompt.decisionKey,
+    action: 'submit', values: { quantity } }), { accepted: true });
+}
+// A 初始分析/等待/再分析、F 处理入口各 1，库存识别和处理 2/4；根步骤 1。
+const interactiveLimits = { maxCalls: 6, maxSteps: 9, maxDepth: 1 };
+export const interactiveActionCases: readonly [string, () => Promise<void>][] = [
+  ['same-root exact budget, short budgets, and waiting cancellation', () => fixture(async f => {
+    f.resource('stock', 'PREAUTHORIZED'); const h = await f.host(); const p = await proxy(h.base, {});
+    try {
+      const c = f.client('interactive', p.base);
+      for (const [i, budget] of [{ ...interactiveLimits, maxCalls: 5 }, { ...interactiveLimits, maxSteps: 8 }, { ...interactiveLimits, maxDepth: 0 }].entries()) {
+        const input = command('short-' + i, 'stock');
+        const reply = await waitForQuantity(c, input, 'FIRST_SUBMIT', budget, (prompt, interaction) => answerQuantity(prompt, interaction, 2)).result;
+        assert.equal(reply.status, 'FAILED'); assert.equal(f.receipt('interactive', input.id), undefined);
+      }
+      const cancelled = await waitForQuantity(c, command('cancelled', 'stock'), 'FIRST_SUBMIT', interactiveLimits,
+        (_prompt, interaction) => interaction.cancel()).result;
+      expect(cancelled, 'REJECT', 'CANCELLED');
+      assert.deepEqual(p.counts, { submit: 0, readback: 0 }); f.state('stock', 0, 20, 0);
+      const input = command('exact', 'stock');
+      const exact = await waitForQuantity(c, input, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => answerQuantity(prompt, interaction, 2)).result;
+      expect(exact, 'COMPLETE'); assert.deepEqual(f.receipt('interactive', input.id), exact); f.state('stock', 1, 18, 1);
+      assert.deepEqual(p.counts, { submit: 1, readback: 0 });
+    } finally { await p.close(); }
+  })],
+  ['real per-call approval revoked or changed across wait, session scope and expiry', () => fixture(async f => {
+    f.resource('per', 'PER_CALL'); f.resource('session', 'SESSION');
+    const h = await f.host(); const p = await proxy(h.base, {});
+    try {
+      const c = f.client('interactive', p.base);
+      const revoked = command('revoked-wait', 'per', 0, 2, 'revoked');
+      f.grant('revoked', 'PER_CALL', revoked);
+      expect(await waitForQuantity(c, revoked, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => {
+        f.owner.revokeGrant('revoked'); answerQuantity(prompt, interaction, 2);
+      }).result, 'REJECT', 'APPROVAL_DENIED');
+      const changed = command('changed-wait', 'per', 0, 2, 'changed');
+      f.grant('changed', 'PER_CALL', changed);
+      expect(await waitForQuantity(c, changed, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => answerQuantity(prompt, interaction, 3)).result, 'REJECT', 'APPROVAL_DENIED');
+      assert.equal(f.owner.bound('changed'), null); f.state('per', 0, 20, 0);
+      const valid = command('valid-wait', 'per', 0, 2, 'valid');
+      f.grant('valid', 'PER_CALL', valid);
+      expect(await waitForQuantity(c, valid, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => answerQuantity(prompt, interaction, 2)).result, 'COMPLETE');
+      assert.equal(f.owner.bound('valid'), valid.id); f.state('per', 1, 18, 1);
+      const session = command('session-wait', 'session', 0, 2, 'session-grant');
+      f.grant('session-grant', 'SESSION', session);
+      expect(await waitForQuantity(c, session, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => answerQuantity(prompt, interaction, 3)).result, 'REJECT', 'APPROVAL_DENIED');
+      const expired = command('expired-wait', 'session', 0, 2, 'expired-grant');
+      const exp = Date.now() + 100;
+      f.grant('expired-grant', 'SESSION', expired, { expires: exp });
+      expect(await waitForQuantity(c, expired, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => {
+        setTimeout(() => answerQuantity(prompt, interaction, 2), Math.max(0, exp - Date.now() + 20));
+      }).result, 'REJECT', 'APPROVAL_DENIED');
+      f.state('session', 0, 20, 0);
+      const permitted = command('session-valid', 'session', 0, 2, 'session-grant');
+      expect(await waitForQuantity(c, permitted, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => answerQuantity(prompt, interaction, 2)).result, 'COMPLETE');
+      f.state('session', 1, 18, 1);
+      assert.deepEqual(p.counts, { submit: 6, readback: 0 });
+    } finally { await p.close(); }
+  })],
+  ['SESSION grant revoked by actual owner while inventory waits', () => fixture(async f => {
+    f.resource('session', 'SESSION'); const h = await f.host(); const p = await proxy(h.base, {});
+    try {
+      const c = f.client('session-revoke', p.base);
+      const path = join(f.folder, 'session-revoke.sqlite');
+      const input = command('session-revoked-wait', 'session', 0, 2, 'session-revoked');
+      f.grant('session-revoked', 'SESSION', input);
+      const pending = waitForQuantity(c, input, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => {
+        assert.equal(interaction.current(), prompt);
+        assert.deepEqual(f.grantState('session-revoked'), { revoked: 0, bound: null, maxQuantity: 2 });
+        assert.deepEqual(p.counts, { submit: 0, readback: 0 });
+        assert.equal(f.attempt(path, input.id), undefined); assert.equal(f.attempt(f.path, input.id), undefined);
+        f.owner.revokeGrant('session-revoked');
+        assert.deepEqual(f.grantState('session-revoked'), { revoked: 1, bound: null, maxQuantity: 2 });
+        answerQuantity(prompt, interaction, 2);
+      });
+      const result = await pending.result;
+      expect(result, 'REJECT', 'APPROVAL_DENIED');
+      f.state('session', 0, 20, 0);
+      assert.deepEqual(f.grantState('session-revoked'), { revoked: 1, bound: null, maxQuantity: 2 });
+      for (const ledger of [path, f.path]) {
+        const attempt = f.attempt(ledger, input.id);
+        assert.equal(attempt?.digest, commandDigest('alice', input));
+        assert.deepEqual(JSON.parse(attempt?.reply ?? 'null'), result);
+      }
+      assert.deepEqual(p.counts, { submit: 1, readback: 0 });
+    } finally { await p.close(); }
+  })],
+  ['inventory pending rejects wrong intent and stale correlation without any Host request', () => fixture(async f => {
+    f.resource('stock', 'PREAUTHORIZED'); const h = await f.host(); const p = await proxy(h.base, {});
+    try {
+      const c = f.client('correlation', p.base);
+      const path = join(f.folder, 'correlation.sqlite');
+      const input = command('correlation', 'stock');
+      let prior: InteractionPrompt | undefined;
+      const old = command('old-intent', 'stock');
+      expect(await waitForQuantity(c, old, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => {
+        prior = prompt; interaction.cancel();
+      }).result, 'REJECT', 'CANCELLED');
+      assert.ok(prior);
+      const stalePrompt = prior;
+      const pending = waitForQuantity(c, input, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => {
+        const correct = { intentId: prompt.intentId, revision: prompt.revision, decisionKey: prompt.decisionKey,
+          action: 'submit', values: { quantity: 2 } };
+        for (const [response, code] of [
+          [{ ...correct, intentId: stalePrompt.intentId }, 'WRONG_INTENT'],
+          [{ ...correct, revision: prompt.revision - 1 }, 'STALE_RESPONSE'],
+          [{ ...correct, decisionKey: 'old-key' }, 'STALE_RESPONSE'],
+        ] as const) {
+          assert.deepEqual(interaction.submit(response), { accepted: false, code });
+          assert.equal(interaction.current(), prompt);
+          assert.deepEqual(p.counts, { submit: 0, readback: 0 });
+          f.state('stock', 0, 20, 0);
+          for (const id of [input.id, old.id]) {
+            assert.equal(f.attempt(path, id), undefined); assert.equal(f.attempt(f.path, id), undefined);
+          }
+        }
+        answerQuantity(prompt, interaction, 2);
+      });
+      const result = await pending.result;
+      expect(result, 'COMPLETE'); f.state('stock', 1, 18, 1);
+      assert.deepEqual(f.receipt('correlation', input.id), result);
+      assert.deepEqual(p.counts, { submit: 1, readback: 0 });
+      // 完整已知输入沿原业务入口直接执行，无交互提示，也不改变既有预算。
+      const direct = command('complete-input', 'stock', 1);
+      expect(await c.run(direct, limits, 'FIRST_SUBMIT'), 'COMPLETE');
+      f.state('stock', 2, 16, 2);
+      assert.deepEqual(p.counts, { submit: 2, readback: 0 });
+    } finally { await p.close(); }
+  })],
+  ['real submit with cancellation after Host commit, lost ACK and original readback', () => fixture(async f => {
+    f.resource('stock', 'PREAUTHORIZED'); const h = await f.host();
+    let active: ReturnType<typeof waitForQuantity> | undefined;
+    const mode: { dropSubmit?: 'after'; afterSubmit: () => void } = { dropSubmit: 'after', afterSubmit: () => active?.interaction.cancel() };
+    const p = await proxy(h.base, mode);
+    try {
+      const c = f.client('interactive', p.base); const input = command('lost-wait', 'stock');
+      active = waitForQuantity(c, input, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => answerQuantity(prompt, interaction, 2));
+      const lost = await active.result; expect(lost, 'UNKNOWN', 'HOST_RESPONSE_UNAVAILABLE');
+      assert.deepEqual(f.receipt('interactive', input.id), lost); f.state('stock', 1, 18, 1);
+      delete mode.dropSubmit;
+      const recovery = await waitForQuantity(c, input, 'RECOVER', interactiveLimits, (prompt, interaction) => answerQuantity(prompt, interaction, 2)).result;
+      expect(recovery, 'COMPLETE'); assert.deepEqual(f.receipt('interactive', input.id), recovery);
+      const next = command('known-wait', 'stock', 1);
+      active = waitForQuantity(c, next, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => answerQuantity(prompt, interaction, 2));
+      const known = await active.result; expect(known, 'COMPLETE'); assert.deepEqual(f.receipt('interactive', next.id), known);
+      f.state('stock', 2, 16, 2); assert.deepEqual(p.counts, { submit: 2, readback: 1 });
     } finally { await p.close(); }
   })],
 ];

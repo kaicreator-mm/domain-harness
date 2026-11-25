@@ -42,3 +42,22 @@
 图书计划以 ISBN 校验与当前目录报价选择合成资源和数量；只有可信调用者明确发出另一逻辑命令且 owner 批准后才由未改动的 T06 Host 提交。先创建权威资源和实际独立 Host，验证只读计划与失败路径零 Effect；未批准 ASK，批准后真实库存 5→3、版本 0→1、Effect 恰好 1 次，RECOVER 返回同一 Receipt；另一个领域分类结果不变。两个独立逻辑根不构成同一请求预算重置。组合应用不声称真实图书出版/目录或水体观测，也不提供真实饮水安全结论。
 
 `npm run test:consumer` 仍然在开发工具链 Node >=22.13 中执行编译和 pack，但可显式指定 **实际消费者** 的 Node 可执行文件 `DH_NATIVE_CONSUMER_NODE` 与其兼容的 `DH_NATIVE_CONSUMER_NPM_CLI`（npm CLI JS 文件绝对路径）。未指定使用当前 Node 和 npm；指定不同 Node 时从其发行目录寻找 npm CLI，也可显式指定。锁和 clean install 使用选定消费者 Node/npm，所有 ESM/Host 探针使用消费者 Node，TypeScript 编译继续使用开发工具链。无 Node 额外启动 flag 或 NODE_PATH 注入；输出记录实际 Node/platform/arch、npm 版本、包版本、tarball SHA256 与通过的门禁。Windows/Linux Node22.12.0 最低版本资格必须另取真实执行证据；CI 不能冒充双平台 PASS。SDK 版本标识在本内部阶段候选更新为 0.11.2，不等同正式发布。
+
+
+### Semantic Interaction 累计见证
+
+`npm run test:demo` 保留原 Reference 结果并验证同一 KDP 激活中的独立意图、依赖、关闭和真实 readline。订单评估沿用现有 normal/strict JSON 策略与 OrderPolicyElement；应用选择 normal 作为当前策略，比较仅为假设评估，不改变权威策略。推荐和预填绑定当前实际策略摘要，明确提交前不成立；无法取得或变化的策略不进入后续评估。媒体与维修排程不强造候选排序：媒体无权威偏好，维修的 what-if 不能冒充当前权威日历。
+
+实际 CLI（在仓库完成 SDK 构建后）：
+
+```sh
+node examples/native-domain-app/packages/interaction-cli.mjs order
+```
+
+在终端输入一行 JSON，例如 `{"action":"submit","values":{"goal":"current"}}`，也可输入 `order current` 进行文本澄清。裸 JSON 不带关联字段时由终端附加当前提示关联；显式关联必须完整且匹配，原样交给协议验证，不自动覆盖或补齐。视觉实例由应用的 `serveOrderInteraction` 在 loopback 创建单次会话，展示同一语义 prompt 的选择、比较及动态字段；它不是生产 Web 服务，不上传文件，不持有业务授权。实际浏览器验收工具使用单独环境中的 Playwright Chromium（不引入 SDK 或业务包依赖）：
+
+```sh
+DH_BROWSER_DRIVER=/absolute/path/to/playwright/index.mjs node scripts/verify-reference-browser.mjs
+```
+
+安装消费者门禁复用累计 Reference、8 组 CLI 和原 8 组 + 新 5 组库存授权实际测试；视觉浏览器独立见证。
