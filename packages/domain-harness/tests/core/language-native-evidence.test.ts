@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolveEvidence, invalidateEvidence } from '../../src/standard-evidence.js';
-import type { EvidenceContext, EvidenceObservation, EvidenceRequirement } from '../../src/standard-evidence.js';
+import type { EvidenceContext, EvidenceDependency, EvidenceObservation, EvidenceRequirement } from '../../src/standard-evidence.js';
 
 const context: EvidenceContext = { scope: 'tenant-a', revisions: new Map([['owner', 'r1'], ['other', 'r1']]), asOf: 10 };
 const source = { id: 'owner', scope: 'tenant-a', revision: 'r1' };
@@ -164,4 +164,53 @@ test('维修 Policy：真实日历未知不能用默认正常替代，变更重�
     { complete: true, stale: ['calendar', 'plan'], retained: ['goal', 'precedence'] });
   const hypothetical = { ...current, scope: 'workshop/what-if' };
   assert.equal(items(resolveEvidence(requirements, actual, hypothetical, policy, 16))[0]?.status, 'unknown');
+});
+
+test('稀疏证据数组及来源声明拒绝，不产生部分确定结果', () => {
+  const badRequirements = new Array<EvidenceRequirement<'x'>>(2);
+  badRequirements[0] = req('x');
+  const badObservations = new Array<EvidenceObservation<'x', number>>(2);
+  badObservations[1] = known('x', 1);
+  const badOrigins = new Array<'authority' | 'user'>(2);
+  badOrigins[0] = 'authority';
+  const invalid = { complete: false, reason: 'INVALID_EVIDENCE' };
+  assert.deepEqual(resolveEvidence(badRequirements, [known('x', 1)], context, equal, 8), invalid);
+  assert.deepEqual(resolveEvidence([req('x')], badObservations, context, equal, 8), invalid);
+  assert.deepEqual(resolveEvidence([{ key: 'x', accepts: badOrigins }], [known('x', 1)], context, equal, 8), invalid);
+  assert.deepEqual(resolveEvidence(new Array<EvidenceRequirement<'x'>>(4097), [], context, equal, 4096), { complete: false, reason: 'LIMIT' });
+  const [row] = items(resolveEvidence([{ key: 'x', accepts: ['authority'] }], [known('x', 1)], context, equal, 8));
+  assert.equal(row?.status === 'resolved' && row.value, 1);
+});
+
+test('稀疏依赖输入拒绝，旧计划不得进入可复用集合', () => {
+  type Key = 'sourceHash' | 'derivedPlan' | 'policyRevision';
+  const keys: readonly Key[] = ['sourceHash', 'derivedPlan', 'policyRevision'];
+  const deps: readonly EvidenceDependency<Key>[] = [{ key: 'sourceHash', dependsOn: [] },
+    { key: 'derivedPlan', dependsOn: ['sourceHash'] }, { key: 'policyRevision', dependsOn: [] }];
+  const badKeys = new Array<Key>(2);
+  badKeys[0] = 'sourceHash';
+  const badChanged = new Array<Key>(1);
+  const badDeclarations = new Array<EvidenceDependency<Key>>(2);
+  badDeclarations[0] = deps[0]!;
+  const badParents = new Array<Key>(2);
+  badParents[1] = 'sourceHash';
+  const invalid = { complete: false, reason: 'INVALID_DEPENDENCY' };
+  assert.deepEqual(invalidateEvidence(badKeys, [], deps, limits), invalid);
+  const denied = invalidateEvidence(keys, badChanged, deps, limits);
+  assert.deepEqual(denied, invalid);
+  assert.equal(Object.hasOwn(denied, 'retained'), false);
+  assert.equal(Object.hasOwn(denied, 'stale'), false);
+  assert.deepEqual(invalidateEvidence(keys, ['sourceHash'], badDeclarations, limits), invalid);
+  assert.deepEqual(invalidateEvidence(keys, ['sourceHash'], [{ key: 'derivedPlan', dependsOn: badParents }], limits), invalid);
+  assert.deepEqual(invalidateEvidence(keys, ['sourceHash'], [{ key: 'derivedPlan', dependsOn: new Array<Key>(65) }], limits), { complete: false, reason: 'LIMIT' });
+  assert.deepEqual(invalidateEvidence(keys, new Array<Key>(33), deps, limits), { complete: false, reason: 'LIMIT' });
+  const changed = invalidateEvidence(keys, ['sourceHash'], deps, limits);
+  assert.deepEqual(changed, { complete: true, stale: ['sourceHash', 'derivedPlan'], retained: ['policyRevision'] });
+  assert.deepEqual(invalidateEvidence(keys, [], deps, limits), { complete: true, stale: [], retained: keys });
+  if (!changed.complete) assert.fail('dense input');
+  const previous = [known<Key, string>('derivedPlan', 'plan-old', 'derived'), known<Key, string>('policyRevision', 'archive-v1')];
+  const rows = items(resolveEvidence<Key, string>([{ key: 'derivedPlan', accepts: ['derived'] }, req('policyRevision')],
+    previous.filter(item => changed.retained.includes(item.key)), context, equal, 8));
+  assert.equal(rows[0]?.status, 'missing');
+  assert.equal(rows[1]?.status === 'resolved' && rows[1].value, 'archive-v1');
 });
