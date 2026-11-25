@@ -21,6 +21,9 @@ test('wrong class category and acquisition are rejected',()=>{
 test('missing symbol, fake method, wrong static and leaked internal members rejected',()=>{
  const mutations=[
   ['KernelLifecycle',r=>({...r,members:r.members.filter(m=>m.name!=='[Symbol.asyncDispose]')})],
+  ['KernelLifecycle',r=>({...r,members:r.members.map(m=>m.name==='[Symbol.asyncDispose]'?{...m,name:'__@asyncDispose@123'}:m)})],
+  ['SQLiteDatabaseError',r=>({...r,members:[...r.members,{name:'stack',scope:'instance'}]})],
+  ['SQLiteDatabaseError',r=>({...r,members:[...r.members,{name:'captureStackTrace',scope:'static'}]})],
   ['KernelLifecycle',r=>({...r,members:[...r.members,{name:'close',scope:'instance'}]})],
   ['VectorQueryElement',r=>({...r,members:r.members.map(m=>({...m,scope:'static'}))})],
   ['InteractionElement',r=>({...r,members:[...r.members,{name:'internal',scope:'instance'}]})],

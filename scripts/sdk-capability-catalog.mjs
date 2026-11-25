@@ -125,7 +125,7 @@ export function compareDeclarations(source,decl){
 const escapeCode=s=>String(s).replaceAll('`','\\`').replaceAll('|','\\|');
 function render(rows){
  verifyInventory(rows);
- const out=['# SDK 能力及成员目录','','由实际根声明、源码文档分类及独立公开合同生成；不是 Runtime registry。包根 import，签名位置为安装包 dist/。按场景读 [指南](../SKILL.md)，领域规则和权限仍由应用负责。',''];
+ const out=['# SDK 能力及成员目录','','由实际根声明、源码文档分类及独立公开合同生成；不是 Runtime registry。包根 import，签名位置为安装包 dist/。按场景读 [指南](../SKILL.md)，领域规则和权限仍由应用负责。','','成员范围：列出 DH 声明拥有的公开构造、静态/实例成员及支持合同。外部继承的 JavaScript Error/Node API（如 name/message/stack 或平台静态方法）是外部合同，不计入 DH 自有能力；如需使用请查相应平台声明。符号成员使用源码可读写法（如 [Symbol.asyncDispose]），不把编译器生成的内部 __@ 名称当作公开 API。不要用反射出来的全部继承成员替代声明目录。',''];
  for(const family of families){
    out.push('## '+family,'','[适用场景、限制与示例](capabilities/'+family+'.md)','');
    for(const r of rows.filter(x=>x.family===family)){
