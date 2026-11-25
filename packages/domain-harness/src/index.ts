@@ -11,3 +11,4 @@ export * from './standard-cli.js';
 export * from './standard-interaction.js';
 export * from './standard-evidence.js';
 export * from './standard-decision.js';
+export * from './standard-candidates.js';
