@@ -21,3 +21,11 @@ Gateway jobs: initial final verify job_01M89N3RT0008FQHG2PHNVD08N; maintenance v
 ## QA-09A 后续整改（非原生成者成果）
 
 #1759：保留首次生成与维护原始提交及原日志；本次仅透传 onPrompt 返回值，补充同步提交后意外返回 resolved/rejected Promise 的两项负对照。实际 Node 22.12.0、原 SDK f81217f5e7c5c17336d1375626f5251287f43847dd356b3438017a90b9fc9616；36 项记录见 evidence/qa09a-notification-run.txt。新 SDK 工件资格另行绑定。
+
+## R80 · I06 澄清封装迁移（集成者后续修改，非陌生生成者成果）
+
+上文是 R65/R69 原始历史收据与旧 SDK 用法，原提交、旧锁和日志保持不变。当前源使用新公共 `ClarificationElement.prepare`，把绑定交给 InteractionElement 并消费实际 `event.clarification`，删除 preparation/prompt 手工配对与通知包装；领域算术、约束、事实读回、候选判断及原测试不变。没有购买效果、独立新生成或因果效率主张。
+
+当前实现须使用已保留的 R80 集成候选 tarball SHA256 `eefa4ec9db2863dcee2665eba45750d8f0e8b42f727da73e3e08bbf92f830aee`。在独立副本中放置 `sdk.tgz`，将 `evidence/r80-clarification-package-lock.json` 复制为该副本的 `package-lock.json`，运行原 npm ci --ignore-scripts 及 npm run verify。仓内原根锁只用于历史源码重放，不能配当前源。新锁 SHA256 b0bd06a9ae18c1d62334c2d053e7cfeb78819cbfc1933f420d4f0111260888af。
+
+实际独立安装 Node22.12.0/Linux/npm11.19（Gateway job_01M8A424YF00DQWB90005196FG）：原 36 JSON case 全部通过，evidence/r80-clarification-run.txt 与 qa09a-notification-run.txt 逐字节一致（SHA256 1ffaa7cf0d34156e9864b622def7a93fcb7713fab8241011613c7eab66e9199f）。R66 原独立数值脚本在当前实际产物重放维护态 60 个 demand/service 组合，与原独立评价输入日志逐字节一致；这是集成者重放，不是新的独立评价。最终接受须绑定集成 PR 和此见证增量，Q5/Q6 是另行冻结的实验，R65 原非盲限制不改变。

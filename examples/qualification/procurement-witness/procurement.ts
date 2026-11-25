@@ -1,7 +1,7 @@
 import { InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision,
-  prepareCandidates, buildClarification, mapClarificationResponse, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
+  prepareCandidates, ClarificationElement, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
 import type { InteractionPrompt, InteractionEvent, InteractionDecision, InteractionField, EvidenceObservation,
-  ClarificationPreparation, ClarificationField, StandardWorkflowOutcome, NativeWorkflowContext, WorkflowLimits } from '@kaicreator/domain-harness';
+  ClarificationField, StandardWorkflowOutcome, NativeWorkflowContext, WorkflowLimits } from '@kaicreator/domain-harness';
 
 export type Service = 'normal' | 'urgent';
 export interface Offer { readonly id: string; readonly pack?: number | null; readonly price?: number | null; readonly maxPacks?: number | null; readonly minPacks?: number | null; readonly ship?: number | null; readonly days?: number | null }
@@ -69,12 +69,10 @@ export function assessOffers(facts:OfferSnapshot,demand:number,service:Service) 
   return ok({assessment:{eligible,recommended,unknown},result,current});
 }
 export function startProcurement(input:string|Request,readFacts:()=>OfferSnapshot,limits:WorkflowLimits,onPrompt?:(p:InteractionPrompt,i:InteractionElement)=>void) {
-  let prompt:InteractionPrompt|undefined;
-  let prepared:Extract<ClarificationPreparation<Key>,{status:'prompt'}>|undefined;
   let snapshot:string|undefined;
   let handling=0;
-  const interaction=new InteractionElement({onPrompt:p=>{prompt=p;return onPrompt?.(p,interaction);}});
-  const decide=async(state:Readonly<State>,event:InteractionEvent,root:NativeWorkflowContext,signal:AbortSignal):Promise<Outcome<InteractionDecision<State,Intent>>>=>{
+  const interaction=new InteractionElement(onPrompt===undefined?undefined:{onPrompt});
+  const decide=async(state:Readonly<State>,event:InteractionEvent<Key>,root:NativeWorkflowContext,signal:AbortSignal):Promise<Outcome<InteractionDecision<State,Intent,Key>>>=>{
     if(signal.aborted)return stop('REJECT','CANCELLED');
     const fetched=await root.invoke(readFacts);
     if(fetched.status!=='COMPLETE')return fetched;
@@ -84,9 +82,8 @@ export function startProcurement(input:string|Request,readFacts:()=>OfferSnapsho
     snapshot=identity;
     let request=state.request;
     if(event.kind==='response'){
-      if(!prompt||!prepared)return stop('FAILED','MISSING_BINDING');
-      const mapped=mapClarificationResponse(prepared,prompt,event);
-      if(mapped.status==='failed')return stop('REJECT','INVALID_RESPONSE');
+      const mapped=event.clarification;
+      if(!mapped)return stop('FAILED','MISSING_BINDING');
       if(mapped.status==='other'){
         if(event.response.action==='no-fit')return stop('ASK','NO_FIT');
         if(event.response.action==='revise'&&'text' in event.response){
@@ -152,15 +149,14 @@ export function startProcurement(input:string|Request,readFacts:()=>OfferSnapsho
       field={id:'plan',kind:'choice',label:'Supplier / pack count',required:true,options:[],completeness:'complete'};
       mapping={field,evidenceKey:key,applicable:'yes',confirmation:'user',candidates:{current:candidate.current,result:candidate.result}};
     }else return stop('FAILED','UNEXPECTED_DECISION');
-    const built=buildClarification(evidence,selection,{decisionKey:key,title:key==='service'?'Choose delivery deadline':'Choose a legal plan',
+    const built=ClarificationElement.prepare(evidence,selection,{decisionKey:key,title:key==='service'?'Choose delivery deadline':'Choose a legal plan',
       description:candidate&&!candidate.result.complete?'Incomplete supplier evidence; no global recommendation.':'Explicit selection required.',
       actions:['submit','revise','no-fit','cancel']},[mapping]);
     if(built.status!=='prompt')return stop('FAILED','CLARIFICATION_'+('reason' in built?built.reason:built.status));
-    prepared=built;
-    return ok({kind:'clarify',state:{request},prompt:built.prompt});
+    return ok({kind:'clarify',state:{request},clarification:built.clarification});
   };
   const initial=parse(input);
-  const result=initial?runInteractiveRecognitionHandling<State,Intent,ProcurementResult>(interaction,limits,{request:initial},decide,async(intent,s)=>{
+  const result=initial?runInteractiveRecognitionHandling<State,Intent,ProcurementResult,Key>(interaction,limits,{request:initial},decide,async(intent,s)=>{
     // Same root, explicit final check of authoritative facts; no purchasing operation.
     if(s.signal.aborted)return stop('REJECT','CANCELLED');
     const checked=await s.root.invoke(readFacts);
