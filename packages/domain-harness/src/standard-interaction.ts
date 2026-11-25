@@ -67,11 +67,7 @@ export class InteractionElement {
     if (!pending.notifying) pending.finish(ok(response));
     return { accepted: true };
   }
-  #wait(spec: InteractionPromptSpec): Promise<Outcome<InteractionResponse>> {
-    if (this.#abort.signal.aborted) return Promise.resolve(stop('REJECT', 'CANCELLED'));
-    let prompt: InteractionPrompt;
-    try { prompt = makePrompt(spec, this.#id, ++this.#revision); }
-    catch { return Promise.resolve(stop('FAILED', 'INTERACTION_INVALID_PROMPT')); }
+  #wait(prompt: InteractionPrompt): Promise<Outcome<InteractionResponse>> {
     if (this.#abort.signal.aborted) return Promise.resolve(stop('REJECT', 'CANCELLED'));
     return new Promise(resolve => {
       const pending: Pending = { prompt, notifying: true, finish: result => {
@@ -118,7 +114,12 @@ export class InteractionElement {
         if (decision.invalidate !== undefined) this.#invalidate(decision.invalidate);
         if (decision.kind === 'ready') return ok(decision.intent);
         state = decision.state;
-        const response = await root.invokeOutcome(() => this.#wait(decision.prompt));
+        // 无法发布的表单在等待预留之前拒绝，不额外消耗等待额度。
+        let prompt: InteractionPrompt;
+        try { prompt = makePrompt(decision.prompt, this.#id, ++this.#revision); }
+        catch { return stop('FAILED', 'INTERACTION_INVALID_PROMPT'); }
+        if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
+        const response = await root.invokeOutcome(() => this.#wait(prompt));
         if (response.status !== 'COMPLETE') return response;
         if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
         const accepted = response.value;
