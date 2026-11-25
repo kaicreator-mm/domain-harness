@@ -1,5 +1,5 @@
 import { SQLiteDatabaseElement, runRecognitionHandling } from '@kaicreator/domain-harness';
-import type { WorkflowLimits } from '@kaicreator/domain-harness';
+import type { NativeWorkflowContext, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
 import { commandDigest, commandOf, stop } from './authority.js';
 import type { Reply, ReserveCommand } from './authority.js';
 
@@ -70,12 +70,23 @@ export class ReservationElement {
     } catch { return stop('UNKNOWN', 'CLIENT_RECEIPT_UNAVAILABLE'); }
     return reply;
   }
+  #recognize(input: unknown, mode: ReservationMode): StandardWorkflowOutcome<ReserveCommand> {
+    if (mode !== 'FIRST_SUBMIT' && mode !== 'RECOVER') return stop('REJECT', 'COMMAND_MODE_REQUIRED');
+    const command = commandOf(input);
+    return command ? { status: 'COMPLETE', value: command } : stop('REJECT', 'COMMAND_INPUT_INVALID');
+  }
   async run(input: unknown, limits: WorkflowLimits, mode: ReservationMode): Promise<Reply> {
-    return runRecognitionHandling(limits, () => {
-      if (mode !== 'FIRST_SUBMIT' && mode !== 'RECOVER') return stop('REJECT', 'COMMAND_MODE_REQUIRED');
-      const command = commandOf(input);
-      return command ? { status: 'COMPLETE', value: command } : stop('REJECT', 'COMMAND_INPUT_INVALID');
-    }, command => this.#dispatch(command, mode));
+    return runRecognitionHandling(limits, () => this.#recognize(input, mode), command => this.#dispatch(command, mode));
+  }
+
+  /** 复用当前意图根预算；取消只阻止未进入的请求，已经进入的账本和 Host 操作必须收敛。 */
+  async runIn(root: NativeWorkflowContext, input: unknown, mode: ReservationMode, signal: AbortSignal): Promise<Reply> {
+    if (signal.aborted) return stop('REJECT', 'CANCELLED');
+    const recognized = await root.child(0, child => child.invokeOutcome(() => this.#recognize(input, mode)));
+    if (recognized.status !== 'COMPLETE') return recognized;
+    if (signal.aborted) return stop('REJECT', 'CANCELLED');
+    return root.child(0, child => child.invokeOutcome(() => signal.aborted
+      ? stop('REJECT', 'CANCELLED') : this.#dispatch(recognized.value, mode)));
   }
   close(): void { this.#db.close(); }
 }

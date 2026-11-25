@@ -144,6 +144,9 @@ try {
     strictPolicyStatus:'REJECT',multiNodeNormal:5,rejectedBranchNodes:4,
     inventoryReusesStandardReader:true,singleNode:'COMPLETE',
   });
+  assert.deepEqual(app.interaction,{independentIntents:true,wrongIntentRejected:true,revision:true,
+    dependencyBlocked:true,closeWaited:true,exactAndShort:true});
+  assert.deepEqual(app.cli,{cases:7,realReadline:true});
   // 明确锁定已安装 App 的跨 Reader/Guard/子 Hook 共享预算结果。
   assert.deepEqual(app.budget,{
     successReads:4,
@@ -360,13 +363,13 @@ try {
     join(root,'node_modules/typescript/bin/tsc'),'--pretty','false','-p',join(consumer,'tsconfig-action.json'),
   ],consumer);
   const actionProbe=[
-    "import { actionCases } from './action-dist/verify.js';",
-    "for (const [i, [, verify]] of actionCases.entries()) { try { await verify(); } catch { console.log('SDK_ACTION_CASE_FAILED '+i); throw Error('ACTION_CASE_FAILED'); } }",
-    "console.log('SDK_ACTION_PROBE_PASS '+actionCases.length);",
+    "import { actionCases, interactiveActionCases } from './action-dist/verify.js';",
+    "for (const [i, [, verify]] of [...actionCases,...interactiveActionCases].entries()) { try { await verify(); } catch { console.log('SDK_ACTION_CASE_FAILED '+i); throw Error('ACTION_CASE_FAILED'); } }",
+    "console.log('SDK_ACTION_PROBE_PASS '+(actionCases.length+interactiveActionCases.length));",
   ].join('\n');
   assert.equal(run('ACTION_PROBE',consumerNode,[
     '--unhandled-rejections=strict','--input-type=module','--eval',actionProbe,
-  ],consumer).trim(),'SDK_ACTION_PROBE_PASS 8');
+  ],consumer).trim(),'SDK_ACTION_PROBE_PASS 11');
 
   // T07：两个新增 Business Package 在同一个外部应用与实际 Host 中组合。
   cpSync(join(root,'examples/native-domain-app/combined'),join(consumer,'combined'),{recursive:true});

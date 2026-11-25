@@ -3,6 +3,7 @@ import { KernelLifecycle, StandardWorkflowSession, routeWorkflowOutcome } from '
 import * as kdp from './packages/kdp.mjs';
 import * as business from './packages/business.mjs';
 import * as workflowInit from './packages/workflow-init.mjs';
+import { verifyReferenceInteractions, verifyReferenceCli } from './packages/interaction-reference.mjs';
 
 async function executeCase(limits) {
   const events = [];
@@ -108,10 +109,13 @@ await initApp.run({
   assert.deepEqual(actualInit.single,{status:'COMPLETE',value:42});
 });
 
+const interaction=await verifyReferenceInteractions();
+const cli=verifyReferenceCli();
 console.log(JSON.stringify({
   app:'native-domain-app',
   status:'PASS',
   ...result,
+  interaction,cli,
   retainedBehavior:{
     initWorkflow:true,
     policySelectedByData:actualInit.normal.value.policyId,

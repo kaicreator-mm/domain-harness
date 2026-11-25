@@ -13,14 +13,15 @@ const policyFiles = {
 const stockFile = new URL('../data/inventory-policy.yaml',import.meta.url);
 
 /** 结构化领域内容是由业务选取的普通文件，不由 SDK 生成/校验其领域正确性。 */
-export async function runOrderPolicy(which, trace = [], policy = new OrderPolicyElement()) {
+export async function runOrderPolicyIn(root, which, trace = [], policy = new OrderPolicyElement(), signal, expected) {
+  const cancelled=()=>({status:'REJECT',reason:{code:'CANCELLED',message:'Order policy evaluation cancelled'}});
+  if(signal?.aborted)return cancelled();
   const url = policyFiles[which];
   if (url === undefined) {
     return {status:'UNKNOWN',reason:{code:'ORDER_POLICY_NOT_SELECTED',message:'Unknown policy selection'}};
   }
   const reader = new JsonReader();
-  const session = new StandardWorkflowSession({maxCalls:5,maxSteps:7,maxDepth:1});
-  return session.run(root=>root.child(0,async child=>{
+  return root.child(0,async child=>{
     const selected = await child.invoke(()=>{
       trace.push('policy:read');
       return reader.read(readFileSync(url,'utf8'));
@@ -29,6 +30,9 @@ export async function runOrderPolicy(which, trace = [], policy = new OrderPolicy
     if(selected.value.kind!=='SUCCEEDED') {
       return {status:'FAILED',reason:{code:'ORDER_POLICY_UNREADABLE',message:'Policy could not be read'}};
     }
+    if(signal?.aborted)return cancelled();
+    if(expected&&(selected.value.value?.id!==expected.id||selected.value.value?.minimumTotal!==expected.minimumTotal))
+      return {status:'UNKNOWN',reason:{code:'POLICY_FACTS_CHANGED',message:'Selected policy changed before evaluation'}};
     const knowledge = new OrderPolicyKnowledgeElement(selected.value.value);
     const outcome = await child.leaf({
       start:()=>{trace.push('policy:start');},
@@ -37,7 +41,7 @@ export async function runOrderPolicy(which, trace = [], policy = new OrderPolicy
     });
     // 具名 Switch：只允许 COMPLETE 进入下一个 Node；拒绝时不能执行 finalize。
     return routeWorkflowOutcome(outcome,{
-      COMPLETE:decision=>child.leaf({
+      COMPLETE:decision=>signal?.aborted?cancelled():child.leaf({
         run:()=>{trace.push('policy:finalize');return policy.finalize(decision.value);},
       }),
       REJECT:result=>result,
@@ -46,7 +50,12 @@ export async function runOrderPolicy(which, trace = [], policy = new OrderPolicy
       UNKNOWN:result=>result,
       FAILED:result=>result,
     });
-  }));
+  });
+}
+
+export async function runOrderPolicy(which, trace = [], policy = new OrderPolicyElement()) {
+  return new StandardWorkflowSession({maxCalls:5,maxSteps:7,maxDepth:1})
+    .run(root=>runOrderPolicyIn(root,which,trace,policy));
 }
 
 export async function runInventoryPolicy() {
