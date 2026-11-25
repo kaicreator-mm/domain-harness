@@ -2,7 +2,11 @@
 
 > [权威目录](./README.md) · Owner 现行新架构决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。本文件同时保留 R151 初审 REWORK 与后续 R160 通过的时间顺序；历史状态不得覆盖新收据。
 
-## R30 · T31B 已接受、T31C 候选
+## R33 · T31C 已接受、T31D 候选
+
+- [R33](https://github.com/kaicreator-mm/domain-harness/issues/1738#issuecomment-7159680340) T31C #1738 已关闭，R32 0/0/0、CI3201受审HEAD成功，#1739 合入 9f7bc5af899f9f24a44a1b9cc4c245d028585452。T31D #1740 Candidates 源码候选（LIFE-17）待独立审核及完整适用验证；E–F/32–35依赖待准入；13产品Oracle NOT_RUN。未发布。
+
+## R30 · T31B 已接受、T31C 候选（历史）
 
 - [R30](https://github.com/kaicreator-mm/domain-harness/issues/1736#issuecomment-7159360100) T31B #1736 已关闭，R29 0/0/0、CI3200受审HEAD成功，#1737 合入 2a8159c0eff5bdf8a7fd57008526bc1e716b618c。T31C #1738 Decision 源码候选（LIFE-16）待独立审核及完整适用验证；D共享写集顺序集成，E–F/32–35依赖待准入；13产品Oracle NOT_RUN。未发布。
 
