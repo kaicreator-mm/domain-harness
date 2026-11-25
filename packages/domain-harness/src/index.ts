@@ -9,3 +9,4 @@ export * from './standard-vector-graph.js';
 export * from './standard-expression.js';
 export * from './standard-cli.js';
 export * from './standard-interaction.js';
+export * from './standard-evidence.js';
