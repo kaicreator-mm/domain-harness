@@ -1,3 +1,4 @@
+import { types } from 'node:util';
 import { dense, validLimit, dependencyOrder } from './semantic-data.js';
 /** 局部意图证据的来源类别；推荐只作为提案，默认需显式许可。 */
 export type EvidenceOrigin = 'authority' | 'user' | 'derived' | 'default' | 'recommendation';
@@ -36,6 +37,12 @@ const origins: readonly EvidenceOrigin[] = ['authority', 'user', 'derived', 'def
 const failure = (reason: Failure['reason']): Failure => Object.freeze({ complete: false, reason });
 const nonempty = (s: string): boolean => typeof s === 'string' && s.trim().length > 0;
 const distinct = (xs: readonly unknown[]): boolean => new Set(xs).size === xs.length;
+// 策略是同步可信回调；错误返回的真实 Promise 只观察拒绝，不等待或使用其结果。
+function synchronous(value: unknown): boolean {
+  if (!types.isPromise(value)) return true;
+  void Promise.prototype.then.call(value, undefined, () => undefined);
+  return false;
+}
 
 
 /** 证据值由可信域提供且保持不可变；复制冻结元数据，不复制任意业务对象。 */
@@ -57,6 +64,7 @@ export function resolveEvidence<K extends string, V>(
   if (!validLimit(maxItems, MAX_ITEMS) || requirements.length > maxItems || observations.length > maxItems || context.revisions.size > maxItems) return failure('LIMIT');
   if (!dense(requirements) || !dense(observations)) return failure('INVALID_EVIDENCE');
   if (!nonempty(context.scope) || (context.asOf !== undefined && !Number.isFinite(context.asOf))) return failure('INVALID_EVIDENCE');
+  if (types.isAsyncFunction(policy.equal) || (policy.rank !== undefined && types.isAsyncFunction(policy.rank))) return failure('POLICY_FAILED');
   const grouped = new Map<K, EvidenceObservation<K, V>[]>();
   for (const req of requirements) {
     if (!nonempty(req.key) || grouped.has(req.key) || !req.accepts.length || req.accepts.length > 4 || !dense(req.accepts) || !distinct(req.accepts) ||
@@ -83,7 +91,7 @@ export function resolveEvidence<K extends string, V>(
       for (const item of applicable) {
         if (item.origin === 'recommendation' || !req.accepts.includes(item.origin)) continue;
         const rank = policy.rank === undefined ? 0 : policy.rank(item);
-        if (!Number.isFinite(rank)) return failure('POLICY_FAILED');
+        if (!synchronous(rank) || !Number.isFinite(rank)) return failure('POLICY_FAILED');
         if (rank > highest) { highest = rank; selected = [item]; }
         else if (rank === highest) selected.push(item);
       }
@@ -92,7 +100,7 @@ export function resolveEvidence<K extends string, V>(
       const first = known[0];
       const mismatch = first !== undefined && known.slice(1).some(item => {
         const equal = policy.equal(req.key, first.value, item.value);
-        if (typeof equal !== 'boolean') throw new Error('EVIDENCE_POLICY_RESULT');
+        if (!synchronous(equal) || typeof equal !== 'boolean') throw new Error('EVIDENCE_POLICY_RESULT');
         return !equal;
       });
       if (mismatch || (first !== undefined && selected.some(item => item.state === 'not-applicable'))) items.push(Object.freeze({ ...base, status: 'conflict', reason: 'CONFLICTING_EVIDENCE' }));

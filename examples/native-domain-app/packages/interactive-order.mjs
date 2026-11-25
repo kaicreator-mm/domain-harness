@@ -38,7 +38,7 @@ function parse(input) {
 /** 当前正式策略由 Reference 应用选择；比较仅评估假设规则，不改变正式规则或授予权限。 */
 export function createOrderInteraction(input, onPrompt=()=>{}, budget={maxCalls:22,maxSteps:24,maxDepth:1}) {
   let binding,prompt;
-  const interaction=new InteractionElement({onPrompt:p=>{prompt=p;onPrompt(p,interaction);}});
+  const interaction=new InteractionElement({onPrompt:p=>{prompt=p;return onPrompt(p,interaction);}});
   const decide=async(state,event,root,signal)=>{
     let choice=state.choice,invalidate;
     if(event.kind==='initial'){

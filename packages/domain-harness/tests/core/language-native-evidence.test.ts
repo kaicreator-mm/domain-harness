@@ -214,3 +214,25 @@ test('稀疏依赖输入拒绝，旧计划不得进入可复用集合', () => {
   assert.equal(rows[0]?.status, 'missing');
   assert.equal(rows[1]?.status === 'resolved' && rows[1].value, 'archive-v1');
 });
+
+test('同步证据策略拒绝 async 声明和真实 Promise 返回，不泄漏拒绝或部分证据', async () => {
+  const observations = [known('x', 1), known('x', 2)];
+  const expected = { complete: false, reason: 'POLICY_FAILED' };
+  let invoked = 0;
+  const asyncEqual = async () => { invoked++; throw Error('PRIVATE_EVIDENCE_MARKER'); };
+  const asyncRank = async () => { invoked++; return 1; };
+  for (const policy of [
+    { equal: asyncEqual as unknown as () => boolean },
+    { ...equal, rank: asyncRank as unknown as () => number },
+  ]) assert.deepEqual(resolveEvidence([req('x')], observations, context, policy, 8), expected);
+  assert.equal(invoked, 0);
+  for (const reject of [false, true]) {
+    const promise = () => reject ? Promise.reject(Error('PRIVATE_EVIDENCE_MARKER')) : Promise.resolve(1);
+    assert.deepEqual(resolveEvidence([req('x')], observations, context,
+      { equal: promise as unknown as () => boolean }, 8), expected);
+    assert.deepEqual(resolveEvidence([req('x')], observations, context,
+      { ...equal, rank: promise as unknown as () => number }, 8), expected);
+  }
+  await new Promise<void>(resolve => setImmediate(resolve));
+  assert.equal(items(resolveEvidence([req('x')], observations, context, equal, 8))[0]?.status, 'conflict');
+});
