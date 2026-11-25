@@ -9,7 +9,7 @@ const values = [
   'StandardWorkflowSession', 'routeWorkflowOutcome', 'JsonReader', 'YamlReader',
   'readJson', 'readYaml', 'writeJson', 'writeYaml', 'BoundedQueryElement',
   'SQLiteDatabaseElement', 'SQLiteDatabaseError', 'VectorQueryElement', 'GraphQueryElement',
-  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence', 'selectNextDecision', 'prepareCandidates',
+  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence', 'selectNextDecision', 'prepareCandidates', 'buildClarification', 'mapClarificationResponse',
 ].sort();
 const types = [
   'CorePackageMetadata', 'DomainAppContext', 'LifecycleInitContext', 'PackageInitElement',
@@ -26,6 +26,7 @@ const types = [
   'EvidenceOrigin', 'EvidenceObservation', 'EvidenceRequirement', 'EvidenceContext', 'EvidenceResolution', 'EvidenceDependency', 'EvidenceInvalidation',
   'DecisionCondition', 'DecisionDescription', 'DecisionSelection',
   'CandidateEntry', 'CandidateSource', 'CandidateAssessment', 'CandidateProjection', 'CandidatePreparation',
+  'ClarificationField', 'ClarificationPreparation', 'ClarificationResponse',
 ];
 
 /** 安装后检查实际字节、公开根运行行为并准备类型探针；调用者仍须完成原有 TYPECHECK。 */
@@ -37,6 +38,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const path of ['dist/standard-evidence.js', 'dist/standard-evidence.d.ts']) assert.ok(packedPaths.includes(path));
   for (const path of ['dist/standard-decision.js', 'dist/standard-decision.d.ts']) assert.ok(packedPaths.includes(path));
   for (const path of ['dist/standard-candidates.js', 'dist/standard-candidates.d.ts']) assert.ok(packedPaths.includes(path));
+  for (const path of ['dist/standard-clarification.js', 'dist/standard-clarification.d.ts']) assert.ok(packedPaths.includes(path));
   const readme = readFileSync(join(installed, 'README.md'));
   assert.deepEqual(readme, readFileSync(join(packageDir, 'README.md')));
   const text = readme.toString('utf8');
@@ -54,7 +56,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const name of [...values, ...types]) assert.ok(text.includes('`' + name + '`'), 'S05_API_NOT_DOCUMENTED:' + name);
   writeFileSync(join(consumer, 's05-types.mts'), [
     `import type { ${types.join(', ')} } from '@kaicreator/domain-harness';`,
-    "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates } from '@kaicreator/domain-harness';",
+    "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, buildClarification, mapClarificationResponse } from '@kaicreator/domain-harness';",
     "const result: Promise<StandardWorkflowOutcome<string>> = runRecognitionHandling({maxCalls:2,maxSteps:5,maxDepth:1}, () => ({status:'COMPLETE',value:{n:2}}), intent => ({status:'COMPLETE',value:String(intent.n)}));",
     "const stdout: Promise<string> = new CliElement().run('trusted-tool', ['--version']);",
     "// @ts-expect-error a number intent is not a string",
@@ -93,7 +95,15 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "void prepareCandidates(candidateSource,{scope:'a',revision:'r1'},{...candidatePolicy,assess:()=>true},{maxVisited:4,maxReturned:4});",
     "// @ts-expect-error numeric comparison cells are not semantic display strings",
     "void prepareCandidates(candidateSource,{scope:'a',revision:'r1'},{...candidatePolicy,project:()=>({label:'x',priority:0,cells:[1]})},{maxVisited:4,maxReturned:4});",
-    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence; void selection; void candidateResult;",
+    "const clarificationField: ClarificationField<'x',number> = {field:{kind:'number',id:'answer',label:'Answer',required:true},evidenceKey:'x',applicable:'yes',confirmation:'user'};",
+    "const clarificationTemplate = {decisionKey:'x',title:'Answer',actions:['submit'] as const};",
+    "const clarification: ClarificationPreparation<'x'> = buildClarification(resolution,selectNextDecision([decision],{maxItems:4,maxDependencies:4}),clarificationTemplate,[clarificationField]);",
+    "// @ts-expect-error field is bound to domain key x",
+    "void buildClarification<'x','x',number>(resolution,selectNextDecision([decision],{maxItems:4,maxDependencies:4}),clarificationTemplate,[{...clarificationField,evidenceKey:'other'}]);",
+    "// @ts-expect-error confirmation does not grant authority",
+    "void buildClarification<'x','x',number>(resolution,selectNextDecision([decision],{maxItems:4,maxDependencies:4}),clarificationTemplate,[{...clarificationField,confirmation:'authority'}]);",
+    "const mapped = (p: InteractionPrompt,event: InteractionEvent): ClarificationResponse<'x'>|undefined => clarification.status==='prompt'?mapClarificationResponse(clarification,p,event):undefined;",
+    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence; void selection; void candidateResult; void mapped;",
   ].join('\n'));
   writeFileSync(join(consumer, 's05-standard-probe.mjs'), [
     "import assert from 'node:assert/strict';",
@@ -130,6 +140,13 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "assert.equal(candidate.status,'available');assert.equal(candidate.complete,false);assert.equal(candidate.options[0].recommended,undefined);assert.deepEqual(candidate.comparison[0].cells,{one:'1'});",
     "assert.equal(sdk.prepareCandidates({...candidateSource,entries:[]},candidateCurrent,candidatePolicy,{maxVisited:4,maxReturned:4}).status,'empty');",
     "assert.equal(sdk.prepareCandidates(candidateSource,{...candidateCurrent,revision:'r2'},candidatePolicy,{maxVisited:4,maxReturned:4}).reason,'STALE_SOURCE');",
+    "const clarifyEvidence=sdk.resolveEvidence([{key:'x',accepts:['user']}],[{key:'x',state:'known',origin:'recommendation',source,value:'one'}],evidenceContext,{equal:(_k,l,r)=>l===r},4);",
+    "const clarifyDecision=sdk.selectNextDecision([{...decision,key:'choose',dependsOn:[]}],decisionLimits);",
+    "const clarifyPrepared=sdk.buildClarification(clarifyEvidence,clarifyDecision,{decisionKey:'choose',title:'Choose',actions:['submit']},[{field:{kind:'choice',id:'answer',label:'Answer',required:true,options:[],completeness:'incomplete'},evidenceKey:'x',applicable:'yes',confirmation:'user',projectPrefill:o=>({value:o.value,source:'domain'}),candidates:{current:candidateCurrent,result:candidate}}]);",
+    "assert.equal(clarifyPrepared.status,'prompt');assert.equal(clarifyPrepared.prompt.fields[0].prefill.source,'recommendation:domain');assert.equal(clarifyPrepared.prompt.fields[0].completeness,'incomplete');",
+    "let clarifyPrompt;const clarifyElement=new sdk.InteractionElement({onPrompt:p=>{clarifyPrompt=p;const env={intentId:p.intentId,revision:p.revision,decisionKey:p.decisionKey};assert.equal(clarifyElement.submit({...env,action:'submit',values:{}}).accepted,false);assert.equal(clarifyElement.submit({...env,action:'submit',values:{answer:'one'}}).accepted,true);}});",
+    "const clarificationOutcome=await clarifyElement.run({maxCalls:3,maxSteps:4,maxDepth:0},scope=>scope.resolve(0,(_state,event)=>{if(event.kind==='initial')return ok({kind:'clarify',state:1,prompt:clarifyPrepared.prompt});const mapped=sdk.mapClarificationResponse(clarifyPrepared,clarifyPrompt,event);assert.deepEqual(mapped,{status:'values',action:'submit',values:[{key:'x',origin:'user',value:'one'}]});return ok({kind:'ready',intent:mapped.values[0].value});}));",
+    "assert.deepEqual(clarificationOutcome,ok('one'));",
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');
