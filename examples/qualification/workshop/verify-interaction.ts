@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { InteractionElement, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
+import { CliElement, GraphQueryElement, InteractionElement, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
 import type { InteractionDecision, InteractionPrompt, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
 import { scheduleInteractively, type ScheduleInput, type ScheduleFacts } from './interactive.js';
 import { baseline, downtime, WorkshopElement, validateSchedule, type Plan, type Task, type Policy, type SolverElement } from './plan.js';
@@ -35,6 +35,26 @@ export async function verifyInteraction(tasks:readonly Task[], solver:SolverElem
   }}).result;assert.equal(solver.calls-beforeReview,2);assert.equal(reviewed.status,'COMPLETE');if(reviewed.status!=='COMPLETE'||!reviewed.value.previous)throw Error('REVIEW');assertPlan(reviewed.value.previous,baseline);assertPlan(reviewed.value.plan,downtime);
   const beforeCancel=solver.calls;const cancelled=await scheduleInteractively(limits(8,12),'排程',facts,solver,{onPrompt:(_p,e)=>e.cancel()}).result;assert.equal(cancelled.status,'REJECT');assert.equal(solver.calls,beforeCancel);
   const nofit=await scheduleInteractively(limits(8,12),'排程',facts,solver,{onPrompt:(p,e)=>{assert.equal(e.submit({...envelope(p),action:'no-fit'}).accepted,true);}}).result;assert.equal(nofit.status,'ASK');assert.equal(solver.calls,beforeCancel);
+  // Observe actual graph/CLI boundaries, without replacing either professional result.
+  const search=GraphQueryElement.prototype.search, cliRun=CliElement.prototype.run;
+  for(const review of [false,true]){
+    let active:ReturnType<typeof scheduleInteractively>|undefined,graphs=0,callsAtCancel=-1;
+    const initialCalls=solver.calls;
+    try{
+      GraphQueryElement.prototype.search=function(...args:Parameters<typeof search>){const result=search.apply(this,args);if(++graphs===(review?2:1)){queueMicrotask(()=>{callsAtCancel=solver.calls;active!.interaction.cancel();});}return result;};
+      active=scheduleInteractively(review?limits(13,20):limits(6,10),review?{goal:'what-if',scenario:'shop-v1'}:{goal:'current'},facts,solver,{review,onPrompt(p,e){assert.equal(e.submit({...envelope(p),action:'submit',values:{goal:'current'}}).accepted,true);}});
+      const result=await active.result;
+      assert.deepEqual(result,{status:'REJECT',reason:{code:'CANCELLED',message:'CANCELLED'}});
+      assert.equal(graphs,review?2:1);assert.equal(callsAtCancel-initialCalls,review?1:0);assert.equal(solver.calls,callsAtCancel);
+    }finally{GraphQueryElement.prototype.search=search;}
+  }
+  const beforeEntered=solver.calls;let entered:ReturnType<typeof scheduleInteractively>|undefined,cliEntered=0;
+  try{
+    CliElement.prototype.run=function(...args:Parameters<typeof cliRun>){const result=cliRun.apply(this,args);cliEntered++;entered!.interaction.cancel();return result;};
+    entered=scheduleInteractively(limits(6,10),{goal:'current'},facts,solver);
+    const result=await entered.result;assert.equal(result.status,'COMPLETE');if(result.status==='COMPLETE')assertPlan(result.value.plan,downtime);
+    assert.equal(cliEntered,1);assert.equal(solver.calls-beforeEntered,1);
+  }finally{CliElement.prototype.run=cliRun;}
   // Fixed comparison actually asks all three fields and solves the same what-if model. Calendar response is not authority.
   const fixedKeys=['goal','calendar','scenario'] as const;const fixedAnswers=['what-if',downtime.revision,baseline.revision];let fixedPrompts=0;
   const fixed=new InteractionElement({onPrompt:p=>{const value=fixedAnswers[fixedPrompts++]!;assert.equal(fixed.submit({...envelope(p),action:'submit',values:{[p.decisionKey]:value}}).accepted,true);}});
