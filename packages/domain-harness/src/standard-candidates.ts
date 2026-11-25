@@ -1,3 +1,4 @@
+import { dense, validLimit as limit, opaqueId as id } from './semantic-data.js';
 import { types } from 'node:util';
 import { BoundedQueryElement } from './standard-query.js';
 import type { BoundedQueryLimits } from './standard-query.js';
@@ -33,16 +34,8 @@ export type CandidatePreparation<T> = Readonly<{ status: 'failed'; complete: fal
   incompleteReasons: readonly IncompleteReason[];
 }>;
 const failure = (reason: FailureCode) => Object.freeze({ status: 'failed' as const, complete: false as const, reason });
-const limit = (n: number, max: number): boolean => Number.isSafeInteger(n) && n >= 0 && n <= max;
 function text(value: unknown, allowEmpty = false): value is string {
   return typeof value === 'string' && value.length <= 1024 && Buffer.byteLength(value) <= 1024 && (allowEmpty || value.trim().length > 0);
-}
-function id(value: unknown): value is string {
-  return typeof value === 'string' && value !== 'constructor' && value !== 'prototype' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/u.test(value);
-}
-function dense(xs: readonly unknown[]): boolean {
-  for (let i = 0; i < xs.length; i++) if (!Object.hasOwn(xs, i)) return false;
-  return true;
 }
 function record(value: unknown): value is Record<string, unknown> {
   if (types.isPromise(value)) {
