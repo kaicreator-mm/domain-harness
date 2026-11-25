@@ -17,17 +17,21 @@
   "files": [
     "dist",
     "README.md",
-    "skills/domain-harness-spec"
+    "skills/domain-harness-spec",
+    "vendor"
   ],
   "scripts": {
-    "build": "node ../../scripts/sdk-capability-catalog.mjs --check && node ../../scripts/clean-sdk-dist.mjs && tsc -p tsconfig.build.json && node ../../scripts/sdk-capability-catalog.mjs --pack",
+    "build": "node ../../scripts/prepare-sdk-bundled-xstate.mjs && node ../../scripts/sdk-capability-catalog.mjs --check && node ../../scripts/clean-sdk-dist.mjs && tsc -p tsconfig.build.json && node ../../scripts/sdk-capability-catalog.mjs --pack",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:typecheck": "tsc -p tsconfig.test.json",
     "prepack": "npm run build"
   },
   "dependencies": {
     "@photostructure/sqlite": "2.5.0",
-    "xstate": "5.33.2",
+    "xstate": "file:vendor/xstate-5.33.2-dh.1.tgz",
     "yaml": "2.9.1"
-  }
+  },
+  "bundleDependencies": [
+    "xstate"
+  ]
 }

@@ -31,7 +31,7 @@ const types = [
 ];
 
 /** 安装后检查实际字节、公开根运行行为并准备类型探针；调用者仍须完成原有 TYPECHECK。 */
-export function verifyS05InstalledStandard({ packageDir, installed, consumer, consumerNode, packedPaths, run }) {
+export function verifyS05InstalledStandard({ packageDir, installed, consumer, actorConsumer, consumerNode, packedPaths, run }) {
   assert.ok(packedPaths.includes('README.md'));
   assert.ok(packedPaths.includes('dist/standard-cli.js'));
   assert.ok(packedPaths.includes('dist/standard-cli.d.ts'));
@@ -53,7 +53,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   assert.ok(examples.length>0,'S05_SKILL_EXAMPLES_MISSING');
   writeFileSync(join(exampleDir,'tsconfig.json'),JSON.stringify({compilerOptions:{
     strict:true,target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',
-    skipLibCheck:true,types:['node'],typeRoots:[join(root,'node_modules/@types')],
+    skipLibCheck:false,exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,verbatimModuleSyntax:true,types:['node'],typeRoots:[join(root,'node_modules/@types')],
     lib:['ES2022','DOM','ESNext.Disposable'],outDir:'out',
   },include:['*.mts']}));
   run('SKILL_TYPECHECK',process.execPath,[join(root,'node_modules/typescript/bin/tsc'),'-p',join(exampleDir,'tsconfig.json')],consumer);
@@ -201,8 +201,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   writeFileSync(join(consumer,'s05-foundation-probe.mjs'),[
     "import assert from 'node:assert/strict';",
     "import { setTimeout as delay } from 'node:timers/promises';",
-    "import { KernelLifecycle,StandardWorkflowSession,XStateWorkflowElement } from '@kaicreator/domain-harness';",
-    "import { fromPromise } from 'xstate';",
+    "import { KernelLifecycle,StandardWorkflowSession } from '@kaicreator/domain-harness';",
     "const primary=new Error('SYNTHETIC_PRIMARY'); const trace=[];",
     "class Init {start(){trace.push('init')} async [Symbol.asyncDispose](){trace.push('exit:begin');await delay(15);trace.push('exit:end');}}",
     "const app=new KernelLifecycle([{packageMeta:{id:'kdp',role:'core',order:0},Init}],{async error(){throw new Error('SYNTHETIC_LOGGER_FAILURE');}});",
@@ -213,11 +212,44 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "assert.deepEqual(result,{status:'COMPLETE',value:'done'});assert.deepEqual(calls,['start','run']);",
     "let deniedEntered=false;const denied=await new StandardWorkflowSession({maxCalls:2,maxSteps:4,maxDepth:0}).run(root=>root.leaf({start(){deniedEntered=true},run(){deniedEntered=true;return result},end(){deniedEntered=true}}));",
     "assert.equal(denied.reason.code,'WORKFLOW_CALL_BUDGET');assert.equal(deniedEntered,false);",
-    "const logic=fromPromise(async()=>1);let mapperCalled=false;",
-    "for(const mapper of [async()=>{mapperCalled=true;throw new Error('mapper')},()=>Promise.reject(new Error('mapper returned promise')),()=>Promise.resolve({status:'COMPLETE',value:9})]){const r=await new XStateWorkflowElement(logic,mapper).run(undefined);assert.equal(r.status,'FAILED');assert.equal(r.reason.code,'WORKFLOW_EXECUTION_FAILED');}",
-    "assert.equal(mapperCalled,false);await delay(5);console.log('S05_FOUNDATION_PASS');",
+    "await delay(5);console.log('S05_FOUNDATION_PASS');",
   ].join('\n'));
   assert.equal(run('S05_FOUNDATION',consumerNode,['--unhandled-rejections=strict','s05-foundation-probe.mjs'],consumer).trim(),'S05_FOUNDATION_PASS');
+  // Application-owned native actor logic requires an explicit direct XState dependency.
+  writeFileSync(join(actorConsumer,'actor-types.mts'),[
+    "import assert from 'node:assert/strict';",
+    "import {fromPromise} from 'xstate';",
+    "import {XStateWorkflowElement,JsonReader} from '@kaicreator/domain-harness';",
+    "const logic=fromPromise<number,{quantity:number}>(async ({input})=>input.quantity+1);",
+    "const flow=new XStateWorkflowElement(logic,output=>({status:'COMPLETE',value:output.toFixed(0)}));",
+    "assert.deepEqual(await flow.run({quantity:7}),{status:'COMPLETE',value:'8'});",
+    "assert.equal(new JsonReader().read('{}').kind,'SUCCEEDED');",
+    "if(false){",
+    "// @ts-expect-error wrong native actor input",
+    "await flow.run({quantity:'bad'});",
+    "// @ts-expect-error wrong native actor output mapper",
+    "new XStateWorkflowElement(logic,(output:string)=>({status:'COMPLETE',value:output}));",
+    "}",
+    "console.log('STRICT_NATIVE_ACTOR_PASS');",
+  ].join('\n'));
+  writeFileSync(join(actorConsumer,'tsconfig.json'),JSON.stringify({compilerOptions:{
+    strict:true,target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',
+    exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,noUnusedLocals:true,noUnusedParameters:true,
+    noImplicitReturns:true,verbatimModuleSyntax:true,skipLibCheck:false,types:['node'],
+    typeRoots:[join(root,'node_modules/@types')],outDir:'dist',
+  },include:['actor-types.mts']}));
+  run('ACTOR_TYPECHECK',process.execPath,[join(root,'node_modules/typescript/bin/tsc'),'-p',join(actorConsumer,'tsconfig.json')],actorConsumer);
+  assert.equal(run('ACTOR_RUNTIME',consumerNode,['--unhandled-rejections=strict','dist/actor-types.mjs'],actorConsumer).trim(),'STRICT_NATIVE_ACTOR_PASS');
+  writeFileSync(join(actorConsumer,'actor-mapper.mjs'),[
+    "import assert from 'node:assert/strict';",
+    "import { setTimeout as delay } from 'node:timers/promises';",
+    "import { XStateWorkflowElement } from '@kaicreator/domain-harness';",
+    "import { fromPromise } from 'xstate';",
+    "const logic=fromPromise(async()=>1);let mapperCalled=false;",
+    "for(const mapper of [async()=>{mapperCalled=true;throw new Error('mapper')},()=>Promise.reject(new Error('mapper returned promise')),()=>Promise.resolve({status:'COMPLETE',value:9})]){const r=await new XStateWorkflowElement(logic,mapper).run(undefined);assert.equal(r.status,'FAILED');assert.equal(r.reason.code,'WORKFLOW_EXECUTION_FAILED');}",
+    "assert.equal(mapperCalled,false);await delay(5);console.log('S05_ACTOR_MAPPER_PASS');",
+  ].join('\n'));
+  assert.equal(run('S05_ACTOR_MAPPER',consumerNode,['--unhandled-rejections=strict','actor-mapper.mjs'],actorConsumer).trim(),'S05_ACTOR_MAPPER_PASS');
   return { readmeSha256: createHash('sha256').update(readme).digest('hex'),
-    skillFiles, skillExamples:examples.length, foundation:true, runtimeExports: values.length, typeImports: types.length };
+    skillFiles, skillExamples:examples.length, foundation:true, strictNativeActor:true, runtimeExports: values.length, typeImports: types.length };
 }

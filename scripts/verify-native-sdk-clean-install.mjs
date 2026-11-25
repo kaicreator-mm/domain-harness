@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyS05InstalledStandard } from './verify-s05-installed-standard.mjs';
+import { verifyInstalledXState, verifyXStateFiles } from './prepare-sdk-bundled-xstate.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const work = mkdtempSync(join(tmpdir(), 'dh-native-sdk-only-'));
@@ -49,10 +50,10 @@ function run(step, command, args, cwd, env = {}) {
   if(result.error || result.status !== 0) {
     // 不输出可能含 token 的 npm stderr；保留可诊断的受控 OS 错误码。
     // 仅保留受控 Business TypeScript 编译诊断，不输出 npm stderr 或环境。
-    if (['TYPECHECK','INTENT_TYPECHECK','ACTION_TYPECHECK','COMBINED_TYPECHECK','SKILL_TYPECHECK'].includes(step) && typeof result.stdout === 'string') {
+    if (['TYPECHECK','INTENT_TYPECHECK','ACTION_TYPECHECK','COMBINED_TYPECHECK','SKILL_TYPECHECK','ACTOR_TYPECHECK'].includes(step) && typeof result.stdout === 'string') {
       const diagnostic = result.stdout.split(/\r?\n/u)
         .map(line => line.replaceAll(cwd,'<consumer>').replaceAll(root,'<workspace>'))
-        .filter(line => /^(?:(?:(?:intent|action|combined|node_modules|skill-examples)\/[A-Za-z0-9_@./-]+|probe\.mts|s05-types\.mts)\(\d+,\d+\): )?error TS\d{4}: /u.test(line))
+        .filter(line => /^(?:(?:(?:intent|action|combined|node_modules|skill-examples)\/[A-Za-z0-9_@./-]+|probe\.mts|s05-types\.mts|actor-types\.mts)\(\d+,\d+\): )?error TS\d{4}: /u.test(line))
         .slice(0,40);
       for(const line of diagnostic) console.error('NATIVE_CONSUMER_TS_DIAGNOSTIC '+line.slice(0,1000));
     }
@@ -112,7 +113,22 @@ try {
   // T02：正式包不得携带任何事务控制替换入口。tarball 清单、已安装的模块文件与模块命名空间三层核对；
   // 仓内测试用的 instrumented 副本只存在于测试进程内，不得被打包。
   const packedPaths=(details.files||[]).map(file=>file.path);
-  const standardS05=verifyS05InstalledStandard({packageDir,installed,consumer,consumerNode,packedPaths,run});
+  assert.deepEqual(installedPkg.bundleDependencies,['xstate']);
+  assert.deepEqual(details.bundled,['xstate']);
+  const dependency=verifyInstalledXState(installed);
+  const actorConsumer=join(work,'actor-consumer');
+  mkdirSync(actorConsumer,{recursive:true});
+  const companion=join(actorConsumer,dependency.candidate.file);
+  cpSync(join(installed,'vendor',dependency.candidate.file),companion);
+  writeFileSync(join(actorConsumer,'package.json'),JSON.stringify({
+    name:'dh-native-actor-consumer',private:true,type:'module',
+    dependencies:{'@kaicreator/domain-harness':'file:'+tgz,xstate:'file:./'+dependency.candidate.file},
+  },null,2));
+  run('ACTOR_LOCK',consumerNode,consumerNpmArgs(['install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund']),actorConsumer);
+  run('ACTOR_CLEAN_INSTALL',consumerNode,consumerNpmArgs(['ci','--ignore-scripts','--no-audit','--no-fund']),actorConsumer);
+  verifyInstalledXState(join(actorConsumer,'node_modules','@kaicreator','domain-harness'));
+  verifyXStateFiles(join(actorConsumer,'node_modules','xstate'),dependency);
+  const standardS05=verifyS05InstalledStandard({packageDir,installed,consumer,actorConsumer,consumerNode,packedPaths,run});
   assert.ok(packedPaths.includes('dist/standard-sqlite.js'),'NATIVE_CONSUMER_PACK_LIST_INCOMPLETE');
   assert.deepEqual(packedPaths.filter(path=>/INSTRUMENTED/iu.test(path)),[],'NATIVE_CONSUMER_INSTRUMENTED_FILE_PACKED');
   const shippedControl=readFileSync(join(installed,'dist/standard-sqlite.js'),'utf8');
@@ -210,7 +226,7 @@ try {
   ].join('\n'));
   writeFileSync(join(consumer,'tsconfig.json'),JSON.stringify({
     compilerOptions:{strict:true,noEmit:true,target:'ES2022',module:'NodeNext',
-      moduleResolution:'NodeNext',skipLibCheck:false,types:[],
+      moduleResolution:'NodeNext',skipLibCheck:false,exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,verbatimModuleSyntax:true,types:[],
       lib:['ES2022','DOM','ESNext.Disposable']},
     include:['probe.mts','s05-types.mts'],
   },null,2));

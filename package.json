@@ -25,6 +25,7 @@
     "eslint": "^10.11.0",
     "tsx": "^4.0.0",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.70.0"
+    "typescript-eslint": "^8.70.0",
+    "xstate": "file:packages/domain-harness/vendor/xstate-5.33.2-dh.1.tgz"
   }
 }
