@@ -108,10 +108,18 @@ Standard Workflow 必须在**执行任何用户 entry/action 和启动 Actor 前
 
 **验收。** 实际 API 与使用方式见 SDK README；原 R14 与 T31A #1733/R22 已验收，修订 L2 R25 补 B–F，受影响媒体/维修/库存、CLI+视觉、真实 SDK 新工件及独立消费者验证分别在 T32–35 完成。本条不证明产品验收或跨重启资格。
 
-## LIFE-15 · Standard Evidence（0.11.3 T31B 候选）
+## LIFE-15 · Standard Evidence（0.11.3 T31B 已接受）
 
 `resolveEvidence<K,V>` 与 `invalidateEvidence<K>` 是可选、无状态的局部意图组织函数，不是知识库、授权判定或新 Runtime。域保有自己的 K/V、真实来源和专业规则；必须从当前实际事实/用户表达/域推导提供 observations 与 required keys、各 key 显式 accepts、当前 scope/每来源 id 的可信 revision、可选 asOf、值等价规则 equal 和可选 rank。域的其它专业适用条件须在供给证据前验证；来源类别由可信域确定，不能由外部客户端自签。仅 known 且有非 undefined 值作为值证据；false/0 合法。时间区间 [from,until)，缺 asOf 时有时效的证据不可用。来源 scope 和 revision 必须精确匹配，不跨 scope 合并，不以更新时间自动选权威。推荐仅提案，默认仅在显式 accepts 包含 default 时可确定且保留来源；authority/user 的限定不能被推荐或默认替代。
 
 未提供 rank 时全部同级；有明确域政策才选最高有限 rank。同级已知值不等或与明确不适用冲突，不静默 last-write-wins；同级 unknown 不能得出 resolved。等价规则必须为可信域的同步等价比较（等价已知值以首项作为表示，保留同级证据）；策略异常/非法返回 POLICY_FAILED，不输出部分结果。resolved/missing/unknown/conflict/not-applicable 和非确定原因可区分；只有适用的已知默认/推荐作为 proposals，complete 表示输入集合处理完毕，不表示所有事项已确定。SDK 无法证明输入事实集合的外部完整性；域不得把截断或未验证的来源标成已知。返回数组、记录和来源元数据冻结，V 仍由域提供不可变值，不复制任意业务对象/资源；不要把私有证据对象直接发给客户端。输入为可信 TS 结构，域不得在同步计算中突变输入/Map/业务值或使用不协作策略。
 
 `invalidateEvidence` 使用当前意图全部 key、明确 changed keys 和依赖声明，按有限拓扑传播 stale；任意变更时无声明的 key 保守失效，显式空依赖表示域已经证明无依赖。循环/未知 key/重复声明或边拒绝。域负责在事实、scope/revision 或相关选择变化后先标出全部 changed、移除 stale 证据、重新取证/推导，再调用 resolveEvidence；不自动修改外部状态、不复活 A 的失效用户记录；保留项仍需当前适用性检查。maxItems 每输入数组/来源版本 Map 上限 0..4096，maxDependencies 边总数上限 0..16384，要求调用者显式指定；超限/非法声明/策略异常 complete:false 与稳定原因 LIMIT/INVALID_EVIDENCE/INVALID_DEPENDENCY/POLICY_FAILED，无部分可用结果。B 不建立 Session、不读 I/O；在已计费分析内执行纯计算，实际取证/专业计算由业务按原 root 计费。两域薄接线和独立负例见 #1736；不构成真实专业路径、权限或最终产品资格。
+
+## LIFE-16 · Standard Decision（0.11.3 T31C 候选）
+
+`selectNextDecision<K>` 是有限无状态的下一决策选择函数；领域根据当前真实证据、专业规则和意图给出每个稳定 key 的 applicable/required/satisfied（yes/no/unknown/conflict）、dependsOn 与有限 priority，不强制统一 Fact/Intent 类型。每轮重评估，不自行运行领域规则、查询、工作流或 UI；必须按当前有效 B 证据及实际业务重新判断，不将默认/推荐当作必须的明确用户表达或权威事实。
+
+只有适用且必要、依赖全部实际满足、自身明确未满足（no）的项可进入 eligible；优先选择最高 priority，同级按领域声明数组顺序。已满足项必须有已满足依赖才可供下游使用。明确不适用或非必要可跳过；跳过不等于满足，非必要项仅在适用、自身及依赖实际满足时可供下游使用。不适用时不需要求值无关必要性/满足性；适用性未知、必要性未知或必要项满足性未知/冲突不能当 no 或 ready。领域可明确将可由用户确定的问题表示为 satisfied=no，无法通过询问解决的权威未知仍保留 unknown。独立的 eligible 可先推进；没有 eligible 时按 conflict、unresolved、blocked 选择非成功状态，仅剩满足或明确跳过项时为 ready。rows 保留每项 disposition/reason、尚不可用的直接依赖 blockedBy，按领域声明顺序返回；即使跳过也可能列出不可用依赖，不表示该项仍需询问。ready 只说明本次有限声明的必要决策已满足或无需处理，不代表领域 READY、授权或未声明事项已完整。领域需提供完整当前决策集，并在选择/修订后重建适用性和证据、验证最终业务条件。
+
+显式 maxItems 0..4096、maxDependencies 0..16384；先长度/累计边限界，再检查自有索引（拒绝稀疏/继承索引）、重复 key/边、未知依赖、非有限 priority、非法状态及全图循环（包含不适用节点）。失败 complete:false 与 LIMIT/INVALID_DECISION/INVALID_DEPENDENCY，不输出部分 rows/next。结果集合及元数据冻结；调用期间使用可信不可变 TS 数据，不承诺任意 JS 沙箱。有限迭代拓扑不是第二 DAG 执行器；纯计算可在原 root 已计费分析中执行，不建立 Session、不启动 Effect。T31C #1738 与 R25 修订 L2、两域薄接线为实施依据，真实领域消费及专业 Oracle 仍待 T32–35。
