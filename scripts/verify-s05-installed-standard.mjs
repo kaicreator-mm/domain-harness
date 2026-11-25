@@ -40,6 +40,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const path of ['dist/standard-candidates.js', 'dist/standard-candidates.d.ts']) assert.ok(packedPaths.includes(path));
   for (const path of ['dist/standard-clarification.js', 'dist/standard-clarification.d.ts']) assert.ok(packedPaths.includes(path));
   for (const path of ['dist/standard-interactive-recognition.js', 'dist/standard-interactive-recognition.d.ts']) assert.ok(packedPaths.includes(path));
+  for (const path of ['dist/semantic-data.js', 'dist/semantic-data.d.ts']) assert.ok(packedPaths.includes(path));
   const readme = readFileSync(join(installed, 'README.md'));
   assert.deepEqual(readme, readFileSync(join(packageDir, 'README.md')));
   const text = readme.toString('utf8');
@@ -109,7 +110,10 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "void runInteractiveRecognitionHandling<number,number,string>(new InteractionElement(),{maxCalls:2,maxSteps:3,maxDepth:0},2,n=>({status:'COMPLETE',value:{kind:'ready',intent:n}}),(n:string)=>({status:'COMPLETE',value:n}));",
     "// @ts-expect-error output is string, not number",
     "void runInteractiveRecognitionHandling<number,number,string>(new InteractionElement(),{maxCalls:2,maxSteps:3,maxDepth:0},2,n=>({status:'COMPLETE',value:{kind:'ready',intent:n}}),n=>({status:'COMPLETE',value:n}));",
-    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence; void selection; void candidateResult; void mapped; void composed;",
+    "const withSignal: Promise<StandardWorkflowOutcome<number>> = runInteractiveRecognitionHandling(new InteractionElement(),{maxCalls:2,maxSteps:3,maxDepth:0},2,(n,_event,_root,signal)=>{const s:AbortSignal=signal;void s;return {status:'COMPLETE',value:{kind:'ready',intent:n}};},n=>({status:'COMPLETE',value:n}));",
+    "// @ts-expect-error internal semantic helper is not public",
+    "import { dense } from '@kaicreator/domain-harness';",
+    "void dense; void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence; void selection; void candidateResult; void mapped; void composed; void withSignal;",
   ].join('\n'));
   writeFileSync(join(consumer, 's05-standard-probe.mjs'), [
     "import assert from 'node:assert/strict';",
@@ -161,6 +165,9 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "let composedPrompt; const composedElement=new sdk.InteractionElement({onPrompt:p=>{composedPrompt=p;assert.equal(composedElement.submit({intentId:p.intentId,revision:p.revision,decisionKey:p.decisionKey,action:'submit',values:{x:3}}).accepted,true);}});",
     "const composedResult=await sdk.runInteractiveRecognitionHandling(composedElement,{maxCalls:4,maxSteps:5,maxDepth:0},0,(_n,event)=>event.kind==='initial'?ok({kind:'clarify',state:1,prompt:{decisionKey:'x',title:'X',actions:['submit'],fields:[{kind:'number',id:'x',label:'X',required:true}]}}):ok({kind:'ready',intent:event.response.values.x}),handleComposed);",
     "assert.deepEqual(composedResult,ok(6));assert.ok(composedPrompt);assert.equal(composedHandled,2);",
+    "let analysisSignal; const sharedSignalResult=await sdk.runInteractiveRecognitionHandling(new sdk.InteractionElement(),{maxCalls:2,maxSteps:3,maxDepth:0},3,(n,_event,_root,signal)=>{analysisSignal=signal;assert.equal(signal.aborted,false);return ok({kind:'ready',intent:n});},(n,scope)=>{assert.strictEqual(scope.signal,analysisSignal);assert.equal(scope.root.remaining().calls,0);return ok(n);});",
+    "assert.deepEqual(sharedSignalResult,ok(3));assert.equal('dense' in sdk,false);assert.equal('dependencyOrder' in sdk,false);",
+    "await assert.rejects(import('@kaicreator/domain-harness/dist/semantic-data.js'),{code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});",
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');
