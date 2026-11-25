@@ -36,15 +36,16 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
   const interaction=new InteractionElement({onPrompt:p=>{lastPrompt=p;return options.onPrompt?.(p,interaction);}});
   const validFacts=(f:ArchiveFacts)=>/^[A-Za-z0-9_-]{1,64}$/u.test(f.tenant)&&id(f.revision)&&id(f.policy.revision)&&f.files.length<=16&&Array.from({length:f.files.length},(_,i)=>Object.hasOwn(f.files,i)).every(Boolean)&&new Set(f.files.map(x=>x.id)).size===f.files.length&&f.files.every(x=>id(x.id));
   const sameFacts=(f:ArchiveFacts)=>{try{const current=readFacts();return current!==undefined&&current.tenant===f.tenant&&current.revision===f.revision&&current.policy.revision===f.policy.revision&&JSON.stringify(current)===JSON.stringify(f);}catch{return false;}};
-  const check=async(file:File,p:Policy):Promise<Result<Checked>>=>{
+  const check=async(file:File,p:Policy,signal:AbortSignal):Promise<Result<Checked>>=>{
+    if(signal.aborted)return stop('REJECT','CANCELLED');
     const ext=extname(file.path).toLowerCase();if(!['.png','.jpg','.jpeg','.mp4'].includes(ext))return stop('REJECT','UNSUPPORTED_MEDIA');
-    try{const hash=await fixity.digest(file.path,p.maxBytes);const element=ext==='.mp4'?video:image;const info=await element.inspect(file.path);
+    try{const hash=await fixity.digest(file.path,p.maxBytes);const element=ext==='.mp4'?video:image;if(signal.aborted)return stop('REJECT','CANCELLED');const info=await element.inspect(file.path);
       if(Math.max(info.seconds,info.containerSeconds??0)>p.maxSeconds)return stop('REJECT','DURATION_LIMIT');
-      await element.verify(file.path);if(await fixity.digest(file.path,p.maxBytes)!==hash)return stop('UNKNOWN','SOURCE_CHANGED');return ok({file,hash,info});
+      if(signal.aborted)return stop('REJECT','CANCELLED');await element.verify(file.path);if(signal.aborted)return stop('REJECT','CANCELLED');if(await fixity.digest(file.path,p.maxBytes)!==hash)return stop('UNKNOWN','SOURCE_CHANGED');return ok({file,hash,info});
     }catch(error){return stop(error instanceof Error&&['FILE_LIMIT','IMAGE_FORMAT','VIDEO_CONTAINER'].includes(error.message)?'REJECT':'UNKNOWN','MEDIA_EVIDENCE_UNAVAILABLE');}
   };
   const invalidatePlan=(key:'first'|'second')=>invalidateEvidence<Key|'plan'>(['scope','policy','first','second','firstHash','secondHash','plan'],[key],[{key:'scope',dependsOn:[]},{key:'policy',dependsOn:[]},{key:'first',dependsOn:[]},{key:'second',dependsOn:['first']},{key:'firstHash',dependsOn:['first']},{key:'secondHash',dependsOn:['second']},{key:'plan',dependsOn:['firstHash','secondHash','policy']}],bounds);
-  const decide=async(state:Readonly<State>,event:InteractionEvent,root:NativeWorkflowContext):Promise<Result<InteractionDecision<State,Intent>>>=>{
+  const decide=async(state:Readonly<State>,event:InteractionEvent,root:NativeWorkflowContext,signal:AbortSignal):Promise<Result<InteractionDecision<State,Intent>>>=>{
     const facts=readFacts();if(!facts)return stop('UNKNOWN','SCOPE_UNKNOWN');if(!validFacts(facts))return stop('REJECT','FACTS_INVALID');
     if(state.snapshot!==undefined&&state.snapshot!==JSON.stringify(facts))return stop('UNKNOWN','STALE_FILE_SET');
     if(state.prior&&!sameFacts(state.prior.facts))return stop('UNKNOWN','STALE_FILE_SET');
@@ -61,12 +62,12 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
         const parsed=parse(event.response.text);if(!parsed)return stop('UNKNOWN','UNSUPPORTED_REVISION');selected=parsed;
         const stale=invalidatePlan('first');
         if(!stale.complete||!stale.stale.includes('plan'))return stop('FAILED','INVALIDATION_FAILED');invalidated=stale.stale;
-      }else for(const item of mapped.values){if(typeof item.value!=='string'||!['first','second'].includes(item.key))return stop('REJECT','INVALID_CHOICE');selected=item.key==='first'?{first:item.value}:{...selected,second:item.value};}
+      }else for(const item of mapped.values){if(typeof item.value!=='string'||!['first','second'].includes(item.key))return stop('REJECT','INVALID_CHOICE');selected=item.key==='first'?(selected.first===undefined||selected.first===item.value?{...selected,first:item.value}:{first:item.value}):{...selected,second:item.value};}
     }
     const available=facts.files.filter(f=>f.tenant===facts.tenant);
     const checked=new Map<string,Result<Checked>>();
     // This bounded read-only analysis is already entered; A drains it on cancellation and prevents Handling.
-    for(const file of available){const result=await root.invokeOutcome(()=>check(file,facts.policy));if(result.status==='FAILED')return result;checked.set(file.id,result);}
+    for(const file of available){if(signal.aborted)return stop('REJECT','CANCELLED');const result=await root.invokeOutcome(()=>check(file,facts.policy,signal));if(signal.aborted)return stop('REJECT','CANCELLED');if(result.status==='FAILED')return result;checked.set(file.id,result);}
     if(!sameFacts(facts))return stop('UNKNOWN','STALE_FILE_SET');
     // A response cannot bind to different bytes than those offered, including the retained first selection.
     for(const key of [selected.first,selected.second])if(key!==undefined){const result=checked.get(key);if(!result)return stop('REJECT','FILE_SCOPE');if(result.status!=='COMPLETE')return result;
@@ -87,7 +88,7 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
     if(!selection.complete)return stop('FAILED','DECISION_FAILED');const key=selection.status==='next'?selection.key:'second';
     const context={scope:facts.tenant,revision:`${facts.revision}:${state.round}:${key}`};
     const candidates=prepareCandidates({status:'complete',...context,entries:available.map(file=>({...context,id:file.id,value:checked.get(file.id)!}))},context,{
-      assess:entry=>entry.value.status==='COMPLETE'?(key==='second'&&first?.status==='COMPLETE'&&entry.value.value.hash===first.value.hash?{status:'excluded',reason:'DUPLICATE_CONTENT'}:{status:'eligible'}):{status:entry.value.status==='REJECT'?'excluded':'unknown',reason:entry.value.reason.code},
+      assess:entry=>entry.value.status==='COMPLETE'?((key==='second'&&first?.status==='COMPLETE'&&entry.value.value.hash===first.value.hash||key==='first'&&second?.status==='COMPLETE'&&entry.value.value.hash===second.value.hash)?{status:'excluded',reason:'DUPLICATE_CONTENT'}:{status:'eligible'}):{status:entry.value.status==='REJECT'?'excluded':'unknown',reason:entry.value.reason.code},
       comparisonLabels:['Kind','Dimensions','Seconds'],project:entry=>{if(entry.value.status!=='COMPLETE')throw Error('NOT_ELIGIBLE');const info=entry.value.value.info;return {label:entry.id,priority:0,cells:[info.kind,`${info.width}×${info.height}`,String(info.seconds)]};},
     },{maxVisited:16,maxReturned:16});
     const built=buildClarification(evidence,selection,{decisionKey:key,title:`Select ${key} media`,...(state.proposal?{description:`Computed access copies: ${state.proposal.map(a=>`${a.output.width}×${a.output.height}`).join(', ')}. Select the second file or revise the pair.`}:{}),actions:['submit','revise','no-fit','cancel']},[{field:{kind:'choice',id:key,label:key,required:true,options:[],completeness:'incomplete'},evidenceKey:key,applicable:'yes',confirmation:'user',candidates:{current:context,result:candidates}}]);
@@ -102,7 +103,7 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
       const makePlan=async()=>{
         if(scope.signal.aborted||!sameFacts(intent.facts))return stop('UNKNOWN','STALE_OR_CANCELLED');
         if(!enough(scope.root,19,23,2))return stop('FAILED','MEDIA_PLAN_BUDGET');
-        const p=await new ArchiveElement(video,intent.facts.policy,staging).planIn(scope.root,intent.pair.map(x=>x.file.path));
+        const p=await new ArchiveElement(video,intent.facts.policy,staging).planIn(scope.root,intent.pair.map(x=>x.file.path),scope.signal);
         if(p.status!=='COMPLETE')return p;plan=p.value;
         if(plan.assets.some((a,i)=>a.original!==intent.pair[i]!.hash||a.revision!==intent.facts.policy.revision))return stop('UNKNOWN','SOURCE_CHANGED');
         proposals.push(Object.freeze(plan.assets.map((a,i)=>Object.freeze({id:intent.pair[i]!.file.id,original:a.original,derivative:a.derivative,revision:a.revision,source:Object.freeze({...a.source}),output:Object.freeze({...a.output})}))));return ok(plan);
