@@ -125,7 +125,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "assert.equal(sdk.selectNextDecision([{...decision,key:'parent',dependsOn:[],required:'unknown'}],decisionLimits).status,'unresolved');",
     "assert.equal(sdk.selectNextDecision([{...decision,key:'parent',dependsOn:[],satisfied:'yes'}],decisionLimits).status,'ready');",
     "const candidateCurrent={scope:'a',revision:'r1'};const candidateSource={...candidateCurrent,status:'complete',entries:[{...candidateCurrent,id:'one',value:1},{...candidateCurrent,id:'unknown',value:0}]};",
-    "const candidatePolicy={comparisonLabels:['Value'],assess:e=>e.value===0?{status:'unknown',reason:'NOT_VERIFIED'}:{status:'eligible'},project:e=>({label:e.id,priority:e.value,recommended:true,cells:[String(e.value)]})};",
+    "const candidatePolicy={comparisonLabels:['Value'],assess:e=>e.value===0?{status:'unknown',reason:'NOT_VERIFIED'}:{status:'eligible'},project:e=>({label:e.id,priority:e.value,reason:'DOMAIN_PREFERENCE',recommended:true,cells:[String(e.value)]})};",
     "const candidate=sdk.prepareCandidates(candidateSource,candidateCurrent,candidatePolicy,{maxVisited:4,maxReturned:4});",
     "assert.equal(candidate.status,'available');assert.equal(candidate.complete,false);assert.equal(candidate.options[0].recommended,undefined);assert.deepEqual(candidate.comparison[0].cells,{one:'1'});",
     "assert.equal(sdk.prepareCandidates({...candidateSource,entries:[]},candidateCurrent,candidatePolicy,{maxVisited:4,maxReturned:4}).status,'empty');",
