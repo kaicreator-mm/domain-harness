@@ -9,7 +9,7 @@ const values = [
   'StandardWorkflowSession', 'routeWorkflowOutcome', 'JsonReader', 'YamlReader',
   'readJson', 'readYaml', 'writeJson', 'writeYaml', 'BoundedQueryElement',
   'SQLiteDatabaseElement', 'SQLiteDatabaseError', 'VectorQueryElement', 'GraphQueryElement',
-  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence', 'selectNextDecision', 'prepareCandidates', 'buildClarification', 'mapClarificationResponse',
+  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence', 'selectNextDecision', 'prepareCandidates', 'buildClarification', 'mapClarificationResponse', 'runInteractiveRecognitionHandling',
 ].sort();
 const types = [
   'CorePackageMetadata', 'DomainAppContext', 'LifecycleInitContext', 'PackageInitElement',
@@ -39,6 +39,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const path of ['dist/standard-decision.js', 'dist/standard-decision.d.ts']) assert.ok(packedPaths.includes(path));
   for (const path of ['dist/standard-candidates.js', 'dist/standard-candidates.d.ts']) assert.ok(packedPaths.includes(path));
   for (const path of ['dist/standard-clarification.js', 'dist/standard-clarification.d.ts']) assert.ok(packedPaths.includes(path));
+  for (const path of ['dist/standard-interactive-recognition.js', 'dist/standard-interactive-recognition.d.ts']) assert.ok(packedPaths.includes(path));
   const readme = readFileSync(join(installed, 'README.md'));
   assert.deepEqual(readme, readFileSync(join(packageDir, 'README.md')));
   const text = readme.toString('utf8');
@@ -56,7 +57,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const name of [...values, ...types]) assert.ok(text.includes('`' + name + '`'), 'S05_API_NOT_DOCUMENTED:' + name);
   writeFileSync(join(consumer, 's05-types.mts'), [
     `import type { ${types.join(', ')} } from '@kaicreator/domain-harness';`,
-    "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, buildClarification, mapClarificationResponse } from '@kaicreator/domain-harness';",
+    "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, buildClarification, mapClarificationResponse, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';",
     "const result: Promise<StandardWorkflowOutcome<string>> = runRecognitionHandling({maxCalls:2,maxSteps:5,maxDepth:1}, () => ({status:'COMPLETE',value:{n:2}}), intent => ({status:'COMPLETE',value:String(intent.n)}));",
     "const stdout: Promise<string> = new CliElement().run('trusted-tool', ['--version']);",
     "// @ts-expect-error a number intent is not a string",
@@ -103,7 +104,12 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "// @ts-expect-error confirmation does not grant authority",
     "void buildClarification<'x','x',number>(resolution,selectNextDecision([decision],{maxItems:4,maxDependencies:4}),clarificationTemplate,[{...clarificationField,confirmation:'authority'}]);",
     "const mapped = (p: InteractionPrompt,event: InteractionEvent): ClarificationResponse<'x'>|undefined => clarification.status==='prompt'?mapClarificationResponse(clarification,p,event):undefined;",
-    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence; void selection; void candidateResult; void mapped;",
+    "const composed: Promise<StandardWorkflowOutcome<string>> = runInteractiveRecognitionHandling(new InteractionElement(),{maxCalls:2,maxSteps:3,maxDepth:0},2,n=>({status:'COMPLETE',value:{kind:'ready',intent:n}}),n=>({status:'COMPLETE',value:String(n)}));",
+    "// @ts-expect-error numeric intent cannot be handled as a string",
+    "void runInteractiveRecognitionHandling<number,number,string>(new InteractionElement(),{maxCalls:2,maxSteps:3,maxDepth:0},2,n=>({status:'COMPLETE',value:{kind:'ready',intent:n}}),(n:string)=>({status:'COMPLETE',value:n}));",
+    "// @ts-expect-error output is string, not number",
+    "void runInteractiveRecognitionHandling<number,number,string>(new InteractionElement(),{maxCalls:2,maxSteps:3,maxDepth:0},2,n=>({status:'COMPLETE',value:{kind:'ready',intent:n}}),n=>({status:'COMPLETE',value:n}));",
+    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence; void selection; void candidateResult; void mapped; void composed;",
   ].join('\n'));
   writeFileSync(join(consumer, 's05-standard-probe.mjs'), [
     "import assert from 'node:assert/strict';",
@@ -147,6 +153,14 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "let clarifyPrompt;const clarifyElement=new sdk.InteractionElement({onPrompt:p=>{clarifyPrompt=p;const env={intentId:p.intentId,revision:p.revision,decisionKey:p.decisionKey};assert.equal(clarifyElement.submit({...env,action:'submit',values:{}}).accepted,false);assert.equal(clarifyElement.submit({...env,action:'submit',values:{answer:'one'}}).accepted,true);}});",
     "const clarificationOutcome=await clarifyElement.run({maxCalls:3,maxSteps:4,maxDepth:0},scope=>scope.resolve(0,(_state,event)=>{if(event.kind==='initial')return ok({kind:'clarify',state:1,prompt:clarifyPrepared.prompt});const mapped=sdk.mapClarificationResponse(clarifyPrepared,clarifyPrompt,event);assert.deepEqual(mapped,{status:'values',action:'submit',values:[{key:'x',origin:'user',value:'one'}]});return ok({kind:'ready',intent:mapped.values[0].value});}));",
     "assert.deepEqual(clarificationOutcome,ok('one'));",
+    "let composedHandled=0; const recognize=n=>ok({kind:'ready',intent:n});",
+    "const handleComposed=(n,scope)=>{composedHandled++;assert.equal(scope.root.remaining().calls,0);return ok(n*2);};",
+    "assert.deepEqual(await sdk.runInteractiveRecognitionHandling(new sdk.InteractionElement(),{maxCalls:2,maxSteps:3,maxDepth:0},3,recognize,handleComposed),ok(6));",
+    "assert.equal((await sdk.runInteractiveRecognitionHandling(new sdk.InteractionElement(),{maxCalls:1,maxSteps:3,maxDepth:0},3,recognize,handleComposed)).reason.code,'WORKFLOW_CALL_BUDGET');assert.equal(composedHandled,1);",
+    "assert.strictEqual(await sdk.runInteractiveRecognitionHandling(new sdk.InteractionElement(),{maxCalls:2,maxSteps:3,maxDepth:0},3,()=>unknown,handleComposed),unknown);",
+    "let composedPrompt; const composedElement=new sdk.InteractionElement({onPrompt:p=>{composedPrompt=p;assert.equal(composedElement.submit({intentId:p.intentId,revision:p.revision,decisionKey:p.decisionKey,action:'submit',values:{x:3}}).accepted,true);}});",
+    "const composedResult=await sdk.runInteractiveRecognitionHandling(composedElement,{maxCalls:4,maxSteps:5,maxDepth:0},0,(_n,event)=>event.kind==='initial'?ok({kind:'clarify',state:1,prompt:{decisionKey:'x',title:'X',actions:['submit'],fields:[{kind:'number',id:'x',label:'X',required:true}]}}):ok({kind:'ready',intent:event.response.values.x}),handleComposed);",
+    "assert.deepEqual(composedResult,ok(6));assert.ok(composedPrompt);assert.equal(composedHandled,2);",
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');
