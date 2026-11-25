@@ -24,7 +24,8 @@ description: DomainHarness v0.11.x 唯一规范导航；TypeScript 原生 Packag
 - Init/Exit 可选，无则跳过；框架按 Order 正常启动并在未捕获异常时打印脱敏日志、执行可行 Exit、失败退出。
 - 记录 `REPO / TASK_ISSUE / PR / EXACT_HEAD / SPEC_FILES_READ / CODE_GAPS / VALIDATION / P0/P1/P2`。无实际测试就写 NOT_RUN；需本地 Agent 时只给单次有限任务，不把 v0.11.1 基础工作转移至 v0.11.2。
 
-- 0.11.3 交互任务先读 [LIFE-14（T31 候选）](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-14--standard-interaction0113-t31-候选) 与当前 SDK README 实际 API；以 #1613 冻结 L2 和 #1733 状态为准。优先同根 InteractionElement，不重复写 pending/关联/失效/字段校验；领域决定事实/关键问题/候选/READY，保持真实授权和 Effect 结果。未受审候选不能作为已发布能力。
+- 0.11.3 交互任务先读 [LIFE-14（T31A 已接受）](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-14--standard-interaction0113-t31a-已接受) 与当前 SDK README；以 #1613 R25 修订冻结及 #1733 R22 为准。优先同根 InteractionElement，不重复写 pending/关联/失效/字段校验；领域提供专业知识、规则及真实授权。
+- T31B 候选 [LIFE-15](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-15--standard-evidence0113-t31b-候选)：按 #1736 资格使用 `resolveEvidence`、`invalidateEvidence`，域提供真实来源/当前 scope/revision、显式 accepts、等价及可选 rank、完整 changed/dependencies；默认/推荐不替代 authority/user，先失效后重取证，不能把 complete 当 READY。候选未验收不可声称已发布；C–F 依赖按 #1613。
 
 ## 已验证实践：生成与审核时的关键提醒
 
