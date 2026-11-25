@@ -11,7 +11,7 @@
 
 ## 2. 最小标准 API 和所有权（候选原生 TS 形状）
 
-新增一个内聚 Standard class InteractionElement，建议文件 packages/domain-harness/src/standard-interaction.ts（纯 helper 私有，可按职责拆文件但不拆包）；从同一 @kaicreator/domain-harness 根导出。下面签名是设计合同，具体泛型/命名经实现与独审细化；不承诺兼容尚未存在的 API。
+原 T31A 设计新增一个内聚 Standard class InteractionElement，建议文件 packages/domain-harness/src/standard-interaction.ts（纯 helper 私有，可按职责拆文件但不拆包）；从同一 @kaicreator/domain-harness 根导出。下面签名是设计合同，具体泛型/命名经实现与独审细化；不承诺兼容尚未存在的 API。
 
 ```ts
 // 设计伪签名，复用已有 Outcome、WorkflowLimits、NativeWorkflowContext。
@@ -48,7 +48,7 @@ type InteractionDecision<S, I> =
 - 状态在 resolve 内随成功分析结果保存；业务生成者负责不修改传入 state/旧权威对象并返回新状态。SDK 所有可外部见到的 prompt、response 和内部交互记录使用受支持的 JSON 值快照、防止可变引用污染；不深复制任意领域对象/资源。领域私有状态可保留已知事实、依赖和专业对象，不能把旧版本选择当现行确认。无通用事实图、规则引擎或全量知识容器。
 - 不提供强制 SDK 级注册中心或通用 Intent 父类；复杂业务可原生组合现有 SDK 与 InteractionElement，短默认路径由标准实现完成，而非要求生成者重写 Promise Gate/关联/重复校验。
 
-公开入口验收：基线 20 个公开运行时值/33 个独立公开类型保持；T30 仅增加实际需要的只读余额返回形状（优先内联类型，不增加运行时值）。T31 候选新增运行时值 InteractionElement；公共签名需要 InteractionScope、InteractionDecision、InteractionPrompt、InteractionPromptSpec、InteractionEvent、InteractionSubmitResult，及调用方确需直接命名的语义字段/候选/已接受响应/有效记录类型（候选 InteractionField、InteractionCandidate、InteractionResponse、InteractionRecord）。能内联而不妨碍正常消费的类型不强制导出；辅助 resolver、内部状态、校验器、预算对象及私有 helper 不导出。T31 在独立 expected 集合冻结准确公开名称及泛型/负例，T35 仓外真实安装的根运行时值、声明类型和 README/Skill 与该集合一致；不以从被测包自动生成预期名单证明自己。此处为候选公开面，不宣称 0.11.3 API 已存在。
+原 T31（现 T31A）公开入口验收历史：基线 20 个公开运行时值/33 个独立公开类型保持；T30 仅增加实际需要的只读余额返回形状（优先内联类型，不增加运行时值）。T31 候选新增运行时值 InteractionElement；公共签名需要 InteractionScope、InteractionDecision、InteractionPrompt、InteractionPromptSpec、InteractionEvent、InteractionSubmitResult，及调用方确需直接命名的语义字段/候选/已接受响应/有效记录类型（候选 InteractionField、InteractionCandidate、InteractionResponse、InteractionRecord）。能内联而不妨碍正常消费的类型不强制导出；辅助 resolver、内部状态、校验器、预算对象及私有 helper 不导出。T31 在独立 expected 集合冻结准确公开名称及泛型/负例，T35 仓外真实安装的根运行时值、声明类型和 README/Skill 与该集合一致；不以从被测包自动生成预期名单证明自己。此处为原 A 的候选公开面设计历史；A 已按 R22 验收 21 个值/43 个独立类型。B–F 的公开入口按 R23 实际用途及独立 expected 名单更新，尚未冻结，不固定新增数量。
 
 ## 3. 语义交互、候选与确认
 
