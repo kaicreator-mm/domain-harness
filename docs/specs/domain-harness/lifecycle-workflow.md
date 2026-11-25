@@ -142,10 +142,16 @@ confirmation=accepted 时 B resolved 非选择字段可跳过；confirmation=use
 
 `mapClarificationResponse` 只在 A 的当前 decide 收到实际 response event 时消费；域保留**同一次发布**的 preparation、实际 onPrompt 收到的 prompt 和当前 event，不在外部构造或重播 event；函数检查最新有效 record 与 response identity，使用原 makePrompt/readResponse/responseData 验证当前 spec/envelope/字段及动作，映射 submit 或 revise 的实际 values 为领域 key、origin=user、值及原 action。只输出显式提交字段，不自动补预填、不写领域状态、不授予权威/权限。text/no-fit/revise-text 等返回 other，由域处理实际 event；A reject/cancel 不进入后续 decide。A 仍唯一负责捕获、revision、记录失效和等待。域 reducer 重新检查当前事实/候选 scope/revision 与专业规则，处理修订时按 B 依赖失效和 A 有效记录重算；同一显示内容可能对应不同内部 key，必须保留当前绑定，不把映射当作独立防重放/授权 API。最终 READY/真实授权与 Effect 边界不变。#1742 双领域薄接线和真实固定逐项基线仅验证共同标准组织及领域薄意图；实际专业结果、权限、客户端和最终产品资格仍待 T32–35。
 
-## LIFE-19 · Standard Interactive Recognition / Handling（0.11.3 T31F 候选）
+## LIFE-19 · Standard Interactive Recognition / Handling（0.11.3 T31F 已接受；R48 接线修正候选）
 
 `runInteractiveRecognitionHandling<S,I,O>(interaction, limits, initial, decide, handle)` 提供原生短路径：使用调用者提供的新 InteractionElement 运行一次原 A run，在同 scope 中先 resolve(initial,decide)，仅 COMPLETE 才 step 调用 handle(intent,scope)。不增加 Session、解析器、模型、Intent 基类或第二执行机制；旧 runRecognitionHandling 及低级 resolve/step/root 不变。领域在初次 decide 中解析结构化输入或确定性文本，后续根据实际 event 更新状态；优先使用 B–E 组织当前证据、关键决策、候选、必要表单，只有领域核验完成才 ready。未知/不支持的文本按领域决定明确澄清或非成功结果，不能把 ASK/WAIT/REJECT/UNKNOWN/FAILED 包装成 COMPLETE 或自动重试；非成功识别不进入 Handling，实际 Handling 返回的 Outcome 原样保留。
 
 同根预算：root 启动 1 step，分析（含初始识别）与每次等待各 1 call/1 step，Handling 回调由 scope.step 收 1 call/1 step。因此无澄清最短 2calls/3steps/depth0，一轮 4/5/0，两轮 6/7/0。纯 B–E 在已计费分析内，独立识别、专业取证、真实业务操作、子 Workflow、Hook 及后续步骤按原 root 的 invokeOutcome/child/leaf 或 scope.step 实际增加预算；不得隐式免费或重建根。remaining 不是预留。固定专业路径的原门禁与预算表仍由领域维护。
 
 再次澄清是领域在 handle 内明确无已提交效果的下一操作或有实际可保留 receipt 的 checkpoint 中 await 同一 scope.resolve；继续下一操作用原 scope/root，已完成处理不自动重跑。每个追加 resolve、等待、step 均照原合同计费。已进入处理返回的实际 COMPLETE/UNKNOWN 等结果不得被取消或后续澄清伪造覆盖；域须保留已进入实际操作的 receipt，处理下一操作是否可以安全继续、授权及恢复。取消阻止新 scope.resolve/step，调用者必须 await 已进入操作并在直接 root 调用前检查 signal 及业务条件；此为可信协作，不是任意 JS 事务、回滚或重放防护。终止后的真实恢复按原 .2 显式授权/只读读回合同，不自动再次 submit。实际专业业务资格仍待 T32–35；#1744 是 SDK 限定实施，不能把薄意图/内存 checkpoint 测试晋升为实际 Host 或专业求解验收。
+
+### LIFE-19A · 同一取消信号与组件封装（R48 #1750 修正候选）
+
+`scope.resolve(initial, decide)` 和 `runInteractiveRecognitionHandling(..., decide, handle)` 的 decide 回调均接收第四个参数 `signal: AbortSignal`，它与同一 scope.signal 完全相同，不创建第二 AbortController。已有三参数回调仍合法；分析可在实际异步取证/候选生成前检查 signal，复杂处理继续使用 scope.signal。原 root 预算、等待关联、取消终态、结果所有权不变。该参数不是强制抢占或权限证明。每个跨 await 的下一相关实际业务操作开始前须重新检查；已进入操作正常 await 收敛，必要的结果验证、receipt 及清理仍须执行。未提交的媒体规划取消可丢弃不完整计划并释放 staging；已进入真实求解完成后的专业校验与已提交/可能提交的 Host 结果不得由取消错误覆盖。不要以额外 scope.step 代替信号传播导致重复计费，不把任意直接 root 回调升级成全局取消管理器。
+
+内部 `semantic-data.ts` 只封装已在 B/C/D/E 和 A/D 复用的有界数据检查与 B/C 有限依赖拓扑次序：自有索引完整性、有限整数上限、原 opaque ID 合同、已验证局部图的稳定迭代排序。调用方继续负责输入规模/结构/依赖有效性与领域意义、错误分类、返回冻结；拓扑 helper 不执行 Workflow、无领域事实或决策规则、不保存状态，不修改传入图。原 B/C 两种算法保留各自传播与选择语义。该模块不是 SDK 公共入口；公开面仍 28 运行时值/61 公开类型、仅包根。构建工件可含内部实现文件，但不能通过包子路径导入。按 #1750 独立验证质量及取消接线后，T32/T33 真实整改与 T34/35 门禁仍须各自完成。
