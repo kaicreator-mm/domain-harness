@@ -1,6 +1,6 @@
 # v0.11.1 原生 Domain App 与仓外 SDK 消费者
 
-> **S04 · #1724 标准双角色组合候选**：T05 repair/AQI、T07 book/water 与 T06 Reservation 客户端共五个模块改用 SDK 根入口 `runRecognitionHandling(limits, recognize, handle)`。它复用既有 Session/Context，完整路径仍为 calls=2/steps=5/depth=1，只有识别 COMPLETE 才进入处理；业务自己的证据、知识、授权、数据库、命令身份、首次提交/恢复和 readback 均不改变。下文 T05/T06/T07 “没有 SDK 变更”等是历史收据，旧工件不含新增函数。本轮完整新工件与业务验收待 #1724，不能沿用旧哈希。
+> **历史 · S04 · #1724 标准双角色组合候选（当时迁移收据）**：T05 repair/AQI、T07 book/water 与 T06 Reservation 客户端共五个模块改用 SDK 根入口 `runRecognitionHandling(limits, recognize, handle)`。它复用既有 Session/Context，完整路径仍为 calls=2/steps=5/depth=1，只有识别 COMPLETE 才进入处理；业务自己的证据、知识、授权、数据库、命令身份、首次提交/恢复和 readback 均不改变。下文 T05/T06/T07 “没有 SDK 变更”等是历史收据，旧工件不含新增函数。本轮完整新工件与业务验收待 #1724，不能沿用旧哈希。
 
 `node examples/native-domain-app/main.mjs` 通过唯一公开的 `@kaicreator/domain-harness` SDK 入口静态导入两个 ESM Core Package：KDP Order=0（有 Init）与 Business Order=2（无占位 Init）。业务 Module Function 和 Class Element 均由原生 JS 调用，不涉及旧 FunctionRef/Target。
 

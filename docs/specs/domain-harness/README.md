@@ -1,6 +1,6 @@
 # DomainHarness · 唯一规范目录
 
-> 设计基线：**Language-Native Domain SDK**；Owner 决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。这是唯一多文件规范，人和 Agent 读同一正文。**设计已确认；0.11.2 已按 R65 限定验收并合入版本列车，0.11.3 Product/L1 与修订 L2 已按 R9/R25 冻结；T30/T31A–F 已限定验收合入，R48 #1750 组件封装与取消接线已按 R49 验收；T32–T34 及 #1754 已收口，T35 正在最终资格验证；#1759 有限整改待独审，产品验收尚未完成。** 详见状态索引；新原则 CORE-13/14、QA-09 已按 R8 接受并合入。
+> 设计基线：**Language-Native Domain SDK**；Owner 决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。这是唯一多文件规范，人和 Agent 读同一正文。**设计已确认；0.11.2 已按 R65 限定验收并合入版本列车，0.11.3 Product/L1 与修订 L2 已按 R9/R25 冻结；T30/T31A–F 已限定验收合入，R48 #1750 组件封装与取消接线已按 R49 验收；T32–T34 及 #1754 已收口，T35 正在最终资格验证；#1759 两项实质整改已按 R70 限定接受，文档 P2 修订及最终工件 Windows 复测待完成，产品验收尚未完成。** 详见状态索引；新原则 CORE-13/14、QA-09 已按 R8 接受并合入。
 
 ## 阅读路径
 
