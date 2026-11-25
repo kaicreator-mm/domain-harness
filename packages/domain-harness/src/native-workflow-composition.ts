@@ -68,6 +68,15 @@ export class NativeWorkflowContext {
     public readonly depth: number,
   ) {}
 
+  /** 当前共享根余额及本层可用子层深度；只读快照，不预留或增加额度。 */
+  public remaining(): Readonly<{ calls: number; steps: number; maxDescendantDepth: number }> {
+    return Object.freeze({
+      calls: this.budget.calls,
+      steps: this.budget.steps,
+      maxDescendantDepth: Math.min(...this.ancestors.map(item => item.descendants - (this.depth - item.depth))),
+    });
+  }
+
   /**
    * 仅处理普通值（包括 Reader 返回的普通数据对象）；任何返回的业务
    * Outcome 都会作为 value 被包装，不能用本方法传播业务 REJECT/UNKNOWN/FAILED。
