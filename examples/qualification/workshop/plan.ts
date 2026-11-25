@@ -56,11 +56,13 @@ export class WorkshopElement{
     if(![limits.maxCalls,limits.maxSteps,limits.maxDepth].every(Number.isSafeInteger)||limits.maxCalls<4||limits.maxSteps<8||limits.maxDepth<2)return Promise.resolve(stop('FAILED','WORKSHOP_TOTAL_BUDGET'));
     return new StandardWorkflowSession(limits).run(root=>this.runIn(root,tasks));
   }
-  async runIn(root:NativeWorkflowContext,tasks:readonly Task[]):Promise<Outcome<Plan>>{
+  async runIn(root:NativeWorkflowContext,tasks:readonly Task[],signal?:AbortSignal):Promise<Outcome<Plan>>{
+    if(signal?.aborted)return stop('REJECT','CANCELLED');
     const remaining=root.remaining();
     if(remaining.calls<4||remaining.steps<7||remaining.maxDescendantDepth<2)return stop('FAILED','WORKSHOP_TOTAL_BUDGET');
       const facts=await root.child(1,async child=>{
         const validated=await child.invokeOutcome(()=>validateTasks(tasks,this.p));if(validated.status!=='COMPLETE')return validated;
+         if(signal?.aborted)return stop('REJECT','CANCELLED');
         const impact=await child.child(0,grand=>grand.invokeOutcome(()=>{
           const edges=validated.value.flatMap(t=>t.after.map(a=>({from:a,to:t.id,type:'requires'})));
           const result=this.graph.search(edges,{start:validated.value.filter(t=>t.stage==='inspection').map(t=>t.id).sort()[0]!,direction:'OUT',relationTypes:['requires'],limits:{maxDepth:6,maxVisited:100,maxReturned:6}});
@@ -69,7 +71,8 @@ export class WorkshopElement{
         }));if(impact.status!=='COMPLETE')return impact;
         return ok({tasks:validated.value,impact:impact.value});
       });if(facts.status!=='COMPLETE')return facts;
-      const solution=await root.child(0,child=>child.invokeOutcome(()=>this.solver.solve(facts.value.tasks,this.p)));if(solution.status!=='COMPLETE')return solution;
+      if(signal?.aborted)return stop('REJECT','CANCELLED');
+       const solution=await root.child(0,child=>child.invokeOutcome(()=>signal?.aborted?stop('REJECT','CANCELLED'):this.solver.solve(facts.value.tasks,this.p)));if(solution.status!=='COMPLETE')return solution;
       return root.invokeOutcome(()=>validateSchedule(facts.value.tasks,this.p,solution.value.starts,solution.value.makespan)?ok({...solution.value,revision:this.p.revision,impact:facts.value.impact}):stop('UNKNOWN','INVALID_SOLVER_SCHEDULE'));
   }
 }
