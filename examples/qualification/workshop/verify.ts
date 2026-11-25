@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { CliElement } from '@kaicreator/domain-harness';
 import { baseline, downtime, WorkshopElement, SolverElement, validateSchedule, type Task, type Policy } from './plan.js';
+import { verifyInteraction } from "./verify-interaction.js";
 const tasks:readonly Task[]=Object.freeze([
   {id:'a-inspect',machine:'inspection',duration:2,after:[]},
   {id:'a-repair',machine:'repair',duration:3,after:['a-inspect']},
@@ -40,3 +41,5 @@ const nonoptimal=new SolverElement(cli,process.execPath,['-e','console.log(JSON.
 const timeout=new SolverElement(new CliElement(100),process.execPath,['-e','setInterval(()=>{},1000)']);assert.deepEqual(await new WorkshopElement(timeout,baseline).run(tasks,limits),{status:'UNKNOWN',reason:{code:'CLI_TIMEOUT',message:'CLI_TIMEOUT'}});
 const missing=new SolverElement(cli,'dh-missing-python-1720',[]);assert.equal((await new WorkshopElement(missing,baseline).run(tasks,limits)).status,'UNKNOWN');
 console.log(JSON.stringify({status:'WORKSHOP_PROBE_PASS',baseline:first.value,revision:second.value,referenceMakespans:[oracle(tasks,baseline),oracle(tasks,downtime)],solverCalls:solver.calls,negative:['infeasible','call-budget','depth-budget','missing','duplicate','cycle','missing-predecessor','malformed-solver','missing-cli','total-call-budget','total-step-budget','required-edge','unknown-stage','invalid-policy','invalid-solver-starts','nonoptimal','solver-timeout'],orderIndependent:true,immutable:true}));
+
+await verifyInteraction(tasks,solver,oracle);
