@@ -98,6 +98,7 @@ export function prepareCandidates<T>(source: CandidateSource<T>, current: Readon
       const raw: unknown = policy.project(entry);
       if (!record(raw) || !text(raw.label) || (raw.reason !== undefined && !text(raw.reason)) || (raw.scope !== undefined && !text(raw.scope)) ||
         typeof raw.priority !== 'number' || !Number.isFinite(raw.priority) || (raw.recommended !== undefined && typeof raw.recommended !== 'boolean') ||
+        (raw.recommended === true && raw.reason === undefined) ||
         !Array.isArray(raw.cells) || raw.cells.length !== labels.length || !dense(raw.cells)) throw new Error(code);
       const cells: readonly unknown[] = raw.cells;
       if (!cells.every(cell => text(cell, true))) throw new Error(code);
