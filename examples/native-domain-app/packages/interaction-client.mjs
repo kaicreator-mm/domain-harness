@@ -5,6 +5,9 @@ import { once } from 'node:events';
 import { createOrderInteraction } from './interactive-order.mjs';
 
 function envelope(prompt, answer) {
+  // 只有无关联的裸终端输入才绑定当前提示；显式关联（包括不完整关联）由协议原样验证。
+  if(!answer||typeof answer!=='object'||Array.isArray(answer))return answer;
+  if(['intentId','revision','decisionKey'].some(key=>Object.hasOwn(answer,key)))return answer;
   return {...answer,intentId:prompt.intentId,revision:prompt.revision,decisionKey:prompt.decisionKey};
 }
 

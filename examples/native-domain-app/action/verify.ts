@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { InventoryAuthority, payloadDigest } from './authority.js';
+import { InventoryAuthority, payloadDigest, commandDigest } from './authority.js';
 import type { ApprovalGrant, Policy, Reply, ReserveCommand } from './authority.js';
 import { ReservationElement } from './client.js';
 import type { ReservationMode } from './client.js';
@@ -88,6 +88,19 @@ class Fixture {
       const row = db.select<{ reply: string | null }>('SELECT reply FROM attempts WHERE id=?', [id], 1)[0];
       return row?.reply ? JSON.parse(row.reply) as unknown : undefined;
     } finally { db.close(); }
+  }
+  attempt(path: string, id: string): { digest: string; reply: string | null } | undefined {
+    const db = new SQLiteDatabaseElement(path, { readOnly: true });
+    try { return db.select<{ digest: string; reply: string | null }>('SELECT digest,reply FROM attempts WHERE id=?', [id], 1)[0]; }
+    finally { db.close(); }
+  }
+  grantState(id: string): { revoked: number; bound: string | null; maxQuantity: number } | undefined {
+    const db = new SQLiteDatabaseElement(this.path, { readOnly: true });
+    try {
+      const row = db.select<{ revoked: number; bound: string | null; maxQuantity: number }>('SELECT revoked,bound,maxQuantity FROM grants WHERE id=?', [id], 1)[0];
+      return row === undefined ? undefined : { ...row };
+    }
+    finally { db.close(); }
   }
   async close(): Promise<void> {
     for (const client of this.clients) client.close();
@@ -365,6 +378,76 @@ export const interactiveActionCases: readonly [string, () => Promise<void>][] = 
       expect(await waitForQuantity(c, permitted, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => answerQuantity(prompt, interaction, 2)).result, 'COMPLETE');
       f.state('session', 1, 18, 1);
       assert.deepEqual(p.counts, { submit: 6, readback: 0 });
+    } finally { await p.close(); }
+  })],
+  ['SESSION grant revoked by actual owner while inventory waits', () => fixture(async f => {
+    f.resource('session', 'SESSION'); const h = await f.host(); const p = await proxy(h.base, {});
+    try {
+      const c = f.client('session-revoke', p.base);
+      const path = join(f.folder, 'session-revoke.sqlite');
+      const input = command('session-revoked-wait', 'session', 0, 2, 'session-revoked');
+      f.grant('session-revoked', 'SESSION', input);
+      const pending = waitForQuantity(c, input, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => {
+        assert.equal(interaction.current(), prompt);
+        assert.deepEqual(f.grantState('session-revoked'), { revoked: 0, bound: null, maxQuantity: 2 });
+        assert.deepEqual(p.counts, { submit: 0, readback: 0 });
+        assert.equal(f.attempt(path, input.id), undefined); assert.equal(f.attempt(f.path, input.id), undefined);
+        f.owner.revokeGrant('session-revoked');
+        assert.deepEqual(f.grantState('session-revoked'), { revoked: 1, bound: null, maxQuantity: 2 });
+        answerQuantity(prompt, interaction, 2);
+      });
+      const result = await pending.result;
+      expect(result, 'REJECT', 'APPROVAL_DENIED');
+      f.state('session', 0, 20, 0);
+      assert.deepEqual(f.grantState('session-revoked'), { revoked: 1, bound: null, maxQuantity: 2 });
+      for (const ledger of [path, f.path]) {
+        const attempt = f.attempt(ledger, input.id);
+        assert.equal(attempt?.digest, commandDigest('alice', input));
+        assert.deepEqual(JSON.parse(attempt?.reply ?? 'null'), result);
+      }
+      assert.deepEqual(p.counts, { submit: 1, readback: 0 });
+    } finally { await p.close(); }
+  })],
+  ['inventory pending rejects wrong intent and stale correlation without any Host request', () => fixture(async f => {
+    f.resource('stock', 'PREAUTHORIZED'); const h = await f.host(); const p = await proxy(h.base, {});
+    try {
+      const c = f.client('correlation', p.base);
+      const path = join(f.folder, 'correlation.sqlite');
+      const input = command('correlation', 'stock');
+      let prior: InteractionPrompt | undefined;
+      const old = command('old-intent', 'stock');
+      expect(await waitForQuantity(c, old, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => {
+        prior = prompt; interaction.cancel();
+      }).result, 'REJECT', 'CANCELLED');
+      assert.ok(prior);
+      const stalePrompt = prior;
+      const pending = waitForQuantity(c, input, 'FIRST_SUBMIT', interactiveLimits, (prompt, interaction) => {
+        const correct = { intentId: prompt.intentId, revision: prompt.revision, decisionKey: prompt.decisionKey,
+          action: 'submit', values: { quantity: 2 } };
+        for (const [response, code] of [
+          [{ ...correct, intentId: stalePrompt.intentId }, 'WRONG_INTENT'],
+          [{ ...correct, revision: prompt.revision - 1 }, 'STALE_RESPONSE'],
+          [{ ...correct, decisionKey: 'old-key' }, 'STALE_RESPONSE'],
+        ] as const) {
+          assert.deepEqual(interaction.submit(response), { accepted: false, code });
+          assert.equal(interaction.current(), prompt);
+          assert.deepEqual(p.counts, { submit: 0, readback: 0 });
+          f.state('stock', 0, 20, 0);
+          for (const id of [input.id, old.id]) {
+            assert.equal(f.attempt(path, id), undefined); assert.equal(f.attempt(f.path, id), undefined);
+          }
+        }
+        answerQuantity(prompt, interaction, 2);
+      });
+      const result = await pending.result;
+      expect(result, 'COMPLETE'); f.state('stock', 1, 18, 1);
+      assert.deepEqual(f.receipt('correlation', input.id), result);
+      assert.deepEqual(p.counts, { submit: 1, readback: 0 });
+      // 完整已知输入沿原业务入口直接执行，无交互提示，也不改变既有预算。
+      const direct = command('complete-input', 'stock', 1);
+      expect(await c.run(direct, limits, 'FIRST_SUBMIT'), 'COMPLETE');
+      f.state('stock', 2, 16, 2);
+      assert.deepEqual(p.counts, { submit: 2, readback: 0 });
     } finally { await p.close(); }
   })],
   ['real submit with cancellation after Host commit, lost ACK and original readback', () => fixture(async f => {

@@ -146,7 +146,7 @@ try {
   });
   assert.deepEqual(app.interaction,{independentIntents:true,wrongIntentRejected:true,revision:true,
     dependencyBlocked:true,closeWaited:true,exactAndShort:true});
-  assert.deepEqual(app.cli,{cases:7,realReadline:true});
+  assert.deepEqual(app.cli,{cases:8,realReadline:true});
   // 明确锁定已安装 App 的跨 Reader/Guard/子 Hook 共享预算结果。
   assert.deepEqual(app.budget,{
     successReads:4,
@@ -369,7 +369,7 @@ try {
   ].join('\n');
   assert.equal(run('ACTION_PROBE',consumerNode,[
     '--unhandled-rejections=strict','--input-type=module','--eval',actionProbe,
-  ],consumer).trim(),'SDK_ACTION_PROBE_PASS 11');
+  ],consumer).trim(),'SDK_ACTION_PROBE_PASS 13');
 
   // T07：两个新增 Business Package 在同一个外部应用与实际 Host 中组合。
   cpSync(join(root,'examples/native-domain-app/combined'),join(consumer,'combined'),{recursive:true});

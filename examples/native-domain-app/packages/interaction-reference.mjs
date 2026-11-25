@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { KernelLifecycle, StandardWorkflowSession, InteractionElement } from '@kaicreator/domain-harness';
 import * as kdp from './kdp.mjs';
@@ -108,7 +110,7 @@ export async function verifyReferenceInteractions() {
 }
 
 /** 真实子进程 stdin/readline 与 stdout，不以直接调用 submit 替代终端。 */
-export function verifyReferenceCli(){
+export async function verifyReferenceCli(){
   const entry=fileURLToPath(new URL('./interaction-cli.mjs',import.meta.url));
   const scenarios=[
     ['current',[{action:'submit',values:{goal:'current'}}],'COMPLETE','order-policy-allow',1],
@@ -129,5 +131,37 @@ export function verifyReferenceCli(){
     assert.equal(rows.filter(r=>r.prompt).length,prompts);
     if(name==='invalid')assert.equal(rows.filter(r=>r.response?.accepted===false).length,1);
   }
-  return {cases:scenarios.length,realReadline:true};
+  // 从真实进程输出获取关联，保留旧提示并在下一轮发送，不伪造当前关联。
+  const child=spawn(process.execPath,[entry,'order'],{stdio:['pipe','pipe','pipe'],windowsHide:true});
+  child.stderr.resume();
+  const lines=createInterface({input:child.stdout});
+  const iter=lines[Symbol.asyncIterator]();
+  const exited=once(child,'exit');
+  const timer=setTimeout(()=>child.kill(),10000);
+  const next=async()=>{const line=await iter.next();assert.equal(line.done,false,'CLI output ended');return JSON.parse(line.value);};
+  const send=async(value,expected)=>{
+    child.stdin.write(JSON.stringify(value)+'\n');
+    assert.deepEqual((await next()).response,expected);
+  };
+  try{
+    const first=(await next()).prompt;
+    const initial=answer(first,'submit',{goal:'compare'});
+    await send({...initial,intentId:'WRONG'},{accepted:false,code:'WRONG_INTENT'});
+    await send({action:'submit',values:{goal:'compare'},revision:first.revision},{accepted:false,code:'WRONG_INTENT'});
+    await send(initial,{accepted:true});
+    const second=(await next()).prompt;
+    assert.equal(second.intentId,first.intentId);
+    assert.ok(second.revision>first.revision);
+    await send(answer(first,'submit',{scenario:'strict'}),{accepted:false,code:'STALE_RESPONSE'});
+    await send({...answer(second,'submit',{scenario:'strict'}),decisionKey:first.decisionKey},{accepted:false,code:'STALE_RESPONSE'});
+    await send(answer(second,'submit',{scenario:'strict'}),{accepted:true});
+    const result=(await next()).outcome;
+    assert.equal(result.status,'REJECT');assert.equal(result.reason.code,'ORDER_POLICY_THRESHOLD');
+    child.stdin.end();assert.equal((await exited)[0],0);
+  }finally{
+    clearTimeout(timer);lines.close();child.stdin.end();
+    if(child.exitCode===null&&child.signalCode===null)child.kill();
+    await exited;
+  }
+  return {cases:scenarios.length+1,realReadline:true};
 }

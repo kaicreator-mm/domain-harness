@@ -110,7 +110,7 @@ await initApp.run({
 });
 
 const interaction=await verifyReferenceInteractions();
-const cli=verifyReferenceCli();
+const cli=await verifyReferenceCli();
 console.log(JSON.stringify({
   app:'native-domain-app',
   status:'PASS',

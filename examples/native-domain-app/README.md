@@ -54,10 +54,10 @@
 node examples/native-domain-app/packages/interaction-cli.mjs order
 ```
 
-在终端输入一行 JSON，例如 `{"action":"submit","values":{"goal":"current"}}`，也可输入 `order current` 进行文本澄清。视觉实例由应用的 `serveOrderInteraction` 在 loopback 创建单次会话，展示同一语义 prompt 的选择、比较及动态字段；它不是生产 Web 服务，不上传文件，不持有业务授权。实际浏览器验收工具使用单独环境中的 Playwright Chromium（不引入 SDK 或业务包依赖）：
+在终端输入一行 JSON，例如 `{"action":"submit","values":{"goal":"current"}}`，也可输入 `order current` 进行文本澄清。裸 JSON 不带关联字段时由终端附加当前提示关联；显式关联必须完整且匹配，原样交给协议验证，不自动覆盖或补齐。视觉实例由应用的 `serveOrderInteraction` 在 loopback 创建单次会话，展示同一语义 prompt 的选择、比较及动态字段；它不是生产 Web 服务，不上传文件，不持有业务授权。实际浏览器验收工具使用单独环境中的 Playwright Chromium（不引入 SDK 或业务包依赖）：
 
 ```sh
 DH_BROWSER_DRIVER=/absolute/path/to/playwright/index.mjs node scripts/verify-reference-browser.mjs
 ```
 
-安装消费者门禁复用累计 Reference、7 条 CLI 和原 8 组 + 新 3 组库存授权实际测试；视觉浏览器独立见证。
+安装消费者门禁复用累计 Reference、8 组 CLI 和原 8 组 + 新 5 组库存授权实际测试；视觉浏览器独立见证。
