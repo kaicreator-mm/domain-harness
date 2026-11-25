@@ -37,6 +37,12 @@ const validLimit = (n: number, max: number): boolean => Number.isSafeInteger(n) 
 const nonempty = (s: string): boolean => typeof s === 'string' && s.trim().length > 0;
 const distinct = (xs: readonly unknown[]): boolean => new Set(xs).size === xs.length;
 
+/** 数组长度已受限；逐个检查自有索引，不能使用跳过空洞的 some/every。 */
+function dense(xs: readonly unknown[]): boolean {
+  for (let i = 0; i < xs.length; i++) if (!Object.hasOwn(xs, i)) return false;
+  return true;
+}
+
 /** 证据值由可信域提供且保持不可变；复制冻结元数据，不复制任意业务对象。 */
 function snapshot<K extends string, V>(item: EvidenceObservation<K, V>): EvidenceObservation<K, V> {
   const { id, scope, revision, validity } = item.source;
@@ -54,10 +60,11 @@ export function resolveEvidence<K extends string, V>(
   }>, maxItems: number,
 ): EvidenceResolution<K, V> {
   if (!validLimit(maxItems, MAX_ITEMS) || requirements.length > maxItems || observations.length > maxItems || context.revisions.size > maxItems) return failure('LIMIT');
+  if (!dense(requirements) || !dense(observations)) return failure('INVALID_EVIDENCE');
   if (!nonempty(context.scope) || (context.asOf !== undefined && !Number.isFinite(context.asOf))) return failure('INVALID_EVIDENCE');
   const grouped = new Map<K, EvidenceObservation<K, V>[]>();
   for (const req of requirements) {
-    if (!nonempty(req.key) || grouped.has(req.key) || !req.accepts.length || req.accepts.length > 4 || !distinct(req.accepts) ||
+    if (!nonempty(req.key) || grouped.has(req.key) || !req.accepts.length || req.accepts.length > 4 || !dense(req.accepts) || !distinct(req.accepts) ||
         req.accepts.some(origin => !origins.slice(0, 4).includes(origin))) return failure('INVALID_EVIDENCE');
     grouped.set(req.key, []);
   }
@@ -110,6 +117,7 @@ export function invalidateEvidence<K extends string>(keys: readonly K[], changed
   const { maxItems, maxDependencies } = limits;
   if (!validLimit(maxItems, MAX_ITEMS) || !validLimit(maxDependencies, MAX_DEPENDENCIES) ||
       keys.length > maxItems || changed.length > maxItems || declarations.length > maxItems) return failure('LIMIT');
+  if (!dense(keys) || !dense(changed) || !dense(declarations)) return failure('INVALID_DEPENDENCY');
   const keySet = new Set(keys);
   if (keySet.size !== keys.length || keys.some(key => !nonempty(key)) || !distinct(changed) || changed.some(key => !keySet.has(key))) return failure('INVALID_DEPENDENCY');
   const children = new Map(keys.map(key => [key, [] as K[]]));
@@ -119,7 +127,7 @@ export function invalidateEvidence<K extends string>(keys: readonly K[], changed
   for (const { key, dependsOn } of declarations) {
     edges += dependsOn.length;
     if (edges > maxDependencies) return failure('LIMIT');
-    if (!keySet.has(key) || declared.has(key) || !distinct(dependsOn) || dependsOn.some(parent => !keySet.has(parent))) return failure('INVALID_DEPENDENCY');
+    if (!keySet.has(key) || declared.has(key) || !dense(dependsOn) || !distinct(dependsOn) || dependsOn.some(parent => !keySet.has(parent))) return failure('INVALID_DEPENDENCY');
     declared.add(key);
     indegree.set(key, dependsOn.length);
     for (const parent of dependsOn) children.get(parent)!.push(key);
