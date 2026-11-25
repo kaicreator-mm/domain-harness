@@ -4,7 +4,7 @@ import type { InteractionPrompt, InteractionEvent, InteractionDecision, Interact
   ClarificationPreparation, ClarificationField, StandardWorkflowOutcome, NativeWorkflowContext, WorkflowLimits } from '@kaicreator/domain-harness';
 
 export type Service = 'normal' | 'urgent';
-export interface Offer { readonly id: string; readonly pack?: number | null; readonly price?: number | null; readonly maxPacks?: number | null; readonly ship?: number | null; readonly days?: number | null }
+export interface Offer { readonly id: string; readonly pack?: number | null; readonly price?: number | null; readonly maxPacks?: number | null; readonly minPacks?: number | null; readonly ship?: number | null; readonly days?: number | null }
 export interface OfferSnapshot { readonly revision: string; readonly offers: readonly Offer[] }
 export interface Request { readonly demand: number; readonly service?: Service; readonly plan?: string }
 export interface Plan { readonly id: string; readonly packs: number; readonly units: number; readonly cost: number; readonly days: number }
@@ -15,7 +15,7 @@ type Value = string | number;
 type Outcome<T> = StandardWorkflowOutcome<T>;
 type State = { readonly request: Request };
 type Intent = { readonly request: Required<Request>; readonly fingerprint: string };
-type KnownOffer = Offer & { readonly pack:number; readonly price:number; readonly maxPacks:number; readonly ship:number; readonly days:number };
+type KnownOffer = Offer & { readonly pack:number; readonly price:number; readonly maxPacks:number; readonly minPacks:number; readonly ship:number; readonly days:number };
 type Candidate = { readonly kind:'unknown'; readonly offer:Offer } | { readonly kind:'known'; readonly offer:KnownOffer; readonly packs:number; readonly units:number; readonly cost:number };
 const ok = <T>(value:T):Outcome<T> => ({status:'COMPLETE',value});
 const stop = (status:'REJECT'|'ASK'|'UNKNOWN'|'FAILED',code:string):Outcome<never> => ({status,reason:{code,message:code}});
@@ -32,12 +32,12 @@ const parse = (input:string|Request):Request|undefined => {
 };
 const validOffer = (o:Offer) => /^[A-Za-z0-9_-]{1,32}$/u.test(o.id)
   &&(o.pack==null||integer(o.pack,1,10000))&&(o.price==null||integer(o.price,0,1000000))
-  &&(o.maxPacks==null||integer(o.maxPacks,1,64))&&(o.ship==null||integer(o.ship,0,1000000))
+  &&(o.maxPacks==null||integer(o.maxPacks,1,64))&&(o.minPacks==null||integer(o.minPacks,1,64))&&(o.ship==null||integer(o.ship,0,1000000))
   &&(o.days==null||integer(o.days,0,365));
-const knownOffer = (o:Offer):o is KnownOffer => o.pack!=null&&o.price!=null&&o.maxPacks!=null&&o.ship!=null&&o.days!=null;
+const knownOffer = (o:Offer):o is KnownOffer => o.pack!=null&&o.price!=null&&o.maxPacks!=null&&o.minPacks!=null&&o.ship!=null&&o.days!=null;
 const assess = (c:Candidate,demand:number,service:Service) => {
   if(c.kind==='unknown')return {status:'unknown',reason:'SUPPLIER_FACT_UNKNOWN'} as const;
-  if(c.units<demand||c.units>demand+3||c.cost>2000||c.offer.days>deadline(service))return {status:'excluded',reason:'HARD_CONSTRAINT'} as const;
+  if(c.packs<c.offer.minPacks||c.units<demand||c.units>demand+3||c.cost>2000||c.offer.days>deadline(service))return {status:'excluded',reason:'HARD_CONSTRAINT'} as const;
   return {status:'eligible'} as const;
 };
 const toPlan = (c:Candidate):Plan => {if(c.kind!=='known')throw Error('UNKNOWN_PLAN');return {id:c.offer.id,packs:c.packs,units:c.units,cost:c.cost,days:c.offer.days};};
