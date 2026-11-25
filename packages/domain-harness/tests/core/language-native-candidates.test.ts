@@ -10,7 +10,7 @@ const source = <T>(entries: readonly CandidateEntry<T>[], status: 'complete' | '
 const policy = {
   comparisonLabels: ['Value'],
   assess: (item: CandidateEntry<number>): CandidateAssessment => item.value < 0 ? { status: 'excluded', reason: 'HARD_CONSTRAINT' } : item.value === 0 ? { status: 'unknown', reason: 'NOT_VERIFIED' } : { status: 'eligible' },
-  project: (item: CandidateEntry<number>): CandidateProjection => ({ label: item.id, priority: item.value, recommended: true, cells: [String(item.value)] }),
+  project: (item: CandidateEntry<number>): CandidateProjection => ({ label: item.id, priority: item.value, reason: 'DOMAIN_PREFERENCE', recommended: true, cells: [String(item.value)] }),
 };
 function result<T>(value: CandidatePreparation<T>) {
   if (value.status === 'failed') assert.fail(value.reason);
@@ -96,6 +96,7 @@ test('有界数组及投影非法，限制优先且不接受继承索引', () =>
   for (const patch of [{ priority: Infinity }, { cells: [] }, { cells: new Array<string>(1) }, { cells: ['字'.repeat(400)] }, { label: '' }]) {
     assert.deepEqual(prepareCandidates(source(entries), current, { ...policy, project: item => ({ ...policy.project(item), ...patch }) }, limits), failure('PROJECTION_FAILED'));
   }
+  assert.deepEqual(prepareCandidates(source(entries), current, { ...policy, project: item => ({ label: item.id, priority: 1, recommended: true, cells: ['1'] }) }, limits), failure('PROJECTION_FAILED'));
   const large = Array.from({ length: 80 }, (_, i) => entry('c' + i, 1));
   assert.deepEqual(prepareCandidates(source(large), current, { ...policy, project: item => ({ ...policy.project(item), label: 'x'.repeat(1024) }) }, { maxVisited: 80, maxReturned: 80 }), failure('LIMIT'));
 });
@@ -107,7 +108,7 @@ test('媒体候选：真实字段形状、已选排除、未知元数据、显�
     entry('video-b', { original: 'hash-b', revision: 'archive-v1', mime: 'video/mp4', size: 200, path: 'PRIVATE/b' }),
     entry('photo-c', { original: 'hash-c', revision: 'archive-v1', size: 120, path: 'PRIVATE/c' })];
   const mediaPolicy = { comparisonLabels: ['Type', 'Bytes'], assess: ({ value }: CandidateEntry<Media>): CandidateAssessment => value.original === 'hash-a' ? { status: 'excluded', reason: 'ALREADY_SELECTED' } : value.mime === undefined ? { status: 'unknown', reason: 'METADATA_UNKNOWN' } : { status: 'eligible' },
-    project: ({ id, value }: CandidateEntry<Media>): CandidateProjection => ({ label: id, priority: 1, recommended: true, cells: [value.mime ?? '', String(value.size)] }) };
+    project: ({ id, value }: CandidateEntry<Media>): CandidateProjection => ({ label: id, priority: 1, reason: 'MEDIA_PREFERENCE', recommended: true, cells: [value.mime ?? '', String(value.size)] }) };
   const partial = result(prepareCandidates(source(items), current, mediaPolicy, limits));
   assert.equal(partial.complete, false); assert.deepEqual(partial.options.map(item => item.id), ['video-b']);
   assert.equal(partial.options[0]?.recommended, undefined); assert.ok(!JSON.stringify({ options: partial.options, comparison: partial.comparison }).includes('PRIVATE'));
