@@ -9,7 +9,7 @@ const values = [
   'StandardWorkflowSession', 'routeWorkflowOutcome', 'JsonReader', 'YamlReader',
   'readJson', 'readYaml', 'writeJson', 'writeYaml', 'BoundedQueryElement',
   'SQLiteDatabaseElement', 'SQLiteDatabaseError', 'VectorQueryElement', 'GraphQueryElement',
-  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement',
+  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence',
 ].sort();
 const types = [
   'CorePackageMetadata', 'DomainAppContext', 'LifecycleInitContext', 'PackageInitElement',
@@ -23,6 +23,7 @@ const types = [
   'ExpressionScalar', 'ExpressionLimits',
   'InteractionCandidate', 'InteractionField', 'InteractionEvent', 'InteractionPrompt', 'InteractionPromptSpec',
   'InteractionRecord', 'InteractionResponse', 'InteractionSubmitResult', 'InteractionDecision', 'InteractionScope',
+  'EvidenceOrigin', 'EvidenceObservation', 'EvidenceRequirement', 'EvidenceContext', 'EvidenceResolution', 'EvidenceDependency', 'EvidenceInvalidation',
 ];
 
 /** 安装后检查实际字节、公开根运行行为并准备类型探针；调用者仍须完成原有 TYPECHECK。 */
@@ -31,6 +32,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   assert.ok(packedPaths.includes('dist/standard-cli.js'));
   assert.ok(packedPaths.includes('dist/standard-cli.d.ts'));
   for (const path of ['dist/standard-interaction.js', 'dist/standard-interaction.d.ts', 'dist/interaction-protocol.js', 'dist/interaction-protocol.d.ts']) assert.ok(packedPaths.includes(path));
+  for (const path of ['dist/standard-evidence.js', 'dist/standard-evidence.d.ts']) assert.ok(packedPaths.includes(path));
   const readme = readFileSync(join(installed, 'README.md'));
   assert.deepEqual(readme, readFileSync(join(packageDir, 'README.md')));
   const text = readme.toString('utf8');
@@ -48,7 +50,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const name of [...values, ...types]) assert.ok(text.includes('`' + name + '`'), 'S05_API_NOT_DOCUMENTED:' + name);
   writeFileSync(join(consumer, 's05-types.mts'), [
     `import type { ${types.join(', ')} } from '@kaicreator/domain-harness';`,
-    "import { CliElement, runRecognitionHandling, InteractionElement } from '@kaicreator/domain-harness';",
+    "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence } from '@kaicreator/domain-harness';",
     "const result: Promise<StandardWorkflowOutcome<string>> = runRecognitionHandling({maxCalls:2,maxSteps:5,maxDepth:1}, () => ({status:'COMPLETE',value:{n:2}}), intent => ({status:'COMPLETE',value:String(intent.n)}));",
     "const stdout: Promise<string> = new CliElement().run('trusted-tool', ['--version']);",
     "// @ts-expect-error a number intent is not a string",
@@ -60,7 +62,19 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "// @ts-expect-error prompt revision is readonly",
     "prompt.revision = 3;",
     "};",
-    "void result; void stdout; void interaction; void immutable;",
+    "const evidenceContext: EvidenceContext = {scope:'a',revisions:new Map([['src','v1']])};",
+    "const evidence: EvidenceObservation<'x',number> = {key:'x',state:'known',value:0,origin:'authority',source:{id:'src',scope:'a',revision:'v1'}};",
+    "const resolution: EvidenceResolution<'x',number> = resolveEvidence([{key:'x',accepts:['authority']}],[evidence],evidenceContext,{equal:(_k,l,r)=>l===r},4);",
+    "const invalidation: EvidenceInvalidation<'x'> = invalidateEvidence(['x'],['x'],[{key:'x',dependsOn:[]}],{maxItems:4,maxDependencies:4});",
+    "// @ts-expect-error recommendation is not accepted evidence",
+    "void resolveEvidence<'x',number>([{key:'x',accepts:['recommendation']}],[evidence],evidenceContext,{equal:(_k,l,r)=>l===r},4);",
+    "// @ts-expect-error wrong value type",
+    "void resolveEvidence<'x',string>([{key:'x',accepts:['authority']}],[evidence],evidenceContext,{equal:(_k,l,r)=>l===r},4);",
+    "const readonlyEvidence = (value: EvidenceContext) => {",
+    "// @ts-expect-error current source revisions are readonly",
+    "value.revisions.set('src','v2');",
+    "};",
+    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence;",
   ].join('\n'));
   writeFileSync(join(consumer, 's05-standard-probe.mjs'), [
     "import assert from 'node:assert/strict';",
@@ -80,6 +94,12 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "let promptCount=0; const interaction=new sdk.InteractionElement({onPrompt:p=>{promptCount++;assert.equal(interaction.submit({intentId:p.intentId,revision:p.revision,decisionKey:p.decisionKey,action:'submit',values:{amount:2}}).accepted,true);}});",
     "const interactive=await interaction.run({maxCalls:4,maxSteps:5,maxDepth:0},async scope=>{const resolved=await scope.resolve(0,(_state,event)=>event.kind==='initial'?ok({kind:'clarify',state:1,prompt:{decisionKey:'amount',title:'Amount',actions:['submit'],fields:[{kind:'number',id:'amount',label:'Amount',required:true,min:1,max:5}]}}):ok({kind:'ready',intent:event.response.values.amount}));if(resolved.status!=='COMPLETE')return resolved;assert.deepEqual(scope.root.remaining(),{calls:1,steps:1,maxDescendantDepth:0});return scope.step(()=>ok(resolved.value*2));});",
     "assert.deepEqual(interactive,ok(4));assert.equal(promptCount,1);assert.equal(interaction.current(),undefined);",
+    "const evidenceContext={scope:'a',revisions:new Map([['src','v1']])}; const source={id:'src',scope:'a',revision:'v1'};",
+    "const evidence=sdk.resolveEvidence([{key:'x',accepts:['authority']}],[{key:'x',state:'known',origin:'authority',source,value:0}],evidenceContext,{equal:(_k,l,r)=>Object.is(l,r)},4);",
+    "assert.equal(evidence.complete,true);assert.equal(evidence.items[0].status,'resolved');assert.equal(evidence.items[0].value,0);",
+    "const proposal=sdk.resolveEvidence([{key:'x',accepts:['authority']}],[{key:'x',state:'known',origin:'default',source,value:1}],evidenceContext,{equal:(_k,l,r)=>Object.is(l,r)},4);",
+    "assert.equal(proposal.items[0].status,'unknown');assert.equal(proposal.items[0].proposals.length,1);",
+    "assert.deepEqual(sdk.invalidateEvidence(['x','y','z'],['x'],[{key:'x',dependsOn:[]},{key:'y',dependsOn:['x']},{key:'z',dependsOn:[]}],{maxItems:4,maxDependencies:4}),{complete:true,stale:['x','y'],retained:['z']});",
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');

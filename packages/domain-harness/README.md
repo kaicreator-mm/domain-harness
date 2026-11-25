@@ -8,14 +8,15 @@
 
 `package.json#exports` **只有 `.` 包根**，没有 `./runtime`、`./composition` 或其它内部子路径。
 
-| 运行时 Value 导出（21 个：原有20个 + 0.11.3 T31 InteractionElement 候选，独立测试预期枚举） | 职责 |
+| 运行时 Value 导出（23 个：原有20个 + T31A InteractionElement + T31B 两个 Evidence 函数候选，独立测试预期枚举） | 职责 |
 | --- | --- |
 | `KernelLifecycle` | 最小 KDP，静态 Core 初始化、资源进入记录和最终逆序 Exit |
 | `WorkflowElement`、`XStateWorkflowElement` | Standard 业务工作流抽象和 XState Actor Logic 适配 |
 | `NativeWorkflowContext`、`StandardWorkflowSession` | 原生业务 Callback/Guard/Reader/Hook 的共享根预算 |
 | `routeWorkflowOutcome` | COMPLETE、REJECT、ASK、WAIT、UNKNOWN、FAILED 的完整具名分支 |
 | `runRecognitionHandling` | #1724 S04：固定双叶子角色共享根预算，识别成功后才处理；可选便捷组合 |
-| `InteractionElement` | T31：同一逻辑意图内的多轮语义澄清、校验、关联、失效、等待及协作取消 |
+| `InteractionElement` | T31A：同一逻辑意图内的多轮语义澄清、校验、关联、失效、等待及协作取消 |
+| `resolveEvidence`、`invalidateEvidence` | T31B：有限局部证据组织、来源/适用性、冲突及依赖传递失效 |
 | `JsonReader`、`YamlReader` | 可复用 JSON/YAML Class Element |
 | `readJson`、`readYaml`、`writeJson`、`writeYaml` | 不强制包装成 Class 的原生 Module Functions |
 | `BoundedQueryElement` | v0.11.2 T01：有界、同步、类型化只读数据查询；返回 visited/complete/truncated 和原因，领域 predicate 由业务实现 |
@@ -24,13 +25,14 @@
 | `BoundedExpressionElement` | v0.11.2 T04：纯 JSON AST 的有界同步标量计算 |
 | `CliElement` | #1724 S04：可信前台进程调用、合计输出限制、超时、脱敏错误与平台限定清理 |
 
-### 公开 TypeScript 类型（43 个独立 type/interface，按职责索引）
+### 公开 TypeScript 类型（50 个独立 type/interface，按职责索引）
 
 | 模块职责 | 类型入口（从同一包根 `import type`） |
 | --- | --- |
 | 生命周期 | `CorePackageMetadata`、`DomainAppContext`、`LifecycleInitContext`、`PackageInitElement`、`StaticCorePackage`、`LifecycleLogRecord`、`LifecycleLogger` |
 | Workflow | `StandardWorkflowOutcome`、`WorkflowLimits`、`WorkflowRoutes` |
 | Interaction | `InteractionDecision`、`InteractionScope`、`InteractionPromptSpec`、`InteractionPrompt`、`InteractionField`、`InteractionCandidate`、`InteractionResponse`、`InteractionEvent`、`InteractionRecord`、`InteractionSubmitResult` |
+| Evidence | `EvidenceOrigin`、`EvidenceObservation`、`EvidenceRequirement`、`EvidenceContext`、`EvidenceResolution`、`EvidenceDependency`、`EvidenceInvalidation` |
 | JSON/YAML | `StandardJsonValue`、`StandardFileOutcome` |
 | Bounded Query | `BoundedQueryLimits`、`BoundedQueryTruncationReason`、`BoundedQueryResult` |
 | SQLite | `SQLiteScalar`、`SQLiteNonThenable`、`SQLiteTransaction`、`SQLiteDatabaseOptions`、`SQLiteErrorCode`、`SQLiteFailureOrigin`、`SQLiteTerminalFailureDetails` |
@@ -46,11 +48,11 @@ SDK 直接运行依赖只有 `xstate@5.33.2`、`yaml@2.9.1` 与 `@photostructure
 
 安装的是单一 SDK；先检查实际 `node_modules/@kaicreator/domain-harness/package.json`、本 README 和公开 `dist/index.d.ts`。使用根入口，不需要 Forge、额外生成器、特殊 DSL 或第二个 Runtime。
 
-本 README 的配套规范快照：`a4b06b42e3707126955cfb545875a90802657887`（0.11.2 已交付 SDK、R20 前置专项、T30 已合入及 T31 交互候选；该快照是导航依据，不是当前 tarball 的源码运行证书）。以下为不可变 Git 提交链接，而非浮动分支：
+本 README 的配套规范快照：`84cb2e4b5364405083acf3a1fc0463e95df33bb7`（0.11.2 已交付 SDK、R20 前置专项、T30/T31A 已验收及 R25 修订L2、T31B 候选；该快照是导航依据，不是当前 tarball 的源码运行证书）。以下为不可变 Git 提交链接，而非浮动分支：
 
-1. [权威规范目录](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/README.md) → [核心原则 CORE-01..14](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/core.md) → [TypeScript Profile](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/typescript-profile.md)。
-2. [Agent Skill](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/.agents/skills/domain-harness-spec/SKILL.md) 与 [需求驱动应用资格实践](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/.agents/skills/domain-harness-spec/references/application-qualification.md)；按需读 [Element/Package](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/element-package.md)、[Lifecycle/Workflow](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/lifecycle-workflow.md)、[QA](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/engineering-quality.md)。
-3. [真实原生应用](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/examples/native-domain-app/main.mjs)、[0.11.2 领域应用（R69/R71 历史，R72/R73 最终裁决及 S04 迁移说明）](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/examples/qualification/README.md)、[状态与验收证据](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/status-and-decisions.md)。
+1. [权威规范目录](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/docs/specs/domain-harness/README.md) → [核心原则 CORE-01..14](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/docs/specs/domain-harness/core.md) → [TypeScript Profile](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/docs/specs/domain-harness/typescript-profile.md)。
+2. [Agent Skill](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/.agents/skills/domain-harness-spec/SKILL.md) 与 [需求驱动应用资格实践](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/.agents/skills/domain-harness-spec/references/application-qualification.md)；按需读 [Element/Package](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/docs/specs/domain-harness/element-package.md)、[Lifecycle/Workflow](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/docs/specs/domain-harness/lifecycle-workflow.md)、[QA](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/docs/specs/domain-harness/engineering-quality.md)。
+3. [真实原生应用](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/examples/native-domain-app/main.mjs)、[0.11.2 领域应用（R69/R71 历史，R72/R73 最终裁决及 S04 迁移说明）](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/examples/qualification/README.md)、[状态与验收证据](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/docs/specs/domain-harness/status-and-decisions.md)。
 
 仓库可能需要授权访问。离线时本 README 与安装的声明仍可用于已公开 API 的基本消费；完整规范和 Skill 不在当前包内，不能把摘要当完整规范或假定已读。需要规范生成/审核时取得匹配快照（可使用已授权 Git checkout）；不要切换到未知的新分支来猜测 API。后续 SDK 改变规范或公开合同，应同步更新此固定快照与 API 文档，保留证据归属。
 
@@ -181,7 +183,7 @@ const outcome = await runRecognitionHandling(
 
 以上为调用形状，`request`、`recognize`、`handle` 由应用定义。每次调用内部只创建一个 `StandardWorkflowSession`；两个静态 child(0) 各调用一次 `invokeOutcome`。完整路径 2 calls / 5 steps / 1 depth；识别任何非 COMPLETE 终态原样返回，不调用处理；处理终态亦不二次包装。额度按既有逐次预留，识别可能在处理额度不足时已经执行，**不是全业务预算预检**，因此需要全阶段先验额度的业务仍自行检查。异常保留既有脱敏 FAILED 语义；真实授权、命令身份、receipt/readback、UNKNOWN、领域证据仍由应用负责。ASK/WAIT 不自动恢复；复杂分支、并行、额外 child、Hook、多轮 Interaction 直接复用 Session/Context 等现有机制，不强制使用此函数。
 
-[五个实际迁移模块及既有业务验收范围](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/examples/native-domain-app/README.md)：维修报价、AQI、图书目录、水硬度和库存 Reservation。无需重复生成固定双角色执行组合；保留真实领域类型、知识、规则、权威 Host 和持久账本。新工件完整验收仍由 #1724 记录，不扩张 R65 历史证据。
+[五个实际迁移模块及既有业务验收范围](https://github.com/kaicreator-mm/domain-harness/blob/84cb2e4b5364405083acf3a1fc0463e95df33bb7/examples/native-domain-app/README.md)：维修报价、AQI、图书目录、水硬度和库存 Reservation。无需重复生成固定双角色执行组合；保留真实领域类型、知识、规则、权威 Host 和持久账本。新工件完整验收仍由 #1724 记录，不扩张 R65 历史证据。
 
 ## T30 · 同根剩余预算查询（.1 归属，#1731）
 
@@ -189,7 +191,7 @@ const outcome = await runRecognitionHandling(
 
 适用于同一逻辑根内多轮交互后固定专业路径的完整预算前置检查。例如实际剩余需至少 4 calls / 7 steps / 2 depth 时，按该快照检查后直接以同一 context 执行原有 child/invokeOutcome 组合；不要另建根。快照不能作为并发 reservation 或授权，其他并发操作可能消耗余额，实际逐次原子门禁仍有效。无新运行时根导出或独立类型。T30 源码候选的正式资格以 #1731 独审和实际验收为准；此处不扩大 R20 旧工件证据。
 
-## T31 · Semantic Interaction（#1733 源码候选）
+## T31A · Semantic Interaction（#1733 R22 已验收执行层）
 
 新增10个公开类型：`InteractionDecision`、`InteractionScope`（原生领域分析与同根执行）；`InteractionPromptSpec`、`InteractionPrompt`、`InteractionField`、`InteractionCandidate`（语义表单、选择及比较）；`InteractionResponse`、`InteractionEvent`、`InteractionRecord`、`InteractionSubmitResult`（关联响应、只读历史、提交 ACK）。内部协议校验 helper 不从根导出。不要求统一领域 Intent 类型或另一运行时。
 
@@ -240,3 +242,45 @@ const result = await interaction.run(
 **执行：** 一次实例一次 run；每轮 decide 与 wait 各占1call/1step，root 启动1step。resolve 可在同一次 run 后续再次调用但不得并发；ready 的业务类型由泛型保持，不需要多余最终确认。InteractionEvent.records 的 valid 表示表达未失效，不是授权；revise 使旧表达失效，同 key 替换，业务可返回 invalidate 的 key。业务重新验证事实和必要确认。current 返回当下可响应的 prompt，submit 校验 intentId/revision/decisionKey；跨意图/旧轮/无效输入不执行领域回调。onPrompt 同步通知必须返回 undefined（即使 TS void 允许 async）；异步返回或抛错撤销等待，已捕获响应不推进。
 
 **取消与收敛：** 适配器可调用 cancel；scope.signal 用于业务协作检查。scope.step 不会在取消后启动，已进入的动作等待真实结果，保留 COMPLETE/UNKNOWN；直接使用 root 的可信业务需自行检查 signal、当前事实/授权及必要预算。所有 scope/业务操作必须 await，不把 root/scope 泄漏到 run 之外；work 结束仍有 scope 在途时撤销等待、收敛并报 UNKNOWN/INTERACTION_UNJOINED_WORK（不是未执行证明）。真实已提交/不确定的动作按领域原身份 readback，不能通过新 Session 规避预算。应用关闭先停止入口、cancel 自己拥有的活跃实例，再 KDP dispose。不承诺重启恢复、任意 JS 沙箱或强制中断不可协作工具。实际 T32–35 领域、真实客户端、授权、SDK 工件和独立消费者仍待验收。
+
+## T31B · 局部证据组织（#1736 源码候选）
+
+用 `resolveEvidence` 组织已经取得的领域证据；K/V 保持领域自有类型，函数不读取事实、不判断来源实际可信度、不代替 Owner 授权。域从可信事实源得到 scope、source id 与 revision，在需要时给出 asOf；客户端不得自行声明 authority。每项明确接受的来源类别，`equal` 是域给定的同步等价比较，`rank` 可选且必须为有限数值（无 rank 同级，不静默覆盖冲突）。不需要统一 Fact/Intent ABI。
+
+```ts
+import { resolveEvidence, invalidateEvidence } from '@kaicreator/domain-harness';
+import type { EvidenceObservation } from '@kaicreator/domain-harness';
+
+const context = {
+  scope: 'workshop/current',
+  revisions: new Map([['calendar', 'v2']]),
+};
+const observations: readonly EvidenceObservation<'calendar', string>[] = [
+  { key: 'calendar', state: 'known', value: 'normal', origin: 'default',
+    source: { id: 'calendar', scope: 'workshop/current', revision: 'v2' } },
+];
+const result = resolveEvidence(
+  [{ key: 'calendar', accepts: ['authority'] }],
+  observations, context, { equal: (_key, a, b) => a === b }, 16,
+);
+if (result.complete) {
+  // 当前日历 unknown，而非自动采用默认 normal；仅为提案。
+  console.log(result.items[0]?.status);
+}
+
+// 已有真实日历发生变化：先移除 stale 证据，再重新读取/推导。
+const invalidation = invalidateEvidence(
+  ['calendar', 'plan', 'precedence'], ['calendar'],
+  [{ key: 'calendar', dependsOn: [] },
+   { key: 'plan', dependsOn: ['calendar'] },
+   { key: 'precedence', dependsOn: [] }],
+  { maxItems: 16, maxDependencies: 32 },
+);
+// complete: true 时 stale 为 calendar/plan，retained 为 precedence。
+// complete: false 时不能使用部分保留结果。
+console.log(invalidation);
+```
+
+**状态和来源：** 输入 known（非 undefined 值）、unknown、not-applicable；输出 resolved、missing、unknown、conflict、not-applicable 及原因/证据/提案。false/0 是合法已知值。仅适用的已知 default/recommendation 作为 proposals；default 只有明确 accepts 包含 default 才可 resolved，recommendation 永远不是已确定证据。source.scope 及每 id 的 revision 必须精确匹配；validity 使用 [from,until)，有时效而无 asOf 不适用。等优先已知冲突不选任意一个，同级 unknown 不可确定。complete 表示已处理输入集合，**不是全部 resolved、外部数据完整、READY 或授权**。域须保留未取得事实/查询截断语义；可信领域同步调用期间不得突变输入或提供不协作回调。返回元数据/集合冻结，V 仍是域持有的不可变值，不深复制资源。
+
+**失效与预算：** 域在 scope/revision/事实/选择变化时列出所有 changed keys，先调用 invalidateEvidence、移除 stale 并重算，再 resolveEvidence；缺少依赖声明在变更时保守失效，显式 [] 表示证明无依赖。循环/未知 key/重复依赖拒绝。保留项仍检查当前适用性，不复活 InteractionElement 已失效用户记录。显式 maxItems 0..4096（每数组及 source revision Map），maxDependencies 0..16384（边总数）；失败 complete:false、LIMIT/INVALID_EVIDENCE/INVALID_DEPENDENCY/POLICY_FAILED，无可用部分。无 I/O、全局状态或新 Session；在已计费分析中纯计算，真实取证和专业操作仍使用同一 root 实际计费。按 LIFE-15 与 #1736 资格使用；真实领域 T32/33 及最终产品验收尚待完成。
