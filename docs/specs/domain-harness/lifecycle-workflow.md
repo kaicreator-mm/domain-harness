@@ -155,3 +155,7 @@ confirmation=accepted 时 B resolved 非选择字段可跳过；confirmation=use
 `scope.resolve(initial, decide)` 和 `runInteractiveRecognitionHandling(..., decide, handle)` 的 decide 回调均接收第四个参数 `signal: AbortSignal`，它与同一 scope.signal 完全相同，不创建第二 AbortController。已有三参数回调仍合法；分析可在实际异步取证/候选生成前检查 signal，复杂处理继续使用 scope.signal。原 root 预算、等待关联、取消终态、结果所有权不变。该参数不是强制抢占或权限证明。每个跨 await 的下一相关实际业务操作开始前须重新检查；已进入操作正常 await 收敛，必要的结果验证、receipt 及清理仍须执行。未提交的媒体规划取消可丢弃不完整计划并释放 staging；已进入真实求解完成后的专业校验与已提交/可能提交的 Host 结果不得由取消错误覆盖。不要以额外 scope.step 代替信号传播导致重复计费，不把任意直接 root 回调升级成全局取消管理器。
 
 内部 `semantic-data.ts` 只封装已在 B/C/D/E 和 A/D 复用的有界数据检查与 B/C 有限依赖拓扑次序：自有索引完整性、有限整数上限、原 opaque ID 合同、已验证局部图的稳定迭代排序。调用方继续负责输入规模/结构/依赖有效性与领域意义、错误分类、返回冻结；拓扑 helper 不执行 Workflow、无领域事实或决策规则、不保存状态，不修改传入图。原 B/C 两种算法保留各自传播与选择语义。该模块不是 SDK 公共入口；公开面仍 28 运行时值/61 公开类型、仅包根。构建工件可含内部实现文件，但不能通过包子路径导入。R49 已接受 #1750，T32/T33 真实整改与 T34 已收口；T35 最终门禁仍待裁决。
+
+### LIFE-09 · 回调快照与借用边界（#1763）
+
+预算预留与实际 Hook 调用须使用同一组已接纳回调；原调用者对象通过普通别名变化不得增加未计费操作，已进入的 end 清理和主终态保留。NativeWorkflowContext 是本次 Session/回调借用的能力，调用者须等待全部业务调用，不自行构造额外根、不泄漏到回调结束之后；不承诺任意可信 JS 的全局强制取消。KDP 日志失败不得阻断 Exit 或覆盖原异常；同步 sink 的意外真实 Promise 拒绝须被观察，不等待日志任务。上述两项缺陷当前仍待实际修正及验收。XState mapper 须同步、仅在 done 调用，不将异步结果当成功。

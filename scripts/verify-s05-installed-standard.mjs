@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, cpSync } from 'node:fs';
 import { join } from 'node:path';
+import { root, packedSkill, verifyPackedSkill } from './sdk-capability-catalog.mjs';
 
 // 独立预期名单；不能由被测包或其 README 生成。
 const values = [
@@ -43,19 +44,20 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const path of ['dist/semantic-data.js', 'dist/semantic-data.d.ts']) assert.ok(packedPaths.includes(path));
   const readme = readFileSync(join(installed, 'README.md'));
   assert.deepEqual(readme, readFileSync(join(packageDir, 'README.md')));
-  const text = readme.toString('utf8');
-  const guide = text.match(/配套规范快照：`([0-9a-f]{40})`/u)?.[1];
-  assert.ok(guide, 'S05_GUIDE_SHA_MISSING');
-  const links = new Set([...text.matchAll(/https:\/\/github\.com\/kaicreator-mm\/domain-harness\/blob\/([0-9a-f]{40})\/([^\s)]+)/gu)]
-    .map(match => `${match[1]}/${match[2]}`));
-  assert.equal(links.size, 12);
-  assert.ok([...links].every(link => link.startsWith(guide + '/')));
-  for (const path of ['.agents/skills/domain-harness-spec/SKILL.md', 'docs/specs/domain-harness/README.md',
-    'examples/native-domain-app/README.md', 'examples/qualification/README.md']) {
-    assert.ok(links.has(guide + '/' + path), 'S05_GUIDE_TARGET_MISSING');
-  }
-  // 检查文档中公开名称；实际类型入口由仓外 tsc 验证。
-  for (const name of [...values, ...types]) assert.ok(text.includes('`' + name + '`'), 'S05_API_NOT_DOCUMENTED:' + name);
+  assert.ok(packedPaths.includes(packedSkill+'/SKILL.md'));
+  const skillFiles=verifyPackedSkill(installed);
+  assert.ok(readme.toString('utf8').includes(packedSkill+'/SKILL.md'));
+  const exampleDir=join(consumer,'skill-examples');
+  cpSync(join(installed,packedSkill,'references/examples'),exampleDir,{recursive:true});
+  const examples=readdirSync(exampleDir).filter(file=>file.endsWith('.mts')).sort();
+  assert.ok(examples.length>0,'S05_SKILL_EXAMPLES_MISSING');
+  writeFileSync(join(exampleDir,'tsconfig.json'),JSON.stringify({compilerOptions:{
+    strict:true,target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',
+    skipLibCheck:true,types:['node'],typeRoots:[join(root,'node_modules/@types')],
+    lib:['ES2022','DOM','ESNext.Disposable'],outDir:'out',
+  },include:['*.mts']}));
+  run('SKILL_TYPECHECK',process.execPath,[join(root,'node_modules/typescript/bin/tsc'),'-p',join(exampleDir,'tsconfig.json')],consumer);
+  for(const name of examples)run('SKILL_EXAMPLE_'+name.replace(/[^a-zA-Z0-9]/gu,'_'),consumerNode,['--unhandled-rejections=strict',join(exampleDir,'out',name.replace(/\.mts$/u,'.mjs'))],consumer);
   writeFileSync(join(consumer, 's05-types.mts'), [
     `import type { ${types.join(', ')} } from '@kaicreator/domain-harness';`,
     "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, buildClarification, mapClarificationResponse, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';",
@@ -175,7 +177,6 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');
-  // 固定链接目标授权访问及陌生生成者实测仍由 S05 独立消费者负责。
-  return { readmeSha256: createHash('sha256').update(readme).digest('hex'), guideSnapshot: guide,
-    guideLinkCount: links.size, runtimeExports: values.length, typeImports: types.length };
+  return { readmeSha256: createHash('sha256').update(readme).digest('hex'),
+    skillFiles, skillExamples:examples.length, runtimeExports: values.length, typeImports: types.length };
 }

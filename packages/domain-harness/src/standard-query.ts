@@ -1,14 +1,24 @@
 import { types } from 'node:util';
 
-/** 有界查询预算由调用方设定；SDK 不规定领域数据的 Schema 或适用性。 */
+/** 有界查询预算由调用方设定；SDK 不规定领域数据的 Schema 或适用性。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface BoundedQueryLimits {
   readonly maxVisited: number;
   readonly maxReturned: number;
 }
 
+/** 查询截断的预算原因。
+ * @dhKind type
+ * @dhCapability query
+ */
 export type BoundedQueryTruncationReason = 'VISIT_LIMIT' | 'RESULT_LIMIT';
 
-/** complete 表示所有输入记录均已判断；部分结果不可当作完整事实。 */
+/** complete 表示所有输入记录均已判断；部分结果不可当作完整事实。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface BoundedQueryResult<T> {
   readonly items: readonly T[];
   readonly visited: number;
@@ -33,6 +43,9 @@ function truncated<T>(
 /**
  * 同步、无副作用的 Standard 查询封装；领域过滤条件来自可信生成期业务代码。
  * 保留调用方源顺序，不隐式排序，也不将截断的候选列表视为完备结论。
+
+ * @dhKind standard-element
+ * @dhCapability query
  */
 export class BoundedQueryElement {
   public select<T>(

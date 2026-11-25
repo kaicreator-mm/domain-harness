@@ -10,3 +10,7 @@ coverage/
 # R60: SDK public type file is generated from tooling/build/src/types.ts.
 packages/domain-harness/src/composition-types.ts
 _tmp/
+
+# 生成期可移植 Skill 投影，不是第二份维护源。
+/packages/domain-harness/skills/
+/node_modules

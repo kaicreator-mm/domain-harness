@@ -12,7 +12,7 @@
     "build": "npm run build --workspace=@kaicreator/domain-harness",
     "typecheck": "npm run typecheck --workspace=@kaicreator/domain-harness",
     "lint": "node scripts/check-source-quality.mjs && eslint .",
-    "test:generation": "node --test scripts/tests/native-generation.test.mjs && node scripts/validate-native-generation.mjs --manifest examples/native-domain-app/package.json --core examples/native-domain-app/packages/kdp.mjs --core examples/native-domain-app/packages/business.mjs --core examples/native-domain-app/packages/workflow-init.mjs",
+    "test:generation": "node scripts/sdk-capability-catalog.mjs --check && node --test scripts/tests/sdk-capability-catalog.test.mjs && node --test scripts/tests/native-generation.test.mjs && node scripts/validate-native-generation.mjs --manifest examples/native-domain-app/package.json --core examples/native-domain-app/packages/kdp.mjs --core examples/native-domain-app/packages/business.mjs --core examples/native-domain-app/packages/workflow-init.mjs",
     "test": "npm run test:typecheck --workspace=@kaicreator/domain-harness && node --import tsx --test packages/domain-harness/tests/core/*.test.ts && npm run test:generation && npm run test:regression",
     "test:demo": "node examples/native-domain-app/main.mjs",
     "test:consumer": "node scripts/verify-native-sdk-clean-install.mjs",

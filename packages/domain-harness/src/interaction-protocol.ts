@@ -1,5 +1,8 @@
 import { opaqueId as id } from './semantic-data.js';
-/** 语义交互只传输有界 JSON 数据，不解释领域规则或可执行代码。 */
+/** 语义交互只传输有界 JSON 数据，不解释领域规则或可执行代码。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface InteractionCandidate {
   readonly id: string;
   readonly label: string;
@@ -16,6 +19,10 @@ interface FieldBase {
   readonly required?: boolean;
   readonly prefill?: { readonly value: Value; readonly source: string };
 }
+/** 原生语义表单的字段类型与约束。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type InteractionField = FieldBase & (
   | { readonly kind: 'string' | 'text' | 'file'; readonly minLength?: number; readonly maxLength?: number }
   | { readonly kind: 'number'; readonly min?: number; readonly max?: number }
@@ -24,6 +31,10 @@ export type InteractionField = FieldBase & (
       readonly completeness: 'complete' | 'incomplete';
       readonly comparison?: readonly { readonly label: string; readonly cells: Readonly<Record<string, string>> }[] }
 );
+/** 由领域组织的待发布表单内容。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface InteractionPromptSpec {
   readonly decisionKey: string;
   readonly title: string;
@@ -31,24 +42,44 @@ export interface InteractionPromptSpec {
   readonly fields: readonly InteractionField[];
   readonly actions: readonly Action[];
 }
+/** 实际发布且带意图身份与修订的表单。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface InteractionPrompt extends InteractionPromptSpec {
   readonly intentId: string;
   readonly revision: number;
 }
+/** 客户端响应动作与显式数据。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type InteractionResponse = Readonly<{ intentId: string; revision: number; decisionKey: string }> & (
   | { readonly action: 'submit'; readonly values: Values }
   | { readonly action: 'revise'; readonly values: Values }
   | { readonly action: 'revise' | 'text'; readonly text: string }
   | { readonly action: 'no-fit' | 'reject' | 'cancel' }
 );
+/** 响应与其当前有效性。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface InteractionRecord {
   readonly response: InteractionResponse;
   readonly valid: boolean;
 }
+/** 领域分析收到的初始或实际响应事件。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type InteractionEvent = (
   | { readonly kind: 'initial' }
   | { readonly kind: 'response'; readonly response: InteractionResponse }
 ) & { readonly records: readonly InteractionRecord[] };
+/** 响应捕获确认；不是业务成功。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type InteractionSubmitResult = { readonly accepted: true } | {
   readonly accepted: false;
   readonly code: 'NO_PENDING' | 'STALE_RESPONSE' | 'WRONG_INTENT' | 'INVALID_RESPONSE' | 'ALREADY_SETTLED';

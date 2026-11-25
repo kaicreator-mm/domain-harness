@@ -1,7 +1,10 @@
 import { createActor } from 'xstate';
 import type { AnyActorLogic, InputFrom, OutputFrom } from 'xstate';
 
-/** 明确区分业务完成与非成功终态，禁止把 stopped/未知误报为成功。 */
+/** 明确区分业务完成与非成功终态，禁止把 stopped/未知误报为成功。
+ * @dhKind type
+ * @dhCapability workflow
+ */
 export type StandardWorkflowOutcome<Output> =
   | { readonly status: 'COMPLETE'; readonly value: Output }
   | {
@@ -9,7 +12,10 @@ export type StandardWorkflowOutcome<Output> =
     readonly reason: { readonly code: string; readonly message: string };
   };
 
-/** 应用级可复用 Workflow Element，不要求 KDP 充当工作流执行中心。 */
+/** 应用级可复用 Workflow Element，不要求 KDP 充当工作流执行中心。
+ * @dhKind abstract-contract
+ * @dhCapability workflow
+ */
 export abstract class WorkflowElement<Input, Output> {
   abstract run(input: Input): Promise<StandardWorkflowOutcome<Output>>;
 }
@@ -17,6 +23,9 @@ export abstract class WorkflowElement<Input, Output> {
 /**
  * XState v5 标准 Workflow Element。
  * 从真实 actor logic 派生 Input 与已完成 Output 类型，防止弱化 TS 类型检查。
+
+ * @dhKind standard-element
+ * @dhCapability workflow
  */
 export class XStateWorkflowElement<
   Logic extends AnyActorLogic,

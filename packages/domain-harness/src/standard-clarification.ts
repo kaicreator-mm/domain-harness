@@ -10,6 +10,10 @@ type Prefill = NonNullable<InteractionField['prefill']>;
 type Value = Prefill['value'];
 type Choice = Extract<InteractionField, { kind: 'choice' | 'multi-choice' }>;
 type Known<E extends string, V> = Extract<EvidenceObservation<E, V>, { state: 'known' }>;
+/** 领域字段与证据键的显式映射。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface ClarificationField<E extends string, V> {
   readonly field: InteractionField;
   readonly evidenceKey: E;
@@ -18,11 +22,19 @@ export interface ClarificationField<E extends string, V> {
   readonly projectPrefill?: (observation: Known<E, V>) => Prefill | undefined;
   readonly candidates?: Readonly<{ current: Readonly<{ scope: string; revision: string }>; result: CandidatePreparation<unknown> }>;
 }
+/** 当前证据及决策对应的澄清准备。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type ClarificationPreparation<E extends string> =
   Readonly<{ status: 'failed'; reason: 'LIMIT' | 'INVALID_MAPPING' | 'EVIDENCE_FAILED' | 'DECISION_FAILED' | 'CANDIDATE_FAILED' | 'STALE_CANDIDATES' | 'INVALID_PROMPT' | 'PREFILL_FAILED' }> |
   Readonly<{ status: 'ready' }> |
   Readonly<{ status: 'unresolved' | 'blocked' | 'conflict'; reason: 'DECISION' | 'FIELD_APPLICABILITY' | 'EVIDENCE_NOT_APPLICABLE' | 'NO_FIELDS' | 'NO_SUBMISSION' }> |
   Readonly<{ status: 'prompt'; prompt: InteractionPromptSpec; bindings: readonly Readonly<{ fieldId: string; key: E }>[] }>;
+/** 显式用户响应的映射结果。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type ClarificationResponse<E extends string> = Readonly<{ status: 'failed'; reason: 'INVALID_RESPONSE' }> |
   Readonly<{ status: 'other'; action: InteractionResponse['action'] }> |
   Readonly<{ status: 'values'; action: 'submit' | 'revise'; values: readonly Readonly<{ key: E; origin: 'user'; value: Value }>[] }>;
@@ -36,7 +48,10 @@ function currentChoice(field: Choice, value: Value): boolean {
   return Array.isArray(value) && value.length <= 256 && dense(value) && (!field.required || value.length > 0) && new Set(value).size === value.length && value.every(has);
 }
 
-/** 根据本轮真实证据组织当前必要决策的原生语义表单，不执行领域规则或业务。 */
+/** 根据本轮真实证据组织当前必要决策的原生语义表单，不执行领域规则或业务。
+ * @dhKind function
+ * @dhCapability semantic-interaction
+ */
 export function buildClarification<K extends string, E extends string, V>(evidence: EvidenceResolution<E, V>, selection: DecisionSelection<K>,
   template: Omit<InteractionPromptSpec, 'fields'>, fields: readonly ClarificationField<E, V>[]): ClarificationPreparation<E> {
   if (!evidence.complete) return failure('EVIDENCE_FAILED');
@@ -100,7 +115,10 @@ export function buildClarification<K extends string, E extends string, V>(eviden
   } catch { return failure('INVALID_PROMPT'); }
 }
 
-/** 只映射实际交互当前有效响应的显式字段；不写状态、不授予权威或权限。 */
+/** 只映射实际交互当前有效响应的显式字段；不写状态、不授予权威或权限。
+ * @dhKind function
+ * @dhCapability semantic-interaction
+ */
 export function mapClarificationResponse<E extends string>(prepared: Extract<ClarificationPreparation<E>, { status: 'prompt' }>,
   current: InteractionPrompt, event: InteractionEvent): ClarificationResponse<E> {
   const invalid = Object.freeze({ status: 'failed' as const, reason: 'INVALID_RESPONSE' as const });

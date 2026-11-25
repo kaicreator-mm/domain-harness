@@ -6,6 +6,9 @@ const MAX_LIMIT = 2_147_483_647;
  * 可信前台 CLI 的通用执行 Element：无 shell、超时、stdout/stderr 合计字节限制和脱敏错误。
  * Linux 负责启动的进程组，其他平台仅负责直接子进程；不保证清理逃离进程组的后代。
  * 调用方负责选择可信可执行文件、参数、权限、输入输出验证和业务结果；非沙箱或授权器。
+
+ * @dhKind standard-element
+ * @dhCapability cli
  */
 export class CliElement {
   constructor(private readonly timeoutMs = 10_000, private readonly maxOutputBytes = 65_536) {

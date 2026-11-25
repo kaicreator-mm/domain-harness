@@ -1,22 +1,41 @@
 import { types } from 'node:util';
 import { dense, validLimit, dependencyOrder } from './semantic-data.js';
-/** 局部意图证据的来源类别；推荐只作为提案，默认需显式许可。 */
+/** 局部意图证据的来源类别；推荐只作为提案，默认需显式许可。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type EvidenceOrigin = 'authority' | 'user' | 'derived' | 'default' | 'recommendation';
+/** 带来源、范围、修订和状态的观察。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type EvidenceObservation<K extends string, V> = Readonly<{
   key: K;
   origin: EvidenceOrigin;
   source: Readonly<{ id: string; scope: string; revision: string; validity?: Readonly<{ from: number; until: number }> }>;
 }> & (Readonly<{ state: 'known'; value: V }> | Readonly<{ state: 'unknown' | 'not-applicable' }>);
+/** 领域声明的证据键及接受来源。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface EvidenceRequirement<K extends string> {
   readonly key: K;
   readonly accepts: readonly Exclude<EvidenceOrigin, 'recommendation'>[];
 }
+/** 本轮范围、修订及可选时间。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface EvidenceContext {
   readonly scope: string;
   readonly revisions: ReadonlyMap<string, string>;
   readonly asOf?: number;
 }
 type Failure = Readonly<{ complete: false; reason: 'LIMIT' | 'INVALID_EVIDENCE' | 'INVALID_DEPENDENCY' | 'POLICY_FAILED' }>;
+/** 证据遍历完整性与逐键结论。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type EvidenceResolution<K extends string, V> = Failure | Readonly<{
   complete: true;
   items: readonly (Readonly<{
@@ -28,7 +47,15 @@ export type EvidenceResolution<K extends string, V> = Failure | Readonly<{
     Readonly<{ status: 'conflict'; reason: 'CONFLICTING_EVIDENCE' }> |
     Readonly<{ status: 'not-applicable'; reason: 'EXPLICIT_NOT_APPLICABLE' }>))[];
 }>;
+/** 证据依赖关系。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface EvidenceDependency<K extends string> { readonly key: K; readonly dependsOn: readonly K[] }
+/** 变更导致的失效和保留键集合。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type EvidenceInvalidation<K extends string> = Failure | Readonly<{ complete: true; stale: readonly K[]; retained: readonly K[] }>;
 
 const MAX_ITEMS = 4096;
@@ -53,7 +80,10 @@ function snapshot<K extends string, V>(item: EvidenceObservation<K, V>): Evidenc
   return item.state === 'known' ? Object.freeze({ ...base, state: item.state, value: item.value }) : Object.freeze({ ...base, state: item.state });
 }
 
-/** 只组织已取得的证据，不读取数据源。complete 表示遍历完整，不表示全部已确定。 */
+/** 只组织已取得的证据，不读取数据源。complete 表示遍历完整，不表示全部已确定。
+ * @dhKind function
+ * @dhCapability semantic-interaction
+ */
 export function resolveEvidence<K extends string, V>(
   requirements: readonly EvidenceRequirement<K>[], observations: readonly EvidenceObservation<K, V>[],
   context: EvidenceContext, policy: Readonly<{
@@ -114,7 +144,10 @@ export function resolveEvidence<K extends string, V>(
   return Object.freeze({ complete: true, items: Object.freeze(items) });
 }
 
-/** 当前意图的显式有限依赖；缺少声明时有变更即保守失效，空列表表示无依赖。 */
+/** 当前意图的显式有限依赖；缺少声明时有变更即保守失效，空列表表示无依赖。
+ * @dhKind function
+ * @dhCapability semantic-interaction
+ */
 export function invalidateEvidence<K extends string>(keys: readonly K[], changed: readonly K[], declarations: readonly EvidenceDependency<K>[],
   limits: Readonly<{ maxItems: number; maxDependencies: number }>): EvidenceInvalidation<K> {
   const { maxItems, maxDependencies } = limits;

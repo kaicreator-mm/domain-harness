@@ -2,6 +2,8 @@
 
 > 设计基线：**Language-Native Domain SDK**；Owner 决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。这是唯一多文件规范，人和 Agent 读同一正文。**设计已确认；0.11.2 已按 R65 限定验收并合入版本列车，0.11.3 Product/L1 与修订 L2 已按 R9/R25 冻结；T30/T31A–F 已限定验收合入，R48 #1750 组件封装与取消接线已按 R49 验收；T32–T34 及 #1754 已收口，T35 正在最终资格验证；#1759 两项实质整改已按 R70 限定接受，文档 P2 修订及最终工件 Windows 复测待完成，产品验收尚未完成。** 详见状态索引；新原则 CORE-13/14、QA-09 已按 R8 接受并合入。
 
+R75（#1761）封装及能力发现规范已通过设计裁决，当前集成候选按 R77 实施；前序缺陷 #1763 的实际修复及新 API 验收仍待对应证据，不以规范更新晋升产品状态。
+
 ## 阅读路径
 
 1. 必读 [核心规范](./core.md)，确定 Package 插件、Element 复用、Standard/Business 与静态可信边界。
@@ -13,12 +15,12 @@
 |---|---|
 | [core.md](./core.md) | CORE-01..14 语言中立的职责和产品不变量 |
 | [typescript-profile.md](./typescript-profile.md) | TS-01..08 ESM/Module/Class/Function、静态元数据、原生依赖、组合、生命周期 |
-| [element-package.md](./element-package.md) | EL-01..08 Package 插件、Element/Function、Standard/Business 与组合 |
+| [element-package.md](./element-package.md) | EL-01..15 Package 插件、Element/Function、Standard/Business 与组合 |
 | [lifecycle-workflow.md](./lifecycle-workflow.md) | LIFE-01..19A（19A 已按 R49 验收）Order、可选 Init/Exit、关闭并发、Actor done/error/stopped、Workflow/Reader 保留验收、语义交互、证据、决策、候选、动态澄清及同根识别处理组合 |
 | [composition-trust.md](./composition-trust.md) | GEN-01..08 生成期正确性、静态组合、npm 交付、模块 Function 与 DIS 领域合同边界 |
 | [architecture.md](./architecture.md) | ARCH-01..09 SDK/KDP/Standard/Business 拓扑、禁止重复系统 |
 | [identity-naming.md](./identity-naming.md) | ID-01..06 身份、代码元数据、命名 |
-| [engineering-quality.md](./engineering-quality.md) | QA-01..09A 开发、测试、日志、配置、审核 |
+| [engineering-quality.md](./engineering-quality.md) | QA-01..09B 开发、测试、日志、配置、审核 |
 | [status-and-decisions.md](./status-and-decisions.md) | 历史收据、旧机制替换、源码与 L2 迁移状态 |
 
 DIS 保留跨语言领域语义；本规范只确定 DomainHarness SDK 的语言原生映射。0.11.0–0.11.9 是同一次完全重写，不要求兼容 0.10.x；v0.11.1 的基础缺陷在本版本修复，不推给 v0.11.2。

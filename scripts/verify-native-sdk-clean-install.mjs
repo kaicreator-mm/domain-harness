@@ -49,7 +49,7 @@ function run(step, command, args, cwd, env = {}) {
   if(result.error || result.status !== 0) {
     // 不输出可能含 token 的 npm stderr；保留可诊断的受控 OS 错误码。
     // 仅保留受控 Business TypeScript 编译诊断，不输出 npm stderr 或环境。
-    if (['INTENT_TYPECHECK','ACTION_TYPECHECK','COMBINED_TYPECHECK'].includes(step) && typeof result.stdout === 'string') {
+    if (['INTENT_TYPECHECK','ACTION_TYPECHECK','COMBINED_TYPECHECK','SKILL_TYPECHECK'].includes(step) && typeof result.stdout === 'string') {
       const diagnostic = result.stdout.split(/\r?\n/u)
         .map(line => line.replaceAll(cwd,'<consumer>').replaceAll(root,'<workspace>'))
         .filter(line => /^(?:(?:intent|action|combined|node_modules)\/[A-Za-z0-9_@./-]+\(\d+,\d+\): )?error TS\d{4}: /u.test(line))

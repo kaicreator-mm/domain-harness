@@ -1,23 +1,38 @@
 import { types } from 'node:util';
 
-/** 领域选择由调用方负责；SDK 不定义候选记录或业务 Scope 的 Schema。 */
+/** 领域选择由调用方负责；SDK 不定义候选记录或业务 Scope 的 Schema。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface VectorCandidate<T> {
   readonly id: string;
   readonly vector: readonly number[];
   readonly item: T;
 }
+/** 向量度量、维度及查询限制。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface VectorQueryOptions {
   readonly topK: number;
   readonly maxVisited: number;
   readonly dimension: number;
   readonly metric: 'COSINE' | 'L2';
 }
+/** 一个实际向量匹配及距离。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface VectorMatch<T> {
   readonly id: string;
   readonly item: T;
   /** 越小越近：COSINE = 1 - similarity；L2 = 欧几里得距离。 */
   readonly distance: number;
 }
+/** 有限向量检索的匹配与完整性。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface VectorQueryResult<T> {
   readonly matches: readonly VectorMatch<T>[];
   readonly visited: number;
@@ -63,7 +78,10 @@ function distance(a: readonly number[], b: readonly number[], metric: 'COSINE' |
   return 1 - Math.max(-1, Math.min(1, similarity));
 }
 
-/** 有限内存 Top-K；可信同步 Scope 不得改变源成员及顺序或 item 的业务属性，不是安全沙箱。 */
+/** 有限内存 Top-K；可信同步 Scope 不得改变源成员及顺序或 item 的业务属性，不是安全沙箱。
+ * @dhKind standard-element
+ * @dhCapability query
+ */
 export class VectorQueryElement {
   public search<T>(
     source: readonly VectorCandidate<T>[],
@@ -120,17 +138,29 @@ export class VectorQueryElement {
     return finish(true);
   }
 }
+/** 有向带类型的图关系。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface TypedGraphEdge {
   readonly from: string;
   readonly to: string;
   readonly type: string;
 }
+/** 图查询的深度、访问及结果限额。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface GraphQueryLimits {
   readonly maxDepth: number;
   /** 实际检查的原始边数量，包含方向或类型不匹配的边。 */
   readonly maxVisited: number;
   readonly maxReturned: number;
 }
+/** 图查询的起点、方向和可选目标。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface GraphQueryOptions {
   readonly start: string;
   readonly target?: string;
@@ -138,10 +168,18 @@ export interface GraphQueryOptions {
   readonly relationTypes?: readonly string[];
   readonly limits: GraphQueryLimits;
 }
+/** 节点及边类型组成的路径。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface GraphPath {
   readonly nodes: readonly string[];
   readonly edgeTypes: readonly string[];
 }
+/** 有限图路径及完整性。
+ * @dhKind type
+ * @dhCapability query
+ */
 export interface GraphQueryResult {
   readonly paths: readonly GraphPath[];
   /** 每次实际检查一条原始边计一次；重复扩展仍计入预算。 */
@@ -151,7 +189,10 @@ export interface GraphQueryResult {
   readonly truncationReason?: 'VISIT_LIMIT' | 'RESULT_LIMIT';
 }
 
-/** 有向类型关系图的有限 BFS；每个节点最多产出一条最短发现路径。 */
+/** 有向类型关系图的有限 BFS；每个节点最多产出一条最短发现路径。
+ * @dhKind standard-element
+ * @dhCapability query
+ */
 export class GraphQueryElement {
   public search(edges: readonly TypedGraphEdge[], options: GraphQueryOptions): GraphQueryResult {
     if (!Array.isArray(edges) || !options || typeof options !== 'object') return invalid('GRAPH_INPUT');

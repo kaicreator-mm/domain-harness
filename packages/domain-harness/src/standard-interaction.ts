@@ -8,9 +8,17 @@ export type { InteractionCandidate, InteractionField, InteractionEvent, Interact
 
 type Outcome<T> = StandardWorkflowOutcome<T>;
 type Maybe<T> = T | Promise<T>;
+/** 领域分析的继续澄清或已确定意图。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type InteractionDecision<S, I> =
   | { readonly kind: 'ready'; readonly intent: I; readonly invalidate?: readonly string[] }
   | { readonly kind: 'clarify'; readonly state: S; readonly prompt: InteractionPromptSpec; readonly invalidate?: readonly string[] };
+/** 同一交互根中的分析、处理及取消信号。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface InteractionScope {
   readonly root: NativeWorkflowContext;
   readonly signal: AbortSignal;
@@ -28,7 +36,10 @@ interface Pending {
   captured?: InteractionResponse;
 }
 
-/** 一个逻辑意图的运行期交互；领域判断与授权始终由应用负责。 */
+/** 一个逻辑意图的运行期交互；领域判断与授权始终由应用负责。
+ * @dhKind standard-element
+ * @dhCapability semantic-interaction
+ */
 export class InteractionElement {
   readonly #id = randomUUID();
   readonly #abort = new AbortController();

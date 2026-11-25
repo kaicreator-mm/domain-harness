@@ -4,17 +4,33 @@ import { BoundedQueryElement } from './standard-query.js';
 import type { BoundedQueryLimits } from './standard-query.js';
 import type { InteractionCandidate, InteractionField } from './interaction-protocol.js';
 
+/** 领域候选及其来源范围和版本。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface CandidateEntry<T> {
   readonly id: string;
   readonly scope: string;
   readonly revision: string;
   readonly value: T;
 }
+/** 实际候选集的来源状态。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type CandidateSource<T> = Readonly<{ scope: string; revision: string }> & (
   | Readonly<{ status: 'complete' | 'incomplete'; entries: readonly CandidateEntry<T>[] }>
   | Readonly<{ status: 'failed' }>);
+/** 领域对候选合法性的判断。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type CandidateAssessment = Readonly<{ status: 'eligible' }> |
   Readonly<{ status: 'excluded' | 'unknown' | 'failed'; reason: string }>;
+/** 候选显示投影；不授予权限。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface CandidateProjection {
   readonly label: string;
   readonly reason?: string;
@@ -26,6 +42,10 @@ export interface CandidateProjection {
 type Comparison = NonNullable<Extract<InteractionField, { kind: 'choice' | 'multi-choice' }>['comparison']>;
 type FailureCode = 'LIMIT' | 'INVALID_CANDIDATE' | 'STALE_SOURCE' | 'STALE_CANDIDATE' | 'SOURCE_FAILED' | 'ASSESSMENT_FAILED' | 'PROJECTION_FAILED';
 type IncompleteReason = 'SOURCE_INCOMPLETE' | 'QUERY_VISIT_LIMIT' | 'QUERY_RESULT_LIMIT' | 'ASSESSMENT_UNKNOWN';
+/** 有限候选组织、完整性及显示内容。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type CandidatePreparation<T> = Readonly<{ status: 'failed'; complete: false; reason: FailureCode }> | Readonly<{
   status: 'available' | 'empty' | 'unknown'; complete: boolean; visited: number;
   scope: string; revision: string; entries: readonly CandidateEntry<T>[];
@@ -45,7 +65,10 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** 组织已取得的领域候选；只把显示投影传给交互协议，业务值留在领域内部。 */
+/** 组织已取得的领域候选；只把显示投影传给交互协议，业务值留在领域内部。
+ * @dhKind function
+ * @dhCapability semantic-interaction
+ */
 export function prepareCandidates<T>(source: CandidateSource<T>, current: Readonly<{ scope: string; revision: string }>,
   policy: Readonly<{ assess: (entry: CandidateEntry<T>) => CandidateAssessment; project: (entry: CandidateEntry<T>) => CandidateProjection; comparisonLabels: readonly string[] }>,
   limits: BoundedQueryLimits): CandidatePreparation<T> {

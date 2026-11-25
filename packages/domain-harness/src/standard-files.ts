@@ -1,11 +1,18 @@
 import { parseDocument, stringify } from 'yaml';
 
-/** 可复用 Standard 负责解析业务数据，不赋予 SDK 业务文件读写权限。 */
+/** 可复用 Standard 负责解析业务数据，不赋予 SDK 业务文件读写权限。
+ * @dhKind type
+ * @dhCapability structured-data
+ */
 export type StandardJsonValue =
   | null | boolean | number | string
   | readonly StandardJsonValue[]
   | { readonly [key: string]: StandardJsonValue };
 
+/** 文本解析或序列化的成功、未知与失败。
+ * @dhKind type
+ * @dhCapability structured-data
+ */
 export type StandardFileOutcome<T> =
   | { readonly kind: 'SUCCEEDED'; readonly value: T }
   | { readonly kind: 'UNKNOWN'; readonly unknownReason: { readonly code: string; readonly message: string } }
@@ -113,18 +120,39 @@ function serialize(value: StandardJsonValue, kind: 'json' | 'yaml'): StandardFil
   }
 }
 
-/** Module 级公开 Function，不需要包装成一个无业务意义的 Class。 */
+/** Module 级公开 Function，不需要包装成一个无业务意义的 Class。
+ * @dhKind function
+ * @dhCapability structured-data
+ */
 export function readJson(source: string): StandardFileOutcome<StandardJsonValue> { return parse(source, 'json'); }
+/** 有界 YAML 文本解析；不读取文件。
+ * @dhKind function
+ * @dhCapability structured-data
+ */
 export function readYaml(source: string): StandardFileOutcome<StandardJsonValue> { return parse(source, 'yaml'); }
+/** 将结构化值序列化为 JSON 文本。
+ * @dhKind function
+ * @dhCapability structured-data
+ */
 export function writeJson(value: StandardJsonValue): StandardFileOutcome<string> { return serialize(value, 'json'); }
+/** 将结构化值序列化为 YAML 文本。
+ * @dhKind function
+ * @dhCapability structured-data
+ */
 export function writeYaml(value: StandardJsonValue): StandardFileOutcome<string> { return serialize(value, 'yaml'); }
 
-/** 应用级 JSON Reader Element，可在不同资源间复用同一实例。 */
+/** 应用级 JSON Reader Element，可在不同资源间复用同一实例。
+ * @dhKind standard-element
+ * @dhCapability structured-data
+ */
 export class JsonReader {
   read(source: string): StandardFileOutcome<StandardJsonValue> { return readJson(source); }
   write(value: StandardJsonValue): StandardFileOutcome<string> { return writeJson(value); }
 }
-/** 应用级 YAML Reader Element，基于 yaml 而非手工解析。 */
+/** 应用级 YAML Reader Element，基于 yaml 而非手工解析。
+ * @dhKind standard-element
+ * @dhCapability structured-data
+ */
 export class YamlReader {
   read(source: string): StandardFileOutcome<StandardJsonValue> { return readYaml(source); }
   write(value: StandardJsonValue): StandardFileOutcome<string> { return writeYaml(value); }

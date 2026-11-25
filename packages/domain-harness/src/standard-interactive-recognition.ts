@@ -5,7 +5,10 @@ import type { StandardWorkflowOutcome } from './standard-workflow.js';
 type Outcome<T> = StandardWorkflowOutcome<T>;
 type Maybe<T> = T | Promise<T>;
 
-/** 同根识别兼分析、必要澄清、处理；复杂业务仍可直接组合原 InteractionScope。 */
+/** 同根识别兼分析、必要澄清、处理；复杂业务仍可直接组合原 InteractionScope。
+ * @dhKind function
+ * @dhCapability semantic-interaction
+ */
 export function runInteractiveRecognitionHandling<S, I, O>(interaction: InteractionElement, limits: WorkflowLimits, initial: S,
   decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>,
   handle: (intent: I, scope: InteractionScope) => Maybe<Outcome<O>>): Promise<Outcome<O>> {
