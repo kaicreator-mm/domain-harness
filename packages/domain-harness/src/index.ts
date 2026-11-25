@@ -12,3 +12,4 @@ export * from './standard-interaction.js';
 export * from './standard-evidence.js';
 export * from './standard-decision.js';
 export * from './standard-candidates.js';
+export * from './standard-clarification.js';

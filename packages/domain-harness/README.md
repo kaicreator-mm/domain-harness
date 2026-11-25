@@ -8,7 +8,7 @@
 
 `package.json#exports` **只有 `.` 包根**，没有 `./runtime`、`./composition` 或其它内部子路径。
 
-| 运行时 Value 导出（25 个：原有20个 + T31A InteractionElement + T31B 两个 Evidence 函数 + T31C Decision 函数 + T31D Candidates 函数候选，独立测试预期枚举） | 职责 |
+| 运行时 Value 导出（27 个：原有20个 + T31A InteractionElement + T31B 两个 Evidence 函数 + T31C Decision 函数 + T31D Candidates 函数 + T31E 两个 Clarification 函数候选，独立测试预期枚举） | 职责 |
 | --- | --- |
 | `KernelLifecycle` | 最小 KDP，静态 Core 初始化、资源进入记录和最终逆序 Exit |
 | `WorkflowElement`、`XStateWorkflowElement` | Standard 业务工作流抽象和 XState Actor Logic 适配 |
@@ -19,6 +19,7 @@
 | `resolveEvidence`、`invalidateEvidence` | T31B：有限局部证据组织、来源/适用性、冲突及依赖传递失效 |
 | `selectNextDecision` | T31C：有限必要决策组织、依赖门禁及优先选择 |
 | `prepareCandidates` | T31D：有界候选筛选、完整性传播、排序与语义比较 |
+| `buildClarification`、`mapClarificationResponse` | T31E：动态语义表单、最小确认及显式用户表达映射 |
 | `JsonReader`、`YamlReader` | 可复用 JSON/YAML Class Element |
 | `readJson`、`readYaml`、`writeJson`、`writeYaml` | 不强制包装成 Class 的原生 Module Functions |
 | `BoundedQueryElement` | v0.11.2 T01：有界、同步、类型化只读数据查询；返回 visited/complete/truncated 和原因，领域 predicate 由业务实现 |
@@ -27,13 +28,14 @@
 | `BoundedExpressionElement` | v0.11.2 T04：纯 JSON AST 的有界同步标量计算 |
 | `CliElement` | #1724 S04：可信前台进程调用、合计输出限制、超时、脱敏错误与平台限定清理 |
 
-### 公开 TypeScript 类型（58 个独立 type/interface，按职责索引）
+### 公开 TypeScript 类型（61 个独立 type/interface，按职责索引）
 
 | 模块职责 | 类型入口（从同一包根 `import type`） |
 | --- | --- |
 | 生命周期 | `CorePackageMetadata`、`DomainAppContext`、`LifecycleInitContext`、`PackageInitElement`、`StaticCorePackage`、`LifecycleLogRecord`、`LifecycleLogger` |
 | Workflow | `StandardWorkflowOutcome`、`WorkflowLimits`、`WorkflowRoutes` |
 | Interaction | `InteractionDecision`、`InteractionScope`、`InteractionPromptSpec`、`InteractionPrompt`、`InteractionField`、`InteractionCandidate`、`InteractionResponse`、`InteractionEvent`、`InteractionRecord`、`InteractionSubmitResult` |
+| Clarification | `ClarificationField`、`ClarificationPreparation`、`ClarificationResponse` |
 | Candidates | `CandidateEntry`、`CandidateSource`、`CandidateAssessment`、`CandidateProjection`、`CandidatePreparation` |
 | Decision | `DecisionCondition`、`DecisionDescription`、`DecisionSelection` |
 | Evidence | `EvidenceOrigin`、`EvidenceObservation`、`EvidenceRequirement`、`EvidenceContext`、`EvidenceResolution`、`EvidenceDependency`、`EvidenceInvalidation` |
@@ -52,11 +54,11 @@ SDK 直接运行依赖只有 `xstate@5.33.2`、`yaml@2.9.1` 与 `@photostructure
 
 安装的是单一 SDK；先检查实际 `node_modules/@kaicreator/domain-harness/package.json`、本 README 和公开 `dist/index.d.ts`。使用根入口，不需要 Forge、额外生成器、特殊 DSL 或第二个 Runtime。
 
-本 README 的配套规范快照：`c97e9bc746b74a378e18b4c936f1c07ed2899b31`（0.11.2 已交付 SDK、R20 前置专项、T30/T31A/B/C 已验收、R25 修订L2及 T31D 候选；该快照是导航依据，不是当前 tarball 的源码运行证书）。以下为不可变 Git 提交链接，而非浮动分支：
+本 README 的配套规范快照：`0f82fb0efec49f36b2e6b03f545e5011dd232991`（0.11.2 已交付 SDK、R20 前置专项、T30/T31A/B/C/D 已验收、R25 修订L2及 T31E 候选；该快照是导航依据，不是当前 tarball 的源码运行证书）。以下为不可变 Git 提交链接，而非浮动分支：
 
-1. [权威规范目录](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/docs/specs/domain-harness/README.md) → [核心原则 CORE-01..14](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/docs/specs/domain-harness/core.md) → [TypeScript Profile](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/docs/specs/domain-harness/typescript-profile.md)。
-2. [Agent Skill](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/.agents/skills/domain-harness-spec/SKILL.md) 与 [需求驱动应用资格实践](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/.agents/skills/domain-harness-spec/references/application-qualification.md)；按需读 [Element/Package](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/docs/specs/domain-harness/element-package.md)、[Lifecycle/Workflow](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/docs/specs/domain-harness/lifecycle-workflow.md)、[QA](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/docs/specs/domain-harness/engineering-quality.md)。
-3. [真实原生应用](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/examples/native-domain-app/main.mjs)、[0.11.2 领域应用（R69/R71 历史，R72/R73 最终裁决及 S04 迁移说明）](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/examples/qualification/README.md)、[状态与验收证据](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/docs/specs/domain-harness/status-and-decisions.md)。
+1. [权威规范目录](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/docs/specs/domain-harness/README.md) → [核心原则 CORE-01..14](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/docs/specs/domain-harness/core.md) → [TypeScript Profile](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/docs/specs/domain-harness/typescript-profile.md)。
+2. [Agent Skill](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/.agents/skills/domain-harness-spec/SKILL.md) 与 [需求驱动应用资格实践](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/.agents/skills/domain-harness-spec/references/application-qualification.md)；按需读 [Element/Package](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/docs/specs/domain-harness/element-package.md)、[Lifecycle/Workflow](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/docs/specs/domain-harness/lifecycle-workflow.md)、[QA](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/docs/specs/domain-harness/engineering-quality.md)。
+3. [真实原生应用](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/examples/native-domain-app/main.mjs)、[0.11.2 领域应用（R69/R71 历史，R72/R73 最终裁决及 S04 迁移说明）](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/examples/qualification/README.md)、[状态与验收证据](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/docs/specs/domain-harness/status-and-decisions.md)。
 
 仓库可能需要授权访问。离线时本 README 与安装的声明仍可用于已公开 API 的基本消费；完整规范和 Skill 不在当前包内，不能把摘要当完整规范或假定已读。需要规范生成/审核时取得匹配快照（可使用已授权 Git checkout）；不要切换到未知的新分支来猜测 API。后续 SDK 改变规范或公开合同，应同步更新此固定快照与 API 文档，保留证据归属。
 
@@ -187,7 +189,7 @@ const outcome = await runRecognitionHandling(
 
 以上为调用形状，`request`、`recognize`、`handle` 由应用定义。每次调用内部只创建一个 `StandardWorkflowSession`；两个静态 child(0) 各调用一次 `invokeOutcome`。完整路径 2 calls / 5 steps / 1 depth；识别任何非 COMPLETE 终态原样返回，不调用处理；处理终态亦不二次包装。额度按既有逐次预留，识别可能在处理额度不足时已经执行，**不是全业务预算预检**，因此需要全阶段先验额度的业务仍自行检查。异常保留既有脱敏 FAILED 语义；真实授权、命令身份、receipt/readback、UNKNOWN、领域证据仍由应用负责。ASK/WAIT 不自动恢复；复杂分支、并行、额外 child、Hook、多轮 Interaction 直接复用 Session/Context 等现有机制，不强制使用此函数。
 
-[五个实际迁移模块及既有业务验收范围](https://github.com/kaicreator-mm/domain-harness/blob/c97e9bc746b74a378e18b4c936f1c07ed2899b31/examples/native-domain-app/README.md)：维修报价、AQI、图书目录、水硬度和库存 Reservation。无需重复生成固定双角色执行组合；保留真实领域类型、知识、规则、权威 Host 和持久账本。新工件完整验收仍由 #1724 记录，不扩张 R65 历史证据。
+[五个实际迁移模块及既有业务验收范围](https://github.com/kaicreator-mm/domain-harness/blob/0f82fb0efec49f36b2e6b03f545e5011dd232991/examples/native-domain-app/README.md)：维修报价、AQI、图书目录、水硬度和库存 Reservation。无需重复生成固定双角色执行组合；保留真实领域类型、知识、规则、权威 Host 和持久账本。新工件完整验收仍由 #1724 记录，不扩张 R65 历史证据。
 
 ## T30 · 同根剩余预算查询（.1 归属，#1731）
 
@@ -316,7 +318,7 @@ if (result.complete && result.status === 'next') {
 
 **有限与复用：** maxItems 0..4096、maxDependencies 0..16384，拒绝稀疏/继承索引、非法状态、非有限优先级、重复/缺失依赖及循环，失败 complete:false（LIMIT/INVALID_DECISION/INVALID_DEPENDENCY），不返回部分结果；结果及 rows 冻结。领域必须提供完整当前决策集、应用 B 失效与重新取证，再重新计算四态；complete 不是事实完整性证明或授权。纯计算在已计费分析内运行，不增加 Session/I/O/Effect。按 LIFE-16、#1738 资格使用，真实双领域与客户端仍待 T32–35。
 
-## T31D · 候选方案组织、筛选及比较（#1740 源码候选）
+## T31D · 候选方案组织、筛选及比较（#1740 R36 已验收）
 
 域负责取得真实候选、执行专业生成和验证规则；`prepareCandidates` 实际复用有界 Query 进行硬约束筛选、完整性传播、稳定排序、推荐标记及比较投影。不是优化求解器，不自动推断专业合法性。
 
@@ -351,4 +353,49 @@ if (result.status === 'available') {
 
 **完整性与失败：** 来源 incomplete、Query visit/result 截断及已访问 unknown 显式传播；完整零合法候选 empty，非完整零合法候选 unknown，有合法候选 available（可能不完整），failed 不提供可用部分。硬约束 excluded 不进入投影；unknown 不是不可行，failed/异常/非法回调不是排除。recommended=true 必须附非空 reason 依据，只对完整集合保留域提供的推荐标记；优先级降序、同级保留源顺序，局部排序不等于全局最优。失败返回稳定 reason（LIMIT、INVALID_CANDIDATE、STALE_SOURCE、STALE_CANDIDATE、SOURCE_FAILED、ASSESSMENT_FAILED、PROJECTION_FAILED）。
 
-**范围、投影与限界：** 源和已访问项须匹配当前 scope/revision；已访问的重复、非法ID及稀疏/继承索引拒绝，未访问项不能宣称验证。比较行由唯一 comparisonLabels 及每候选的等长字符串 cells 组成，按 opaque ID 关联；专业数据和敏感字段仅留在内部 entries，域应提供非敏感显示投影，不将整个结果发给客户端。提交仍由 A 关联及域当前事实/版本/授权核验决定。maxVisited 0..4096、maxReturned 0..256、源长度≤4096、比较行≤32、显示文本每项≤1024 UTF8 bytes、options+comparison JSON≤64KiB；完整 prompt 仍需 A 限界。同步可信回调不得修改输入或执行隐式专业操作；拒绝异步策略，观察实际返回的 Promise 拒绝而不等待。域值保持不可变，输出记录及元数据冻结。真实候选生成和专业计算另在原 root 计费。按 LIFE-17/#1740 资格使用，真实两域与 E 消费尚待实施。
+**范围、投影与限界：** 源和已访问项须匹配当前 scope/revision；已访问的重复、非法ID及稀疏/继承索引拒绝，未访问项不能宣称验证。比较行由唯一 comparisonLabels 及每候选的等长字符串 cells 组成，按 opaque ID 关联；专业数据和敏感字段仅留在内部 entries，域应提供非敏感显示投影，不将整个结果发给客户端。提交仍由 A 关联及域当前事实/版本/授权核验决定。maxVisited 0..4096、maxReturned 0..256、源长度≤4096、比较行≤32、显示文本每项≤1024 UTF8 bytes、options+comparison JSON≤64KiB；完整 prompt 仍需 A 限界。同步可信回调不得修改输入或执行隐式专业操作；拒绝异步策略，观察实际返回的 Promise 拒绝而不等待。域值保持不可变，输出记录及元数据冻结。真实候选生成和专业计算另在原 root 计费。按 LIFE-17/#1740 资格使用，真实两域尚待 T32/33，E 的候选组合见下节。
+
+## T31E · 动态表单及最小确认（#1742 源码候选）
+
+`buildClarification` 组合本轮 B/C/D 结果和 A 字段模板，复用 A 协议完整校验；`mapClarificationResponse` 映射实际 A 当前响应的显式用户表达。领域继续负责事实、适用性、业务必要性、候选生成、意图 reducer 和授权。以下为单字段示例，初次取证无 user、只有推荐值时仍发布必要问题。
+
+```ts
+import { resolveEvidence, selectNextDecision, buildClarification,
+  mapClarificationResponse } from '@kaicreator/domain-harness';
+import type { ClarificationField, InteractionPrompt, InteractionEvent } from '@kaicreator/domain-harness';
+
+const source = { id: 'domain', scope: 'app', revision: 'r1' };
+const evidence = resolveEvidence<'goal', string>(
+  [{ key: 'goal', accepts: ['user'] }],
+  [{ key: 'goal', origin: 'recommendation', source, state: 'known', value: 'current' }],
+  { scope: 'app', revisions: new Map([['domain', 'r1']]) },
+  { equal: (_key, a, b) => a === b }, 16,
+);
+const selection = selectNextDecision([
+  { key: 'goal', dependsOn: [], applicable: 'yes', required: 'yes',
+    satisfied: 'no', priority: 10 },
+], { maxItems: 16, maxDependencies: 32 });
+const fields: readonly ClarificationField<'goal', string>[] = [
+  { field: { kind: 'string', id: 'answer', label: 'Goal', required: true },
+    evidenceKey: 'goal', applicable: 'yes', confirmation: 'user',
+    projectPrefill: observation => ({ value: observation.value, source: 'domain' }) },
+];
+const prepared = buildClarification(evidence, selection,
+  { decisionKey: 'goal', title: 'Choose goal', actions: ['submit', 'text'] }, fields);
+// prompt 时，把 prepared.prompt 交给 InteractionElement 的 clarify 决策；
+// 只在同一次实际 A 发布及当前 decide 的 response event 中调用映射。
+function consume(current: InteractionPrompt, event: InteractionEvent) {
+  if (prepared.status === 'prompt') {
+    const mapped = mapClarificationResponse(prepared, current, event);
+    // 映射出 goal/user/实际提交值；领域 reducer 重新验证并更新 B/C。
+    return mapped;
+  }
+}
+void consume;
+```
+
+**最小确认：** C 必须由域依据当前证据及确认条件计算；ready 仅表示必要事项已满足，不是业务 READY/授权。非 next 保留 unresolved/blocked/conflict，不凭空生成问题。next 匹配模板和 eligible 行；绑定字段 ID 与 evidenceKey 均唯一，B 包含对应项。不适用删除、未知/冲突适用性阻断；accepted 可跳过 resolved，user 必须实际选中已知 user 证据；默认和推导不代替 user。required 由 A 模板定义，域只绑定用户能表达的事项。prefill 必须由安全同步投影显式提供，从已确定证据或唯一可用提案取值，来源带 origin 前缀；不复制任意领域值、不自动提交。拒绝模板预置 prefill。C next 却无字段返回 unresolved/NO_FIELDS，要求域重评，而不是空提交或 ready。
+
+**选择及响应：** choice/multi-choice 使用空 options 的原 A 模板，提供 candidates.current 与 D result，失败/过期拒绝；只复制 options/comparison/completeness，内部业务值保留域内。已确定选择须仍是当前合法 ID（多选不重复、必填非空）才跳过；失效选项不预填。必填空选择仅 submit 返回 unresolved/NO_SUBMISSION，可按域声明 no-fit/text 等替代。映射只接受同次发布的 preparation、真实 A prompt 与当前 response event，检查最新有效 record identity、原 A 关联与字段动作；只映射实际 submit/revise values，不补预填、不写权威状态。其它动作由域处理，修订后按 B/A 失效重算。此不是独立防重放 API，同一可见表单可对应不同内部绑定，域必须保留正确配对并重新验证候选版本、事实及授权。
+
+**限界：** 模板字段≤256，B/C 行≤4096，先限界再检查自有索引；使用原 makePrompt 完整验证和冻结，64KiB、字段加选项≤256、节点≤4096、深度≤16及不可满足门禁不变。失败不返回部分表单；声明 async 投影拒绝、意外 Promise 拒绝被观察但不等待。纯组织不创建 root、不执行 I/O/Effect。按 LIFE-18/#1742 资格使用，实际媒体/维修专业结果及权限仍待 T32–35。
