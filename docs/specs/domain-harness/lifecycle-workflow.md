@@ -98,7 +98,7 @@ Standard Workflow 必须在**执行任何用户 entry/action 和启动 Actor 前
 
 `NativeWorkflowContext.remaining()` 返回新建并冻结的只读快照 `{ calls, steps, maxDescendantDepth }`。calls/steps 是当下实际共享根剩余额度（根启动、child、invoke/invokeOutcome、leaf 的既有预留已经反映）；maxDescendantDepth 是相对于当前 context 深度的所有活动祖先剩余子层限制的最小值，包括本层。查询不消耗、不预留、不增加或重置额度，不暴露内部 RootBudget。调用者可在独占当前逻辑根的连续固定专业路径前以实际剩余值完成业务前置检查；快照随其他调用消耗而过期，不能当并发 reservation、授权或全业务预算预测器。原子逐次预留与祖先拒绝仍是执行门禁，不改变 Session 单次 run、Outcome、KDP 或调用成本。归属 0.11.1 #1605 / T30 #1731，服务 0.11.3 同根组合；实际产品验收仍在后续任务。
 
-## LIFE-14 · Standard Interaction（0.11.3 T31 候选）
+## LIFE-14 · Standard Interaction（0.11.3 T31A 已接受）
 
 **归属与作用域。** InteractionElement 为应用持有的一个运行期逻辑意图；一次 run 创建一个现有 StandardWorkflowSession。resolve 通过领域 decide(state,event,root) 动态给出 ready/clarify 或真实非成功 Outcome；每次分析及发布/等待分别使用同根 invokeOutcome，均为1call/1step，scope.step 仅取消检查加 invokeOutcome。一次澄清再处理的最小路径4calls/5steps；两次6/7，额外业务子层/计算另计。复杂领域仍以同一 root 组合及 remaining 业务前置门禁，不另建 Session。无关意图实例独立，无全局会话表、额外 Runtime 或重启恢复。
 
@@ -106,4 +106,12 @@ Standard Workflow 必须在**执行任何用户 entry/action 和启动 Actor 前
 
 **等待与退出。** 先登记 resolver/pending 后同步通知；通知必须返回 undefined，捕获响应在成功通知返回后才交付。同步异常或意外返回值/thenable 失败并撤销，观察异步拒绝但不 await 通知自身的任务。cancel 撤销当前等待、发出 signal，拒绝新的 scope.step/resolve；已进入 step 等实际结果及清理完成，不覆盖 COMPLETE/UNKNOWN。resolve 是无业务 Effect 的领域分析，取消时可拒绝后续分析；实际 Effect 及恢复由业务在最新状态下协作检查。调用者必须等待全部业务调用，禁止泄漏 root/scope；如果 work 返回时仍有未汇合的 scope 操作，撤销等待并等收敛，返回 UNKNOWN/INTERACTION_UNJOINED_WORK，不能据此判定未执行。宿主停止接入、取消其活跃实例，再 await KDP dispose；原 KDP 不感知交互状态。意图确认与真实 Owner/Host 批准、grant 时效、attempt/receipt/readback 独立。已提交或不确定效果的身份及结果由领域保留，不自动重试或重开预算。
 
-**验收。** 候选实际 API 与使用方式见 SDK README；冻结 L2 R14 和 T31 #1733，受影响媒体/维修/库存、CLI+视觉、真实 SDK 新工件及独立消费者验证分别在 T32–35 完成。本条不证明产品验收或跨重启资格。
+**验收。** 实际 API 与使用方式见 SDK README；原 R14 与 T31A #1733/R22 已验收，修订 L2 R25 补 B–F，受影响媒体/维修/库存、CLI+视觉、真实 SDK 新工件及独立消费者验证分别在 T32–35 完成。本条不证明产品验收或跨重启资格。
+
+## LIFE-15 · Standard Evidence（0.11.3 T31B 候选）
+
+`resolveEvidence<K,V>` 与 `invalidateEvidence<K>` 是可选、无状态的局部意图组织函数，不是知识库、授权判定或新 Runtime。域保有自己的 K/V、真实来源和专业规则；必须从当前实际事实/用户表达/域推导提供 observations 与 required keys、各 key 显式 accepts、当前 scope/每来源 id 的可信 revision、可选 asOf、值等价规则 equal 和可选 rank。域的其它专业适用条件须在供给证据前验证；来源类别由可信域确定，不能由外部客户端自签。仅 known 且有非 undefined 值作为值证据；false/0 合法。时间区间 [from,until)，缺 asOf 时有时效的证据不可用。来源 scope 和 revision 必须精确匹配，不跨 scope 合并，不以更新时间自动选权威。推荐仅提案，默认仅在显式 accepts 包含 default 时可确定且保留来源；authority/user 的限定不能被推荐或默认替代。
+
+未提供 rank 时全部同级；有明确域政策才选最高有限 rank。同级已知值不等或与明确不适用冲突，不静默 last-write-wins；同级 unknown 不能得出 resolved。等价规则必须为可信域的同步等价比较（等价已知值以首项作为表示，保留同级证据）；策略异常/非法返回 POLICY_FAILED，不输出部分结果。resolved/missing/unknown/conflict/not-applicable 和非确定原因可区分；只有适用的已知默认/推荐作为 proposals，complete 表示输入集合处理完毕，不表示所有事项已确定。SDK 无法证明输入事实集合的外部完整性；域不得把截断或未验证的来源标成已知。返回数组、记录和来源元数据冻结，V 仍由域提供不可变值，不复制任意业务对象/资源；不要把私有证据对象直接发给客户端。输入为可信 TS 结构，域不得在同步计算中突变输入/Map/业务值或使用不协作策略。
+
+`invalidateEvidence` 使用当前意图全部 key、明确 changed keys 和依赖声明，按有限拓扑传播 stale；任意变更时无声明的 key 保守失效，显式空依赖表示域已经证明无依赖。循环/未知 key/重复声明或边拒绝。域负责在事实、scope/revision 或相关选择变化后先标出全部 changed、移除 stale 证据、重新取证/推导，再调用 resolveEvidence；不自动修改外部状态、不复活 A 的失效用户记录；保留项仍需当前适用性检查。maxItems 每输入数组/来源版本 Map 上限 0..4096，maxDependencies 边总数上限 0..16384，要求调用者显式指定；超限/非法声明/策略异常 complete:false 与稳定原因 LIMIT/INVALID_EVIDENCE/INVALID_DEPENDENCY/POLICY_FAILED，无部分可用结果。B 不建立 Session、不读 I/O；在已计费分析内执行纯计算，实际取证/专业计算由业务按原 root 计费。两域薄接线和独立负例见 #1736；不构成真实专业路径、权限或最终产品资格。
