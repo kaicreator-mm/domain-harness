@@ -1,4 +1,5 @@
 import { createActor } from 'xstate';
+import { types } from 'node:util';
 import type { AnyActorLogic, InputFrom, OutputFrom } from 'xstate';
 
 /** 明确区分业务完成与非成功终态，禁止把 stopped/未知误报为成功。
@@ -77,7 +78,18 @@ export class XStateWorkflowElement<
           const observed = snapshot as { readonly status?: unknown; readonly output?: unknown };
           if (observed.status === 'done') {
             try {
-              finish(this.mapOutput(observed.output as OutputFrom<Logic>));
+              // mapper 合同为同步；不启动已声明 async 的 mapper，也不采用异步结果。
+              if (types.isAsyncFunction(this.mapOutput)) {
+                finish(this.failed('WORKFLOW_EXECUTION_FAILED'));
+                return;
+              }
+              const mapped = this.mapOutput(observed.output as OutputFrom<Logic>);
+              if (types.isPromise(mapped)) {
+                void Promise.prototype.then.call(mapped, undefined, () => undefined);
+                finish(this.failed('WORKFLOW_EXECUTION_FAILED'));
+                return;
+              }
+              finish(mapped);
             } catch {
               finish(this.failed('WORKFLOW_EXECUTION_FAILED'));
             }

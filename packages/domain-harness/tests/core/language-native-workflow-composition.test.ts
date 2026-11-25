@@ -290,3 +290,70 @@ test('R151 P1：独立拷贝调用/步骤/深度三个数值，后续缩小原�
   assert.deepEqual(outcome,{status:'COMPLETE',value:1});
   assert.equal(count,1);
 });
+
+test('FND01: 已预留回调集合不受普通 TS 可变别名增加 Hook 影响', async () => {
+  const trace: string[] = [];
+  const options: {start: () => void; run: () => StandardWorkflowOutcome<string>; end?: () => void} = {
+    start() {
+      assert.equal(this, options);
+      trace.push('start');
+      options.end = () => { trace.push('unmetered'); };
+    },
+    run() {
+      assert.equal(this, options);
+      trace.push('run');
+      return {status:'COMPLETE',value:'done'};
+    },
+  };
+  const result = await new StandardWorkflowSession({maxCalls:2,maxSteps:3,maxDepth:0})
+    .run(async root => {
+      const outcome = await root.leaf(options);
+      assert.deepEqual(root.remaining(),{calls:0,steps:0,maxDescendantDepth:0});
+      return outcome;
+    });
+  assert.deepEqual(result,{status:'COMPLETE',value:'done'});
+  assert.deepEqual(trace,['start','run']);
+});
+
+test('FND01: 跨 await 的替换或删除不能改变已预留执行及清理，保留方法 receiver', async () => {
+  const trace: string[] = [];
+  const options: {start: () => Promise<void>; run: () => StandardWorkflowOutcome<number>; end?: () => Promise<void>} = {
+    async start() {
+      assert.equal(this, options);
+      trace.push('start');
+      await Promise.resolve();
+      options.run=()=>{trace.push('wrong-run');return {status:'COMPLETE',value:99};};
+      delete options.end;
+    },
+    run() {
+      assert.equal(this, options);
+      trace.push('run');
+      return {status:'COMPLETE',value:7};
+    },
+    async end() {
+      assert.equal(this, options);
+      trace.push('end');
+      await Promise.resolve();
+      trace.push('end-settled');
+    },
+  };
+  const result=await new StandardWorkflowSession({maxCalls:3,maxSteps:4,maxDepth:0}).run(root=>root.leaf(options));
+  assert.deepEqual(result,{status:'COMPLETE',value:7});
+  assert.deepEqual(trace,['start','run','end','end-settled']);
+});
+
+test('FND01: 预算不足不进入任何已接纳回调；start 失败仍用已预留 end', async () => {
+  const trace: string[]=[];
+  const options: {start:()=>void;run:()=>StandardWorkflowOutcome<number>;end:()=>void}={start(){trace.push('start');options.end=()=>{trace.push('wrong-end');};throw new Error('start');},
+    run(): StandardWorkflowOutcome<number>{trace.push('run');return {status:'COMPLETE',value:1};},
+    end(){trace.push('end');throw new Error('end');}};
+  const denied=await new StandardWorkflowSession({maxCalls:2,maxSteps:4,maxDepth:0}).run(root=>root.leaf(options));
+  assert.equal(denied.status==='FAILED'&&denied.reason.code,'WORKFLOW_CALL_BUDGET');
+  assert.deepEqual(trace,[]);
+  const deniedSteps=await new StandardWorkflowSession({maxCalls:3,maxSteps:3,maxDepth:0}).run(root=>root.leaf(options));
+  assert.equal(deniedSteps.status==='FAILED'&&deniedSteps.reason.code,'WORKFLOW_STEP_BUDGET');
+  assert.deepEqual(trace,[]);
+  const result=await new StandardWorkflowSession({maxCalls:3,maxSteps:4,maxDepth:0}).run(root=>root.leaf(options));
+  assert.equal(result.status==='FAILED'&&result.reason.code,'WORKFLOW_EXECUTION_FAILED');
+  assert.deepEqual(trace,['start','end']);
+});

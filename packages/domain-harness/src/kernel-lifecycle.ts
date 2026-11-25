@@ -1,3 +1,5 @@
+import { types } from 'node:util';
+
 /** Core 插件的执行元数据；顺序的结构合法性由生成者检查。
  * @dhKind type
  * @dhCapability lifecycle
@@ -274,7 +276,12 @@ export class KernelLifecycle<Context extends DomainAppContext = DomainAppContext
 
   private log(record: LifecycleLogRecord): void {
     try {
-      this.logger.error(record);
+      const returned: unknown = this.logger.error(record);
+      // void 回调在 TS 中允许 async；观察真实 Promise 拒绝，不等待日志任务。
+      // 日志 sink 不能阻断退出、覆盖主异常或造成未处理拒绝。
+      if (types.isPromise(returned)) {
+        void Promise.prototype.then.call(returned, undefined, () => undefined);
+      }
     } catch {
       // 记录日志的故障不能覆盖业务/Init 原始异常。
     }

@@ -152,21 +152,23 @@ export class NativeWorkflowContext {
     readonly run: () => Result<T> | Promise<Result<T>>;
     readonly end?: () => void | Promise<void>;
   }): Promise<Result<T>> {
-    const calls = 1 + Number(options.start !== undefined) + Number(options.end !== undefined);
+    // 预算与执行必须使用同一组已接纳的回调；调用方可能持有可变别名。
+    const { start, run, end } = options;
+    const calls = 1 + Number(start !== undefined) + Number(end !== undefined);
     const refused = this.budget.reserve(calls, calls);
     if (refused !== undefined) return failure(refused);
 
     let result: Result<T> | undefined;
     try {
-      if (options.start !== undefined) await options.start();
-      result = await options.run();
+      if (start !== undefined) await start.call(options);
+      result = await run.call(options);
     } catch {
       result = failure('WORKFLOW_EXECUTION_FAILED');
     } finally {
       // 进入 start / run 后总是等待 end；end 不是 Package Exit。
-      if (options.end !== undefined) {
+      if (end !== undefined) {
         try {
-          await options.end();
+          await end.call(options);
         } catch {
           // 保留更早的非成功结果，成功结果不能掩盖 end 失败。
           if (result === undefined || result.status === 'COMPLETE') {

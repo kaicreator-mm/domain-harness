@@ -378,3 +378,24 @@ test('K3-D: 外部关闭与异步业务错误同时发生时保留主因且延�
     'resource:init', 'business:started', 'DH_KDP_UNHANDLED', 'resource:exit',
   ]);
 });
+
+test('FND03: 合法 void 日志接口的异步拒绝不能阻断真实 Exit 或覆盖主异常', async () => {
+  const events: string[]=[];
+  const primary=new Error('primary');
+  const k=new KernelLifecycle([core(0,'kdp',events),core(1,'sdk',events,{failExit:true})],
+    {async error(record){events.push('log:'+record.stage);await Promise.resolve();throw new Error('synthetic-logger-failure');}});
+  await assert.rejects(k.run(context,()=>{throw primary;}),error=>error===primary);
+  await new Promise<void>(resolve=>setImmediate(resolve));
+  assert.deepEqual(events,['start:kdp','start:sdk','log:business','exit:sdk','log:exit','exit:kdp']);
+});
+
+test('FND03: 同步包装返回拒绝 Promise 与未收敛 logger 均不阻塞 Init 失败清理', {timeout:2000}, async () => {
+  for(const reject of [true,false]){
+    const events: string[]=[];
+    const k=new KernelLifecycle([core(0,'kdp',events),core(1,'bad',events,{failInit:true})],
+      {error(){return reject?Promise.reject(new Error('logger rejection')):new Promise<void>(()=>{});}});
+    await assert.rejects(k.start(context),/Init failure: bad/u);
+    await new Promise<void>(resolve=>setImmediate(resolve));
+    assert.deepEqual(events,['start:kdp','start:bad','exit:bad','exit:kdp']);
+  }
+});

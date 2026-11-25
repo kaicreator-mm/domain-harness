@@ -158,4 +158,4 @@ confirmation=accepted 时 B resolved 非选择字段可跳过；confirmation=use
 
 ### LIFE-09 · 回调快照与借用边界（#1763）
 
-预算预留与实际 Hook 调用须使用同一组已接纳回调；原调用者对象通过普通别名变化不得增加未计费操作，已进入的 end 清理和主终态保留。NativeWorkflowContext 是本次 Session/回调借用的能力，调用者须等待全部业务调用，不自行构造额外根、不泄漏到回调结束之后；不承诺任意可信 JS 的全局强制取消。KDP 日志失败不得阻断 Exit 或覆盖原异常；同步 sink 的意外真实 Promise 拒绝须被观察，不等待日志任务。上述两项缺陷当前仍待实际修正及验收。XState mapper 须同步、仅在 done 调用，不将异步结果当成功。
+预算预留与实际 Hook 调用须使用同一组已接纳回调；原调用者对象通过普通别名变化不得增加未计费操作，已进入的 end 清理和主终态保留。NativeWorkflowContext 是本次 Session/回调借用的能力，调用者须等待全部业务调用，不自行构造额外根、不泄漏到回调结束之后；不承诺任意可信 JS 的全局强制取消。KDP 日志失败不得阻断 Exit 或覆盖原异常；同步 sink 的意外真实 Promise 拒绝须被观察，不等待日志任务。上述两项已进入 I04 源码整改候选，正式关闭须绑定实际测试与独立审核。XState mapper 须同步、仅在 done 调用；声明 async 不执行，意外返回真实 Promise 观察拒绝并返回 FAILED，不将异步结果当成功。

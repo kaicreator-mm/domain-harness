@@ -63,6 +63,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, buildClarification, mapClarificationResponse, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';",
     "const result: Promise<StandardWorkflowOutcome<string>> = runRecognitionHandling({maxCalls:2,maxSteps:5,maxDepth:1}, () => ({status:'COMPLETE',value:{n:2}}), intent => ({status:'COMPLETE',value:String(intent.n)}));",
     "const stdout: Promise<string> = new CliElement().run('trusted-tool', ['--version']);",
+    "const validAsyncLog: LifecycleLogger = {async error(){ throw new Error('example'); }}; void validAsyncLog;",
     "// @ts-expect-error a number intent is not a string",
     "void runRecognitionHandling({maxCalls:2,maxSteps:5,maxDepth:1}, () => ({status:'COMPLETE',value:1}), (intent: string) => ({status:'COMPLETE',value:intent}));",
     "const interaction: Promise<StandardWorkflowOutcome<string>> = new InteractionElement().run({maxCalls:1,maxSteps:2,maxDepth:0}, scope => scope.resolve<number,string>(1,n=>({status:'COMPLETE',value:{kind:'ready',intent:String(n)}})));",
@@ -177,6 +178,26 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');
+  writeFileSync(join(consumer,'s05-foundation-probe.mjs'),[
+    "import assert from 'node:assert/strict';",
+    "import { setTimeout as delay } from 'node:timers/promises';",
+    "import { KernelLifecycle,StandardWorkflowSession,XStateWorkflowElement } from '@kaicreator/domain-harness';",
+    "import { fromPromise } from 'xstate';",
+    "const primary=new Error('SYNTHETIC_PRIMARY'); const trace=[];",
+    "class Init {start(){trace.push('init')} async [Symbol.asyncDispose](){trace.push('exit:begin');await delay(15);trace.push('exit:end');}}",
+    "const app=new KernelLifecycle([{packageMeta:{id:'kdp',role:'core',order:0},Init}],{async error(){throw new Error('SYNTHETIC_LOGGER_FAILURE');}});",
+    "await assert.rejects(app.run({appId:'installed'},()=>{throw primary}),e=>e===primary);",
+    "assert.deepEqual(trace,['init','exit:begin','exit:end']);",
+    "const calls=[]; const options={start(){assert.equal(this,options);calls.push('start');options.end=()=>{calls.push('unmetered')}},run(){calls.push('run');return {status:'COMPLETE',value:'done'}}};",
+    "const result=await new StandardWorkflowSession({maxCalls:2,maxSteps:3,maxDepth:0}).run(async root=>{const out=await root.leaf(options);assert.equal(root.remaining().calls,0);return out});",
+    "assert.deepEqual(result,{status:'COMPLETE',value:'done'});assert.deepEqual(calls,['start','run']);",
+    "let deniedEntered=false;const denied=await new StandardWorkflowSession({maxCalls:2,maxSteps:4,maxDepth:0}).run(root=>root.leaf({start(){deniedEntered=true},run(){deniedEntered=true;return result},end(){deniedEntered=true}}));",
+    "assert.equal(denied.reason.code,'WORKFLOW_CALL_BUDGET');assert.equal(deniedEntered,false);",
+    "const logic=fromPromise(async()=>1);let mapperCalled=false;",
+    "for(const mapper of [async()=>{mapperCalled=true;throw new Error('mapper')},()=>Promise.reject(new Error('mapper returned promise')),()=>Promise.resolve({status:'COMPLETE',value:9})]){const r=await new XStateWorkflowElement(logic,mapper).run(undefined);assert.equal(r.status,'FAILED');assert.equal(r.reason.code,'WORKFLOW_EXECUTION_FAILED');}",
+    "assert.equal(mapperCalled,false);await delay(5);console.log('S05_FOUNDATION_PASS');",
+  ].join('\n'));
+  assert.equal(run('S05_FOUNDATION',consumerNode,['--unhandled-rejections=strict','s05-foundation-probe.mjs'],consumer).trim(),'S05_FOUNDATION_PASS');
   return { readmeSha256: createHash('sha256').update(readme).digest('hex'),
-    skillFiles, skillExamples:examples.length, runtimeExports: values.length, typeImports: types.length };
+    skillFiles, skillExamples:examples.length, foundation:true, runtimeExports: values.length, typeImports: types.length };
 }
