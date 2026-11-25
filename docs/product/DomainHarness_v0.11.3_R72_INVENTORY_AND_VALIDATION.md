@@ -1,0 +1,53 @@
+# R72 · 全 SDK 能力裁决与实施/验收矩阵
+
+状态 DESIGN_CANDIDATE；#1761。实际读取基线 261e92faa9a3ec864c984e7de99016372a3d081b 的公开根、实现、示例及安装门禁；R71 pack b0a7f60e... 原证据不变。R70 已限定接受两项 P1，P2 文案已修正候选。本文件是设计/验收计划，不是新运行 PASS 或独立审核结论。
+
+## 全部 28 个公开值（15 class/13 function）、61 独立类型
+实际 TS checker 清点见 #1761，分类不依赖后缀。以下每行覆盖实际根值；列出主要接口、所有权及当前真实用途/限制，并作设计裁决。KEEP 不是全行为重新验收；若独审发现实际问题按证据限定修订。
+| 能力/根值 | 类别 / 责任与主要接口 | 实际用途和边界 | 裁决 |
+|---|---|---|---|
+| KernelLifecycle | KDP Element；start/execute/run/close；实际进入与逆序退出 | native-domain-app/main 与 interaction-reference；仅静态 Core 元数据和兜底，非 loader | KEEP |
+| WorkflowElement | 抽象契约；run | XState 实现继承，非可直接实例化 | KEEP |
+| XStateWorkflowElement | Standard Element；actor logic/mapOutput/run | 原生 Workflow/真实 Reference；actor 生命周期与 Outcome，不拥有根预算或领域规则 | KEEP |
+| NativeWorkflowContext | 执行支持；remaining/invoke/invokeOutcome/child/leaf | root callback 贯穿 Reference、media、workshop；不由应用另建根、不泄露预算 | KEEP，明确不可自行构造普通业务根 |
+| StandardWorkflowSession | 执行支持；每根 limits/run | native-domain-app、media archive/register、workshop plan；唯一实际根会话，不是另一个引擎 | KEEP |
+| routeWorkflowOutcome | Function；六态分流 | workflow-init 等；保留不同状态，不吞 UNKNOWN | KEEP |
+| runRecognitionHandling | Function；固定双叶同根 | air-quality/repair-quote/combined；非交互等待，不嵌套为第二 root | KEEP |
+| JsonReader / YamlReader | 两个 Standard Element；read/write 文本数据 | Reference business 多资源同实例、inventory/workflow-init；不是文件路径 I/O，无业务文件权限 | REFINE 文档分类/命名说明；保留实际接口，未来若证据足够再更名/合并 |
+| readJson / readYaml / writeJson / writeYaml | 四个独立 Function；有限解析序列化 | 实际独立单元和非法输入测试；与 reader 共用实现，支持单次调用；非文件 I/O | KEEP，说明首选单次函数/组合实例，无重复实现 |
+| BoundedQueryElement | Standard Element；select 同步有界扫描 | air-quality、repair-quote、combined、D 内部；完成性与截断，非数据库/安全沙箱 | KEEP |
+| SQLiteDatabaseElement | Standard Element；连接、select、transaction、close | inventory authority/client、媒体 catalog、combined；真实事务/CAS、资源归实例；不替域授权 | KEEP |
+| SQLiteDatabaseError | Error；脱敏错误码/阶段 | SQLite 失败语义，非可复用 Element | KEEP |
+| VectorQueryElement | Standard Element；有限 Top-K | combined book-catalog/water-hardness；scope/完整性，非 embedding 生成/数据库 | KEEP |
+| GraphQueryElement | Standard Element；有界有向 BFS | combined、workshop；关系方向/深度/完备性，非专业优化 solver | KEEP |
+| BoundedExpressionElement | Standard Element；evaluate 有限纯 JSON AST | combined book-catalog/water-hardness；不执行任意 TS/业务规则引擎 | KEEP |
+| CliElement | Standard Element；run/timeout/合计输出界限 | media FFmpeg/ffprobe、workshop SciPy；可信前台进程，Linux 进程组 vs Windows 直接子进程，不是 sandbox/权限 | KEEP |
+| InteractionElement | Standard Element；run/current/submit/cancel | 四域、inventory、CLI/GUI；唯一逻辑意图运行/等待/预算 | REFINE/COMPOSE，仅增加原发布绑定通路和直接 notify 第二参数 |
+| resolveEvidence / invalidateEvidence | 两个 Function；来源/冲突/依赖失效 | 四域实际；只处理已取得证据；无独立状态/读取/授权 | KEEP |
+| selectNextDecision | Function；四态/依赖/必要优先 | 四域；域判断适用/满足/优先级，ready 不代表业务 READY | KEEP |
+| prepareCandidates | Function；有限筛选/排序/投影/complete | 四域；复用 BoundedQuery；域硬约束/专业结果、截断不推荐 | KEEP |
+| buildClarification / mapClarificationResponse | 两个 Function；组织及映射 | 四域手工配对，当前实证错配；纯内部测试仍保留 | COMPOSE 为 ClarificationElement，候选移出根，独审批准后迁移 |
+| runInteractiveRecognitionHandling | Function；同根 resolve→step | 四域及 inventory；不设统一 reducer，不另建 Session | REFINE 泛型贯通，KEEP 原职责 |
+实际值计数：具体 Standard10（XState、两 Reader、BoundedQuery、SQLite、Vector、Graph、Expression、CLI、Interaction）；KDP1、抽象1、执行支持2、Error1、Function13。公开类型61 按 lifecycle(7)、workflow(3)、interaction(10)、clarification(3)、candidates(5)、decision(3)、evidence(7)、structured-data(2)、bounded query(3)、SQLite(7)、vector(4)、graph(4)、expression(2) 关联目录；各实际名称由 checker 与独立预期逐项核验，不靠上述分组数代替名单。Class 同时可作类型不重复计作独立 type。
+结果语义：文件 kind/SUCCEEDED、Workflow status/COMPLETE、查询 complete、Evidence complete、CLI/SQLite 抛错分别有不同含义；F11 默认文档及实际组合正反例，不统一不等价概念。F08/F10 未证实需要其他 API；F09 全清单裁决已给出，独审可反驳；不以名义数量作为问题。
+
+## 方案一致性修正 C01–06 / F01–12
+| 编号 | 设计交付 | 验收 |
+|---|---|---|
+| C01/F01,F02,F03,F06 | EL09–15+QA09B，源码分类/Skill/显式根/独立 inventory | 缺 Reader、错 Error、抽象当具体、漏 type、重复/phantom、新未批准 export、无分类均拒绝；源与安装实际一致 |
+| C02/F04,F05 | portable Skill+本地规范及指南、README 导航 | 实际 tar/clean install 中所有本地引用/anchor 可达，离线查找与运行 API；无 repo 私有访问要求/不存在示例 |
+| C03/F06 | build/gen gate/CI sparse 与 path include、独立 root+types | clean stale/丢 docs/漏 sparse/错版本/坏例/深路径负例；保留旧功能门禁和 --ignore-scripts；不加 runtime validator |
+| C04/F07 | E immutable preparation + A actual publication binding | 同 visible 不同 key、双路径、stale/cross-root/cancel、async notify、预算、真实四域，不手工配对；见 L2-D |
+| C05/F08–11 | 上表逐项裁决、必要有限 refactor | 无自动 IntentElement/全 Class 化/状态统一，真实调用及维护边界；对新增问题先给独审限定范围 |
+| C06/F12 | 两阶段独立消费证据 | docs-only runtime 相同与 API-change 分开，原始产物/盲评隔离，不泛化效率 |
+
+## 独立设计审查及验收 Oracle（先冻结，后实施）
+- Q1 公共面：对实际 root 的 runtime+type set 完整枚举，独立预期不由被测目录生成；逐符号明确 kind/semantic class/family，核验根导出与安装 d.ts，排除内部 helpers/子路径。负对照删 Reader/错 Error/抽象实例化/多余公开/漏类型/假符号；新预期 27 值（待独审准确裁定）及类型合同，不把数字当目的。
+- Q2 Skill：仓内/安装均可查同一能力目录，使用者从 README 找到本地 SKILL.md；本地链接、引用 canonical 快照/例/注释描述可核验，离线无需私有 GitHub。生成物 deterministic，漏文件/错锚点/陈旧分类/错误示例/不含 CI docs 均有可判别失败；实际 npm pack --ignore-scripts 在先构建后有效。所有 standalone TS 示例实际编译，代表性真实示例运行。
+- Q3 绑定机制：旧反例 shippingName vs billingName 同 visible 内容真实 accepted response 再现；新 bound 路径普通应用无法在发布后替换 binding，实际映射正确 key，另一准备只能在新实际发布前选择。保持原 raw prompt；双路径或无效准备拒绝不发布；实际旧 revision、跨意图、重复/无效、cancel/reject、async resolved/rejected notify（含 sync submit 后）、修订和 checkpoint、no-fit/text/revise-values，失败不进入后续 Handling，不产生权限/权威提升；测试 mapper 输入快照不可变和 per-occurrence 隔离。不宣称阻止任意恶意可信 JS。 
+- Q4 原功能：实际 R64/R69/R70/R67 的 core/generation/regression、CLI8、inventory13、visual6、media/professional + workshop/SciPy + 原 independent oracle、采购真实36（按实际新测试扩展）及预算/取消/权限/Effect 正负对照。既有 2/3,4/5,6/7 最小路径及各域实际预算/副作用保持，触发次数无错误膨胀。全 Linux verify + clean packed separate consumers；新 artifact Windows 只运行实际受影响路径，R67/R71 原证据保留，不重复全版本。
+- Q5 discovery experiment：独立 reviewer 在实施前冻结任务、真值（独立实际 public inventory 分类+需求→可接受能力/不适用项）、评判及隔离方法；评价 oracle 置于不向 generator 暴露的独立会话/受控文件，仅公开哈希或任务定义，后公开实际证据。两 fresh isolated Agent 使用旧实际 SDK docs 与仅文档投影的新 Skill（相同 runtime/dist byte hashes、同要求；新文档不得描述未实现接口），不提供符号名称/正确答案；任务包括完整 Element/Function/support 清单及适用需求：结构化文本非文件 I/O、root budget、有限查询 vs SQLite、向量/图、CLI、expression、语义澄清与无适合能力。记录错漏、幻觉、正确选择/no-fit、读取/步骤/token仅在实际可测时，不能承诺固定速度；至少一次独立完整发现及真实选用。文档对照与后续 API 对照分开。
+- Q6 API experiment：同一真实领域要求/Oracle，独立初见者基于旧 API 与新受审 API 的本地 public SDK/Skill 生成/维护一个有明确非盲限制的真实小域，或者用冻结陌生任务+独立维护者比较（独审先裁定实际设计，不能使用已知答案当独立）；实测编译、真实业务结果、错配反例、修订前后、通用协议重复、调用者需掌握概念/步骤、变化影响与无权限越界。先前 R65 原始证据及 evaluator exposure 明示、绝不改写。四现有域迁移是集成证据，不冒充四次独立陌生生成。独立真实 Oracle 分离且原始输出/初始与维护 SHA 留存；不推广单次效率。
+- Q7 final：全部冻结 SI-L1 13 Oracle + QA-09B 实际裁决、R70 P2、#1761 无未解决 material P0/P1，非阻断 P2 有 owner/scope；exact CI/pack SHA/tree，Windows 证据绑定实际 bytes，合入后核验组合树，不发布或启动新版本。
+## 写集/Task DAG（批准后）
+D1/D2 本三文件为设计候选，D3 独立 non-writer 审查接受/返工/阻塞；确认分类、API、真值实验设计和每个处理裁决。D4A canonical/Skill规范；D4B source annotations/explicit exports/catalog generator/test; D4C portable pack/build/CI/installed gate；先产旧 API docs-only 实验快照，非产品发布，保留 runtime hash；D4D A/E/F limited refactor、四域迁移；共同 index/docs/gates 顺序集成避免覆盖。D5 实际全 Linux/clean-packed、两阶段独立消费、有限 independent implementation review。D6 单次最终 freeze，保留 R67/R71 旧工件，按真实变化确定 Windows 受影响验证；T35 最终综合独审。若 R71 尚未完成不阻断设计，不虚报其结果。不新增本地任务（除必要平台）、不做 0.11.4、不改 R65 证据。 
