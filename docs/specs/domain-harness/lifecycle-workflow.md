@@ -93,3 +93,7 @@ Standard Workflow 必须在**执行任何用户 entry/action 和启动 Actor 前
 ### LIFE-13 · R173 类型闭包补充
 
 `PackageInitElement<Context>` 的 `start` 采用 **函数值属性类型**，使 `--strictFunctionTypes` 对所需 Context 进行逆变检查；实现者仍可使用普通 `class Init { start(ctx) {} }` 方法，不引入 Element 包装类。生成期 TypeScript 应拒绝：拥有特定字段的 Init/StaticCorePackage 被错接给 Base Context、Base Kernel 选择仅接受专有 Context 的 Core，以及 Base Extension 进入仅接受专有 Context 的 Init。仓内编译期 `@ts-expect-error` 与仓外真实 npm SDK 的 TypeScript 负例共同验证；JavaScript 仍由 Package 作者按适用类型保证正确性，SDK Runtime 不进行新的 Package 结构正确性验证。
+
+### LIFE-13 · T30 同根剩余预算查询
+
+`NativeWorkflowContext.remaining()` 返回新建并冻结的只读快照 `{ calls, steps, maxDescendantDepth }`。calls/steps 是当下实际共享根剩余额度（根启动、child、invoke/invokeOutcome、leaf 的既有预留已经反映）；maxDescendantDepth 是相对于当前 context 深度的所有活动祖先剩余子层限制的最小值，包括本层。查询不消耗、不预留、不增加或重置额度，不暴露内部 RootBudget。调用者可在独占当前逻辑根的连续固定专业路径前以实际剩余值完成业务前置检查；快照随其他调用消耗而过期，不能当并发 reservation、授权或全业务预算预测器。原子逐次预留与祖先拒绝仍是执行门禁，不改变 Session 单次 run、Outcome、KDP 或调用成本。归属 0.11.1 #1605 / T30 #1731，服务 0.11.3 同根组合；实际产品验收仍在后续任务。
