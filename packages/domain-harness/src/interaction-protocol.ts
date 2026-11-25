@@ -124,6 +124,7 @@ export function makePrompt(spec: InteractionPromptSpec, intentId: string, revisi
   if (!id(raw.decisionKey) || !str(raw.title) || (raw.description !== undefined && typeof raw.description !== 'string')) return invalid();
   const fields = list(raw.fields), actions = list(raw.actions);
   if (!actions.length || !unique(actions) || actions.some(a => typeof a !== 'string' || !ACTIONS.includes(a))) return invalid();
+  const submitOnly = actions.length === 1 && actions[0] === 'submit';
   const ids = new Set<string>();
   let items = fields.length;
   for (const field of fields) {
@@ -156,6 +157,11 @@ export function makePrompt(spec: InteractionPromptSpec, intentId: string, revisi
         if (!str(r.label) || !object(r.cells) || Object.entries(r.cells).some(([key, val]) => !optionIds.has(key) || typeof val !== 'string')) return invalid();
       }
     } else return invalid();
+    // 必填空选项及零长度文件引用不可能通过提交；有其他声明动作时仍可澄清或退出。
+    if (submitOnly && f.required === true && (
+      ((f.kind === 'choice' || f.kind === 'multi-choice') && list(f.options).length === 0) ||
+      (f.kind === 'file' && f.maxLength === 0)
+    )) return invalid();
     if (f.prefill !== undefined) {
       const p = keys(f.prefill, ['value', 'source']);
       if (!str(p.source) || !valueMatches(f as unknown as InteractionField, p.value)) return invalid();
