@@ -197,14 +197,56 @@ test('媒体：只问第二件，一次选择确定配对，和固定逐项基�
     assert.deepEqual(result, baseline.result);
     assert.deepEqual(asked, complete ? [] : ['second']);
     const necessary = complete ? 0 : 1;
-    assert.deepEqual({ necessary, repeated: baseline.asked.length - necessary, derived: 1, skipped: 0 },
+    const derived: number = Number(result.status === 'COMPLETE' && Array.isArray(result.value) && result.value.length === 2);
+    const baselineDerived: number = Number(baseline.result.status === 'COMPLETE' && Array.isArray(baseline.result.value) && baseline.result.value.length === 2);
+    assert.deepEqual({ necessary, repeated: baseline.asked.length - necessary, derived: baselineDerived, skipped: 0 },
       { necessary, repeated: complete ? 4 : 3, derived: 1, skipped: 0 });
-    assert.deepEqual({ necessary: asked.length, repeated: 0, derived: 1, skipped: baseline.asked.length - asked.length },
+    assert.deepEqual({ necessary: asked.length, repeated: 0, derived, skipped: baseline.asked.length - asked.length },
       { necessary, repeated: 0, derived: 1, skipped: complete ? 4 : 3 });
   }
 });
 
+async function fixedWorkshopBaseline() {
+  const order = ['goal', 'calendar', 'scenario'] as const;
+  const asked: string[] = [];
+  let goal: string | undefined;
+  const e = new InteractionElement({ onPrompt: p => {
+    const key = order[asked.length]!; asked.push(key);
+    const env = envelope(p);
+    const response = key === 'scenario' ? { ...env, action: 'revise', text: 'current' } :
+      { ...env, action: 'submit', values: { [key]: key === 'goal' ? 'what-if' : 'shop-v2' } };
+    assert.equal(e.submit(response).accepted, true);
+  } });
+  const result = await e.run({ maxCalls: 7, maxSteps: 8, maxDepth: 0 }, scope => scope.resolve(0, (index, input) => {
+    if (input.kind === 'response') {
+      if (index === 1) {
+        assert.equal(input.response.action, 'submit');
+        if (input.response.action !== 'submit') assert.fail('submit');
+        assert.equal(input.response.values.goal, 'what-if'); goal = 'what-if';
+      } else if (index === 2) {
+        assert.equal(input.response.action, 'submit');
+        if (input.response.action !== 'submit') assert.fail('submit');
+        assert.equal(input.response.values.calendar, 'shop-v2');
+      } else {
+        assert.equal(goal, 'what-if'); assert.equal(input.response.action, 'revise');
+        if (input.response.action !== 'revise' || !('text' in input.response)) assert.fail('revise');
+        assert.equal(input.response.text, 'current'); goal = 'current';
+      }
+    }
+    if (index === order.length) {
+      assert.equal(goal, 'current');
+      return ok({ kind: 'ready', intent: { goal, calendar: 'shop-v2' } });
+    }
+    const key = order[index]!;
+    return ok({ kind: 'clarify', state: index + 1, prompt: { ...template(key, ['submit', 'revise']), fields: [{ kind: 'string', id: key, label: key, required: true }] } });
+  }));
+  return { result, asked };
+}
+
 test('维修：实际前置选择后增加情景字段，revision拒旧，修订回current使旧表达失效', async () => {
+  const baseline = await fixedWorkshopBaseline();
+  assert.deepEqual(baseline.asked, ['goal', 'calendar', 'scenario']);
+  assert.deepEqual(baseline.result, ok({ goal: 'current', calendar: 'shop-v2' }));
   type K = 'goal' | 'calendar' | 'scenario';
   const requirements: EvidenceRequirement<K>[] = [{ key: 'goal', accepts: ['user'] }, { key: 'calendar', accepts: ['authority'] }, { key: 'scenario', accepts: ['user'] }];
   let observations: EvidenceObservation<K, string>[] = [known<K>('calendar', 'shop-v2', 'authority')];
@@ -236,8 +278,12 @@ test('维修：实际前置选择后增加情景字段，revision拒旧，修订
     if (built.status === 'ready') { assert.equal(goal, 'current'); assert.equal(values.get('calendar'), 'shop-v2'); assert.equal(values.has('scenario'), false); return ok({ kind: 'ready', intent: { goal, calendar: values.get('calendar') } }); }
     prepared = prompt(built); return ok({ kind: 'clarify', state: 1, prompt: prepared.prompt });
   }));
-  assert.deepEqual(result, ok({ goal: 'current', calendar: 'shop-v2' }));
+  assert.deepEqual(result, baseline.result);
   assert.deepEqual(asked, [['goal'], ['scenario']]);
+  const necessary = asked.flat().length;
+  const derived: number = Number(result.status === 'COMPLETE' && typeof result.value === 'object' && result.value !== null && !Object.hasOwn(result.value, 'scenario'));
+  assert.deepEqual({ necessary, repeated: baseline.asked.length - necessary, derived, skipped: 0 }, { necessary: 2, repeated: 1, derived: 1, skipped: 0 });
+  assert.deepEqual({ necessary, repeated: 0, derived, skipped: baseline.asked.length - necessary }, { necessary: 2, repeated: 0, derived: 1, skipped: 1 });
 });
 
 
