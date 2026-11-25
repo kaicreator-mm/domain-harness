@@ -9,7 +9,7 @@ const values = [
   'StandardWorkflowSession', 'routeWorkflowOutcome', 'JsonReader', 'YamlReader',
   'readJson', 'readYaml', 'writeJson', 'writeYaml', 'BoundedQueryElement',
   'SQLiteDatabaseElement', 'SQLiteDatabaseError', 'VectorQueryElement', 'GraphQueryElement',
-  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence', 'selectNextDecision',
+  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence', 'selectNextDecision', 'prepareCandidates',
 ].sort();
 const types = [
   'CorePackageMetadata', 'DomainAppContext', 'LifecycleInitContext', 'PackageInitElement',
@@ -25,6 +25,7 @@ const types = [
   'InteractionRecord', 'InteractionResponse', 'InteractionSubmitResult', 'InteractionDecision', 'InteractionScope',
   'EvidenceOrigin', 'EvidenceObservation', 'EvidenceRequirement', 'EvidenceContext', 'EvidenceResolution', 'EvidenceDependency', 'EvidenceInvalidation',
   'DecisionCondition', 'DecisionDescription', 'DecisionSelection',
+  'CandidateEntry', 'CandidateSource', 'CandidateAssessment', 'CandidateProjection', 'CandidatePreparation',
 ];
 
 /** 安装后检查实际字节、公开根运行行为并准备类型探针；调用者仍须完成原有 TYPECHECK。 */
@@ -35,6 +36,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const path of ['dist/standard-interaction.js', 'dist/standard-interaction.d.ts', 'dist/interaction-protocol.js', 'dist/interaction-protocol.d.ts']) assert.ok(packedPaths.includes(path));
   for (const path of ['dist/standard-evidence.js', 'dist/standard-evidence.d.ts']) assert.ok(packedPaths.includes(path));
   for (const path of ['dist/standard-decision.js', 'dist/standard-decision.d.ts']) assert.ok(packedPaths.includes(path));
+  for (const path of ['dist/standard-candidates.js', 'dist/standard-candidates.d.ts']) assert.ok(packedPaths.includes(path));
   const readme = readFileSync(join(installed, 'README.md'));
   assert.deepEqual(readme, readFileSync(join(packageDir, 'README.md')));
   const text = readme.toString('utf8');
@@ -52,7 +54,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const name of [...values, ...types]) assert.ok(text.includes('`' + name + '`'), 'S05_API_NOT_DOCUMENTED:' + name);
   writeFileSync(join(consumer, 's05-types.mts'), [
     `import type { ${types.join(', ')} } from '@kaicreator/domain-harness';`,
-    "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision } from '@kaicreator/domain-harness';",
+    "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates } from '@kaicreator/domain-harness';",
     "const result: Promise<StandardWorkflowOutcome<string>> = runRecognitionHandling({maxCalls:2,maxSteps:5,maxDepth:1}, () => ({status:'COMPLETE',value:{n:2}}), intent => ({status:'COMPLETE',value:String(intent.n)}));",
     "const stdout: Promise<string> = new CliElement().run('trusted-tool', ['--version']);",
     "// @ts-expect-error a number intent is not a string",
@@ -83,7 +85,15 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "void selectNextDecision<'x'>([{...decision,dependsOn:['y']}],{maxItems:4,maxDependencies:4});",
     "// @ts-expect-error the condition is four-state, not boolean",
     "void selectNextDecision<'x'>([{...decision,required:true}],{maxItems:4,maxDependencies:4});",
-    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence; void selection;",
+    "const candidateEntry: CandidateEntry<number> = {id:'one',scope:'a',revision:'r1',value:1};",
+    "const candidateSource: CandidateSource<number> = {scope:'a',revision:'r1',status:'complete',entries:[candidateEntry]};",
+    "const candidatePolicy = {comparisonLabels:['Value'],assess:(_e:CandidateEntry<number>):CandidateAssessment=>({status:'eligible'}),project:(e:CandidateEntry<number>):CandidateProjection=>({label:e.id,priority:e.value,cells:[String(e.value)]})};",
+    "const candidateResult: CandidatePreparation<number> = prepareCandidates(candidateSource,{scope:'a',revision:'r1'},candidatePolicy,{maxVisited:4,maxReturned:4});",
+    "// @ts-expect-error a boolean is not a candidate assessment",
+    "void prepareCandidates(candidateSource,{scope:'a',revision:'r1'},{...candidatePolicy,assess:()=>true},{maxVisited:4,maxReturned:4});",
+    "// @ts-expect-error numeric comparison cells are not semantic display strings",
+    "void prepareCandidates(candidateSource,{scope:'a',revision:'r1'},{...candidatePolicy,project:()=>({label:'x',priority:0,cells:[1]})},{maxVisited:4,maxReturned:4});",
+    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence; void selection; void candidateResult;",
   ].join('\n'));
   writeFileSync(join(consumer, 's05-standard-probe.mjs'), [
     "import assert from 'node:assert/strict';",
@@ -114,6 +124,12 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "assert.equal(choice.status,'next');assert.equal(choice.key,'parent');assert.deepEqual(choice.rows[0].blockedBy,['parent']);",
     "assert.equal(sdk.selectNextDecision([{...decision,key:'parent',dependsOn:[],required:'unknown'}],decisionLimits).status,'unresolved');",
     "assert.equal(sdk.selectNextDecision([{...decision,key:'parent',dependsOn:[],satisfied:'yes'}],decisionLimits).status,'ready');",
+    "const candidateCurrent={scope:'a',revision:'r1'};const candidateSource={...candidateCurrent,status:'complete',entries:[{...candidateCurrent,id:'one',value:1},{...candidateCurrent,id:'unknown',value:0}]};",
+    "const candidatePolicy={comparisonLabels:['Value'],assess:e=>e.value===0?{status:'unknown',reason:'NOT_VERIFIED'}:{status:'eligible'},project:e=>({label:e.id,priority:e.value,reason:'DOMAIN_PREFERENCE',recommended:true,cells:[String(e.value)]})};",
+    "const candidate=sdk.prepareCandidates(candidateSource,candidateCurrent,candidatePolicy,{maxVisited:4,maxReturned:4});",
+    "assert.equal(candidate.status,'available');assert.equal(candidate.complete,false);assert.equal(candidate.options[0].recommended,undefined);assert.deepEqual(candidate.comparison[0].cells,{one:'1'});",
+    "assert.equal(sdk.prepareCandidates({...candidateSource,entries:[]},candidateCurrent,candidatePolicy,{maxVisited:4,maxReturned:4}).status,'empty');",
+    "assert.equal(sdk.prepareCandidates(candidateSource,{...candidateCurrent,revision:'r2'},candidatePolicy,{maxVisited:4,maxReturned:4}).reason,'STALE_SOURCE');",
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');
