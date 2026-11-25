@@ -167,7 +167,7 @@ test('无效 prompt 不发布：重复字段/候选、非法约束、超限和�
 
 for (const kind of ['throw', 'async', 'self', 'then-getter'] as const) {
   test('通知异常不交付同步响应：' + kind, { timeout: 3000 }, async () => {
-    let run!: Promise<StandardWorkflowOutcome<string>>, analyzed = 0;
+    let analyzed = 0;
     const e = new InteractionElement({ onPrompt: p => {
       assert.equal(e.submit(answer(p)).accepted, true);
       if (kind === 'throw') throw Error('PRIVATE_MARKER');
@@ -175,7 +175,7 @@ for (const kind of ['throw', 'async', 'self', 'then-getter'] as const) {
       if (kind === 'self') return run;
       return { get then() { throw Error('PRIVATE_MARKER'); } };
     } });
-    run = e.run(limits, scope => scope.resolve(0, (state, event) => { analyzed++; return decide(state, event); }));
+    const run: Promise<StandardWorkflowOutcome<string>> = e.run(limits, scope => scope.resolve(0, (state, event) => { analyzed++; return decide(state, event); }));
     const result = await run; await nextTurn();
     assert.equal(code(result), 'INTERACTION_NOTIFICATION_FAILED'); assert.equal(analyzed, 1);
     assert.ok(!JSON.stringify(result).includes('PRIVATE_MARKER')); assert.equal(e.current(), undefined);
@@ -264,4 +264,57 @@ test('同一决策重新提交只保留最新有效表达，原模板与响应�
   const second = await pending(e); assert.equal(second.title, 'Changed');
   assert.equal(e.submit({ ...envelope(second), action: 'submit', values: { name: 'new' } }).accepted, true);
   assert.deepEqual(await run, ok('new'));
+});
+
+test('不可满足的纯提交表单在等待扣费前拒绝，无通知或后续分析', async () => {
+  const fields: InteractionPromptSpec['fields'] = [
+    { id: 'x', label: 'X', required: true, kind: 'choice', options: [], completeness: 'complete' },
+    { id: 'x', label: 'X', required: true, kind: 'choice', options: [], completeness: 'incomplete' },
+    { id: 'x', label: 'X', required: true, kind: 'multi-choice', options: [], completeness: 'complete' },
+    { id: 'x', label: 'X', required: true, kind: 'multi-choice', options: [], completeness: 'incomplete' },
+    { id: 'x', label: 'X', required: true, kind: 'file', maxLength: 0 },
+  ];
+  for (const field of fields) {
+    let noticed = 0, analyzed = 0, handled = 0;
+    const e = new InteractionElement({ onPrompt: () => { noticed++; e.cancel(); } });
+    const result = await e.run(limits, async scope => {
+      const resolved = await scope.resolve<number, string>(0, () => {
+        analyzed++;
+        return ok({ kind: 'clarify', state: 1, prompt: { decisionKey: 'impossible', title: 'Impossible', fields: [field], actions: ['submit'] } });
+      });
+      assert.deepEqual(scope.root.remaining(), { calls: 11, steps: 11, maxDescendantDepth: 2 });
+      if (resolved.status !== 'COMPLETE') return resolved;
+      return scope.step(() => { handled++; return ok('unexpected'); });
+    });
+    assert.equal(code(result), 'INTERACTION_INVALID_PROMPT');
+    assert.equal(noticed, 0); assert.equal(analyzed, 1); assert.equal(handled, 0);
+    assert.equal(e.current(), undefined);
+  }
+});
+
+test('合法的可选空选项、纯提交及显式替代动作不被拒绝', async () => {
+  for (const [field, action, values] of [
+    [{ id: 'x', label: 'X', kind: 'choice', options: [], completeness: 'complete' }, 'submit', {}],
+    [{ id: 'x', label: 'X', kind: 'multi-choice', options: [], completeness: 'incomplete' }, 'submit', { x: [] }],
+    [{ id: 'x', label: 'X', required: true, kind: 'choice', options: [{ id: 'a', label: 'A' }], completeness: 'complete' }, 'submit', { x: 'a' }],
+    [{ id: 'x', label: 'X', required: true, kind: 'file', maxLength: 0 }, 'no-fit', {}],
+    [{ id: 'x', label: 'X', required: true, kind: 'choice', options: [], completeness: 'incomplete' }, 'no-fit', {}],
+  ] as const satisfies readonly (readonly [InteractionPromptSpec['fields'][number], 'submit' | 'no-fit', object])[]) {
+    let noticed = 0, analyzed = 0;
+    const e = new InteractionElement({ onPrompt: p => {
+      noticed++;
+      const response = action === 'submit' ? { ...envelope(p), action, values } : { ...envelope(p), action };
+      assert.equal(e.submit(response).accepted, true);
+    } });
+    const result = await e.run({ maxCalls: 3, maxSteps: 4, maxDepth: 0 }, scope => scope.resolve<number, string>(0, (_state, event) => {
+      analyzed++;
+      if (event.kind === 'initial') return ok({ kind: 'clarify', state: 1, prompt: {
+        decisionKey: 'possible', title: 'Possible', fields: [field], actions: action === 'submit' ? ['submit'] : ['submit', 'no-fit'],
+      } });
+      assert.equal(event.response.action, action);
+      return action === 'submit' ? ok({ kind: 'ready', intent: 'valid' }) : { status: 'UNKNOWN', reason: { code: 'NO_FIT', message: 'No fit' } };
+    }));
+    assert.equal(code(result), action === 'submit' ? 'COMPLETE' : 'NO_FIT');
+    assert.equal(noticed, 1); assert.equal(analyzed, 2); assert.equal(e.current(), undefined);
+  }
 });
