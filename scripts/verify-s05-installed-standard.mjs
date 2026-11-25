@@ -9,7 +9,7 @@ const values = [
   'StandardWorkflowSession', 'routeWorkflowOutcome', 'JsonReader', 'YamlReader',
   'readJson', 'readYaml', 'writeJson', 'writeYaml', 'BoundedQueryElement',
   'SQLiteDatabaseElement', 'SQLiteDatabaseError', 'VectorQueryElement', 'GraphQueryElement',
-  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence',
+  'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence', 'selectNextDecision',
 ].sort();
 const types = [
   'CorePackageMetadata', 'DomainAppContext', 'LifecycleInitContext', 'PackageInitElement',
@@ -24,6 +24,7 @@ const types = [
   'InteractionCandidate', 'InteractionField', 'InteractionEvent', 'InteractionPrompt', 'InteractionPromptSpec',
   'InteractionRecord', 'InteractionResponse', 'InteractionSubmitResult', 'InteractionDecision', 'InteractionScope',
   'EvidenceOrigin', 'EvidenceObservation', 'EvidenceRequirement', 'EvidenceContext', 'EvidenceResolution', 'EvidenceDependency', 'EvidenceInvalidation',
+  'DecisionCondition', 'DecisionDescription', 'DecisionSelection',
 ];
 
 /** 安装后检查实际字节、公开根运行行为并准备类型探针；调用者仍须完成原有 TYPECHECK。 */
@@ -33,6 +34,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   assert.ok(packedPaths.includes('dist/standard-cli.d.ts'));
   for (const path of ['dist/standard-interaction.js', 'dist/standard-interaction.d.ts', 'dist/interaction-protocol.js', 'dist/interaction-protocol.d.ts']) assert.ok(packedPaths.includes(path));
   for (const path of ['dist/standard-evidence.js', 'dist/standard-evidence.d.ts']) assert.ok(packedPaths.includes(path));
+  for (const path of ['dist/standard-decision.js', 'dist/standard-decision.d.ts']) assert.ok(packedPaths.includes(path));
   const readme = readFileSync(join(installed, 'README.md'));
   assert.deepEqual(readme, readFileSync(join(packageDir, 'README.md')));
   const text = readme.toString('utf8');
@@ -50,7 +52,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
   for (const name of [...values, ...types]) assert.ok(text.includes('`' + name + '`'), 'S05_API_NOT_DOCUMENTED:' + name);
   writeFileSync(join(consumer, 's05-types.mts'), [
     `import type { ${types.join(', ')} } from '@kaicreator/domain-harness';`,
-    "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence } from '@kaicreator/domain-harness';",
+    "import { CliElement, runRecognitionHandling, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision } from '@kaicreator/domain-harness';",
     "const result: Promise<StandardWorkflowOutcome<string>> = runRecognitionHandling({maxCalls:2,maxSteps:5,maxDepth:1}, () => ({status:'COMPLETE',value:{n:2}}), intent => ({status:'COMPLETE',value:String(intent.n)}));",
     "const stdout: Promise<string> = new CliElement().run('trusted-tool', ['--version']);",
     "// @ts-expect-error a number intent is not a string",
@@ -74,7 +76,14 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "// @ts-expect-error current source revisions are readonly",
     "value.revisions.set('src','v2');",
     "};",
-    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence;",
+    "const condition: DecisionCondition = 'yes';",
+    "const decision: DecisionDescription<'x'> = {key:'x',dependsOn:[],applicable:condition,required:'yes',satisfied:'no',priority:1};",
+    "const selection: DecisionSelection<'x'> = selectNextDecision([decision],{maxItems:4,maxDependencies:4});",
+    "// @ts-expect-error a different key cannot be a dependency",
+    "void selectNextDecision<'x'>([{...decision,dependsOn:['y']}],{maxItems:4,maxDependencies:4});",
+    "// @ts-expect-error the condition is four-state, not boolean",
+    "void selectNextDecision<'x'>([{...decision,required:true}],{maxItems:4,maxDependencies:4});",
+    "void result; void stdout; void interaction; void immutable; void resolution; void invalidation; void readonlyEvidence; void selection;",
   ].join('\n'));
   writeFileSync(join(consumer, 's05-standard-probe.mjs'), [
     "import assert from 'node:assert/strict';",
@@ -100,6 +109,11 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, co
     "const proposal=sdk.resolveEvidence([{key:'x',accepts:['authority']}],[{key:'x',state:'known',origin:'default',source,value:1}],evidenceContext,{equal:(_k,l,r)=>Object.is(l,r)},4);",
     "assert.equal(proposal.items[0].status,'unknown');assert.equal(proposal.items[0].proposals.length,1);",
     "assert.deepEqual(sdk.invalidateEvidence(['x','y','z'],['x'],[{key:'x',dependsOn:[]},{key:'y',dependsOn:['x']},{key:'z',dependsOn:[]}],{maxItems:4,maxDependencies:4}),{complete:true,stale:['x','y'],retained:['z']});",
+    "const decision={applicable:'yes',required:'yes',satisfied:'no',priority:1}; const decisionLimits={maxItems:4,maxDependencies:4};",
+    "const choice=sdk.selectNextDecision([{...decision,key:'child',dependsOn:['parent'],priority:9},{...decision,key:'parent',dependsOn:[]}],decisionLimits);",
+    "assert.equal(choice.status,'next');assert.equal(choice.key,'parent');assert.deepEqual(choice.rows[0].blockedBy,['parent']);",
+    "assert.equal(sdk.selectNextDecision([{...decision,key:'parent',dependsOn:[],required:'unknown'}],decisionLimits).status,'unresolved');",
+    "assert.equal(sdk.selectNextDecision([{...decision,key:'parent',dependsOn:[],satisfied:'yes'}],decisionLimits).status,'ready');",
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');

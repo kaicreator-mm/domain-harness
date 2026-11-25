@@ -25,7 +25,8 @@ description: DomainHarness v0.11.x 唯一规范导航；TypeScript 原生 Packag
 - 记录 `REPO / TASK_ISSUE / PR / EXACT_HEAD / SPEC_FILES_READ / CODE_GAPS / VALIDATION / P0/P1/P2`。无实际测试就写 NOT_RUN；需本地 Agent 时只给单次有限任务，不把 v0.11.1 基础工作转移至 v0.11.2。
 
 - 0.11.3 交互任务先读 [LIFE-14（T31A 已接受）](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-14--standard-interaction0113-t31a-已接受) 与当前 SDK README；以 #1613 R25 修订冻结及 #1733 R22 为准。优先同根 InteractionElement，不重复写 pending/关联/失效/字段校验；领域提供专业知识、规则及真实授权。
-- T31B 候选 [LIFE-15](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-15--standard-evidence0113-t31b-候选)：按 #1736 资格使用 `resolveEvidence`、`invalidateEvidence`，域提供真实来源/当前 scope/revision、显式 accepts、等价及可选 rank、完整 changed/dependencies；默认/推荐不替代 authority/user，先失效后重取证，不能把 complete 当 READY。候选未验收不可声称已发布；C–F 依赖按 #1613。
+- T31B 已接受 [LIFE-15](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-15--standard-evidence0113-t31b-已接受)：按 #1736 资格使用 `resolveEvidence`、`invalidateEvidence`，域提供真实来源/当前 scope/revision、显式 accepts、等价及可选 rank、完整 changed/dependencies；默认/推荐不替代 authority/user，先失效后重取证，不能把 complete 当 READY。R30限定验收不等于已发布。
+- T31C 候选 [LIFE-16](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-16--standard-decision0113-t31c-候选)：按 #1738 资格使用 `selectNextDecision`，领域从当前证据提供四态判断及依赖、优先级；标准选择必要可执行项，跳过不等于满足，unknown/conflict 不当 no；ready 不代表业务 READY 或授权。不要重写排序/依赖/跳过判断，不引入第二执行器。D–F 依赖按 #1613。
 
 ## 已验证实践：生成与审核时的关键提醒
 
