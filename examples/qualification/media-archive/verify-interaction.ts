@@ -64,7 +64,7 @@ export async function verifyMediaInteraction(){
       const short=start('short',{first:'photo-a'},budget,{onPrompt(p,e){e.submit({...envelope(p),action:'submit',values:{second:'video-b'}});}});assert.equal((await short.result).status,'FAILED');assert.deepEqual([registers,reads,ownerCalls],before);assert.equal(catalog.count('short'),0);}
     const denied=start('denied',{first:'photo-a',second:'video-b'},limits(29,34),{},false);assert.equal((await denied.result).status,'ASK');assert.equal(denied.observed()?.registration.status,'ASK');assert.equal(catalog.count('denied'),0);assert.equal(reads,before[1]);
     before=[registers,reads,ownerCalls];const missing=start('missing','归档 photo-a video-b',limits(29,34),{},true,()=>undefined);assert.equal((await missing.result).status,'UNKNOWN');
-    assert.equal((await start('foreign','归档 photo-a foreign').result).status,'REJECT');
+    assert.equal((await start('foreign','归档 photo-a foreign',limits(40,50)).result).status,'REJECT');
     assert.equal((await start('duplicate','归档 photo-a photo-a').result).status,'REJECT');
     const nofit=start('nofit','归档 photo-a',limits(34,39),{onPrompt(p,e){e.submit({...envelope(p),action:'no-fit'});}});assert.equal((await nofit.result).status,'ASK');
     const cancelled=start('cancel','归档 photo-a',limits(34,39),{onPrompt(_p,e){e.cancel();}});assert.equal((await cancelled.result).status,'REJECT');
