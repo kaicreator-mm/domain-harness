@@ -107,6 +107,59 @@ export async function verifyMediaInteraction(){
         const result=await active.result;assert.equal(result.status,'REJECT');assert.ok(cancelled);assert.equal(after,0);assert.equal(entered,phase==='entered'?1:0);assert.equal(settled,entered);assert.equal(active.proposals().length,0);assert.equal(active.observed(),undefined);assert.deepEqual([registers,reads,ownerCalls],beforeReverseShort);assert.equal(catalog.count('cancel-'+phase),0);
       }finally{ImageElement.prototype.inspect=inspect;ImageElement.prototype.verify=verifyImage;ImageElement.prototype.derive=derive;}
     }
+    // 故障只注入真实 plan 的清理回调；正常专业处理、Host、SQLite 及原始清理仍实际执行。
+    const planIn=ArchiveElement.prototype.planIn;
+    let disposeCalls=0,planCalls=0,failBefore=false;
+    try{
+      ArchiveElement.prototype.planIn=async function(...args){
+        planCalls++;
+        const result=await planIn.apply(this,args);
+        if(result.status!=='COMPLETE')return result;
+        const original=result.value.dispose;
+        return {status:'COMPLETE',value:{...result.value,dispose:async()=>{
+          disposeCalls++;
+          if(failBefore&&disposeCalls===1)throw Error('PRIVATE_CLEANUP_MARKER');
+          await original();
+          if(!failBefore)throw Error('PRIVATE_CLEANUP_MARKER');
+        }}};
+      };
+      const baseline=[registers,reads,ownerCalls];
+      const absent=archiveInteractively(limits(29,34),'归档 photo-a video-b',()=>facts('cleanup-no-owner'),video,root,async()=>{ownerCalls++;return undefined;});
+      assert.deepEqual(await absent.result,{status:'ASK',reason:{code:'APPROVAL_REQUIRED',message:'APPROVAL_REQUIRED'}});
+      assert.equal(absent.cleanupFailed(),true);assert.equal(absent.observed(),undefined);assert.equal(disposeCalls,1);
+      assert.deepEqual([registers,reads,ownerCalls],[baseline[0],baseline[1],baseline[2]!+1]);
+      assert.equal(catalog.count('cleanup-no-owner'),0);
+      const beforeRevision=[registers,reads,ownerCalls];
+      failBefore=true;disposeCalls=0;planCalls=0;
+      const cleanupRevision=start('cleanup-revision','归档 photo-a video-b',limits(62,71),{review:true,onPrompt(p,e){
+        assert.equal(e.submit({...envelope(p),action:'revise',text:'归档 photo-c video-b'}).accepted,true);
+      }});
+      assert.deepEqual(await cleanupRevision.result,{status:'FAILED',reason:{code:'MEDIA_CLEANUP_FAILED',message:'MEDIA_CLEANUP_FAILED'}});
+      assert.equal(cleanupRevision.cleanupFailed(),true);assert.equal(cleanupRevision.observed(),undefined);
+      // 首次清理拒绝后禁止第二次规划；最终清理再次尝试并真正删除 staging。
+      assert.equal(planCalls,1);assert.equal(disposeCalls,2);assert.deepEqual([registers,reads,ownerCalls],beforeRevision);
+      assert.equal(catalog.count('cleanup-revision'),0);
+      failBefore=false;disposeCalls=0;
+      const beforeKnown=[registers,reads,ownerCalls];
+      const cleanupKnown=start('cleanup-known','归档 photo-a video-b');
+      const knownReceipt=complete(await cleanupKnown.result);
+      assert.equal(knownReceipt.tenant,'cleanup-known');assert.equal(cleanupKnown.cleanupFailed(),true);
+      assert.equal(cleanupKnown.observed()?.registration.status,'COMPLETE');assert.equal(cleanupKnown.observed()?.readback?.status,'COMPLETE');
+      await verifyStored('cleanup-known',cleanupKnown.observed()!.asset);assert.equal(disposeCalls,1);
+      assert.deepEqual([registers,reads,ownerCalls],beforeKnown.map(n=>n+1));
+      disposeCalls=0;
+      const beforeLost=[registers,reads,ownerCalls];
+      const cleanupLost=start('cleanup-lost','归档 photo-a video-b');
+      afterRegister=()=>true;
+      const unknown=await cleanupLost.result;afterRegister=undefined;
+      assert.equal(unknown.status,'UNKNOWN');assert.equal(cleanupLost.cleanupFailed(),true);
+      assert.deepEqual(cleanupLost.observed()?.registration,unknown);assert.equal(cleanupLost.observed()?.readbackSkipped,'REGISTRATION_NOT_COMPLETE');
+      await verifyStored('cleanup-lost',cleanupLost.observed()!.asset);assert.equal(disposeCalls,1);
+      assert.deepEqual([registers,reads,ownerCalls],[beforeLost[0]!+1,beforeLost[1],beforeLost[2]!+1]);
+      complete(await client.readback('cleanup-lost',cleanupLost.observed()!.asset));
+      assert.deepEqual([registers,reads,ownerCalls],beforeLost.map(n=>n+1));
+      console.log(JSON.stringify({status:'MEDIA_CLEANUP_NEGATIVES_PASS',cases:4,realHost:true,realStaging:true,knownReceiptPreserved:true,unknownReceiptPreserved:true,originalAskPreserved:true,revisionStopsBeforeReplan:true}));
+    }finally{ArchiveElement.prototype.planIn=planIn;afterRegister=undefined;}
     assert.equal((await readdir(root)).filter(n=>n.startsWith('archive-')).length,0);
     console.log(JSON.stringify({status:'MEDIA_INTERACTION_PASS',fixedPrompts,semanticPrompts:prompted,completePrompts:0,revisionPrompts,registers,reads,ownerCalls,realHost:true,lostAckRecovered:true,stagingClean:true,exactAndShort:true}));
   }finally{proxy.closeAllConnections();await new Promise<void>(resolve=>proxy.close(()=>resolve()));if(host&&host.exitCode===null){const done=once(host,'exit');host.kill();await done;}catalog.close();await rm(root,{recursive:true,force:true});}

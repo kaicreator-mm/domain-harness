@@ -99,6 +99,12 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
   };
   const result=runInteractiveRecognitionHandling<State,Intent,Receipt>(interaction,limits,{selection:{},round:0},decide,async(initial,scope)=>{
     let intent=initial;let plan:Extract<Awaited<ReturnType<ArchiveElement['planIn']>>,{status:'COMPLETE'}>['value']|undefined;
+    // 清理失败单独记录，不让 finally 覆盖已经得到的业务结果或原始异常。
+    const disposePlan=async():Promise<boolean>=>{
+      if(!plan)return true;
+      try{await plan.dispose();plan=undefined;return true;}
+      catch{cleanupFailed=true;return false;}
+    };
     try{
       const makePlan=async()=>{
         if(scope.signal.aborted||!sameFacts(intent.facts))return stop('UNKNOWN','STALE_OR_CANCELLED');
@@ -111,7 +117,7 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
       const first=await makePlan();if(first.status!=='COMPLETE')return first;
       if(options.review){const next=await scope.resolve<State,Intent>({selection:{first:intent.pair[0].file.id},round:100,prior:intent,proposal:first.value.assets,snapshot:JSON.stringify(intent.facts)},decide);
         if(next.status!=='COMPLETE')return next;const changed=next.value.pair.some((x,i)=>x.hash!==intent.pair[i]!.hash);intent=next.value;
-        if(changed){await plan!.dispose();plan=undefined;const revised=await makePlan();if(revised.status!=='COMPLETE')return revised;}}
+        if(changed){if(!await disposePlan())return stop('FAILED','MEDIA_CLEANUP_FAILED');const revised=await makePlan();if(revised.status!=='COMPLETE')return revised;}}
       if(scope.signal.aborted||!sameFacts(intent.facts))return stop('UNKNOWN','STALE_OR_CANCELLED');
       const group=options.readback===false?4:5;if(!enough(scope.root,group,group))return stop('FAILED','MEDIA_REGISTRATION_BUDGET');
       const original=plan!.assets[0]!;const asset=Object.freeze({...original,source:Object.freeze({...original.source}),output:Object.freeze({...original.output})});const tenant=intent.facts.tenant;
@@ -127,7 +133,7 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
         attempt=Object.freeze({...attempt,readbackSkipped:options.readback===false?'NOT_REQUESTED':scope.signal.aborted?'CANCELLED':!sameFacts(intent.facts)?'STALE_CONTEXT':'BUDGET'});return registration;
       }
       const readback=await authorized.value.readbackIn(scope.root,tenant,asset);attempt=Object.freeze({...attempt,readback});return registration;
-    }finally{if(plan)try{await plan.dispose();}catch(error){cleanupFailed=true;if(!attempt)throw error;}}
+    }finally{await disposePlan();}
   });
   return Object.freeze({interaction,result,observed:()=>attempt,proposals:()=>Object.freeze([...proposals]),cleanupFailed:()=>cleanupFailed});
 }
