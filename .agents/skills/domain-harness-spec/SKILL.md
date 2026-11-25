@@ -24,6 +24,8 @@ description: DomainHarness v0.11.x 唯一规范导航；TypeScript 原生 Packag
 - Init/Exit 可选，无则跳过；框架按 Order 正常启动并在未捕获异常时打印脱敏日志、执行可行 Exit、失败退出。
 - 记录 `REPO / TASK_ISSUE / PR / EXACT_HEAD / SPEC_FILES_READ / CODE_GAPS / VALIDATION / P0/P1/P2`。无实际测试就写 NOT_RUN；需本地 Agent 时只给单次有限任务，不把 v0.11.1 基础工作转移至 v0.11.2。
 
+- 0.11.3 交互任务先读 [LIFE-14（T31 候选）](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-14--standard-interaction0113-t31-候选) 与当前 SDK README 实际 API；以 #1613 冻结 L2 和 #1733 状态为准。优先同根 InteractionElement，不重复写 pending/关联/失效/字段校验；领域决定事实/关键问题/候选/READY，保持真实授权和 Effect 结果。未受审候选不能作为已发布能力。
+
 ## 已验证实践：生成与审核时的关键提醒
 
 - **需求先行**：先独立分析领域需求、知识、约束、异常、验收 Oracle，再映射当前公开 SDK；不要以已有 API 缩减真实需求，也不要为了覆盖 SDK 功能虚构业务。保留 baseline，按确证根因修正业务、共享 Element、SDK、规范或 Skill。

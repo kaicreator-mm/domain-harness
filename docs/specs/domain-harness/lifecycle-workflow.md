@@ -97,3 +97,13 @@ Standard Workflow 必须在**执行任何用户 entry/action 和启动 Actor 前
 ### LIFE-13 · T30 同根剩余预算查询
 
 `NativeWorkflowContext.remaining()` 返回新建并冻结的只读快照 `{ calls, steps, maxDescendantDepth }`。calls/steps 是当下实际共享根剩余额度（根启动、child、invoke/invokeOutcome、leaf 的既有预留已经反映）；maxDescendantDepth 是相对于当前 context 深度的所有活动祖先剩余子层限制的最小值，包括本层。查询不消耗、不预留、不增加或重置额度，不暴露内部 RootBudget。调用者可在独占当前逻辑根的连续固定专业路径前以实际剩余值完成业务前置检查；快照随其他调用消耗而过期，不能当并发 reservation、授权或全业务预算预测器。原子逐次预留与祖先拒绝仍是执行门禁，不改变 Session 单次 run、Outcome、KDP 或调用成本。归属 0.11.1 #1605 / T30 #1731，服务 0.11.3 同根组合；实际产品验收仍在后续任务。
+
+## LIFE-14 · Standard Interaction（0.11.3 T31 候选）
+
+**归属与作用域。** InteractionElement 为应用持有的一个运行期逻辑意图；一次 run 创建一个现有 StandardWorkflowSession。resolve 通过领域 decide(state,event,root) 动态给出 ready/clarify 或真实非成功 Outcome；每次分析及发布/等待分别使用同根 invokeOutcome，均为1call/1step，scope.step 仅取消检查加 invokeOutcome。一次澄清再处理的最小路径4calls/5steps；两次6/7，额外业务子层/计算另计。复杂领域仍以同一 root 组合及 remaining 业务前置门禁，不另建 Session。无关意图实例独立，无全局会话表、额外 Runtime 或重启恢复。
+
+**语义与证据。** 结构化字段、合法选项、比较、预填来源及当前候选完整性均由领域提供。标准只校验数据形状/字段约束/选项 ID，不判断事实真实性、合法业务候选或权限。每个 prompt 带唯一意图ID、递增 revision、decisionKey；响应须匹配当前等待且仅捕获一次，错误输入不消费等待/业务预算。快照为深冻结 JSON 数据（普通记录不继承对象原型），单份 UTF-8 JSON 不超过64KiB、字段加选项≤256、节点≤4096、深度≤16；宿主另负责原始网络输入限额、身份/速率及凭据隔离，勿把秘密放入可呈现数据。不是任意 JS/Proxy 沙箱。模板可预生成，实例内容动态给出。 发布前拒绝显然无法合法提交且只声明 submit 的表单（必填空单选/多选、必填 file 且 maxLength=0）；返回 FAILED/INTERACTION_INVALID_PROMPT，不通知、不建立 pending、不扣等待额度。合法可选空字段或明确声明的 no-fit/text/revise/reject/cancel 等替代动作保留。仅检查已知结构性矛盾，不是领域可满足性求解器。记录 valid 表示尚未失效的用户表达，不等于确认/授权；no-fit、text、revise 不是批准。修改保守失效本意图旧记录；同 key 新表达替换旧有效记录；领域决定明确 invalidate 的 key。必要确认、硬政策、当前事实与真实授权由领域重新校验，不要求额外最终确认。
+
+**等待与退出。** 先登记 resolver/pending 后同步通知；通知必须返回 undefined，捕获响应在成功通知返回后才交付。同步异常或意外返回值/thenable 失败并撤销，观察异步拒绝但不 await 通知自身的任务。cancel 撤销当前等待、发出 signal，拒绝新的 scope.step/resolve；已进入 step 等实际结果及清理完成，不覆盖 COMPLETE/UNKNOWN。resolve 是无业务 Effect 的领域分析，取消时可拒绝后续分析；实际 Effect 及恢复由业务在最新状态下协作检查。调用者必须等待全部业务调用，禁止泄漏 root/scope；如果 work 返回时仍有未汇合的 scope 操作，撤销等待并等收敛，返回 UNKNOWN/INTERACTION_UNJOINED_WORK，不能据此判定未执行。宿主停止接入、取消其活跃实例，再 await KDP dispose；原 KDP 不感知交互状态。意图确认与真实 Owner/Host 批准、grant 时效、attempt/receipt/readback 独立。已提交或不确定效果的身份及结果由领域保留，不自动重试或重开预算。
+
+**验收。** 候选实际 API 与使用方式见 SDK README；冻结 L2 R14 和 T31 #1733，受影响媒体/维修/库存、CLI+视觉、真实 SDK 新工件及独立消费者验证分别在 T32–35 完成。本条不证明产品验收或跨重启资格。
