@@ -130,8 +130,41 @@ test('限界、稀疏、非法映射、协议超限与预填失败无部分表�
   assert.deepEqual(buildClarification(recommended, next, template(), [field('x', { projectPrefill: () => { throw new Error('secret'); } })]), { status: 'failed', reason: 'PREFILL_FAILED' });
 });
 
+// 固定逐项询问对照：使用同一真实A运行，但不使用E的跳过与组织机制；
+// 领域薄Oracle仍以真实给定的scope/policy/calendar为准，重复询问不能产生权威。
+async function fixedMediaBaseline() {
+  const order = ['scope', 'first', 'second', 'policy'] as const;
+  const answers = { scope: 'tenant-a', first: 'photo-a', second: 'video-b', policy: 'archive-v1' };
+  const asked: string[] = [];
+  const confirmed = new Map<string, string>();
+  const e = new InteractionElement({ onPrompt: p => {
+    const key = order[asked.length]!; asked.push(key);
+    assert.equal(e.submit({ ...envelope(p), action: 'submit', values: { [key]: answers[key] } }).accepted, true);
+  } });
+  const result = await e.run({ maxCalls: 9, maxSteps: 10, maxDepth: 0 }, scope => scope.resolve(0, (index, input) => {
+    if (input.kind === 'response') {
+      assert.equal(input.response.action, 'submit');
+      if (input.response.action !== 'submit') assert.fail('submit');
+      const key = order[index - 1]!;
+      const value = input.response.values[key];
+      assert.equal(value, answers[key]); confirmed.set(key, answers[key]);
+    }
+    if (index === order.length) {
+      assert.equal(confirmed.get('scope'), 'tenant-a'); assert.equal(confirmed.get('policy'), 'archive-v1');
+      assert.notEqual(confirmed.get('first'), confirmed.get('second'));
+      return ok({ kind: 'ready', intent: [confirmed.get('first'), confirmed.get('second')] });
+    }
+    const key = order[index]!;
+    return ok({ kind: 'clarify', state: index + 1, prompt: { ...template(key), fields: [{ kind: 'string', id: key, label: key, required: true }] } });
+  }));
+  return { result, asked };
+}
+
 // 真实A/B/C/D/E组合，专业文件/求解与授权仍由后续领域实现独立验证。
 test('媒体：只问第二件，一次选择确定配对，和固定逐项基线得到同一薄领域意图', async () => {
+  const baseline = await fixedMediaBaseline();
+  assert.deepEqual(baseline.asked, ['scope', 'first', 'second', 'policy']);
+  assert.deepEqual(baseline.result, ok(['photo-a', 'video-b']));
   for (const complete of [false, true]) {
     type K = 'scope' | 'first' | 'second' | 'policy';
     const requirements: EvidenceRequirement<K>[] = [{ key: 'scope', accepts: ['authority'] }, { key: 'first', accepts: ['user'] }, { key: 'second', accepts: ['user'] }, { key: 'policy', accepts: ['authority'] }];
@@ -161,9 +194,13 @@ test('媒体：只问第二件，一次选择确定配对，和固定逐项基�
       prepared = prompt(built);
       return ok({ kind: 'clarify', state: 1, prompt: prepared.prompt });
     }));
-    const baseline = { scope: 'tenant-a', first: 'photo-a', second: 'video-b', policy: 'archive-v1' };
-    assert.deepEqual(result, ok([baseline.first, baseline.second]));
-    assert.deepEqual(asked, complete ? [] : ['second']); assert.equal(Object.keys(baseline).length, 4);
+    assert.deepEqual(result, baseline.result);
+    assert.deepEqual(asked, complete ? [] : ['second']);
+    const necessary = complete ? 0 : 1;
+    assert.deepEqual({ necessary, repeated: baseline.asked.length - necessary, derived: 1, skipped: 0 },
+      { necessary, repeated: complete ? 4 : 3, derived: 1, skipped: 0 });
+    assert.deepEqual({ necessary: asked.length, repeated: 0, derived: 1, skipped: baseline.asked.length - asked.length },
+      { necessary, repeated: 0, derived: 1, skipped: complete ? 4 : 3 });
   }
 });
 
@@ -224,5 +261,26 @@ test('复用A字段加选项总数上限，精确255个选项通过而256个拒�
     const built = buildClarification(missing, next, template(), [choice('x', [], { candidates: { current, result } })]);
     assert.equal(built.status, size === 255 ? 'prompt' : 'failed');
     if (size === 256) assert.deepEqual(built, { status: 'failed', reason: 'INVALID_PROMPT' });
+  }
+});
+
+
+test('字段ID与领域key不同，映射只能产生显式用户表达', () => {
+  const prepared = prompt(buildClarification(missing, next, template(), [field('x', { field: { kind: 'string', id: 'answer', label: 'Answer', required: true } })]));
+  const p = makePrompt(prepared.prompt, 'intent', 1);
+  assert.deepEqual(mapClarificationResponse(prepared, p, event({ ...envelope(p), action: 'submit', values: { answer: 'v' } })),
+    { status: 'values', action: 'submit', values: [{ key: 'x', origin: 'user', value: 'v' }] });
+  assert.equal(mapClarificationResponse(prepared, p, event({ ...envelope(p), action: 'submit', values: { x: 'v' } })).status, 'failed');
+});
+
+test('多选已确认值只在当前候选全部合法时跳过，旧ID及重复选择不能跳过', () => {
+  type V = readonly string[];
+  const binding: ClarificationField<'x', V> = { field: { kind: 'multi-choice', id: 'x', label: 'X', required: true, options: [], completeness: 'incomplete' },
+    evidenceKey: 'x', applicable: 'yes', confirmation: 'user', projectPrefill: observation => ({ value: observation.value, source: 'selection' }), candidates: { current, result: candidates(['a', 'b']) } };
+  for (const value of [['a', 'b'], ['a', 'old'], ['a', 'a'], []] as const) {
+    const evidence = resolveEvidence<'x', V>(req, [{ key: 'x', state: 'known', origin: 'user', value, source }], context, { equal: (_key, a, b) => a === b }, 32);
+    const prepared = buildClarification(evidence, next, template(), [binding]);
+    if (value.length === 2 && value[1] === 'b') assert.deepEqual(prepared, { status: 'unresolved', reason: 'NO_FIELDS' });
+    else assert.equal(prompt(prepared).prompt.fields[0]?.prefill, undefined);
   }
 });
