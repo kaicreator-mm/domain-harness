@@ -1,4 +1,4 @@
-> **当前 R9：** [0.11.3 Product/L1 正式冻结及 P2 验收补充](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7145891451)；全局 CORE-13/14、QA-09 已接受合并。先完成 [#1724](https://github.com/kaicreator-mm/domain-harness/issues/1724) 再进入 .3 L2。R7 原受审 PRD 内待审措辞以及下方早期状态均为历史快照；不表示 .3 源码已实现或 R65 资格扩大。
+> **当前 R9：** [0.11.3 Product/L1 正式冻结及 P2 验收补充](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7145891451)；全局 CORE-13/14、QA-09 已接受合并。[#1724 R20](https://github.com/kaicreator-mm/domain-harness/issues/1724#issuecomment-7155041545) 已完成前置专项，现进入 [R10 L2 技术合同候选](./DomainHarness_v0.11.3_R10_L2_SEMANTIC_INTERACTION.md) 独立设计审核；未冻结 L2、未实施。R7 原受审 PRD 内待审措辞以及下方早期状态均为历史快照；不表示 .3 源码已实现或 R65 资格扩大。
 
 ## R65 · 0.11.2 内部阶段完成（2026-11-25）
 
@@ -170,7 +170,7 @@ NODE_MINIMUM=22.12.0
 | **0.11.0** | [#1564](https://github.com/kaicreator-mm/domain-harness/issues/1564) | Foundation | Stage-0 accepted; internal only |
 | **0.11.1** | [#1605](https://github.com/kaicreator-mm/domain-harness/issues/1605) | Task Execution | R27 Product/L1/L2 ACCEPT_SCOPED，T11–T14 合入，#1605/#1608 已关闭；内部阶段完成 |
 | **0.11.2** | [#1612](https://github.com/kaicreator-mm/domain-harness/issues/1612) | Domain Intelligence + Authorized Action | R25 Product/L1 scope FROZEN，L2 design admitted，源码/CI/功能验收未开始 |
-| **0.11.3** | [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | Semantic Interaction | R9 L1 FROZEN_SCOPE；[#1724](https://github.com/kaicreator-mm/domain-harness/issues/1724) 前置专项，L2 ON_HOLD、implementation NOT_STARTED |
+| **0.11.3** | [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) | Semantic Interaction | R9 L1 FROZEN_SCOPE；[#1724](https://github.com/kaicreator-mm/domain-harness/issues/1724) COMPLETED_SCOPED；[R10 L2](./DomainHarness_v0.11.3_R10_L2_SEMANTIC_INTERACTION.md) CANDIDATE_PENDING_REVIEW、implementation NOT_STARTED |
 | **0.11.4** | [#1614](https://github.com/kaicreator-mm/domain-harness/issues/1614) | Authorized Action historical transfer index | 全部原内容/AC 已按 R25 Product/L1 归属 #1612，不单独启动独立版本实现；号保留 |
 | **0.11.5** | [#1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) | Bounded Reasoning | Scope assigned, Product/L2/implementation pending |
 | **0.11.6** | [#1616](https://github.com/kaicreator-mm/domain-harness/issues/1616) | Durable Execution | Scope assigned, Product/L2/implementation pending |
