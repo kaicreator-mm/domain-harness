@@ -129,7 +129,7 @@ export function scheduleInteractively(limits:WorkflowLimits, input:ScheduleInput
   const interaction=new InteractionElement({onPrompt:p=>{lastPrompt=p;return options.onPrompt?.(p,interaction);}});
   const result=runInteractiveRecognitionHandling<State,Intent,ScheduleResult>(interaction,limits,{choice:{},round:0},decide,async(intent,scope)=>{
     if(scope.signal.aborted)return stop('REJECT','CANCELLED');
-    const first=await new WorkshopElement(solver,intent.policy).runIn(scope.root,facts.tasks);
+    const first=await new WorkshopElement(solver,intent.policy).runIn(scope.root,facts.tasks,scope.signal);
     if(first.status!=='COMPLETE')return first;
     if(!options.review)return ok({goal:intent.goal,plan:first.value});
     // Explicitly requested review of a computed proposal, not a mandatory repeated confirmation.
@@ -137,7 +137,7 @@ export function scheduleInteractively(limits:WorkflowLimits, input:ScheduleInput
     if(next.status!=='COMPLETE')return next;
     if(scope.signal.aborted)return stop('REJECT','CANCELLED');
     if(next.value.policy===intent.policy)return ok({goal:next.value.goal,plan:first.value});
-    const revised=await new WorkshopElement(solver,next.value.policy).runIn(scope.root,facts.tasks);
+    const revised=await new WorkshopElement(solver,next.value.policy).runIn(scope.root,facts.tasks,scope.signal);
     if(revised.status!=='COMPLETE')return revised;
     return ok({goal:next.value.goal,plan:revised.value,previous:first.value});
   });
