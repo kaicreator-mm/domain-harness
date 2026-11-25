@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { CliElement, InteractionElement, StandardWorkflowSession } from '@kaicreator/domain-harness';
 import type { InteractionPrompt } from '@kaicreator/domain-harness';
-import { VideoElement, policy, policyV2, FixityElement } from './media.js';
+import { VideoElement, policy, policyV2, FixityElement, ImageElement } from './media.js';
 import { ArchiveElement, type Asset, type Result } from './archive.js';
 import { CatalogElement } from './catalog.js';
 import { RegistrationElement } from './client.js';
@@ -85,6 +85,28 @@ export async function verifyMediaInteraction(){
     const registerOnly=start('single','归档 photo-a video-b',limits(28,33),{readback:false});complete(await registerOnly.result);assert.equal(registerOnly.observed()?.readbackSkipped,'NOT_REQUESTED');
     const beforeRead=reads;const only=registerOnly.observed()!;for(const l of [limits(0,2,0),limits(1,1,0)])assert.equal((await new StandardWorkflowSession(l).run(r=>client.readbackIn(r,only.tenant,only.asset))).status,'FAILED');assert.equal(reads,beforeRead);
     complete(await new StandardWorkflowSession(limits(1,2,0)).run(r=>client.readbackIn(r,only.tenant,only.asset)));assert.equal(reads,beforeRead+1);
+    // The reverse partial input must preserve its confirmed second file and exclude the same content.
+    let reversePrompts=0;const reverseOptions:Parameters<typeof archiveInteractively>[6]={onPrompt(p,e){reversePrompts++;assert.equal(p.decisionKey,'first');const field=p.fields[0]!;assert.equal(field.kind,'choice');if(field.kind==='choice')assert.deepEqual(field.options.map(x=>x.id),['photo-a','photo-c']);assert.equal(e.submit({...envelope(p),action:'submit',values:{first:'video-b'}}).accepted,false);assert.equal(e.submit({...envelope(p),action:'submit',values:{first:'photo-a'}}).accepted,true);}};
+    const reverseBefore=[registers,reads,ownerCalls];const reverse=start('reverse',{second:'video-b'},limits(34,39),reverseOptions);
+    const reverseReceipt=complete(await reverse.result);assert.equal(reversePrompts,1);assert.equal(reverseReceipt.original,zero.original);assert.equal(reverseReceipt.derivative,zero.derivative);await verifyStored('reverse',reverse.observed()!.asset);
+    assert.deepEqual([registers,reads,ownerCalls],reverseBefore.map(n=>n+1));
+    const beforeReverseShort=[registers,reads,ownerCalls];for(const l of [limits(33,39),limits(34,38),limits(34,39,1)]){assert.equal((await start('reverse-short',{second:'video-b'},l,reverseOptions).result).status,'FAILED');assert.deepEqual([registers,reads,ownerCalls],beforeReverseShort);assert.equal(catalog.count('reverse-short'),0);}
+    const movieBytes=await readFile(movie);let changedSecond:Promise<void>|undefined;
+    try{const altered=start('reverse-changed',{second:'video-b'},limits(34,39),{onPrompt(p,e){changedSecond=writeFile(movie,Buffer.from('changed'));void changedSecond.then(()=>e.submit({...envelope(p),action:'submit',values:{first:'photo-a'}}));}});assert.equal((await altered.result).status,'UNKNOWN');await changedSecond;assert.deepEqual([registers,reads,ownerCalls],beforeReverseShort);}
+    finally{await writeFile(movie,movieBytes);}
+    // Observe actual Sharp boundaries. No new professional action after cancellation; entered conversion drains.
+    const inspect=ImageElement.prototype.inspect,verifyImage=ImageElement.prototype.verify,derive=ImageElement.prototype.derive;
+    for(const phase of ['evidence','metadata','entered'] as const){
+      let active:ReturnType<typeof archiveInteractively>|undefined,cancelled=false,after=0,entered=0,settled=0;
+      const cancel=()=>{cancelled=true;active!.interaction.cancel();};
+      try{
+        ImageElement.prototype.inspect=async function(path){if(cancelled)after++;const info=await inspect.call(this,path);if(!cancelled&&phase==='metadata'&&path.includes('archive-')&&path.includes('original-'))cancel();return info;};
+        ImageElement.prototype.verify=async function(path){if(cancelled)after++;await verifyImage.call(this,path);if(!cancelled&&phase==='evidence')cancel();};
+        ImageElement.prototype.derive=async function(...args){if(cancelled)after++;entered++;const result=derive.apply(this,args);if(!cancelled&&phase==='entered')cancel();await result;settled++;};
+        active=start('cancel-'+phase,{first:'photo-a',second:'photo-c'},limits(40,50));
+        const result=await active.result;assert.equal(result.status,'REJECT');assert.ok(cancelled);assert.equal(after,0);assert.equal(entered,phase==='entered'?1:0);assert.equal(settled,entered);assert.equal(active.proposals().length,0);assert.equal(active.observed(),undefined);assert.deepEqual([registers,reads,ownerCalls],beforeReverseShort);assert.equal(catalog.count('cancel-'+phase),0);
+      }finally{ImageElement.prototype.inspect=inspect;ImageElement.prototype.verify=verifyImage;ImageElement.prototype.derive=derive;}
+    }
     assert.equal((await readdir(root)).filter(n=>n.startsWith('archive-')).length,0);
     console.log(JSON.stringify({status:'MEDIA_INTERACTION_PASS',fixedPrompts,semanticPrompts:prompted,completePrompts:0,revisionPrompts,registers,reads,ownerCalls,realHost:true,lostAckRecovered:true,stagingClean:true,exactAndShort:true}));
   }finally{proxy.closeAllConnections();await new Promise<void>(resolve=>proxy.close(()=>resolve()));if(host&&host.exitCode===null){const done=once(host,'exit');host.kill();await done;}catalog.close();await rm(root,{recursive:true,force:true});}
