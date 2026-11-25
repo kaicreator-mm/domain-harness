@@ -1,6 +1,6 @@
 # DomainHarness · 唯一规范目录
 
-> 设计基线：**Language-Native Domain SDK**；Owner 决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。这是唯一多文件规范，人和 Agent 读同一正文。**设计已确认；0.11.2 已按 R65 限定验收并合入版本列车，0.11.3 Product/L1 与修订 L2 已按 R9/R25 冻结；T30/T31A/B 已验收合入，T31C Decision 源码候选待审，产品验收尚未完成。** 详见状态索引；新原则 CORE-13/14、QA-09 已按 R8 接受并合入。
+> 设计基线：**Language-Native Domain SDK**；Owner 决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。这是唯一多文件规范，人和 Agent 读同一正文。**设计已确认；0.11.2 已按 R65 限定验收并合入版本列车，0.11.3 Product/L1 与修订 L2 已按 R9/R25 冻结；T30/T31A/B/C 已验收合入，T31D Candidates 源码候选待审，产品验收尚未完成。** 详见状态索引；新原则 CORE-13/14、QA-09 已按 R8 接受并合入。
 
 ## 阅读路径
 
@@ -14,7 +14,7 @@
 | [core.md](./core.md) | CORE-01..14 语言中立的职责和产品不变量 |
 | [typescript-profile.md](./typescript-profile.md) | TS-01..08 ESM/Module/Class/Function、静态元数据、原生依赖、组合、生命周期 |
 | [element-package.md](./element-package.md) | EL-01..08 Package 插件、Element/Function、Standard/Business 与组合 |
-| [lifecycle-workflow.md](./lifecycle-workflow.md) | LIFE-01..16（16 为 T31C 候选）Order、可选 Init/Exit、关闭并发、Actor done/error/stopped、Workflow/Reader 保留验收、语义交互、证据及决策组织 |
+| [lifecycle-workflow.md](./lifecycle-workflow.md) | LIFE-01..17（17 为 T31D 候选）Order、可选 Init/Exit、关闭并发、Actor done/error/stopped、Workflow/Reader 保留验收、语义交互、证据、决策及候选组织 |
 | [composition-trust.md](./composition-trust.md) | GEN-01..08 生成期正确性、静态组合、npm 交付、模块 Function 与 DIS 领域合同边界 |
 | [architecture.md](./architecture.md) | ARCH-01..09 SDK/KDP/Standard/Business 拓扑、禁止重复系统 |
 | [identity-naming.md](./identity-naming.md) | ID-01..06 身份、代码元数据、命名 |
