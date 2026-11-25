@@ -7,7 +7,7 @@ type Maybe<T> = T | Promise<T>;
 
 /** 同根识别兼分析、必要澄清、处理；复杂业务仍可直接组合原 InteractionScope。 */
 export function runInteractiveRecognitionHandling<S, I, O>(interaction: InteractionElement, limits: WorkflowLimits, initial: S,
-  decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext) => Maybe<Outcome<InteractionDecision<S, I>>>,
+  decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>,
   handle: (intent: I, scope: InteractionScope) => Maybe<Outcome<O>>): Promise<Outcome<O>> {
   return interaction.run(limits, async scope => {
     const recognized = await scope.resolve(initial, decide);
