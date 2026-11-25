@@ -30,6 +30,7 @@
 | --- | --- |
 | 生命周期 | `CorePackageMetadata`、`DomainAppContext`、`LifecycleInitContext`、`PackageInitElement`、`StaticCorePackage`、`LifecycleLogRecord`、`LifecycleLogger` |
 | Workflow | `StandardWorkflowOutcome`、`WorkflowLimits`、`WorkflowRoutes` |
+| Interaction | `InteractionDecision`、`InteractionScope`、`InteractionPromptSpec`、`InteractionPrompt`、`InteractionField`、`InteractionCandidate`、`InteractionResponse`、`InteractionEvent`、`InteractionRecord`、`InteractionSubmitResult` |
 | JSON/YAML | `StandardJsonValue`、`StandardFileOutcome` |
 | Bounded Query | `BoundedQueryLimits`、`BoundedQueryTruncationReason`、`BoundedQueryResult` |
 | SQLite | `SQLiteScalar`、`SQLiteNonThenable`、`SQLiteTransaction`、`SQLiteDatabaseOptions`、`SQLiteErrorCode`、`SQLiteFailureOrigin`、`SQLiteTerminalFailureDetails` |
@@ -45,11 +46,11 @@ SDK 直接运行依赖只有 `xstate@5.33.2`、`yaml@2.9.1` 与 `@photostructure
 
 安装的是单一 SDK；先检查实际 `node_modules/@kaicreator/domain-harness/package.json`、本 README 和公开 `dist/index.d.ts`。使用根入口，不需要 Forge、额外生成器、特殊 DSL 或第二个 Runtime。
 
-本 README 的配套规范快照：`e54dcad2b735e7d2e309c0551fc24ade11c43e1d`（0.11.2 已交付 SDK、R20 前置专项、T30 已合入及 T31 交互候选；该快照是导航依据，不是当前 tarball 的源码运行证书）。以下为不可变 Git 提交链接，而非浮动分支：
+本 README 的配套规范快照：`a4b06b42e3707126955cfb545875a90802657887`（0.11.2 已交付 SDK、R20 前置专项、T30 已合入及 T31 交互候选；该快照是导航依据，不是当前 tarball 的源码运行证书）。以下为不可变 Git 提交链接，而非浮动分支：
 
-1. [权威规范目录](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/docs/specs/domain-harness/README.md) → [核心原则 CORE-01..14](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/docs/specs/domain-harness/core.md) → [TypeScript Profile](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/docs/specs/domain-harness/typescript-profile.md)。
-2. [Agent Skill](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/.agents/skills/domain-harness-spec/SKILL.md) 与 [需求驱动应用资格实践](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/.agents/skills/domain-harness-spec/references/application-qualification.md)；按需读 [Element/Package](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/docs/specs/domain-harness/element-package.md)、[Lifecycle/Workflow](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/docs/specs/domain-harness/lifecycle-workflow.md)、[QA](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/docs/specs/domain-harness/engineering-quality.md)。
-3. [真实原生应用](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/examples/native-domain-app/main.mjs)、[0.11.2 领域应用（R69/R71 历史，R72/R73 最终裁决及 S04 迁移说明）](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/examples/qualification/README.md)、[状态与验收证据](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/docs/specs/domain-harness/status-and-decisions.md)。
+1. [权威规范目录](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/README.md) → [核心原则 CORE-01..14](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/core.md) → [TypeScript Profile](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/typescript-profile.md)。
+2. [Agent Skill](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/.agents/skills/domain-harness-spec/SKILL.md) 与 [需求驱动应用资格实践](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/.agents/skills/domain-harness-spec/references/application-qualification.md)；按需读 [Element/Package](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/element-package.md)、[Lifecycle/Workflow](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/lifecycle-workflow.md)、[QA](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/engineering-quality.md)。
+3. [真实原生应用](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/examples/native-domain-app/main.mjs)、[0.11.2 领域应用（R69/R71 历史，R72/R73 最终裁决及 S04 迁移说明）](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/examples/qualification/README.md)、[状态与验收证据](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/docs/specs/domain-harness/status-and-decisions.md)。
 
 仓库可能需要授权访问。离线时本 README 与安装的声明仍可用于已公开 API 的基本消费；完整规范和 Skill 不在当前包内，不能把摘要当完整规范或假定已读。需要规范生成/审核时取得匹配快照（可使用已授权 Git checkout）；不要切换到未知的新分支来猜测 API。后续 SDK 改变规范或公开合同，应同步更新此固定快照与 API 文档，保留证据归属。
 
@@ -180,7 +181,7 @@ const outcome = await runRecognitionHandling(
 
 以上为调用形状，`request`、`recognize`、`handle` 由应用定义。每次调用内部只创建一个 `StandardWorkflowSession`；两个静态 child(0) 各调用一次 `invokeOutcome`。完整路径 2 calls / 5 steps / 1 depth；识别任何非 COMPLETE 终态原样返回，不调用处理；处理终态亦不二次包装。额度按既有逐次预留，识别可能在处理额度不足时已经执行，**不是全业务预算预检**，因此需要全阶段先验额度的业务仍自行检查。异常保留既有脱敏 FAILED 语义；真实授权、命令身份、receipt/readback、UNKNOWN、领域证据仍由应用负责。ASK/WAIT 不自动恢复；复杂分支、并行、额外 child、Hook、多轮 Interaction 直接复用 Session/Context 等现有机制，不强制使用此函数。
 
-[五个实际迁移模块及既有业务验收范围](https://github.com/kaicreator-mm/domain-harness/blob/e54dcad2b735e7d2e309c0551fc24ade11c43e1d/examples/native-domain-app/README.md)：维修报价、AQI、图书目录、水硬度和库存 Reservation。无需重复生成固定双角色执行组合；保留真实领域类型、知识、规则、权威 Host 和持久账本。新工件完整验收仍由 #1724 记录，不扩张 R65 历史证据。
+[五个实际迁移模块及既有业务验收范围](https://github.com/kaicreator-mm/domain-harness/blob/a4b06b42e3707126955cfb545875a90802657887/examples/native-domain-app/README.md)：维修报价、AQI、图书目录、水硬度和库存 Reservation。无需重复生成固定双角色执行组合；保留真实领域类型、知识、规则、权威 Host 和持久账本。新工件完整验收仍由 #1724 记录，不扩张 R65 历史证据。
 
 ## T30 · 同根剩余预算查询（.1 归属，#1731）
 
@@ -234,7 +235,7 @@ const result = await interaction.run(
 // COMPLETE value=4；真实应用应独立验证其专业结果。
 ```
 
-**语义协议：** field kind 支持 string、text、file（引用，非文件读取）、number、boolean、choice、multi-choice。字符串长度、数值上下界、required（字段存在；非空用 minLength）、单/多选 ID 校验；choice/multi-choice 必须显式 completeness=complete/incomplete，option 可含 reason/scope/recommended，comparison cells 以选项 ID 为 key，prefill={value,source} 仅提示。submit 需完整必填 values；revise 可用当前字段的非空部分 values 或 text；text 需非空文本；no-fit/reject/cancel 无值，必须由当前 actions 允许。ACK accepted 仅捕获，不是 COMPLETE。prompt/response 单份 UTF-8 JSON ≤64KiB、字段+选项≤256、节点≤4096、深度≤16；返回数据深冻结，记录对象无继承原型，请用 Object.hasOwn/普通字段访问。外部 HTTP 原始大小与速率由宿主管理。禁止把密钥、真实批准令牌或任意代码当语义数据。
+**语义协议：** field kind 支持 string、text、file（引用，非文件读取）、number、boolean、choice、multi-choice。字符串长度、数值上下界、required（字段存在；非空用 minLength）、单/多选 ID 校验；choice/multi-choice 必须显式 completeness=complete/incomplete，option 可含 reason/scope/recommended，comparison cells 以选项 ID 为 key，prefill={value,source} 仅提示。submit 需完整必填 values；revise 可用当前字段的非空部分 values 或 text；text 需非空文本；no-fit/reject/cancel 无值，必须由当前 actions 允许。只有 submit 动作且必填单选/多选没有候选或必填 file 的 maxLength=0 时，发布前返回 FAILED/INTERACTION_INVALID_PROMPT，不建立等待或扣等待额度；显式 no-fit 等替代动作及合法可选空字段仍可用。此为已知结构性矛盾检查，不证明领域约束可满足。ACK accepted 仅捕获，不是 COMPLETE。prompt/response 单份 UTF-8 JSON ≤64KiB、字段+选项≤256、节点≤4096、深度≤16；返回数据深冻结，记录对象无继承原型，请用 Object.hasOwn/普通字段访问。外部 HTTP 原始大小与速率由宿主管理。禁止把密钥、真实批准令牌或任意代码当语义数据。
 
 **执行：** 一次实例一次 run；每轮 decide 与 wait 各占1call/1step，root 启动1step。resolve 可在同一次 run 后续再次调用但不得并发；ready 的业务类型由泛型保持，不需要多余最终确认。InteractionEvent.records 的 valid 表示表达未失效，不是授权；revise 使旧表达失效，同 key 替换，业务可返回 invalidate 的 key。业务重新验证事实和必要确认。current 返回当下可响应的 prompt，submit 校验 intentId/revision/decisionKey；跨意图/旧轮/无效输入不执行领域回调。onPrompt 同步通知必须返回 undefined（即使 TS void 允许 async）；异步返回或抛错撤销等待，已捕获响应不推进。
 
