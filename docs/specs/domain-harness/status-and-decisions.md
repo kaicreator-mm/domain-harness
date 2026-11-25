@@ -2,7 +2,12 @@
 
 > [权威目录](./README.md) · Owner 现行新架构决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。本文件同时保留 R151 初审 REWORK 与后续 R160 通过的时间顺序；历史状态不得覆盖新收据。
 
-## R39 · T31E 已接受、T31F 候选
+## R48 · SDK 组件封装与同一取消信号候选
+
+- [R42](https://github.com/kaicreator-mm/domain-harness/issues/1744#issuecomment-7161393465) T31F #1744 正式关闭，R41 0/0/0、CI3204 受审HEAD成功，train 7a339d4c1329f7dbfc2814dc94cbaea3452720f7。T30/A–F 已限定合入，不等于产品验收。
+- [R47](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7162543245) 整体需求分析：T32 #1746/T33 #1747 两独审 REWORK，新增媒体取消实际反例。#1750 R48 真实消费驱动有限SDK封装与取消接线候选（LIFE-19A/QA-09A）；T32/T33 整改待独审，T34 HOLD，13产品Oracle尚未最终通过。保留冻结L1/L2，未发布。
+
+## R39 · T31E 已接受、T31F 候选（历史）
 
 - [R39](https://github.com/kaicreator-mm/domain-harness/issues/1742#issuecomment-7160964099) T31E #1742 已关闭，R38 0/0/0、CI3203受审HEAD成功，#1743 合入 7910381e671bbc93b915481a49ed1fa9d8833574。T31F #1744 同根识别/处理源码候选（LIFE-19）待独立审核及完整适用验证；32–35依赖待准入；13产品Oracle NOT_RUN。未发布。
 

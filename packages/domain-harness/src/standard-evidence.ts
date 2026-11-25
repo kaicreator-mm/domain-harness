@@ -1,3 +1,4 @@
+import { dense, validLimit, dependencyOrder } from './semantic-data.js';
 /** 局部意图证据的来源类别；推荐只作为提案，默认需显式许可。 */
 export type EvidenceOrigin = 'authority' | 'user' | 'derived' | 'default' | 'recommendation';
 export type EvidenceObservation<K extends string, V> = Readonly<{
@@ -33,15 +34,9 @@ const MAX_ITEMS = 4096;
 const MAX_DEPENDENCIES = 16384;
 const origins: readonly EvidenceOrigin[] = ['authority', 'user', 'derived', 'default', 'recommendation'];
 const failure = (reason: Failure['reason']): Failure => Object.freeze({ complete: false, reason });
-const validLimit = (n: number, max: number): boolean => Number.isSafeInteger(n) && n >= 0 && n <= max;
 const nonempty = (s: string): boolean => typeof s === 'string' && s.trim().length > 0;
 const distinct = (xs: readonly unknown[]): boolean => new Set(xs).size === xs.length;
 
-/** 数组长度已受限；逐个检查自有索引，不能使用跳过空洞的 some/every。 */
-function dense(xs: readonly unknown[]): boolean {
-  for (let i = 0; i < xs.length; i++) if (!Object.hasOwn(xs, i)) return false;
-  return true;
-}
 
 /** 证据值由可信域提供且保持不可变；复制冻结元数据，不复制任意业务对象。 */
 function snapshot<K extends string, V>(item: EvidenceObservation<K, V>): EvidenceObservation<K, V> {
@@ -134,16 +129,8 @@ export function invalidateEvidence<K extends string>(keys: readonly K[], changed
   }
   const stale = new Set(changed);
   if (changed.length > 0) for (const key of keys) if (!declared.has(key)) stale.add(key);
-  const queue = keys.filter(key => indegree.get(key) === 0);
-  for (let i = 0; i < queue.length; i++) {
-    const key = queue[i]!;
-    for (const child of children.get(key)!) {
-      if (stale.has(key)) stale.add(child);
-      const remaining = indegree.get(child)! - 1;
-      indegree.set(child, remaining);
-      if (remaining === 0) queue.push(child);
-    }
-  }
-  if (queue.length !== keys.length) return failure('INVALID_DEPENDENCY');
+  const order = dependencyOrder(keys, children, indegree);
+  if (order === undefined) return failure('INVALID_DEPENDENCY');
+  for (const key of order) if (stale.has(key)) for (const child of children.get(key)!) stale.add(child);
   return Object.freeze({ complete: true, stale: Object.freeze(keys.filter(key => stale.has(key))), retained: Object.freeze(keys.filter(key => !stale.has(key))) });
 }

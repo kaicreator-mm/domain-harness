@@ -1,3 +1,4 @@
+import { opaqueId as id } from './semantic-data.js';
 /** 语义交互只传输有界 JSON 数据，不解释领域规则或可执行代码。 */
 export interface InteractionCandidate {
   readonly id: string;
@@ -65,7 +66,6 @@ function keys(value: unknown, allowed: readonly string[]): Record<string, unknow
   return value;
 }
 function str(value: unknown): value is string { return typeof value === 'string' && value.trim().length > 0; }
-function id(value: unknown): value is string { return typeof value === 'string' && value !== 'constructor' && value !== 'prototype' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/u.test(value); }
 function finite(value: unknown): value is number { return typeof value === 'number' && Number.isFinite(value); }
 function size(value: unknown): value is number { return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= MAX_BYTES; }
 function list(value: unknown): unknown[] { if (!Array.isArray(value)) return invalid(); return value as unknown[]; }

@@ -1,3 +1,4 @@
+import { dense } from './semantic-data.js';
 import { types } from 'node:util';
 import { makePrompt, readResponse, responseData } from './interaction-protocol.js';
 import type { InteractionEvent, InteractionField, InteractionPrompt, InteractionPromptSpec, InteractionResponse } from './interaction-protocol.js';
@@ -28,10 +29,6 @@ export type ClarificationResponse<E extends string> = Readonly<{ status: 'failed
 
 const previewId = '00000000-0000-0000-0000-000000000000';
 const failure = (reason: Extract<ClarificationPreparation<string>, { status: 'failed' }>['reason']) => Object.freeze({ status: 'failed' as const, reason });
-function dense(xs: readonly unknown[]): boolean {
-  for (let i = 0; i < xs.length; i++) if (!Object.hasOwn(xs, i)) return false;
-  return true;
-}
 function choice(field: InteractionField): field is Choice { return field.kind === 'choice' || field.kind === 'multi-choice'; }
 function currentChoice(field: Choice, value: Value): boolean {
   const has = (id: unknown) => typeof id === 'string' && field.options.some(option => option.id === id);

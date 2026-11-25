@@ -14,7 +14,7 @@ export type InteractionDecision<S, I> =
 export interface InteractionScope {
   readonly root: NativeWorkflowContext;
   readonly signal: AbortSignal;
-  resolve<S, I>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext) => Maybe<Outcome<InteractionDecision<S, I>>>): Promise<Outcome<I>>;
+  resolve<S, I>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>): Promise<Outcome<I>>;
   step<T>(action: () => Maybe<Outcome<T>>): Promise<Outcome<T>>;
 }
 function stop(status: 'REJECT' | 'FAILED', code: string): Outcome<never> {
@@ -98,7 +98,7 @@ export class InteractionElement {
     const records = Object.freeze([...this.#records]);
     return response ? Object.freeze({ kind: 'response', response, records }) : Object.freeze({ kind: 'initial', records });
   }
-  async #resolve<S, I>(root: NativeWorkflowContext, initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext) => Maybe<Outcome<InteractionDecision<S, I>>>): Promise<Outcome<I>> {
+  async #resolve<S, I>(root: NativeWorkflowContext, initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>): Promise<Outcome<I>> {
     if (this.#phase !== 'running') return stop('FAILED', 'INTERACTION_NOT_RUNNING');
     if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
     if (this.#resolving) return stop('FAILED', 'INTERACTION_RESOLVE_ACTIVE');
@@ -107,7 +107,7 @@ export class InteractionElement {
       let state = initial, event = this.#event();
       for (;;) {
         if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
-        const result = await root.invokeOutcome(() => decide(state, event, root));
+        const result = await root.invokeOutcome(() => decide(state, event, root, this.#abort.signal));
         if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
         if (result.status !== 'COMPLETE') return result;
         const decision = result.value;
@@ -146,7 +146,7 @@ export class InteractionElement {
       return await new StandardWorkflowSession(limits).run(async root => {
         const scope: InteractionScope = Object.freeze({
           root, signal: this.#abort.signal,
-          resolve: <S, I>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext) => Maybe<Outcome<InteractionDecision<S, I>>>) =>
+          resolve: <S, I>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I>>>) =>
             this.#track(this.#resolve(root, initial, decide)),
           step: <R>(action: () => Maybe<Outcome<R>>) => {
             if (this.#phase !== 'running') return Promise.resolve(stop('FAILED', 'INTERACTION_NOT_RUNNING'));

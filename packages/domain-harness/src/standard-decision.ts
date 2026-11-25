@@ -1,3 +1,4 @@
+import { dense, validLimit, dependencyOrder } from './semantic-data.js';
 /** 当前领域判断，不将未知或冲突当成否定。 */
 export type DecisionCondition = 'yes' | 'no' | 'unknown' | 'conflict';
 export interface DecisionDescription<K extends string> {
@@ -18,13 +19,8 @@ export type DecisionSelection<K extends string> = Readonly<{ complete: false; re
   (Readonly<{ complete: true; rows: readonly Row<K>[] }> & (Readonly<{ status: 'next'; key: K }> |
     Readonly<{ status: 'ready' | 'unresolved' | 'blocked' | 'conflict' }>));
 
-const validLimit = (n: number, max: number): boolean => Number.isSafeInteger(n) && n >= 0 && n <= max;
 const validCondition = (value: DecisionCondition): boolean => ['yes', 'no', 'unknown', 'conflict'].includes(value);
 const failure = (reason: Extract<DecisionSelection<string>, { complete: false }>['reason']) => Object.freeze({ complete: false as const, reason });
-function dense(xs: readonly unknown[]): boolean {
-  for (let i = 0; i < xs.length; i++) if (!Object.hasOwn(xs, i)) return false;
-  return true;
-}
 
 /** 根据当前证据的领域判断选择必要决策；不执行领域规则、工作流或外部操作。 */
 export function selectNextDecision<K extends string>(decisions: readonly DecisionDescription<K>[],
@@ -48,11 +44,11 @@ export function selectNextDecision<K extends string>(decisions: readonly Decisio
     indegree.set(d.key, d.dependsOn.length);
     for (const parent of d.dependsOn) children.get(parent)!.push(d.key);
   }
-  const queue = decisions.filter(d => indegree.get(d.key) === 0).map(d => d.key);
+  const order = dependencyOrder(decisions.map(d => d.key), children, indegree);
+  if (order === undefined) return failure('INVALID_DEPENDENCY');
   const available = new Set<K>();
   const evaluated = new Map<K, Row<K>>();
-  for (let i = 0; i < queue.length; i++) {
-    const key = queue[i]!;
+  for (const key of order) {
     const d = byKey.get(key)!;
     const blockedBy = Object.freeze(d.dependsOn.filter(parent => !available.has(parent)));
     const row = (disposition: Row<K>['disposition'], reason: Row<K>['reason']): Row<K> => Object.freeze({ key, disposition, reason, blockedBy });
@@ -69,13 +65,7 @@ export function selectNextDecision<K extends string>(decisions: readonly Decisio
     else if (d.satisfied === 'yes') { current = row('satisfied', 'SATISFIED'); available.add(key); }
     else current = row('eligible', 'NEEDS_DECISION');
     evaluated.set(key, current);
-    for (const child of children.get(key)!) {
-      const remaining = indegree.get(child)! - 1;
-      indegree.set(child, remaining);
-      if (remaining === 0) queue.push(child);
-    }
   }
-  if (queue.length !== decisions.length) return failure('INVALID_DEPENDENCY');
   const rows = Object.freeze(decisions.map(d => evaluated.get(d.key)!));
   let best: DecisionDescription<K> | undefined;
   for (const d of decisions) {
