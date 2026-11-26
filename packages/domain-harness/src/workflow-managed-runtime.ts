@@ -10,7 +10,7 @@ import type {
 import {
   EVENT_SCAN_WORK, frameScanWork, knowledgeScanWork, WorkflowClock,
 } from './workflow-resource-control.js';
-import type { ResourceCharge, ResourceTicket, WorkflowResourceLedger } from './workflow-resource-control.js';
+import type { ResourceCharge, ResourceTicket, WorkflowResourceLedger, LocalWorkQuota } from './workflow-resource-control.js';
 
 type Outcome<T> = StandardWorkflowOutcome<T>;
 type Frame = WorkflowKnowledgeFrame;
@@ -59,6 +59,7 @@ export interface ManagedScope {
   delivery: Delivery;
   diagnostic: boolean;
   readonly parent?: ManagedScope;
+  readonly local?: LocalWorkQuota;
   readonly policy?: LocalFramePolicy;
   bound?: ScopeFrames;
   resolved?: EvidenceResolution<string, unknown>;
@@ -89,17 +90,27 @@ export class ManagedRuntime {
   readonly clock: WorkflowClock;
   readonly #final: WorkflowObservation[] = [];
   #seq = 0;
-  readonly #progress = new Map<string, WorkflowContextView['progress'][number]>();
+  readonly #progress = new Map<string, Map<string, WorkflowContextView['progress'][number]>>();
 
   public sequence(): number { return ++this.#seq; }
-  public canRecordNode(): boolean { return this.#progress.size < 4096; }
-  public progress(): WorkflowContextView['progress'] { return Object.freeze([...this.#progress.values()]); }
+
+  /** 每次尝试预留四条事件，进度槽随实际事件生成；不额外扩大总历史上限。 */
+  public progress(scopeId: string): WorkflowContextView['progress'] {
+    return Object.freeze([...(this.#progress.get(scopeId)?.values() ?? [])]);
+  }
+
   public noteNode(record: Extract<WorkflowObservation, { kind: 'node' }>): void {
     const { instanceId, definitionId } = record.occurrence;
     const state = record.phase === 'enter' ? 'running' : record.acceptance === 'accepted' ? 'accepted'
-      : record.acceptance === 'stale' ? 'stale' : record.effect === 'unknown' ? 'unknown' : 'rejected';
-    this.#progress.set(instanceId, Object.freeze({ instanceId, definitionId, state }));
+      : record.effect === 'unknown' ? 'unknown' : record.acceptance === 'stale' ? 'stale' : 'rejected';
+    const parent = record.parentScopeId ?? record.scopeId;
+    let progress = this.#progress.get(parent);
+    if (!progress) { progress = new Map(); this.#progress.set(parent, progress); }
+    progress.set(instanceId, Object.freeze({ instanceId, definitionId, state }));
     if (record.phase === 'disposition') this.#final.push(record);
+  }
+  public localRemaining(scope: ManagedScope): number {
+    return scope.local === undefined ? this.ledger.remaining().work : this.ledger.localRemaining(scope.local);
   }
   public get criticalFailed(): boolean { return this.#criticalFailed; }
 
@@ -185,14 +196,22 @@ export class ManagedRuntime {
       locals.push({ policy, frame });
     }
     const captured = { root, locals };
-    // 运行中的祖先尝试不能通过新一次调用偷偷换到新的事实版本。
+    // 祖先绑定在接纳时已验证其更早祖先；逐层检查自身绑定与最深的根绑定，避免重复扫描所有前缀。
+    let rootChecked = false;
+    let index = locals.length - 1;
     for (let owner: ManagedScope | undefined = scope; owner !== undefined; owner = owner.parent) {
+      if (owner.policy === undefined) continue;
+      const current = locals[index--];
+      if (!current || current.policy !== owner.policy) return undefined;
       const bound = owner.bound;
       if (!bound) continue;
-      if (!this.same(bound.root, root) || bound.locals.length > locals.length
-        || !bound.locals.every((x, i) => x.policy === locals[i]?.policy && this.same(x.frame, locals[i].frame))) return undefined;
-      const current = locals[bound.locals.length - 1]?.frame ?? root;
-      if (!this.evidenceCurrent(current, owner.resolved)) return undefined;
+      const own = bound.locals.at(-1);
+      if (!own || own.policy !== current.policy || !this.same(own.frame, current.frame)
+        || !this.evidenceCurrent(current.frame, owner.resolved)) return undefined;
+      if (!rootChecked) {
+        if (!this.same(bound.root, root)) return undefined;
+        rootChecked = true;
+      }
     }
     return captured;
   }
@@ -229,7 +248,7 @@ export class ManagedRuntime {
     return true;
   }
 
-  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope):
+  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope, maxLocalWork?: number):
     { scope: ManagedScope } | { code: string } {
     if (!this.available()) return { code: 'WORKFLOW_STOPPED' };
     const owner = {};
@@ -239,17 +258,20 @@ export class ManagedRuntime {
       work: 4 + 3 * EVENT_SCAN_WORK + finalCalls + (completion === undefined
         ? 4 * this.frameChainCost(parent) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost),
       events: 3, activeScopes: 1, terminalReads: reads };
-    const admission = this.ledger.reserve(owner, charge);
+    if (maxLocalWork !== undefined && !valid(maxLocalWork)) return { code: 'WORKFLOW_INVALID_LIMIT' };
+    // 局部额度包含作用域自身准入、所有后代及终止预留；不从根转移或复制实际余额。
+    const local = maxLocalWork === undefined ? parent?.local : this.ledger.local(maxLocalWork, parent?.local);
+    const admission = this.ledger.reserve(owner, charge, local);
     if (!admission.ok) return { code: admission.code };
     return { scope: { id: randomUUID(), ...(parentId === undefined ? {} : { parentId }),
-      owner, ticket: admission.ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }) } };
+      owner, ticket: admission.ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }), ...(local === undefined ? {} : { local }) } };
   }
 
   public reserveCall(scope: ManagedScope, calls: number, units: number):
     { frame: ScopeFrames } | { code: string } {
     if (!this.available()) return { code: 'WORKFLOW_STOPPED' };
     const admission = this.ledger.reserve(scope.owner, { calls, steps: calls,
-      work: units + 4 * calls * this.frameChainCost(scope) });
+      work: units + 4 * calls * this.frameChainCost(scope) }, scope.local);
     if (!admission.ok) return { code: admission.code };
     admission.ticket.close(scope.owner);
     const frame = this.frames(scope);
@@ -267,6 +289,12 @@ export class ManagedRuntime {
   }
 
   public deliver(scope: ManagedScope, record: WorkflowObservation): boolean {
+    // 此处仅序列化经过限定的观察元数据，不读取原生业务值。
+    if (Buffer.byteLength(JSON.stringify(record)) > 65536) {
+      scope.diagnostic = true;
+      if (this.control.evidence?.required) { scope.delivery = 'failed'; this.#criticalFailed = true; }
+      return false;
+    }
     const { observe, evidence } = this.control;
     let requiredOk = true;
     try {
@@ -380,10 +408,10 @@ export class ManagedRuntime {
     const remaining = this.ledger.remaining();
     const view: WorkflowContextView = Object.freeze({ runId: this.runId, scopeId: scope.id,
       goal: policy.goal, stage: 'completion', factRevision: frame.epoch, knowledge: resolution,
-      capabilities: Object.freeze([]), constraints: Object.freeze([]), progress: this.progress(),
+      capabilities: Object.freeze([]), constraints: Object.freeze([]), progress: this.progress(scope.id),
       feedbackRevision: 0, remaining: Object.freeze({ calls: remaining.calls, steps: remaining.steps,
         maxDescendantDepth: depth, work: remaining.work, events: remaining.events,
-        ...this.clock.remaining(), localWork: remaining.work }) });
+        ...this.clock.remaining(), localWork: this.localRemaining(scope) }) });
     try {
       const validated = this.guarded(() => policy.validate(value.value, view));
       if (!isManagedOutcome(validated)) return { result: managedFailure('WORKFLOW_COMPLETION_INVALID') };
