@@ -145,6 +145,15 @@ function afterJoin<T>(result: Result<T>, unjoined: boolean): Result<T> {
 }
 
 const scopeLifetimes = new WeakMap<NativeWorkflowContext, ScopeLifetime>();
+const scopeBorrowers = new WeakMap<NativeWorkflowContext, <T>(depth: number, action: WorkflowHandler<T>, local?: number) => Promise<Result<T>>>();
+
+/** 内部 Region/Actor 入口使用同一借用生命周期；不从 SDK 根导出。 */
+export function borrowWorkflowScope<T>(root: NativeWorkflowContext, maxDescendantDepth: number,
+  action: WorkflowHandler<T>, maxLocalWork?: number): Promise<Result<T>> {
+  const borrow = scopeBorrowers.get(root);
+  return borrow === undefined ? Promise.resolve(managedFailure('WORKFLOW_SCOPE_CLOSED'))
+    : borrow(maxDescendantDepth, action, maxLocalWork);
+}
 
 function scopeLifetime(context: NativeWorkflowContext): ScopeLifetime {
   const lifetime = scopeLifetimes.get(context);
@@ -168,6 +177,7 @@ export class NativeWorkflowContext {
     public readonly depth: number,
   ) {
     scopeLifetimes.set(this, new ScopeLifetime());
+    scopeBorrowers.set(this, (depth, action, local) => this.borrow(depth, action, local));
   }
 
   public get signal(): AbortSignal { return scopeLifetime(this).signal; }
@@ -256,6 +266,10 @@ export class NativeWorkflowContext {
     maxDescendantDepth: number,
     action: WorkflowHandler<T>,
   ): Promise<Result<T>> {
+    return this.borrow(maxDescendantDepth, action);
+  }
+
+  private async borrow<T>(maxDescendantDepth: number, action: WorkflowHandler<T>, maxLocalWork?: number): Promise<Result<T>> {
     const parent = scopeLifetime(this);
     if (!parent.admissible()) return failure('WORKFLOW_SCOPE_CLOSED');
     if (!validLimit(maxDescendantDepth) || (parent.managed && maxDescendantDepth > 2 ** 31 - 1)) return failure('WORKFLOW_INVALID_LIMIT');
@@ -264,10 +278,11 @@ export class NativeWorkflowContext {
     const managed = parent.managed;
     let scope: ManagedScope | undefined;
     if (managed) {
-      const admitted = managed.reserveScope(this.scopeId, undefined, parent.scope);
+      const admitted = managed.reserveScope(this.scopeId, undefined, parent.scope, maxLocalWork);
       if ('code' in admitted) return managedFailure(admitted.code);
       scope = admitted.scope;
     } else {
+      if (maxLocalWork !== undefined) return managedFailure('WORKFLOW_CONTROL_REQUIRED');
       const refused = this.budget.reserve(0, 1);
       if (refused !== undefined) return failure(refused);
     }
