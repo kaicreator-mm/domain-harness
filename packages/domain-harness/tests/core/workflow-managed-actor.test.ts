@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { fromPromise } from 'xstate';
+import { createMachine, fromPromise } from 'xstate';
 import { StandardWorkflowSession, XStateWorkflowElement } from '@kaicreator/domain-harness';
 import type { NativeWorkflowContext, StandardWorkflowOutcome, WorkflowControlOptions, WorkflowCompletionPolicy,
   WorkflowNode, WorkflowNodeOptions, WorkflowObservation } from '@kaicreator/domain-harness';
@@ -121,4 +121,22 @@ test('legacy session cannot start managed actor and async projection rejected be
     maxProjections:2,project:(async()=>null) as never
   }),completion)).status,'COMPLETE');
   assert.equal(inputs,0);
+});
+
+test('managed actual error and stopped snapshots never invoke success mapper', async()=>{
+  for (const kind of ['error','stopped'] as const) {
+    const records:WorkflowObservation[]=[];
+    const s=new StandardWorkflowSession(base,control({observe:r=>{records.push(r);}}));
+    let mapped=0;
+    const logic=createMachine({initial:'working',states:{working:{entry:({self})=>{
+      if(kind==='error')throw Error('private actor error');
+      queueMicrotask(()=>self.stop());
+    }}}});
+    const actor=new XStateWorkflowElement(logic,()=>{mapped++;return ok(1);});
+    const result=await s.run(root=>actor.runIn(()=>undefined,root,{maxProjections:4,project:snap=>snap.status}),completion);
+    assert.notEqual(result.status,'COMPLETE');assert.equal(mapped,0);
+    const actual=records.filter(r=>r.kind==='actor').map(r=>r.detail);
+    assert.ok(actual.includes(kind),JSON.stringify(actual));
+    assert.ok(!JSON.stringify(records).includes('private actor error'));
+  }
 });
