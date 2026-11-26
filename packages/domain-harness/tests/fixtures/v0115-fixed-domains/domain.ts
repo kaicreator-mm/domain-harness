@@ -61,19 +61,23 @@ export function scheduleMetrics(jobs:readonly Job[],starts:readonly number[],dea
 
 const solver=fileURLToPath(new URL('./repair-solver.py',import.meta.url));
 type SolverReply={status:string;solver:string;starts?:number[]};
-export async function solveRepair(jobs:Job[],deadline:number,signal:AbortSignal):Promise<Outcome<Schedule>>{
+type SolverLifecycle = Readonly<{ started: (pid: number) => void; closed: () => void }>;
+export async function solveRepair(jobs:Job[],deadline:number,signal:AbortSignal,lifecycle?:SolverLifecycle):Promise<Outcome<Schedule>>{
   const python=process.env.DH_WITNESS_PYTHON;
   if(!python || signal.aborted) return fail('SOLVER_UNAVAILABLE');
   return new Promise(resolve=>{
     // 子进程属于实际节点；abort 后仍等待 close，而不是仅等待取消通知。
     const proc=spawn(python,[solver,JSON.stringify({jobs,deadline,horizon:fixture.DB.horizon})],
-      {stdio:['ignore','pipe','pipe'],signal,timeout:20000});
+      {stdio:['ignore','pipe','pipe'],signal,timeout:20000,killSignal:'SIGKILL',
+        env:{PATH:process.env.PATH??'',LANG:'C.UTF-8',OPENBLAS_NUM_THREADS:'1',OMP_NUM_THREADS:'1'}});
+    proc.once('spawn',()=>{if(proc.pid!==undefined)lifecycle?.started(proc.pid);});
     let body='',bad=false;
     proc.stdout.setEncoding('utf8');
     proc.stdout.on('data',(chunk:string)=>{if(body.length+chunk.length>65536)bad=true;else if(!bad)body+=chunk;});
     proc.stderr.resume();
     proc.on('error',()=>{bad=true;});
     proc.on('close',code=>{
+      lifecycle?.closed();
       if(bad || code!==0 || signal.aborted){resolve(fail('SOLVER_FAILED'));return;}
       try{
         const r=JSON.parse(body) as SolverReply;
