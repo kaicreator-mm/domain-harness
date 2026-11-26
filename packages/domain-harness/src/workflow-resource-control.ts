@@ -39,7 +39,7 @@ interface LocalBalance {
   readonly parent: LocalWorkQuota | undefined;
   remaining: number;
 }
-interface LocalWorkQuota {
+export interface LocalWorkQuota {
   readonly kind: 'workflow-local-work';
 }
 
