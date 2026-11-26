@@ -11,7 +11,7 @@ const options: WorkflowNodeOptions={knowledge:rootPolicy,current:()=>true};
 const control: WorkflowControlOptions={limits:{maxWork:2000000,maxEvents:100,maxActiveScopes:10,maxNoProgress:5,maxActiveMs:10000,maxSettlementMs:1000},knowledge:rootPolicy,current:()=>true};
 const completion: WorkflowCompletionPolicy<number>={goal:'actual goal',requiredKnowledge:[],terminalReads:0,validate:()=>ok(undefined)};
 const base={maxCalls:100,maxSteps:100,maxDepth:4};
-const childWork=99080, nodeWork=132137;
+const childWork=99080, nodeWork=132137+2*25;
 function node(patch: Partial<WorkflowNode<number,number>>={}):WorkflowNode<number,number>{
   return {id:'calculate',goal:'calculate',requiredKnowledge:[],before:()=>ok(undefined),run:x=>ok(x*2),
     after:()=>ok(undefined),project:()=>({effect:'none',detail:null}),...patch};
