@@ -19,7 +19,7 @@ export const expectedClasses = {
 };
 export const expectedFunctions = ['routeWorkflowOutcome','readJson','readYaml','writeJson','writeYaml',
  'runRecognitionHandling','resolveEvidence','invalidateEvidence','selectNextDecision','prepareCandidates',
- 'runInteractiveRecognitionHandling','createWorkflowSlot'];
+ 'runInteractiveRecognitionHandling','createWorkflowSlot','bindWorkflowFunction','bindWorkflowRegion'];
 export const expectedTypes = [
  'CorePackageMetadata','DomainAppContext','LifecycleInitContext','PackageInitElement','StaticCorePackage','LifecycleLogRecord','LifecycleLogger',
  'StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','WorkflowControlLimits','WorkflowControlOptions','WorkflowOccurrence','WorkflowKnowledgeFrame','WorkflowKnowledgePolicy','WorkflowCompletionPolicy','WorkflowContextView','WorkflowTerminalContext','ModelUsage','WorkflowObservation','WorkflowNode','WorkflowNodeOptions','WorkflowAttempt','WorkflowActorOptions','StandardJsonValue','StandardFileOutcome',
@@ -30,7 +30,7 @@ export const expectedTypes = [
  'InteractionRecord','InteractionResponse','InteractionSubmitResult','InteractionDecision','InteractionScope','EvidenceOrigin','EvidenceObservation',
  'EvidenceRequirement','EvidenceContext','EvidenceResolution','EvidenceDependency','EvidenceInvalidation','DecisionCondition',
  'DecisionDescription','DecisionSelection','CandidateEntry','CandidateSource','CandidateAssessment','CandidateProjection','CandidatePreparation',
- 'ClarificationField','ClarificationPreparation','ClarificationResponse','WorkflowSlot','WorkflowSlotReader','WorkflowSlotWriter',
+ 'ClarificationField','ClarificationPreparation','ClarificationResponse','WorkflowSlot','WorkflowSlotReader','WorkflowSlotWriter','WorkflowSlotBinding','WorkflowNodeProposal','WorkflowEdit','WorkflowRegionProposal','WorkflowRegionLimits','WorkflowRegionView','WorkflowFunctionBinding','WorkflowCapability','WorkflowRegionDefinition',
 ];
 export const expectedSupport = {
  LifecycleInitContext:['appId','enter'],PackageInitElement:['start','[Symbol.asyncDispose]'],StaticCorePackage:['Init','packageMeta'],LifecycleLogger:['error'],
@@ -40,7 +40,7 @@ export const expectedSupport = {
 };
 export const expectedFamilies={
  lifecycle:['KernelLifecycle','CorePackageMetadata','DomainAppContext','LifecycleInitContext','PackageInitElement','StaticCorePackage','LifecycleLogRecord','LifecycleLogger'],
- workflow:['WorkflowElement','XStateWorkflowElement','NativeWorkflowContext','StandardWorkflowSession','routeWorkflowOutcome','runRecognitionHandling','StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','WorkflowControlLimits','WorkflowControlOptions','WorkflowOccurrence','WorkflowKnowledgeFrame','WorkflowKnowledgePolicy','WorkflowCompletionPolicy','WorkflowContextView','WorkflowTerminalContext','ModelUsage','WorkflowObservation','WorkflowNode','WorkflowNodeOptions','WorkflowAttempt','WorkflowActorOptions','createWorkflowSlot','WorkflowSlot','WorkflowSlotReader','WorkflowSlotWriter'],
+ workflow:['WorkflowElement','XStateWorkflowElement','NativeWorkflowContext','StandardWorkflowSession','routeWorkflowOutcome','runRecognitionHandling','StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','WorkflowControlLimits','WorkflowControlOptions','WorkflowOccurrence','WorkflowKnowledgeFrame','WorkflowKnowledgePolicy','WorkflowCompletionPolicy','WorkflowContextView','WorkflowTerminalContext','ModelUsage','WorkflowObservation','WorkflowNode','WorkflowNodeOptions','WorkflowAttempt','WorkflowActorOptions','createWorkflowSlot','bindWorkflowFunction','bindWorkflowRegion','WorkflowSlot','WorkflowSlotReader','WorkflowSlotWriter','WorkflowSlotBinding','WorkflowNodeProposal','WorkflowEdit','WorkflowRegionProposal','WorkflowRegionLimits','WorkflowRegionView','WorkflowFunctionBinding','WorkflowCapability','WorkflowRegionDefinition'],
  'structured-data':['JsonReader','YamlReader','readJson','readYaml','writeJson','writeYaml','StandardJsonValue','StandardFileOutcome'],
  query:['BoundedQueryElement','BoundedQueryLimits','BoundedQueryTruncationReason','BoundedQueryResult','VectorQueryElement','VectorCandidate','VectorQueryOptions','VectorMatch','VectorQueryResult','GraphQueryElement','TypedGraphEdge','GraphQueryLimits','GraphQueryOptions','GraphPath','GraphQueryResult'],
  database:['SQLiteDatabaseElement','SQLiteDatabaseError','SQLiteScalar','SQLiteNonThenable','SQLiteTransaction','SQLiteDatabaseOptions','SQLiteErrorCode','SQLiteFailureOrigin','SQLiteTerminalFailureDetails'],

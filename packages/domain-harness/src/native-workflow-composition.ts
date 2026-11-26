@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ManagedRuntime, isManagedOutcome, managedFailure, snapshotControl, snapshotOutcome } from './workflow-managed-runtime.js';
 import { admitNode, executeNode, safeDetail } from './workflow-managed-node.js';
+import type { BoundNodePreparation } from './workflow-managed-node.js';
 import type { ScopeFrames, ManagedScope } from './workflow-managed-runtime.js';
 import type { WorkflowCompletionPolicy, WorkflowControlOptions, WorkflowObservation, WorkflowNode, WorkflowNodeOptions } from './workflow-managed-contract.js';
 import type { StandardJsonValue } from './standard-files.js';
@@ -188,6 +189,23 @@ function afterJoin<T>(result: Result<T>, unjoined: boolean): Result<T> {
 }
 
 const scopeLifetimes = new WeakMap<NativeWorkflowContext, ScopeLifetime>();
+const boundNodes = new WeakMap<NativeWorkflowContext, <I, O>(definition: WorkflowNode<I, O>, options: WorkflowNodeOptions,
+  binding: BoundNodePreparation<I, O>) => Promise<Result<O>>>();
+
+/** 子区域工厂是同步准备回调，禁止借用其他已捕获作用域重入。 */
+export function guardBoundFactory<T>(root: NativeWorkflowContext, factory: () => Result<T>): Result<T> {
+  const lifetime = scopeLifetime(root);
+  if (!lifetime.admissible() || !lifetime.managed) return managedFailure('WORKFLOW_SCOPE_CLOSED');
+  try { return snapshotOutcome(lifetime.managed.guarded(factory)); }
+  catch { return managedFailure('WORKFLOW_BINDING_INVALID'); }
+}
+
+/** 内部动态能力复用同一受控节点；不增加公开执行入口。 */
+export function executeBoundNode<I, O>(root: NativeWorkflowContext, definition: WorkflowNode<I, O>,
+  options: WorkflowNodeOptions, binding: BoundNodePreparation<I, O>): Promise<Result<O>> {
+  return boundNodes.get(root)?.(definition, options, binding) ?? Promise.resolve(managedFailure('WORKFLOW_SCOPE_CLOSED'));
+}
+
 const scopeBorrowers = new WeakMap<NativeWorkflowContext, <T>(depth: number, action: WorkflowHandler<T>, local?: number, actorProjections?: number) => Promise<Result<T>>>();
 
 /** 内部 Region/Actor 入口使用同一借用生命周期；不从 SDK 根导出。 */
@@ -294,6 +312,7 @@ export class NativeWorkflowContext {
     public readonly depth: number,
   ) {
     scopeLifetimes.set(this, new ScopeLifetime());
+    boundNodes.set(this, (definition, options, binding) => this.runNode(definition, binding.input, options, binding));
     scopeBorrowers.set(this, (depth, action, local, actorProjections) => this.borrow(depth, action, local, actorProjections));
   }
 
@@ -315,11 +334,16 @@ export class NativeWorkflowContext {
 
   /** 同一根任务中的类型化节点尝试；普通固定代码与未来动态结构共用。 */
   public async node<I, O>(definition: WorkflowNode<I, O>, input: I, options: WorkflowNodeOptions): Promise<Result<O>> {
+    return this.runNode(definition, () => ({ status: 'COMPLETE', value: input }), options);
+  }
+
+  private async runNode<I, O>(definition: WorkflowNode<I, O>, input: () => Result<I>, options: WorkflowNodeOptions,
+    binding?: BoundNodePreparation<I, O>): Promise<Result<O>> {
     const parent = scopeLifetime(this);
     if (!parent.admissible() || !parent.managed || !parent.scope) return managedFailure('WORKFLOW_NODE_CONTROL_REQUIRED');
     const runtime = parent.managed;
     try {
-      const admitted = admitNode(runtime, parent.scope, definition, options);
+      const admitted = admitNode(runtime, parent.scope, definition, options, binding);
       if ('code' in admitted) return managedFailure(admitted.code);
       const finish = parent.begin('child');
       const lifetime = new ScopeLifetime(parent, runtime, admitted.scope);

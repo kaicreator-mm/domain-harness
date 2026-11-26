@@ -9,7 +9,7 @@ const ok = <T>(value: T): Outcome<T> => ({ status: 'COMPLETE', value });
 const fail = <T>(code = 'WORKFLOW_SLOT_INVALID'): Outcome<T> => managedFailure(code);
 const issued = new WeakSet<object>();
 const nameValid = (name: unknown): name is string =>
-  typeof name === 'string' && name.trim().length > 0 && Buffer.byteLength(name) <= 128;
+  typeof name === 'string' && name.trim().length > 0 && Buffer.byteLength(name) <= 128 && !name.includes('/');
 
 function sync<T>(callback: () => T): T {
   if (types.isAsyncFunction(callback)) throw Error('WORKFLOW_SLOT_ASYNC');
@@ -69,7 +69,7 @@ export interface SlotEntry extends NativeValue {
 }
 export interface SlotStage<T> { readonly result: T }
 
-function declarations(input: Declarations, max: number): Map<string, WorkflowSlot<unknown>> {
+export function slotDeclarations(input: Declarations, max: number): Map<string, WorkflowSlot<unknown>> {
   if (!valid(max, 2048) || !input || types.isProxy(input)
     || ![Object.prototype, null].includes(Object.getPrototypeOf(input) as object | null)) throw Error('WORKFLOW_SLOT_INVALID');
   const out = new Map<string, WorkflowSlot<unknown>>();
@@ -133,13 +133,30 @@ export class SlotLeaseScope {
       && entry.scope === frame.context.scope && entry.sources.every(s => applicable(s, frame));
   }
 
+  /** 使用节点刚捕获的可信 frame 检查实际输入/暂存结果，不触发用户回调。 */
+  public entriesCurrent(entries: ReadonlyMap<string, SlotEntry>, frame: WorkflowKnowledgeFrame): boolean {
+    if (this.#closed || entries.size > 2048) return false;
+    let links = 0;
+    const checked = new Set<readonly Source[]>();
+    for (const entry of entries.values()) {
+      if (!this.#entries.has(entry) || entry.epoch !== frame.epoch || entry.scope !== frame.context.scope) return false;
+      if (checked.has(entry.sources)) continue;
+      checked.add(entry.sources);
+      for (const source of entry.sources) {
+        if (++links > 16384 || !applicable(source, frame)) return false;
+      }
+    }
+    return true;
+  }
+
   /** 已声明名称与已接纳记录绑定；回调结束即关闭，失败不能被回调吞掉。 */
   public read<T>(declared: Declarations, supplied: ReadonlyMap<string, SlotEntry>, maxBindings: number,
-    callback: (reader: WorkflowSlotReader) => Outcome<T>): Outcome<T> {
+    callback: (reader: WorkflowSlotReader) => Outcome<T>, requireAll = false): Outcome<T> {
     return this.execute(frame => {
-      const names = declarations(declared, maxBindings);
+      const names = slotDeclarations(declared, maxBindings);
       let open = true, failed = false, count = 0, checking = false;
       const seen = new Set<SlotEntry>();
+      const readNames = new Set<string>();
       const reader: WorkflowSlotReader = Object.freeze({
         read: <V>(name: string, slot: WorkflowSlot<V>): Outcome<V> => {
           if (!open || this.#closed) return fail('WORKFLOW_SLOT_CLOSED');
@@ -150,7 +167,7 @@ export class SlotLeaseScope {
             if (names.get(name) !== slot || !entry || !this.usable(entry, slot, frame) || !accepted(slot, entry.value)) {
               failed = true; return fail();
             }
-            seen.add(entry);
+            seen.add(entry); readNames.add(name);
             return ok(entry.value);
           } catch { failed = true; return fail(); }
           finally { checking = false; }
@@ -162,16 +179,16 @@ export class SlotLeaseScope {
         result = snapshotOutcome(sync(() => callback(reader)));
       } finally { open = false; }
       const fresh = this.frame();
-      return failed || !sameFrame(frame, fresh) || [...seen].some(e => !this.usable(e, e.slot, fresh))
+      return failed || (requireAll && readNames.size !== names.size) || !sameFrame(frame, fresh) || [...seen].some(e => !this.usable(e, e.slot, fresh))
         ? fail('WORKFLOW_SLOT_CURRENTNESS') : result;
     });
   }
 
   /** 只暂存输出；每个声明名最多写入一次。失败或过期丢弃整批。 */
   public write<T>(declared: Declarations, maxBindings: number,
-    callback: (writer: WorkflowSlotWriter) => Outcome<T>): Outcome<SlotStage<T>> {
+    callback: (writer: WorkflowSlotWriter) => Outcome<T>, requireAll = false): Outcome<SlotStage<T>> {
     return this.execute(frame => {
-      const names = declarations(declared, maxBindings);
+      const names = slotDeclarations(declared, maxBindings);
       const values = new Map<string, NativeValue>();
       let open = true, failed = false, count = 0, checking = false;
       const writer: WorkflowSlotWriter = Object.freeze({
@@ -192,11 +209,46 @@ export class SlotLeaseScope {
         if (types.isAsyncFunction(callback)) return fail('WORKFLOW_SLOT_ASYNC');
         result = snapshotOutcome(sync(() => callback(writer)));
       } finally { open = false; }
-      if (failed || !sameFrame(frame, this.frame())) return fail('WORKFLOW_SLOT_CURRENTNESS');
+      if (failed || (requireAll && values.size !== names.size) || !sameFrame(frame, this.frame())) return fail('WORKFLOW_SLOT_CURRENTNESS');
       if (result.status !== 'COMPLETE') return result;
       const stage = Object.freeze({ result: result.value });
       this.#stages.set(stage, { frame, values });
       return ok(stage);
+    });
+  }
+
+  /** 从实际已接纳输入和节点解析证据继承结果依赖；候选只由调用方在节点接纳后使用。 */
+  public resultEntries<T>(stage: SlotStage<T>, inputs: ReadonlyMap<string, SlotEntry>,
+    resolution: EvidenceResolution<string, unknown>): Outcome<ReadonlyMap<string, SlotEntry>> {
+    return this.execute(frame => {
+      const staged = this.#stages.get(stage);
+      if (!staged) return fail();
+      this.#stages.delete(stage);
+      if (!sameFrame(staged.frame, frame) || !resolution.complete || resolution.items.length > 4096 || inputs.size > 2048) return fail();
+      const keys = new Set<string>(), sources = new Set<Source>();
+      let links = 0;
+      for (const entry of inputs.values()) {
+        if (!this.usable(entry, entry.slot, frame)) return fail();
+        for (const key of entry.evidenceKeys) { if (++links > 16384) return fail(); keys.add(key); }
+        for (const source of entry.sources) { if (++links > 16384) return fail(); sources.add(source); }
+      }
+      for (const item of resolution.items) {
+        if (item.status !== 'resolved' || !item.evidence.length) return fail();
+        keys.add(item.key);
+        for (const e of item.evidence) {
+          if (++links > 16384 || !applicable(e.source, frame)) return fail();
+          sources.add(e.source);
+        }
+      }
+      const fresh = this.frame();
+      if (!sameFrame(frame, fresh) || [...sources].some(s => !applicable(s, fresh))) return fail();
+      const evidenceKeys = Object.freeze([...keys]), provenance = Object.freeze([...sources]);
+      const out = new Map<string, SlotEntry>();
+      for (const [name, value] of staged.values) {
+        const entry = Object.freeze({ ...value, epoch: frame.epoch, scope: frame.context.scope, evidenceKeys, sources: provenance });
+        this.#entries.add(entry); out.set(name, entry);
+      }
+      return ok(out);
     });
   }
 

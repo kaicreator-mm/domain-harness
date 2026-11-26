@@ -247,12 +247,13 @@ export class ManagedRuntime {
   }
 
   public checkFrames(scope: ManagedScope, captured: ScopeFrames,
-    resolution?: EvidenceResolution<string, unknown>): boolean {
+    resolution?: EvidenceResolution<string, unknown>,
+    validate?: (frame: Frame) => boolean): boolean {
     const now = this.frames(scope);
     if (!now || !this.same(captured.root, now.root) || now.locals.length !== captured.locals.length) return false;
     if (!captured.locals.every((x, i) => x.policy === now.locals[i]?.policy && this.same(x.frame, now.locals[i].frame))) return false;
     const frame = now.locals.at(-1)?.frame ?? now.root;
-    return this.evidenceCurrent(frame, resolution);
+    return this.evidenceCurrent(frame, resolution) && (validate?.(frame) ?? true);
   }
 
   private same(a: Frame, b: Frame): boolean {
