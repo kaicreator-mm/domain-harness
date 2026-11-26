@@ -295,7 +295,7 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
     if (!emit('candidate', result)) rejectIfComplete('WORKFLOW_EVIDENCE_FAILED');
     if (result.status === 'COMPLETE' && (!current() || runtime.criticalFailed)) result = stale();
     if (scope.ticket.event(scope.owner)) {
-      runtime.noteNode(record('disposition', result.status === 'COMPLETE' ? 'accepted' : result.status === 'UNKNOWN' ? 'stale' : 'rejected', result));
+      runtime.noteNode(record('disposition', result.status === 'COMPLETE' ? 'accepted' : result.status === 'UNKNOWN' ? 'stale' : 'rejected', result), scope);
     } else rejectIfComplete('WORKFLOW_EVENT_BUDGET');
     scope.ticket.close(scope.owner);
   }

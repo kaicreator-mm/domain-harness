@@ -1,9 +1,9 @@
 import { types } from 'node:util';
-import { executeBoundNode, guardBoundFactory } from './native-workflow-composition.js';
+import { executeBoundNode, guardBoundFactory, verifyRegionProofs } from './native-workflow-composition.js';
 import type { NativeWorkflowContext } from './native-workflow-composition.js';
 import { managedFailure } from './workflow-managed-runtime.js';
 import { slotDeclarations } from './workflow-slots.js';
-import type { SlotEntry, SlotLeaseScope, SlotProvenance, WorkflowSlot } from './workflow-slots.js';
+import type { SlotEntry, SlotLeaseScope, DetachedRegionProof, WorkflowSlot } from './workflow-slots.js';
 import type { WorkflowCapability, WorkflowFunctionBinding, WorkflowRegionDefinition, WorkflowNodeProposal } from './workflow-region-contract.js';
 import type { WorkflowNode, WorkflowNodeOptions } from './workflow-managed-contract.js';
 import type { StandardWorkflowOutcome as Outcome } from './standard-workflow.js';
@@ -15,7 +15,7 @@ type RegionBinding<I, O> = Omit<WorkflowFunctionBinding<I, O>, 'node'> & Readonl
   create: (input: I) => Outcome<WorkflowRegionDefinition<I, O>>;
 }>;
 type RegionRunner = <I, O>(root: NativeWorkflowContext, definition: WorkflowRegionDefinition<I, O>,
-  input: I, initial?: readonly WorkflowNodeProposal[], proof?: (value: SlotProvenance) => void) => Promise<Outcome<O>>;
+  input: I, initial?: readonly WorkflowNodeProposal[], proof?: (value: DetachedRegionProof) => void) => Promise<Outcome<O>>;
 interface BoundInvocation {
   readonly root: NativeWorkflowContext;
   readonly leases: SlotLeaseScope;
@@ -25,8 +25,8 @@ interface BoundInvocation {
   readonly runRegion?: RegionRunner;
   readonly initial?: readonly WorkflowNodeProposal[];
   readonly delegated?: readonly WorkflowCapability[];
-  readonly delegatedCurrent?: () => boolean;
-  readonly receiveProof?: (proof: SlotProvenance) => void;
+  readonly acceptedChild?: (proof: DetachedRegionProof) => void;
+  readonly receiveProof?: (proof: DetachedRegionProof) => void;
   readonly occurrence?: Readonly<{ instanceId: string; attempt: number; planRevision: number }>;
 }
 interface CapabilityData {
@@ -69,11 +69,12 @@ function factory<I, O>(binding: ReturnType<typeof common<I, O>>, kind: WorkflowC
   const invoke: CapabilityData['invoke'] = async invocation => {
     const { root, leases, inputs, maxBindings, options } = invocation;
     let staged: ReadonlyMap<string, SlotEntry> | undefined;
-    let childProof: SlotProvenance | undefined;
+    let childProof: DetachedRegionProof | undefined;
     try {
       const result = await executeBoundNode(root, build({ ...invocation, receiveProof: proof => { childProof = proof; } }), options, {
         maxBindings, child: kind === 'region', ...(invocation.occurrence === undefined ? {} : { occurrence: invocation.occurrence }),
-        current: frame => leases.entriesCurrent(inputs, frame) && (staged === undefined || leases.entriesCurrent(staged, frame)),
+        current: frame => leases.entriesCurrent(inputs, frame) && (staged === undefined || leases.entriesCurrent(staged, frame))
+          && verifyRegionProofs(root, [...new Set([...inputs.values()].flatMap(e => e.children ?? []).concat(childProof ? [childProof] : []))]),
         input: () => {
           // 每个声明输入必须存在；实际 token、值、来源在同一租约再次验证。
           const declared = slotDeclarations(binding.inputs, maxBindings);
@@ -96,7 +97,10 @@ function factory<I, O>(binding: ReturnType<typeof common<I, O>>, kind: WorkflowC
         },
       });
       // 最终候选观察和当前性校验由已有节点 envelope 完成；非成功不泄漏暂存值。
-      return result.status === 'COMPLETE' ? staged === undefined ? fail() : ok(staged) : result;
+      if (result.status !== 'COMPLETE') return result;
+      if (staged === undefined) return fail();
+      if (childProof !== undefined) invocation.acceptedChild?.(childProof);
+      return ok(staged);
     } catch { return fail(); }
   };
   capabilities.set(capability, Object.freeze({ inputs: binding.inputs, outputs: binding.outputs,
@@ -131,13 +135,9 @@ export function bindWorkflowRegion<I, O>(binding: RegionBinding<I, O>): Workflow
         || definition.capabilities.some(c => !capabilities.has(c) || !invocation.delegated!.includes(c))) {
         return Promise.resolve(fail('WORKFLOW_CAPABILITY_DENIED'));
       }
-      // 当前批次只接纳共用可信事实/适用性策略的子区域；独立私有事实映射需额外证明，
-      // 不能在父候选交付后凭旧的子结果冒充仍当前。
-      if (definition.knowledge.current !== invocation.options.knowledge.current
-        || definition.current !== invocation.delegatedCurrent) return Promise.resolve(fail('WORKFLOW_CHILD_FRAME_UNSUPPORTED'));
       return invocation.runRegion<I, O>(root, definition, input, invocation.initial, invocation.receiveProof);
     },
-  }), 'never');
+  }), envelope.replay ?? 'never');
 }
 
 /** 内部接纳读取已分配身份；不是运行时全局按名称查找能力。 */

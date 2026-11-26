@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { borrowRegionScope, guardBoundFactory, regionDisposition, regionOperation } from './native-workflow-composition.js';
+import { borrowRegionScope, guardBoundFactory, regionDisposition, regionOperation, verifyRegionProofs, regionReplaySafe } from './native-workflow-composition.js';
 import type { NativeWorkflowContext } from './native-workflow-composition.js';
 import { capabilityData, invokeCapability } from './workflow-capabilities.js';
 import { SlotLeaseScope, slotDeclarations } from './workflow-slots.js';
-import type { SlotEntry, SlotProvenance, WorkflowSlotReader } from './workflow-slots.js';
+import type { SlotEntry, DetachedRegionProof, WorkflowSlotReader } from './workflow-slots.js';
 import { candidate, nodeProposal, proposal } from './workflow-region-proposal.js';
 import { managedFailure, snapshotOutcome } from './workflow-managed-runtime.js';
 import { invalidateEvidence, resolveEvidence } from './standard-evidence.js';
@@ -29,6 +29,7 @@ interface Pending {
   readonly state: State;
   readonly attempt: number;
   readonly outputs?: Entries;
+  readonly childProof?: DetachedRegionProof;
 }
 interface Gap { readonly id: string; readonly section: number; readonly templates: ReadonlyMap<string, WorkflowNodeProposal> }
 type RefreshState = { entries: Entries; facts: Resolution; nodes: Pending[]; replays: number; next: number; frame: WorkflowKnowledgeFrame; progress: boolean };
@@ -79,7 +80,7 @@ class Region<I, O> {
   #replays = 0;
   #maxNoProgress = 0;
   #factRevision = 0;
-  finalProof?: SlotProvenance;
+  finalProof?: DetachedRegionProof;
   constructor(readonly root: NativeWorkflowContext, readonly d: WorkflowRegionDefinition<I,O>, readonly input: I,
     readonly initial?: readonly WorkflowNodeProposal[]) {
     this.id = root.scopeId;
@@ -110,8 +111,17 @@ class Region<I, O> {
     }
     return out;
   }
+  private proofs(nodes = this.#nodes): DetachedRegionProof[] {
+    const proofs = new Set<DetachedRegionProof>();
+    for (const n of nodes) if (n.state === 'accepted') {
+      if (n.childProof) proofs.add(n.childProof);
+      for (const e of n.outputs?.values() ?? []) for (const proof of e.children ?? []) proofs.add(proof);
+      if (proofs.size > 256) throw Error('WORKFLOW_CHILD_PROOF_LIMIT');
+    }
+    return [...proofs];
+  }
   private currentEntries(frame: WorkflowKnowledgeFrame): Map<string, SlotEntry> {
-    return new Map([...this.entries()].filter(([, e]) => sourceCurrent(e, frame)));
+    return new Map([...this.entries()].filter(([, e]) => sourceCurrent(e, frame) && verifyRegionProofs(this.root, e.children ?? [])));
   }
   private view(reader: WorkflowSlotReader, remaining: Left, stage: string, frame: WorkflowKnowledgeFrame): WorkflowRegionView {
     const results = this.#nodes.filter(n => n.state === 'accepted').map(n => Object.freeze({ node: n.id, slots: Object.freeze([...(n.outputs?.keys() ?? [])]) }));
@@ -127,6 +137,7 @@ class Region<I, O> {
   }
   private async withView<T>(frame: WorkflowKnowledgeFrame, remaining: Left, stage: string,
     callback: (view: WorkflowRegionView) => Outcome<T> | Promise<Outcome<T>>): Promise<Outcome<T>> {
+    if (!verifyRegionProofs(this.root, this.proofs())) return stale();
     const lease = this.leases.viewLease(this.currentEntries(frame), this.limits.maxBindings, fn => guardBoundFactory(this.root, fn));
     let actual: Outcome<T> | Promise<Outcome<T>>;
     try { actual = callback(this.view(lease.reader, remaining, stage, frame)); }
@@ -134,7 +145,7 @@ class Region<I, O> {
     finally { lease.close(); }
     try {
       const result = snapshotOutcome(await actual);
-      return lease.valid() ? result : fail('WORKFLOW_SLOT_CLOSED');
+      return lease.valid() && (stage === 'clarify' || verifyRegionProofs(this.root, this.proofs())) ? result : fail('WORKFLOW_SLOT_CLOSED');
     } catch { return fail(); }
   }
   private create(p: WorkflowNodeProposal, section: number, required: boolean, aliases: Map<string, string>): Pending {
@@ -275,15 +286,17 @@ class Region<I, O> {
         const touched = Object.values(n.node.input).some(ref => ref.kind === 'context' ? changedSlots.has(ref.slot)
           : ref.kind === 'result' && staleIds.has(ref.node));
         const hasProof = [...(n.outputs?.values() ?? [])].some(e => e.evidenceKeys.length > 0);
-        const retained = touched || (n.capability.kind === 'region' && (affected.size > 0 || frame.epoch !== this.#factRevision)) || (!hasProof && affected.size > 0) ? fail<Entries>() : this.leases.retain(n.outputs ?? new Map(), affected);
+        const childCurrent = verifyRegionProofs(this.root, [...new Set([...(n.childProof ? [n.childProof] : []),
+          ...[...(n.outputs?.values() ?? [])].flatMap(e => e.children ?? [])])]);
+        const retained = touched || !childCurrent || (!hasProof && !n.childProof && affected.size > 0) ? fail<Entries>() : this.leases.retain(n.outputs ?? new Map(), affected);
         if (retained.status === 'COMPLETE') {
           nodes.push(Object.freeze({ ...n, outputs: retained.value })); continue;
         }
         const actual = regionDisposition(this.root, n.id);
-        if (capabilityData(n.capability)?.replay !== 'pure-read-only' || actual?.effect !== 'none' || actual.acceptance !== 'accepted') return stale();
+        if (capabilityData(n.capability)?.replay !== 'pure-read-only' || (n.capability.kind === 'region' && !n.childProof?.replayable) || actual?.effect !== 'none' || actual.acceptance !== 'accepted') return stale();
         staleIds.add(n.id); replays++;
-        const { outputs: _discarded, ...rest } = n;
-        void _discarded;
+        const { outputs: _discarded, childProof: _proof, ...rest } = n;
+        void _discarded; void _proof;
         nodes.push(Object.freeze({ ...rest, state: 'stale' }));
       }
       if (nodes.length + replays > this.limits.maxNodes) return fail('WORKFLOW_REGION_LIMIT');
@@ -387,16 +400,17 @@ class Region<I, O> {
     });
     if (prepared.status !== 'COMPLETE') return prepared;
     const revision = this.#revision;
+    let childProof: DetachedRegionProof | undefined;
     const actual = await invokeCapability(n.capability, [...this.allowed.values()], { root: this.root, leases: this.leases,
       inputs: prepared.value, maxBindings: this.limits.maxBindings, options: { ...this.options, planRevision: revision,
         current: () => revision === this.#revision && this.d.current() },
       occurrence: { instanceId: n.id, attempt: n.attempt + 1, planRevision: revision },
-      runRegion: runRegionWithProof, delegated: [...this.allowed.values()], delegatedCurrent: this.d.current,
+      runRegion: runRegionWithProof, delegated: [...this.allowed.values()], acceptedChild: proof => { childProof = proof; },
       ...(n.node.initial === undefined ? {} : { initial: n.node.initial }) });
     if (actual.status !== 'COMPLETE') return actual;
     const index = this.#nodes.indexOf(n);
     if (index < 0) return stale();
-    this.#nodes[index] = Object.freeze({ ...n, state: 'accepted', attempt: n.attempt + 1, outputs: actual.value });
+    this.#nodes[index] = Object.freeze({ ...n, state: 'accepted', attempt: n.attempt + 1, outputs: actual.value, ...(childProof ? { childProof } : {}) });
     return ok(undefined);
   }
   private async choose(): Promise<Outcome<WorkflowRegionProposal>> {
@@ -416,6 +430,19 @@ class Region<I, O> {
       let refreshed = await this.refresh();
       if (refreshed.status !== 'COMPLETE') return refreshed;
       for (;;) {
+        const probe = await regionOperation<boolean>(this.root, this.viewWork, 1, false, frame => {
+          this.current(frame);
+          return ok({ value: frame.epoch !== this.#factRevision || !verifyRegionProofs(this.root, this.proofs())
+            || [...this.entries().values()].some(e => !sourceCurrent(e, frame)) });
+        });
+        if (probe.status !== 'COMPLETE') return probe;
+        if (probe.value) {
+          refreshed = await this.refresh();
+          if (refreshed.status !== 'COMPLETE') return refreshed;
+          this.#noProgress = refreshed.value ? 0 : this.#noProgress + 1;
+          if (this.#noProgress > this.#maxNoProgress) return fail('WORKFLOW_REGION_NO_PROGRESS');
+          continue;
+        }
         const choice = await this.choose();
         if (choice.status !== 'COMPLETE') return choice;
         const p = choice.value;
@@ -424,29 +451,33 @@ class Region<I, O> {
         if (p.action === 'stop') return fail('WORKFLOW_REGION_STOPPED');
         if (p.action === 'finish') {
           if (this.#nodes.some(n => n.required && n.state !== 'accepted' || pending(n))) return fail('WORKFLOW_REGION_OBLIGATION');
-          const finalized = await regionOperation<{ result: O; proof: SlotProvenance }>(this.root,
+          const finalized = await regionOperation<{ result: O; proof: DetachedRegionProof }>(this.root,
             this.viewWork + knowledgeScanWork(this.d.knowledge.maxItems), 1, true, async (frame, left) => {
               this.current(frame);
               const entries = [...this.entries().values()];
-              const valid = (now: WorkflowKnowledgeFrame) => now.epoch === this.#factRevision && entries.every(e => sourceCurrent(e, now));
+              const valid = (now: WorkflowKnowledgeFrame) => now.epoch === this.#factRevision && entries.every(e => sourceCurrent(e, now)) && verifyRegionProofs(this.root, this.proofs());
               if (!valid(frame) || !this.#facts?.complete) return stale();
               const complete = await this.withView(frame, left, 'complete', view => this.d.complete(view, this.root));
               if (complete.status !== 'COMPLETE') return complete;
-              const keys = new Set<string>(), sources = new Set<SlotEntry['sources'][number]>();
+              const sources = new Set<SlotEntry['sources'][number]>();
               let links = 0;
               const checked = new Set<readonly SlotEntry['sources'][number][]>();
               for (const entry of entries) {
                 if (checked.has(entry.sources)) continue;
                 checked.add(entry.sources);
-                for (const key of entry.evidenceKeys) { if (++links > 16384) return fail('WORKFLOW_SLOT_LIMIT'); keys.add(key); }
+
                 for (const source of entry.sources) { if (++links > 16384) return fail('WORKFLOW_SLOT_LIMIT'); sources.add(source); }
               }
               for (const item of this.#facts.items) if (item.status === 'resolved') {
-                keys.add(item.key);
                 for (const evidence of item.evidence) { if (++links > 16384) return fail('WORKFLOW_SLOT_LIMIT'); sources.add(evidence.source); }
               }
-              const proof: SlotProvenance = Object.freeze({ epoch: frame.epoch, scope: frame.context.scope,
-                evidenceKeys: Object.freeze([...keys]), sources: Object.freeze([...sources]) });
+              const children = Object.freeze(this.proofs());
+              const replayable = this.d.replay === 'pure-read-only' && regionReplaySafe(this.root) && children.every(c => c.replayable)
+                && this.#nodes.every(n => n.attempt === 0 || (n.state === 'accepted'
+                  && capabilityData(n.capability)?.replay === 'pure-read-only'
+                  && regionDisposition(this.root, n.id)?.effect === 'none'));
+              const proof: DetachedRegionProof = Object.freeze({ frame, knowledge: this.d.knowledge, current: this.d.current,
+                sources: Object.freeze([...sources]), children, replayable });
               return ok({ value: { result: complete.value, proof }, resolution: this.#facts, validate: valid,
                 event: this.event('complete', this.#revision, this.#revision, 'WORKFLOW_REGION_COMPLETE') });
             }, true);
@@ -493,7 +524,7 @@ export function runWorkflowRegion<I, O>(root: NativeWorkflowContext, definition:
   return runRegionWithProof(root, definition, input, initial);
 }
 async function runRegionWithProof<I, O>(root: NativeWorkflowContext, definition: WorkflowRegionDefinition<I, O>,
-  input: I, initial?: readonly WorkflowNodeProposal[], receiveProof?: (proof: SlotProvenance) => void): Promise<Outcome<O>> {
+  input: I, initial?: readonly WorkflowNodeProposal[], receiveProof?: (proof: DetachedRegionProof) => void): Promise<Outcome<O>> {
   try {
     if (!definition || !validLimits(definition.limits) || !definition.knowledge || !validLimit(definition.knowledge.maxItems, 4096)
       || !array(definition.requiredKnowledge) || !array(definition.optionalKnowledge)
@@ -502,7 +533,7 @@ async function runRegionWithProof<I, O>(root: NativeWorkflowContext, definition:
     // 同一可信声明快照用于预算和执行；可变的事实由 current/refresh 提供。
     const d = Object.freeze({ ...definition, limits: Object.freeze({ ...definition.limits }),
       knowledge: Object.freeze({ ...definition.knowledge }) });
-    let proof: SlotProvenance | undefined;
+    let proof: DetachedRegionProof | undefined;
     const result = await borrowRegionScope(root, d.limits.maxDescendantDepth, d.limits.maxWork,
       { knowledge: d.knowledge, current: d.current }, async child => {
         const region = new Region(child, d, input, initial);

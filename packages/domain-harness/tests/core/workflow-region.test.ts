@@ -261,3 +261,57 @@ test('shared-frame child actual source expiry in parent candidate sink rejects p
   const n=s.dispositions().find(x=>x.kind==='node'&&x.occurrence.definitionId==='child');
   assert.equal(n?.kind==='node'&&n.acceptance==='accepted',false);
 });
+
+test('private child frame never leaks into parent keys; actual child may replay only with safe trace',async()=>{
+  for(const mode of ['valid','replay','committed','late'] as const){
+    const e=environment(),count:Record<string,number>={};
+    let privateEpoch=1,privateValue=2,asked=false,creates=0;
+    const policy={maxItems:1,equal:Object.is,current:()=>({epoch:privateEpoch,context:{
+      scope:'private-child',revisions:new Map([['private-source',String(privateEpoch)]])}})};
+    const leaf=capability('private-leaf',x=>x*2,count,mode==='committed'?'committed':'none');
+    const child=bindWorkflowRegion<number,number>({id:'child',description:'private child',inputs:{value:integer},outputs:{value:integer},
+      input:r=>r.read('value',integer),output:(v,w)=>w.put('value',integer,v),
+      node:{id:'child',goal:'child',requiredKnowledge:[],replay:'pure-read-only',before:()=>ok(undefined),
+        after:()=>ok(undefined),project:()=>({effect:'none',detail:null})},
+      create:()=>{creates++;return ok({
+        id:'private-child',goal:'private source',limits:{...limits,maxDescendantDepth:0},capabilities:[leaf],constraints:[],
+        knowledge:policy,current:()=>true,requiredKnowledge:[{key:'private-key',accepts:['authority']}],optionalKnowledge:[],
+        contextSlots:{privateValue:integer},layout:[{kind:'anchor',id:'private',node:{alias:'p',capability:'private-leaf',input:{value:ctx('privateValue')}}}],
+        refresh:(_i,_root,_prev,w)=>{const a=w.put('privateValue',integer,privateValue);return a.status!=='COMPLETE'?a:ok({
+          changed:[],dependencies:[{key:'private-key',dependsOn:[]}],observations:[{key:'private-key',origin:'authority',state:'known',
+            value:privateValue,source:{id:'private-source',scope:'private-child',revision:String(privateEpoch)}}],slotEvidence:{privateValue:['private-key']}});},
+        plan:v=>result(v,accepted(v,'private-leaf')?'finish':'continue'),admit:()=>ok(undefined),canSkip:()=>ok(undefined),canRebind:()=>ok(undefined),
+        replay:'pure-read-only',complete:v=>v.reader.read(idOf(v,'private-leaf')+'/value',integer)
+      });}});
+    const d=e.region<number>({capabilities:[child,leaf],layout:[{kind:'anchor',id:'child',node:{alias:'a',capability:'child',input:{value:ctx('quote')}}}],
+      plan:v=>{
+        assert.ok(v.knowledge?.complete);
+        assert.deepEqual(v.knowledge.items.map(i=>i.key),['vehicle','quote']);
+        assert.ok(!v.slots.includes('privateValue'));
+        if(accepted(v,'child')&&!asked&&(mode==='replay'||mode==='committed')){asked=true;return result(v,'clarify');}
+        return result(v,accepted(v,'child')?'finish':'continue');
+      },
+      clarify:async(_v,root)=>{
+        const interaction=new InteractionElement({onPrompt:(p,actual)=>{setImmediate(()=>actual.submit({
+          intentId:p.intentId,revision:p.revision,decisionKey:p.decisionKey,action:'submit',values:{quote:3}}));}});
+        const answer=await interaction.runIn(root,scope=>scope.resolve<number,number>(0,(_s,event)=>event.kind==='initial'
+          ?ok({kind:'clarify',state:1,prompt:{decisionKey:'quote',title:'quote',actions:['submit'],fields:[{id:'quote',kind:'number',label:'quote',required:true}]}})
+          :event.response.action==='submit'&&typeof event.response.values.quote==='number'?ok({kind:'ready',intent:event.response.values.quote}):deny()));
+        if(answer.status!=='COMPLETE')return answer;privateEpoch++;privateValue=answer.value;return ok(undefined);
+      },complete:v=>v.reader.read(idOf(v,'child')+'/value',integer)});
+    const s=new StandardWorkflowSession(rootLimits,{knowledge:e.policy,current:()=>true,limits:baseControl,evidence:{required:true,emit:r=>{
+      if(mode==='late'&&r.kind==='node'&&r.phase==='candidate'&&r.occurrence.definitionId==='child')privateEpoch++;
+      return ok(undefined);
+    }}});
+    const r=await s.run(root=>runWorkflowRegion(root,d,undefined),completion<number>(v=>v===(mode==='replay'?6:4)));
+    assert.equal(r.status==='COMPLETE',mode==='valid'||mode==='replay',mode);
+    assert.equal(creates,mode==='replay'?2:1,mode);
+    assert.equal(count['private-leaf'],mode==='replay'?2:1,mode);
+    const records=s.dispositions().filter(x=>x.kind==='node').filter(x=>x.occurrence.definitionId==='child');
+    if(mode==='replay'){
+      assert.deepEqual(records.map(x=>x.occurrence.attempt),[1,2]);assert.equal(records[0]?.occurrence.instanceId,records[1]?.occurrence.instanceId);
+    }
+    if(mode==='committed')assert.ok(s.dispositions().some(x=>x.kind==='node'&&x.effect==='committed'&&x.receiptId==='receipt-1'));
+    if(mode==='late')assert.notEqual(records[0]?.acceptance,'accepted');
+  }
+});

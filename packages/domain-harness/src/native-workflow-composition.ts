@@ -289,6 +289,18 @@ export async function regionOperation<T>(root: NativeWorkflowContext, units: num
   finally { ticket.ticket.close(scope.owner); finish(); }
 }
 
+/** 私有子域来源校验由实际所属根和作用域承担。 */
+export function verifyRegionProofs(root: NativeWorkflowContext, proofs: readonly import('./workflow-slots.js').DetachedRegionProof[]): boolean {
+  const lifetime = scopeLifetime(root);
+  return lifetime.managed !== undefined && lifetime.scope !== undefined && lifetime.managed.checkDetached(lifetime.scope, proofs);
+}
+
+/** 实际受控后代出现已提交/未知或未接纳调用时，不得自动重执行区域。 */
+export function regionReplaySafe(root: NativeWorkflowContext): boolean {
+  const scope = scopeLifetime(root).scope;
+  return scope !== undefined && scope.feedbackCount !== undefined && !scope.unsafeReplay;
+}
+
 /** 实际已接受节点的效果只用于后续保守重规划判断。 */
 export function regionDisposition(root: NativeWorkflowContext, instanceId: string): Extract<WorkflowObservation, { kind: 'node' }> | undefined {
   return scopeLifetime(root).managed?.nodeDisposition(instanceId);

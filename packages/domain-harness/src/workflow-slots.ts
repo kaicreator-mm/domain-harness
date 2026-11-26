@@ -1,6 +1,6 @@
 import { types } from 'node:util';
 import { managedFailure, snapshotOutcome, valid } from './workflow-managed-runtime.js';
-import type { WorkflowKnowledgeFrame } from './workflow-managed-contract.js';
+import type { WorkflowKnowledgeFrame, WorkflowKnowledgePolicy } from './workflow-managed-contract.js';
 import type { EvidenceObservation, EvidenceResolution } from './standard-evidence.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 
@@ -58,16 +58,21 @@ export function createWorkflowSlot<T>(id: string, accepts: (value: unknown) => v
 }
 
 type Declarations = Readonly<Record<string, WorkflowSlot<unknown>>>;
-type Source = EvidenceObservation<string, unknown>['source'];
+export type SlotSource = EvidenceObservation<string, unknown>['source'];
+type Source = SlotSource;
 type Resolved = Extract<EvidenceResolution<string, unknown>, { complete: true }>;
 interface NativeValue { readonly slot: WorkflowSlot<unknown>; readonly value: unknown }
-export interface SlotEntry extends NativeValue {
-  readonly epoch: number;
-  readonly scope: string;
-  readonly evidenceKeys: readonly string[];
+/** 子区域的私有事实证明只在 SDK 内传递，不进入父区域的知识键或模型投影。 */
+export interface DetachedRegionProof {
+  readonly frame: WorkflowKnowledgeFrame;
+  readonly knowledge: WorkflowKnowledgePolicy;
+  readonly current: () => boolean;
   readonly sources: readonly Source[];
+  readonly children: readonly DetachedRegionProof[];
+  readonly replayable: boolean;
 }
-export interface SlotProvenance {
+export interface SlotEntry extends NativeValue {
+  readonly children?: readonly DetachedRegionProof[];
   readonly epoch: number;
   readonly scope: string;
   readonly evidenceKeys: readonly string[];
@@ -277,27 +282,22 @@ export class SlotLeaseScope {
 
   /** 从实际已接纳输入和节点解析证据继承结果依赖；候选只由调用方在节点接纳后使用。 */
   public resultEntries<T>(stage: SlotStage<T>, inputs: ReadonlyMap<string, SlotEntry>,
-    resolution: EvidenceResolution<string, unknown>, extra?: SlotProvenance): Outcome<ReadonlyMap<string, SlotEntry>> {
+    resolution: EvidenceResolution<string, unknown>, extra?: DetachedRegionProof): Outcome<ReadonlyMap<string, SlotEntry>> {
     return this.execute(frame => {
       const staged = this.#stages.get(stage);
       if (!staged) return fail();
       this.#stages.delete(stage);
       if (!sameFrame(staged.frame, frame) || !resolution.complete || resolution.items.length > 4096 || inputs.size > 2048) return fail();
-      const keys = new Set<string>(), sources = new Set<Source>();
+      const keys = new Set<string>(), sources = new Set<Source>(), children = new Set<DetachedRegionProof>();
       let links = 0;
       for (const entry of inputs.values()) {
         if (!this.usable(entry, entry.slot, frame)) return fail();
+        for (const child of entry.children ?? []) { children.add(child); if (children.size > 256) return fail(); }
         for (const key of entry.evidenceKeys) { if (++links > 16384) return fail(); keys.add(key); }
         for (const source of entry.sources) { if (++links > 16384) return fail(); sources.add(source); }
       }
-      if (extra) {
-        if (extra.epoch !== frame.epoch || extra.scope !== frame.context.scope) return fail();
-        for (const key of extra.evidenceKeys) { if (++links > 16384) return fail(); keys.add(key); }
-        for (const source of extra.sources) {
-          if (++links > 16384 || !applicable(source, frame)) return fail();
-          sources.add(source);
-        }
-      }
+      if (extra) children.add(extra);
+      if (children.size > 256) return fail();
       for (const item of resolution.items) {
         if (item.status !== 'resolved' || !item.evidence.length) return fail();
         keys.add(item.key);
@@ -311,7 +311,7 @@ export class SlotLeaseScope {
       const evidenceKeys = Object.freeze([...keys]), provenance = Object.freeze([...sources]);
       const out = new Map<string, SlotEntry>();
       for (const [name, value] of staged.values) {
-        const entry = Object.freeze({ ...value, epoch: frame.epoch, scope: frame.context.scope, evidenceKeys, sources: provenance });
+        const entry = Object.freeze({ ...value, epoch: frame.epoch, scope: frame.context.scope, evidenceKeys, sources: provenance, ...(children.size ? { children: Object.freeze([...children]) } : {}) });
         this.#entries.add(entry); out.set(name, entry);
       }
       return ok(out);

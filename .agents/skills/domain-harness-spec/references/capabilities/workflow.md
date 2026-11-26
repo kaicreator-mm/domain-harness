@@ -22,3 +22,5 @@ API: WorkflowElement XStateWorkflowElement StandardWorkflowSession NativeWorkflo
 类型化 Slot 使用 createWorkflowSlot 创建真实 token，名称相同不代表 token 相同；守卫必须同步。原生 bigint、Date 和领域对象不转换 JSON。读取器及写入器仅在受控回调期间借用；输出暂存不等于已接纳结果，区域执行入口完成后才由 SDK 接线提供，不自行构造或保留租约。
 
 Function/Region 通过 bindWorkflowFunction / bindWorkflowRegion 分配能力身份，声明全部输入输出 token；输入装配与输出编码复用受控节点的完整预接纳，输出仅在实际 post、证据与当前性裁定后可使用。能力绑定本身不执行；动态区域使用 runWorkflowRegion 在受控根内借用作用域，按当前有效结构执行；模型来源提案尚未开放，失败不自动重试。
+
+子区域可使用独立可信事实范围；父级只接收声明的原生结果，私有证据由 SDK 保留为内部当前性证明，不增加父级知识键或可读 Slot。重新调用已失效的子区域须绑定和区域都明确 pure-read-only，且实际受控后代没有已提交/未知或未接纳的执行效果。实际副作用收据仍保留；不自动重试。

@@ -1,5 +1,6 @@
 import { types } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import type { DetachedRegionProof } from './workflow-slots.js';
 import { resolveEvidence } from './standard-evidence.js';
 import type { EvidenceObservation, EvidenceRequirement, EvidenceResolution } from './standard-evidence.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
@@ -72,6 +73,7 @@ export interface ManagedScope {
   resolved?: EvidenceResolution<string, unknown>;
   finalCurrent?: (frame: Frame) => boolean;
   feedbackCount?: number;
+  unsafeReplay?: boolean;
 }
 
 export interface LocalFramePolicy {
@@ -116,7 +118,7 @@ export class ManagedRuntime {
     return Object.freeze([...(progress?.values() ?? [])]);
   }
 
-  public noteNode(record: Extract<WorkflowObservation, { kind: 'node' }>): void {
+  public noteNode(record: Extract<WorkflowObservation, { kind: 'node' }>, scope?: ManagedScope): void {
     const { instanceId, definitionId } = record.occurrence;
     const state = record.phase === 'enter' ? 'running' : record.acceptance === 'accepted' ? 'accepted'
       : record.effect === 'unknown' ? 'unknown' : record.acceptance === 'stale' ? 'stale' : 'rejected';
@@ -124,7 +126,13 @@ export class ManagedRuntime {
     let progress = this.#progress.get(parent);
     if (!progress) { progress = new Map(); this.#progress.set(parent, progress); }
     progress.set(instanceId, Object.freeze({ instanceId, definitionId, state }));
-    if (record.phase === 'disposition') { this.#final.push(record); this.#nodeFinal.set(instanceId, record); }
+    if (record.phase === 'disposition') {
+      this.#final.push(record); this.#nodeFinal.set(instanceId, record);
+      // 子区域的所有实际后代（含域直接调用的受控节点）都参与保守重执行资格。
+      if (record.entered && (record.effect !== 'none' || record.acceptance !== 'accepted')) {
+        for (let s = scope; s !== undefined; s = s.parent) if (s.feedbackCount !== undefined) s.unsafeReplay = true;
+      }
+    }
   }
   public nodeDisposition(instanceId: string) { return this.#nodeFinal.get(instanceId); }
   public localRemaining(scope: ManagedScope): number {
@@ -258,6 +266,39 @@ export class ManagedRuntime {
     if (!captured.locals.every((x, i) => x.policy === now.locals[i]?.policy && this.same(x.frame, now.locals[i].frame))) return false;
     const frame = now.locals.at(-1)?.frame ?? now.root;
     return this.evidenceCurrent(frame, resolution) && (validate?.(frame) ?? true);
+  }
+
+  /** 闭合子域的事实校验在原根内进行；父域不获得子域的事实键。
+   * 先用已有 work 额度预留本次有限校验，再调用可信策略。
+   */
+  public checkDetached(scope: ManagedScope, proofs: readonly DetachedRegionProof[]): boolean {
+    if (!this.available() || proofs.length > 256) return false;
+    if (proofs.length === 0) return true;
+    const seen = new Set<DetachedRegionProof>(), pending = [...proofs];
+    let work = 1, links = 0;
+    for (let i = 0; i < pending.length; i++) {
+      const p = pending[i]!;
+      if (seen.has(p)) continue;
+      if (seen.size >= 256 || p.children.length > 256 || !valid(p.knowledge.maxItems, 4096)
+        || (links += p.sources.length + p.children.length) > 16384) return false;
+      seen.add(p);
+      work += frameScanWork(p.knowledge.maxItems) + 4 * (p.sources.length + p.children.length);
+      for (const child of p.children) if (!seen.has(child)) pending.push(child);
+    }
+    const admission = this.ledger.reserve(scope.owner, { calls: 0, steps: 0, work }, scope.local);
+    if (!admission.ok) return false;
+    try {
+      for (const p of seen) {
+        const now = this.capture(p.knowledge, p.current, p.frame);
+        if (!now || !this.same(p.frame, now)) return false;
+        for (const source of p.sources) {
+          const t = source.validity, asOf = now.context.asOf;
+          if (source.scope !== now.context.scope || now.context.revisions.get(source.id) !== source.revision
+            || (t && (asOf === undefined || asOf < t.from || asOf >= t.until))) return false;
+        }
+      }
+      return this.available();
+    } finally { admission.ticket.close(scope.owner); }
   }
 
   private same(a: Frame, b: Frame): boolean {
