@@ -1,0 +1,70 @@
+{
+  "classification": "PUBLIC_EXPECTED_PREDICATES_NOT_HIDDEN",
+  "fixture": "laboratory calendar v1",
+  "data": [
+    {
+      "id": "S1",
+      "release": 0,
+      "prep": 2,
+      "assay": 2
+    },
+    {
+      "id": "S2",
+      "release": 1,
+      "prep": 1,
+      "assay": 3
+    },
+    {
+      "id": "S3",
+      "release": 0,
+      "prep": 1,
+      "assay": 1
+    }
+  ],
+  "horizon": 9,
+  "blackout": [
+    [
+      4,
+      5
+    ]
+  ],
+  "initial": {
+    "tested": 1000000,
+    "feasible": 24,
+    "best": [
+      9,
+      19
+    ],
+    "optimalCount": 9,
+    "example": [
+      0,
+      2,
+      3,
+      2,
+      6,
+      5
+    ]
+  },
+  "maintenanceChange": {
+    "id": "S2",
+    "release": 3
+  },
+  "maintenance": {
+    "tested": 1000000,
+    "feasible": 17,
+    "best": [
+      9,
+      19
+    ],
+    "optimalCount": 7,
+    "example": [
+      0,
+      3,
+      2,
+      2,
+      6,
+      5
+    ]
+  },
+  "acceptance": "any feasible objective-optimal schedule; compare constraints and actual source/trace independently, not exact starts; no execution yet"
+}
