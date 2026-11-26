@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { StandardWorkflowSession } from './native-workflow-composition.js';
+import { StandardWorkflowSession, borrowInteractionScope } from './native-workflow-composition.js';
 import type { NativeWorkflowContext, WorkflowLimits } from './native-workflow-composition.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import { makePrompt, readResponse, responseData } from './interaction-protocol.js';
@@ -188,31 +188,55 @@ export class InteractionElement {
     void operation.then(() => { this.#active.delete(operation); }, () => { this.#active.delete(operation); });
     return operation;
   }
-  async run<T>(limits: WorkflowLimits, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>> {
+  async #runScope<T>(root: NativeWorkflowContext, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>> {
+    const scope: InteractionScope = Object.freeze({
+      root, signal: this.#abort.signal,
+      resolve: <S, I, E extends string = string>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent<E>, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I, E>>>) =>
+        this.#track(this.#resolve(root, initial, decide)),
+      step: <R>(action: () => Maybe<Outcome<R>>) => {
+        if (this.#phase !== 'running') return Promise.resolve(stop('FAILED', 'INTERACTION_NOT_RUNNING'));
+        if (this.#abort.signal.aborted) return Promise.resolve(stop('REJECT', 'CANCELLED'));
+        return this.#track(root.invokeOutcome(action));
+      },
+    });
+    try {
+      const result = await work(scope);
+      if (this.#active.size > 0) return { status: 'UNKNOWN', reason: { code: 'INTERACTION_UNJOINED_WORK', message: 'Interaction has unjoined work' } };
+      return result;
+    } finally {
+      // 可信调用方必须 await 自己的业务；防止遗留 scope 操作在应用退出后仍活跃。
+      if (this.#active.size > 0) { this.cancel(); await Promise.allSettled([...this.#active]); }
+    }
+  }
+
+  async #execute<T>(action: () => Promise<Outcome<T>>): Promise<Outcome<T>> {
     if (this.#phase !== 'new') return stop('FAILED', 'INTERACTION_ALREADY_RUN');
     this.#phase = 'running';
     try {
       if (this.#abort.signal.aborted) return stop('REJECT', 'CANCELLED');
-      return await new StandardWorkflowSession(limits).run(async root => {
-        const scope: InteractionScope = Object.freeze({
-          root, signal: this.#abort.signal,
-          resolve: <S, I, E extends string = string>(initial: S, decide: (state: Readonly<S>, event: InteractionEvent<E>, root: NativeWorkflowContext, signal: AbortSignal) => Maybe<Outcome<InteractionDecision<S, I, E>>>) =>
-            this.#track(this.#resolve(root, initial, decide)),
-          step: <R>(action: () => Maybe<Outcome<R>>) => {
-            if (this.#phase !== 'running') return Promise.resolve(stop('FAILED', 'INTERACTION_NOT_RUNNING'));
-            if (this.#abort.signal.aborted) return Promise.resolve(stop('REJECT', 'CANCELLED'));
-            return this.#track(root.invokeOutcome(action));
-          },
-        });
-        try {
-          const result = await work(scope);
-          if (this.#active.size > 0) return { status: 'UNKNOWN', reason: { code: 'INTERACTION_UNJOINED_WORK', message: 'Interaction has unjoined work' } };
-          return result;
-        } finally {
-          // 可信调用方必须 await 自己的业务；防止遗留 scope 操作在应用退出后仍活跃。
-          if (this.#active.size > 0) { this.cancel(); await Promise.allSettled([...this.#active]); }
-        }
-      });
+      return await action();
     } finally { this.#phase = 'terminal'; this.#pending = undefined; }
+  }
+
+  async run<T>(limits: WorkflowLimits, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>> {
+    return this.#execute(() => new StandardWorkflowSession(limits).run(root => this.#runScope(root, work)));
+  }
+
+  /** 附着已有受控 Workflow；共享根额度、作用域及取消，不创建 Session。 */
+  async runIn<T>(root: NativeWorkflowContext, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>> {
+    return this.#execute(() => borrowInteractionScope(root, async (child, cancel) => {
+      const abort = () => this.cancel();
+      child.signal.addEventListener('abort', abort, { once: true });
+      this.#abort.signal.addEventListener('abort', cancel, { once: true });
+      try {
+        if (child.signal.aborted) this.cancel();
+        if (this.#abort.signal.aborted) { cancel(); return stop('REJECT', 'CANCELLED'); }
+        const result = await this.#runScope(child, work);
+        return this.#abort.signal.aborted && result.status === 'COMPLETE' ? stop('REJECT', 'CANCELLED') : result;
+      } finally {
+        child.signal.removeEventListener('abort', abort);
+        this.#abort.signal.removeEventListener('abort', cancel);
+      }
+    }));
   }
 }

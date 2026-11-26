@@ -14,7 +14,7 @@ export const expectedClasses = {
  GraphQueryElement:['standard-element','public','search'],
  BoundedExpressionElement:['standard-element','public','evaluate'],
  CliElement:['standard-element','public','run'],
- InteractionElement:['standard-element','public','current','cancel','submit','run'],
+ InteractionElement:['standard-element','public','current','cancel','submit','run','runIn'],
  ClarificationElement:['standard-element','factory','.prepare'],
 };
 export const expectedFunctions = ['routeWorkflowOutcome','readJson','readYaml','writeJson','writeYaml',

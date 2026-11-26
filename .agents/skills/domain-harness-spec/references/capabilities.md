@@ -832,6 +832,7 @@
 - `InteractionElement#cancel` · instance method：`() => void`；调用：`(): void`
 - `InteractionElement#current` · instance method：`() => InteractionPrompt \| undefined`；调用：`(): InteractionPrompt \| undefined`
 - `InteractionElement#run` · instance method：`<T>(limits: WorkflowLimits, work: (scope: InteractionScope) => Maybe<Outcome<T>>) => Promise<Outcome<T>>`；调用：`<T>(limits: WorkflowLimits, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>>`
+- `InteractionElement#runIn` · instance method：`<T>(root: NativeWorkflowContext, work: (scope: InteractionScope) => Maybe<Outcome<T>>) => Promise<Outcome<T>>`；调用：`<T>(root: NativeWorkflowContext, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>>`
 - `InteractionElement#submit` · instance method：`(input: unknown) => InteractionSubmitResult`；调用：`(input: unknown): InteractionSubmitResult`
 
 ### InteractionEvent

@@ -162,6 +162,14 @@ export function borrowWorkflowScope<T>(root: NativeWorkflowContext, maxDescendan
     : borrow(maxDescendantDepth, action, maxLocalWork);
 }
 
+/** Interaction 复用同一受控子作用域；取消仅关闭该作用域及后代。 */
+export function borrowInteractionScope<T>(root: NativeWorkflowContext,
+  action: (child: NativeWorkflowContext, cancel: () => void) => Promise<Result<T>>): Promise<Result<T>> {
+  if (!scopeLifetime(root).managed) return Promise.resolve(managedFailure('WORKFLOW_CONTROL_REQUIRED'));
+  return borrowWorkflowScope(root, Math.max(0, root.remaining().maxDescendantDepth - 1),
+    child => action(child, () => scopeLifetime(child).stopAdmission(true)));
+}
+
 function scopeLifetime(context: NativeWorkflowContext): ScopeLifetime {
   const lifetime = scopeLifetimes.get(context);
   if (lifetime === undefined) throw new Error('Missing native workflow scope');
