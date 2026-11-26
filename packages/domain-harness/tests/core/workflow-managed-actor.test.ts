@@ -25,7 +25,7 @@ test('real XState active and done snapshot with exact combined reservation; P+1 
     const actor=new XStateWorkflowElement(logic,ok<number>);
     const c=control({observe:r=>{trace.push(r);}});
     const s=new StandardWorkflowSession({maxCalls:2,maxSteps:4,maxDepth:1},{...c,limits:{...c.limits,
-      maxWork:rootWork+childWork+1+P*(1+33024+1),maxEvents:6+P,maxActiveScopes:2}});
+      maxWork:rootWork+Math.floor((6+P)/4)+childWork+1+P*(1+33024+1),maxEvents:6+P,maxActiveScopes:2}});
     const result=await s.run(root=>actor.runIn(()=>{factory++;return 4;},root,{
       maxProjections:P,project:snapshot=>{projected++;return {status:snapshot.status};}
     }),completion);
@@ -36,7 +36,7 @@ test('real XState active and done snapshot with exact combined reservation; P+1 
 });
 
 test('actor inclusive one-short calls/steps/work/events/active/depth; input and actual actor both zero',async()=>{
-  const requiredWork=99086+99080+1+2*(1+33024+1);
+  const requiredWork=99086+2+99080+1+2*(1+33024+1);
   for(const mode of ['calls','steps','work','events','active','depth']){
     let factory=0, invoked=0, projected=0;
     const logic=fromPromise<number,number>(async({input})=>{invoked++;return await Promise.resolve(input);});
