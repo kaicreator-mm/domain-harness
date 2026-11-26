@@ -166,8 +166,8 @@
     {
       "id": "O03",
       "map": "AC03/04;F-W05",
-      "input": "DA source revisions, required offerSetComplete missing vs optional alternative absent; DB job release and scoped source; native slot bigint 9007199254740993 and Date 2026-01-02T03:04:05.000Z",
-      "expected": "Required missing planner/node=0; optional absent explicit status and valid path; wrong origin/scope/epoch/type/expired lease/mapped unresolved provenance no publication; valid native typeof bigint exact and Date instance with exact millis 1767323045000 (derive from ISO at execution), same token through fixed/dynamic/child; private slot absent from Model; sibling/parent dependencies invalidate, unrelated valid vehicle retained.",
+      "input": "DA source revisions, required quoteSetComplete missing vs optional alternative absent; DB job release and scoped source; native slot bigint 9007199254740993 and Date 2026-01-02T03:04:05.000Z",
+      "expected": "Required missing planner/node=0; optional absent explicit status and valid path; wrong origin/scope/epoch/type/expired lease/mapped unresolved provenance no publication; valid native typeof bigint exact and Date instance with exact millis 1767323045000, same token through fixed/dynamic/child; private slot absent from Model; sibling/parent dependencies invalidate, unrelated valid vehicle retained.",
       "status": "NOT_RUN"
     },
     {
