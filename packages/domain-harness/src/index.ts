@@ -30,3 +30,5 @@ export { runInteractiveRecognitionHandling } from './standard-interactive-recogn
 export type { WorkflowControlLimits, WorkflowControlOptions, WorkflowOccurrence, WorkflowKnowledgeFrame, WorkflowKnowledgePolicy, WorkflowCompletionPolicy, WorkflowContextView, WorkflowTerminalContext, ModelUsage, WorkflowObservation } from './workflow-managed-contract.js';
 export type { WorkflowNode, WorkflowNodeOptions, WorkflowAttempt } from './workflow-managed-contract.js';
 export type { WorkflowActorOptions } from './workflow-managed-contract.js';
+export { createWorkflowSlot } from './workflow-slots.js';
+export type { WorkflowSlot, WorkflowSlotReader, WorkflowSlotWriter } from './workflow-slots.js';

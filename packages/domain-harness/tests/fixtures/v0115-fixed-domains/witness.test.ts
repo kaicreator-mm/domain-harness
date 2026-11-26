@@ -2,11 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assign, fromPromise, setup } from 'xstate';
 import { Socket } from 'node:net';
-import { InteractionElement, StandardWorkflowSession, XStateWorkflowElement } from '@kaicreator/domain-harness';
+import { resolveEvidence, InteractionElement, StandardWorkflowSession, XStateWorkflowElement } from '@kaicreator/domain-harness';
 import type { NativeWorkflowContext, WorkflowCompletionPolicy, WorkflowKnowledgePolicy,
   WorkflowNode, WorkflowNodeOptions, WorkflowObservation, EvidenceObservation } from '@kaicreator/domain-harness';
 import { fixture, ok, fail, reject, optimize, planMetrics, scheduleMetrics, solveRepair } from './domain.js';
 import type { Outcome, Offer, Job, Plan, Demand, Schedule } from './domain.js';
+import type { WorkflowSlot } from '@kaicreator/domain-harness';
+import { SlotLeaseScope } from '../../../src/workflow-slots.js';
+import { createWorkflowSlot } from '../../../src/index.js';
+import { leaseScanWork, knowledgeScanWork } from '../../../src/workflow-resource-control.js';
 
 function source(scope:string){
   let complete=true,foreign=false,epoch=1;
@@ -311,4 +315,41 @@ test('D-B actual same-root deadline feedback drives a new real solver decision',
   const actual=trace.filter(r=>r.kind==='node'&&r.phase==='actual');
   assert.deepEqual(actual.map(r=>r.factRevision),[1,1,1,1,2,2,2]);
   assert.equal(new Set(trace.map(r=>r.runId)).size,1);
+});
+
+// 复用 T05 私有租约接线验证两个真实领域的原生输入，不声称动态 Region 已完成。
+async function leasedInput<I,Q,O>(root:NativeWorkflowContext,src:Source,p:Fixed<I,Q,O>,
+  input:I,slot:WorkflowSlot<I>):Promise<Outcome<O>>{
+  const leases=new SlotLeaseScope(()=>root.signal.aborted?undefined:src.policy.current());
+  try{
+    const values=await root.work(leaseScanWork(1)+knowledgeScanWork(src.policy.maxItems),()=>{
+      const stage=leases.write({input:slot},1,w=>w.put('input',slot,input));
+      if(stage.status!=='COMPLETE')return stage;
+      const facts=resolveEvidence(req('input'),src.observations({input}),src.policy.current().context,src.policy,src.policy.maxItems);
+      return leases.contextEntries(stage.value,{input:['input']},facts);
+    });
+    if(values.status!=='COMPLETE')return values;
+    const read=await root.work(leaseScanWork(1),()=>leases.read({input:slot},values.value,1,r=>r.read('input',slot)));
+    if(read.status!=='COMPLETE')return read;
+    assert.equal(read.value,input);
+    return native(root,p,src,read.value);
+  }finally{leases.close();}
+}
+
+test('T05 actual D-A procurement consumes native typed demand with resolved authority provenance',async()=>{
+  const src=source('typed-procurement'),count=stats(),s=session(src,[]);
+  const demand={lead:3,budget:75},p=procurement(src,count,demand);
+  const demandSlot=createWorkflowSlot('demand',(v):v is Demand=>
+    typeof v==='object'&&v!==null&&'lead'in v&&typeof v.lead==='number'&&'budget'in v&&typeof v.budget==='number');
+  const result=await s.run(root=>leasedInput(root,src,p,demand,demandSlot),p.policy);
+  assert.deepEqual(result,ok(fixture.DA.enumeration.cases.find(x=>x.lead===3&&x.budget===75)?.optimum));
+  assert.deepEqual(count,{query:1,solve:1,verify:1});
+});
+test('T05 actual D-B repair consumes a typed native deadline and real solver',async()=>{
+  const src=source('typed-repair'),count=stats(),s=session(src,[]),p=repair(src,count,7);
+  const deadline=createWorkflowSlot('deadline',(v):v is number=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0);
+  const result=await s.run(root=>leasedInput(root,src,p,7,deadline),p.policy);
+  assert.equal(result.status,'COMPLETE');
+  if(result.status==='COMPLETE')assert.deepEqual([result.value.makespan,result.value.sum],fixture.DB.enumeration.best);
+  assert.deepEqual(count,{query:1,solve:1,verify:1});
 });

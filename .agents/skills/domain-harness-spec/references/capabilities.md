@@ -82,6 +82,12 @@
 
 [适用场景、限制与示例](capabilities/workflow.md)
 
+### createWorkflowSlot
+
+- 分类：`function`；声明：`dist/workflow-slots.d.ts`
+- 职责：创建不可伪造身份的类型能力；守卫必须是可信同步判断。
+- 调用签名：`<T>(id: string, accepts: (value: unknown) => value is T): WorkflowSlot<T>`
+
 ### ModelUsage
 
 - 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
@@ -308,6 +314,28 @@
 - `WorkflowRoutes#REJECT` · contract callback readonly：`(outcome: Result<T>) => R \| Promise<R>`；调用：`(outcome: Result<T>): R \| Promise<R>`
 - `WorkflowRoutes#UNKNOWN` · contract callback readonly：`(outcome: Result<T>) => R \| Promise<R>`；调用：`(outcome: Result<T>): R \| Promise<R>`
 - `WorkflowRoutes#WAIT` · contract callback readonly：`(outcome: Result<T>) => R \| Promise<R>`；调用：`(outcome: Result<T>): R \| Promise<R>`
+
+### WorkflowSlot
+
+- 分类：`type`；声明：`dist/workflow-slots.d.ts`
+- 职责：模块分配的原生值类型身份；同名不表示同一类型能力。
+- 类型声明：`interface WorkflowSlot<T> { readonly id: string; readonly accepts: (value: unknown) => value is T; }`
+- `WorkflowSlot#accepts` · contract callback readonly：`(value: unknown) => value is T`；调用：`(value: unknown): value is T`
+- `WorkflowSlot#id` · contract property readonly：`string`
+
+### WorkflowSlotReader
+
+- 分类：`type`；声明：`dist/workflow-slots.d.ts`
+- 职责：仅在本次同步输入/投影回调内借用的具名原生值读取器。
+- 类型声明：`interface WorkflowSlotReader { read<T>(name: string, slot: WorkflowSlot<T>): Outcome<T>; }`
+- `WorkflowSlotReader#read` · contract method：`<T>(name: string, slot: WorkflowSlot<T>) => Outcome<T>`；调用：`<T>(name: string, slot: WorkflowSlot<T>): Outcome<T>`
+
+### WorkflowSlotWriter
+
+- 分类：`type`；声明：`dist/workflow-slots.d.ts`
+- 职责：仅在本次同步输出回调内借用的暂存写入器，不直接发布结果。
+- 类型声明：`interface WorkflowSlotWriter { put<T>(name: string, slot: WorkflowSlot<T>, value: NoInfer<T>): Outcome<void>; }`
+- `WorkflowSlotWriter#put` · contract method：`<T>(name: string, slot: WorkflowSlot<T>, value: NoInfer<T>) => Outcome<void>`；调用：`<T>(name: string, slot: WorkflowSlot<T>, value: NoInfer<T>): Outcome<void>`
 
 ### WorkflowTerminalContext
 
