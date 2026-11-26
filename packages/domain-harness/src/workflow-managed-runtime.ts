@@ -43,6 +43,12 @@ export function isManagedOutcome(value: unknown): value is Outcome<unknown> {
       && 'code' in value.reason && typeof value.reason.code === 'string'
       && 'message' in value.reason && typeof value.reason.message === 'string');
 }
+/** 复制结果外壳；原生业务值仍由可信域负责不可变性，不递归复制。 */
+export function snapshotOutcome<T>(value: Outcome<T>): Outcome<T> {
+  if (!isManagedOutcome(value)) return managedFailure('WORKFLOW_INVALID_OUTCOME');
+  if (value.status === 'COMPLETE') return Object.freeze({ status: 'COMPLETE', value: value.value });
+  return Object.freeze({ status: value.status, reason: Object.freeze({ code: value.reason.code, message: value.reason.message }) });
+}
 export function redact(value: Outcome<unknown>): Outcome<void> {
   if (value.status === 'COMPLETE') return Object.freeze(ok(undefined));
   // 不将业务值、错误文本或凭据放入公开观察。
@@ -95,7 +101,9 @@ export class ManagedRuntime {
 
   public sequence(): number { return ++this.#seq; }
 
-  /** 每次尝试预留四条事件，进度槽随实际事件生成；不额外扩大总历史上限。 */
+  /** 每次尝试预留四条事件，根 maxEvents<=65536，故最多 16384 个实际进度项。
+   * 每个固定节点至多构建两次视图；根完成至多一次。不得从任意回调反复构建。
+   */
   public progress(scopeId: string): WorkflowContextView['progress'] {
     return Object.freeze([...(this.#progress.get(scopeId)?.values() ?? [])]);
   }
@@ -201,18 +209,18 @@ export class ManagedRuntime {
     let rootChecked = false;
     let index = locals.length - 1;
     for (let owner: ManagedScope | undefined = scope; owner !== undefined; owner = owner.parent) {
+      const bound = owner.bound;
+      if (bound && !rootChecked) {
+        if (!this.same(bound.root, root)) return undefined;
+        rootChecked = true;
+      }
       if (owner.policy === undefined) continue;
       const current = locals[index--];
       if (!current || current.policy !== owner.policy) return undefined;
-      const bound = owner.bound;
       if (!bound) continue;
       const own = bound.locals.at(-1);
       if (!own || own.policy !== current.policy || !this.same(own.frame, current.frame)
         || !this.evidenceCurrent(current.frame, owner.resolved)) return undefined;
-      if (!rootChecked) {
-        if (!this.same(bound.root, root)) return undefined;
-        rootChecked = true;
-      }
     }
     return captured;
   }
@@ -285,6 +293,21 @@ export class ManagedRuntime {
     return frame === undefined ? { code: 'WORKFLOW_CURRENTNESS' } : { frame };
   }
 
+  public modelDecision(scope: ManagedScope, reason: string, action: 'not-needed' | 'unavailable'): Outcome<void> {
+    if (!this.available() || !boundedText(reason) || Buffer.byteLength(reason) > 1024
+      || (action !== 'not-needed' && action !== 'unavailable')) return managedFailure('WORKFLOW_MODEL_DECISION_INVALID');
+    const charge = this.ledger.reserve(scope.owner, { calls: 0, steps: 1, work: 1 + EVENT_SCAN_WORK, events: 1 }, scope.local);
+    if (!charge.ok) return managedFailure(charge.code);
+    try {
+      if (!charge.ticket.event(scope.owner)) return managedFailure('WORKFLOW_EVENT_BUDGET');
+      const record = Object.freeze({ kind: 'model' as const, action, decisionId: randomUUID(), reason,
+        usage: Object.freeze({ input: null, output: null, total: null, kind: 'unavailable' as const }), detail: null,
+        runId: this.runId, scopeId: scope.id, ...(scope.parentId === undefined ? {} : { parentScopeId: scope.parentId }),
+        seq: this.sequence(), factRevision: this.#last?.epoch ?? 0, stage: 'model-decision' });
+      return this.deliver(scope, record) && this.available() ? ok(undefined) : managedFailure('WORKFLOW_EVIDENCE_FAILED');
+    } finally { charge.ticket.close(scope.owner); }
+  }
+
   private record(scope: ManagedScope, phase: ScopeRecord['phase'], reason: string,
     quiescent: boolean, delivery: Delivery, value?: Outcome<unknown>, candidateSeq?: number): ScopeRecord {
     return Object.freeze({ kind: 'scope', phase, runId: this.runId, scopeId: scope.id,
@@ -330,7 +353,7 @@ export class ManagedRuntime {
   /** 先候选交付，再检查当前性，最后不调用用户代码地提交唯一裁定。 */
   public close<T>(scope: ManagedScope, value: Outcome<T>, frame?: Frame,
     resolution?: EvidenceResolution<string, unknown>, chain?: ScopeFrames): Outcome<T> {
-    let result = isManagedOutcome(value) ? value : managedFailure<T>('WORKFLOW_INVALID_OUTCOME');
+    let result = snapshotOutcome(value);
     let seq: number | undefined;
     if (scope.ticket.event(scope.owner)) {
       const candidate = this.record(scope, 'candidate', 'WORKFLOW_SCOPE_CANDIDATE', true,
@@ -380,7 +403,7 @@ export class ManagedRuntime {
   public async complete<T>(scope: ManagedScope, value: Outcome<T>, policy: WorkflowCompletionPolicy<T>,
     requirements: readonly EvidenceRequirement<string>[], depth: number):
     Promise<{ result: Outcome<T>; frame?: Frame; resolution?: EvidenceResolution<string, unknown> }> {
-    if (!isManagedOutcome(value)) return { result: managedFailure('WORKFLOW_INVALID_OUTCOME') };
+    value = snapshotOutcome(value);
     if (value.status !== 'COMPLETE') return { result: value };
     if (!this.available()) return { result: unknown('WORKFLOW_STOPPED') };
     const frame = this.frame();
@@ -422,7 +445,7 @@ export class ManagedRuntime {
     try {
       const validated = this.guarded(() => policy.validate(value.value, view));
       if (!isManagedOutcome(validated)) return { result: managedFailure('WORKFLOW_COMPLETION_INVALID') };
-      if (validated.status !== 'COMPLETE') return { result: validated };
+      if (validated.status !== 'COMPLETE') return { result: snapshotOutcome(validated) };
       if (!this.check(frame, resolution)) return { result: unknown('WORKFLOW_CURRENTNESS') };
     } catch { return { result: managedFailure('WORKFLOW_COMPLETION_INVALID') }; }
     return { result: value, frame, resolution };
@@ -440,7 +463,7 @@ export class ManagedRuntime {
     const context: WorkflowTerminalContext = Object.freeze({
       signal: controller.signal,
       read: async <T>(action: (signal: AbortSignal) => Outcome<T> | Promise<Outcome<T>>): Promise<Outcome<T>> => {
-        if (!open || controller.signal.aborted || left() <= 0
+        if (!open || this.#callback || controller.signal.aborted || left() <= 0
           || !scope.ticket.terminalRead(scope.owner)) {
           invalid = true;
           return managedFailure('WORKFLOW_TERMINAL_READ_DENIED');
@@ -449,9 +472,10 @@ export class ManagedRuntime {
         const joined = new Promise<void>(resolve => { release = resolve; });
         pending.add(joined);
         try {
-          const value = await action(controller.signal);
+          const rawValue = await action(controller.signal);
+          const value = snapshotOutcome(rawValue);
           const current = chain ? this.checkFrames(scope, chain) : frame !== undefined && this.check(frame);
-          if (!isManagedOutcome(value) || (!actualObservation && !current) || controller.signal.aborted
+          if (!isManagedOutcome(rawValue) || (!actualObservation && !current) || controller.signal.aborted
             || left() <= 0) {
             invalid = true;
             return managedFailure('WORKFLOW_TERMINAL_READ_STALE');
