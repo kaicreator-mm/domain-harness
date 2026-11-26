@@ -16,3 +16,5 @@ API: WorkflowElement XStateWorkflowElement StandardWorkflowSession NativeWorkflo
 固定原生节点使用 `NativeWorkflowContext#node`，绑定 `WorkflowNode` 与 `WorkflowNodeOptions`。类型化输入/输出不经 JSON；声明所需知识，取得实际 raw observations，以同一根及局部当前性策略验证，执行 before/run/after/cleanup/project。前置失败不调用业务 Function；实际执行后的 post、清理及观察保留实际效果和 receipt。候选不是正式接纳，最终裁定由 Session 提供；不得将 stale/UNKNOWN 当作成功。节点自身使用借用尝试作用域，不新建根预算。动态区域、Model、XState 和 Interaction 附着待后续集成。
 
 受控 XState 使用 `XStateWorkflowElement#runIn`，输入工厂接收 SDK 创建的实际借用作用域；actor 内的受控节点必须使用该 scope，不创建第二根任务。`WorkflowActorOptions` 声明同步 project 和 maxProjections（包含真实终态），执行前完整预留借用、输入和投影额度。超出投影上限、实际终态不可用或投影失效不能返回 COMPLETE；退出先关闭普通准入、等待已接纳的本地工作。旧 run(input) 行为不变。
+
+不需要或无法使用模型时，领域可调用 `NativeWorkflowContext#recordModelDecision` 记录 not-needed / unavailable 及有限原因，消费同根 step/work/event 额度，不初始化 Provider，不生成虚构模型用量，也不改变业务授权或目标验证。
