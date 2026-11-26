@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { ManagedRuntime, isManagedOutcome, managedFailure, snapshotControl } from './workflow-managed-runtime.js';
+import type { ManagedScope } from './workflow-managed-runtime.js';
+import type { WorkflowCompletionPolicy, WorkflowControlOptions, WorkflowKnowledgeFrame, WorkflowObservation } from './workflow-managed-contract.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import { WorkflowResourceLedger } from './workflow-resource-control.js';
 import type { ResourceFailure } from './workflow-resource-control.js';
@@ -49,10 +53,10 @@ export function routeWorkflowOutcome<T, R>(
 }
 
 class RootBudget {
-  private readonly ledger: WorkflowResourceLedger;
+  public readonly ledger: WorkflowResourceLedger;
 
-  constructor(limits: WorkflowLimits) {
-    this.ledger = new WorkflowResourceLedger(limits.maxCalls, limits.maxSteps);
+  constructor(limits: WorkflowLimits, control?: WorkflowControlOptions) {
+    this.ledger = new WorkflowResourceLedger(limits.maxCalls, limits.maxSteps, control?.limits);
   }
 
   public get calls(): number { return this.ledger.remaining().calls; }
@@ -74,7 +78,37 @@ class ScopeLifetime {
   private state: 'OPEN' | 'STOPPING' | 'CLOSED' = 'OPEN';
   private readonly pending = new Set<Promise<void>>();
 
-  constructor(private readonly parent?: ScopeLifetime) {}
+  readonly id = randomUUID();
+  readonly runId: string;
+  readonly signal: AbortSignal;
+  private readonly controller = new AbortController();
+  private readonly upstream: AbortSignal | undefined;
+  private readonly abort = () => { this.controller.abort(this.upstream?.reason); };
+  constructor(private readonly parent?: ScopeLifetime, readonly managed?: ManagedRuntime,
+    readonly scope?: ManagedScope) {
+    this.runId = managed?.runId ?? parent?.runId ?? randomUUID();
+    this.upstream = parent?.signal ?? managed?.signal;
+    this.signal = this.controller.signal;
+    if (this.upstream?.aborted) this.abort();
+    else this.upstream?.addEventListener('abort', this.abort, { once: true });
+  }
+  public admissible(): boolean { return this.isOpen() && (this.managed?.available() ?? true); }
+
+  public reserve(budget: RootBudget, calls: number, units: number):
+    { frame?: WorkflowKnowledgeFrame } | { code: string } {
+    if (!this.admissible()) return { code: 'WORKFLOW_SCOPE_CLOSED' };
+    if (this.managed && this.scope) return this.managed.reserveCall(this.scope, calls, units);
+    const refused = budget.reserve(calls, calls);
+    return refused === undefined ? {} : { code: refused };
+  }
+
+  public checked<T>(result: Result<T>, frame?: WorkflowKnowledgeFrame): Result<T> {
+    if (!this.managed) return result;
+    if (!isManagedOutcome(result)) return managedFailure('WORKFLOW_INVALID_OUTCOME');
+    if (result.status !== 'COMPLETE') return result;
+    return frame && this.admissible() && this.managed.check(frame) ? result
+      : { status: 'UNKNOWN', reason: { code: 'WORKFLOW_CURRENTNESS', message: 'Managed result not accepted' } };
+  }
 
   public isOpen(): boolean {
     return this.state === 'OPEN' && (this.parent?.isOpen() ?? true);
@@ -96,6 +130,7 @@ class ScopeLifetime {
     const outstanding = [...this.pending];
     await Promise.all(outstanding);
     this.state = 'CLOSED';
+    this.upstream?.removeEventListener('abort', this.abort);
     return outstanding.length > 0;
   }
 }
@@ -134,6 +169,22 @@ export class NativeWorkflowContext {
     scopeLifetimes.set(this, new ScopeLifetime());
   }
 
+  public get signal(): AbortSignal { return scopeLifetime(this).signal; }
+  public get runId(): string { return scopeLifetime(this).runId; }
+  public get scopeId(): string { const lifetime = scopeLifetime(this); return lifetime.scope?.id ?? lifetime.id; }
+
+  /** 显式有限工作；仅受控 Session 可接纳。 */
+  public async work<T>(units: number, action: () => Result<T> | Promise<Result<T>>): Promise<Result<T>> {
+    const lifetime = scopeLifetime(this);
+    if (!lifetime.managed || !Number.isSafeInteger(units) || units <= 0) return managedFailure('WORKFLOW_INVALID_LIMIT');
+    const reserved = lifetime.reserve(this.budget, 1, units);
+    if ('code' in reserved) return lifetime.managed ? managedFailure(reserved.code) : failure(reserved.code as WorkflowFailureCode);
+    const finish = lifetime.begin();
+    try { return lifetime.checked(await action(), reserved.frame); }
+    catch { return failure('WORKFLOW_EXECUTION_FAILED'); }
+    finally { finish(); }
+  }
+
   /** 当前共享根余额及本层可用子层深度；只读快照，不预留或增加额度。 */
   public remaining(): Readonly<{ calls: number; steps: number; maxDescendantDepth: number }> {
     return Object.freeze({
@@ -148,12 +199,12 @@ export class NativeWorkflowContext {
    * Outcome 都会作为 value 被包装，不能用本方法传播业务 REJECT/UNKNOWN/FAILED。
    */
   public async invoke<T>(action: () => T | Promise<T>): Promise<Result<T>> {
-    if (!scopeLifetime(this).isOpen()) return failure('WORKFLOW_SCOPE_CLOSED');
-    const refused = this.budget.reserve(1, 1);
-    if (refused !== undefined) return failure(refused);
-    const finish = scopeLifetime(this).begin();
+    const lifetime = scopeLifetime(this);
+    const reserved = lifetime.reserve(this.budget, 1, 1);
+    if ('code' in reserved) return lifetime.managed ? managedFailure(reserved.code) : failure(reserved.code as WorkflowFailureCode);
+    const finish = lifetime.begin();
     try {
-      return { status: 'COMPLETE', value: await action() };
+      return lifetime.checked({ status: 'COMPLETE', value: await action() }, reserved.frame);
     } catch {
       return failure('WORKFLOW_EXECUTION_FAILED');
     } finally {
@@ -168,12 +219,12 @@ export class NativeWorkflowContext {
   public async invokeOutcome<T>(
     action: () => Result<T> | Promise<Result<T>>,
   ): Promise<Result<T>> {
-    if (!scopeLifetime(this).isOpen()) return failure('WORKFLOW_SCOPE_CLOSED');
-    const refused = this.budget.reserve(1, 1);
-    if (refused !== undefined) return failure(refused);
-    const finish = scopeLifetime(this).begin();
+    const lifetime = scopeLifetime(this);
+    const reserved = lifetime.reserve(this.budget, 1, 1);
+    if ('code' in reserved) return lifetime.managed ? managedFailure(reserved.code) : failure(reserved.code as WorkflowFailureCode);
+    const finish = lifetime.begin();
     try {
-      return await action();
+      return lifetime.checked(await action(), reserved.frame);
     } catch {
       return failure('WORKFLOW_EXECUTION_FAILED');
     } finally {
@@ -186,32 +237,44 @@ export class NativeWorkflowContext {
     maxDescendantDepth: number,
     action: WorkflowHandler<T>,
   ): Promise<Result<T>> {
-    if (!scopeLifetime(this).isOpen()) return failure('WORKFLOW_SCOPE_CLOSED');
-    // 不可信数值只验证当前 Workflow 的业务参数，不复查 Package 结构。
-    if (!validLimit(maxDescendantDepth)) return failure('WORKFLOW_INVALID_LIMIT');
+    const parent = scopeLifetime(this);
+    if (!parent.admissible()) return failure('WORKFLOW_SCOPE_CLOSED');
+    if (!validLimit(maxDescendantDepth) || (parent.managed && maxDescendantDepth > 2 ** 31 - 1)) return failure('WORKFLOW_INVALID_LIMIT');
     const nextDepth = this.depth + 1;
-    if (this.ancestors.some((item) => nextDepth - item.depth > item.descendants)) {
-      return failure('WORKFLOW_DEPTH_LIMIT');
+    if (this.ancestors.some(item => nextDepth - item.depth > item.descendants)) return failure('WORKFLOW_DEPTH_LIMIT');
+    const managed = parent.managed;
+    let scope: ManagedScope | undefined;
+    if (managed) {
+      const admitted = managed.reserveScope(this.scopeId);
+      if ('code' in admitted) return managedFailure(admitted.code);
+      scope = admitted.scope;
+    } else {
+      const refused = this.budget.reserve(0, 1);
+      if (refused !== undefined) return failure(refused);
     }
-    const refused = this.budget.reserve(0, 1);
-    if (refused !== undefined) return failure(refused);
-    const finish = scopeLifetime(this).begin();
-    const lifetime = new ScopeLifetime(scopeLifetime(this));
+    const finish = parent.begin();
+    const lifetime = new ScopeLifetime(parent, managed, scope);
     const child = new NativeWorkflowContext(this.budget, [
       ...this.ancestors, { depth: nextDepth, descendants: maxDescendantDepth },
     ], nextDepth);
     scopeLifetimes.set(child, lifetime);
     let result: Result<T>;
+    const frame = managed?.frame();
     try {
-      result = await action(child);
-    } catch {
-      result = failure('WORKFLOW_EXECUTION_FAILED');
-    }
+      if (managed && scope && (!frame || !managed.open(scope) || !managed.check(frame) || !parent.admissible())) {
+        result = managedFailure('WORKFLOW_CHILD_ADMISSION');
+      } else result = await action(child);
+    } catch { result = failure('WORKFLOW_EXECUTION_FAILED'); }
     try {
-      return afterJoin(result, await lifetime.close());
-    } finally {
-      finish();
-    }
+      const unjoined = await lifetime.close();
+      if (managed && !isManagedOutcome(result)) result = managedFailure('WORKFLOW_INVALID_OUTCOME');
+      result = afterJoin(result, unjoined);
+      if (managed && scope) {
+        if (result.status === 'COMPLETE' && !parent.admissible()) result = managedFailure('WORKFLOW_SCOPE_CLOSED');
+        return managed.close(scope, result, frame);
+      }
+      return result;
+    } finally { finish(); }
   }
 
   /**
@@ -223,18 +286,19 @@ export class NativeWorkflowContext {
     readonly run: () => Result<T> | Promise<Result<T>>;
     readonly end?: () => void | Promise<void>;
   }): Promise<Result<T>> {
-    if (!scopeLifetime(this).isOpen()) return failure('WORKFLOW_SCOPE_CLOSED');
+    const lifetime = scopeLifetime(this);
+    if (!lifetime.admissible()) return failure('WORKFLOW_SCOPE_CLOSED');
     // 预算与执行必须使用同一组已接纳的回调；调用方可能持有可变别名。
     const { start, run, end } = options;
     const calls = 1 + Number(start !== undefined) + Number(end !== undefined);
-    const refused = this.budget.reserve(calls, calls);
-    if (refused !== undefined) return failure(refused);
-    const finish = scopeLifetime(this).begin();
+    const reserved = lifetime.reserve(this.budget, calls, calls);
+    if ('code' in reserved) return lifetime.managed ? managedFailure(reserved.code) : failure(reserved.code as WorkflowFailureCode);
+    const finish = lifetime.begin();
 
     let result: Result<T> | undefined;
     try {
       if (start !== undefined) await start.call(options);
-      result = scopeLifetime(this).isOpen()
+      result = lifetime.admissible() && (!lifetime.managed || (reserved.frame && lifetime.managed.check(reserved.frame)))
         ? await run.call(options)
         : failure('WORKFLOW_SCOPE_CLOSED');
     } catch {
@@ -253,7 +317,7 @@ export class NativeWorkflowContext {
       }
       finish();
     }
-    return result ?? failure('WORKFLOW_EXECUTION_FAILED');
+    return lifetime.checked(result ?? failure('WORKFLOW_EXECUTION_FAILED'), reserved.frame);
   }
 }
 
@@ -266,8 +330,10 @@ export class StandardWorkflowSession {
   private started = false;
 
   private readonly limits: WorkflowLimits;
+  private readonly control: WorkflowControlOptions | undefined;
+  private managed: ManagedRuntime | undefined;
 
-  constructor(limits: WorkflowLimits) {
+  constructor(limits: WorkflowLimits, control?: WorkflowControlOptions) {
     // 同一时点读取不可变快照；验证、余额和祖先深度必须使用同一份值。
     // 不能信任调用方后续对原始 limits 对象的修改。
     this.limits = {
@@ -275,16 +341,24 @@ export class StandardWorkflowSession {
       maxSteps: limits.maxSteps,
       maxDepth: limits.maxDepth,
     };
-    this.budget = new RootBudget(this.limits);
+    this.control = control === undefined ? undefined : snapshotControl(control);
+    this.budget = new RootBudget(this.limits, this.control);
   }
 
-  public async run<T>(action: WorkflowHandler<T>): Promise<Result<T>> {
+  public dispositions(): readonly WorkflowObservation[] { return this.managed?.dispositions() ?? Object.freeze([]); }
+
+  public async run<T>(action: WorkflowHandler<T>, completion?: WorkflowCompletionPolicy<T>): Promise<Result<T>> {
     if (this.started) return failure('WORKFLOW_ALREADY_RUN');
     this.started = true;
     if (![this.limits.maxCalls, this.limits.maxSteps, this.limits.maxDepth]
       .every(validLimit)) {
       return failure('WORKFLOW_INVALID_LIMIT');
     }
+    if (this.control !== undefined) {
+      if (this.limits.maxDepth > 2 ** 31 - 1) return failure('WORKFLOW_INVALID_LIMIT');
+      return this.runManaged(action, completion);
+    }
+    if (completion !== undefined) return managedFailure('WORKFLOW_CONTROL_REQUIRED');
     const refused = this.budget.reserve(0, 1);
     if (refused !== undefined) return failure(refused);
     const lifetime = new ScopeLifetime();
@@ -300,6 +374,43 @@ export class StandardWorkflowSession {
     }
     return afterJoin(result, await lifetime.close());
   }
+
+  private async runManaged<T>(action: WorkflowHandler<T>, completion?: WorkflowCompletionPolicy<T>): Promise<Result<T>> {
+    let managed: ManagedRuntime;
+    try { managed = new ManagedRuntime(this.control!, this.budget.ledger); }
+    catch { return managedFailure('WORKFLOW_INVALID_LIMIT'); }
+    this.managed = managed;
+    try {
+      if (!managed.validCompletion(completion)) return managedFailure('WORKFLOW_COMPLETION_REQUIRED');
+      // 读取一次可信完成策略，预算和执行使用同一份回调与声明。
+      const policy = Object.freeze({ ...completion });
+      const admitted = managed.reserveScope(undefined, policy as WorkflowCompletionPolicy<unknown>);
+      if ('code' in admitted) return managedFailure(admitted.code);
+      const scope = admitted.scope;
+      const lifetime = new ScopeLifetime(undefined, managed, scope);
+      const root = new NativeWorkflowContext(this.budget, [
+        { depth: 0, descendants: this.limits.maxDepth },
+      ], 0);
+      scopeLifetimes.set(root, lifetime);
+      let result: Result<T>;
+      let requirements: ReturnType<ManagedRuntime['requirements']>;
+      try {
+        requirements = managed.requirements(policy as WorkflowCompletionPolicy<unknown>);
+        const frame = managed.frame();
+        result = requirements && frame && managed.open(scope) && managed.check(frame)
+          ? await action(root) : managedFailure('WORKFLOW_ROOT_ADMISSION');
+      } catch { result = failure('WORKFLOW_EXECUTION_FAILED'); }
+      const unjoined = await lifetime.close();
+      if (!isManagedOutcome(result)) result = managedFailure('WORKFLOW_INVALID_OUTCOME');
+      result = afterJoin(result, unjoined);
+      if (requirements === undefined) return managed.close(scope, result);
+      try {
+        const final = await managed.complete(scope, result, policy, requirements, this.limits.maxDepth);
+        return managed.close(scope, final.result, final.frame, final.resolution);
+      } catch { return managed.close(scope, managedFailure('WORKFLOW_COMPLETION_INVALID')); }
+    } finally { managed.clock.finish(); }
+  }
+
 }
 
 /**
