@@ -1,0 +1,511 @@
+{
+  "format": "dh-r23-public-wire/1",
+  "status": "NOT_RUN",
+  "classification": "PUBLIC_LOOPBACK_FIXTURES_NOT_PROVIDER_QUALIFICATION",
+  "profile": {
+    "explicitLoopback": true,
+    "requestBytes": 4096,
+    "responseBytes": 4096,
+    "maxOutputTokens": 32,
+    "timeoutMs": 1000,
+    "features": [
+      "tools",
+      "jsonSchema",
+      "toolsWithJsonSchema"
+    ],
+    "tokenBoundFixtureOnly": {
+      "inputUpperBound": 128,
+      "output": 32,
+      "aggregateExactTwoCalls": 320,
+      "aggregateOneShort": 319,
+      "assertion": "trusted test handler enforces declared bound; second credential and HTTP zero for 319; live profile must separately demonstrate reliable bound"
+    }
+  },
+  "openai": {
+    "endpointSuffix": "/chat/completions",
+    "headers": {
+      "authorization": "Bearer <runtime-test-token>",
+      "contentType": "application/json"
+    },
+    "initial": {
+      "model": "fixture-model",
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use only current authorized offer observations."
+        },
+        {
+          "role": "user",
+          "content": "Compare A and B for six compatible units."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "quote",
+            "description": "Read actual current offer",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "offer": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "offer"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "max_completion_tokens": 32
+    },
+    "response": {
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call-A",
+                "type": "function",
+                "function": {
+                  "name": "quote",
+                  "arguments": "{\"offer\":\"A\"}"
+                }
+              },
+              {
+                "id": "call-B",
+                "type": "function",
+                "function": {
+                  "name": "quote",
+                  "arguments": "{\"offer\":\"B\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 90,
+        "completion_tokens": 12,
+        "total_tokens": 102
+      }
+    },
+    "continuation": {
+      "model": "fixture-model",
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use only current authorized offer observations."
+        },
+        {
+          "role": "user",
+          "content": "Compare A and B for six compatible units."
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call-A",
+              "type": "function",
+              "function": {
+                "name": "quote",
+                "arguments": "{\"offer\":\"A\"}"
+              }
+            },
+            {
+              "id": "call-B",
+              "type": "function",
+              "function": {
+                "name": "quote",
+                "arguments": "{\"offer\":\"B\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call-A",
+          "content": "{\"value\":{\"offer\":\"A\",\"cost\":30,\"pack\":3,\"revision\":\"r1\"},\"error\":false}"
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call-B",
+          "content": "{\"value\":{\"offer\":\"B\",\"cost\":24,\"pack\":2,\"revision\":\"r1\"},\"error\":false}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "quote",
+            "description": "Read actual current offer",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "offer": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "offer"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "max_completion_tokens": 32,
+      "response_format": {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "lead",
+          "strict": true,
+          "schema": {
+            "type": "object",
+            "properties": {
+              "lead": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "lead"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "final": {
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "{\"lead\":2}"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 110,
+        "completion_tokens": 4,
+        "total_tokens": 114
+      }
+    }
+  },
+  "anthropic": {
+    "endpointSuffix": "/messages",
+    "headers": {
+      "x-api-key": "<runtime-test-token>",
+      "anthropic-version": "2023-06-01",
+      "contentType": "application/json"
+    },
+    "initial": {
+      "model": "fixture-model",
+      "system": "Use only current authorized offer observations.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Compare A and B for six compatible units."
+        }
+      ],
+      "tools": [
+        {
+          "name": "quote",
+          "description": "Read actual current offer",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "offer": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "offer"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "max_tokens": 32
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Check current offers."
+        },
+        {
+          "type": "tool_use",
+          "id": "call-A",
+          "name": "quote",
+          "input": {
+            "offer": "A"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "call-B",
+          "name": "quote",
+          "input": {
+            "offer": "B"
+          }
+        }
+      ],
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 80,
+        "output_tokens": 12,
+        "cache_creation_input_tokens": 10,
+        "cache_read_input_tokens": 5
+      }
+    },
+    "continuation": {
+      "model": "fixture-model",
+      "system": "Use only current authorized offer observations.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Compare A and B for six compatible units."
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Check current offers."
+            },
+            {
+              "type": "tool_use",
+              "id": "call-A",
+              "name": "quote",
+              "input": {
+                "offer": "A"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "call-B",
+              "name": "quote",
+              "input": {
+                "offer": "B"
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-A",
+              "content": "{\"offer\":\"A\",\"cost\":30,\"pack\":3,\"revision\":\"r1\"}",
+              "is_error": false
+            },
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-B",
+              "content": "{\"offer\":\"B\",\"cost\":24,\"pack\":2,\"revision\":\"r1\"}",
+              "is_error": false
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "name": "quote",
+          "description": "Read actual current offer",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "offer": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "offer"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "max_tokens": 32,
+      "output_config": {
+        "format": {
+          "type": "json_schema",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "lead": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "lead"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "final": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"lead\":2}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 4,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    }
+  },
+  "assertions": {
+    "wire": "compare parsed JSON structure and exact frozen request bytes used for token bound versus HTTP body; property order not an independent business criterion; assistant accepted prior wire order and result IDs exact; all results prior to reentry",
+    "expectedUsage": {
+      "openaiInitial": {
+        "input": 90,
+        "output": 12,
+        "total": 102
+      },
+      "anthropicInitial": {
+        "input": 95,
+        "output": 12,
+        "total": 107
+      },
+      "missingAnthropicCache": "unknown input total unless profile establishes absent means zero"
+    },
+    "actualResult": "lead=2 is a bounded schema-valid suggestion, not source authority; verify DA optimum against actual data independently"
+  },
+  "negative": [
+    {
+      "id": "wire-id-duplicate",
+      "mutate": "second call id=call-A",
+      "expect": "non-COMPLETE, no tool execution"
+    },
+    {
+      "id": "wire-id-foreign",
+      "mutate": "result callId=foreign",
+      "expect": "continuation HTTP delta0"
+    },
+    {
+      "id": "wire-id-incomplete",
+      "mutate": "omit second result",
+      "expect": "continuation HTTP delta0"
+    },
+    {
+      "id": "wire-id-reorder",
+      "mutate": "swap result order",
+      "expect": "reject wrong order or normalize to exact original accepted call order per contract; never send wrong correlation"
+    },
+    {
+      "id": "wire-args",
+      "mutate": "OpenAI arguments raw string {bad",
+      "expect": "non-COMPLETE"
+    },
+    {
+      "id": "wire-json-duplicate",
+      "raw": "{\"lead\":2,\"lead\":3}",
+      "expect": "non-COMPLETE"
+    },
+    {
+      "id": "wire-json-prototype",
+      "raw": "{\"__proto__\":{},\"lead\":2}",
+      "expect": "non-COMPLETE"
+    },
+    {
+      "id": "wire-json-shape",
+      "raw": "{\"lead\":\"2\"}",
+      "expect": "non-COMPLETE"
+    },
+    {
+      "id": "wire-schema",
+      "mutate": "strict true missing schema or $ref recursion or additionalProperties not false or unsupported tools+schema profile",
+      "expect": "credential and HTTP delta0"
+    },
+    {
+      "id": "wire-reject",
+      "mutate": "OpenAI refusal/content_filter/length or Anthropic refusal/max_tokens/pause_turn/unknown block",
+      "expect": "non-COMPLETE; no invented output"
+    },
+    {
+      "id": "wire-http",
+      "statuses": [
+        401,
+        403,
+        429,
+        500,
+        503
+      ],
+      "expect": "stable redacted non-success; no automatic retry"
+    },
+    {
+      "id": "wire-redirect",
+      "status": 302,
+      "location": "/target",
+      "expect": "target hit0 and no forwarded credentials"
+    },
+    {
+      "id": "wire-cap",
+      "bodyBytes": 4097,
+      "expect": "bounded read/cancel, no parse/adoption"
+    },
+    {
+      "id": "wire-utf8",
+      "hex": "c328",
+      "expect": "fatal UTF-8 failure"
+    },
+    {
+      "id": "wire-timeout",
+      "delayMs": 1500,
+      "expect": "actual abort/non-COMPLETE, no late result accepted"
+    },
+    {
+      "id": "wire-credential-cancel",
+      "barrier": "credential pending then abort",
+      "expect": "HTTP delta0; local quiescence before scope release"
+    },
+    {
+      "id": "wire-credential-stale",
+      "barrier": "credential pending then bound ancestor frame r1->r2 or auth revoke",
+      "expect": "HTTP delta0"
+    },
+    {
+      "id": "wire-late",
+      "barrier": "after actual HTTP before body adoption change epoch",
+      "expect": "no proposal adoption, actual usage/attempt retained"
+    },
+    {
+      "id": "wire-usage",
+      "mutate": "OpenAI total inconsistent with input/output, negative/noninteger or output33 beyond32",
+      "expect": "protocol/limit failure, retain actual facts"
+    },
+    {
+      "id": "wire-retry",
+      "mutate": "explicit same key after failure then fallback, success reclassified as retry, foreign turn",
+      "expect": "only authorized eligible retry/fallback increment same attempt and shared counters, successful reclassification/foreign turn deny"
+    },
+    {
+      "id": "wire-budget",
+      "aggregate": 319,
+      "expect": "first actual request may consume160, second zero credential/HTTP; no refund"
+    },
+    {
+      "id": "wire-depth",
+      "depth": 33,
+      "expect": "bounded reject before unbounded construction"
+    }
+  ]
+}
