@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { ManagedRuntime, isManagedOutcome, managedFailure, snapshotControl } from './workflow-managed-runtime.js';
-import { admitNode, executeNode } from './workflow-managed-node.js';
+import { admitNode, executeNode, safeDetail } from './workflow-managed-node.js';
 import type { ScopeFrames, ManagedScope } from './workflow-managed-runtime.js';
 import type { WorkflowCompletionPolicy, WorkflowControlOptions, WorkflowObservation, WorkflowNode, WorkflowNodeOptions } from './workflow-managed-contract.js';
+import type { StandardJsonValue } from './standard-files.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import { WorkflowResourceLedger } from './workflow-resource-control.js';
 import type { ResourceFailure } from './workflow-resource-control.js';
@@ -93,7 +94,7 @@ class ScopeLifetime {
     if (this.upstream?.aborted) this.abort();
     else this.upstream?.addEventListener('abort', this.abort, { once: true });
   }
-  public admissible(): boolean { return this.isOpen() && (this.managed?.available() ?? true); }
+  public admissible(): boolean { return !this.signal.aborted && this.isOpen() && (this.managed?.available() ?? true); }
 
   public reserve(budget: RootBudget, calls: number, units: number):
     { frame?: ScopeFrames } | { code: string } {
@@ -126,8 +127,14 @@ class ScopeLifetime {
     };
   }
 
+  /** actor 终态先关闭准入；异常仅取消本地作用域及后代，随后由原有 close 等待。 */
+  public stopAdmission(cancel: boolean): void {
+    if (this.state === 'OPEN') this.state = 'STOPPING';
+    if (cancel) this.controller.abort('workflow-scope-stopped');
+  }
+
   public async close(): Promise<boolean> {
-    this.state = 'STOPPING';
+    this.stopAdmission(false);
     const outstanding = [...this.pending];
     await Promise.all(outstanding);
     this.state = 'CLOSED';
@@ -145,7 +152,7 @@ function afterJoin<T>(result: Result<T>, unjoined: boolean): Result<T> {
 }
 
 const scopeLifetimes = new WeakMap<NativeWorkflowContext, ScopeLifetime>();
-const scopeBorrowers = new WeakMap<NativeWorkflowContext, <T>(depth: number, action: WorkflowHandler<T>, local?: number) => Promise<Result<T>>>();
+const scopeBorrowers = new WeakMap<NativeWorkflowContext, <T>(depth: number, action: WorkflowHandler<T>, local?: number, actorProjections?: number) => Promise<Result<T>>>();
 
 /** 内部 Region/Actor 入口使用同一借用生命周期；不从 SDK 根导出。 */
 export function borrowWorkflowScope<T>(root: NativeWorkflowContext, maxDescendantDepth: number,
@@ -159,6 +166,57 @@ function scopeLifetime(context: NativeWorkflowContext): ScopeLifetime {
   const lifetime = scopeLifetimes.get(context);
   if (lifetime === undefined) throw new Error('Missing native workflow scope');
   return lifetime;
+}
+
+/** 私有 actor 接线，不暴露账本、票据或新的根任务。 */
+export interface AttachedActorScope {
+  readonly signal: AbortSignal;
+  input<T>(factory: () => T): T;
+  project(definitionId: string, callback: () => StandardJsonValue): boolean;
+  map<T>(callback: () => Result<T>): Result<T>;
+  stop(cancel: boolean): void;
+}
+
+export function borrowActorScope<T>(root: NativeWorkflowContext, maxProjections: number,
+  action: (scope: NativeWorkflowContext, actor: AttachedActorScope) => Result<T> | Promise<Result<T>>): Promise<Result<T>> {
+  const borrow = scopeBorrowers.get(root);
+  if (!borrow || !Number.isSafeInteger(maxProjections) || maxProjections < 1 || maxProjections > 65536) {
+    return Promise.resolve(managedFailure('WORKFLOW_INVALID_LIMIT'));
+  }
+  return borrow(Math.max(0, root.remaining().maxDescendantDepth - 1), async child => {
+    const lifetime = scopeLifetime(child);
+    const runtime = lifetime.managed, scope = lifetime.scope, actor = scope?.actor;
+    if (!runtime || !scope || !actor?.frame) return managedFailure('WORKFLOW_ACTOR_ADMISSION');
+    const frame = actor.frame;
+    const attached: AttachedActorScope = {
+      signal: child.signal,
+      input: <I>(factory: () => I): I => {
+        if (!lifetime.admissible()) throw Error('WORKFLOW_SCOPE_CLOSED');
+        const input = runtime.guarded(factory);
+        if (!lifetime.admissible() || !runtime.checkFrames(scope, frame)) throw Error('WORKFLOW_CURRENTNESS');
+        return input;
+      },
+      project: (definitionId, callback) => {
+        if (!lifetime.admissible() || actor.remaining === 0 || !scope.ticket.event(scope.owner)) return false;
+        actor.remaining--;
+        try {
+          const detail = runtime.guarded(() => safeDetail(callback(), 65536 - 1024));
+          const delivered = runtime.deliver(scope, Object.freeze({ kind: 'actor', definitionId, detail,
+            runId: runtime.runId, scopeId: scope.id, parentScopeId: scope.parentId!,
+            seq: runtime.sequence(), factRevision: frame.locals.at(-1)?.frame.epoch ?? frame.root.epoch,
+            stage: 'actor' }));
+          return delivered && lifetime.admissible() && runtime.checkFrames(scope, frame);
+        } catch { return false; }
+      },
+      map: <O>(callback: () => Result<O>): Result<O> => {
+        if (!lifetime.admissible()) return managedFailure('WORKFLOW_SCOPE_CLOSED');
+        const result = runtime.guarded(callback);
+        return isManagedOutcome(result) ? result : managedFailure('WORKFLOW_INVALID_OUTCOME');
+      },
+      stop: cancel => { lifetime.stopAdmission(cancel); },
+    };
+    return action(child, attached);
+  }, undefined, maxProjections);
 }
 
 interface AncestorLimit {
@@ -177,7 +235,7 @@ export class NativeWorkflowContext {
     public readonly depth: number,
   ) {
     scopeLifetimes.set(this, new ScopeLifetime());
-    scopeBorrowers.set(this, (depth, action, local) => this.borrow(depth, action, local));
+    scopeBorrowers.set(this, (depth, action, local, actorProjections) => this.borrow(depth, action, local, actorProjections));
   }
 
   public get signal(): AbortSignal { return scopeLifetime(this).signal; }
@@ -269,7 +327,7 @@ export class NativeWorkflowContext {
     return this.borrow(maxDescendantDepth, action);
   }
 
-  private async borrow<T>(maxDescendantDepth: number, action: WorkflowHandler<T>, maxLocalWork?: number): Promise<Result<T>> {
+  private async borrow<T>(maxDescendantDepth: number, action: WorkflowHandler<T>, maxLocalWork?: number, actorProjections?: number): Promise<Result<T>> {
     const parent = scopeLifetime(this);
     if (!parent.admissible()) return failure('WORKFLOW_SCOPE_CLOSED');
     if (!validLimit(maxDescendantDepth) || (parent.managed && maxDescendantDepth > 2 ** 31 - 1)) return failure('WORKFLOW_INVALID_LIMIT');
@@ -278,11 +336,11 @@ export class NativeWorkflowContext {
     const managed = parent.managed;
     let scope: ManagedScope | undefined;
     if (managed) {
-      const admitted = managed.reserveScope(this.scopeId, undefined, parent.scope, maxLocalWork);
+      const admitted = managed.reserveScope(this.scopeId, undefined, parent.scope, maxLocalWork, actorProjections);
       if ('code' in admitted) return managedFailure(admitted.code);
       scope = admitted.scope;
     } else {
-      if (maxLocalWork !== undefined) return managedFailure('WORKFLOW_CONTROL_REQUIRED');
+      if (maxLocalWork !== undefined || actorProjections !== undefined) return managedFailure('WORKFLOW_CONTROL_REQUIRED');
       const refused = this.budget.reserve(0, 1);
       if (refused !== undefined) return failure(refused);
     }
@@ -294,6 +352,7 @@ export class NativeWorkflowContext {
     scopeLifetimes.set(child, lifetime);
     let result: Result<T>;
     const frame = managed && scope ? managed.frames(scope) : undefined;
+    if (scope?.actor && frame) scope.actor.frame = frame;
     try {
       if (managed && scope && (!frame || !managed.open(scope) || !managed.checkFrames(scope, frame) || !parent.admissible())) {
         result = managedFailure('WORKFLOW_CHILD_ADMISSION');
