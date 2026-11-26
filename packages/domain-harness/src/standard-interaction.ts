@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { StandardWorkflowSession, borrowInteractionScope } from './native-workflow-composition.js';
-import type { NativeWorkflowContext, WorkflowLimits } from './native-workflow-composition.js';
+import type { NativeWorkflowContext, WorkflowLimits, AttachedInteractionScope } from './native-workflow-composition.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import { makePrompt, readResponse, responseData } from './interaction-protocol.js';
 import type { InteractionEvent as RawInteractionEvent, InteractionPrompt, InteractionPromptSpec, InteractionRecord, InteractionResponse, InteractionSubmitResult } from './interaction-protocol.js';
@@ -45,6 +45,7 @@ interface Pending {
   readonly prompt: InteractionPrompt;
   readonly finish: (result: Outcome<InteractionResponse>) => void;
   notifying: boolean;
+  published?: boolean;
   captured?: InteractionResponse;
 }
 
@@ -61,6 +62,7 @@ export class InteractionElement {
   #pending: Pending | undefined;
   #records: InteractionRecord[] = [];
   #resolving = false;
+  #attachment: AttachedInteractionScope | undefined;
   #active = new Set<Promise<unknown>>();
   constructor(options?: { readonly onPrompt?: (prompt: InteractionPrompt, interaction: InteractionElement) => void }) { this.#notify = options?.onPrompt; }
 
@@ -85,6 +87,7 @@ export class InteractionElement {
       response = readResponse(data, pending.prompt);
     } catch { return { accepted: false, code: 'INVALID_RESPONSE' }; }
     // 解析结束再次核对所有权；同一个等待只可捕获一次。
+    if (this.#attachment && !this.#attachment.admissible()) return { accepted: false, code: 'ALREADY_SETTLED' };
     if (this.#pending !== pending || pending.captured || this.#abort.signal.aborted) return { accepted: false, code: 'ALREADY_SETTLED' };
     pending.captured = response;
     if (!pending.notifying) pending.finish(ok(response));
@@ -95,6 +98,10 @@ export class InteractionElement {
     return new Promise(resolve => {
       const pending: Pending = { prompt, notifying: true, finish: result => {
         if (this.#pending === pending) this.#pending = undefined;
+        if (pending.published) {
+          pending.published = false;
+          this.#attachment?.waiting(false);
+        }
         resolve(result);
       } };
       this.#pending = pending;
@@ -108,6 +115,10 @@ export class InteractionElement {
         pending.notifying = false;
         if (this.#abort.signal.aborted) pending.finish(stop('REJECT', 'CANCELLED'));
         else if (pending.captured) pending.finish(ok(pending.captured));
+        else if (this.#attachment) {
+          pending.published = true;
+          this.#attachment.waiting(true);
+        }
       } catch {
         pending.finish(stop('FAILED', 'INTERACTION_NOTIFICATION_FAILED'));
       }
@@ -175,6 +186,8 @@ export class InteractionElement {
         const accepted = response.value;
         if (accepted.action === 'cancel') { this.cancel(); return stop('REJECT', 'CANCELLED'); }
         if (accepted.action === 'reject') return stop('REJECT', 'INTERACTION_REJECTED');
+        const checkpoint = this.#attachment?.feedback();
+        if (checkpoint && checkpoint.status !== 'COMPLETE') return checkpoint;
         if (accepted.action === 'revise') this.#invalidate();
         else this.#invalidate([accepted.decisionKey]);
         this.#records.push(Object.freeze({ response: accepted, valid: true }));
@@ -224,7 +237,9 @@ export class InteractionElement {
 
   /** 附着已有受控 Workflow；共享根额度、作用域及取消，不创建 Session。 */
   async runIn<T>(root: NativeWorkflowContext, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>> {
-    return this.#execute(() => borrowInteractionScope(root, async (child, cancel) => {
+    return this.#execute(() => borrowInteractionScope(root, async (child, attachment) => {
+      this.#attachment = attachment;
+      const cancel = () => attachment.cancel();
       const abort = () => this.cancel();
       child.signal.addEventListener('abort', abort, { once: true });
       this.#abort.signal.addEventListener('abort', cancel, { once: true });
@@ -236,6 +251,7 @@ export class InteractionElement {
       } finally {
         child.signal.removeEventListener('abort', abort);
         this.#abort.signal.removeEventListener('abort', cancel);
+        this.#attachment = undefined;
       }
     }));
   }

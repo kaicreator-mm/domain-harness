@@ -128,6 +128,16 @@ export class ManagedRuntime {
   }
   public get criticalFailed(): boolean { return this.#criticalFailed; }
 
+  #activeLeaves = 0;
+  #waitingLeaves = 0;
+
+  /** 只接收已拥有操作的叶子状态变化；时钟需要是否存在，不新增额度维度。 */
+  public activity(activeDelta: number, waitingDelta: number): void {
+    this.#activeLeaves += activeDelta;
+    this.#waitingLeaves += waitingDelta;
+    this.clock.activity(Number(this.#activeLeaves > 0), Number(this.#waitingLeaves > 0));
+  }
+
   #callback = false;
   #criticalFailed = false;
   #last: Frame | undefined;
@@ -302,6 +312,21 @@ export class ManagedRuntime {
     admission.ticket.close(scope.owner);
     const frame = this.frames(scope);
     return frame === undefined ? { code: 'WORKFLOW_CURRENTNESS' } : { frame };
+  }
+
+  /** 用户响应实际进入分析前预留检查点；真实响应由 Interaction 保存，
+   * 区域的反馈/重规划观察由实际 Region 产生，不虚构 region 标识。
+   */
+  public feedbackCheckpoint(scope: ManagedScope): Outcome<void> {
+    if (!this.available()) return managedFailure('WORKFLOW_STOPPED');
+    const charge = this.ledger.reserve(scope.owner, { calls: 1, steps: 1,
+      work: 1 + 4 * this.frameChainCost(scope), events: 1 }, scope.local);
+    if (!charge.ok) return managedFailure(charge.code);
+    try {
+      const frame = this.frames(scope);
+      if (!frame || !this.checkFrames(scope, frame)) return unknown('WORKFLOW_CURRENTNESS');
+      return charge.ticket.event(scope.owner) ? ok(undefined) : managedFailure('WORKFLOW_EVENT_BUDGET');
+    } finally { charge.ticket.close(scope.owner); }
   }
 
   public modelDecision(scope: ManagedScope, reason: string, action: 'not-needed' | 'unavailable'): Outcome<void> {
