@@ -228,7 +228,7 @@
     "mandatoryKeys": [
       "vehicle",
       "compatibility",
-      "offerSetComplete",
+      "quoteSetComplete",
       "quotes"
     ],
     "optionalKeys": [
@@ -349,7 +349,16 @@
         "id": "DB-release",
         "job": "J3",
         "release": 4,
-        "expected": "re-evaluate affected resource/precedence and stale old results; actual solver vs independent oracle"
+        "expected": "Re-evaluate affected resource/precedence and reject stale old results; actual new solver plan must attain independently computed objective.",
+        "independentEnumeration": {
+          "tested": 531441,
+          "feasible": 29,
+          "objective": [
+            7,
+            16
+          ],
+          "optimalCount": 2
+        }
       },
       {
         "id": "DB-unknown",
