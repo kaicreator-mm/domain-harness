@@ -1,0 +1,36 @@
+# B1 integrated foundation candidate — implementation evidence index
+
+This is a writer-produced source-tree witness index, not independent acceptance. Scope is T01/T02/T03 only, per #1771/#1772, frozen L1 #1766, L2 #1768 at 42ad4bfa16385f3e5a2db484e709855c8071f240, and public R23 fixture cc1c53f6dcef436555eb9757990c9c029d824359. The receipt on #1772 binds the actual candidate tree and test logs; this file does not claim a complete product oracle. No hidden inputs were read.
+
+| Frozen subcase | Actual implementation/test witness to review | Explicit remainder |
+| --- | --- | --- |
+| T01 O07a/b, WF04 and fixed portion F-W04 | native-workflow-composition.ts, workflow-resource-control.ts, workflow-managed-runtime.ts; language-native-workflow-scope, workflow-resource-control, workflow-managed-session, scope, integration tests: root public m=4 exact and five one-short, local ancestor atomic admission, repeated run/retained scope, active and wall expiry, actual unjoined barrier and terminal read deadline, cancellation and cleanup, legacy counts | Real Interaction waiting/feedback and active-leaf pause in T04, region and model quota dimensions later. No hard preemption or remote settlement claim. |
+| T02 O01a, O03a, O06a/b, O07c, O10a; WF01/02/05/06 | workflow-managed-node.ts + root completion; managed-node/integration/session tests and both public fixed domains: native input/output, actual knowledge keys/scopes/revisions, pre-reject, post-reject, stale actual receipt, candidate/disposition and critical sink, projection bounds and actual progress, no-model decision | Dynamic lease/slot provenance, structural edits, actual Host effect and model cases later. Root trusted domain values not cloned by SDK; callbacks must obey trusted bounded construction/ownership. |
+| T03 O01a, O07d, O08a; WF03, F-W01 and fixed portion F-W03 | standard-workflow.ts runIn; workflow-managed-actor tests: same root, actual active/done/error/stopped snapshots, combined one-short, P+1, local join; D-A/D-B actual native and XState machine data/control flow, fixed child and goal verification | Dynamic and model-selected same callable, generated children/grandchildren, feedback changes and complete F-W03 later. |
+| O01a no-model discriminator | witness.test.ts actual four fixed paths; explicit not-needed event with unavailable usage; test guards fetch, Node Socket.connect and credential-like environment variable reads; solver receives narrow explicit env | Node-process guards are not system-wide network auditing or proof for arbitrary external/native programs. Real model-required/no-profile belongs to T07. |
+| O10a actual evidence | managed-node/session/scope/integration tests: actual effect receipt, candidate correlation, failure after critical delivery, immutable redacted local dispositions; both domain traces | Cross-process/Host and independent external consumer, region/model correlation belong later. |
+| F-W02/05/06 fixed subset | actual repeated instances and two domains, scoped progress, authoritative source failures, changed revisions, local actual/terminal evidence | Full F-W02/05/06 require dynamic/model/Interaction/Host composition and remain NOT_RUN. |
+
+## Shared foundation reuse denominator (source-tree)
+
+Two domain definitions supply actual independent business inputs and goal predicates; common fixed TS and XState machine composition are intentionally reused. Each row refers to real calls in witness.test.ts, not a planned usage. The domain data is controlled public synthetic data, not production transactions.
+
+| Shared capability | D-A actual use | D-B actual use |
+| --- | --- | --- |
+| StandardWorkflowSession, NativeWorkflowContext, child, unified ledger | compatibility/offer read, nested pack optimization, finalVerify | jobs/resource read, nested real MILP, schedule verification |
+| node/typed Context/knowledge/pre/post | actual required quote/compatibility completeness, pack and budget/lead constraints | actual required resource/jobs, release, precedence and nonoverlap |
+| work and terminal.read | work(252) bounded finite enumeration, current quote observations | work(64) logical admission + real solver, current jobs/resources observations |
+| XStateWorkflowElement.runIn | actual procurement machine transitions read/solve/verify/done, native node calls | actual repair machine transitions read/solve/verify/done, native node calls |
+| recordModelDecision and observations | not-needed, actual no-network guard, actual node stages + final disposition | not-needed, actual no-network guard, actual node stages + final disposition |
+| root completion | current authoritative offer set and feasible selected result | current jobs/resources and valid schedule |
+| local work ownership / cancel / failure | shared runtime on actual fixed child, stale and post failures | shared runtime on actual fixed child, stale/post failures and real solver child abort/close |
+
+This does not assert full O11 reuse denominator or installed SDK acceptance; those require later public-surface inventory, actual second uses for all changed shared capabilities, strict installed positives/negatives and both exact Node22.12 platforms. The fixed witness runs use the same implementation of the shared machine template, not two independent SDK implementations.
+
+## Bounded projection accounting
+
+For fixed managed execution, each node attempt consumes four nonrefundable cumulative event reservations; root maxEvents <= 65536. Therefore total distinct fixed progress entries, including concurrent/pre-rejected attempts, <= Q=floor(maxEvents/4). Root reserves Q additional logical work units for its single completion snapshot. Each fixed node reserves 2Q for before/run snapshots, before any guard or callback. Copying each already-frozen progress entry costs one logical unit; no scan of native values. Additional Context callback metadata (up to 4096 combined string items and 64 KiB) prepays 4*4096+ceil(65536/256) logical work, separate from per-record JSON scanning. These are conservative declared-cap accounting units, not CPU instructions. Existing event/call/step and frame/knowledge charges retained; unused reserve never refunded. Root R23 m=4 E=3 exact work 99278 remains unchanged (Q=0). The dynamic-function public vector is NOT_RUN and not silently replaced: dynamic projection/lease accounting must be checked against frozen L2 and independent fixture at T05/T06, with any further explicit bound documented and reviewed. Cumulative and one-short concurrent fixed tests assert actual callback counts, work remainder and frozen progress. No arbitrary extra cap added. Future region progress requires its own controlled producer accounting.
+
+## Limits of cancellation and trust
+
+Real cancellation test aborts after operating-system spawn of actual Python/SciPy adapter and verifies child close before post and root closed; it is not proof of interruption inside the numerical MILP routine or external process tree ownership. Local barrier and terminal tests prove admission closure and actual joined completion, not forced preemption of arbitrary JS or durable settlement. Only native typed domain code and configured trusted callbacks own business data and effects. No deployment, model gateway, Forge or durable evidence changes are included.

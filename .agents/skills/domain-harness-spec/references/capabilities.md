@@ -82,6 +82,16 @@
 
 [适用场景、限制与示例](capabilities/workflow.md)
 
+### ModelUsage
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：模型使用量保留已观察、估计和未知的区别。
+- 类型声明：`interface ModelUsage { readonly input: number \| null; readonly output: number \| null; readonly total: number \| null; readonly kind: 'observed' \| 'estimated' \| 'unavailable'; }`
+- `ModelUsage#input` · contract property readonly：`number \| null`
+- `ModelUsage#kind` · contract property readonly：`"unavailable" \| "observed" \| "estimated"`
+- `ModelUsage#output` · contract property readonly：`number \| null`
+- `ModelUsage#total` · contract property readonly：`number \| null`
+
 ### NativeWorkflowContext
 
 - 分类：`execution-support`；声明：`dist/native-workflow-composition.d.ts`
@@ -93,7 +103,13 @@
 - `NativeWorkflowContext#invoke` · instance method：`<T>(action: () => T \| Promise<T>) => Promise<Result<T>>`；调用：`<T>(action: () => T \| Promise<T>): Promise<Result<T>>`
 - `NativeWorkflowContext#invokeOutcome` · instance method：`<T>(action: () => Result<T> \| Promise<Result<T>>) => Promise<Result<T>>`；调用：`<T>(action: () => Result<T> \| Promise<Result<T>>): Promise<Result<T>>`
 - `NativeWorkflowContext#leaf` · instance method：`<T>(options: { readonly start?: () => void \| Promise<void>; readonly run: () => Result<T> \| Promise<Result<T>>; readonly end?: () => void \| Promise<void>; }) => Promise<Result<T>>`；调用：`<T>(options: { readonly start?: () => void \| Promise<void>; readonly run: () => Result<T> \| Promise<Result<T>>; readonly end?: () => void \| Promise<void>; }): Promise<Result<T>>`
+- `NativeWorkflowContext#node` · instance method：`<I, O>(definition: WorkflowNode<I, O>, input: I, options: WorkflowNodeOptions) => Promise<Result<O>>`；调用：`<I, O>(definition: WorkflowNode<I, O>, input: I, options: WorkflowNodeOptions): Promise<Result<O>>`
+- `NativeWorkflowContext#recordModelDecision` · instance method：`(reason: string, action: "not-needed" \| "unavailable") => Result<void>`；调用：`(reason: string, action: "not-needed" \| "unavailable"): Result<void>`
 - `NativeWorkflowContext#remaining` · instance method：`() => Readonly<{ calls: number; steps: number; maxDescendantDepth: number; }>`；调用：`(): Readonly<{ calls: number; steps: number; maxDescendantDepth: number; }>`
+- `NativeWorkflowContext#runId` · instance property：`string`
+- `NativeWorkflowContext#scopeId` · instance property：`string`
+- `NativeWorkflowContext#signal` · instance property：`AbortSignal`
+- `NativeWorkflowContext#work` · instance method：`<T>(units: number, action: () => Result<T> \| Promise<Result<T>>) => Promise<Result<T>>`；调用：`<T>(units: number, action: () => Result<T> \| Promise<Result<T>>): Promise<Result<T>>`
 
 ### routeWorkflowOutcome
 
@@ -119,8 +135,79 @@
 - 分类：`execution-support`；声明：`dist/native-workflow-composition.d.ts`
 - 职责：每个业务根 Workflow 显式创建独立会话，内部不包含 KDP/Package Loader。
 - 获取方式：public constructor / new
-- 构造声明：`(limits: WorkflowLimits): StandardWorkflowSession`
-- `StandardWorkflowSession#run` · instance method：`<T>(action: WorkflowHandler<T>) => Promise<Result<T>>`；调用：`<T>(action: WorkflowHandler<T>): Promise<Result<T>>`
+- 构造声明：`(limits: WorkflowLimits, control?: WorkflowControlOptions): StandardWorkflowSession`
+- `StandardWorkflowSession#dispositions` · instance method：`() => readonly WorkflowObservation[]`；调用：`(): readonly WorkflowObservation[]`
+- `StandardWorkflowSession#run` · instance method：`<T>(action: WorkflowHandler<T>, completion?: WorkflowCompletionPolicy<T>) => Promise<Result<T>>`；调用：`<T>(action: WorkflowHandler<T>, completion?: WorkflowCompletionPolicy<T>): Promise<Result<T>>`
+
+### WorkflowActorOptions
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：XState 实际快照的同步有限语义投影，不序列化 actor 内部状态。
+- 类型声明：`interface WorkflowActorOptions<Snapshot> { readonly project: (snapshot: Snapshot) => StandardJsonValue; readonly maxProjections: number; }`
+- `WorkflowActorOptions#maxProjections` · contract property readonly：`number`
+- `WorkflowActorOptions#project` · contract callback readonly：`(snapshot: Snapshot) => StandardJsonValue`；调用：`(snapshot: Snapshot): StandardJsonValue`
+
+### WorkflowAttempt
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：实际调用结算事实与候选业务结果分离。
+- 类型声明：`type WorkflowAttempt<O> = Readonly<{ kind: 'returned'; outcome: Outcome<O>; }> \| Readonly<{ kind: 'exception' \| 'cancelled' \| 'timeout' \| 'unsettled'; code: string; }>`
+- `WorkflowAttempt#kind` · contract property：`"returned" \| "exception" \| "cancelled" \| "timeout" \| "unsettled"`
+
+### WorkflowCompletionPolicy
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：受控根任务在真实本地操作结算后验证当前业务目标。
+- 类型声明：`interface WorkflowCompletionPolicy<T> { readonly goal: string; readonly requiredKnowledge: readonly EvidenceRequirement<string>[]; readonly terminalReads: number; readonly observe?: (value: T, scope: WorkflowTerminalContext) => Maybe<Outcome<readonly EvidenceObservation<string, unknown>[]>>; readonly validate: (value: T, context: WorkflowContextView) => Outcome<void>; }`
+- `WorkflowCompletionPolicy#goal` · contract property readonly：`string`
+- `WorkflowCompletionPolicy#observe` · contract callback readonly optional：`(value: T, scope: WorkflowTerminalContext) => Maybe<Outcome<readonly EvidenceObservation<string, unknown>[]>>`；调用：`(value: T, scope: WorkflowTerminalContext): Maybe<Outcome<readonly EvidenceObservation<string, unknown>[]>>`
+- `WorkflowCompletionPolicy#requiredKnowledge` · contract property readonly：`readonly EvidenceRequirement<string>[]`
+- `WorkflowCompletionPolicy#terminalReads` · contract property readonly：`number`
+- `WorkflowCompletionPolicy#validate` · contract callback readonly：`(value: T, context: WorkflowContextView) => Outcome<void>`；调用：`(value: T, context: WorkflowContextView): Outcome<void>`
+
+### WorkflowContextView
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：当前作用域的有限语义投影；原生业务值不自动序列化。
+- 类型声明：`interface WorkflowContextView { readonly runId: string; readonly scopeId: string; readonly goal: string; readonly stage: string; readonly factRevision: number; readonly planRevision?: number; readonly knowledge: EvidenceResolution<string, unknown> \| undefined; readonly capabilities: readonly string[]; readonly constraints: readonly string[]; readonly progress: readonly Readonly<{ instanceId: string; definitionId: string; state: 'pending' \| 'running' \| 'accepted' \| 'rejected' \| 'skipped' \| 'stale' \| 'unknown' \| 'removed'; }>[]; readonly feedbackRevision: number; readonly remaining: Readonly<{ calls: number; steps: number; maxDescendantDepth: number; work: number; events: number; activeMs: number; wallMs?: number; localWork: number; }>; }`
+- `WorkflowContextView#capabilities` · contract property readonly：`readonly string[]`
+- `WorkflowContextView#constraints` · contract property readonly：`readonly string[]`
+- `WorkflowContextView#factRevision` · contract property readonly：`number`
+- `WorkflowContextView#feedbackRevision` · contract property readonly：`number`
+- `WorkflowContextView#goal` · contract property readonly：`string`
+- `WorkflowContextView#knowledge` · contract property readonly：`EvidenceResolution<string, unknown> \| undefined`
+- `WorkflowContextView#planRevision` · contract property readonly optional：`number`
+- `WorkflowContextView#progress` · contract property readonly：`readonly Readonly<{ instanceId: string; definitionId: string; state: "pending" \| "running" \| "accepted" \| "rejected" \| "skipped" \| "stale" \| "unknown" \| "removed"; }>[]`
+- `WorkflowContextView#remaining` · contract property readonly：`Readonly<{ calls: number; steps: number; maxDescendantDepth: number; work: number; events: number; activeMs: number; wallMs?: number; localWork: number; }>`
+- `WorkflowContextView#runId` · contract property readonly：`string`
+- `WorkflowContextView#scopeId` · contract property readonly：`string`
+- `WorkflowContextView#stage` · contract property readonly：`string`
+
+### WorkflowControlLimits
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：统一根任务的有限资源合同。
+- 类型声明：`interface WorkflowControlLimits { readonly maxWork: number; readonly maxActiveMs: number; readonly maxWallMs?: number; readonly maxSettlementMs: number; readonly maxNoProgress: number; readonly maxEvents: number; readonly maxActiveScopes: number; readonly model?: Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; maxReservedTokens?: number; }>; }`
+- `WorkflowControlLimits#maxActiveMs` · contract property readonly：`number`
+- `WorkflowControlLimits#maxActiveScopes` · contract property readonly：`number`
+- `WorkflowControlLimits#maxEvents` · contract property readonly：`number`
+- `WorkflowControlLimits#maxNoProgress` · contract property readonly：`number`
+- `WorkflowControlLimits#maxSettlementMs` · contract property readonly：`number`
+- `WorkflowControlLimits#maxWallMs` · contract property readonly optional：`number`
+- `WorkflowControlLimits#maxWork` · contract property readonly：`number`
+- `WorkflowControlLimits#model` · contract property readonly optional：`Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; maxReservedTokens?: number; }>`
+
+### WorkflowControlOptions
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：根任务的可信事实策略、取消与同步观察。
+- 类型声明：`interface WorkflowControlOptions { readonly limits: WorkflowControlLimits; readonly signal?: AbortSignal; readonly knowledge: WorkflowKnowledgePolicy; readonly current: () => boolean; readonly observe?: (record: WorkflowObservation) => void; readonly evidence?: Readonly<{ required: boolean; emit: (record: WorkflowObservation) => Outcome<void>; }>; }`
+- `WorkflowControlOptions#current` · contract callback readonly：`() => boolean`；调用：`(): boolean`
+- `WorkflowControlOptions#evidence` · contract property readonly optional：`Readonly<{ required: boolean; emit: (record: WorkflowObservation) => Outcome<void>; }>`
+- `WorkflowControlOptions#knowledge` · contract property readonly：`WorkflowKnowledgePolicy`
+- `WorkflowControlOptions#limits` · contract property readonly：`WorkflowControlLimits`
+- `WorkflowControlOptions#observe` · contract callback readonly optional：`(record: WorkflowObservation) => void`；调用：`(record: WorkflowObservation): void`
+- `WorkflowControlOptions#signal` · contract property readonly optional：`AbortSignal`
 
 ### WorkflowElement
 
@@ -130,6 +217,24 @@
 - 构造声明：`<Input, Output>(): WorkflowElement<Input, Output>`
 - `WorkflowElement#run` · instance method：`(input: Input) => Promise<StandardWorkflowOutcome<Output>>`；调用：`(input: Input): Promise<StandardWorkflowOutcome<Output>>`
 
+### WorkflowKnowledgeFrame
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：当前可信证据范围与单调事实版本。
+- 类型声明：`interface WorkflowKnowledgeFrame { readonly epoch: number; readonly context: EvidenceContext; }`
+- `WorkflowKnowledgeFrame#context` · contract property readonly：`EvidenceContext`
+- `WorkflowKnowledgeFrame#epoch` · contract property readonly：`number`
+
+### WorkflowKnowledgePolicy
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：域提供事实读取与比较策略，SDK 只执行有限验证。
+- 类型声明：`interface WorkflowKnowledgePolicy { readonly current: () => WorkflowKnowledgeFrame; readonly equal: (key: string, left: unknown, right: unknown) => boolean; readonly rank?: (observation: EvidenceObservation<string, unknown>) => number; readonly maxItems: number; }`
+- `WorkflowKnowledgePolicy#current` · contract callback readonly：`() => WorkflowKnowledgeFrame`；调用：`(): WorkflowKnowledgeFrame`
+- `WorkflowKnowledgePolicy#equal` · contract callback readonly：`(key: string, left: unknown, right: unknown) => boolean`；调用：`(key: string, left: unknown, right: unknown): boolean`
+- `WorkflowKnowledgePolicy#maxItems` · contract property readonly：`number`
+- `WorkflowKnowledgePolicy#rank` · contract callback readonly optional：`(observation: EvidenceObservation<string, unknown>) => number`；调用：`(observation: EvidenceObservation<string, unknown>): number`
+
 ### WorkflowLimits
 
 - 分类：`type`；声明：`dist/native-workflow-composition.d.ts`
@@ -138,6 +243,59 @@
 - `WorkflowLimits#maxCalls` · contract property readonly：`number`
 - `WorkflowLimits#maxDepth` · contract property readonly：`number`
 - `WorkflowLimits#maxSteps` · contract property readonly：`number`
+
+### WorkflowNode
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：固定、动态及复合 Workflow 共用的原生类型化节点合同。
+- 类型声明：`interface WorkflowNode<I, O> { readonly id: string; readonly goal: string; readonly requiredKnowledge: readonly EvidenceRequirement<string>[]; readonly knowledge?: (input: I, scope: NativeWorkflowContext) => Maybe<Outcome<readonly EvidenceObservation<string, unknown>[]>>; readonly before: (input: I, scope: NativeWorkflowContext, context: WorkflowContextView) => Maybe<Outcome<void>>; readonly run: (input: I, scope: NativeWorkflowContext, context: WorkflowContextView) => Maybe<Outcome<O>>; readonly terminalReads?: number; readonly after: (input: I, actual: WorkflowAttempt<O>, scope: WorkflowTerminalContext) => Maybe<Outcome<void>>; readonly cleanup?: (input: I, actual: WorkflowAttempt<O>) => Maybe<void>; readonly project: (actual: WorkflowAttempt<O>) => Readonly<{ effect: 'none' \| 'committed' \| 'unknown' \| 'not-applicable'; receiptId?: string; detail: StandardJsonValue; }>; readonly replay?: 'pure-read-only' \| 'never'; readonly context?: (input: I) => Readonly<{ constraints: readonly string[]; capabilities: readonly string[]; feedbackRevision: number; }>; }`
+- `WorkflowNode#after` · contract callback readonly：`(input: I, actual: WorkflowAttempt<O>, scope: WorkflowTerminalContext) => Maybe<Outcome<void>>`；调用：`(input: I, actual: WorkflowAttempt<O>, scope: WorkflowTerminalContext): Maybe<Outcome<void>>`
+- `WorkflowNode#before` · contract callback readonly：`(input: I, scope: NativeWorkflowContext, context: WorkflowContextView) => Maybe<Outcome<void>>`；调用：`(input: I, scope: NativeWorkflowContext, context: WorkflowContextView): Maybe<Outcome<void>>`
+- `WorkflowNode#cleanup` · contract callback readonly optional：`(input: I, actual: WorkflowAttempt<O>) => Maybe<void>`；调用：`(input: I, actual: WorkflowAttempt<O>): Maybe<void>`
+- `WorkflowNode#context` · contract callback readonly optional：`(input: I) => Readonly<{ constraints: readonly string[]; capabilities: readonly string[]; feedbackRevision: number; }>`；调用：`(input: I): Readonly<{ constraints: readonly string[]; capabilities: readonly string[]; feedbackRevision: number; }>`
+- `WorkflowNode#goal` · contract property readonly：`string`
+- `WorkflowNode#id` · contract property readonly：`string`
+- `WorkflowNode#knowledge` · contract callback readonly optional：`(input: I, scope: NativeWorkflowContext) => Maybe<Outcome<readonly EvidenceObservation<string, unknown>[]>>`；调用：`(input: I, scope: NativeWorkflowContext): Maybe<Outcome<readonly EvidenceObservation<string, unknown>[]>>`
+- `WorkflowNode#project` · contract callback readonly：`(actual: WorkflowAttempt<O>) => Readonly<{ effect: "none" \| "committed" \| "unknown" \| "not-applicable"; receiptId?: string; detail: StandardJsonValue; }>`；调用：`(actual: WorkflowAttempt<O>): Readonly<{ effect: "unknown" \| "not-applicable" \| "none" \| "committed"; receiptId?: string; detail: StandardJsonValue; }>`
+- `WorkflowNode#replay` · contract property readonly optional：`"pure-read-only" \| "never"`
+- `WorkflowNode#requiredKnowledge` · contract property readonly：`readonly EvidenceRequirement<string>[]`
+- `WorkflowNode#run` · contract callback readonly：`(input: I, scope: NativeWorkflowContext, context: WorkflowContextView) => Maybe<Outcome<O>>`；调用：`(input: I, scope: NativeWorkflowContext, context: WorkflowContextView): Maybe<Outcome<O>>`
+- `WorkflowNode#terminalReads` · contract property readonly optional：`number`
+
+### WorkflowNodeOptions
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：受控节点绑定的局部知识和当前性策略。
+- 类型声明：`interface WorkflowNodeOptions { readonly knowledge: WorkflowKnowledgePolicy; readonly planRevision?: number; readonly current: () => boolean; }`
+- `WorkflowNodeOptions#current` · contract callback readonly：`() => boolean`；调用：`(): boolean`
+- `WorkflowNodeOptions#knowledge` · contract property readonly：`WorkflowKnowledgePolicy`
+- `WorkflowNodeOptions#planRevision` · contract property readonly optional：`number`
+
+### WorkflowObservation
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：运行时最小观察合同；候选结果不是最终裁定。
+- 类型声明：`type WorkflowObservation = Readonly<{ runId: string; scopeId: string; parentScopeId?: string; seq: number; factRevision: number; planRevision?: number; stage: string; }> & (Readonly<{ kind: 'scope'; phase: 'open' \| 'stopping' \| 'candidate' \| 'closed'; reason: string; localQuiescent: boolean; outcome?: Outcome<void>; candidateSeq?: number; delivery: 'pending' \| 'satisfied' \| 'failed' \| 'not-required'; }> \| Readonly<{ kind: 'node'; occurrence: WorkflowOccurrence; phase: 'pre-reject' \| 'enter' \| 'skip' \| 'actual' \| 'candidate' \| 'disposition' \| 'invalidate'; entered: boolean; acceptance: 'pending' \| 'accepted' \| 'rejected' \| 'not-applicable' \| 'stale'; candidateSeq?: number; delivery: 'pending' \| 'satisfied' \| 'failed' \| 'not-required'; outcome?: Outcome<void>; post: 'pending' \| 'passed' \| 'failed' \| 'unknown' \| 'not-applicable'; effect: 'none' \| 'committed' \| 'unknown' \| 'not-applicable'; receiptId?: string; reason: string; sources: readonly Readonly<{ key: string; id: string; scope: string; revision: string; status: string; }>[]; detail: StandardJsonValue; }> \| Readonly<{ kind: 'region'; regionId: string; action: 'proposal-rejected' \| 'edit' \| 'feedback' \| 'revalidate' \| 'complete'; beforeRevision: number; afterRevision: number; reason: string; detail: StandardJsonValue; }> \| Readonly<{ kind: 'actor'; definitionId: string; detail: StandardJsonValue; }> \| Readonly<{ kind: 'model'; decisionId: string; action: 'not-needed' \| 'unavailable'; reason: string; usage: ModelUsage; detail: StandardJsonValue; }> \| Readonly<{ kind: 'model'; requestId: string; attempt: number; action: 'selected' \| 'retry' \| 'fallback' \| 'result'; profileId: string; model: string; protocol: 'openai-chat' \| 'anthropic-messages'; reason: string; usage: ModelUsage; detail: StandardJsonValue; }> \| Readonly<{ kind: 'evidence'; delivery: 'failed'; required: boolean; reason: string; }>)`
+- `WorkflowObservation#factRevision` · contract property：`number`
+- `WorkflowObservation#kind` · contract property：`"model" \| "scope" \| "node" \| "region" \| "actor" \| "evidence"`
+- `WorkflowObservation#parentScopeId` · contract property optional：`string`
+- `WorkflowObservation#planRevision` · contract property optional：`number`
+- `WorkflowObservation#runId` · contract property：`string`
+- `WorkflowObservation#scopeId` · contract property：`string`
+- `WorkflowObservation#seq` · contract property：`number`
+- `WorkflowObservation#stage` · contract property：`string`
+
+### WorkflowOccurrence
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：SDK 分配的作用域、定义、实例和执行尝试标识。
+- 类型声明：`interface WorkflowOccurrence { readonly runId: string; readonly scopeId: string; readonly parentScopeId?: string; readonly definitionId: string; readonly instanceId: string; readonly attempt?: number; }`
+- `WorkflowOccurrence#attempt` · contract property readonly optional：`number`
+- `WorkflowOccurrence#definitionId` · contract property readonly：`string`
+- `WorkflowOccurrence#instanceId` · contract property readonly：`string`
+- `WorkflowOccurrence#parentScopeId` · contract property readonly optional：`string`
+- `WorkflowOccurrence#runId` · contract property readonly：`string`
+- `WorkflowOccurrence#scopeId` · contract property readonly：`string`
 
 ### WorkflowRoutes
 
@@ -151,6 +309,14 @@
 - `WorkflowRoutes#UNKNOWN` · contract callback readonly：`(outcome: Result<T>) => R \| Promise<R>`；调用：`(outcome: Result<T>): R \| Promise<R>`
 - `WorkflowRoutes#WAIT` · contract callback readonly：`(outcome: Result<T>) => R \| Promise<R>`；调用：`(outcome: Result<T>): R \| Promise<R>`
 
+### WorkflowTerminalContext
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：已预留的只读终止观察窗口，不提供普通业务调用入口。
+- 类型声明：`interface WorkflowTerminalContext { readonly signal: AbortSignal; read<T>(action: (signal: AbortSignal) => Maybe<Outcome<T>>): Promise<Outcome<T>>; }`
+- `WorkflowTerminalContext#read` · contract method：`<T>(action: (signal: AbortSignal) => Maybe<Outcome<T>>) => Promise<Outcome<T>>`；调用：`<T>(action: (signal: AbortSignal) => Maybe<Outcome<T>>): Promise<Outcome<T>>`
+- `WorkflowTerminalContext#signal` · contract property readonly：`AbortSignal`
+
 ### XStateWorkflowElement
 
 - 分类：`standard-element`；声明：`dist/standard-workflow.d.ts`
@@ -158,6 +324,7 @@
 - 获取方式：public constructor / new
 - 构造声明：`<Logic extends AnyActorLogic, Output>(logic: Logic, mapOutput: (output: OutputFrom<Logic>) => StandardWorkflowOutcome<Output>): XStateWorkflowElement<Logic, Output>`
 - `XStateWorkflowElement#run` · instance method：`(input: InputFrom<Logic>) => Promise<StandardWorkflowOutcome<Output>>`；调用：`(input: InputFrom<Logic>): Promise<StandardWorkflowOutcome<Output>>`
+- `XStateWorkflowElement#runIn` · instance method：`(input: (scope: NativeWorkflowContext) => InputFrom<Logic>, root: NativeWorkflowContext, options: WorkflowActorOptions<SnapshotFrom<Logic>>) => Promise<StandardWorkflowOutcome<Output>>`；调用：`(input: (scope: NativeWorkflowContext) => InputFrom<Logic>, root: NativeWorkflowContext, options: WorkflowActorOptions<SnapshotFrom<Logic>>): Promise<StandardWorkflowOutcome<Output>>`
 
 ## structured-data
 
