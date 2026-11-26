@@ -1,7 +1,7 @@
 # 0.11.5 R15 · Native bounded domain reasoning — L2 architecture draft
 
 > Parent #1615 / L2 #1767 / master #1563. R14 frozen Product/L1: train `d289b3fc4b86456f319e6e16a37483b66644b12e`, product blob `7041bb9f3d6fabfa5db0533bf3f2807276b74ab2`; [R13](https://github.com/kaicreator-mm/domain-harness/issues/1615#issuecomment-7193011776), [R14](https://github.com/kaicreator-mm/domain-harness/issues/1615#issuecomment-7193176743).
-> L2_DESIGN_CANDIDATE_IN_PROGRESS, not frozen, not ready for independent review yet. This is engineering design, not SDK source or a qualification receipt. All AC01–15, DY01–06, W01–06 NOT_RUN. R16 completes concrete public API/limits and independent domain-oracle dossier before one combined L2 review.
+> L2_DESIGN_CANDIDATE_REVIEW_READY (R16, not frozen). This is engineering design, not SDK source or a qualification receipt. All actual AC01–15, DY01–06, W01–06 and F-W01–06 NOT_RUN. Read together with [R16 Workflow-first technical contract](./DomainHarness_v0.11.5_R16_WORKFLOW_REASONING_L2_CONTRACT.md), which supersedes R15 illustrative API/limits, region, protocol and oracle details. WF01–08 and F-W01–06 remain mandatory, not a later extension. R17 reviews both documents as one exact-SHA L2 batch. Independent fixture sealing and implementation admission remain gated.
 
 ## 1. Exact baseline and owned gaps
 
@@ -177,7 +177,9 @@ Reuse existing independent loopback Host/SQLite and real readback. Barrier inter
 ### Coverage obligations
 W01–06 all mandatory, not all Cartesian combinations; actual LLM domain loop on >=1 configured provider, ideally same live provider used in two independent domain tasks to prove Model Standard reuse; two protocol contracts even if second not live. For each new/changed shared Standard area in §3, map at least two actual independent uses; private codecs/helpers not separate shared Standard. Procurement and scheduling must both consume shared real Context/validation/region/evidence/control implementation, not copy mechanics. Add second actual Interaction/model use as appropriate to prove changed public Standard, not one helper across two domains. AC01–15 and DY01–06 crosswalk to §3–7 plus concrete independent oracle inputs/results, negative probes, unchanged/regression claims separated. Actual stranger initial and maintenance consumers use exact packed root API/docs only with independent evaluator; no hidden SDK source/hints; Windows/Linux Node22.12 actual consumer as applicable. Oracle writer/evaluator separate from implementation; fixture identity and expectations frozen before code. No real oracle/solver/model/Host rerun in this round.
 
-## 9. Remaining L2 closure before review (not implementation Task DAG)
+## 9. Historical R15 closure checklist (addressed by the R16 companion candidate; not implementation Task DAG)
+
+R16 supplies the concrete candidate for L2-A0/A/B/C/D/E. Independent review must determine sufficiency, resolve any remaining design inconsistencies, and identify prerequisites for fixture sealing and implementation. Candidate controller calculations and local Node22.16 transport probe are not independent product-oracle or exact Node22.12/provider qualification.
 
 L2-A0: §2A foundation strengthening is prerequisite to L2-A/B; integrate WF01–08 and F-W01–06 in shared contracts/oracle coverage.
 
