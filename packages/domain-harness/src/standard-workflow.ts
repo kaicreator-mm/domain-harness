@@ -148,7 +148,11 @@ export class XStateWorkflowElement<
           attached?.signal.addEventListener('abort', aborted, { once: true });
           subscription = actor.subscribe({
             next: (snapshot) => { observe(snapshot); },
-            error: () => { finish(this.failed('WORKFLOW_EXECUTION_FAILED')); },
+            error: () => {
+              // error 通知未必经过 next；读取实际 error 快照并消耗已预留投影。
+              if (attached) observe(actor.getSnapshot());
+              finish(this.failed('WORKFLOW_EXECUTION_FAILED'));
+            },
             complete: () => {
               // XState 的 complete 同时代表 done 和主动 stop，必须看快照。
               observe(actor.getSnapshot());
