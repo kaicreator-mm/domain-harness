@@ -1,3 +1,4 @@
+import type { NativeWorkflowContext } from "./native-workflow-composition.js";
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import type { StandardJsonValue } from './standard-files.js';
 import type { EvidenceContext, EvidenceObservation, EvidenceRequirement, EvidenceResolution } from './standard-evidence.js';
@@ -133,3 +134,43 @@ export type WorkflowObservation = Readonly<{
     reason: string; usage: ModelUsage; detail: StandardJsonValue }>
   | Readonly<{ kind: 'evidence'; delivery: 'failed'; required: boolean; reason: string }>
 );
+
+/** 受控节点绑定的局部知识和当前性策略。
+ * @dhKind type
+ * @dhCapability workflow
+ */
+export interface WorkflowNodeOptions {
+  readonly knowledge: WorkflowKnowledgePolicy;
+  readonly planRevision?: number;
+  readonly current: () => boolean;
+}
+
+/** 实际调用结算事实与候选业务结果分离。
+ * @dhKind type
+ * @dhCapability workflow
+ */
+export type WorkflowAttempt<O> =
+  | Readonly<{ kind: 'returned'; outcome: Outcome<O> }>
+  | Readonly<{ kind: 'exception' | 'cancelled' | 'timeout' | 'unsettled'; code: string }>;
+
+/** 固定、动态及复合 Workflow 共用的原生类型化节点合同。
+ * @dhKind type
+ * @dhCapability workflow
+ */
+export interface WorkflowNode<I, O> {
+  readonly id: string; readonly goal: string;
+  readonly requiredKnowledge: readonly EvidenceRequirement<string>[];
+  readonly knowledge?: (input: I, scope: NativeWorkflowContext) => Maybe<Outcome<readonly EvidenceObservation<string, unknown>[]>>;
+  readonly before: (input: I, scope: NativeWorkflowContext, context: WorkflowContextView) => Maybe<Outcome<void>>;
+  readonly run: (input: I, scope: NativeWorkflowContext, context: WorkflowContextView) => Maybe<Outcome<O>>;
+  readonly terminalReads?: number;
+  readonly after: (input: I, actual: WorkflowAttempt<O>, scope: WorkflowTerminalContext) => Maybe<Outcome<void>>;
+  readonly cleanup?: (input: I, actual: WorkflowAttempt<O>) => Maybe<void>;
+  readonly project: (actual: WorkflowAttempt<O>) => Readonly<{
+    effect: 'none' | 'committed' | 'unknown' | 'not-applicable'; receiptId?: string; detail: StandardJsonValue;
+  }>;
+  readonly replay?: 'pure-read-only' | 'never';
+  readonly context?: (input: I) => Readonly<{
+    constraints: readonly string[]; capabilities: readonly string[]; feedbackRevision: number;
+  }>;
+}
