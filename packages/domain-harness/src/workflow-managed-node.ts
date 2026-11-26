@@ -93,8 +93,12 @@ export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, d
   const R = node.terminalReads ?? 0;
   const N = 4 + Number(node.knowledge !== undefined) + Number(node.cleanup !== undefined) + R + Number(node.context !== undefined);
   const F = runtime.frameChainCost(parent) + frameScanWork(local.knowledge.maxItems);
+  // Context 声明元数据至多 4096 项 / 64KiB；验证密集性、字符串、字节和复制各一次。
+  // 不复用为实际事件 JSON 扫描预留的额度；两次进度视图亦各自预付。
+  const contextWork = node.context === undefined ? 0 : 4 * 4096 + Math.ceil(65536 / 256);
   const reservation = runtime.ledger.reserve(owner, { calls: N, steps: N,
-    work: N + 4 + 4 * EVENT_SCAN_WORK + (16 + R) * F + knowledgeScanWork(local.knowledge.maxItems),
+    work: N + 4 + 4 * EVENT_SCAN_WORK + (16 + R) * F + knowledgeScanWork(local.knowledge.maxItems)
+      + 2 * runtime.progressScanCost + contextWork,
     events: 4, activeScopes: 1, terminalReads: R }, parent.local);
   if (!reservation.ok) return { code: reservation.code };
   return { definition: node, options: bound, scope: { id: randomUUID(), parentId: parent.id, parent,
@@ -189,16 +193,20 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
           work: remaining.work, events: remaining.events, localWork: runtime.localRemaining(scope),
           maxDescendantDepth: context.remaining().maxDescendantDepth, ...runtime.clock.remaining() }) });
     };
+    const beforeView = view('before');
+    if (!parentOpen()) throw Error('WORKFLOW_NODE_ADMISSION');
     preEntered = true;
-    const pre = accept(await node.before(input, context, view('before')));
+    const pre = accept(await node.before(input, context, beforeView));
     if (pre.status !== 'COMPLETE') { result = pre; throw Error('WORKFLOW_PRE_REJECT'); }
     if (!current()) throw Error('WORKFLOW_CURRENTNESS');
     // enter 记录不代表实际调用；若证据交付使当前性失效，禁止调用。
     if (!emit('enter') || !current()) throw Error('WORKFLOW_NODE_ADMISSION');
+    const runView = view('run');
+    if (!parentOpen()) throw Error('WORKFLOW_NODE_ADMISSION');
     entered = true;
     post = 'pending';
     try {
-      result = accept(await node.run(input, context, view('run')));
+      result = accept(await node.run(input, context, runView));
       actual = Object.freeze({ kind: 'returned', outcome: result });
     } catch {
       const kind = runtime.clock.reason === 'cancelled' ? 'cancelled' : runtime.clock.reason !== undefined ? 'timeout' : 'exception';
