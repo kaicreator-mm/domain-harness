@@ -1,4 +1,6 @@
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
+import { WorkflowResourceLedger } from './workflow-resource-control.js';
+import type { ResourceFailure } from './workflow-resource-control.js';
 
 /** 同一根 Workflow 的共享调用和步骤额度；不是 Package 的运行时安全验证。
  * @dhKind type
@@ -18,7 +20,7 @@ type WorkflowFailureCode =
   | 'WORKFLOW_CALL_BUDGET' | 'WORKFLOW_STEP_BUDGET'
   | 'WORKFLOW_DEPTH_LIMIT' | 'WORKFLOW_EXECUTION_FAILED'
   | 'WORKFLOW_HOOK_END_FAILED' | 'WORKFLOW_ALREADY_RUN'
-  | 'WORKFLOW_INVALID_LIMIT' | 'WORKFLOW_SCOPE_CLOSED';
+  | 'WORKFLOW_INVALID_LIMIT' | 'WORKFLOW_SCOPE_CLOSED' | ResourceFailure;
 
 function failure<T>(code: WorkflowFailureCode): Result<T> {
   return { status: 'FAILED', reason: { code, message: 'Workflow could not complete' } };
@@ -47,21 +49,19 @@ export function routeWorkflowOutcome<T, R>(
 }
 
 class RootBudget {
-  public calls: number;
-  public steps: number;
+  private readonly ledger: WorkflowResourceLedger;
 
   constructor(limits: WorkflowLimits) {
-    this.calls = limits.maxCalls;
-    this.steps = limits.maxSteps;
+    this.ledger = new WorkflowResourceLedger(limits.maxCalls, limits.maxSteps);
   }
 
-  /** 在执行任何业务副作用前同步预留，多个嵌套调用共享此对象。 */
+  public get calls(): number { return this.ledger.remaining().calls; }
+  public get steps(): number { return this.ledger.remaining().steps; }
+
+  /** 旧调用、步骤与后续 managed 维度使用同一个内部账本。 */
   public reserve(calls: number, steps: number): WorkflowFailureCode | undefined {
-    if (this.calls < calls) return 'WORKFLOW_CALL_BUDGET';
-    if (this.steps < steps) return 'WORKFLOW_STEP_BUDGET';
-    this.calls -= calls;
-    this.steps -= steps;
-    return undefined;
+    const admission = this.ledger.reserve(this, { calls, steps });
+    return admission.ok ? undefined : admission.code;
   }
 }
 
