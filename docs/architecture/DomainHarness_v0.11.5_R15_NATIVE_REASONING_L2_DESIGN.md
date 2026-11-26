@@ -1,7 +1,7 @@
 # 0.11.5 R15 · Native bounded domain reasoning — L2 architecture draft
 
 > Parent #1615 / L2 #1767 / master #1563. R14 frozen Product/L1: train `d289b3fc4b86456f319e6e16a37483b66644b12e`, product blob `7041bb9f3d6fabfa5db0533bf3f2807276b74ab2`; [R13](https://github.com/kaicreator-mm/domain-harness/issues/1615#issuecomment-7193011776), [R14](https://github.com/kaicreator-mm/domain-harness/issues/1615#issuecomment-7193176743).
-> L2_R18_REMEDIATION_REVIEW_READY (not frozen; R17 architecture direction accepted, 4P1/3P2 design findings corrected pending R19). This is engineering design, not SDK source or a qualification receipt. All actual AC01–15, DY01–06, W01–06 and F-W01–06 NOT_RUN. Read together with [R16 Workflow-first technical contract](./DomainHarness_v0.11.5_R16_WORKFLOW_REASONING_L2_CONTRACT.md), which supersedes R15 illustrative API/limits, region, protocol and oracle details. WF01–08 and F-W01–06 remain mandatory, not a later extension. R17 reviewed both documents; R18 companion is current technical correction, R19 finite review covers seven findings and affected contracts only. Independent fixture sealing and implementation admission remain gated.
+> L2_R20_RESIDUAL_REVIEW_READY (not frozen; R19 retained architecture and four original closures; residual 2P1/1P2 corrected pending R21). This is engineering design, not SDK source or a qualification receipt. All actual AC01–15, DY01–06, W01–06 and F-W01–06 NOT_RUN. Read together with [R16 Workflow-first technical contract](./DomainHarness_v0.11.5_R16_WORKFLOW_REASONING_L2_CONTRACT.md), which supersedes R15 illustrative API/limits, region, protocol and oracle details. WF01–08 and F-W01–06 remain mandatory, not a later extension. R17 reviewed both documents; R19 retained four original closures. R20 companion is current technical correction; R21 finite review covers three residual findings and affected contracts only. Independent fixture sealing and implementation admission remain gated.
 
 ## 1. Exact baseline and owned gaps
 
@@ -179,7 +179,7 @@ W01–06 all mandatory, not all Cartesian combinations; actual LLM domain loop o
 
 ## 9. Historical R15 closure checklist (addressed by the R16 companion candidate; not implementation Task DAG)
 
-R16 supplied the concrete candidate for L2-A0/A/B/C/D/E. R17 accepted architecture direction but required 4P1/3P2 correction. R18 companion supersedes earlier illustrative signatures and algorithms; finite R19 review checks closure and affected contracts. Independent fixture sealing and actual implementation admission remain gated. Candidate controller calculations and local Node22.16 transport probe are not independent product-oracle or exact Node22.12/provider qualification.
+R16 supplied the concrete candidate for L2-A0/A/B/C/D/E. R17 accepted architecture direction but required 4P1/3P2 correction. R18 companion superseded earlier illustrative signatures and algorithms. R19 accepted four corrections; R20 addresses three residual gaps (root/region currentness, input preparation reservation, candidate vs definitive disposition); finite R21 review checks only residual closure and affected contracts. Independent fixture sealing and actual implementation admission remain gated. Candidate controller calculations and local Node22.16 transport probe are not independent product-oracle or exact Node22.12/provider qualification.
 
 L2-A0: §2A foundation strengthening is prerequisite to L2-A/B; integrate WF01–08 and F-W01–06 in shared contracts/oracle coverage.
 
