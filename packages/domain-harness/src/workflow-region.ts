@@ -4,7 +4,7 @@ import { borrowRegionScope, guardBoundFactory, regionDisposition, regionOperatio
 import type { NativeWorkflowContext } from './native-workflow-composition.js';
 import { capabilityData, invokeCapability } from './workflow-capabilities.js';
 import { SlotLeaseScope, slotDeclarations } from './workflow-slots.js';
-import type { SlotEntry, DetachedRegionProof, WorkflowSlotReader } from './workflow-slots.js';
+import type { SlotEntry, DetachedRegionProof, ObligationProof, WorkflowSlotReader } from './workflow-slots.js';
 import { candidate, nodeProposal, proposal } from './workflow-region-proposal.js';
 import { managedFailure, snapshotOutcome } from './workflow-managed-runtime.js';
 import { invalidateEvidence, resolveEvidence } from './standard-evidence.js';
@@ -30,6 +30,7 @@ interface Pending {
   readonly state: State;
   readonly attempt: number;
   readonly outputs?: Entries;
+  readonly obligation?: ObligationProof;
   readonly childProof?: DetachedRegionProof;
 }
 interface Gap { readonly id: string; readonly section: number; readonly templates: ReadonlyMap<string, WorkflowNodeProposal> }
@@ -43,10 +44,13 @@ const validLimits = (l: WorkflowRegionLimits) => !!l && validLimit(l.maxWork, 2 
   && validLimit(l.maxNodes, 256) && validLimit(l.maxBindings, 2048) && validLimit(l.maxEdits, 128);
 const live = (n: Pending) => n.state !== 'removed' && n.state !== 'skipped';
 const pending = (n: Pending) => n.state === 'pending' || n.state === 'stale';
-function sourceCurrent(entry: SlotEntry, frame: WorkflowKnowledgeFrame): boolean {
-  return entry.epoch === frame.epoch && entry.scope === frame.context.scope && entry.sources.every(s =>
+function sourcesApplicable(entry: ObligationProof, frame: WorkflowKnowledgeFrame): boolean {
+  return entry.scope === frame.context.scope && entry.sources.every(s =>
     s.scope === frame.context.scope && frame.context.revisions.get(s.id) === s.revision &&
     (s.validity === undefined || (frame.context.asOf !== undefined && s.validity.from <= frame.context.asOf && frame.context.asOf < s.validity.until)));
+}
+function sourceCurrent(entry: ObligationProof, frame: WorkflowKnowledgeFrame): boolean {
+  return entry.epoch === frame.epoch && sourcesApplicable(entry,frame);
 }
 function sameSource(a: SlotEntry, b: SlotEntry): boolean {
   return a.slot === b.slot && Object.is(a.value, b.value) && a.evidenceKeys.length === b.evidenceKeys.length
@@ -115,11 +119,20 @@ class Region<I, O> {
   private proofs(nodes = this.#nodes): DetachedRegionProof[] {
     const proofs = new Set<DetachedRegionProof>();
     for (const n of nodes) if (n.state === 'accepted') {
+      if (!n.obligation) throw Error('WORKFLOW_OBLIGATION_MISSING');
       if (n.childProof) proofs.add(n.childProof);
-      for (const e of n.outputs?.values() ?? []) for (const proof of e.children ?? []) proofs.add(proof);
+      for (const proof of n.obligation.children ?? []) proofs.add(proof);
       if (proofs.size > 256) throw Error('WORKFLOW_CHILD_PROOF_LIMIT');
     }
     return [...proofs];
+  }
+  private obligationsCurrent(frame: WorkflowKnowledgeFrame,nodes=this.#nodes): boolean {
+    let links=0;
+    for(const n of nodes) if(n.state==='accepted'){
+      const proof=n.obligation;
+      if(!proof || (links+=proof.sources.length+proof.evidenceKeys.length)>16384 || !sourceCurrent(proof,frame))return false;
+    }
+    return true;
   }
   private currentEntries(frame: WorkflowKnowledgeFrame, proofsChecked=false): Map<string, SlotEntry> {
     return new Map([...this.entries()].filter(([, e]) => sourceCurrent(e, frame) && (proofsChecked || verifyRegionProofs(this.root, e.children ?? []))));
@@ -139,7 +152,7 @@ class Region<I, O> {
   private async withView<T>(frame: WorkflowKnowledgeFrame, remaining: Left, stage: string,
     callback: (view: WorkflowRegionView) => Outcome<T> | Promise<Outcome<T>>, prepaid?:()=>boolean): Promise<Outcome<T>> {
     const check=prepaid??(()=>verifyRegionProofs(this.root,this.proofs()));
-    if (!check()) return stale();
+    if (!this.obligationsCurrent(frame) || !check()) return stale();
     const lease = this.leases.viewLease(this.currentEntries(frame,true), this.limits.maxBindings, fn => guardBoundFactory(this.root, fn));
     let actual: Outcome<T> | Promise<Outcome<T>>;
     try { actual = callback(this.view(lease.reader, remaining, stage, frame)); }
@@ -232,7 +245,7 @@ class Region<I, O> {
     return nodes;
   }
   private async refresh(): Promise<Outcome<boolean>> {
-    const result = await regionOperation<RefreshState>(this.root, this.structuralWork + this.viewWork + this.graphWork
+    const result = await regionOperation<RefreshState>(this.root, this.structuralWork + this.viewWork + 3*this.graphWork
       + knowledgeScanWork(this.d.knowledge.maxItems) + leaseScanWork(this.limits.maxBindings), 1, true, async (frame, left, max) => {
       this.current(frame); this.#maxNoProgress = max;
       if (this.requirements.length > this.d.knowledge.maxItems || new Set(this.requirements.map(r => r.key)).size !== this.requirements.length) return fail('WORKFLOW_REGION_KNOWLEDGE');
@@ -282,30 +295,32 @@ class Region<I, O> {
       if (!invalid.complete) return fail('WORKFLOW_REGION_DEPENDENCY');
       const affected = new Set(invalid.stale), staleIds = new Set<string>();
       const nodes: Pending[] = this.#initialized ? [] : this.initLayout(entries.value);
-      let replays = this.#replays;
+      let replays = this.#replays, obligationLinks=0;
       if (this.#initialized) for (const n of this.#nodes) {
         if (n.state !== 'accepted') { nodes.push(n); continue; }
         const touched = Object.values(n.node.input).some(ref => ref.kind === 'context' ? changedSlots.has(ref.slot)
           : ref.kind === 'result' && staleIds.has(ref.node));
-        const hasProof = [...(n.outputs?.values() ?? [])].some(e => e.evidenceKeys.length > 0);
-        const childCurrent = verifyRegionProofs(this.root, [...new Set([...(n.childProof ? [n.childProof] : []),
-          ...[...(n.outputs?.values() ?? [])].flatMap(e => e.children ?? [])])]);
-        const retained = touched || !childCurrent || (!hasProof && !n.childProof && affected.size > 0) ? fail<Entries>() : this.leases.retain(n.outputs ?? new Map(), affected);
+        const obligation=n.obligation;
+        if(!obligation || (obligationLinks+=obligation.sources.length+obligation.evidenceKeys.length)>16384)return fail('WORKFLOW_OBLIGATION_LIMIT');
+        const hasProof=obligation.evidenceKeys.length>0;
+        const childCurrent = verifyRegionProofs(this.root, obligation.children ?? []);
+        const retained = touched || !childCurrent || !sourcesApplicable(obligation,frame) || obligation.evidenceKeys.some(k=>affected.has(k))
+          || (!hasProof && !n.childProof && affected.size>0) ? fail<Entries>() : this.leases.retain(n.outputs ?? new Map(), affected);
         if (retained.status === 'COMPLETE') {
-          nodes.push(Object.freeze({ ...n, outputs: retained.value })); continue;
+          nodes.push(Object.freeze({ ...n, outputs: retained.value, obligation:Object.freeze({...obligation,epoch:frame.epoch}) })); continue;
         }
         const actual = regionDisposition(this.root, n.id);
         if (capabilityData(n.capability)?.replay !== 'pure-read-only' || (n.capability.kind === 'region' && !n.childProof?.replayable) || actual?.effect !== 'none' || actual.acceptance !== 'accepted') return stale();
         staleIds.add(n.id); replays++;
-        const { outputs: _discarded, childProof: _proof, ...rest } = n;
-        void _discarded; void _proof;
+        const { outputs: _discarded, childProof: _proof, obligation: _obligation, ...rest } = n;
+        void _discarded; void _proof; void _obligation;
         nodes.push(Object.freeze({ ...rest, state: 'stale' }));
       }
       if (nodes.length + replays > this.limits.maxNodes) return fail('WORKFLOW_REGION_LIMIT');
       const progress = !this.#initialized || staleIds.size > 0 || changed.size > 0 || changedSlots.size > 0;
       const next = this.#revision + Number(this.#initialized && progress);
       return ok({ value: { entries: entries.value, facts: resolved.value, nodes, replays, next, frame, progress },
-        resolution: resolved.value, ...(this.#initialized && progress ? {
+        resolution: resolved.value, validate: now=>this.obligationsCurrent(now,nodes), ...(this.#initialized && progress ? {
           event: this.event('revalidate', this.#revision, next, 'WORKFLOW_REGION_REFRESH', { stale: [...staleIds] }),
         } : {}) });
     });
@@ -318,7 +333,7 @@ class Region<I, O> {
 
   private async edit(p: WorkflowRegionProposal): Promise<Outcome<boolean>> {
     const l = this.limits;
-    const result = await regionOperation<EditState>(this.root, this.structuralWork + this.viewWork * (1 + p.edits.length), 1 + p.edits.filter(e => e.kind === 'skip' || e.kind === 'rebind').length,
+    const result = await regionOperation<EditState>(this.root, this.structuralWork + (this.viewWork + this.graphWork) * (1 + p.edits.length) + 2*this.graphWork, 1 + p.edits.filter(e => e.kind === 'skip' || e.kind === 'rebind').length,
       true, async (frame, left, _max, check) => {
       this.current(frame);
       if (p.runId !== this.root.runId || p.regionId !== this.id || p.planRevision !== this.#revision || p.factRevision !== frame.epoch || this.#factRevision !== frame.epoch) return stale();
@@ -371,7 +386,7 @@ class Region<I, O> {
         return old?.id !== n.id || old.state !== n.state || JSON.stringify(old.node.input) !== JSON.stringify(n.node.input);
       });
       const next = this.#revision + Number(progress);
-      return ok({ value: { nodes, next, progress }, ...(progress ? { event: this.event('edit', this.#revision, next, 'WORKFLOW_EDIT_ACCEPTED', { edits: p.edits.length }) } : {}),
+      return ok({ value: { nodes, next, progress }, validate: now=>this.obligationsCurrent(now,nodes), ...(progress ? { event: this.event('edit', this.#revision, next, 'WORKFLOW_EDIT_ACCEPTED', { edits: p.edits.length }) } : {}),
         ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
     }, false, false, 2 * l.maxEdits, this.event('proposal-rejected', this.#revision, this.#revision, 'WORKFLOW_EDIT_REJECTED'));
     if (result.status !== 'COMPLETE') return result;
@@ -379,9 +394,9 @@ class Region<I, O> {
     return ok(result.value.progress);
   }
   private async execute(n: Pending): Promise<Outcome<void>> {
-    const prepared = await regionOperation<Entries>(this.root, this.structuralWork + leaseScanWork(this.limits.maxBindings), 1, false, frame => {
+    const prepared = await regionOperation<Entries>(this.root, this.structuralWork + 2*this.graphWork + leaseScanWork(this.limits.maxBindings), 1, false, frame => {
       this.current(frame);
-      if (frame.epoch !== this.#factRevision || !this.validate(this.#nodes, this.#context)) return stale();
+      if (frame.epoch !== this.#factRevision || !this.obligationsCurrent(frame) || !this.validate(this.#nodes, this.#context)) return stale();
       const data = capabilityData(n.capability);
       if (!data) return fail();
       const inputs = new Map<string, SlotEntry>();
@@ -398,21 +413,21 @@ class Region<I, O> {
           inputs.set(name, value);
         }
       }
-      return ok({ value: inputs, ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
+      return ok({ value: inputs, validate:now=>this.obligationsCurrent(now), ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
     });
     if (prepared.status !== 'COMPLETE') return prepared;
     const revision = this.#revision;
-    let childProof: DetachedRegionProof | undefined;
+    let childProof: DetachedRegionProof | undefined, obligation:ObligationProof|undefined;
     const actual = await invokeCapability(n.capability, [...this.allowed.values()], { root: this.root, leases: this.leases,
       inputs: prepared.value, maxBindings: this.limits.maxBindings, options: { ...this.options, planRevision: revision,
         current: () => revision === this.#revision && this.d.current() },
       occurrence: { instanceId: n.id, attempt: n.attempt + 1, planRevision: revision },
-      runRegion: runRegionWithProof, delegated: [...this.allowed.values()], acceptedChild: proof => { childProof = proof; },
+      runRegion: runRegionWithProof, delegated: [...this.allowed.values()], acceptedChild: proof => { childProof = proof; }, acceptedObligation: proof=>{obligation=proof;},
       ...(n.node.initial === undefined ? {} : { initial: n.node.initial }) });
     if (actual.status !== 'COMPLETE') return actual;
     const index = this.#nodes.indexOf(n);
-    if (index < 0) return stale();
-    this.#nodes[index] = Object.freeze({ ...n, state: 'accepted', attempt: n.attempt + 1, outputs: actual.value, ...(childProof ? { childProof } : {}) });
+    if (index < 0 || !obligation) return stale();
+    this.#nodes[index] = Object.freeze({ ...n, state: 'accepted', attempt: n.attempt + 1, outputs: actual.value, obligation, ...(childProof ? { childProof } : {}) });
     return ok(undefined);
   }
   /** 模型只得到显式投影能力及实际当前 slot；结构接纳仍由原生区域验证。 */
@@ -475,7 +490,7 @@ class Region<I, O> {
     return true;
   }
   private async choose(): Promise<Outcome<WorkflowRegionProposal>> {
-    const result = await regionOperation<WorkflowRegionProposal>(this.root, this.structuralWork + this.viewWork, 1, true, async (frame, left) => {
+    const result = await regionOperation<WorkflowRegionProposal>(this.root, this.structuralWork + this.viewWork + 2*this.graphWork, 1, true, async (frame, left) => {
       this.current(frame);
       if (frame.epoch !== this.#factRevision) return stale();
       const plan = beginModelPlan(this.root);
@@ -488,7 +503,7 @@ class Region<I, O> {
       if(planned.value.source==='model'){
         if(!consumeModelJson(raw,this.root.runId,this.root.scopeId,plan)||!this.modelAccess(parsed,planned.value.access,frame))return fail('WORKFLOW_MODEL_ACCESS_DENIED');
       }else if(planned.value.source!=='native'||isModelJson(raw))return fail('WORKFLOW_MODEL_ACCESS_DENIED');
-      return ok({ value: parsed, ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
+      return ok({ value: parsed, validate: now=>this.obligationsCurrent(now), ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
     }, false, false, 0, this.event('proposal-rejected', this.#revision, this.#revision, 'WORKFLOW_PROPOSAL_REJECTED'));
     return result;
   }
@@ -497,9 +512,9 @@ class Region<I, O> {
       let refreshed = await this.refresh();
       if (refreshed.status !== 'COMPLETE') return refreshed;
       for (;;) {
-        const probe = await regionOperation<boolean>(this.root, this.viewWork, 1, false, frame => {
+        const probe = await regionOperation<boolean>(this.root, this.viewWork + this.graphWork, 1, false, frame => {
           this.current(frame);
-          return ok({ value: frame.epoch !== this.#factRevision || !verifyRegionProofs(this.root, this.proofs())
+          return ok({ value: frame.epoch !== this.#factRevision || !this.obligationsCurrent(frame) || !verifyRegionProofs(this.root, this.proofs())
             || [...this.entries().values()].some(e => !sourceCurrent(e, frame)) });
         });
         if (probe.status !== 'COMPLETE') return probe;
@@ -524,17 +539,17 @@ class Region<I, O> {
           let checks=6;
           const checkProof=()=>checks-->0&&proofPlan.check();
           const finalized = await regionOperation<{ result: O; proof: DetachedRegionProof }>(this.root,
-            this.viewWork + knowledgeScanWork(this.d.knowledge.maxItems)+6*proofPlan.work, 1, true, async (frame, left) => {
+            this.viewWork + 6*this.graphWork + knowledgeScanWork(this.d.knowledge.maxItems)+6*proofPlan.work, 1, true, async (frame, left) => {
               this.current(frame);
               const entries = [...this.entries().values()];
-              const valid = (now: WorkflowKnowledgeFrame) => now.epoch === this.#factRevision && entries.every(e => sourceCurrent(e, now)) && checkProof();
+              const valid = (now: WorkflowKnowledgeFrame) => now.epoch === this.#factRevision && entries.every(e => sourceCurrent(e, now)) && this.obligationsCurrent(now) && checkProof();
               if (!valid(frame) || !this.#facts?.complete) return stale();
               const complete = await this.withView(frame, left, 'complete', view => this.d.complete(view, this.root),checkProof);
               if (complete.status !== 'COMPLETE') return complete;
               const sources = new Set<SlotEntry['sources'][number]>();
               let links = 0;
               const checked = new Set<readonly SlotEntry['sources'][number][]>();
-              for (const entry of entries) {
+              for (const entry of [...entries,...this.#nodes.filter(n=>n.state==='accepted').map(n=>n.obligation!)]) {
                 if (checked.has(entry.sources)) continue;
                 checked.add(entry.sources);
 
@@ -560,7 +575,7 @@ class Region<I, O> {
         if (p.action === 'clarify') {
           const clarify = this.d.clarify;
           if (!clarify) return fail('WORKFLOW_REGION_CLARIFY_REQUIRED');
-          const feedback = await regionOperation<void>(this.root, this.viewWork, 1, true, async (frame, left) => {
+          const feedback = await regionOperation<void>(this.root, this.viewWork + this.graphWork, 1, true, async (frame, left) => {
             this.current(frame);
             const response = await this.withView(frame, left, 'clarify', view => clarify(view, this.root));
             if (response.status !== 'COMPLETE') return response;

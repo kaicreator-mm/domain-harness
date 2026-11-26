@@ -147,11 +147,13 @@ export function decode(p:ModelProfile,data:J,prepared:Prepared,requestId:string,
     content=m.content===null||m.content===undefined?'':str(m.content);
     const raw=m.tool_calls===undefined?[]:array(m.tool_calls);
     for(const t of raw){const c=object(t),f=object(c.function);if(c.type!=='function'||Object.keys(c).some(k=>!['type','id','function'].includes(k))||Object.keys(f).some(k=>!['name','arguments'].includes(k)))return invalid('MODEL_UNSUPPORTED_BLOCK');add(c.id,f.name,parseJson(str(f.arguments),p.limits.responseBytes));}
+    if(!calls.length&&typeof m.content!=='string')return invalid('MODEL_CONTENT_MISSING');
     if(choice.finish_reason!==(calls.length?'tool_calls':'stop'))return invalid('MODEL_FINISH_REJECTED');
     wire={role:'assistant',content:m.content??null,...(raw.length?{tool_calls:raw}:{})};
   }else{
     const blocks=array(o.content);for(const b of blocks){const c=object(b);if(c.type==='text'){if(Object.keys(c).some(k=>k!=='type'&&k!=='text'))return invalid('MODEL_UNSUPPORTED_BLOCK');content+=str(c.text);}
       else if(c.type==='tool_use'){if(Object.keys(c).some(k=>!['type','id','name','input'].includes(k)))return invalid('MODEL_UNSUPPORTED_BLOCK');add(c.id,c.name,c.input??invalid());}else return invalid('MODEL_UNSUPPORTED_BLOCK');}
+    if(!calls.length&&!blocks.some(b=>object(b).type==='text'))return invalid('MODEL_CONTENT_MISSING');
     if(o.stop_reason!==(calls.length?'tool_use':'end_turn'))return invalid('MODEL_FINISH_REJECTED');
     wire={role:'assistant',content:blocks};
   }

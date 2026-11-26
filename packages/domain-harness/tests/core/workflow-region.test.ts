@@ -315,3 +315,48 @@ test('private child frame never leaks into parent keys; actual child may replay 
     if(mode==='late')assert.notEqual(records[0]?.acceptance,'accepted');
   }
 });
+
+test('zero-output required node keeps own currentness, including revision/expiry and actual replay',async()=>{
+  for(const mode of ['unchanged','unrelated','revision','expiry','replay','committed','late'] as const){
+    let epoch=1,revision='1',asOf=1,until=3,authorized=true,runs=0,reads=0,pre=0,completeCalls=0,asked=false;
+    const trace:WorkflowObservation[]=[];
+    const policy={maxItems:2,equal:Object.is,current:()=>({epoch,context:{scope:'shop',asOf,revisions:new Map([['quote',revision],['unrelated',String(epoch)]])}})};
+    const cap=bindWorkflowFunction<void,void>({id:'gate',description:'mandatory current authorization',inputs:{},outputs:{},input:()=>ok(undefined),output:()=>ok(undefined),
+      node:{id:'gate',goal:'check quote',requiredKnowledge:[{key:'quote',accepts:['authority']}],replay:mode==='replay'||mode==='committed'?'pure-read-only':'never',
+        knowledge:()=>{reads++;return ok([{key:'quote',origin:'authority',state:'known',value:authorized,source:{id:'quote',scope:'shop',revision,validity:{from:0,until}}}]);},
+        before:(_i,_r,v)=>{pre++;return v.knowledge?.complete&&v.knowledge.items.some(i=>i.key==='quote'&&i.status==='resolved'&&i.value===true)?ok(undefined):deny();},
+        run:()=>{runs++;return ok(undefined);},after:()=>ok(undefined),
+        project:()=>mode==='committed'?{effect:'committed',receiptId:'gate-receipt',detail:null}:{effect:'none',detail:null}}});
+    const d:WorkflowRegionDefinition<void,number>={id:'gate-region',goal:'current mandatory gate',limits,capabilities:[cap],constraints:[],knowledge:policy,current:()=>true,
+      requiredKnowledge:[],optionalKnowledge:[],contextSlots:{},layout:[{kind:'anchor',id:'gate',node:{alias:'a',capability:'gate',input:{}}}],
+      refresh:()=>ok({changed:[],dependencies:[],observations:[],slotEvidence:{}}),
+      plan:v=>{if(!accepted(v,'gate'))return result(v,'continue');if(!asked){asked=true;return result(v,'clarify');}return result(v,'finish');},
+      admit:()=>ok(undefined),canSkip:()=>deny(),canRebind:()=>deny(),replay:'never',
+      clarify:async(_v,root)=>{
+        const interaction=new InteractionElement({onPrompt:(p,actual)=>{setImmediate(()=>actual.submit({intentId:p.intentId,revision:p.revision,decisionKey:p.decisionKey,action:'submit',values:{quote:2}}));}});
+        const response=await interaction.runIn(root,scope=>scope.resolve<number,number>(0,(_s,event)=>event.kind==='initial'
+          ?ok({kind:'clarify',state:1,prompt:{decisionKey:'quote',title:'change source',actions:['submit'],fields:[{id:'quote',kind:'number',label:'quote',required:true}]}})
+          :event.response.action==='submit'&&typeof event.response.values.quote==='number'?ok({kind:'ready',intent:event.response.values.quote}):deny()));
+        if(response.status!=='COMPLETE')return response;
+        if(mode==='expiry')asOf=3;
+        else if(mode==='unrelated')epoch++;
+        else if(['revision','replay','committed'].includes(mode)){epoch++;revision='2';authorized=mode==='replay';until=10;}
+        return ok(undefined);
+      },
+      complete:v=>{completeCalls++;return accepted(v,'gate')?ok(1):deny();}};
+    const s=new StandardWorkflowSession(rootLimits,{knowledge:policy,current:()=>true,limits:baseControl,observe:r=>{trace.push(r);},
+      evidence:{required:true,emit:r=>{if(mode==='late'&&r.kind==='region'&&r.action==='complete')asOf=3;return ok(undefined);}}});
+    const r=await s.run(root=>runWorkflowRegion(root,d,undefined),completion<number>(v=>v===1));
+    const passes=mode==='unchanged'||mode==='unrelated'||mode==='replay';
+    assert.equal(r.status==='COMPLETE',passes,mode);
+    assert.deepEqual([runs,reads,pre],mode==='replay'?[2,2,2]:[1,1,1],mode);
+    assert.equal(completeCalls,passes||mode==='late'?1:0,mode);
+    assert.equal(trace.filter(x=>x.kind==='region'&&x.action==='feedback').length,1,mode);
+    const records=s.dispositions().filter(x=>x.kind==='node'&&x.occurrence.definitionId==='gate');
+    assert.equal(records.length,mode==='replay'?2:1,mode);
+    assert.ok(records.every(x=>x.kind==='node'&&x.acceptance==='accepted'));
+    if(mode==='replay'){const a=records[0],b=records[1];assert.ok(a?.kind==='node'&&b?.kind==='node');assert.equal(a.occurrence.instanceId,b.occurrence.instanceId);assert.equal(b.occurrence.attempt,2);}
+    if(mode==='committed'){const a=records[0];assert.ok(a?.kind==='node');assert.equal(a.receiptId,'gate-receipt');}
+    assert.equal(new Set(trace.map(x=>x.runId)).size,1);
+  }
+});

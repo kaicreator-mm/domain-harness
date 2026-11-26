@@ -71,13 +71,15 @@ export interface DetachedRegionProof {
   readonly children: readonly DetachedRegionProof[];
   readonly replayable: boolean;
 }
-export interface SlotEntry extends NativeValue {
+/** 已接纳节点义务的来源独立于输出数量；与输出共享同一冻结元数据。 */
+export interface ObligationProof {
   readonly children?: readonly DetachedRegionProof[];
   readonly epoch: number;
   readonly scope: string;
   readonly evidenceKeys: readonly string[];
   readonly sources: readonly Source[];
 }
+export interface SlotEntry extends NativeValue, ObligationProof {}
 export interface SlotStage<T> { readonly result: T }
 
 export function slotDeclarations(input: Declarations, max: number, handles = false): Map<string, WorkflowSlot<unknown>> {
@@ -282,7 +284,8 @@ export class SlotLeaseScope {
 
   /** 从实际已接纳输入和节点解析证据继承结果依赖；候选只由调用方在节点接纳后使用。 */
   public resultEntries<T>(stage: SlotStage<T>, inputs: ReadonlyMap<string, SlotEntry>,
-    resolution: EvidenceResolution<string, unknown>, extra?: DetachedRegionProof): Outcome<ReadonlyMap<string, SlotEntry>> {
+    resolution: EvidenceResolution<string, unknown>, extra?: DetachedRegionProof,
+    capture?: (proof: ObligationProof) => void): Outcome<ReadonlyMap<string, SlotEntry>> {
     return this.execute(frame => {
       const staged = this.#stages.get(stage);
       if (!staged) return fail();
@@ -309,11 +312,13 @@ export class SlotLeaseScope {
       const fresh = this.frame();
       if (!sameFrame(frame, fresh) || [...sources].some(s => !applicable(s, fresh))) return fail();
       const evidenceKeys = Object.freeze([...keys]), provenance = Object.freeze([...sources]);
+      const proof: ObligationProof = Object.freeze({ epoch: frame.epoch, scope: frame.context.scope, evidenceKeys, sources: provenance, ...(children.size ? { children: Object.freeze([...children]) } : {}) });
       const out = new Map<string, SlotEntry>();
       for (const [name, value] of staged.values) {
-        const entry = Object.freeze({ ...value, epoch: frame.epoch, scope: frame.context.scope, evidenceKeys, sources: provenance, ...(children.size ? { children: Object.freeze([...children]) } : {}) });
+        const entry = Object.freeze({ ...value, ...proof });
         this.#entries.add(entry); out.set(name, entry);
       }
+      capture?.(proof);
       return ok(out);
     });
   }

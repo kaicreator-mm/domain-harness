@@ -3,7 +3,7 @@ import { executeBoundNode, guardBoundFactory, prepayRegionProofs, prepareRegionP
 import type { NativeWorkflowContext } from './native-workflow-composition.js';
 import { managedFailure } from './workflow-managed-runtime.js';
 import { slotDeclarations } from './workflow-slots.js';
-import type { SlotEntry, SlotLeaseScope, DetachedRegionProof, WorkflowSlot } from './workflow-slots.js';
+import type { SlotEntry, SlotLeaseScope, DetachedRegionProof, ObligationProof, WorkflowSlot } from './workflow-slots.js';
 import type { WorkflowCapability, WorkflowFunctionBinding, WorkflowRegionDefinition, WorkflowNodeProposal } from './workflow-region-contract.js';
 import type { WorkflowNode, WorkflowNodeOptions } from './workflow-managed-contract.js';
 import type { StandardWorkflowOutcome as Outcome } from './standard-workflow.js';
@@ -25,6 +25,7 @@ interface BoundInvocation {
   readonly runRegion?: RegionRunner;
   readonly initial?: readonly WorkflowNodeProposal[];
   readonly delegated?: readonly WorkflowCapability[];
+  readonly acceptedObligation?: (proof: ObligationProof) => void;
   readonly acceptedChild?: (proof: DetachedRegionProof) => void;
   readonly receiveProof?: (proof: DetachedRegionProof) => void;
   readonly occurrence?: Readonly<{ instanceId: string; attempt: number; planRevision: number }>;
@@ -68,7 +69,7 @@ function factory<I, O>(binding: ReturnType<typeof common<I, O>>, kind: WorkflowC
   const capability: WorkflowCapability = Object.freeze({ id: binding.id, kind });
   const invoke: CapabilityData['invoke'] = async invocation => {
     const { root, leases, inputs, maxBindings, options } = invocation;
-    let staged: ReadonlyMap<string, SlotEntry> | undefined;
+    let staged: ReadonlyMap<string, SlotEntry> | undefined, obligation: ObligationProof | undefined;
     let childProof: DetachedRegionProof | undefined, checkChild: (()=>boolean)|undefined;
     try {
       if (inputs.size > maxBindings) return fail();
@@ -93,7 +94,7 @@ function factory<I, O>(binding: ReturnType<typeof common<I, O>>, kind: WorkflowC
           if (kind === 'region' && childProof === undefined) return fail('WORKFLOW_CHILD_PROVENANCE');
           const stage = leases.write(binding.outputs, maxBindings, writer => binding.output(value, writer), true);
           if (stage.status !== 'COMPLETE') return stage;
-          const entries = leases.resultEntries(stage.value, inputs, resolution, childProof);
+          const entries = leases.resultEntries(stage.value, inputs, resolution, childProof, proof => { obligation = proof; });
           if (entries.status !== 'COMPLETE') return entries;
           staged = entries.value;
           return ok(undefined);
@@ -101,7 +102,8 @@ function factory<I, O>(binding: ReturnType<typeof common<I, O>>, kind: WorkflowC
       });
       // 最终候选观察和当前性校验由已有节点 envelope 完成；非成功不泄漏暂存值。
       if (result.status !== 'COMPLETE') return result;
-      if (staged === undefined) return fail();
+      if (staged === undefined || obligation === undefined) return fail();
+      invocation.acceptedObligation?.(obligation);
       if (childProof !== undefined) invocation.acceptedChild?.(childProof);
       return ok(staged);
     } catch { return fail(); }

@@ -305,3 +305,27 @@ test('actual model-origin child and grandchild initial are delegated, locally bo
     }finally{await server.close();}
   }
 });
+
+test('both protocols distinguish missing content from present empty text and valid tool-only turns',async()=>{
+  for(const protocol of ['openai-chat','anthropic-messages'] as const)for(const mode of ['missing','null','empty-blocks','empty-text','text','tool'] as const){
+    const server=await serve((_r,s)=>{
+      if(protocol==='openai-chat'){
+        const message={role:'assistant',...(mode==='missing'||mode==='empty-blocks'?{}:{content:mode==='null'||mode==='tool'?null:mode==='empty-text'?'':'ok'}),
+          ...(mode==='tool'?{tool_calls:[{id:'call-q',type:'function',function:{name:'quote',arguments:'{"offer":"A"}'}}]}:{})};
+        send(s,{choices:[{message,finish_reason:mode==='tool'?'tool_calls':'stop'}]});
+      }else{
+        const content=mode==='null'?null:mode==='empty-blocks'?[]:mode==='tool'?[{type:'tool_use',id:'call-q',name:'quote',input:{offer:'A'}}]:
+          [{type:'text',text:mode==='empty-text'?'':'ok'}];
+        send(s,{...(mode==='missing'?{}:{content}),stop_reason:mode==='tool'?'tool_use':'end_turn'});
+      }
+    });
+    try{
+      const m=new ModelElement(profile(server.base,protocol));
+      const s=session();
+      const r=await s.run(root=>m.generate(root,req({tools:mode==='tool'?[tool]:[]})),complete<ModelTurn>());
+      assert.equal(r.status==='COMPLETE',['empty-text','text','tool'].includes(mode),protocol+' '+mode);
+      assert.equal(server.calls(),1);
+      if(r.status==='COMPLETE'){assert.equal(r.value.text,mode==='text'?'ok':'');assert.equal(r.value.calls.length,mode==='tool'?1:0);}
+    }finally{await server.close();}
+  }
+});
