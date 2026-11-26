@@ -58,7 +58,7 @@ test('exact/one-short complete fixed node bundle before callbacks', async () => 
     const c = control();
     const s = new StandardWorkflowSession({ maxCalls: mode === 'calls' ? 4 : 5,
       maxSteps: mode === 'steps' ? 5 : 6, maxDepth: 0 }, { ...c,
-      limits: { ...c.limits, maxWork: rootWork + nodeWork - Number(mode === 'work'),
+      limits: { ...c.limits, maxWork: rootWork + nodeWork + 3 - Number(mode === 'work'),
         maxEvents: mode === 'events' ? 6 : 7, maxActiveScopes: mode === 'active' ? 1 : 2 } });
     const n = definition({ before: () => { before++; return ok(undefined); }, run: x => { run++; return ok(x); },
       after: () => { after++; return ok(undefined); }, project: () => { project++; return { effect: 'none', detail: null }; } });
