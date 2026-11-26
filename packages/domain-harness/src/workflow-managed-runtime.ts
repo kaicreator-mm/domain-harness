@@ -101,11 +101,16 @@ export class ManagedRuntime {
 
   public sequence(): number { return ++this.#seq; }
 
-  /** 每次尝试预留四条事件，根 maxEvents<=65536，故最多 16384 个实际进度项。
-   * 每个固定节点至多构建两次视图；根完成至多一次。不得从任意回调反复构建。
+  /** 每个实际节点至少预留四个累计事件；独立于记录扫描额度预付进度复制。
+   * 同一根可能并发接纳新节点，按根声明的最大事件数计算上界而非接纳时当前长度。
    */
+  public get progressScanCost(): number { return Math.floor(this.control.limits.maxEvents / 4); }
+
+  /** 仅供已预留的固定节点两次、根完成一次投影；每项已是冻结元数据。 */
   public progress(scopeId: string): WorkflowContextView['progress'] {
-    return Object.freeze([...(this.#progress.get(scopeId)?.values() ?? [])]);
+    const progress = this.#progress.get(scopeId);
+    if (progress && progress.size > this.progressScanCost) throw new RangeError('WORKFLOW_PROGRESS_LIMIT');
+    return Object.freeze([...(progress?.values() ?? [])]);
   }
 
   public noteNode(record: Extract<WorkflowObservation, { kind: 'node' }>): void {
@@ -269,7 +274,7 @@ export class ManagedRuntime {
     const finalCalls = completion === undefined ? 0 : 1 + Number(completion.observe !== undefined) + reads;
     const charge: ResourceCharge = { calls: finalCalls + actorCalls, steps: 1 + finalCalls + actorCalls,
       work: 4 + 3 * EVENT_SCAN_WORK + finalCalls + (completion === undefined
-        ? 4 * this.frameChainCost(parent) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost)
+        ? 4 * this.frameChainCost(parent) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost + this.progressScanCost)
         + actorCalls + P * (1 + EVENT_SCAN_WORK + this.frameChainCost(parent)),
       events: 3 + P, activeScopes: 1, terminalReads: reads };
     if (maxLocalWork !== undefined && !valid(maxLocalWork)) return { code: 'WORKFLOW_INVALID_LIMIT' };
