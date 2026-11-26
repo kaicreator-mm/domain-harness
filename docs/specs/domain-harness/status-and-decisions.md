@@ -2,7 +2,14 @@
 
 > [权威目录](./README.md) · Owner 现行新架构决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。本文件同时保留 R151 初审 REWORK 与后续 R160 通过的时间顺序；历史状态不得覆盖新收据。
 
-## 0.11.3 · R70 后 QA-09A 有限整改（当前候选状态）
+## 0.11.3 · R94 产品与见证合入（当前）
+
+- [R93 独立验收](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7187295917)、[R94 CI 准入](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7187545899)：13/13 Oracle 限定接受，P0/P1=0，两项非阻断 P2 有处置；[Woodpecker #3212](https://ci.kaicreator.com/repos/18/pipeline/3212/1) 在受审产品 HEAD `fd2629c3d214a3190f613202636508e70867d61a` 上 SUCCESS。
+- 产品 [#1764](https://github.com/kaicreator-mm/domain-harness/pull/1764) 与独立采购见证 [#1758](https://github.com/kaicreator-mm/domain-harness/pull/1758) 按原 HEAD 合入；版本列车组合提交 `99bfa7c4551cd3025c55c14f34035873e7f4e4da`，实际 Tree `446babfc73974b3a06dadfd515059420900bc269`，与预计算组合 Tree 一致。合入后 fresh build/pack 与 R93 受审工件 SHA256 `30423cac561a5da52717885443cc3d19dff854a2feabd4d14810435c017aaee4` 字节相同；该工件为内部阶段版本 0.11.2，非 0.11.3 npm 发布。
+- 当前根公开面 27 值/61 类型，Skill 32 文件/9 示例；四领域实际复用；R90/R88 的旧工件执行证据保留原身份，R91/R92 用实际 manifest-only 差异与安装证据证明受影响路径等价。OBS-R90-01 已限定关闭。P2-R89-01 仅收窄根 symlink 声明，未实施额外 hardening；本次仅同步当前状态导航，不能把新文档包当作旧受审工件。
+- I08 原始负面资格保留：Q5A 35/36、Q5B 33/36、6/6 原始 strict 编译失败及 Q6B 额外 adapter 负例；Q6 92/92 runtime 通过与 R89 整改限定接受，不等于原实验追溯 PASS、盲测或 LLM 效率证明。收尾状态以 [#1757](https://github.com/kaicreator-mm/domain-harness/issues/1757) 与 [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) 最新实际收据为准；不启动后续版本、不打 tag、不发布。
+
+## 0.11.3 · R70 后 QA-09A 有限整改（历史候选状态）
 
 - [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) T30–T34 已限定验收合入：R49 #1751、R51 #1748、R53 #1752、R59 #1755；#1754 R62 #1756 已收口。集成基线 `a9355631735dda9da48c3477c93528df10f9f4ef`。
 - [T35 #1757 R64](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7166610731) 原工件实际 Linux Node22.12.0 全新消费者、两专业域和累计 Reference 已验证；R65 #1758 独立生成/维护，R66 数值复核；R67 Windows 原工件验证与 [R66B](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7167658767) 并行。
