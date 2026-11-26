@@ -138,6 +138,14 @@
 - `StandardWorkflowSession#dispositions` · instance method：`() => readonly WorkflowObservation[]`；调用：`(): readonly WorkflowObservation[]`
 - `StandardWorkflowSession#run` · instance method：`<T>(action: WorkflowHandler<T>, completion?: WorkflowCompletionPolicy<T>) => Promise<Result<T>>`；调用：`<T>(action: WorkflowHandler<T>, completion?: WorkflowCompletionPolicy<T>): Promise<Result<T>>`
 
+### WorkflowActorOptions
+
+- 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
+- 职责：XState 实际快照的同步有限语义投影，不序列化 actor 内部状态。
+- 类型声明：`interface WorkflowActorOptions<Snapshot> { readonly project: (snapshot: Snapshot) => StandardJsonValue; readonly maxProjections: number; }`
+- `WorkflowActorOptions#maxProjections` · contract property readonly：`number`
+- `WorkflowActorOptions#project` · contract callback readonly：`(snapshot: Snapshot) => StandardJsonValue`；调用：`(snapshot: Snapshot): StandardJsonValue`
+
 ### WorkflowAttempt
 
 - 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
@@ -315,6 +323,7 @@
 - 获取方式：public constructor / new
 - 构造声明：`<Logic extends AnyActorLogic, Output>(logic: Logic, mapOutput: (output: OutputFrom<Logic>) => StandardWorkflowOutcome<Output>): XStateWorkflowElement<Logic, Output>`
 - `XStateWorkflowElement#run` · instance method：`(input: InputFrom<Logic>) => Promise<StandardWorkflowOutcome<Output>>`；调用：`(input: InputFrom<Logic>): Promise<StandardWorkflowOutcome<Output>>`
+- `XStateWorkflowElement#runIn` · instance method：`(input: (scope: NativeWorkflowContext) => InputFrom<Logic>, root: NativeWorkflowContext, options: WorkflowActorOptions<SnapshotFrom<Logic>>) => Promise<StandardWorkflowOutcome<Output>>`；调用：`(input: (scope: NativeWorkflowContext) => InputFrom<Logic>, root: NativeWorkflowContext, options: WorkflowActorOptions<SnapshotFrom<Logic>>): Promise<StandardWorkflowOutcome<Output>>`
 
 ## structured-data
 
