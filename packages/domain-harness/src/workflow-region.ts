@@ -540,7 +540,7 @@ async function runRegionWithProof<I, O>(root: NativeWorkflowContext, definition:
         const outcome = await region.run();
         proof = region.finalProof;
         return outcome;
-      });
+      }, receiveProof !== undefined);
     if (result.status === 'COMPLETE' && receiveProof) {
       if (!proof) return fail('WORKFLOW_CHILD_PROVENANCE');
       receiveProof(proof);

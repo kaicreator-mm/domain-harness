@@ -207,7 +207,7 @@ export function executeBoundNode<I, O>(root: NativeWorkflowContext, definition: 
   return boundNodes.get(root)?.(definition, options, binding) ?? Promise.resolve(managedFailure('WORKFLOW_SCOPE_CLOSED'));
 }
 
-const scopeBorrowers = new WeakMap<NativeWorkflowContext, <T>(depth: number, action: WorkflowHandler<T>, local?: number, actorProjections?: number, region?: WorkflowNodeOptions) => Promise<Result<T>>>();
+const scopeBorrowers = new WeakMap<NativeWorkflowContext, <T>(depth: number, action: WorkflowHandler<T>, local?: number, actorProjections?: number, region?: WorkflowNodeOptions, prepaid?: boolean) => Promise<Result<T>>>();
 
 /** 内部 Region/Actor 入口使用同一借用生命周期；不从 SDK 根导出。 */
 export function borrowWorkflowScope<T>(root: NativeWorkflowContext, maxDescendantDepth: number,
@@ -219,9 +219,9 @@ export function borrowWorkflowScope<T>(root: NativeWorkflowContext, maxDescendan
 
 /** 区域沿用借用生命周期，可信区域策略加入祖先策略链。 */
 export function borrowRegionScope<T>(root: NativeWorkflowContext, depth: number, local: number,
-  options: WorkflowNodeOptions, action: WorkflowHandler<T>): Promise<Result<T>> {
+  options: WorkflowNodeOptions, action: WorkflowHandler<T>, prepaid = false): Promise<Result<T>> {
   if (!scopeLifetime(root).managed) return Promise.resolve(managedFailure('WORKFLOW_CONTROL_REQUIRED'));
-  return scopeBorrowers.get(root)?.(depth, action, local, undefined, options)
+  return scopeBorrowers.get(root)?.(depth, action, local, undefined, options, prepaid)
     ?? Promise.resolve(managedFailure('WORKFLOW_SCOPE_CLOSED'));
 }
 
@@ -287,6 +287,13 @@ export async function regionOperation<T>(root: NativeWorkflowContext, units: num
     return { status: 'COMPLETE', value: output.value };
   } catch { return managedFailure('WORKFLOW_REGION_INVALID'); }
   finally { ticket.ticket.close(scope.owner); finish(); }
+}
+
+/** 已知输入的子域证明只构建一次有限扫描计划；由节点完整接纳预付。 */
+export function prepareRegionProofs(root: NativeWorkflowContext, proofs: readonly import('./workflow-slots.js').DetachedRegionProof[]) {
+  const lifetime = scopeLifetime(root);
+  if (!lifetime.admissible() || !lifetime.managed || !lifetime.scope) return undefined;
+  return lifetime.managed.detachedPlan(proofs);
 }
 
 /** 私有子域来源校验由实际所属根和作用域承担。 */
@@ -403,7 +410,7 @@ export class NativeWorkflowContext {
   ) {
     scopeLifetimes.set(this, new ScopeLifetime());
     boundNodes.set(this, (definition, options, binding) => this.runNode(definition, binding.input, options, binding));
-    scopeBorrowers.set(this, (depth, action, local, actorProjections, region) => this.borrow(depth, action, local, actorProjections, region));
+    scopeBorrowers.set(this, (depth, action, local, actorProjections, region, prepaid) => this.borrow(depth, action, local, actorProjections, region, prepaid));
   }
 
   public get signal(): AbortSignal { return scopeLifetime(this).signal; }
@@ -432,6 +439,7 @@ export class NativeWorkflowContext {
     const parent = scopeLifetime(this);
     if (!parent.admissible() || !parent.managed || !parent.scope) return managedFailure('WORKFLOW_NODE_CONTROL_REQUIRED');
     const runtime = parent.managed;
+    if (binding?.child && this.remaining().maxDescendantDepth < 1) return managedFailure('WORKFLOW_DEPTH_LIMIT');
     try {
       const admitted = admitNode(runtime, parent.scope, definition, options, binding);
       if ('code' in admitted) return managedFailure(admitted.code);
@@ -509,7 +517,7 @@ export class NativeWorkflowContext {
     return this.borrow(maxDescendantDepth, action);
   }
 
-  private async borrow<T>(maxDescendantDepth: number, action: WorkflowHandler<T>, maxLocalWork?: number, actorProjections?: number, region?: WorkflowNodeOptions): Promise<Result<T>> {
+  private async borrow<T>(maxDescendantDepth: number, action: WorkflowHandler<T>, maxLocalWork?: number, actorProjections?: number, region?: WorkflowNodeOptions, prepaid = false): Promise<Result<T>> {
     const parent = scopeLifetime(this);
     if (!parent.admissible()) return failure('WORKFLOW_SCOPE_CLOSED');
     if (!validLimit(maxDescendantDepth) || (parent.managed && maxDescendantDepth > 2 ** 31 - 1)) return failure('WORKFLOW_INVALID_LIMIT');
@@ -518,7 +526,7 @@ export class NativeWorkflowContext {
     const managed = parent.managed;
     let scope: ManagedScope | undefined;
     if (managed) {
-      const admitted = managed.reserveScope(this.scopeId, undefined, parent.scope, maxLocalWork, actorProjections, region);
+      const admitted = managed.reserveScope(this.scopeId, undefined, parent.scope, maxLocalWork, actorProjections, region, prepaid);
       if ('code' in admitted) return managedFailure(admitted.code);
       scope = admitted.scope;
     } else {

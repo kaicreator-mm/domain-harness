@@ -219,7 +219,7 @@
 
 - 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
 - 职责：统一根任务的有限资源合同。
-- 类型声明：`interface WorkflowControlLimits { readonly maxWork: number; readonly maxActiveMs: number; readonly maxWallMs?: number; readonly maxSettlementMs: number; readonly maxNoProgress: number; readonly maxEvents: number; readonly maxActiveScopes: number; readonly model?: Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; maxReservedTokens?: number; }>; }`
+- 类型声明：`interface WorkflowControlLimits { readonly maxWork: number; readonly maxActiveMs: number; readonly maxWallMs?: number; readonly maxSettlementMs: number; readonly maxNoProgress: number; readonly maxEvents: number; readonly maxActiveScopes: number; readonly model?: Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; }>; }`
 - `WorkflowControlLimits#maxActiveMs` · contract property readonly：`number`
 - `WorkflowControlLimits#maxActiveScopes` · contract property readonly：`number`
 - `WorkflowControlLimits#maxEvents` · contract property readonly：`number`
@@ -227,7 +227,7 @@
 - `WorkflowControlLimits#maxSettlementMs` · contract property readonly：`number`
 - `WorkflowControlLimits#maxWallMs` · contract property readonly optional：`number`
 - `WorkflowControlLimits#maxWork` · contract property readonly：`number`
-- `WorkflowControlLimits#model` · contract property readonly optional：`Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; maxReservedTokens?: number; }>`
+- `WorkflowControlLimits#model` · contract property readonly optional：`Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; }>`
 
 ### WorkflowControlOptions
 

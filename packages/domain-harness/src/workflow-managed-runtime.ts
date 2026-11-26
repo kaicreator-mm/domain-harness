@@ -74,6 +74,7 @@ export interface ManagedScope {
   finalCurrent?: (frame: Frame) => boolean;
   feedbackCount?: number;
   unsafeReplay?: boolean;
+  prepaidChildWork?: number;
 }
 
 export interface LocalFramePolicy {
@@ -268,26 +269,22 @@ export class ManagedRuntime {
     return this.evidenceCurrent(frame, resolution) && (validate?.(frame) ?? true);
   }
 
-  /** 闭合子域的事实校验在原根内进行；父域不获得子域的事实键。
-   * 先用已有 work 额度预留本次有限校验，再调用可信策略。
-   */
-  public checkDetached(scope: ManagedScope, proofs: readonly DetachedRegionProof[]): boolean {
-    if (!this.available() || proofs.length > 256) return false;
-    if (proofs.length === 0) return true;
+  /** 已知私有子域证明的有限扫描计划，不调用可信策略。 */
+  public detachedPlan(proofs: readonly DetachedRegionProof[]): Readonly<{ work: number; check: () => boolean }> | undefined {
+    if (!this.available() || proofs.length > 256) return undefined;
+    if (proofs.length === 0) return Object.freeze({ work: 0, check: () => true });
     const seen = new Set<DetachedRegionProof>(), pending = [...proofs];
     let work = 1, links = 0;
     for (let i = 0; i < pending.length; i++) {
       const p = pending[i]!;
       if (seen.has(p)) continue;
       if (seen.size >= 256 || p.children.length > 256 || !valid(p.knowledge.maxItems, 4096)
-        || (links += p.sources.length + p.children.length) > 16384) return false;
+        || (links += p.sources.length + p.children.length) > 16384) return undefined;
       seen.add(p);
       work += frameScanWork(p.knowledge.maxItems) + 4 * (p.sources.length + p.children.length);
       for (const child of p.children) if (!seen.has(child)) pending.push(child);
     }
-    const admission = this.ledger.reserve(scope.owner, { calls: 0, steps: 0, work }, scope.local);
-    if (!admission.ok) return false;
-    try {
+    return Object.freeze({ work, check: () => {
       for (const p of seen) {
         const now = this.capture(p.knowledge, p.current, p.frame);
         if (!now || !this.same(p.frame, now)) return false;
@@ -298,7 +295,18 @@ export class ManagedRuntime {
         }
       }
       return this.available();
-    } finally { admission.ticket.close(scope.owner); }
+    } });
+  }
+
+  /** 区域普通阶段按已有 work 额度校验；节点已知输入证明在整次接纳中预留。 */
+  public checkDetached(scope: ManagedScope, proofs: readonly DetachedRegionProof[]): boolean {
+    const plan = this.detachedPlan(proofs);
+    if (!plan) return false;
+    if (plan.work === 0) return true;
+    const admission = this.ledger.reserve(scope.owner, { calls: 0, steps: 0, work: plan.work }, scope.local);
+    if (!admission.ok) return false;
+    try { return plan.check(); }
+    finally { admission.ticket.close(scope.owner); }
   }
 
   private same(a: Frame, b: Frame): boolean {
@@ -324,7 +332,7 @@ export class ManagedRuntime {
     return true;
   }
 
-  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope, maxLocalWork?: number, actorProjections?: number, region?: WorkflowNodeOptions):
+  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope, maxLocalWork?: number, actorProjections?: number, region?: WorkflowNodeOptions, prepaid = false):
     { scope: ManagedScope } | { code: string } {
     if (!this.available()) return { code: 'WORKFLOW_STOPPED' };
     if (actorProjections !== undefined && (!valid(actorProjections, 65536) || actorProjections < 1
@@ -344,11 +352,24 @@ export class ManagedRuntime {
       events: 3 + P, activeScopes: 1, terminalReads: reads };
     if (maxLocalWork !== undefined && !valid(maxLocalWork)) return { code: 'WORKFLOW_INVALID_LIMIT' };
     // 局部额度包含作用域自身准入、所有后代及终止预留；不从根转移或复制实际余额。
-    const local = maxLocalWork === undefined ? parent?.local : this.ledger.local(maxLocalWork, parent?.local);
-    const admission = this.ledger.reserve(owner, charge, local);
-    if (!admission.ok) return { code: admission.code };
+    let local: LocalWorkQuota | undefined, ticket: ResourceTicket;
+    if (prepaid) {
+      if (!parent || !region || parent.prepaidChildWork === undefined || completion || actorProjections !== undefined
+        || maxLocalWork === undefined || charge.work === undefined || charge.work > parent.prepaidChildWork) return { code: 'WORKFLOW_CHILD_ADMISSION' };
+      if (maxLocalWork < charge.work) return { code: 'WORKFLOW_LOCAL_WORK_BUDGET' };
+      local = this.ledger.prepaidLocal(maxLocalWork, charge.work, parent.local);
+      const split = parent.ticket.splitChild(parent.owner, owner);
+      if (!split) return { code: 'WORKFLOW_CHILD_ADMISSION' };
+      delete parent.prepaidChildWork;
+      ticket = split;
+    } else {
+      local = maxLocalWork === undefined ? parent?.local : this.ledger.local(maxLocalWork, parent?.local);
+      const admission = this.ledger.reserve(owner, charge, local);
+      if (!admission.ok) return { code: admission.code };
+      ticket = admission.ticket;
+    }
     return { scope: { id: randomUUID(), ...(parentId === undefined ? {} : { parentId }),
-      owner, ticket: admission.ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }), ...(local === undefined ? {} : { local }),
+      owner, ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }), ...(local === undefined ? {} : { local }),
       ...(actorProjections === undefined ? {} : { actor: { remaining: P } }),
       ...(region ? { policy: { knowledge: Object.freeze({ ...region.knowledge }), current: region.current }, feedbackCount: 0 } : {}) } };
   }

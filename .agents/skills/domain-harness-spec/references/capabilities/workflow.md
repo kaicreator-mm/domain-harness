@@ -24,3 +24,7 @@ API: WorkflowElement XStateWorkflowElement StandardWorkflowSession NativeWorkflo
 Function/Region 通过 bindWorkflowFunction / bindWorkflowRegion 分配能力身份，声明全部输入输出 token；输入装配与输出编码复用受控节点的完整预接纳，输出仅在实际 post、证据与当前性裁定后可使用。能力绑定本身不执行；动态区域使用 runWorkflowRegion 在受控根内借用作用域，按当前有效结构执行；模型来源提案尚未开放，失败不自动重试。
 
 子区域可使用独立可信事实范围；父级只接收声明的原生结果，私有证据由 SDK 保留为内部当前性证明，不增加父级知识键或可读 Slot。重新调用已失效的子区域须绑定和区域都明确 pure-read-only，且实际受控后代没有已提交/未知或未接纳的执行效果。实际副作用收据仍保留；不自动重试。
+
+R40 模型运行边界仅包含实际调用次数、显式重试及每次输出上限；不支持累计 token 预留或商业计费控制。旧的非 undefined 累计预留字段在准入拒绝，不静默忽略。R50 普通动态节点保留 16 次 frame 检查，已知子域证明由节点完整准入预付有限校验。
+
+子区域工厂前与父节点原子预付子入口，包含一个子活动占位和三个作用域记录；未知子事实策略用既有 maxItems4096 合同上界预留，不增加额度维度。工厂返回实际局部上限后只扣子局部入口实际额度，已预付的根/祖先额度不重复扣减或退款。

@@ -13,7 +13,7 @@ export interface ResourceLimits {
   readonly maxEvents: number;
   readonly maxActiveScopes: number;
   readonly model?: Readonly<{
-    maxCalls: number; maxRetries: number; maxOutputTokens: number; maxReservedTokens?: number;
+    maxCalls: number; maxRetries: number; maxOutputTokens: number;
   }>;
 }
 
@@ -25,7 +25,6 @@ export interface ResourceCharge {
   readonly activeScopes?: number;
   readonly modelCalls?: number;
   readonly modelRetries?: number;
-  readonly reservedTokens?: number;
   readonly outputTokens?: number;
   /** 终止读取已包含在调用、步骤及 work 中，不再重复收费。 */
   readonly terminalReads?: number;
@@ -74,6 +73,14 @@ export class ResourceTicket {
     return true;
   }
 
+  /** 将已原子接纳的子作用域记录和活动占位移交给唯一子所有者，不重复扣账。 */
+  public splitChild(owner: object, childOwner: object): ResourceTicket | undefined {
+    if (owner !== this.owner || this.#closed || this.#events < 3 || this.#activeScopes < 2) return undefined;
+    this.#events -= 3;
+    this.#activeScopes--;
+    return new ResourceTicket(childOwner, 3, 0, 1, this.releaseActive);
+  }
+
   /** 只能由拥有者在本地操作实际结算、作用域 CLOSED 后调用。 */
   public close(owner: object): boolean {
     if (owner !== this.owner || this.#closed) return false;
@@ -120,7 +127,6 @@ export class WorkflowResourceLedger {
   #activeScopes: number;
   #modelCalls: number;
   #modelRetries: number;
-  #tokens: number | undefined;
   readonly #outputLimit: number | undefined;
   readonly #managed: boolean;
   readonly #valid: boolean;
@@ -136,21 +142,21 @@ export class WorkflowResourceLedger {
     this.#modelCalls = limits?.model?.maxCalls ?? 0;
     this.#modelRetries = limits?.model?.maxRetries ?? 0;
     this.#outputLimit = limits?.model?.maxOutputTokens;
-    this.#tokens = limits?.model?.maxReservedTokens;
+    const model = limits?.model;
     this.#valid = valid(calls, this.#managed ? MAX_LIMIT : Number.MAX_SAFE_INTEGER)
       && valid(steps, this.#managed ? MAX_LIMIT : Number.MAX_SAFE_INTEGER)
       && valid(this.#work, MAX_LIMIT) && valid(this.#events, 65536)
       && valid(this.#activeScopes, 4096) && valid(this.#modelCalls, MAX_LIMIT)
       && valid(this.#modelRetries, MAX_LIMIT)
       && (this.#outputLimit === undefined || valid(this.#outputLimit, MAX_LIMIT))
-      && (this.#tokens === undefined || valid(this.#tokens, MAX_LIMIT));
+      && !(model && 'maxReservedTokens' in model && model.maxReservedTokens !== undefined);
   }
 
   public remaining() {
     return Object.freeze({
       calls: this.#calls, steps: this.#steps, work: this.#work, events: this.#events,
       activeScopes: this.#activeScopes, modelCalls: this.#modelCalls,
-      modelRetries: this.#modelRetries, reservedTokens: this.#tokens,
+      modelRetries: this.#modelRetries,
     });
   }
 
@@ -162,6 +168,14 @@ export class WorkflowResourceLedger {
     }
     const quota = Object.freeze({ kind: 'workflow-local-work' as const });
     this.#locals.set(quota, { parent, remaining: maxWork });
+    return quota;
+  }
+
+  /** 已由祖先预付的子入口只扣新建局部余额，不能再次扣根或祖先。 */
+  public prepaidLocal(maxWork: number, entryWork: number, parent?: LocalWorkQuota): LocalWorkQuota {
+    if (!valid(entryWork, MAX_LIMIT) || entryWork > maxWork) throw new RangeError('Invalid prepaid scope work');
+    const quota = this.local(maxWork, parent);
+    this.#locals.get(quota)!.remaining -= entryWork;
     return quota;
   }
 
@@ -180,14 +194,14 @@ export class WorkflowResourceLedger {
   public reserve(owner: object, charge: ResourceCharge, local?: LocalWorkQuota): Admission {
     // 每个字段只读一次；先完整验证，再同步扣除，失败不产生票据。
     const { calls, steps, work = 0, events = 0, activeScopes = 0,
-      modelCalls = 0, modelRetries = 0, reservedTokens = 0,
+      modelCalls = 0, modelRetries = 0,
       outputTokens = 0, terminalReads = 0 } = charge;
-    const managed = [work, events, activeScopes, modelCalls, modelRetries, reservedTokens,
+    const managed = [work, events, activeScopes, modelCalls, modelRetries,
       outputTokens, terminalReads];
-    if (!this.#valid || !valid(calls) || !valid(steps) || !managed.every(n => valid(n))
+    if (!this.#valid || ('reservedTokens' in charge && charge.reservedTokens !== undefined) || !valid(calls) || !valid(steps) || !managed.every(n => valid(n))
       || (!this.#managed && (managed.some(n => n !== 0) || local !== undefined))
       || terminalReads > Math.min(calls, steps, work) || modelRetries > modelCalls
-      || (modelCalls === 0 && (outputTokens !== 0 || reservedTokens !== 0))
+      || (modelCalls === 0 && outputTokens !== 0)
       || (modelCalls > 0 && (modelCalls !== 1 || outputTokens === 0))) {
       return denied('WORKFLOW_INVALID_LIMIT');
     }
@@ -206,8 +220,7 @@ export class WorkflowResourceLedger {
     if (activeScopes > this.#activeScopes) return denied('WORKFLOW_ACTIVE_SCOPE_LIMIT');
     if (modelCalls > this.#modelCalls) return denied('WORKFLOW_MODEL_CALL_BUDGET');
     if (modelRetries > this.#modelRetries) return denied('WORKFLOW_MODEL_RETRY_BUDGET');
-    if (modelCalls > 0 && (this.#outputLimit === undefined || outputTokens > this.#outputLimit
-      || (this.#tokens !== undefined && (reservedTokens < outputTokens || reservedTokens > this.#tokens)))) {
+    if (modelCalls > 0 && (this.#outputLimit === undefined || outputTokens > this.#outputLimit)) {
       return denied('WORKFLOW_MODEL_TOKEN_BUDGET');
     }
     if (balances.some(balance => work > balance.remaining)) return denied('WORKFLOW_LOCAL_WORK_BUDGET');
@@ -219,7 +232,6 @@ export class WorkflowResourceLedger {
     this.#activeScopes -= activeScopes;
     this.#modelCalls -= modelCalls;
     this.#modelRetries -= modelRetries;
-    if (this.#tokens !== undefined) this.#tokens -= reservedTokens;
     for (const balance of balances) balance.remaining -= work;
     const ticket = new ResourceTicket(owner, events, terminalReads, activeScopes,
       count => { this.#activeScopes += count; });

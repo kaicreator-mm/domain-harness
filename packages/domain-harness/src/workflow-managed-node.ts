@@ -68,6 +68,7 @@ export function safeDetail(value: StandardJsonValue, limit: number): StandardJso
 export interface BoundNodePreparation<I, O> {
   readonly maxBindings: number;
   readonly child: boolean;
+  readonly knownProofWork?: number;
   readonly occurrence?: Readonly<{ instanceId: string; attempt: number; planRevision: number }>;
   readonly current: (frame: WorkflowKnowledgeFrame) => boolean;
   readonly input: () => Outcome<I>;
@@ -85,7 +86,7 @@ export interface NodeAdmission<I, O> {
 export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, definition: WorkflowNode<I, O>,
   options: WorkflowNodeOptions, binding?: BoundNodePreparation<I, O>): NodeAdmission<I, O> | { code: string } {
   if (!runtime.available()) return { code: 'WORKFLOW_STOPPED' };
-  if (binding && !valid(binding.maxBindings, 2048)) return { code: 'WORKFLOW_INVALID_LIMIT' };
+  if (binding && (!valid(binding.maxBindings, 2048) || !valid(binding.knownProofWork ?? 0))) return { code: 'WORKFLOW_INVALID_LIMIT' };
   if (!definition || !options || !options.knowledge || !boundedText(definition.id) || Buffer.byteLength(definition.id) > 128 || !boundedText(definition.goal)
     || !valid(options.knowledge.maxItems, 4096) || !array(definition.requiredKnowledge)
     || definition.requiredKnowledge.length > options.knowledge.maxItems
@@ -108,15 +109,18 @@ export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, d
   const F = runtime.frameChainCost(parent) + frameScanWork(local.knowledge.maxItems);
   // Context 声明元数据至多 4096 项 / 64KiB；验证密集性、字符串、字节和复制各一次。
   // 不复用为实际事件 JSON 扫描预留的额度；两次进度视图亦各自预付。
+  // 子区域工厂返回事实策略之前无法得知其 maxItems，使用合同上限 4096
+  // 预付入口和活动占位；具体局部额度在工厂返回后按实际声明扣除。
+  const childWork = binding?.child ? 4 + 3 * EVENT_SCAN_WORK + 4 * (F + frameScanWork(4096)) : 0;
   const contextWork = node.context === undefined ? 0 : 4 * 4096 + Math.ceil(65536 / 256);
-  const reservation = runtime.ledger.reserve(owner, { calls: N, steps: N,
-    work: N + 4 + 4 * EVENT_SCAN_WORK + (16 + R + (binding ? 4 : 0)) * F + knowledgeScanWork(local.knowledge.maxItems)
-      + (binding ? 2 * leaseScanWork(binding.maxBindings) : 0)
-      + 2 * runtime.progressScanCost + contextWork,
-    events: 4, activeScopes: 1, terminalReads: R }, parent.local);
+  const reservation = runtime.ledger.reserve(owner, { calls: N, steps: N + Number(binding?.child === true),
+    work: N + 4 + 4 * EVENT_SCAN_WORK + (16 + R) * F + knowledgeScanWork(local.knowledge.maxItems)
+      + (binding ? 2 * leaseScanWork(binding.maxBindings) + 15 * (binding.knownProofWork ?? 0) : 0)
+      + 2 * runtime.progressScanCost + contextWork + childWork,
+    events: 4 + 3 * Number(binding?.child === true), activeScopes: 1 + Number(binding?.child === true), terminalReads: R }, parent.local);
   if (!reservation.ok) return { code: reservation.code };
   return { definition: node, options: bound, ...(binding ? { binding } : {}), scope: { id: randomUUID(), parentId: parent.id, parent,
-    policy: local, owner, ticket: reservation.ticket, delivery: 'not-required', diagnostic: false, ...(parent.local === undefined ? {} : { local: parent.local }) } };
+    policy: local, owner, ticket: reservation.ticket, ...(childWork ? { prepaidChildWork: childWork } : {}), delivery: 'not-required', diagnostic: false, ...(parent.local === undefined ? {} : { local: parent.local }) } };
 }
 
 export async function executeNode<I, O>(runtime: ManagedRuntime, admission: NodeAdmission<I, O>, initial: () => Outcome<I>,
@@ -135,7 +139,7 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
   let result: Outcome<O> = managedFailure('WORKFLOW_NODE_INVALID');
   let candidateSeq: number | undefined;
   let currentChecks = 0;
-  const current = () => ++currentChecks <= (binding ? 19 : 15) && frames !== undefined && parentOpen() && runtime.checkFrames(scope, frames, resolution, binding?.current);
+  const current = () => ++currentChecks <= 15 && frames !== undefined && parentOpen() && runtime.checkFrames(scope, frames, resolution, binding?.current);
   const record = (phase: NodeRecord['phase'], acceptance: NodeRecord['acceptance'], value?: Outcome<unknown>): NodeRecord =>
     Object.freeze({ kind: 'node', phase, occurrence, runId: runtime.runId, scopeId: scope.id, parentScopeId: scope.parentId!,
       seq: runtime.sequence(), factRevision: frames?.locals.at(-1)?.frame.epoch ?? 0, stage: node.id, ...(binding?.occurrence === undefined ? {} : { planRevision: binding.occurrence.planRevision }),

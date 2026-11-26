@@ -90,8 +90,8 @@ test('foreign/forged capability, missing input and incomplete output fail closed
 });
 test('inclusive exact/one-short binding reserves input and encoder before any callback', async () => {
   const e0 = environment(0);
-  // Fixed base 132137, 2 extra calls/work + 4*F=8 + 2 leases(1+4*0)=2; progress Q=1 root / 2Q node.
-  const rootWork = 99086 + 1, nodeWork = 132137 + 2 + 8 + 2 + 2;
+  // Fixed base 132137, 2 extra calls/work + 2 leases(1+4*0)=2; progress Q=1 root / 2Q node.
+  const rootWork = 99086 + 1, nodeWork = 132137 + 2 + 2 + 2;
   for (const mode of ['exact','work','calls','steps','events','active'] as const) {
     const e = environment(0); let input = 0, run = 0, output = 0, guards = 0;
     const c = bindWorkflowFunction<number, number>({ id: 'empty', description: 'empty native boundary', inputs: {}, outputs: {},
@@ -165,10 +165,9 @@ test('bound input and output cannot reenter a captured root, preserve actual nod
   assert.equal(effects, 0);
 });
 
-test('public m4 dynamic vector differs only by explicit existing bounds; actual exact and one-short admission',async()=>{
-  // 冻结 public 132735 未改。现有固定 Context 元数据与 progress 预留，以及 R47 绑定附加 frame 检查，
-  // 需要限定 Oracle 兼容性裁定；不能把新边界冒充冻结向量已通过。
-  const rootWork=99278+1, original=132735, actual=original+16640+2+4*34;
+test('R50 independently amended m4 dynamic vector exact and one-short admission',async()=>{
+  // R50 前瞻性修订：独立作者确认 Context 与 progress 票据；保留 16 次 frame 检查。
+  const rootWork=99278+1, original=132735, actual=149377;
   for(const mode of ['exact','frozen','work','calls','steps','events','active'] as const){
     const e=environment(4),entries=e.entries();
     let input=0,run=0,output=0,guard=0,context=0,knowledge=0;
@@ -185,5 +184,59 @@ test('public m4 dynamic vector differs only by explicit existing bounds; actual 
     assert.equal(r.status==='COMPLETE',mode==='exact',mode);
     assert.deepEqual([input,run,output,context,knowledge],mode==='exact'?[1,1,1,1,1]:[0,0,0,0,0],mode);
     if(mode!=='exact')assert.equal(guard,0);
+  }
+});
+
+test('known detached input proof is prepaid with the node before any binding or frame callback', async () => {
+  // R50 ordinary m4 node + 15 bounded known-proof checks, one private frame m1 and one source.
+  const baseWork = 149377, proofWork = 1 + (1 + 4) + 4;
+  for (const mode of ['exact','short','stale'] as const) {
+    const e = environment(4), entries = e.entries();
+    let privateReads = 0, input = 0, guards = 0, runs = 0, outputs = 0;
+    const privateFrame = { epoch: 1, context: { scope: 'private', revisions: new Map([['private-source', '1']]) } };
+    const proof = Object.freeze({ frame: privateFrame,
+      knowledge: { maxItems: 1, equal: Object.is, current: () => { privateReads++; return mode === 'stale' ? { ...privateFrame, epoch: 2 } : privateFrame; } },
+      current: () => true, sources: Object.freeze([{ id: 'private-source', scope: 'private', revision: '1' }]),
+      children: Object.freeze([]), replayable: true });
+    const stage = complete(e.leases.write({ cost, due }, 2, w => {
+      complete(w.put('cost', cost, 1n)); return w.put('due', due, new Date(0));
+    }));
+    const resolution = resolveEvidence([], [], e.options.knowledge.current().context, e.options.knowledge, 4);
+    const inputEntries = complete(e.leases.resultEntries(stage, entries, resolution, proof));
+    const b = binding();
+    const cap = bindWorkflowFunction({...b, input:r=>{input++;return b.input(r);}, output:(v,w)=>{outputs++;return b.output(v,w);},
+      node:{...b.node, context:()=>({constraints:[],capabilities:[],feedbackRevision:0}),knowledge:()=>ok([]),
+        run:v=>{runs++;return ok(v);}}});
+    const s = new StandardWorkflowSession({maxCalls:9,maxSteps:10,maxDepth:0},
+      {...e.control,limits:{...e.control.limits,maxWork:99279+baseWork+15*proofWork-Number(mode==='short'),maxEvents:7,maxActiveScopes:2}});
+    const r = await s.run(root=>invokeCapability(cap,[cap],{root,leases:e.leases,inputs:inputEntries,maxBindings:2,
+      options:{...e.options,current:()=>{guards++;return true;}}}),completion<ReadonlyMap<string,unknown>>());
+    assert.equal(r.status==='COMPLETE',mode==='exact',mode);
+    if(mode==='exact'){assert.deepEqual([input,runs,outputs],[1,1,1]);assert.ok(privateReads>0&&privateReads<=15);}
+    else {assert.deepEqual([input,runs,outputs],[0,0,0]);if(mode==='short')assert.deepEqual([guards,privateReads],[0,0]);}
+  }
+});
+
+test('child entry is reserved with bound node before factory, input, and guards',async()=>{
+  // m0 root, bound child (I/B/E=1), child factory fact policy not yet known: maxItems4096.
+  const rootWork=99086+2; // maxEvents10: Q=2.
+  const nodeWork=132137+3+2+4; // I/B/E, two m0 lease tickets, progress 2Q.
+  const childWork=4+3*33024+4*(2+16385);
+  for(const mode of ['exact','work','events','active','steps','depth'] as const){
+    const e=environment(0);let input=0,create=0,guards=0;
+    const region=bindWorkflowRegion<number,number>({id:'child',description:'child',inputs:{},outputs:{},
+      input:()=>{input++;return ok(1);},output:()=>ok(undefined),
+      node:{id:'child',goal:'child',requiredKnowledge:[],before:()=>ok(undefined),after:()=>ok(undefined),
+        project:()=>({effect:'none',detail:null})},
+      create:()=>{create++;return {status:'REJECT',reason:{code:'FACTORY_DECLINED',message:'declined'}};}});
+    const s=new StandardWorkflowSession({maxCalls:8,maxSteps:10-Number(mode==='steps'),maxDepth:mode==='depth'?0:1},
+      {...e.control,limits:{...e.control.limits,maxWork:rootWork+nodeWork+childWork-Number(mode==='work'),
+        maxEvents:10-Number(mode==='events'),maxActiveScopes:3-Number(mode==='active')}});
+    const r=await s.run(root=>invokeCapability(region,[region],{root,leases:e.leases,inputs:new Map(),maxBindings:0,
+      options:{...e.options,current:()=>{guards++;return true;}},delegated:[],runRegion:()=>{throw Error('must not enter');}}),
+      completion<ReadonlyMap<string,unknown>>());
+    assert.notEqual(r.status,'COMPLETE',mode);
+    assert.deepEqual([input,create],mode==='exact'?[1,1]:[0,0],mode);
+    if(mode!=='exact')assert.equal(guards,0,mode);
   }
 });
