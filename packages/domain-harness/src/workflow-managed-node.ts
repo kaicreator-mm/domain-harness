@@ -19,17 +19,17 @@ const defaultProjection: Projection = Object.freeze({ effect: 'unknown', detail:
 const notEntered: Projection = Object.freeze({ effect: 'not-applicable', detail: null });
 
 /** 仅允许有限 JSON 观察元数据；原生值不经此投影。 */
-function safeDetail(value: StandardJsonValue): StandardJsonValue {
+function safeDetail(value: StandardJsonValue, limit: number): StandardJsonValue {
   let items = 0, bytes = 0;
   const seen = new Set<object>();
   function copy(v: StandardJsonValue, depth: number): StandardJsonValue {
-    if (++items > 8192 || depth > 32) throw Error('WORKFLOW_PROJECTION_LIMIT');
+    if (++items > 8192 || depth > 32 || bytes > limit) throw Error('WORKFLOW_PROJECTION_LIMIT');
     if (v === null || typeof v === 'boolean') { bytes += 5; return v; }
     if (typeof v === 'number' && Number.isFinite(v)) { bytes += 32; return v; }
     if (typeof v === 'string') {
-      if (v.length > 65536) throw Error('WORKFLOW_PROJECTION_LIMIT');
+      if (v.length > limit) throw Error('WORKFLOW_PROJECTION_LIMIT');
       bytes += Buffer.byteLength(JSON.stringify(v));
-      if (bytes > 65536) throw Error('WORKFLOW_PROJECTION_LIMIT');
+      if (bytes > limit) throw Error('WORKFLOW_PROJECTION_LIMIT');
       return v;
     }
     if (typeof v !== 'object' || v === null || types.isProxy(v) || seen.has(v)) throw Error('WORKFLOW_PROJECTION_INVALID');
@@ -53,14 +53,14 @@ function safeDetail(value: StandardJsonValue): StandardJsonValue {
         const d = Object.getOwnPropertyDescriptor(v, k);
         if (!d || !('value' in d)) throw Error('WORKFLOW_PROJECTION_INVALID');
         bytes += Buffer.byteLength(JSON.stringify(k)) + 2;
-        if (bytes > 65536) throw Error('WORKFLOW_PROJECTION_LIMIT');
+        if (bytes > limit) throw Error('WORKFLOW_PROJECTION_LIMIT');
         result[k] = copy(d.value as StandardJsonValue, depth + 1);
       }
       return Object.freeze(result);
     } finally { seen.delete(v); }
   }
   const result = copy(value, 0);
-  if (Buffer.byteLength(JSON.stringify(result)) > 32768) throw Error('WORKFLOW_PROJECTION_LIMIT');
+  if (Buffer.byteLength(JSON.stringify(result)) > limit) throw Error('WORKFLOW_PROJECTION_LIMIT');
   return result;
 }
 
@@ -74,7 +74,6 @@ export interface NodeAdmission<I, O> {
 export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, definition: WorkflowNode<I, O>,
   options: WorkflowNodeOptions): NodeAdmission<I, O> | { code: string } {
   if (!runtime.available()) return { code: 'WORKFLOW_STOPPED' };
-  if (!runtime.canRecordNode()) return { code: 'WORKFLOW_NODE_PROGRESS_LIMIT' };
   if (!definition || !options || !options.knowledge || !boundedText(definition.id) || Buffer.byteLength(definition.id) > 128 || !boundedText(definition.goal)
     || !valid(options.knowledge.maxItems, 4096) || !array(definition.requiredKnowledge)
     || definition.requiredKnowledge.length > options.knowledge.maxItems
@@ -96,10 +95,10 @@ export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, d
   const F = runtime.frameChainCost(parent) + frameScanWork(local.knowledge.maxItems);
   const reservation = runtime.ledger.reserve(owner, { calls: N, steps: N,
     work: N + 4 + 4 * EVENT_SCAN_WORK + (16 + R) * F + knowledgeScanWork(local.knowledge.maxItems),
-    events: 4, activeScopes: 1, terminalReads: R });
+    events: 4, activeScopes: 1, terminalReads: R }, parent.local);
   if (!reservation.ok) return { code: reservation.code };
   return { definition: node, options: bound, scope: { id: randomUUID(), parentId: parent.id, parent,
-    policy: local, owner, ticket: reservation.ticket, delivery: 'not-required', diagnostic: false } };
+    policy: local, owner, ticket: reservation.ticket, delivery: 'not-required', diagnostic: false, ...(parent.local === undefined ? {} : { local: parent.local }) } };
 }
 
 export async function executeNode<I, O>(runtime: ManagedRuntime, admission: NodeAdmission<I, O>, input: I,
@@ -147,10 +146,14 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
     let feedbackRevision = 0;
     if (node.context) {
       const projected = runtime.guarded(() => node.context!(input));
-      if (!array(projected.constraints) || !array(projected.capabilities) || projected.constraints.length > 2048
-        || projected.capabilities.length > 2048 || !dense(projected.constraints) || !dense(projected.capabilities)
+      if (!array(projected.constraints) || !array(projected.capabilities) || projected.constraints.length + projected.capabilities.length > 4096 || !dense(projected.constraints) || !dense(projected.capabilities)
         || projected.constraints.some(x => !boundedText(x)) || projected.capabilities.some(x => !boundedText(x))
         || !valid(projected.feedbackRevision, Number.MAX_SAFE_INTEGER)) throw Error('WORKFLOW_CONTEXT_INVALID');
+      let contextBytes = 0;
+      for (const list of [projected.constraints, projected.capabilities]) for (const item of list) {
+        contextBytes += Buffer.byteLength(JSON.stringify(item)) + 1;
+        if (contextBytes > 65536) throw Error('WORKFLOW_CONTEXT_LIMIT');
+      }
       constraints = Object.freeze([...projected.constraints]); capabilities = Object.freeze([...projected.capabilities]);
       feedbackRevision = projected.feedbackRevision;
       if (!current()) throw Error('WORKFLOW_CURRENTNESS');
@@ -168,16 +171,22 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
     resolution = runtime.guarded(() => resolveEvidence(requirements, raw, local.context, options.knowledge, options.knowledge.maxItems));
     if (!resolution.complete || resolution.items.some(x => x.status !== 'resolved') || !current()) throw Error('WORKFLOW_KNOWLEDGE');
     scope.resolved = resolution;
-    sources = Object.freeze(resolution.items.flatMap(item => item.evidence.map(e => Object.freeze({
-      key: item.key, id: e.source.id, scope: e.source.scope, revision: e.source.revision, status: item.status,
-    }))));
-    if (Buffer.byteLength(JSON.stringify(sources)) > 16384) { sources = Object.freeze([]); throw Error('WORKFLOW_SOURCE_LIMIT'); }
+    const projectedSources: NodeRecord['sources'][number][] = [];
+    let sourceBytes = 2;
+    for (const item of resolution.items) for (const e of item.evidence) {
+      const source = Object.freeze({ key: item.key, id: e.source.id, scope: e.source.scope,
+        revision: e.source.revision, status: item.status });
+      sourceBytes += Buffer.byteLength(JSON.stringify(source)) + 1;
+      if (sourceBytes > 65536 - 2048) throw Error('WORKFLOW_SOURCE_LIMIT');
+      projectedSources.push(source);
+    }
+    sources = Object.freeze(projectedSources);
     const view = (stage: string): WorkflowContextView => {
       const remaining = runtime.ledger.remaining();
       return Object.freeze({ runId: runtime.runId, scopeId: scope.id, goal: node.goal, stage,
         factRevision: local.epoch, knowledge: resolution, capabilities, constraints, feedbackRevision,
-        progress: runtime.progress(), remaining: Object.freeze({ calls: remaining.calls, steps: remaining.steps,
-          work: remaining.work, events: remaining.events, localWork: remaining.work,
+        progress: runtime.progress(scope.parentId!), remaining: Object.freeze({ calls: remaining.calls, steps: remaining.steps,
+          work: remaining.work, events: remaining.events, localWork: runtime.localRemaining(scope),
           maxDescendantDepth: context.remaining().maxDescendantDepth, ...runtime.clock.remaining() }) });
     };
     preEntered = true;
@@ -224,7 +233,7 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
           return value;
         });
         projection = Object.freeze({ effect: p.effect, ...(p.receiptId === undefined ? {} : { receiptId: p.receiptId }), detail: null });
-        try { projection = Object.freeze({ ...projection, detail: safeDetail(p.detail) }); }
+        try { projection = Object.freeze({ ...projection, detail: safeDetail(p.detail, 65536 - Buffer.byteLength(JSON.stringify(sources)) - 2048) }); }
         catch { rejectIfComplete('WORKFLOW_PROJECT_INVALID'); }
       } catch { projection = defaultProjection; rejectIfComplete('WORKFLOW_PROJECT_INVALID'); }
       if (projection.effect === 'unknown') rejectIfComplete('WORKFLOW_EFFECT_UNKNOWN');
