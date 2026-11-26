@@ -6,7 +6,7 @@ import type { NativeWorkflowContext } from './native-workflow-composition.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import type { StandardJsonValue } from './standard-files.js';
 import type { WorkflowNode, WorkflowNodeOptions, WorkflowAttempt, WorkflowContextView, WorkflowObservation } from './workflow-managed-contract.js';
-import { boundedText, dense, valid, managedFailure, isManagedOutcome, redact } from './workflow-managed-runtime.js';
+import { boundedText, dense, valid, managedFailure, snapshotOutcome, redact } from './workflow-managed-runtime.js';
 import type { ManagedRuntime, ManagedScope, LocalFramePolicy, ScopeFrames } from './workflow-managed-runtime.js';
 import { EVENT_SCAN_WORK, frameScanWork, knowledgeScanWork } from './workflow-resource-control.js';
 
@@ -131,7 +131,7 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
     if (phase === 'candidate') candidateSeq = r.seq;
     return runtime.deliver(scope, r);
   };
-  const accept = <T>(x: Outcome<T>): Outcome<T> => isManagedOutcome(x) ? x : managedFailure('WORKFLOW_INVALID_OUTCOME');
+  const accept = snapshotOutcome;
   const rejectIfComplete = (code: string) => { if (result.status === 'COMPLETE') result = managedFailure(code); };
   let actual: WorkflowAttempt<O> | undefined;
   let preEntered = false;
