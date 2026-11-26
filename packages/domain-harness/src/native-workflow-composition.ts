@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { ManagedRuntime, isManagedOutcome, managedFailure, snapshotControl } from './workflow-managed-runtime.js';
-import type { ManagedScope } from './workflow-managed-runtime.js';
-import type { WorkflowCompletionPolicy, WorkflowControlOptions, WorkflowKnowledgeFrame, WorkflowObservation } from './workflow-managed-contract.js';
+import { admitNode, executeNode } from './workflow-managed-node.js';
+import type { ScopeFrames, ManagedScope } from './workflow-managed-runtime.js';
+import type { WorkflowCompletionPolicy, WorkflowControlOptions, WorkflowObservation, WorkflowNode, WorkflowNodeOptions } from './workflow-managed-contract.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import { WorkflowResourceLedger } from './workflow-resource-control.js';
 import type { ResourceFailure } from './workflow-resource-control.js';
@@ -95,18 +96,18 @@ class ScopeLifetime {
   public admissible(): boolean { return this.isOpen() && (this.managed?.available() ?? true); }
 
   public reserve(budget: RootBudget, calls: number, units: number):
-    { frame?: WorkflowKnowledgeFrame } | { code: string } {
+    { frame?: ScopeFrames } | { code: string } {
     if (!this.admissible()) return { code: 'WORKFLOW_SCOPE_CLOSED' };
     if (this.managed && this.scope) return this.managed.reserveCall(this.scope, calls, units);
     const refused = budget.reserve(calls, calls);
     return refused === undefined ? {} : { code: refused };
   }
 
-  public checked<T>(result: Result<T>, frame?: WorkflowKnowledgeFrame): Result<T> {
+  public checked<T>(result: Result<T>, frame?: ScopeFrames): Result<T> {
     if (!this.managed) return result;
     if (!isManagedOutcome(result)) return managedFailure('WORKFLOW_INVALID_OUTCOME');
     if (result.status !== 'COMPLETE') return result;
-    return frame && this.admissible() && this.managed.check(frame) ? result
+    return frame && this.admissible() && this.scope && this.managed.checkFrames(this.scope, frame) ? result
       : { status: 'UNKNOWN', reason: { code: 'WORKFLOW_CURRENTNESS', message: 'Managed result not accepted' } };
   }
 
@@ -185,6 +186,24 @@ export class NativeWorkflowContext {
     finally { finish(); }
   }
 
+  /** 同一根任务中的类型化节点尝试；普通固定代码与未来动态结构共用。 */
+  public async node<I, O>(definition: WorkflowNode<I, O>, input: I, options: WorkflowNodeOptions): Promise<Result<O>> {
+    const parent = scopeLifetime(this);
+    if (!parent.admissible() || !parent.managed || !parent.scope) return managedFailure('WORKFLOW_NODE_CONTROL_REQUIRED');
+    const runtime = parent.managed;
+    try {
+      const admitted = admitNode(runtime, parent.scope, definition, options);
+      if ('code' in admitted) return managedFailure(admitted.code);
+      const finish = parent.begin();
+      const lifetime = new ScopeLifetime(parent, runtime, admitted.scope);
+      // 尝试不是子 Workflow 层级；嵌套 child 仍按原有祖先深度合同。
+      const attempt = new NativeWorkflowContext(this.budget, this.ancestors, this.depth);
+      scopeLifetimes.set(attempt, lifetime);
+      try { return await executeNode(runtime, admitted, input, attempt, () => lifetime.close(), () => parent.admissible()); }
+      finally { finish(); }
+    } catch { return managedFailure('WORKFLOW_NODE_INVALID'); }
+  }
+
   /** 当前共享根余额及本层可用子层深度；只读快照，不预留或增加额度。 */
   public remaining(): Readonly<{ calls: number; steps: number; maxDescendantDepth: number }> {
     return Object.freeze({
@@ -245,7 +264,7 @@ export class NativeWorkflowContext {
     const managed = parent.managed;
     let scope: ManagedScope | undefined;
     if (managed) {
-      const admitted = managed.reserveScope(this.scopeId);
+      const admitted = managed.reserveScope(this.scopeId, undefined, parent.scope);
       if ('code' in admitted) return managedFailure(admitted.code);
       scope = admitted.scope;
     } else {
@@ -259,9 +278,9 @@ export class NativeWorkflowContext {
     ], nextDepth);
     scopeLifetimes.set(child, lifetime);
     let result: Result<T>;
-    const frame = managed?.frame();
+    const frame = managed && scope ? managed.frames(scope) : undefined;
     try {
-      if (managed && scope && (!frame || !managed.open(scope) || !managed.check(frame) || !parent.admissible())) {
+      if (managed && scope && (!frame || !managed.open(scope) || !managed.checkFrames(scope, frame) || !parent.admissible())) {
         result = managedFailure('WORKFLOW_CHILD_ADMISSION');
       } else result = await action(child);
     } catch { result = failure('WORKFLOW_EXECUTION_FAILED'); }
@@ -271,7 +290,7 @@ export class NativeWorkflowContext {
       result = afterJoin(result, unjoined);
       if (managed && scope) {
         if (result.status === 'COMPLETE' && !parent.admissible()) result = managedFailure('WORKFLOW_SCOPE_CLOSED');
-        return managed.close(scope, result, frame);
+        return managed.close(scope, result, undefined, undefined, frame);
       }
       return result;
     } finally { finish(); }
@@ -298,7 +317,7 @@ export class NativeWorkflowContext {
     let result: Result<T> | undefined;
     try {
       if (start !== undefined) await start.call(options);
-      result = lifetime.admissible() && (!lifetime.managed || (reserved.frame && lifetime.managed.check(reserved.frame)))
+      result = lifetime.admissible() && (!lifetime.managed || (reserved.frame && lifetime.scope && lifetime.managed.checkFrames(lifetime.scope, reserved.frame)))
         ? await run.call(options)
         : failure('WORKFLOW_SCOPE_CLOSED');
     } catch {
@@ -395,7 +414,7 @@ export class StandardWorkflowSession {
       let result: Result<T>;
       let requirements: ReturnType<ManagedRuntime['requirements']>;
       try {
-        requirements = managed.requirements(policy as WorkflowCompletionPolicy<unknown>);
+        requirements = managed.requirements(policy);
         const frame = managed.frame();
         result = requirements && frame && managed.open(scope) && managed.check(frame)
           ? await action(root) : managedFailure('WORKFLOW_ROOT_ADMISSION');
