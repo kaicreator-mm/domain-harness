@@ -164,3 +164,26 @@ test('bound input and output cannot reenter a captured root, preserve actual nod
   for (const result of await Promise.all(reentries)) assert.notEqual(result.status, 'COMPLETE');
   assert.equal(effects, 0);
 });
+
+test('public m4 dynamic vector differs only by explicit existing bounds; actual exact and one-short admission',async()=>{
+  // 冻结 public 132735 未改。现有固定 Context 元数据与 progress 预留，以及 R47 绑定附加 frame 检查，
+  // 需要限定 Oracle 兼容性裁定；不能把新边界冒充冻结向量已通过。
+  const rootWork=99278+1, original=132735, actual=original+16640+2+4*34;
+  for(const mode of ['exact','frozen','work','calls','steps','events','active'] as const){
+    const e=environment(4),entries=e.entries();
+    let input=0,run=0,output=0,guard=0,context=0,knowledge=0;
+    const b=binding();
+    const cap=bindWorkflowFunction({...b,input:r=>{input++;return b.input(r);},output:(v,w)=>{output++;return b.output(v,w);},
+      node:{...b.node,context:()=>{context++;return {constraints:['actual dynamic context'],capabilities:['calculate'],feedbackRevision:0};},
+        knowledge:()=>{knowledge++;return ok([]);},before:(_v,_root,view)=>{assert.equal(view.remaining.work,0);return ok(undefined);},
+        run:v=>{run++;return ok(v);}}});
+    const s=new StandardWorkflowSession({maxCalls:9-Number(mode==='calls'),maxSteps:10-Number(mode==='steps'),maxDepth:0},
+      {...e.control,limits:{...e.control.limits,maxWork:rootWork+(mode==='frozen'?original:actual)-Number(mode==='work'),
+        maxEvents:7-Number(mode==='events'),maxActiveScopes:2-Number(mode==='active')}});
+    const r=await s.run(root=>invokeCapability(cap,[cap],{root,leases:e.leases,inputs:entries,maxBindings:2,
+      options:{...e.options,current:()=>{guard++;return true;}}}),completion<ReadonlyMap<string,unknown>>());
+    assert.equal(r.status==='COMPLETE',mode==='exact',mode);
+    assert.deepEqual([input,run,output,context,knowledge],mode==='exact'?[1,1,1,1,1]:[0,0,0,0,0],mode);
+    if(mode!=='exact')assert.equal(guard,0);
+  }
+});

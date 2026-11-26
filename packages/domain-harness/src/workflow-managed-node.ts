@@ -68,6 +68,7 @@ export function safeDetail(value: StandardJsonValue, limit: number): StandardJso
 export interface BoundNodePreparation<I, O> {
   readonly maxBindings: number;
   readonly child: boolean;
+  readonly occurrence?: Readonly<{ instanceId: string; attempt: number; planRevision: number }>;
   readonly current: (frame: WorkflowKnowledgeFrame) => boolean;
   readonly input: () => Outcome<I>;
   readonly encode: (value: O, resolution: EvidenceResolution<string, unknown>) => Outcome<void>;
@@ -89,7 +90,7 @@ export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, d
     || !valid(options.knowledge.maxItems, 4096) || !array(definition.requiredKnowledge)
     || definition.requiredKnowledge.length > options.knowledge.maxItems
     || (definition.requiredKnowledge.length > 0 && typeof definition.knowledge !== 'function')
-    || !valid(definition.terminalReads ?? 0) || options.planRevision !== undefined
+    || !valid(definition.terminalReads ?? 0) || (options.planRevision !== undefined && !binding)
     || typeof options.current !== 'function' || typeof options.knowledge.current !== 'function'
     || typeof options.knowledge.equal !== 'function'
     || [definition.before, definition.run, definition.after, definition.project].some(x => typeof x !== 'function')
@@ -124,7 +125,7 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
   let prepared = false;
   let input!: I;
   const occurrence = Object.freeze({ runId: runtime.runId, scopeId: scope.id, parentScopeId: scope.parentId!,
-    definitionId: node.id, instanceId: randomUUID(), attempt: 1 });
+    definitionId: node.id, instanceId: binding?.occurrence?.instanceId ?? randomUUID(), attempt: binding?.occurrence?.attempt ?? 1 });
   let frames: ScopeFrames | undefined;
   let resolution: EvidenceResolution<string, unknown> | undefined;
   let enterRecord = false;
@@ -137,7 +138,7 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
   const current = () => ++currentChecks <= (binding ? 19 : 15) && frames !== undefined && parentOpen() && runtime.checkFrames(scope, frames, resolution, binding?.current);
   const record = (phase: NodeRecord['phase'], acceptance: NodeRecord['acceptance'], value?: Outcome<unknown>): NodeRecord =>
     Object.freeze({ kind: 'node', phase, occurrence, runId: runtime.runId, scopeId: scope.id, parentScopeId: scope.parentId!,
-      seq: runtime.sequence(), factRevision: frames?.locals.at(-1)?.frame.epoch ?? 0, stage: node.id,
+      seq: runtime.sequence(), factRevision: frames?.locals.at(-1)?.frame.epoch ?? 0, stage: node.id, ...(binding?.occurrence === undefined ? {} : { planRevision: binding.occurrence.planRevision }),
       entered, acceptance, post, effect: projection.effect, ...(projection.receiptId === undefined ? {} : { receiptId: projection.receiptId }),
       detail: phase === 'disposition' ? null : projection.detail, sources: phase === 'disposition' ? Object.freeze([]) : sources,
       reason: scope.diagnostic ? 'WORKFLOW_OBSERVER_FAILED' : value?.status === 'COMPLETE' ? 'WORKFLOW_NODE_CANDIDATE' : 'WORKFLOW_NODE_OBSERVATION',

@@ -34,3 +34,4 @@ export { createWorkflowSlot } from './workflow-slots.js';
 export type { WorkflowSlot, WorkflowSlotReader, WorkflowSlotWriter } from './workflow-slots.js';
 export { bindWorkflowFunction, bindWorkflowRegion } from './workflow-capabilities.js';
 export type { WorkflowSlotBinding, WorkflowNodeProposal, WorkflowEdit, WorkflowRegionProposal, WorkflowRegionLimits, WorkflowRegionView, WorkflowFunctionBinding, WorkflowCapability, WorkflowRegionDefinition } from './workflow-region-contract.js';
+export { runWorkflowRegion } from './workflow-region.js';

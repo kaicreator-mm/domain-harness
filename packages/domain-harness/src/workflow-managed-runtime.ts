@@ -5,7 +5,7 @@ import type { EvidenceObservation, EvidenceRequirement, EvidenceResolution } fro
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import type {
   WorkflowControlOptions, WorkflowCompletionPolicy, WorkflowContextView,
-  WorkflowKnowledgeFrame, WorkflowObservation, WorkflowTerminalContext, WorkflowKnowledgePolicy,
+  WorkflowKnowledgeFrame, WorkflowObservation, WorkflowTerminalContext, WorkflowKnowledgePolicy, WorkflowNodeOptions,
 } from './workflow-managed-contract.js';
 import {
   EVENT_SCAN_WORK, frameScanWork, knowledgeScanWork, WorkflowClock,
@@ -70,6 +70,8 @@ export interface ManagedScope {
   readonly policy?: LocalFramePolicy;
   bound?: ScopeFrames;
   resolved?: EvidenceResolution<string, unknown>;
+  finalCurrent?: (frame: Frame) => boolean;
+  feedbackCount?: number;
 }
 
 export interface LocalFramePolicy {
@@ -97,6 +99,7 @@ export class ManagedRuntime {
   readonly clock: WorkflowClock;
   readonly #final: WorkflowObservation[] = [];
   #seq = 0;
+  readonly #nodeFinal = new Map<string, Extract<WorkflowObservation, { kind: 'node' }>>();
   readonly #progress = new Map<string, Map<string, WorkflowContextView['progress'][number]>>();
 
   public sequence(): number { return ++this.#seq; }
@@ -121,8 +124,9 @@ export class ManagedRuntime {
     let progress = this.#progress.get(parent);
     if (!progress) { progress = new Map(); this.#progress.set(parent, progress); }
     progress.set(instanceId, Object.freeze({ instanceId, definitionId, state }));
-    if (record.phase === 'disposition') this.#final.push(record);
+    if (record.phase === 'disposition') { this.#final.push(record); this.#nodeFinal.set(instanceId, record); }
   }
+  public nodeDisposition(instanceId: string) { return this.#nodeFinal.get(instanceId); }
   public localRemaining(scope: ManagedScope): number {
     return scope.local === undefined ? this.ledger.remaining().work : this.ledger.localRemaining(scope.local);
   }
@@ -279,11 +283,14 @@ export class ManagedRuntime {
     return true;
   }
 
-  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope, maxLocalWork?: number, actorProjections?: number):
+  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope, maxLocalWork?: number, actorProjections?: number, region?: WorkflowNodeOptions):
     { scope: ManagedScope } | { code: string } {
     if (!this.available()) return { code: 'WORKFLOW_STOPPED' };
     if (actorProjections !== undefined && (!valid(actorProjections, 65536) || actorProjections < 1
       || completion !== undefined || parent === undefined)) return { code: 'WORKFLOW_INVALID_LIMIT' };
+    if (region && (completion || !parent || !valid(region.knowledge.maxItems, 4096)
+      || typeof region.current !== 'function' || typeof region.knowledge.current !== 'function'
+      || typeof region.knowledge.equal !== 'function')) return { code: 'WORKFLOW_INVALID_LIMIT' };
     const P = actorProjections ?? 0;
     const actorCalls = Number(actorProjections !== undefined);
     const owner = {};
@@ -291,7 +298,7 @@ export class ManagedRuntime {
     const finalCalls = completion === undefined ? 0 : 1 + Number(completion.observe !== undefined) + reads;
     const charge: ResourceCharge = { calls: finalCalls + actorCalls, steps: 1 + finalCalls + actorCalls,
       work: 4 + 3 * EVENT_SCAN_WORK + finalCalls + (completion === undefined
-        ? 4 * this.frameChainCost(parent) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost + this.progressScanCost)
+        ? 4 * (this.frameChainCost(parent) + (region ? frameScanWork(region.knowledge.maxItems) : 0)) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost + this.progressScanCost)
         + actorCalls + P * (1 + EVENT_SCAN_WORK + this.frameChainCost(parent)),
       events: 3 + P, activeScopes: 1, terminalReads: reads };
     if (maxLocalWork !== undefined && !valid(maxLocalWork)) return { code: 'WORKFLOW_INVALID_LIMIT' };
@@ -301,7 +308,8 @@ export class ManagedRuntime {
     if (!admission.ok) return { code: admission.code };
     return { scope: { id: randomUUID(), ...(parentId === undefined ? {} : { parentId }),
       owner, ticket: admission.ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }), ...(local === undefined ? {} : { local }),
-      ...(actorProjections === undefined ? {} : { actor: { remaining: P } }) } };
+      ...(actorProjections === undefined ? {} : { actor: { remaining: P } }),
+      ...(region ? { policy: { knowledge: Object.freeze({ ...region.knowledge }), current: region.current }, feedbackCount: 0 } : {}) } };
   }
 
   public reserveCall(scope: ManagedScope, calls: number, units: number):
@@ -326,7 +334,14 @@ export class ManagedRuntime {
     try {
       const frame = this.frames(scope);
       if (!frame || !this.checkFrames(scope, frame)) return unknown('WORKFLOW_CURRENTNESS');
-      return charge.ticket.event(scope.owner) ? ok(undefined) : managedFailure('WORKFLOW_EVENT_BUDGET');
+      if (!charge.ticket.event(scope.owner)) return managedFailure('WORKFLOW_EVENT_BUDGET');
+      for (let owner: ManagedScope | undefined = scope; owner !== undefined; owner = owner.parent) {
+        if (owner.feedbackCount !== undefined) {
+          if (!Number.isSafeInteger(owner.feedbackCount + 1)) return managedFailure('WORKFLOW_FEEDBACK_LIMIT');
+          owner.feedbackCount++; break;
+        }
+      }
+      return ok(undefined);
     } finally { charge.ticket.close(scope.owner); }
   }
 
@@ -405,7 +420,7 @@ export class ManagedRuntime {
       if (!delivered && result.status === 'COMPLETE') result = managedFailure('WORKFLOW_EVIDENCE_FAILED');
     } else if (result.status === 'COMPLETE') result = managedFailure('WORKFLOW_EVENT_BUDGET');
     if (result.status === 'COMPLETE' && this.#criticalFailed) result = managedFailure('WORKFLOW_EVIDENCE_FAILED');
-    if (result.status === 'COMPLETE' && (chain ? !this.checkFrames(scope, chain, resolution) : !frame || !this.check(frame, resolution))) result = unknown('WORKFLOW_CURRENTNESS');
+    if (result.status === 'COMPLETE' && (chain ? !this.checkFrames(scope, chain, resolution, scope.finalCurrent) : !frame || !this.check(frame, resolution))) result = unknown('WORKFLOW_CURRENTNESS');
     if (!scope.ticket.event(scope.owner)) {
       scope.ticket.close(scope.owner);
       return result.status === 'COMPLETE' ? managedFailure('WORKFLOW_EVENT_BUDGET') : result;

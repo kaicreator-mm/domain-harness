@@ -67,15 +67,21 @@ export interface SlotEntry extends NativeValue {
   readonly evidenceKeys: readonly string[];
   readonly sources: readonly Source[];
 }
+export interface SlotProvenance {
+  readonly epoch: number;
+  readonly scope: string;
+  readonly evidenceKeys: readonly string[];
+  readonly sources: readonly Source[];
+}
 export interface SlotStage<T> { readonly result: T }
 
-export function slotDeclarations(input: Declarations, max: number): Map<string, WorkflowSlot<unknown>> {
+export function slotDeclarations(input: Declarations, max: number, handles = false): Map<string, WorkflowSlot<unknown>> {
   if (!valid(max, 2048) || !input || types.isProxy(input)
     || ![Object.prototype, null].includes(Object.getPrototypeOf(input) as object | null)) throw Error('WORKFLOW_SLOT_INVALID');
   const out = new Map<string, WorkflowSlot<unknown>>();
   for (const key in input) {
     const d = Object.getOwnPropertyDescriptor(input, key);
-    if (out.size >= max || !nameValid(key) || !d || !('value' in d) || !issued.has(d.value as object)) throw Error('WORKFLOW_SLOT_INVALID');
+    if (out.size >= max || !((handles && key.split('/').length === 2 && key.split('/').every(nameValid)) || nameValid(key)) || !d || !('value' in d) || !issued.has(d.value as object)) throw Error('WORKFLOW_SLOT_INVALID');
     out.set(key, d.value as WorkflowSlot<unknown>);
   }
   return out;
@@ -149,17 +155,69 @@ export class SlotLeaseScope {
     return true;
   }
 
+  /** 提案中的 JSON 字面量只能通过目标 token 守卫接纳，不取得来源权威。 */
+  public literal(slot: WorkflowSlot<unknown>, value: unknown): Outcome<SlotEntry> {
+    return this.execute(frame => {
+      if (!issued.has(slot) || !accepted(slot, value) || !sameFrame(frame, this.frame())) return fail();
+      const entry = Object.freeze({ slot, value, epoch: frame.epoch, scope: frame.context.scope,
+        evidenceKeys: Object.freeze([]), sources: Object.freeze([]) });
+      this.#entries.add(entry);
+      return ok(entry);
+    });
+  }
+
+  /** 只在可信刷新后把实际未受影响的旧记录重新绑定当前 frame，不重写历史。 */
+  public retain(entries: ReadonlyMap<string, SlotEntry>, changed: ReadonlySet<string>): Outcome<ReadonlyMap<string, SlotEntry>> {
+    return this.execute(frame => {
+      const out = new Map<string, SlotEntry>();
+      if (entries.size > 2048) return fail();
+      for (const [name, entry] of entries) {
+        if (!this.#entries.has(entry) || entry.scope !== frame.context.scope
+          || entry.evidenceKeys.some(k => changed.has(k)) || entry.sources.some(s => !applicable(s, frame))) return fail();
+        out.set(name, Object.freeze({ ...entry, epoch: frame.epoch }));
+      }
+      if (!sameFrame(frame, this.frame())) return fail();
+      for (const entry of out.values()) this.#entries.add(entry);
+      return ok(out);
+    });
+  }
+
+  /** 区域视图借用只在同步前缀有效，与 refresh 的写租约并存。 */
+  public viewLease(supplied: ReadonlyMap<string, SlotEntry>, maxBindings: number,
+    guard: <T>(action: () => Outcome<T>) => Outcome<T>) {
+    const frame = this.frame();
+    if (!valid(maxBindings, 2048) || supplied.size > maxBindings) throw Error('WORKFLOW_SLOT_LIMIT');
+    let open = true, failed = false, count = 0, checking = false;
+    const reader: WorkflowSlotReader = Object.freeze({
+      read: <T>(name: string, slot: WorkflowSlot<T>): Outcome<T> => {
+        if (!open || this.#closed || checking || ++count > maxBindings) { failed = true; return fail('WORKFLOW_SLOT_CLOSED'); }
+        checking = true;
+        try {
+          const value = guard(() => {
+            const entry = supplied.get(name);
+            if (!entry || !this.usable(entry, slot, frame) || !accepted(slot, entry.value)) return fail<T>();
+            return ok(entry.value);
+          });
+          if (value.status !== 'COMPLETE') failed = true;
+          return value;
+        } catch { failed = true; return fail(); }
+        finally { checking = false; }
+      },
+    });
+    return { reader, close: () => { open = false; }, valid: () => !failed && !this.#closed && sameFrame(frame, this.frame()) };
+  }
+
   /** 已声明名称与已接纳记录绑定；回调结束即关闭，失败不能被回调吞掉。 */
   public read<T>(declared: Declarations, supplied: ReadonlyMap<string, SlotEntry>, maxBindings: number,
-    callback: (reader: WorkflowSlotReader) => Outcome<T>, requireAll = false): Outcome<T> {
+    callback: (reader: WorkflowSlotReader) => Outcome<T>, requireAll = false, handles = false, late?: () => void): Outcome<T> {
     return this.execute(frame => {
-      const names = slotDeclarations(declared, maxBindings);
+      const names = slotDeclarations(declared, maxBindings, handles);
       let open = true, failed = false, count = 0, checking = false;
       const seen = new Set<SlotEntry>();
       const readNames = new Set<string>();
       const reader: WorkflowSlotReader = Object.freeze({
         read: <V>(name: string, slot: WorkflowSlot<V>): Outcome<V> => {
-          if (!open || this.#closed) return fail('WORKFLOW_SLOT_CLOSED');
+          if (!open || this.#closed) { late?.(); return fail('WORKFLOW_SLOT_CLOSED'); }
           if (checking || ++count > maxBindings) { failed = true; return fail('WORKFLOW_SLOT_LIMIT'); }
           checking = true;
           try {
@@ -186,14 +244,14 @@ export class SlotLeaseScope {
 
   /** 只暂存输出；每个声明名最多写入一次。失败或过期丢弃整批。 */
   public write<T>(declared: Declarations, maxBindings: number,
-    callback: (writer: WorkflowSlotWriter) => Outcome<T>, requireAll = false): Outcome<SlotStage<T>> {
+    callback: (writer: WorkflowSlotWriter) => Outcome<T>, requireAll = false, late?: () => void): Outcome<SlotStage<T>> {
     return this.execute(frame => {
       const names = slotDeclarations(declared, maxBindings);
       const values = new Map<string, NativeValue>();
       let open = true, failed = false, count = 0, checking = false;
       const writer: WorkflowSlotWriter = Object.freeze({
         put: <V>(name: string, slot: WorkflowSlot<V>, value: NoInfer<V>): Outcome<void> => {
-          if (!open || this.#closed) return fail('WORKFLOW_SLOT_CLOSED');
+          if (!open || this.#closed) { late?.(); return fail('WORKFLOW_SLOT_CLOSED'); }
           if (checking || ++count > maxBindings) { failed = true; return fail('WORKFLOW_SLOT_LIMIT'); }
           checking = true;
           try {
@@ -219,7 +277,7 @@ export class SlotLeaseScope {
 
   /** 从实际已接纳输入和节点解析证据继承结果依赖；候选只由调用方在节点接纳后使用。 */
   public resultEntries<T>(stage: SlotStage<T>, inputs: ReadonlyMap<string, SlotEntry>,
-    resolution: EvidenceResolution<string, unknown>): Outcome<ReadonlyMap<string, SlotEntry>> {
+    resolution: EvidenceResolution<string, unknown>, extra?: SlotProvenance): Outcome<ReadonlyMap<string, SlotEntry>> {
     return this.execute(frame => {
       const staged = this.#stages.get(stage);
       if (!staged) return fail();
@@ -231,6 +289,14 @@ export class SlotLeaseScope {
         if (!this.usable(entry, entry.slot, frame)) return fail();
         for (const key of entry.evidenceKeys) { if (++links > 16384) return fail(); keys.add(key); }
         for (const source of entry.sources) { if (++links > 16384) return fail(); sources.add(source); }
+      }
+      if (extra) {
+        if (extra.epoch !== frame.epoch || extra.scope !== frame.context.scope) return fail();
+        for (const key of extra.evidenceKeys) { if (++links > 16384) return fail(); keys.add(key); }
+        for (const source of extra.sources) {
+          if (++links > 16384 || !applicable(source, frame)) return fail();
+          sources.add(source);
+        }
       }
       for (const item of resolution.items) {
         if (item.status !== 'resolved' || !item.evidence.length) return fail();

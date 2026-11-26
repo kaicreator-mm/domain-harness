@@ -141,6 +141,12 @@
 - 职责：两个固定叶子角色的便捷组合：识别 COMPLETE 才进入处理，两个角色共享一根额度。 各角色的输入、输出、领域规则与授权由调用方定义；复杂流程直接组合 Session/Context。 完整成功路径需要 2 次调用、5 个步骤和 1 层深度；不是业务全量预算预检或等待恢复协议。
 - 调用签名：`<Intent, Output>(limits: WorkflowLimits, recognize: () => StandardWorkflowOutcome<Intent> \| Promise<StandardWorkflowOutcome<Intent>>, handle: (intent: Intent) => StandardWorkflowOutcome<Output> \| Promise<StandardWorkflowOutcome<Output>>): Promise<StandardWorkflowOutcome<Output>>`
 
+### runWorkflowRegion
+
+- 分类：`function`；声明：`dist/workflow-region.d.ts`
+- 职责：在已有受控根内执行有界原生区域，复用实际节点、作用域和共享预算。
+- 调用签名：`<I, O>(root: NativeWorkflowContext, definition: WorkflowRegionDefinition<I, O>, input: I, initial?: readonly WorkflowNodeProposal[]): Promise<StandardWorkflowOutcome<O>>`
+
 ### StandardWorkflowOutcome
 
 - 分类：`type`；声明：`dist/standard-workflow.d.ts`
