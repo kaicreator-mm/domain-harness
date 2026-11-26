@@ -60,6 +60,7 @@ export interface ManagedScope {
   diagnostic: boolean;
   readonly parent?: ManagedScope;
   readonly local?: LocalWorkQuota;
+  readonly actor?: { remaining: number; frame?: ScopeFrames };
   readonly policy?: LocalFramePolicy;
   bound?: ScopeFrames;
   resolved?: EvidenceResolution<string, unknown>;
@@ -248,23 +249,29 @@ export class ManagedRuntime {
     return true;
   }
 
-  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope, maxLocalWork?: number):
+  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope, maxLocalWork?: number, actorProjections?: number):
     { scope: ManagedScope } | { code: string } {
     if (!this.available()) return { code: 'WORKFLOW_STOPPED' };
+    if (actorProjections !== undefined && (!valid(actorProjections, 65536) || actorProjections < 1
+      || completion !== undefined || parent === undefined)) return { code: 'WORKFLOW_INVALID_LIMIT' };
+    const P = actorProjections ?? 0;
+    const actorCalls = Number(actorProjections !== undefined);
     const owner = {};
     const reads = completion?.terminalReads ?? 0;
     const finalCalls = completion === undefined ? 0 : 1 + Number(completion.observe !== undefined) + reads;
-    const charge: ResourceCharge = { calls: finalCalls, steps: 1 + finalCalls,
+    const charge: ResourceCharge = { calls: finalCalls + actorCalls, steps: 1 + finalCalls + actorCalls,
       work: 4 + 3 * EVENT_SCAN_WORK + finalCalls + (completion === undefined
-        ? 4 * this.frameChainCost(parent) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost),
-      events: 3, activeScopes: 1, terminalReads: reads };
+        ? 4 * this.frameChainCost(parent) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost)
+        + actorCalls + P * (1 + EVENT_SCAN_WORK + this.frameChainCost(parent)),
+      events: 3 + P, activeScopes: 1, terminalReads: reads };
     if (maxLocalWork !== undefined && !valid(maxLocalWork)) return { code: 'WORKFLOW_INVALID_LIMIT' };
     // 局部额度包含作用域自身准入、所有后代及终止预留；不从根转移或复制实际余额。
     const local = maxLocalWork === undefined ? parent?.local : this.ledger.local(maxLocalWork, parent?.local);
     const admission = this.ledger.reserve(owner, charge, local);
     if (!admission.ok) return { code: admission.code };
     return { scope: { id: randomUUID(), ...(parentId === undefined ? {} : { parentId }),
-      owner, ticket: admission.ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }), ...(local === undefined ? {} : { local }) } };
+      owner, ticket: admission.ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }), ...(local === undefined ? {} : { local }),
+      ...(actorProjections === undefined ? {} : { actor: { remaining: P } }) } };
   }
 
   public reserveCall(scope: ManagedScope, calls: number, units: number):
