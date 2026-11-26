@@ -29,3 +29,4 @@ export type { ClarificationField, ClarificationPreparation, ClarificationRespons
 export { runInteractiveRecognitionHandling } from './standard-interactive-recognition.js';
 export type { WorkflowControlLimits, WorkflowControlOptions, WorkflowOccurrence, WorkflowKnowledgeFrame, WorkflowKnowledgePolicy, WorkflowCompletionPolicy, WorkflowContextView, WorkflowTerminalContext, ModelUsage, WorkflowObservation } from './workflow-managed-contract.js';
 export type { WorkflowNode, WorkflowNodeOptions, WorkflowAttempt } from './workflow-managed-contract.js';
+export type { WorkflowActorOptions } from './workflow-managed-contract.js';
