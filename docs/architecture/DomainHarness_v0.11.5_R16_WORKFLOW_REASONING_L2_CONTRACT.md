@@ -1,7 +1,7 @@
 # 0.11.5 R16 · Workflow-first native L2 contract and adversarial qualification design
 
 > #1563 / #1615 / L2 #1767 / PR #1768. Frozen Product/L1 train d289b3fc4b86456f319e6e16a37483b66644b12e, blob 7041bb9f3d6fabfa5db0533bf3f2807276b74ab2; R13 ACCEPT_SCOPED; R14 freeze 7193176743. R15/R16-A0 architecture baseline 36de9cd5356ee55c741425cdfb8d223db43b2d2a / 190ecbbf713230d925022fb2e4305df0caf1671c. 
-> L2 CANDIDATE FOR ONE INDEPENDENT REVIEW; NOT FROZEN. This companion specifies the previously open R15 §9, with Workflow strengthening integral to L2, not an optional follow-up. Where R15 illustrative names/choices differ, this companion is the current technical candidate. L1 controls scope. All SDK implementation, AC/DY/W/F-W execution NOT_RUN. Independent reviewer must verify design and oracle adequacy before freeze; actual external consumer task and fixture bytes must be separately sealed before implementation.
+> R18 REMEDIATION CANDIDATE FOR FINITE R19 REVIEW; NOT FROZEN. R17 [review](https://github.com/kaicreator-mm/domain-harness/issues/1767#issuecomment-7194239584) P0=0 P1=4 P2=3. R18 supersedes R16 technical signatures/algorithms; L1 unchanged. This companion specifies the previously open R15 §9, with Workflow strengthening integral to L2, not an optional follow-up. Where R15 illustrative names/choices differ, this companion is the current technical candidate. L1 controls scope. All SDK implementation, AC/DY/W/F-W execution NOT_RUN. Independent reviewer must verify design and oracle adequacy before freeze; actual external consumer task and fixture bytes must be separately sealed before implementation.
 
 ## 1. Architecture and implementation ownership
 
@@ -21,276 +21,286 @@ WF01–08 in R15 §2A are mandatory. The shared native Workflow owns managed nod
 
 Source evidence: actual R15 §1 and R16-A0 §2A readbacks; .1 R75 historical closure #1605 retained; no broad reopen or new independent review per small task. Any owner-stage correction has finite task + affected regression before dependent .5 use. No main/release/version bump by design.
 
-## 2. Candidate public TypeScript surface (L2, not implementation)
+## 2. R18 corrected public TypeScript surface (L2 candidate)
 
-Notation below: Readonly data is snapshot by SDK for bounded JSON and framework metadata; native I/O values remain trusted immutable domain values. Function-valued properties preserve strictFunctionTypes; no bivariant method contract for domain-specific arguments. Optional context-aware entry is additive for old calls. Stable reason codes use existing Outcome.reason; no seventh Outcome. Callback error/invalid return maps to FAILED or UNKNOWN where effect unsettled, redacted. Ordinary constructors should not perform I/O. Omitted optional fields never imply permission.
+R17-P1-01/02/03 and P2-01/02: these signatures replace the R16 JSON-only data path and optional currentness. Native objects are trusted immutable values (not automatically copied/serialized; Date requires immutable-use discipline). Bounded JSON J=StandardJsonValue is only the untrusted proposal/literal and explicit public/model projection format. All function-valued properties checked with strictFunctionTypes. Maybe<T> and Outcome<T> are private aliases of T|Promise<T> and existing StandardWorkflowOutcome<T>. Constructors do not perform I/O. Existing six outcomes and legacy calls unchanged.
 
 ```ts
-type Maybe<T> = T | Promise<T>; // private helper
-type Outcome<T> = StandardWorkflowOutcome<T>; // existing
-type J = StandardJsonValue; // existing JSON value type; exact runtime validation below
-
 export interface WorkflowControlLimits {
-  readonly maxWork: number;
-  readonly maxActiveMs: number;
-  readonly maxWallMs?: number; // relative to root start; includes actual user wait
-  readonly maxSettlementMs: number; // bounded remote observation/cleanup, not force-kill
-  readonly maxNoProgress: number;
-  readonly model?: Readonly<{
-    maxCalls: number; maxRetries: number; maxOutputTokens: number;
-    maxReservedTokens?: number; // conservative aggregate cap only with reliable bound
-  }>;
+  readonly maxWork:number; readonly maxActiveMs:number; readonly maxWallMs?:number;
+  readonly maxSettlementMs:number; readonly maxNoProgress:number;
+  readonly maxEvents:number; readonly maxActiveScopes:number;
+  readonly model?:Readonly<{maxCalls:number; maxRetries:number;
+    maxOutputTokens:number; maxReservedTokens?:number}>;
 }
 export interface WorkflowControlOptions {
-  readonly limits: WorkflowControlLimits;
-  readonly signal?: AbortSignal;
-  readonly observe?: (record: WorkflowObservation) => void;
-  readonly evidence?: Readonly<{required:boolean; emit:(record:WorkflowObservation)=>Outcome<void>}>;
-  // trusted synchronous callbacks; required evidence is an explicit acceptance gate
+  readonly limits:WorkflowControlLimits; readonly signal?:AbortSignal;
+  readonly observe?:(record:WorkflowObservation)=>void;
+  readonly evidence?:Readonly<{required:boolean;emit:(record:WorkflowObservation)=>Outcome<void>}>;
 }
+// Scope identities allocated by SDK, not supplied by proposal.
 export interface WorkflowOccurrence {
-  readonly runId: string; readonly parentPath: readonly string[];
-  readonly definitionId: string; readonly nodeId: string; readonly attempt: number;
+  readonly runId:string; readonly scopeId:string; readonly parentScopeId?:string;
+  readonly definitionId:string; readonly instanceId:string;
+  readonly attempt:number; // >=1, per instance
 }
-export interface WorkflowObservation {
-  readonly occurrence: WorkflowOccurrence;
-  readonly seq: number; readonly planRevision?: number; readonly factRevision?: number;
-  readonly kind: 'enter'|'reject'|'skip'|'observe'|'accept'|'invalidate'|'edit'|'stop';
-  readonly detail: J; // safe explicit projection, never raw exception/native input or provider response
+export interface WorkflowKnowledgeFrame {
+  readonly epoch:number; readonly context:EvidenceContext; // independent trusted scope/revisions/asOf
+}
+export interface WorkflowKnowledgePolicy {
+  readonly current:()=>WorkflowKnowledgeFrame; // sync trusted state, no I/O
+  readonly equal:(key:string,left:unknown,right:unknown)=>boolean;
+  readonly rank?:(observation:EvidenceObservation<string,unknown>)=>number;
+  readonly maxItems:number;
+}
+export interface WorkflowNodeOptions {
+  readonly knowledge:WorkflowKnowledgePolicy;
+  readonly planRevision?:number; // present for mutable region; root verifies actual revision via internal binding
+  readonly current:()=>boolean; // required sync domain guard, additional to SDK frame/scope checks
+}
+export interface WorkflowContextView {
+  readonly runId:string; readonly scopeId:string; readonly goal:string; readonly stage:string;
+  readonly factRevision:number; readonly planRevision?:number;
+  readonly knowledge:EvidenceResolution<string,unknown>|undefined; // private typed native values
+  readonly capabilities:readonly string[]; readonly constraints:readonly string[];
+  readonly progress:readonly Readonly<{instanceId:string;definitionId:string;
+    state:'pending'|'running'|'accepted'|'rejected'|'skipped'|'stale'|'unknown'|'removed'}>[];
+  readonly feedbackRevision:number;
+  readonly remaining:Readonly<{calls:number;steps:number;maxDescendantDepth:number;
+    work:number;events:number;activeMs:number;wallMs?:number;localWork:number}>;
 }
 export interface WorkflowTerminalContext {
-  readonly signal:AbortSignal; // bounded terminal observation signal, not a new execution root
+  readonly signal:AbortSignal;
   read<T>(action:(signal:AbortSignal)=>Maybe<Outcome<T>>):Promise<Outcome<T>>;
 }
-export interface WorkflowNode<I,O> {
-  readonly id: string;
-  readonly goal: string;
-  readonly requiredKnowledge: readonly EvidenceRequirement<string>[]; // known prerequisites, may be empty
-  readonly knowledge?: (input:I, scope:NativeWorkflowContext)
-    => Maybe<Outcome<EvidenceResolution<string,unknown>>>;
-  readonly before: (input: I, scope: NativeWorkflowContext,
-    knowledge: EvidenceResolution<string,unknown>|undefined) => Maybe<Outcome<void>>;
-  readonly run: (input: I, scope: NativeWorkflowContext,
-    knowledge: EvidenceResolution<string,unknown>|undefined) => Maybe<Outcome<O>>;
-  readonly terminalReads?: number; // bounded readback/settlement allowance, default 0
-  readonly after: (input: I, actual: WorkflowAttempt<O>, scope: WorkflowTerminalContext) => Maybe<Outcome<void>>;
-  readonly cleanup?: (input: I, actual: WorkflowAttempt<O>) => Maybe<void>;
-  readonly project: (actual: WorkflowAttempt<O>) => J; // explicit safe actual observation
-}
 export type WorkflowAttempt<O> =
-  | Readonly<{kind:'returned'; outcome:Outcome<O>}>
-  | Readonly<{kind:'exception'|'cancelled'|'timeout'|'unsettled'; code:string}>;
-export interface WorkflowNodeOptions {
-  readonly planRevision?: number; readonly factRevision?: number;
-  // trusted synchronous current-revision check, required in mutable region
-  readonly current?: () => boolean;
+  | Readonly<{kind:'returned';outcome:Outcome<O>}>
+  | Readonly<{kind:'exception'|'cancelled'|'timeout'|'unsettled';code:string}>;
+export interface WorkflowNode<I,O> {
+  readonly id:string; readonly goal:string;
+  readonly requiredKnowledge:readonly EvidenceRequirement<string>[];
+  readonly knowledge?:(input:I,scope:NativeWorkflowContext)
+    =>Maybe<Outcome<readonly EvidenceObservation<string,unknown>[]>>;
+  readonly before:(input:I,scope:NativeWorkflowContext,context:WorkflowContextView)=>Maybe<Outcome<void>>;
+  readonly run:(input:I,scope:NativeWorkflowContext,context:WorkflowContextView)=>Maybe<Outcome<O>>;
+  readonly terminalReads?:number;
+  readonly after:(input:I,actual:WorkflowAttempt<O>,scope:WorkflowTerminalContext)=>Maybe<Outcome<void>>;
+  readonly cleanup?:(input:I,actual:WorkflowAttempt<O>)=>Maybe<void>;
+  readonly project:(actual:WorkflowAttempt<O>)=>J; // explicit safe actual detail
 }
 export interface WorkflowActorOptions<Snapshot> {
-  readonly project: (snapshot: Snapshot) => J;
+  readonly project:(snapshot:Snapshot)=>J;
+  readonly maxProjections:number; // pre-reserved bound, includes actual terminal snapshot
 }
+// Public observation is a discriminated union. Required common fields; no fake node for root events.
+export type WorkflowObservation = Readonly<{
+  runId:string;scopeId:string;parentScopeId?:string;seq:number;
+  factRevision:number;planRevision?:number;stage:string
+}> & (
+ | Readonly<{kind:'scope';phase:'open'|'stopping'|'closed';reason:string;
+    localQuiescent:boolean;outcome?:Outcome<void>}>
+ | Readonly<{kind:'node';occurrence:WorkflowOccurrence;
+    phase:'pre-reject'|'enter'|'skip'|'actual'|'accept'|'invalidate';
+    entered:boolean;acceptance:'pending'|'accepted'|'rejected'|'not-applicable'|'stale';
+    outcome?:Outcome<void>;post:'pending'|'passed'|'failed'|'unknown'|'not-applicable';
+    effect:'none'|'committed'|'unknown'|'not-applicable';receiptId?:string;
+    reason:string;sources:readonly Readonly<{key:string;id:string;scope:string;revision:string;status:string}>[];
+    detail:J}>
+ | Readonly<{kind:'region';regionId:string;action:'proposal-rejected'|'edit'|'feedback'|'revalidate'|'complete';
+    beforeRevision:number;afterRevision:number;reason:string;detail:J}>
+ | Readonly<{kind:'actor';definitionId:string;detail:J}>
+ | Readonly<{kind:'model';requestId:string;attempt:number;
+    action:'selected'|'not-needed'|'unavailable'|'retry'|'fallback'|'result';
+    profileId?:string;model?:string;protocol?:'openai-chat'|'anthropic-messages';
+    reason:string;usage:ModelUsage;detail:J}>
+ | Readonly<{kind:'evidence';delivery:'failed';required:boolean;reason:string}>
+);
 ```
 
-Existing public classes extended (no new root):
-```ts
-// StandardWorkflowSession(limits: WorkflowLimits, control?: WorkflowControlOptions)
-// run<T>(action: (root: NativeWorkflowContext)=>Maybe<Outcome<T>>): Promise<Outcome<T>> unchanged
-// NativeWorkflowContext additions; legacy invoke/invokeOutcome/child/leaf/remaining remain:
-readonly signal: AbortSignal;
-readonly runId: string;
-node<I,O>(definition: WorkflowNode<I,O>, input: I, options?: WorkflowNodeOptions): Promise<Outcome<O>>;
-work<T>(units: number, action: () => Maybe<Outcome<T>>): Promise<Outcome<T>>;
-// XStateWorkflowElement retains run(input) and adds:
-runIn(input: InputFrom<Logic>, root: NativeWorkflowContext,
-      options: WorkflowActorOptions<SnapshotFrom<Logic>>): Promise<Outcome<Output>>;
-// InteractionElement retains run(limits, work), adds:
-runIn<T>(root: NativeWorkflowContext, work: (scope: InteractionScope)=>Maybe<Outcome<T>>): Promise<Outcome<T>>;
-```
+Existing classes: StandardWorkflowSession(limits:WorkflowLimits,control?:WorkflowControlOptions); run<T>(action:(root:NativeWorkflowContext)=>Maybe<Outcome<T>>):Promise<Outcome<T>> unchanged. NativeWorkflowContext additions readonly signal:AbortSignal, readonly runId:string, readonly scopeId:string; node<I,O>(definition:WorkflowNode<I,O>,input:I,options:WorkflowNodeOptions):Promise<Outcome<O>>; work<T>(units:number,action:()=>Maybe<Outcome<T>>):Promise<Outcome<T>>. Existing child/invoke/invokeOutcome/leaf/remaining signatures retain behavior and gain scope fences; managed work requires control. XStateWorkflowElement retains run(input); adds runIn(input:InputFrom<Logic>,root:NativeWorkflowContext,options:WorkflowActorOptions<SnapshotFrom<Logic>>):Promise<Outcome<Output>>. InteractionElement retains run(limits,work); adds runIn<T>(root:NativeWorkflowContext,work:(scope:InteractionScope)=>Maybe<Outcome<T>>):Promise<Outcome<T>>. WorkflowElement remains unchanged; generic native node is a typed contract not mandatory Class. XState root binding: trusted actor definition input must explicitly contain the supplied borrowed scope (typed input created for that invocation by domain); adapter rejects foreign scope using explicit supplied scope equality before entry, no implicit actor state inspection. Actual root binding contract refined below.
 
-The general node API is not a dynamic interpreter. A fixed Domain Workflow definition can itself be a composite WorkflowNode: goal/id, declared known knowledge prerequisites, native run references and independent after/completion check, with its run composing child nodes and child scopes. No second definition registry or required serialization. For managed fixed and dynamic nodes alike, requiredKnowledge identifies actual knowledge requirements; knowledge callback obtains/resolves only selected authorized facts through native domain access and existing resolveEvidence. With nonempty requirements, callback is required and each declared key must be actually resolved (not missing/conflict/unknown/not-applicable, no recommendation accepted as authority); otherwise pre-reject before business run. Domain declares applicability and source revision and remains owner of truth; SDK checks returned finite resolution matches keys and accepted origins, does not prove domain source completeness. A node whose role is to acquire missing facts may declare only its own true prerequisites. Empty requirements need no lookup; required knowledge may be satisfied from already verified current facts, not compulsory I/O. Typed input and same resolved knowledge go to before/run; code need not rebuild contexts. Safe bounded source/status metadata and goal projected in node observations; raw native values remain private. Region refresh uses the same sources and dependency semantics; a region node may use validated existing facts in its knowledge callback, not duplicate all retrieval. Parent root/child completion contract uses the same node envelope and native input/output binding. These declarations and native calls are part of Definition, not runtime discovery. Fixed domain code can directly call `root.node(checkCompatibility, vehicle)`, bind its COMPLETE value to the next native node; direct raw Function call remains valid for unmanaged helper. For XState, trusted actor actions/invokes explicitly receive supplied root through typed input closure; runIn observes actual snapshot, does not intercept arbitrary actor internal effects or auto-discover managed nodes. Required gates must be explicitly executed as managed nodes by domain-defined fixed transitions. Adapter reserves its entry as controlled work; actor terminal projection and stop obey §3. SDK tests actual producer transitions and gate reachability; no static proof of arbitrary trusted TS code.
+### 2.1 Native domain data path and bounded dynamic proposals
 
-Domain Context and dynamic region:
+A typed slot is a local capability to read/write a *native* value of a declared type, not a string ID-to-object global store. Identity is module-created opaque token with a trusted synchronous type guard; same display name is not identity. SDK-private store is per run and region, contains explicitly admitted typed slots and provenance. No model sees values or tokens unless separately projected. Generic bind/read APIs ensure compile-time and runtime type checks. Type erasure internal only after checked binding; private map key object identity, no unsafe cast exposed. A native value may be reused through identical declared slot token or an explicitly trusted conversion Function; different token identity never auto-compatible based on matching text or TypeScript structural shape. Slot records are immutable within accepted epoch; refresh may replace through scoped contract. Input assembly is domain-owned typed Function; reads resolve only the named input binding, not arbitrary store traversal.
+
 ```ts
+export interface WorkflowSlot<T> {
+  readonly id:string; readonly accepts:(value:unknown)=>value is T;
+}
+export function createWorkflowSlot<T>(id:string,accepts:(value:unknown)=>value is T):WorkflowSlot<T>;
+export interface WorkflowSlotReader {
+  read<T>(name:string,slot:WorkflowSlot<T>):Outcome<T>;
+}
+export interface WorkflowSlotWriter {
+  put<T>(name:string,slot:WorkflowSlot<T>,value:T):Outcome<void>;
+}
 export type WorkflowSlotBinding =
-  | Readonly<{kind:'literal'; value:J}>
-  | Readonly<{kind:'context'; slot:string}>
-  | Readonly<{kind:'result'; node:string; slot:string}>;
+ | Readonly<{kind:'literal';value:J}>
+ | Readonly<{kind:'context';slot:string}>
+ | Readonly<{kind:'result';node:string;slot:string}>;
 export interface WorkflowNodeProposal {
-  readonly alias: string;
-  readonly capability: string;
-  readonly input: Readonly<Record<string,WorkflowSlotBinding>>;
-  readonly initial?: readonly WorkflowNodeProposal[]; // only for region capability
+ readonly alias:string;readonly capability:string;
+ readonly input:Readonly<Record<string,WorkflowSlotBinding>>;
+ readonly initial?:readonly WorkflowNodeProposal[];
 }
 export type WorkflowEdit =
-  | Readonly<{kind:'insert'; gap:string; before?:string; node:WorkflowNodeProposal}>
-  | Readonly<{kind:'reuse'; gap:string; before?:string; template:string; alias:string}>
-  | Readonly<{kind:'skip'|'remove'; node:string}>
-  | Readonly<{kind:'move'; node:string; before?:string}>;
+ | Readonly<{kind:'insert';gap:string;before?:string;node:WorkflowNodeProposal}>
+ | Readonly<{kind:'reuse';gap:string;before?:string;template:string;alias:string}>
+ | Readonly<{kind:'skip'|'remove';node:string}>
+ | Readonly<{kind:'move';node:string;before?:string}>
+ | Readonly<{kind:'rebind';node:string;input:string;to:WorkflowSlotBinding}>;
 export interface WorkflowRegionProposal {
-  readonly runId:string; readonly regionId:string;
-  readonly planRevision:number; readonly factRevision:number;
-  readonly edits:readonly WorkflowEdit[];
-  readonly action:'continue'|'finish'|'clarify'|'stop';
+ readonly runId:string;readonly regionId:string;readonly planRevision:number;readonly factRevision:number;
+ readonly edits:readonly WorkflowEdit[];readonly action:'continue'|'finish'|'clarify'|'stop';
 }
 export interface WorkflowRegionLimits {
-  readonly maxWork:number; readonly maxDescendantDepth:number;
-  readonly maxCandidateBytes:number; readonly maxJsonDepth:number; readonly maxJsonItems:number;
-  readonly maxNodes:number; readonly maxBindings:number; readonly maxEdits:number;
-  readonly maxProjectionBytes:number;
+ readonly maxWork:number;readonly maxDescendantDepth:number;readonly maxCandidateBytes:number;
+ readonly maxJsonDepth:number;readonly maxJsonItems:number;readonly maxNodes:number;
+ readonly maxBindings:number;readonly maxEdits:number;readonly maxProjectionBytes:number;
 }
-export interface WorkflowRegionView {
-  readonly runId:string; readonly regionId:string;
-  readonly planRevision:number; readonly factRevision:number;
-  readonly goal:string; readonly constraints:readonly J[];
-  readonly slots:Readonly<Record<string,J>>;
-  readonly sources:readonly J[];
-  readonly results:Readonly<Record<string,Readonly<Record<string,J>>>>; // only current accepted result slots
-  readonly nodes:readonly Readonly<{id:string; definitionId:string; gap:string;
-    state:'pending'|'running'|'accepted'|'rejected'|'skipped'|'stale'|'unknown'|'removed'}>[];
-  readonly capabilities:readonly Readonly<{id:string; description:string;
-    kind:'function'|'region'; schema:J}>[];
+export interface WorkflowRegionView extends WorkflowContextView {
+ readonly regionId:string;
+ readonly slots:readonly string[]; // declared available context names, no values
+ readonly results:readonly Readonly<{node:string;slots:readonly string[]}>[];
+ readonly reader:WorkflowSlotReader; // scoped to current declared inputs/projection and epoch
 }
 export interface WorkflowFunctionBinding<I,O> {
-  readonly id:string; readonly description:string; readonly schema:J;
-  readonly decode:(value:J)=>Outcome<I>;
-  readonly node:WorkflowNode<I,O>;
-  readonly encode:(value:O)=>Outcome<Readonly<Record<string,J>>>;
+ readonly id:string;readonly description:string;
+ readonly input:(reader:WorkflowSlotReader)=>Outcome<I>;
+ readonly node:WorkflowNode<I,O>;
+ readonly output:(value:O,writer:WorkflowSlotWriter)=>Outcome<void>;
+ readonly model?:Readonly<{schema:J;describe:string}>; // optional provider projection only
 }
-// Opaque SDK-created value/type, no public execute or arbitrary code in proposal.
-// Internally captures typed decoder, same native node, encoder, or trusted region factory.
-export interface WorkflowCapability { readonly id:string; readonly kind:'function'|'region' }
+export interface WorkflowCapability {readonly id:string;readonly kind:'function'|'region'}
 export function bindWorkflowFunction<I,O>(binding:WorkflowFunctionBinding<I,O>):WorkflowCapability;
-export function bindWorkflowRegion(binding:Readonly<{
-  id:string; description:string; schema:J;
-  create:(input:Readonly<Record<string,J>>)=>Outcome<WorkflowRegionDefinition>;
+export function bindWorkflowRegion<I,O>(binding:Readonly<{
+ id:string;description:string;input:(reader:WorkflowSlotReader)=>Outcome<I>;
+ create:(input:I)=>Outcome<WorkflowRegionDefinition<I,O>>;
+ output:(value:O,writer:WorkflowSlotWriter)=>Outcome<void>;
+ model?:Readonly<{schema:J;describe:string}>;
 }>):WorkflowCapability;
-export interface WorkflowRegionDefinition {
-  readonly id:string; readonly goal:string; readonly constraints:readonly J[];
-  readonly limits:WorkflowRegionLimits;
-  readonly capabilities:readonly WorkflowCapability[];
-  // required anchors are domain-selected nodes; gaps are ordered mutable slots between them.
-  readonly layout:readonly (
-    | Readonly<{kind:'anchor'; id:string; node:WorkflowNodeProposal}>
-    | Readonly<{kind:'gap'; id:string; templates:readonly WorkflowNodeProposal[]; seed:readonly string[]}>
-  )[];
-  readonly refresh:(root:NativeWorkflowContext, previous:WorkflowRegionView|undefined)
-    =>Maybe<Outcome<Readonly<{
-      slots:Readonly<Record<string,J>>;
-      sources:readonly J[]; changed:readonly string[];
-      dependencies:readonly EvidenceDependency<string>[];
-    }>>>;
-  readonly plan:(view:WorkflowRegionView, root:NativeWorkflowContext)
-    =>Maybe<Outcome<WorkflowRegionProposal>>;
-  readonly admit:(current:WorkflowRegionView, proposed:WorkflowRegionProposal)=>Maybe<Outcome<void>>;
-  readonly canSkip:(nodeId:string, view:WorkflowRegionView)=>Maybe<Outcome<void>>;
-  readonly clarify?: (view:WorkflowRegionView, root:NativeWorkflowContext)=>Maybe<Outcome<void>>;
-  readonly complete:(view:WorkflowRegionView, root:NativeWorkflowContext)
-    =>Maybe<Outcome<Readonly<Record<string,J>>>>;
+export interface WorkflowRegionDefinition<I,O> {
+ readonly id:string;readonly goal:string;readonly constraints:readonly string[];
+ readonly limits:WorkflowRegionLimits;readonly capabilities:readonly WorkflowCapability[];
+ readonly knowledge:WorkflowKnowledgePolicy;
+ readonly layout:readonly (
+ | Readonly<{kind:'anchor';id:string;node:WorkflowNodeProposal}>
+ | Readonly<{kind:'gap';id:string;templates:readonly WorkflowNodeProposal[];seed:readonly string[]}>
+ )[];
+ readonly refresh:(input:I,root:NativeWorkflowContext,previous:WorkflowRegionView|undefined,
+   writer:WorkflowSlotWriter)=>Maybe<Outcome<Readonly<{changed:readonly string[];
+   dependencies:readonly EvidenceDependency<string>[];
+   observations:readonly EvidenceObservation<string,unknown>[]}>>>;
+ readonly plan:(view:WorkflowRegionView,root:NativeWorkflowContext)=>Maybe<Outcome<WorkflowRegionProposal>>;
+ readonly admit:(current:WorkflowRegionView,proposed:WorkflowRegionProposal)=>Maybe<Outcome<void>>;
+ readonly canSkip:(nodeId:string,view:WorkflowRegionView)=>Maybe<Outcome<void>>;
+ readonly canRebind:(nodeId:string,input:string,from:WorkflowSlotBinding,to:WorkflowSlotBinding,
+   view:WorkflowRegionView)=>Maybe<Outcome<void>>;
+ readonly replay:'never'|'pure-read-only'; // default explicit never for effectful/unknown operations
+ readonly clarify?:(view:WorkflowRegionView,root:NativeWorkflowContext)=>Maybe<Outcome<void>>;
+ readonly complete:(view:WorkflowRegionView,root:NativeWorkflowContext)=>Maybe<Outcome<O>>;
 }
-export function runWorkflowRegion(root:NativeWorkflowContext, definition:WorkflowRegionDefinition,
-  initial?:readonly WorkflowNodeProposal[]):Promise<Outcome<Readonly<Record<string,J>>>>;
+export function runWorkflowRegion<I,O>(root:NativeWorkflowContext,definition:WorkflowRegionDefinition<I,O>,
+ input:I,initial?:readonly WorkflowNodeProposal[]):Promise<Outcome<O>>;
 ```
 
-Clarifications normative for design: region is JSON *proposal/projection boundary only*; fixed/native typed objects not forced into JSON; child factory validates typed input before constructing a region. Binding captures concrete Function (or ordinary Workflow call), not a global registry. Runtime capability object must be authenticated by module-private WeakMap/brand, not structural public interface alone. Only explicitly delegated binding set copied by trusted definition; child factory may use trusted private internal native helpers, but dynamic capability/slot authority must be subset of trusted parent delegation (private prebound helpers do not become model-selectable). View includes only domain-safe projected slots; result slots are exposed only after node validation, encoder success and current revision; encoder is bounded projection, not second business invocation. Schema is provider-facing description; local decoder authoritative and tests ensure agreement on supported shapes. Domain decoder must enforce shape and professional constraints; not claim arbitrary supplied JSON schema is runtime-enforced by SDK. No new validator DSL. For SDK-owned proposal schema, handwritten finite parser plus exact documented schema + conformance tests; no dependency on general JSON Schema validator in this candidate. If two real consumer cases require generic schema validation, evaluate vetted dependency in finite L2 delta before implementation; never silently accept unknown keywords as enforced.
+**Binding and authorization.** Slot/capability brands checked against private factory identities; structural forged objects rejected. Private types and native values never go in proposal. Reader is scoped to exact input binding name and token, valid only during its synchronous callback; rejects expired lease/epoch, undelegated or stale result, wrong slot identity/value predicate. Writer only during synchronous callback into a finite staged write set, unique output names, explicit token and guard, no access to other results. No unchecked cast from J to native I. For literal binding read checks target token predicate against bounded J; no automatic Date/bigint parse or authority. For model tools, schema is only proposal description; input assembly still checks actual named bindings, domain validation, currentness. Capability-level replay policy: fixed node and binding definitions declare pure-read-only explicitly (add optional readonly replay?:'pure-read-only'|'never' to WorkflowNode, default never); generated child may be replayed only if its region explicitly pure-read-only and actual trace contains no effects or unknown attempts. All other nodes never automatically replay; domain may verify new evidence through separate approved read-only reconciliation node, or stop with appropriate non-success. No automatic effect retry.
 
-Required gate reachability: layout anchors immutable ordered; each gap may edit only own pending nodes; cursor cannot cross an anchor except after actual anchor accepted, and cannot finish until all required anchors and required completion predicate pass. Skip cannot target anchors; skipped optional output never becomes a value. Gap template existing instance fresh on reuse; initial/insert creates actual fresh local occurrence. Child generated through region capability with initial runtime node specs; child layout trusted; initial specs admitted into the first declared mutable gap before execution, then its own planner can generate a grandchild. No child factory may create a new root. Output, provenance and parent scope checked at child boundary. `complete` is trusted, called only after gates and no required pending work; it returns final validated typed JSON projection, not a model finish claim. Native domain wrapper can decode to rich O. Planner may run on actual state after each accepted node/refresh; action continue executes next pending node or consumes no-progress count if none, finish requires gates+complete, clarify calls declared same-root checkpoint and refreshes, stop returns non-success. Anchors execute at cursor, not controlled by model. `admit` is extra trusted business policy, not ability to override structural validator. Async admission compares original plan/fact revision again before atomic commit. For native plans same bounds apply; planner is trusted cooperative code, not arbitrary JS sandbox. R16 chooses finite ordered regions with dependencies on earlier accepted result slots; no dynamic general parallel/conditional graph API, existing fixed TS/XState control intact.
+Native example (illustrative authoring with explicit domain callbacks, not installed SDK proof): createWorkflowSlot<bigint>('cost', (v):v is bigint=>typeof v==='bigint'); createWorkflowSlot<Date>('due',(v):v is Date=>v instanceof Date). A fixed native node returns {cost:9007199254740993n,due:Date}; region refresh writes cost/due using those tokens; deterministic planner references context slots; bound node input calls reader.read('cost',costSlot) and reader.read('due',dueSlot), propagates any non-COMPLETE, invokes same typed Function as direct fixed node; output writer writes typed result, region complete reads exact accepted result through its scoped reader and returns native bigint/Date to next fixed node. Child binding input builds same typed input from explicitly delegated slots, child run receives only typed input and own approved capabilities, output maps only declared result to parent; no schema/no JSON encode/no model config. Wrong slot token, wrong type, expired/foreign reader rejected. Native planner view reader addresses approved context names or exact 'nodeId/slot' result handles issued in view; no arbitrary property paths. For model-assisted variant trusted domain projects only selected cost decimal string/due date and descriptions, model returns aliases/binding refs, actual native value remains exact; no provider schema required for deterministic path. Child definition capabilities subset of parent explicitly delegated capability identities; approved private native helper not a model-selectable capability. All context/result slot scopes, dependencies, source revision and ownership recorded by SDK, token metadata immutable. Callback output writes transactionally staged; only publish after current revision+post+encode validation+evidence gates; on failure discard staged values but keep real effect facts. Native O only published when validated, no need to serialize to cross fixed/dynamic. View's reader for plan/complete uses same finite scoped handles but not arbitrary native state. Model projection constructed by trusted domain from view using explicit safe bounded JSON; no automatic full view serialization.
 
-Model API:
+**Current evidence.** Managed node options mandatory even fixed (legacy unmanaged calls remain valid). Domain current() returns independent trusted frame, SDK snapshots context scope, revision map, asOf and epoch, validates finite inputs; knowledge callback returns raw observations (never pre-resolved foreign result). SDK calls existing resolveEvidence with actual requirements, current trusted frame and policy. Complete traversal AND each required item resolved with exact accepted origins, matching scope/source/revision and validity; no missing/unknown/conflict/not-applicable or recommendation. Domain provider marks truncated/incomplete source as non-success, SDK cannot prove external completeness or trusted arbitrary code truth. Time validity checked with fresh trusted asOf before run and acceptance, absent asOf with validity fails. Epoch/revision map changes even during before/after/async policy invalidate captured snapshot; recheck after every relevant await and immediately before effect and publication, plus current guard and scope fence. Fixed node no knowledge requirement still receives current frame and guard, empty resolution valid. Epoch is monotonic nonnegative safe int; same epoch with different scope/revisions rejected, asOf may advance, check validity rather than require exact clock equality. Region current snapshot used for all nodes with mandatory internal plan/fact fences, no bypass via supplied scalar labels. Source origins determined by trusted domain, never model/user self-assertion. Context native view includes goal/stage, required knowledge status/provenance, authorized capability set, constraints, actual progress, feedback revision, remaining root/local budget; fixed node view uses domain-owned declared projections (add readonly context?:(input:I)=>Readonly<{constraints:readonly string[];capabilities:readonly string[];feedbackRevision:number}> to WorkflowNode; default empty lists/0 when no such domain constraints). SDK progress from actual node observations; fixed composition uses actual sequence and child projection, not guessed percentages. Project to model only via explicit safe view (mandatory relevant constraints/source statuses retained; overflow non-success).
+
+**Actor attachment.** runIn input explicitly uses SDK-created borrowed scope supplied to trusted input factory (replace first argument with (scope:NativeWorkflowContext)=>InputFrom<Logic>, invokes once before actor creation). No caller-provided independent root; actual managed nodes must use this passed scope; actor binding tested, no automatic arbitrary TS inspection. Snapshot projections synchronous, bounded pre-reserved maxProjections, actual done/error/stopped; see §3. Interaction attaches through borrowed scope, own prompt contract retained.
+
+### 2.2 Model API
+
 ```ts
 export interface ModelProfile {
-  readonly id:string; readonly protocol:'openai-chat'|'anthropic-messages';
-  readonly endpoint:string; readonly model:string;
-  readonly credential:()=>Maybe<string>;
-  readonly tokenField?:'max_tokens'|'max_completion_tokens'; // only OpenAI explicit
-  readonly anthropicVersion?:string; // required for Anthropic profile
-  readonly features:Readonly<{tools:boolean; jsonSchema:boolean}>;
-  readonly limits:Readonly<{requestBytes:number; responseBytes:number; maxOutputTokens:number; timeoutMs:number}>;
-  // Optional trusted conservative *upper bound*, not tokenizer estimate.
-  readonly boundInputTokens?:(request:ModelRequest)=>number;
+ readonly id:string;readonly protocol:'openai-chat'|'anthropic-messages';
+ readonly endpoint:string;readonly model:string;readonly credential:()=>Maybe<string>;
+ readonly tokenField?:'max_tokens'|'max_completion_tokens';readonly anthropicVersion?:string;
+ readonly features:Readonly<{tools:boolean;jsonSchema:boolean;toolsWithJsonSchema:boolean}>;
+ readonly limits:Readonly<{requestBytes:number;responseBytes:number;maxOutputTokens:number;timeoutMs:number}>;
+ readonly boundInputTokens?:(wire:Readonly<{protocol:'openai-chat'|'anthropic-messages';body:string}>)=>number;
 }
 export interface ModelToolDescription {readonly name:string;readonly description:string;readonly inputSchema:J}
 export interface ModelToolCall {readonly id:string;readonly name:string;readonly input:J}
 export interface ModelToolResult {readonly callId:string;readonly value:J;readonly error:boolean}
 export interface ModelUsage {
-  readonly input:number|null;readonly output:number|null;readonly total:number|null;
-  readonly kind:'observed'|'estimated'|'unavailable';
+ readonly input:number|null;readonly output:number|null;readonly total:number|null;
+ readonly kind:'observed'|'estimated'|'unavailable';
 }
-export interface ModelTurn {
-  readonly text:string; readonly calls:readonly ModelToolCall[]; readonly usage:ModelUsage;
-}
+export interface ModelTurn {readonly text:string;readonly calls:readonly ModelToolCall[];readonly usage:ModelUsage}
 export interface ModelRequest {
-  readonly system:string;
-  readonly input:readonly (
-    | Readonly<{role:'user';text:string}>
-    | Readonly<{role:'assistant';turn:ModelTurn}>
-    | Readonly<{role:'tool-results';results:readonly ModelToolResult[]}>
-  )[];
-  readonly tools:readonly ModelToolDescription[];
-  readonly output: Readonly<{kind:'text'}|{kind:'json'; schema?:J; strict:boolean}>;
-  readonly maxOutputTokens:number;
-  readonly retry?:boolean; // charged in same root; caller decides, no automatic retry
+ readonly system:string;
+ readonly input:readonly (
+ | Readonly<{role:'user';text:string}>
+ | Readonly<{role:'assistant';turn:ModelTurn}>
+ | Readonly<{role:'tool-results';results:readonly ModelToolResult[]}>
+ )[];
+ readonly tools:readonly ModelToolDescription[];
+ readonly output:Readonly<{kind:'text'}|{kind:'json';strict:false}|{kind:'json';strict:true;schema:J}>;
+ readonly maxOutputTokens:number;
+ readonly previousRequestId?:string;readonly action:'initial'|'retry'|'fallback'|'continue';
 }
 export class ModelElement {
-  constructor(profile:ModelProfile);
-  generate(root:NativeWorkflowContext, request:ModelRequest):Promise<Outcome<ModelTurn>>;
+ constructor(profile:ModelProfile);
+ generate(root:NativeWorkflowContext,request:ModelRequest):Promise<Outcome<ModelTurn>>;
 }
 ```
 
-Model turns from successful calls must retain protocol-required safe ordering of text/tool blocks privately (SDK-owned brand for continuation, bounded and bound to profile/root, not public model authority); domain provides actual tool results correlated to exact preceding calls. Unknown/repeated/foreign IDs and malformed role order rejected before request. No server tools, hidden thought retention, multimodal, streaming or automatic provider switching. Model request output JSON parse and proposal shape checked locally by region planner; strict schema feature explicit supported profile, unsupported strict rejects before I/O. Non-strict JSON output mode explicitly requested and locally decoded, never silently downgrade strict. Plain text remains possible without tools. Single turn cannot represent business result success; actual observation separate.
+Model selection/failure evidence for deterministic path comes from managed domain workflow context and explicit trusted decision record (see §3). Continuation turns are SDK-issued privately branded immutable exact wire blocks, bounded and bound to root/scope/profile; caller cannot substitute mutated exposed fields; no hidden thought storage. Request attempt correlation in §5. All true calls use existing Function; Model tool descriptions not executable.
 
-### 2.1 Root public expectation
+### 2.3 Independent expected public surface
 
-Existing root runtime values (retain): KernelLifecycle, WorkflowElement, XStateWorkflowElement, JsonReader, YamlReader, readJson, readYaml, writeJson, writeYaml, NativeWorkflowContext, StandardWorkflowSession, routeWorkflowOutcome, runRecognitionHandling, BoundedQueryElement, SQLiteDatabaseElement, SQLiteDatabaseError, VectorQueryElement, GraphQueryElement, BoundedExpressionElement, CliElement, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, ClarificationElement, runInteractiveRecognitionHandling (27).
-Candidate additions: bindWorkflowFunction, bindWorkflowRegion, runWorkflowRegion, ModelElement (4). No new subpath; do not export codecs/ledger/admission internals, authoring CLI, private brands or runtime graph registry. Existing type exports unchanged from exact baseline index blob 36581edff250571ff1eebcb6f225a817ae325cd2; independently enumerated additions: WorkflowControlLimits, WorkflowControlOptions, WorkflowOccurrence, WorkflowObservation, WorkflowTerminalContext, WorkflowNode, WorkflowAttempt, WorkflowNodeOptions, WorkflowActorOptions, WorkflowSlotBinding, WorkflowNodeProposal, WorkflowEdit, WorkflowRegionProposal, WorkflowRegionLimits, WorkflowRegionView, WorkflowFunctionBinding, WorkflowCapability, WorkflowRegionDefinition, ModelProfile, ModelToolDescription, ModelToolCall, ModelToolResult, ModelUsage, ModelTurn, ModelRequest. Count 25 new named type exports. Public signatures of changed existing values above; method addition expected separately in capability catalog. Implementer must compare explicit expected type and value inventory to actual root/installed declarations; no export-star or expected derived from tested runtime. Compile negative: wrong native input/result, wrong child decoder binding, wrong actor input, unsafe private path, caller-created capability object runtime reject. Compile positive: native fixed node, same callable selected Tool, region child, XState and Interaction attached, no Model dependency/config. This is a signature design, not compiled SDK declaration evidence.
+Retain 27 existing root values: KernelLifecycle, WorkflowElement, XStateWorkflowElement, JsonReader, YamlReader, readJson, readYaml, writeJson, writeYaml, NativeWorkflowContext, StandardWorkflowSession, routeWorkflowOutcome, runRecognitionHandling, BoundedQueryElement, SQLiteDatabaseElement, SQLiteDatabaseError, VectorQueryElement, GraphQueryElement, BoundedExpressionElement, CliElement, InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, ClarificationElement, runInteractiveRecognitionHandling. Add 5 values: createWorkflowSlot, bindWorkflowFunction, bindWorkflowRegion, runWorkflowRegion, ModelElement. Existing 61 type symbols retained per exact baseline root index 36581edff250571ff1eebcb6f225a817ae325cd2. New named types: WorkflowControlLimits, WorkflowControlOptions, WorkflowOccurrence, WorkflowKnowledgeFrame, WorkflowKnowledgePolicy, WorkflowContextView, WorkflowNodeOptions, WorkflowTerminalContext, WorkflowNode, WorkflowAttempt, WorkflowActorOptions, WorkflowObservation, WorkflowSlot, WorkflowSlotReader, WorkflowSlotWriter, WorkflowSlotBinding, WorkflowNodeProposal, WorkflowEdit, WorkflowRegionProposal, WorkflowRegionLimits, WorkflowRegionView, WorkflowFunctionBinding, WorkflowCapability, WorkflowRegionDefinition, ModelProfile, ModelToolDescription, ModelToolCall, ModelToolResult, ModelUsage, ModelTurn, ModelRequest (31 new types, expected total 32 values/92 types). Changed existing members: Session constructor optional control and original run; NativeWorkflowContext signal/runId/scopeId/node/work and existing child/invoke/invokeOutcome/leaf/remaining with lifetime fences; XStateWorkflowElement.runIn with trusted input factory and projection bound; InteractionElement.runIn with existing scope; no new subpath. Add explicit NativeWorkflowContext.recordModelDecision(reason:string,action:'not-needed'|'unavailable'):Outcome<void> for domain no-model decision evidence (charged, no authority). No exports of codecs/brands/store/ledger/admission helpers; generated tooling not SDK. Type positive/negative sketches and eventual installed root/type inventory required; these signatures are design, no actual compiled implementation. Wrong type, wrong slot, forged capability, wrong actor input, stale frame, unsafe private imports negative; real fixed/native/dynamic/child, model projection and same-root actor/interaction positive. Reassess every public member against two real independent uses, no class-count goal.
 
-## 3. Root resource, lifecycle and node execution contract
+## 3. Shared root, scope, resource, observation and node execution (R17-P1-04/P2-01)
 
-Two modes: original simple Session numeric legacy accounting and managed-control Session with explicit finite limits. Legacy simple path costs remain root start 0 calls/1 step; child 0/1; invoke/invokeOutcome 1/1; leaf start/run/end each 1/1, pre-reserved; remaining read-only. Close fence applies both modes to SDK-controlled entry, not arbitrary trusted direct calls. Managed node/region/Model APIs require control configured (fail before work otherwise); XState run(input) and Interaction run(limits,work) remain valid legacy paths, not automatically claimed to satisfy managed .5 constraints.
+Preserve legacy root start 0calls/1step, child 0/1, invoke/invokeOutcome 1/1, leaf exact original start/run/end reservations (end awaited), old XState run(input), Interaction run(limits,work) prompt correlation. Managed APIs require explicit control. Single physical root ledger plus parent-owned borrowed scopes; no per-child reset. Root and every child/actor/region/attached Interaction/attempt have distinct internal admission state OPEN→STOPPING→CLOSED, opaque identity and owned operations. Root starts NEW; each scope closes new admission synchronously on return/stop before terminal callbacks and joining. A retained child while parent/sibling OPEN is invalid after child's STOPPING; all ancestor admission fences checked, ancestor/local limits shared; closed ancestor prevents descendants. Scope-local cancellation closes descendants and signal, not unrelated sibling/root; root abort cascades. Scope owns its active child promises/listeners/leases; never detached, no self-join; wait actual local resource quiescence before CLOSED and KDP dispose. A remote request can remain UNKNOWN after local quiescence; bounded terminal readback records fact, not forced remote settlement. Noncooperative local callback cannot be preempted; task requiring hard deadline must reject unqualified adapter before entry; otherwise stop new work and await quiescence, no SDK background observer. If trusted callback violates cooperation, elapsed overrun is observable, no false finite return. No root reopen or hidden resume. Terminal reads only already-reserved readback, separate attempt-bound expiring scope, not new business work.
 
-| Event | Legacy calls/steps charge | Managed work charge / semantics |
-|---|---|---|
-| root start / child admission | 0/1 each | 1 each, child depth checked before entry |
-| invoke / invokeOutcome | 1/1 | 1 before callback |
-| leaf | exact prior start/run/end count | same count before start |
-| node | optional knowledge + pre + run + post + projection + optional cleanup + declared terminalReads = 4 or 5 plus optional knowledge callback (1) and terminalReads calls/steps, reserved atomically | same number, terminal allowance reserved with entry; pre failure doesn't refund |
-| work(units, callback) | 1/1 | units positive safe integer, >=1, caller trusted upper bound for private bounded operation; cannot bypass normal calls through untrusted work |
-| refresh/planner/structural admission/edit/feedback/finish | each through work or controlled node/child | >=1 each, admission reserves worst-case bounded scan, see below |
-| Model request | 1/1 | 1 + model request quota, optional retry quota + conservative tokens before credential/network; response validation within separately reserved bounded work |
-| interaction decision and wait | existing 1/1 each | 1 each; true user wait clock exclusion only while no active sibling work |
-| remaining/progress read-only projection snapshot | 0/0 | bounded output; no budget grant |
+Managed accounting units (safe positive integers <= 2^31-1 per limit, cumulative checked safe integer; work/model/attempt/event/active counts finite, zero allowed for quotas, invalid limits reject before callbacks). All reservations atomic synchronous across root and every active ancestor, no refund or double charge. Managed child local work cap set by region/definition, ancestor depth checked at admission, all descendant work/event reservations counted at ancestors. Counters for maxEvents (including failure/terminal records), maxActiveScopes (simultaneous owned scopes/attempts; release only at CLOSED, root counts 1), maxWork, model calls/retries/tokens plus legacy calls/steps. Limits do not measure arbitrary trusted TS instructions. No optional user control of counter internals. Terminal reservations held for exact owning scope/attempt, unspent never returned; terminal work allowed only for that owner after stop, not general grant. Normal records and delivery callbacks synchronous bounded (event <=64KiB and finite shape; maxEvents reserves record emission, one work per record includes validated projection/emit and observer, no unmetered retries). A failure diagnostic is not recursively emitted through a failed sink; use reserved failure summary in next/final envelope or explicit terminal reason; optional observer errors recorded separately. Required evidence invalid or throw/non-COMPLETE prevents acceptance/goal, actual receipt retained. Observer/emit guard rejects reentrant admission, async functions rejected before call, unexpected Promise observed for rejection and never awaited/adopted, contract failure; synchronous trusted callbacks bounded by contract, not sandboxed.
 
-The above are design accounting units, not CPU instructions. Each admitted candidate parse/scan/graph validation charges deterministic upper bound before processing: one work unit per 256 bytes (ceil), plus declared maxJsonItems + maxNodes + maxBindings + maxEdits of bounded region for worst-case structural validation; bounded iterative parse scanner and finite passes; if budget insufficient reject before parse/admission (even malformed candidate is charged at least admission attempt and byte check; no unbounded rejection loop). Separate cap for bytes/decoded strings, depth, total items and total tree nodes including child initial specs, edge/binding count; use hard implementation maxima (proposal/request/response <= 1MiB each; JSON depth<=32; items<=8192; live/attempted region nodes<=256 per proposal, bindings<=2048, edits<=128; region scope may choose stricter; root work limits total cumulative work). Values and hard maxima are technical defaults/ceilings, not universal domain constraints; no arbitrary unbounded expansion. For preflight oversize raw body count up to cap then cancel; no full materialization. JSON scanner handles quoted escapes, rejects duplicate keys, non-finite numbers, prototype-sensitive keys, malformed UTF-8 and excessive nesting/items; no recursive parse before structural guard. Trusted native proposals are limited plain JSON data, no getters/proxies/cycles; trusted authors obey construction cap and finite callbacks; no claim arbitrary code interception. Local work consumed across all ancestors; reserve checks all root/ancestor budgets atomically, never copies root or refunds failure. Model time/usage must not depend on fake usage=0. If maxReservedTokens is set, require reliable explicit conservative input bound and actual enforced output bound; reserve sum before I/O; no refund for unknown/failed request. Output cap configured per call/provider, check requested<=profile<=root policy; observed usage exceeding certified cap is contract failure, stop new work, retain actual reported usage; do not claim strict provider total when no reliable bound. No cost API in this candidate because no reliable pricing/usage hard bound yet. Caller-specified unsupported hard limits fail before work.
+| Controlled event | Atomic reservation (calls,steps; work; events) |
+|---|---|
+| Managed root/borrowed child scope | (0,1; 3;2) for entry + scope open/close records; active slot 1 before creating scope; root has reserved final record from start |
+| invoke/invokeOutcome / leaf | legacy (1,1 per callback) plus equal work count; no fabricated node record for unmanaged helper |
+| Managed node attempt | (4+K+C+R,4+K+C+R; 4+K+C+R+4;4), K=knowledge callback 0/1, C=cleanup 0/1, R=terminalReads; four record allowances enter/pre-reject, actual, accept/reject, terminal diagnostic (unused never refunded); pre-run/post/project base 4; active scope slot; nested actual work separately through same root |
+| work(units,callback) | (1,1;units;0), units positive safe int, trusted bounded operation, cannot use as untrusted arbitrary code |
+| region refresh/planner/admit/skip/rebind/edit/encoder/complete | each (1,1;bounded scan units+1; up to 1 record if producer emits), reserve before callback/scan; edit reservation includes rejection alternative; complete includes region completion candidate record before callback; encoder separate before output projection, not hidden extra business call |
+| region invalidation/revalidation/feedback/skip observation | (1,1;bounded graph scan units+1;1) per transition before state mutation; pre-reserve needed records for bounded batch, no event without quota |
+| XState runIn | borrowed scope above plus (1,1;1+P;P), P=maxProjections incl terminal actor projection; actor source transition observer consumes its own reserved ticket before project; if no projection ticket for next snapshot stop actor, terminal scope record still reserved, no success based on unobserved final |
+| Interaction decide/wait | legacy (1,1) each plus 1work, attached borrowed scope above; feedback checkpoint (1,1;1;1) before consuming revision update; pending response matching remains existing contract |
+| Model request | (1,1;1+bounded request/response scan units+2;2), before credential/network plus model call/retry and conservative tokens; selected/result events reserved, failure alternative; no new work after deadline |
+| recordModelDecision | (0,1;1;1) before decision event |
+| remaining/read-only bounded already-materialized snapshot | (0,0;0;0); building/projection is controlled work, not read |
 
-Root lifetime states internal NEW→OPEN→STOPPING→CLOSED; admission fence shared and checked before any managed action, including captured child/context after terminal. Stop signal closes new admission synchronously before callbacks; pending terminal allowances usable only by already-entered attempt, never new business work. Track actual active operations and local resource leases; root result cannot allow Package disposal before local work actually quiesces. For cooperative Node I/O signal and bounded transport timeout; for opaque noncooperative local TS, not preemptible, cannot promise wall time or release resources on timer. Strict hard-time task must reject unsupported adapter before entering; trusted violation stops admission and awaits local resource quiescence or explicit app-owned retained lease, never detached unobserved promise. Prefer await quiescence for initial design; no SDK-owned detached worker or after-run background observer. Remote operation can be unsettled while local I/O quiesces; bounded terminal readback window produces honest UNKNOWN. If local still active beyond window, do not claim CLOSED; LIFE10 controls Package lifetime. Signal is root-wide cancellation; child local failure does not automatically abort unrelated concurrent root. runIn owner attaches signal and cleans listener in finally, single existing resolve; real UI wait registration only after publication; active clock monotonic, pauses when all managed activity is genuinely waiting and no sibling active. Wall timer if configured never paused. Timeout/stop after awaited actual return rejects stale acceptance and retains terminal facts. No new work after stop. Meaningful progress increments only when validated fact/goal/accepted actual stage changes; proposal ID/revision or empty edit no progress. Repeated invalid proposal or no-op uses quota and stops at no-progress threshold; feedback change with real new fact may progress but root finite. maxNoProgress=0 permits no consecutive nonprogress (first triggers). Time checks before/after each controlled operation; do not promise hard synchronous CPU preemption.
+Node invocation uses borrowed attempt fence with its own reserved record allowance, not double charge generic scope open/close records. Root/child mandatory terminal scope record includes any additional failure summary and actual local quiescence; no extra event required when reserved event exhausted. All work units include finite SDK loop passes (see next). Native legacy root close has no managed event contract, no extra charges to historical simple paths. On admission refusal due exhausted work/events, do not emit unreserved record; preserve reason through already reserved owning scope terminal record, stop/return non-success, no effect. Root with insufficient 3work/2events/1step does not enter or promise evidence; returns stable failure. Zero/one-short for root, actor, node and terminal read verified later. No extra arbitrary max values unsupported by implementation; hard caps for structures §4; maxActiveScopes <=4096, maxEvents <=65536 for bounded active metadata and total records. No unbounded observer/lease registry. Finite event seq monotonic per root; SDK-generated run/scope/instance identities distinct, attempts monotonic within same obligation, no fake occurrence for root/region/model. Event fields from §2 typed union: kind/phase/identity/outcome (redacted Outcome<void>), actual entered vs pre-reject/skip, post state, acceptance, source metadata, effect/receipt (domain authoritative projection), reason and usage. Domain actual fact and output acceptance separate; receipt known commit never erased by late revision/evidence failure. For node actual/acceptance events domain's project supplies explicit typed effect/receipt data: replace project return J in §2 with Readonly<{effect:'none'|'committed'|'unknown'|'not-applicable';receiptId?:string;detail:J}>; unknown/committed only trusted source, no false 'none' on absent receipt. No private thoughts/raw exceptions/native objects. Model no-call event explicitly no profile/model and usage unavailable. Scope open/stopping/closed: emit open and final closed; stopping state observable in final reason (if explicit stopping event requested requires own normal record; no mandatory extra terminal ticket). Outcome in final event means candidate result delivered to evidence sink; if sink fails, public returned result non-success, not atomic external commit.
 
-Managed node algorithm (same fixed/dynamic):
-1. Allocate instance ID on trusted definition occurrence; enter attempt only after atomic knowledge/pre/run/post/projection/cleanup reservation. Snapshot metadata and callbacks; no callback gets untrusted code as executable; resolve declared known knowledge before before (bounded actual callback and source checks), validate input and current dependencies in before. Pre-reject means no run, emit reject without fake actual business invocation; cleanup only for resources actually entered (pre must not produce business effect). Current revision and signal rechecked after pre, before actual run.
-2. Execute actual callable, retain Outcome vs exception vs timeout/cancel/unsettled; if result contains authoritative receipt preserve even if obsolete. No catch→COMPLETE wrapper. after observes actual attempt (including non-success) and domain validation/authoritative settlement, never opens unapproved new effect; applicable cleanup always finally. Reserve bounded terminal observation separately from new work admission; after receives only WorkflowTerminalContext, not the normal admission scope; read consumes its already-reserved finite terminalReads and terminal work window, not root's ordinary new-work allowance. Trusted domain callback is readback/observation only, no effect replay or arbitrary new work; runtime cannot prove arbitrary TS callback purity. Signal ends on terminal window, actual local resource quiescence still required. Once terminal callback ends the retained terminal context rejects further reads. Root stop is not an excuse to erase actual fact. Node project is pure synchronous safe JSON fact projection, bounded. Project/cleanup/critical evidence failure cannot erase receipt; use domain-owned authoritative record and return non-success/UNKNOWN per L1.
-3. Observe before acceptance: append actual outcome/effect, post validation and terminal state; current-revision and pre/post success gate checked, only then expose result. If non-success return original reason (retain additional diagnostic as bounded observation). If actual COMPLETE but post/cleanup rejects, return non-success; committed effect stays known. Stale/timeout/cancel after actual effect never implies rollback; no current plan advancement. Required goal validation separate. Observer and evidence callbacks synchronous, bounded and guarded against reentry. Optional evidence.emit returns explicit Outcome<void>; when required=true any missing/invalid/non-COMPLETE/throw blocks result acceptance/goal completion. Required delivery failure is retained in root terminal reason and separately projected if possible without recursive emit failure; actual authoritative facts remain owned by domain. No failed emit callback is retried automatically. Noncritical failure is a recorded diagnostic without fabricating delivery. If a COMPLETE terminal record cannot be delivered, root returns non-success; record is evidence of candidate completion, not an external atomic commit guarantee. No private thought/secret raw logs. Existing six Outcomes unchanged.
-4. Root completion/stop closes managed admission; final record distinguishes local quiescence and remote fact. Actual task-owned record sink consumes during run; no durable event queue or post-run processing. Evidence record includes source/scope/revision, provider optional, actual model usage classification, plan edit diff, node identity/attempt, post status, receipt identity, user feedback and stop reason. Detail data explicit redacted projection, never serialization of arbitrary object/credentials. Bound event size (<=64KiB), total work and count; observer failure never silently promotes missing mandatory evidence.
+Structural scanner work reserve before parse: 1+ceil(maxCandidateBytes/256)+4*(maxJsonItems+maxNodes+maxBindings+maxEdits) for bounded passes on capped input; explicit graph scan 1+4*(maxItems+maxDependencies), cap 4096/16384. Projection/encoder/refresh similarly pre-reserve 1+ceil(maxProjectionBytes/256)+4*(maxJsonItems+maxBindings) within region, fixed node safe detail cap64KiB/8192items enforced with pre-reserved scan units per event (ceil(65536/256)+4*8192) added to work for every record allowance in table. Model scan 1+ceil((requestBytes+responseBytes)/256)+4*8192 per request; charge full declared maxima, no double debit when actual bytes less. Candidate malformed/oversize still charged admission before parse; header length checked bounded, capped body read then cancel. Limits technical conservative counters, not exact CPU; bounded iterative scanner rejects duplicate/prototype-sensitive keys, invalid UTF-8/nonfinite/depth/items. Native trusted callbacks obey bounded construction and cooperation; no arbitrary JS sandbox. Candidate/response/request <=1MiB each, JSON depth<=32, items<=8192, live plus attempted local node entries <=256, bindings<=2048, edits<=128; root work counts cumulative, no unlimited new IDs. Native slot values not enumerated/serialized by SDK, trusted domain bounds native acquisition and validation. Private state metadata count bounded by nodes/items/scopes; epoch/attempt safe integer overflow rejects.
 
-## 4. Dynamic structure, Context and interaction algorithm
+Clock: monotonic active elapsed whenever any leaf owned operation running (ancestor awaiting child not double-counted; ancestor independently doing work counts active), pause only when at least one real published user wait and all current leaves waiting, none active; transition ledger on start/end/wait/resume, do not pause for arbitrary Promise or remote I/O. Arm active remaining timer when active, wall timer always if configured, both close admission/abort even while awaited; before/after awaited checks catch deadline races. Terminal window starts on actual stop requiring reconciliation, or node completion if terminal reads needed, finite maxSettlementMs not reset per retry; no normal business admission. Finite no-progress consecutive count per region (new ID/revision/no-op not progress; actual verified fact/goal/node state change only); root work also caps all rejected attempts and feedback. Clock expires before actual invocation if stale, local quiescence as above. Model maxOutputTokens per-call root ceiling, maxReservedTokens aggregate conservative quota, not same field.
 
-WF05/06 and C03/04: generation fixed domain Knowledge/Function requirements expressed in typed nodes/definition/refresh; runtime refresh uses only authorized actual sources, bounded reads, resolveEvidence policy, records source/scope/revision and complete vs truncated. View must include required goal, immutable constraints, mandatory facts or explicit missing/conflict/UNKNOWN, stage and allowed current capabilities. Domain's refresh returns scoped keys (run/region occurrence and slot), changed keys derived from actual source/user revisions; SDK maps admitted result slot dependencies to actual earlier result and source slots. Domain supplies additional semantic dependency edges (including child output to parent fact) where known; merge and validate finite graph with existing invalidateEvidence (4096 keys/16384 edges max). Missing declaration on change conservative stale. Cross-sibling/parent child dependency crosses only explicit input/output projections; private source remains private but revision/result validity propagates. Fact epoch increments on actual relevant change, not repeated same refresh. Invalidated accepted node result marked stale, immutable actual history remains; new attempt with fresh invocation identity if re-execution safe. No automatic replay of effect. Context refresh is managed work; projection cap checked without dropping mandatory constraints. Runtime LLM gets only safe projected current view, allowed Tool descriptions, no entire SDK or package. Trusted native algorithm can operate typed original data inside its own Function; model not required.
+Managed node sequence: reserve all entry+terminal allowance before any callback; snapshot trusted definition/options/input metadata, create attempt identity and borrowed scope, current frame validated. Resolve actual raw observations via existing resolveEvidence (§2.1); verify current guard/scope/fact epoch/revisions after knowledge and before callback, after pre and immediately before actual callable. Pre may not perform business effect; reject no actual run, applicable cleanup for entered resources, actual pre-reject record not fake run. Business Function executes same native invocation, preserves Outcome; actual entered result/exception/cancel/timeout/unsettled recorded; always applicable post observation and cleanup with terminal scope read allowance. A post-read callback only observes/reconciles authorized fact, cannot replay unknown effect. Current frame recheck after await, post/cleanup/encoder/evidence and immediately before publishing accepted result; stale receipt still observed, never advance old plan. Pre/post/cleanup/project/evidence failure cannot yield accepted output, preserve first non-success/UNKNOWN and actual commit. Domain determines conflict of effects using authoritative source; different command ID doesn't resolve prior UNKNOWN. Required gate/goal rechecked §4. Node attempt closes admission before terminal callbacks (terminal read scope only), joins actual entered local operations before scope ends, result acceptance only if quiescent/current. Native nested child during business run attaches to borrowed attempt scope; parent result not usable until child joins. Explicit final root close fence before terminal callback/observer; no reentry or new work. Existing .1/.3 legacy behavior regression required. No durable persistence/recovery.
 
-Admission pseudocode:
-```text
-reserve bounded candidate work
-capture {run,region,planRevision,factRevision}
-bounded decode and exact shape check; reject foreign identity/revision
-copy current pending layout within finite cap
-apply edit batch in order to copy, allocating only local temporary aliases
-  existing template → new occurrence; insert → local allowed capability
-  skip/remove/move → optional pending node in allowed current/future gap
-  spawn → trusted child contract + bounded runtime initial nodes
-check anchor order and reachability, cursor, dependencies, input slots,
-  unique names/aliases, no skipped-required output, child delegation/depth
-validate business admission and skip policy on actual current view
-compare captured epoch/revision again; atomically commit or reject whole batch
-execute through shared root.node/child; actual output and post validation only
-```
+## 4. Current context, anchor obligations and bounded dynamic composition (R17-P1-01/02/03)
 
-Wire aliases mapped to SDK-issued occurrence IDs (opaque strings bounded 128 chars; reject reserved prototype names); forward references, cycles, cross-gap moves of anchors, mutation of running/completed history, wrong child region input, undelegated slots/functions rejected. New child initial structures are admitted before child work, bounded structurally before expansion; child execution depth checked independently. Move within same gap only, dependency order revalidated. `skip` accepted only domain canSkip positive and downstream bindings still satisfiable by actual prior/equivalent evidence explicitly rebound; no synthetic value. When revision changes invalidate affected pending candidates/outputs, retain actual receipts/history; repeated replan uses root and ancestor work. Ordered region has no generic DAG parallel scheduler, does not restrict fixed TS/XState loops/branches/parallel. Dynamic regions with mandatory anchor list can cover entire problem solving area; new local Workflow never becomes permanent definition. 
-Interaction runIn uses existing resolve/step/response correlation, one pending resolve, actual user wait and cancel; old run creates one session then attaches, no second root; same-root planner can ask through declared clarify checkpoint, trusted feedback reducer updates actual facts, no direct model state mutation. If reasoning is inside current resolve decision, return clarification decision to owning scope rather than nested active resolve. Old response/approval invalid after revision, retained valid independent records subject to domain policy. Intent is not authority. Two independent roots do not share context/usage/abort. Existing Interaction unjoined work must be joined/observed under §3 lifetime contract.
+Ordered immutable anchor obligations separated from mutable gaps; physical history immutable, current satisfaction mutable. Each required anchor has trusted definition, logical obligation ID, current accepted attempt+provenance/dependencies and status unsatisfied/valid/stale/blocked. Optional nodes similarly have logical identity vs attempts. Cursor means earliest unsatisfied required obligation or pending eligible optional node in ordered layout, NOT permanent history index. Current slots only validated output from accepted attempt with valid dependencies and epoch/source revision. Refresh from actual domain observations (raw, resolve with independent trusted frame); refresh stages native typed slot writes and source/dependency metadata, commits atomically only current. Domain's refresh changed keys and scoped source versions; SDK compares actual slot/provenance identity and mandatory declared dependencies, invalidates result/anchor/gate via existing finite invalidateEvidence; absent dependency declarations conservative stale. Exact typed native dataflow and allowed context/capability names per scope; private child sources don't leak, only explicitly delegated inputs and verified output/provenance; parent dependencies invalidated when child output validity changes. Current global epoch changes on actual relevant revision/feedback, not repeated same data. For unchanged evidence retain only after scope/version/asOf/applicability and dependency proof; update validation binding to current frame without inventing reexecution. Fixed native nodes use same mandatory current frame and pre/post checks; domain fixed control explicitly routes back to a read-only validation node when actual need, no automatic mutation of trusted code.
+
+### 4.1 Revalidation and edit semantics
+
+On invalidation mark affected anchor obligation stale even if earlier historically executed; remove its result slots from current view, cascade downstream (including current child output/finish candidate). Preserve all actual attempts, effects, evidence. Recompute earliest unsatisfied anchor/pending predecessor; trusted SDK reopens allowed prior gap for repair/rebind, not model skipping or changing anchor. Replay a stale logical anchor or predecessor with fresh attempt/occurrence reference only when explicit pure-read-only replay policy and domain current guard pass, no prior unknown/committed effect to repeat, same root budget/depth; prior attempt remains immutable. If invalidated effectful/UNKNOWN obligation, block replay and dependent/conflicting effect, use explicitly authorized reconciliation read-only capability to establish current fact and trusted gate policy, or return UNKNOWN/non-success. Do not declare existing committed effect undone. Stale generated child: replay only explicit pure-read-only region and actual trace no effect/unknown; otherwise reconcile/stop; no new root. Current gate satisfaction after replay must reference new verified attempt, not historical accepted status. Unaffected anchors stay valid and need not rerun; global mandatory completion checks current obligations not existence. Revalidation consumes own work/record, no unbounded loop; no-progress and root limits.
+
+Edit batch atomic, proposal references existing issued instance ID or same-batch earlier alias, never definition display name. Template local names immutable; reuse clones template with new occurrence ID and remaps references only to explicitly named prior accepted result/context or earlier same-batch alias; unresolved/self/future/foreign reference rejected. Reuse of same template never reuses prior output by ID. Initial child specs inserted into first declared mutable gap, validated under delegated capability/slot restrictions and trusted child contract before work; no arbitrary new function. Insertion only in allowed current/future gap or reopened repair gap. Move within same gap and pending only, before named pending node or end; recheck data dependency ordering. Remove only pending optional with no required downstream binding after entire transaction. Skip pending optional only (no executed result, no fabricated value), canSkip must prove domain not needed or equivalent valid source. Rebind edit explicitly targets input of pending optional OR pending/stale required anchor obligation, not history; domain canRebind confirms allowed source and equivalence/applicability (mandatory anchor's contract/identity unchanged), input slot token and source provenance current. From binding known in candidate copy, to legal context or earlier current result; no literal asserting authority. Required anchor pending/stale effective bindings stored per current attempt, not immutable source definition. If already accepted target's input affected, invalidate first via trusted revision, then rebind effective binding for new attempt; cannot silently modify accepted history. All dependent consumers including required anchors must remain satisfiable after skip/remove, or entire batch rejects. Replacing pending optional = remove+insert with explicit rebind; no alias collision. Forward refs/cycles/foreign scopes/unavailable tokens/illegal gate or gap edits reject. All reachable paths preserve fixed ordered anchors; no general DAG or dynamic parallel scheduler.
+
+Algorithm:
+1. Borrow current root scope, reserve planning/refresh/validation; snapshot run/region/plan+fact epoch, root/scope OPEN, bounded context. Candidate parser bounded before construction; proposed structure uses JSON names and refs only, native values private. Verify trusted layout and anchors, limits, current source and delegated capability identities.
+2. Copy bounded pending structure/effective bindings; apply finite edits with local aliases, validate dependency order/cap/required anchors and typed binding admissibility, collect staged changes. Validate skip/rebind/business policy on current view (async permitted but recheck frame+root+scope+revision after each await). Before commit re-read captured identity, frame, revisions, scope OPEN; atomic sync commit or whole reject; reserve records beforehand. No partial mutation on invalid proposals.
+3. Execute earliest current ready obligation/pending node through same node primitive. Read native typed inputs from scope-bound reader, guard then actual Function/child, post/observe and typed writer staged, check current after every async phase/encoder/required evidence; only publish validated current result. Update actual progress. Loop refresh/propose/revalidate under same budgets; finish action no authority.
+4. On feedback/new observation update trusted epoch/deps, invalidate downstream and reopen earliest affected safe obligations; Interaction uses same-root borrowed scope and prompt identity. User changes don't rewrite root contract, actual receipt facts retained; model no direct state mutation. If actual root goal changes outside allowed scope, require trusted new task/explicit rejection. If canceled/time over/stale after await, no new plan acceptance; actual observation/cleanup retained.
+5. Completion: check all current required anchors and prerequisites valid, no required pending/stale work, current frame/plan/fact epoch, invoke trusted complete under reservation; after await recheck all these plus currentness, after output/critical evidence delivery recheck again synchronously before returning current COMPLETE. If changed, invalidate/replan bounded or non-success, no stale COMPLETE. Parent child result same rule at parent acceptance, independent root goal. Partial verified evidence may accompany non-success, not fabricated success.
+
+Positive mandatory-anchor revalidation: compatibility anchor A accepted using quote r1; later actual quote r2 invalidates A and dependent comparison, cursor later; reopen A with fresh read-only attempt (same logical obligation), source r2 validated, unaffected vehicle ID anchor retained, new comparison executes, current completion gate. Legal skip optional duplicate source read with actual equivalent accepted context slot, rebind required anchor input by explicit trusted equivalence; illegal skip missing dependency rejects. Negative complete awaiting r1 then change to r2 -> old result rejected, receipt preserved if any; no replay of unsafe effect/UNKNOWN, independent readback guard; child late result cannot advance parent. Fixed/dynamic common native dataflow no JSON conversion. Interaction actual wait and revision same root; no nested resolve while one active, return clarification to owner, existing prompt correlation and approval distinction. No mandatory global Context Manager, no runtime discovery.
 
 ## 5. Model protocols and feasibility decision
 
