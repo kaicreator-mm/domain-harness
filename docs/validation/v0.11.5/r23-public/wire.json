@@ -408,7 +408,7 @@
     {
       "id": "wire-id-reorder",
       "mutate": "swap result order",
-      "expect": "reject wrong order or normalize to exact original accepted call order per contract; never send wrong correlation"
+      "expect": "Reject wrong supplied result order before HTTP; normalized outgoing order must equal exact original accepted call order."
     },
     {
       "id": "wire-args",
