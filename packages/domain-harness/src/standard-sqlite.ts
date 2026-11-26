@@ -1,29 +1,59 @@
 import { DatabaseSync, constants } from '@photostructure/sqlite'
 import { types } from 'node:util'
 
+/** 数据库参数的标量值域。
+ * @dhKind type
+ * @dhCapability database
+ */
 export type SQLiteScalar = string | number | bigint | Uint8Array | null
+/** 同步事务回调的非异步结果类型。
+ * @dhKind type
+ * @dhCapability database
+ */
 export type SQLiteNonThenable<T> = T extends PromiseLike<unknown> ? never : T
+/** 本次同步事务的借用操作接口。
+ * @dhKind type
+ * @dhCapability database
+ */
 export interface SQLiteTransaction {
   readonly active: boolean
   run(sql: string, parameters: readonly SQLiteScalar[]): { changes: number }
   get<T>(sql: string, parameters: readonly SQLiteScalar[]): T | undefined
 }
+/** 打开数据库的只读及等待选项。
+ * @dhKind type
+ * @dhCapability database
+ */
 export interface SQLiteDatabaseOptions {
   readonly readOnly?: boolean
   readonly busyTimeoutMs?: number
 }
+/** 稳定的数据库错误分类。
+ * @dhKind type
+ * @dhCapability database
+ */
 export type SQLiteErrorCode = 'INVALID_INPUT' | 'CLOSED' | 'BUSY' | 'LOCKED' |
   'READONLY' | 'CONSTRAINT' | 'IO' | 'OPEN' | 'AUTH' | 'SQL' | 'REENTRANT' |
   'INACTIVE_TX' | 'ASYNC_TX' | 'LIMIT' | 'COMMIT_UNKNOWN' | 'ROLLBACK_FAILED'
 
-/** 终态复合故障的起因：SDK 归类码，或业务回调自身的失败。 */
+/** 终态复合故障的起因：SDK 归类码，或业务回调自身的失败。
+ * @dhKind type
+ * @dhCapability database
+ */
 export type SQLiteFailureOrigin = SQLiteErrorCode | 'BUSINESS'
+/** 数据库终态失败的脱敏详情。
+ * @dhKind type
+ * @dhCapability database
+ */
 export interface SQLiteTerminalFailureDetails {
   readonly primaryCode?: SQLiteFailureOrigin
   readonly rollbackCode?: SQLiteErrorCode
 }
 
-/** SDK 只暴露脱敏错误码和操作阶段，不打印路径、SQL 或绑定参数。 */
+/** SDK 只暴露脱敏错误码和操作阶段，不打印路径、SQL 或绑定参数。
+ * @dhKind error
+ * @dhCapability database
+ */
 export class SQLiteDatabaseError extends Error {
   public declare readonly primaryCode?: SQLiteFailureOrigin
   public declare readonly rollbackCode?: SQLiteErrorCode
@@ -105,7 +135,10 @@ function sanitizedPrimary(error: unknown): SQLiteDatabaseError {
   return sdkError(trusted?.code ?? 'SQL', trusted?.stage ?? 'callback')
 }
 
-/** 普通 Standard Element；业务实例显式拥有连接，KDP 不创建全局数据库。 */
+/** 普通 Standard Element；业务实例显式拥有连接，KDP 不创建全局数据库。
+ * @dhKind standard-element
+ * @dhCapability database
+ */
 export class SQLiteDatabaseElement {
   readonly #db: Driver
   #state: 'open' | 'poisoned' | 'closed' = 'open'

@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { InteractionElement } from '../../src/standard-interaction.js';
 import type { InteractionDecision } from '../../src/standard-interaction.js';
-import type { InteractionEvent, InteractionPrompt } from '../../src/interaction-protocol.js';
+import type { InteractionPrompt } from '../../src/interaction-protocol.js';
+import type { InteractionEvent } from '../../src/standard-interaction.js';
 import type { StandardWorkflowOutcome } from '../../src/standard-workflow.js';
 import { runInteractiveRecognitionHandling } from '../../src/standard-interactive-recognition.js';
 import { resolveEvidence } from '../../src/standard-evidence.js';
 import type { EvidenceObservation } from '../../src/standard-evidence.js';
 import { selectNextDecision } from '../../src/standard-decision.js';
 import { prepareCandidates } from '../../src/standard-candidates.js';
-import { buildClarification, mapClarificationResponse } from '../../src/standard-clarification.js';
-import type { ClarificationPreparation } from '../../src/standard-clarification.js';
+import { ClarificationElement } from '../../src/standard-clarification.js';
 
 const ok = <T>(value: T): StandardWorkflowOutcome<T> => ({ status: 'COMPLETE', value });
 const stop = (status: 'REJECT' | 'ASK' | 'WAIT' | 'UNKNOWN' | 'FAILED', code = 'DOMAIN'): StandardWorkflowOutcome<never> => ({ status, reason: { code, message: code } });
@@ -98,10 +98,9 @@ async function fixture(kind: 'media' | 'workshop', input: Input, authority: bool
   const observations: EvidenceObservation<Key, string>[] = [];
   const add = (key: Key, value: string, origin: 'authority' | 'user') => { observations.push({ key, value, origin, state: 'known', source }); };
   if (authority) add('authority', kind === 'media' ? 'archive-v1' : 'shop-v2', 'authority');
-  let prepared: Extract<ClarificationPreparation<Key>, { status: 'prompt' }> | undefined, current: InteractionPrompt | undefined;
   let asked = 0, handled = 0;
-  const e = new InteractionElement({ onPrompt: p => { current = p; const value = responses[asked++]!; assert.equal(e.submit({ ...envelope(p), action: 'submit', values: { [p.fields[0]!.id]: value } }).accepted, true); } });
-  const decide = (state: Readonly<Input>, event: InteractionEvent): StandardWorkflowOutcome<InteractionDecision<Input, Readonly<{ goal: string; scenario?: string; authority: string }>>> => {
+  const e = new InteractionElement({ onPrompt: p => { const value = responses[asked++]!; assert.equal(e.submit({ ...envelope(p), action: 'submit', values: { [p.fields[0]!.id]: value } }).accepted, true); } });
+  const decide = (state: Readonly<Input>, event: InteractionEvent<Key>): StandardWorkflowOutcome<InteractionDecision<Input, Readonly<{ goal: string; scenario?: string; authority: string }>, Key>> => {
     if (event.kind === 'initial') {
       if (typeof state === 'string') {
         const allowed = kind === 'media' ? /^归档 photo-a(?: (video-b|photo-c))?$/u : /^排程(?: (current|what-if)(?: (shop-v1|shop-v2))?)?$/u;
@@ -110,9 +109,8 @@ async function fixture(kind: 'media' | 'workshop', input: Input, authority: bool
         else { if (match[1]) add('goal', match[1], 'user'); if (match[2]) add('scenario', match[2], 'user'); }
       } else { if (state.goal !== undefined) add('goal', state.goal, 'user'); if (state.scenario !== undefined) add('scenario', state.scenario, 'user'); }
     } else {
-      if (!prepared || !current) assert.fail('binding');
-      const mapped = mapClarificationResponse(prepared, current, event);
-      if (mapped.status !== 'values') return stop('UNKNOWN');
+      const mapped = event.clarification;
+      if (mapped?.status !== 'values') return stop('UNKNOWN');
       for (const item of mapped.values) { if (typeof item.value !== 'string') return stop('REJECT'); add(item.key, item.value, 'user'); }
     }
     const facts = resolveEvidence<Key, string>([{ key: 'authority', accepts: ['authority'] }, { key: 'goal', accepts: ['user'] }, { key: 'scenario', accepts: ['user'] }], observations, context, { equal: (_k, a, b) => a === b }, 16);
@@ -131,10 +129,10 @@ async function fixture(kind: 'media' | 'workshop', input: Input, authority: bool
     const candidateContext = { scope: kind, revision: key };
     const candidates = prepareCandidates({ ...candidateContext, status: 'complete', entries: ids.map(id => ({ ...candidateContext, id, value: id })) }, candidateContext,
       { assess: () => ({ status: 'eligible' }), comparisonLabels: [], project: entry => ({ label: entry.value, priority: 0, cells: [] }) }, { maxVisited: 8, maxReturned: 8 });
-    const built = buildClarification(facts, selected, { decisionKey: key, title: key, actions: ['submit'] }, [{ field: { kind: 'choice', id: key, label: key, required: true, options: [], completeness: 'incomplete' }, evidenceKey: key, applicable: 'yes', confirmation: 'user', candidates: { current: candidateContext, result: candidates } }]);
+    const built = ClarificationElement.prepare(facts, selected, { decisionKey: key, title: key, actions: ['submit'] }, [{ field: { kind: 'choice', id: key, label: key, required: true, options: [], completeness: 'incomplete' }, evidenceKey: key, applicable: 'yes', confirmation: 'user', candidates: { current: candidateContext, result: candidates } }]);
     if (built.status === 'ready' && goal) return ok({ kind: 'ready', intent: { goal, authority: fact, ...(goal === 'what-if' && scenario ? { scenario } : {}) } });
     if (built.status !== 'prompt') return stop('UNKNOWN');
-    prepared = built; return ok({ kind: 'clarify', state, prompt: built.prompt });
+    return ok({ kind: 'clarify', state, clarification: built.clarification });
   };
   const result = await runInteractiveRecognitionHandling(e, limits(2 + responses.length * 2), input, decide, (intent, scope) => {
     handled++; assert.equal(scope.root.remaining().calls, 0); return ok(intent);

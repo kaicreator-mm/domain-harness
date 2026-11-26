@@ -2,7 +2,13 @@
 
 > [权威目录](./README.md) · Owner 现行新架构决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。本文件同时保留 R151 初审 REWORK 与后续 R160 通过的时间顺序；历史状态不得覆盖新收据。
 
-## R48 · SDK 组件封装与同一取消信号候选
+## 0.11.3 · R70 后 QA-09A 有限整改（当前候选状态）
+
+- [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) T30–T34 已限定验收合入：R49 #1751、R51 #1748、R53 #1752、R59 #1755；#1754 R62 #1756 已收口。集成基线 `a9355631735dda9da48c3477c93528df10f9f4ef`。
+- [T35 #1757 R64](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7166610731) 原工件实际 Linux Node22.12.0 全新消费者、两专业域和累计 Reference 已验证；R65 #1758 独立生成/维护，R66 数值复核；R67 Windows 原工件验证与 [R66B](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7167658767) 并行。
+- [#1759](https://github.com/kaicreator-mm/domain-harness/issues/1759) Evidence 同步策略、Reference/采购通知包装的实际反例及有限修正已按 [R70](https://github.com/kaicreator-mm/domain-harness/issues/1759#issuecomment-7168893663) 限定接受，P0/P1=0，剩余 P2 为指南状态文案；本次仅修正文案，最终工件/受影响 Windows 复测及 P2 最终复核待完成。原工件证据只绑定原字节，历史 R65 原始提交不改写。13 产品 Oracle 仍 NOT_FINAL_ACCEPTED；未发布。
+
+## R48 · SDK 组件封装与同一取消信号候选（历史）
 
 - [R42](https://github.com/kaicreator-mm/domain-harness/issues/1744#issuecomment-7161393465) T31F #1744 正式关闭，R41 0/0/0、CI3204 受审HEAD成功，train 7a339d4c1329f7dbfc2814dc94cbaea3452720f7。T30/A–F 已限定合入，不等于产品验收。
 - [R47](https://github.com/kaicreator-mm/domain-harness/issues/1613#issuecomment-7162543245) 整体需求分析：T32 #1746/T33 #1747 两独审 REWORK，新增媒体取消实际反例。#1750 R48 真实消费驱动有限SDK封装与取消接线候选（LIFE-19A/QA-09A）；T32/T33 整改待独审，T34 HOLD，13产品Oracle尚未最终通过。保留冻结L1/L2，未发布。

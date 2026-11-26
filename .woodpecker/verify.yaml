@@ -9,6 +9,8 @@ when:
         - 'scripts/**'
         - 'examples/native-domain-app/**'
         - '.agents/**'
+        - 'docs/specs/domain-harness/**'
+        - 'docs/engineering/DomainHarness_v0.11.0_v0.11.1_NATIVE_REGRESSION_CROSSWALK.md'
         - 'package.json'
         - 'package-lock.json'
         - 'tsconfig.base.json'
@@ -32,6 +34,8 @@ clone:
         - scripts
         - examples/native-domain-app
         - .agents
+        - docs/specs/domain-harness
+        - docs/engineering
 steps:
   - name: verify
     image: bash

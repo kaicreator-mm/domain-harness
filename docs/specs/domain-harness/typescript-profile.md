@@ -66,6 +66,8 @@ export class OrderService {
 
 ## TS-05 · Workflow/XState Standard Element
 
+直接使用 XState actor 构造器的应用必须声明 xstate 直接依赖。当前 SDK 使用随包 vendor/ 交付的、保留原生运行时的 5.33.2-dh.1 声明兼容工件；复制该归档到应用自身 vendor 目录并声明相对 file 依赖。SDK-only 消费者不需要单独安装 XState。不得依赖提升或混用未经验证的版本；正式上游修复后可经实际严格类型和 actor 验证替换。
+
 ```ts
 import { fromPromise } from 'xstate';
 import { XStateWorkflowElement, StandardWorkflowSession } from '@kaicreator/domain-harness';

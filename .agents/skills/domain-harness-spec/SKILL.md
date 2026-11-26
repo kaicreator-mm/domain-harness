@@ -7,37 +7,27 @@ description: DomainHarness v0.11.x 唯一规范导航；TypeScript 原生 Packag
 
 **本 Skill 指导 Agent 阅读规范、生成、验证和审查，并导航已验证工程经验；不是第二份规范。** 唯一原文：[规范目录](../../../docs/specs/domain-harness/README.md)。代码 Metadata 供框架执行，Skill 与 TSDoc/JSDoc 供 Agent 读；Agent 也可以分析代码元数据。
 
-## 先读什么
+## 先发现能力
 
-1. 必读 [core.md](../../../docs/specs/domain-harness/core.md)；TS 生成/审查必读 [typescript-profile.md](../../../docs/specs/domain-harness/typescript-profile.md)。
-2. 按需读取 [Element/Standard](../../../docs/specs/domain-harness/element-package.md)、[生命周期/Workflow](../../../docs/specs/domain-harness/lifecycle-workflow.md)、[静态组合与交付](../../../docs/specs/domain-harness/composition-trust.md)、[架构](../../../docs/specs/domain-harness/architecture.md)、[命名](../../../docs/specs/domain-harness/identity-naming.md)、[工程质量](../../../docs/specs/domain-harness/engineering-quality.md)。
-3. 对照 [迁移状态](../../../docs/specs/domain-harness/status-and-decisions.md) 与 GitHub 当前 Exact SHA，不用旧历史 ABI 推断新源码已经合格。
+从 [完整能力及成员目录](references/capabilities.md) 找到实际根导出、构造方式、签名及对应指南；不以类名后缀猜测。按需求阅读：
 
-4. 设计复杂 Domain App、封装 Library/CLI/外部 Tool、组合 Knowledge/Workflow、组织跨域依赖或设计资格 Demo 时，读 [需求驱动应用资格实践](references/application-qualification.md)。依据具体任务选择相关小节；不把示例的业务政策或 Linux 特定实现当成通用规范。
+| 需要 | 指南 |
+|---|---|
+| 应用启动、真实资源退出、日志 | [Lifecycle](references/capabilities/lifecycle.md) |
+| 任务执行、同根预算、Hook、Outcome | [Workflow](references/capabilities/workflow.md) |
+| JSON/YAML 文本解析与序列化 | [Structured data](references/capabilities/structured-data.md) |
+| 有界扫描、向量或图查询 | [Query](references/capabilities/query.md) |
+| SQLite 持久化及事务 | [Database](references/capabilities/database.md) |
+| 受限纯表达式 | [Expression](references/capabilities/expression.md) |
+| 可信前台工具 | [CLI](references/capabilities/cli.md) |
+| 意图、证据、决策、候选、澄清 | [Semantic interaction](references/capabilities/semantic-interaction.md) |
 
-## 生成/审查要点
+[组合模式](references/composition.md) · [应用资格实践](references/application-qualification.md)。
 
-- Package 是静态 ESM 插件集合；Element 是一个内聚 Class；Function 是模块函数/类方法。优先复用 SDK Standard Elements；Business 不够用再自定义。
-- 按 [CORE-13/14](../../../docs/specs/domain-harness/core.md) 与 [QA-09](../../../docs/specs/domain-harness/engineering-quality.md)：优先使用 SDK 的实际 Standard 实现，不重复生成通用机制；先分析真实领域需求，再辨识领域专有规则和通用职责。遇到共同能力缺口，记录真实用途、重复实现及 SDK 改进候选，不虚构已有 API，不为省代码降低业务正确性。SDK 设计/审查优先验证 Agent 凭公开入口、类型、规范和本 Skill 可完成真实任务，并兼顾人类用同一 API 手工实现；不强制另设 DSL、生成器或 Runtime。
-- 元数据是框架读取的普通 TS 代码（如 Order）；TSDoc/JSDoc 与本 Skill 说明责任，不产生独立运行时选择/权限模型。
-- 静态 import 与 npm 直接依赖；KDP Order=0，Core Order 互异。生成期检查结构/TS 类型/必要测试，不让 SDK 运行期重建依赖、Lock/Pin、函数分派。
-- Init/Exit 可选，无则跳过；框架按 Order 正常启动并在未捕获异常时打印脱敏日志、执行可行 Exit、失败退出。
-- 记录 `REPO / TASK_ISSUE / PR / EXACT_HEAD / SPEC_FILES_READ / CODE_GAPS / VALIDATION / P0/P1/P2`。无实际测试就写 NOT_RUN；需本地 Agent 时只给单次有限任务，不把 v0.11.1 基础工作转移至 v0.11.2。
+## 生成和审查
 
-- 0.11.3 交互任务先读 [LIFE-14（T31A 已接受）](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-14--standard-interaction0113-t31a-已接受) 与当前 SDK README；以 #1613 R25 修订冻结及 #1733 R22 为准。优先同根 InteractionElement，不重复写 pending/关联/失效/字段校验；领域提供专业知识、规则及真实授权。
-- T31B 已接受 [LIFE-15](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-15--standard-evidence0113-t31b-已接受)：按 #1736 资格使用 `resolveEvidence`、`invalidateEvidence`，域提供真实来源/当前 scope/revision、显式 accepts、等价及可选 rank、完整 changed/dependencies；默认/推荐不替代 authority/user，先失效后重取证，不能把 complete 当 READY。R30限定验收不等于已发布。
-- T31C 已接受 [LIFE-16](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-16--standard-decision0113-t31c-已接受)：按 #1738 资格使用 `selectNextDecision`，领域从当前证据提供四态判断及依赖、优先级；标准选择必要可执行项，跳过不等于满足，unknown/conflict 不当 no；ready 不代表业务 READY 或授权。不要重写排序/依赖/跳过判断，不引入第二执行器。R33限定验收不等于已发布。
-- T31D 已接受 [LIFE-17](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-17--standard-candidates0113-t31d-已接受)：按 #1740 资格使用 `prepareCandidates`，域提供实际候选、当前 scope/revision、硬约束四态与可信显示投影。复用有界 Query；unknown/failed 不当排除，截断不标推荐，empty 不等于 unknown；只把 options/comparison 放进语义表单，内部 entries 保留域值，提交后重验版本、事实及授权。不重新实现共同筛选/比较，不新增专业求解器。R36 限定验收不等于发布。
-- T31E 已接受 [LIFE-18](../../../docs/specs/domain-harness/lifecycle-workflow.md#life-18--standard-clarification0113-t31e-已接受)：按 #1742 资格使用 `buildClarification`、`mapClarificationResponse`，用当前 B/C/D 结果和 A 字段模板/显式映射，跳过已满足/不适用项；预填不是用户确认，旧候选拒绝，只有当前合法 ID 可跳过已选项。保留同一次实际 A prompt、preparation 与最新有效 response，映射仅 user 表达，域处理修订、重算证据/决策、专业规则和真实授权。不要重复构造 A 校验器或 UI Runtime。
-- T31F 已接受、R48 修正候选 [LIFE-19/19A](../../../docs/specs/domain-harness/lifecycle-workflow.md)：按 #1744 资格使用 `runInteractiveRecognitionHandling`，域提供初始输入、decide 和 handle；同根 resolve→step，非成功原样传播。复杂业务直接组合 scope；再次澄清仅在明确 checkpoint 由域 await 同 scope.resolve，不重跑处理、不新建根、不覆盖实际 receipt。处理、额外专业调用和再次澄清按真实预算；取消及实际权限/恢复沿用既有合同。R48 #1750：decide 第四参 signal 与 scope.signal 相同；跨 await 在每个新相关操作前检查，已进入操作及结果/清理仍须收敛；原三参回调兼容。内部 semantic-data 不是公开入口，不直接导入，不重写重复数据检查/拓扑逻辑。按 QA-09A 对真实使用做有限版本封装/质量复核。T32/33 整改及 T34/35 依赖按 #1613。
-
-## 已验证实践：生成与审核时的关键提醒
-
-- **需求先行**：先独立分析领域需求、知识、约束、异常、验收 Oracle，再映射当前公开 SDK；不要以已有 API 缩减真实需求，也不要为了覆盖 SDK 功能虚构业务。保留 baseline，按确证根因修正业务、共享 Element、SDK、规范或 Skill。
-- **外部计算**：按真实输入/输出合同验证 Library/CLI/HTTP；不能以退出码0、元数据、正常回包或 mock 证明计算正确。独立核对输出、关键不变量及失败时的实际副作用。CLI 明确平台、进程/管道所有权、超时及结束合同。
-- **组合与预算**：业务若规定总额度不足不得开始外部计算，应在启动前验证完整阶段所需额度；SDK 逐次保留共享根预算，不推测未来业务调用。普通 invoke 的包装值不等于业务成功；预期 WorkflowOutcome 用 invokeOutcome/leaf 保留状态、稳定错误码及安全阶段。
-- **知识与外部状态**：表达真实领域不变量、适用范围、来源/政策修订；独立检查结果与必要最优性证据。持久操作需要验证真实效果、授权、读取既有记录及资源隔离；重复写请求不等于只读查询。
-- **复用与交付**：先证实两个用途再抽取共享 Element；检查实际依赖闭包而不只是 import。无关领域的第三方库、CLI 和环境不能成为必需依赖。区分真实 clean install、留存依赖恢复与 mock；按任务范围实测。
-- **反例驱动**：冻结正常边界、临界额度、失败、资源回收、政策修改和独立对照；验证真实失败不会误报 COMPLETE。证据绑定 Exact SHA，分开作者运行与独立重放，不以历史 CI 或同一日志哈希证明新运行。
-
-实践依据：[#1720 R72](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7143284440)、[R73 合并归档](https://github.com/kaicreator-mm/domain-harness/issues/1720#issuecomment-7143329514)。以上是现行规范的实践导航，不新增 SDK Runtime 义务，不自动启动后续版本或强制所有应用采用相同测试集合。
+- 先读 [核心](../../../docs/specs/domain-harness/core.md)、[TS Profile](../../../docs/specs/domain-harness/typescript-profile.md)、[Element](../../../docs/specs/domain-harness/element-package.md)、[工程质量](../../../docs/specs/domain-harness/engineering-quality.md)；按需读 [生命周期](../../../docs/specs/domain-harness/lifecycle-workflow.md)、[组合](../../../docs/specs/domain-harness/composition-trust.md)、[架构](../../../docs/specs/domain-harness/architecture.md)、[命名](../../../docs/specs/domain-harness/identity-naming.md)。规范是权威，Skill 导航不新增运行义务。
+- 先确定真实领域需求与验收，再选择 Standard，业务拥有领域规则、专业计算、真实授权、事实及外部效果。不要假设目录之外存在 API；不强制 DSL/额外 Runtime。
+- 使用包根 import、直接依赖、原生 Class/Function；类型可见不代表可直接构造。按 EL-09..15 分析完整能力与不变量，不按数量拆类。
+- 生成期负责类型、结构、依赖及功能正确性；SDK 不验证任意 Package。实际错误、版本、工件与业务 Oracle 绑定；未执行写 NOT_RUN。
+- [状态索引](../../../docs/specs/domain-harness/status-and-decisions.md) 是历史与当前资格的导航，不把候选或历史接受当成新工件 PASS。安装包使用本地规范快照，历史 GitHub 链接仅供溯源。

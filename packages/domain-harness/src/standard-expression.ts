@@ -1,6 +1,14 @@
 import { types } from 'node:util';
 
+/** 有限表达式的标量结果。
+ * @dhKind type
+ * @dhCapability expression
+ */
 export type ExpressionScalar = string | number | boolean | null;
+/** 表达式输入、节点、深度和运算限制。
+ * @dhKind type
+ * @dhCapability expression
+ */
 export interface ExpressionLimits {
   readonly maxAstNodes: number;
   readonly maxAstDepth: number;
@@ -132,7 +140,10 @@ function numericResult(value: number): number {
   if (!validNumber(value)) return fail('EXPRESSION_EVALUATION');
   return value;
 }
-/** 仅计算有限纯 JSON 表达式，不执行领域代码、不验证 Package。 */
+/** 仅计算有限纯 JSON 表达式，不执行领域代码、不验证 Package。
+ * @dhKind standard-element
+ * @dhCapability expression
+ */
 export class BoundedExpressionElement {
   evaluate(astJson: string, inputJson: string, options: Partial<ExpressionLimits> = {}): ExpressionScalar {
     const limits = limitsOf(options);

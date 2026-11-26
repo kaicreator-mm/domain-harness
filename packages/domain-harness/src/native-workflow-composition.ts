@@ -1,6 +1,9 @@
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 
-/** 同一根 Workflow 的共享调用和步骤额度；不是 Package 的运行时安全验证。 */
+/** 同一根 Workflow 的共享调用和步骤额度；不是 Package 的运行时安全验证。
+ * @dhKind type
+ * @dhCapability workflow
+ */
 export interface WorkflowLimits {
   readonly maxCalls: number;
   readonly maxSteps: number;
@@ -25,11 +28,18 @@ function validLimit(value: number): boolean {
   return Number.isSafeInteger(value) && value >= 0;
 }
 
-/** 以普通 TypeScript 函数显式声明全部结果分支，无中央 FunctionRef/Target。 */
+/** 以普通 TypeScript 函数显式声明全部结果分支，无中央 FunctionRef/Target。
+ * @dhKind type
+ * @dhCapability workflow
+ */
 export type WorkflowRoutes<T, R> = Readonly<
   Record<Status, (outcome: Result<T>) => R | Promise<R>>
 >;
 
+/** 显式路由六种 Workflow 结果。
+ * @dhKind function
+ * @dhCapability workflow
+ */
 export function routeWorkflowOutcome<T, R>(
   outcome: Result<T>, exits: WorkflowRoutes<T, R>,
 ): Promise<R> {
@@ -60,7 +70,10 @@ interface AncestorLimit {
   readonly descendants: number;
 }
 
-/** Standard 层的执行上下文仅组合原生回调，不是动态任务图解释器。 */
+/** Standard 层的执行上下文仅组合原生回调，不是动态任务图解释器。
+ * @dhKind execution-support
+ * @dhCapability workflow
+ */
 export class NativeWorkflowContext {
   constructor(
     private readonly budget: RootBudget,
@@ -139,21 +152,23 @@ export class NativeWorkflowContext {
     readonly run: () => Result<T> | Promise<Result<T>>;
     readonly end?: () => void | Promise<void>;
   }): Promise<Result<T>> {
-    const calls = 1 + Number(options.start !== undefined) + Number(options.end !== undefined);
+    // 预算与执行必须使用同一组已接纳的回调；调用方可能持有可变别名。
+    const { start, run, end } = options;
+    const calls = 1 + Number(start !== undefined) + Number(end !== undefined);
     const refused = this.budget.reserve(calls, calls);
     if (refused !== undefined) return failure(refused);
 
     let result: Result<T> | undefined;
     try {
-      if (options.start !== undefined) await options.start();
-      result = await options.run();
+      if (start !== undefined) await start.call(options);
+      result = await run.call(options);
     } catch {
       result = failure('WORKFLOW_EXECUTION_FAILED');
     } finally {
       // 进入 start / run 后总是等待 end；end 不是 Package Exit。
-      if (options.end !== undefined) {
+      if (end !== undefined) {
         try {
-          await options.end();
+          await end.call(options);
         } catch {
           // 保留更早的非成功结果，成功结果不能掩盖 end 失败。
           if (result === undefined || result.status === 'COMPLETE') {
@@ -166,7 +181,10 @@ export class NativeWorkflowContext {
   }
 }
 
-/** 每个业务根 Workflow 显式创建独立会话，内部不包含 KDP/Package Loader。 */
+/** 每个业务根 Workflow 显式创建独立会话，内部不包含 KDP/Package Loader。
+ * @dhKind execution-support
+ * @dhCapability workflow
+ */
 export class StandardWorkflowSession {
   private readonly budget: RootBudget;
   private started = false;
@@ -208,6 +226,9 @@ export class StandardWorkflowSession {
  * 两个固定叶子角色的便捷组合：识别 COMPLETE 才进入处理，两个角色共享一根额度。
  * 各角色的输入、输出、领域规则与授权由调用方定义；复杂流程直接组合 Session/Context。
  * 完整成功路径需要 2 次调用、5 个步骤和 1 层深度；不是业务全量预算预检或等待恢复协议。
+
+ * @dhKind function
+ * @dhCapability workflow
  */
 export function runRecognitionHandling<Intent, Output>(
   limits: WorkflowLimits,

@@ -1,6 +1,6 @@
 import { extname } from 'node:path';
-import { InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, buildClarification, mapClarificationResponse, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
-import type { InteractionPrompt, InteractionEvent, InteractionDecision, ClarificationPreparation, EvidenceObservation, NativeWorkflowContext, WorkflowLimits } from '@kaicreator/domain-harness';
+import { InteractionElement, resolveEvidence, invalidateEvidence, selectNextDecision, prepareCandidates, ClarificationElement, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
+import type { InteractionPrompt, InteractionEvent, InteractionDecision, EvidenceObservation, NativeWorkflowContext, WorkflowLimits } from '@kaicreator/domain-harness';
 import { ArchiveElement, type Asset, type Result } from './archive.js';
 import { FixityElement, ImageElement, VideoElement, type Policy, type MediaInfo } from './media.js';
 import type { Receipt } from './catalog.js';
@@ -31,9 +31,8 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
   owner: (tenant:string,asset:Asset)=>Promise<RegistrationElement|undefined>,
   options:Readonly<{review?:boolean;readback?:boolean;onPrompt?:(prompt:InteractionPrompt,interaction:InteractionElement)=>void}>={}) {
   const fixity=new FixityElement(),image=new ImageElement();
-  let prepared:Extract<ClarificationPreparation<Key>,{status:'prompt'}>|undefined,lastPrompt:InteractionPrompt|undefined;
   let attempt:ArchiveAttempt|undefined;let cleanupFailed=false;const proposals:ArchiveProposal[]=[];
-  const interaction=new InteractionElement({onPrompt:p=>{lastPrompt=p;return options.onPrompt?.(p,interaction);}});
+  const interaction=new InteractionElement(options.onPrompt===undefined?undefined:{onPrompt:options.onPrompt});
   const validFacts=(f:ArchiveFacts)=>/^[A-Za-z0-9_-]{1,64}$/u.test(f.tenant)&&id(f.revision)&&id(f.policy.revision)&&f.files.length<=16&&Array.from({length:f.files.length},(_,i)=>Object.hasOwn(f.files,i)).every(Boolean)&&new Set(f.files.map(x=>x.id)).size===f.files.length&&f.files.every(x=>id(x.id));
   const sameFacts=(f:ArchiveFacts)=>{try{const current=readFacts();return current!==undefined&&current.tenant===f.tenant&&current.revision===f.revision&&current.policy.revision===f.policy.revision&&JSON.stringify(current)===JSON.stringify(f);}catch{return false;}};
   const check=async(file:File,p:Policy,signal:AbortSignal):Promise<Result<Checked>>=>{
@@ -45,7 +44,7 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
     }catch(error){return stop(error instanceof Error&&['FILE_LIMIT','IMAGE_FORMAT','VIDEO_CONTAINER'].includes(error.message)?'REJECT':'UNKNOWN','MEDIA_EVIDENCE_UNAVAILABLE');}
   };
   const invalidatePlan=(key:'first'|'second')=>invalidateEvidence<Key|'plan'>(['scope','policy','first','second','firstHash','secondHash','plan'],[key],[{key:'scope',dependsOn:[]},{key:'policy',dependsOn:[]},{key:'first',dependsOn:[]},{key:'second',dependsOn:['first']},{key:'firstHash',dependsOn:['first']},{key:'secondHash',dependsOn:['second']},{key:'plan',dependsOn:['firstHash','secondHash','policy']}],bounds);
-  const decide=async(state:Readonly<State>,event:InteractionEvent,root:NativeWorkflowContext,signal:AbortSignal):Promise<Result<InteractionDecision<State,Intent>>>=>{
+  const decide=async(state:Readonly<State>,event:InteractionEvent<Key>,root:NativeWorkflowContext,signal:AbortSignal):Promise<Result<InteractionDecision<State,Intent,Key>>>=>{
     const facts=readFacts();if(!facts)return stop('UNKNOWN','SCOPE_UNKNOWN');if(!validFacts(facts))return stop('REJECT','FACTS_INVALID');
     if(state.snapshot!==undefined&&state.snapshot!==JSON.stringify(facts))return stop('UNKNOWN','STALE_FILE_SET');
     if(state.prior&&!sameFacts(state.prior.facts))return stop('UNKNOWN','STALE_FILE_SET');
@@ -55,8 +54,7 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
       if(!stale.complete||!stale.stale.includes('plan'))return stop('FAILED','INVALIDATION_FAILED');invalidated=stale.stale;
     }else if(event.kind==='initial'&&!state.proposal){const parsed=parse(input);if(!parsed)return stop('UNKNOWN','UNSUPPORTED_INPUT');selected=parsed;}
     else if(event.kind==='response'){
-      if(!prepared||!lastPrompt)return stop('FAILED','CLARIFICATION_BINDING');
-      const mapped=mapClarificationResponse(prepared,lastPrompt,event);if(mapped.status==='failed')return stop('FAILED','CLARIFICATION_BINDING');
+      const mapped=event.clarification;if(!mapped)return stop('FAILED','CLARIFICATION_BINDING');
       if(mapped.status==='other'){
         if(event.response.action!=='revise'||!('text' in event.response))return stop('ASK','NO_MATCHING_FILE');
         const parsed=parse(event.response.text);if(!parsed)return stop('UNKNOWN','UNSUPPORTED_REVISION');selected=parsed;
@@ -91,13 +89,13 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
       assess:entry=>entry.value.status==='COMPLETE'?((key==='second'&&first?.status==='COMPLETE'&&entry.value.value.hash===first.value.hash||key==='first'&&second?.status==='COMPLETE'&&entry.value.value.hash===second.value.hash)?{status:'excluded',reason:'DUPLICATE_CONTENT'}:{status:'eligible'}):{status:entry.value.status==='REJECT'?'excluded':'unknown',reason:entry.value.reason.code},
       comparisonLabels:['Kind','Dimensions','Seconds'],project:entry=>{if(entry.value.status!=='COMPLETE')throw Error('NOT_ELIGIBLE');const info=entry.value.value.info;return {label:entry.id,priority:0,cells:[info.kind,`${info.width}×${info.height}`,String(info.seconds)]};},
     },{maxVisited:16,maxReturned:16});
-    const built=buildClarification(evidence,selection,{decisionKey:key,title:`Select ${key} media`,...(state.proposal?{description:`Computed access copies: ${state.proposal.map(a=>`${a.output.width}×${a.output.height}`).join(', ')}. Select the second file or revise the pair.`}:{}),actions:['submit','revise','no-fit','cancel']},[{field:{kind:'choice',id:key,label:key,required:true,options:[],completeness:'incomplete'},evidenceKey:key,applicable:'yes',confirmation:'user',candidates:{current:context,result:candidates}}]);
+    const built=ClarificationElement.prepare(evidence,selection,{decisionKey:key,title:`Select ${key} media`,...(state.proposal?{description:`Computed access copies: ${state.proposal.map(a=>`${a.output.width}×${a.output.height}`).join(', ')}. Select the second file or revise the pair.`}:{}),actions:['submit','revise','no-fit','cancel']},[{field:{kind:'choice',id:key,label:key,required:true,options:[],completeness:'incomplete'},evidenceKey:key,applicable:'yes',confirmation:'user',candidates:{current:context,result:candidates}}]);
     if(built.status==='ready'&&first?.status==='COMPLETE'&&second?.status==='COMPLETE')return ok({kind:'ready',intent:{facts,pair:[first.value,second.value]},...(invalidated?{invalidate:invalidated}:{})});
     if(built.status!=='prompt')return stop(built.status==='failed'?'FAILED':'UNKNOWN','CLARIFICATION_'+built.status.toUpperCase());
-    prepared=built;const offered=new Map<string,string>();for(const [file,result] of checked)if(result.status==='COMPLETE')offered.set(file,result.value.hash);
-    return ok({kind:'clarify',state:{...state,selection:selected,round:state.round+1,offered,snapshot:JSON.stringify(facts)},prompt:built.prompt,...(invalidated?{invalidate:invalidated}:{})});
+    const offered=new Map<string,string>();for(const [file,result] of checked)if(result.status==='COMPLETE')offered.set(file,result.value.hash);
+    return ok({kind:'clarify',state:{...state,selection:selected,round:state.round+1,offered,snapshot:JSON.stringify(facts)},clarification:built.clarification,...(invalidated?{invalidate:invalidated}:{})});
   };
-  const result=runInteractiveRecognitionHandling<State,Intent,Receipt>(interaction,limits,{selection:{},round:0},decide,async(initial,scope)=>{
+  const result=runInteractiveRecognitionHandling<State,Intent,Receipt,Key>(interaction,limits,{selection:{},round:0},decide,async(initial,scope)=>{
     let intent=initial;let plan:Extract<Awaited<ReturnType<ArchiveElement['planIn']>>,{status:'COMPLETE'}>['value']|undefined;
     // 清理失败单独记录，不让 finally 覆盖已经得到的业务结果或原始异常。
     const disposePlan=async():Promise<boolean>=>{
@@ -115,7 +113,7 @@ export function archiveInteractively(limits:WorkflowLimits,input:ArchiveInput,re
         proposals.push(Object.freeze(plan.assets.map((a,i)=>Object.freeze({id:intent.pair[i]!.file.id,original:a.original,derivative:a.derivative,revision:a.revision,source:Object.freeze({...a.source}),output:Object.freeze({...a.output})}))));return ok(plan);
       };
       const first=await makePlan();if(first.status!=='COMPLETE')return first;
-      if(options.review){const next=await scope.resolve<State,Intent>({selection:{first:intent.pair[0].file.id},round:100,prior:intent,proposal:first.value.assets,snapshot:JSON.stringify(intent.facts)},decide);
+      if(options.review){const next=await scope.resolve<State,Intent,Key>({selection:{first:intent.pair[0].file.id},round:100,prior:intent,proposal:first.value.assets,snapshot:JSON.stringify(intent.facts)},decide);
         if(next.status!=='COMPLETE')return next;const changed=next.value.pair.some((x,i)=>x.hash!==intent.pair[i]!.hash);intent=next.value;
         if(changed){if(!await disposePlan())return stop('FAILED','MEDIA_CLEANUP_FAILED');const revised=await makePlan();if(revised.status!=='COMPLETE')return revised;}}
       if(scope.signal.aborted||!sameFacts(intent.facts))return stop('UNKNOWN','STALE_OR_CANCELLED');

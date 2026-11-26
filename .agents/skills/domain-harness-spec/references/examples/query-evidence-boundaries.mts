@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {GraphQueryElement, resolveEvidence} from '@kaicreator/domain-harness';
+import type {EvidenceObservation} from '@kaicreator/domain-harness';
+
+const graph=new GraphQueryElement();
+const edges=[{from:'entrance',to:'hall',type:'access'},{from:'hall',to:'studio',type:'access'}];
+const search=(target:string,maxVisited:number)=>graph.search(edges,{start:'entrance',target,direction:'OUT',relationTypes:['access'],limits:{maxDepth:2,maxVisited,maxReturned:1}});
+const found=search('studio',4);
+assert.equal(found.complete,true);
+assert.deepEqual(found.paths[0]?.nodes,['entrance','hall','studio']);
+const absent=search('roof',4);
+assert.equal(absent.complete,true);
+assert.equal(absent.paths.length,0);
+const partial=search('studio',1);
+assert.equal(partial.complete,false);
+assert.equal(partial.paths.length,0);
+
+type Key='temperature';
+const sample:EvidenceObservation<Key,number>={key:'temperature',state:'known',origin:'default',source:{id:'settings',scope:'room',revision:'r1'},value:18};
+const context={scope:'room',revisions:new Map([['settings','r1']])};
+const policy={equal:(_key:Key,left:number,right:number)=>left===right};
+const onlyUser=resolveEvidence([{key:'temperature',accepts:['user']}],[sample],context,policy,4);
+assert.equal(onlyUser.complete,true);
+assert.equal(onlyUser.items[0]?.status,'unknown');
+const defaultAllowed=resolveEvidence([{key:'temperature',accepts:['default']}],[sample],context,policy,4);
+assert.equal(defaultAllowed.complete,true);
+assert.equal(defaultAllowed.items[0]?.status,'resolved');
+const recommendation=resolveEvidence([{key:'temperature',accepts:['default']}],[{...sample,origin:'recommendation'}],context,policy,4);
+assert.equal(recommendation.complete,true);
+assert.equal(recommendation.items[0]?.status,'unknown');
+assert.equal(recommendation.items[0]?.proposals.length,1);
+const stale=resolveEvidence([{key:'temperature',accepts:['default']}],[sample],{...context,revisions:new Map([['settings','r2']])},policy,4);
+assert.equal(stale.complete,true);
+assert.equal(stale.items[0]?.status,'unknown');

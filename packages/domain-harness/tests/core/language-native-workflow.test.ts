@@ -146,3 +146,19 @@ test('R138 P1: 初始 entry 同步异常已由 Standard 观察，Host 不被原�
     reason: { code: 'WORKFLOW_EXECUTION_FAILED', message: 'Workflow execution failed' },
   });
 });
+
+test('FND02: 错误异步 mapper 不启动，真实 Promise 结果拒绝且不泄漏异常', async () => {
+  const logic=fromPromise<number,number>(async ({input})=>input);
+  type Mapper=(output:number)=>StandardWorkflowOutcome<number>;
+  let called=0;
+  const declared=async ()=>{called++;throw new Error('synthetic mapper rejection');};
+  const invalid=[declared,()=>Promise.reject(new Error('synthetic returned Promise')),()=>Promise.resolve({status:'COMPLETE',value:99})];
+  for(const mapper of invalid){
+    // 非法 JS 或绕过类型的调用者误用，不能成为成功结果或逃逸异常。
+    const workflow=new XStateWorkflowElement<typeof logic,number>(logic,mapper as unknown as Mapper);
+    const result=await workflow.run(7);
+    assert.equal(result.status==='FAILED'&&result.reason.code,'WORKFLOW_EXECUTION_FAILED');
+  }
+  await new Promise<void>(resolve=>setImmediate(resolve));
+  assert.equal(called,0);
+});

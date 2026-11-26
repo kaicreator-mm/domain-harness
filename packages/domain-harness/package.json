@@ -1,7 +1,7 @@
 {
   "name": "@kaicreator/domain-harness",
   "version": "0.11.2",
-  "description": "Language-Native DomainHarness SDK — reusable Standard Elements for Node and TypeScript",
+  "description": "Language-Native DomainHarness SDK \u2014 reusable Standard Elements for Node and TypeScript",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -16,17 +16,22 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "skills/domain-harness-spec",
+    "vendor"
   ],
   "scripts": {
-    "build": "node ../../scripts/clean-sdk-dist.mjs && tsc -p tsconfig.build.json",
+    "build": "node ../../scripts/prepare-sdk-bundled-xstate.mjs && node ../../scripts/sdk-capability-catalog.mjs --check && node ../../scripts/clean-sdk-dist.mjs && tsc -p tsconfig.build.json && node ../../scripts/sdk-capability-catalog.mjs --pack",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:typecheck": "tsc -p tsconfig.test.json",
     "prepack": "npm run build"
   },
   "dependencies": {
     "@photostructure/sqlite": "2.5.0",
-    "xstate": "5.33.2",
+    "xstate": "5.33.2-dh.1",
     "yaml": "2.9.1"
-  }
+  },
+  "bundleDependencies": [
+    "xstate"
+  ]
 }

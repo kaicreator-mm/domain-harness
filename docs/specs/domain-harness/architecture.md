@@ -48,3 +48,5 @@ Workflow 的接口由抽象 Class 定义，执行由 SDK Standard `XStateWorkflo
 ## ARCH-09 · 禁止的重复系统
 
 禁止专用 `FunctionRef → Binding → Target` 动态执行层、旧 App Lock/Boot Pin/InstalledRecord 及运行时校验、Extension 权限 DAG/PackageSystem 插件 Loader、KDP 独占 Workflow 引擎、所有 Package 强制空 Init、全部 helper Element 化、Package 函数强制归属 Class、独立 Agent-only 执行元数据或 docs-only 假冒代码 PASS。
+
+组合能力按 EL-09..15 判断，仍是原生 Class/Function；Skill 与静态目录不参与运行时，能力抽取不增加第二执行、权限或状态系统。

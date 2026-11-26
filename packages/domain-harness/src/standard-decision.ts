@@ -1,6 +1,13 @@
 import { dense, validLimit, dependencyOrder } from './semantic-data.js';
-/** 当前领域判断，不将未知或冲突当成否定。 */
+/** 当前领域判断，不将未知或冲突当成否定。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type DecisionCondition = 'yes' | 'no' | 'unknown' | 'conflict';
+/** 领域提供的四态决策、依赖和优先级。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export interface DecisionDescription<K extends string> {
   readonly key: K;
   readonly dependsOn: readonly K[];
@@ -15,6 +22,10 @@ type Row<K extends string> = Readonly<{
   reason: 'SATISFIED' | 'NOT_APPLICABLE' | 'NOT_REQUIRED' | 'NEEDS_DECISION' | 'APPLICABILITY' | 'NECESSITY' | 'SATISFACTION' | 'DEPENDENCY';
   blockedBy: readonly K[];
 }>;
+/** 必要决策选择及阻塞、未知和冲突。
+ * @dhKind type
+ * @dhCapability semantic-interaction
+ */
 export type DecisionSelection<K extends string> = Readonly<{ complete: false; reason: 'LIMIT' | 'INVALID_DECISION' | 'INVALID_DEPENDENCY' }> |
   (Readonly<{ complete: true; rows: readonly Row<K>[] }> & (Readonly<{ status: 'next'; key: K }> |
     Readonly<{ status: 'ready' | 'unresolved' | 'blocked' | 'conflict' }>));
@@ -22,7 +33,10 @@ export type DecisionSelection<K extends string> = Readonly<{ complete: false; re
 const validCondition = (value: DecisionCondition): boolean => ['yes', 'no', 'unknown', 'conflict'].includes(value);
 const failure = (reason: Extract<DecisionSelection<string>, { complete: false }>['reason']) => Object.freeze({ complete: false as const, reason });
 
-/** 根据当前证据的领域判断选择必要决策；不执行领域规则、工作流或外部操作。 */
+/** 根据当前证据的领域判断选择必要决策；不执行领域规则、工作流或外部操作。
+ * @dhKind function
+ * @dhCapability semantic-interaction
+ */
 export function selectNextDecision<K extends string>(decisions: readonly DecisionDescription<K>[],
   limits: Readonly<{ maxItems: number; maxDependencies: number }>): DecisionSelection<K> {
   if (!validLimit(limits.maxItems, 4096) || !validLimit(limits.maxDependencies, 16384) || decisions.length > limits.maxItems) return failure('LIMIT');

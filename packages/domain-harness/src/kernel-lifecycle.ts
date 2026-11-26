@@ -1,16 +1,28 @@
-/** Core 插件的执行元数据；顺序的结构合法性由生成者检查。 */
+import { types } from 'node:util';
+
+/** Core 插件的执行元数据；顺序的结构合法性由生成者检查。
+ * @dhKind type
+ * @dhCapability lifecycle
+ */
 export interface CorePackageMetadata {
   readonly id: string;
   readonly role: 'core';
   readonly order: number;
 }
 
+/** 应用自有上下文的最小 appId 合同。
+ * @dhKind type
+ * @dhCapability lifecycle
+ */
 export interface DomainAppContext {
   readonly appId: string;
 }
 
 /** Package 通过原生 Class 引用初始化直接依赖；KDP 只登记真实生命周期进入。 */
-/** 透传应用自有 Context 类型，SDK 不要求额外的 Context 容器或固定业务字段。 */
+/** 透传应用自有 Context 类型，SDK 不要求额外的 Context 容器或固定业务字段。
+ * @dhKind type
+ * @dhCapability lifecycle
+ */
 export type LifecycleInitContext<Context extends DomainAppContext = DomainAppContext> =
   Context & {
     readonly enter: (
@@ -19,6 +31,10 @@ export type LifecycleInitContext<Context extends DomainAppContext = DomainAppCon
     ) => Promise<void>;
   };
 
+/** 可选 Init 与 Exit 的生命周期合同。
+ * @dhKind type
+ * @dhCapability lifecycle
+ */
 export interface PackageInitElement<Context extends DomainAppContext = DomainAppContext> {
   /**
    * 用函数值属性（而非 method signature）保留严格的参数逆变检查：
@@ -29,12 +45,19 @@ export interface PackageInitElement<Context extends DomainAppContext = DomainApp
   [Symbol.asyncDispose]?(): void | Promise<void>;
 }
 
-/** 静态导入的 ESM Package 模块形状，而不是运行时插件管理对象。 */
+/** 静态导入的 ESM Package 模块形状，而不是运行时插件管理对象。
+ * @dhKind type
+ * @dhCapability lifecycle
+ */
 export interface StaticCorePackage<Context extends DomainAppContext = DomainAppContext> {
   readonly packageMeta: CorePackageMetadata;
   readonly Init?: new () => PackageInitElement<Context>;
 }
 
+/** 脱敏生命周期错误记录。
+ * @dhKind type
+ * @dhCapability lifecycle
+ */
 export interface LifecycleLogRecord {
   readonly event: 'DH_KDP_UNHANDLED' | 'DH_KDP_EXIT_FAILED';
   readonly stage: 'init' | 'business' | 'exit';
@@ -44,6 +67,10 @@ export interface LifecycleLogRecord {
   readonly reasonCode?: 'EXIT_HOOK_FAILED';
 }
 
+/** 宿主提供的生命周期日志接收器。
+ * @dhKind type
+ * @dhCapability lifecycle
+ */
 export interface LifecycleLogger {
   error(record: LifecycleLogRecord): void;
 }
@@ -66,6 +93,9 @@ class LifecycleClosingError extends Error {
  * 最小 KDP 生命周期 Element：
  * 静态 Core.Order、可选 Init、真实进入记录、逆序 Exit、未处理错误最后兜底。
  * 关闭屏障与等待在途 Init 是资源正确释放所必需，不重新验证 Package 正确性。
+
+ * @dhKind kdp-element
+ * @dhCapability lifecycle
  */
 export class KernelLifecycle<Context extends DomainAppContext = DomainAppContext> {
   private readonly entered: EnteredInit<Context>[] = [];
@@ -246,7 +276,12 @@ export class KernelLifecycle<Context extends DomainAppContext = DomainAppContext
 
   private log(record: LifecycleLogRecord): void {
     try {
-      this.logger.error(record);
+      const returned: unknown = this.logger.error(record);
+      // void 回调在 TS 中允许 async；观察真实 Promise 拒绝，不等待日志任务。
+      // 日志 sink 不能阻断退出、覆盖主异常或造成未处理拒绝。
+      if (types.isPromise(returned)) {
+        void Promise.prototype.then.call(returned, undefined, () => undefined);
+      }
     } catch {
       // 记录日志的故障不能覆盖业务/Init 原始异常。
     }

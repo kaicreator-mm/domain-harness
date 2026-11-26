@@ -14,11 +14,15 @@
 | TS 文件/目录 | `kebab-case`，不限制生态固定名 |
 | `Core.Order` | 非负整数，KDP=0 且唯一；其他 Core 不重复 |
 
+新增具体 Element 默认 PascalCase + Element；具有明确语义的既有例外如 JsonReader/YamlReader 必须在能力目录标明类别，不以名称后缀判定。
+
 不使用 R41、v011、Issue 编号等迭代标记作为产品稳定 ID；有业务意义的编号与 SemVer 不受此限。
 
 ## ID-02 · Metadata 属于代码
 
 Package 模块显式导出 `packageMeta`，Element Class 可定义 `static readonly metadata`；**框架和普通代码读取其执行含义**，如 Order。只保留运行确有必要的字段，不强制每个函数都有额外描述 JSON。TSDoc/JSDoc 与 Skill 用于 Agent，Agent 可读取代码 Metadata，但它不是 Agent-only 元数据。
+
+TSDoc/JSDoc 的 @dhKind 与 @dhCapability 是静态文档标签，供生成期提取与 Skill 分类；不产生运行时标识、分派或 Registry。
 
 ## ID-03 · 原生公开入口
 

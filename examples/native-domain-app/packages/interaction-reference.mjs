@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { once } from 'node:events';
+import { setImmediate as nextTurn } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { KernelLifecycle, StandardWorkflowSession, InteractionElement } from '@kaicreator/domain-harness';
 import * as kdp from './kdp.mjs';
@@ -96,6 +97,20 @@ export async function verifyReferenceInteractions() {
     await closing;
     assert.deepEqual(events,['A:wait','B:complete','C:inventory','A:complete','C:hook-end','closed']);
     assert.deepEqual(trace,['policy:read','policy:start','policy:evaluate','policy:end','policy:finalize']);
+    // 真实应用入口不得吞掉 void 通知意外返回的 Promise。
+    for(const rejects of [false,true]){
+      let notifications=0;
+      const invalid=createOrderInteraction('order',async(p,i)=>{
+        notifications++;
+        assert.equal(i.submit(answer(p,'submit',{goal:'current'})).accepted,true);
+        if(rejects)throw Error('PRIVATE_NOTIFICATION_MARKER');
+      });
+      const result=await invalid.run();
+      assert.equal(notifications,1);
+      assert.deepEqual(result,{status:'FAILED',reason:{code:'INTERACTION_NOTIFICATION_FAILED',message:'Interaction could not continue'}});
+      assert.equal(invalid.interaction.current(),undefined);
+    }
+    await nextTurn();
     const exact={maxCalls:15,maxSteps:17,maxDepth:1};
     for(const budget of [{...exact,maxCalls:14},{...exact,maxSteps:16},{...exact,maxDepth:0}]){
       const short=createOrderInteraction('order',(p,i)=>i.submit(answer(p,'submit',{goal:'current'})),budget);
