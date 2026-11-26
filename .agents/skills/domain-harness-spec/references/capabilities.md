@@ -88,7 +88,7 @@
 - 职责：模型使用量保留已观察、估计和未知的区别。
 - 类型声明：`interface ModelUsage { readonly input: number \| null; readonly output: number \| null; readonly total: number \| null; readonly kind: 'observed' \| 'estimated' \| 'unavailable'; }`
 - `ModelUsage#input` · contract property readonly：`number \| null`
-- `ModelUsage#kind` · contract property readonly：`"observed" \| "estimated" \| "unavailable"`
+- `ModelUsage#kind` · contract property readonly：`"unavailable" \| "observed" \| "estimated"`
 - `ModelUsage#output` · contract property readonly：`number \| null`
 - `ModelUsage#total` · contract property readonly：`number \| null`
 
@@ -104,6 +104,7 @@
 - `NativeWorkflowContext#invokeOutcome` · instance method：`<T>(action: () => Result<T> \| Promise<Result<T>>) => Promise<Result<T>>`；调用：`<T>(action: () => Result<T> \| Promise<Result<T>>): Promise<Result<T>>`
 - `NativeWorkflowContext#leaf` · instance method：`<T>(options: { readonly start?: () => void \| Promise<void>; readonly run: () => Result<T> \| Promise<Result<T>>; readonly end?: () => void \| Promise<void>; }) => Promise<Result<T>>`；调用：`<T>(options: { readonly start?: () => void \| Promise<void>; readonly run: () => Result<T> \| Promise<Result<T>>; readonly end?: () => void \| Promise<void>; }): Promise<Result<T>>`
 - `NativeWorkflowContext#node` · instance method：`<I, O>(definition: WorkflowNode<I, O>, input: I, options: WorkflowNodeOptions) => Promise<Result<O>>`；调用：`<I, O>(definition: WorkflowNode<I, O>, input: I, options: WorkflowNodeOptions): Promise<Result<O>>`
+- `NativeWorkflowContext#recordModelDecision` · instance method：`(reason: string, action: "not-needed" \| "unavailable") => Result<void>`；调用：`(reason: string, action: "not-needed" \| "unavailable"): Result<void>`
 - `NativeWorkflowContext#remaining` · instance method：`() => Readonly<{ calls: number; steps: number; maxDescendantDepth: number; }>`；调用：`(): Readonly<{ calls: number; steps: number; maxDescendantDepth: number; }>`
 - `NativeWorkflowContext#runId` · instance property：`string`
 - `NativeWorkflowContext#scopeId` · instance property：`string`
