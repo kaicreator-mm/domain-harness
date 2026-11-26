@@ -1,0 +1,316 @@
+{
+  "format": "dh-r50-public-affected-predicate-delta/1",
+  "classification": "PUBLIC",
+  "role": "OTHER_CONVERSATION_INDEPENDENT_ORACLE_AUTHOR_NON_IMPLEMENTER",
+  "status": "AMENDMENT_CANDIDATE_NOT_PRODUCT_PASS",
+  "authority": {
+    "taskComment": "7202588561",
+    "r40ScopeBlob": "c789ffd7dd0c09009d9370c7f26fe64acf3cf5f1",
+    "l2Blob": "39c0fa4e680098542972fd11ea0d14829fcc6eef",
+    "publicBase": "cc1c53f6dcef436555eb9757990c9c029d824359",
+    "originalOraclesBlob": "4625d36c46defa4ee670f3fe4e21c3b7160a60eb",
+    "originalWireBlob": "9ad13e453227111d165a33f2ec75ecb388c6bc69",
+    "implementationHead": "2d56e31bda3df8d57d163cc6f02d3849ddfd5e18",
+    "acceptedB1": "bcf2975dbc6c3cc357e5f089898a66803c77a547",
+    "r39Review": "7200182146",
+    "r42Review": "7200758840",
+    "r43Receipt": "7200832809",
+    "r48Receipt": "7202355703",
+    "r49Receipt": "7202581657"
+  },
+  "application": "Append-only prospective overlay of O07g and O07f numeric assumption only. Historical R23 public and R29 evaluator bytes and all prior outcomes immutable. Controller must explicitly adopt O07f amendment before relying on it; no fixture adjustment to observed implementation pass. All unaffected O/DY/W/F-W/AC and protocol requirements unchanged.",
+  "O07g": {
+    "decision": "READY",
+    "retire": [
+      "mandatory commercial pricing/billing/monetary limits and aggregate commercial token accounting",
+      "mandatory maxReservedTokens aggregate token reservation, boundInputTokens certified estimator, aggregate exact/one-short token acceptance"
+    ],
+    "publicReferencesSuperseded": [
+      "wire.json profile.tokenBoundFixtureOnly",
+      "wire.json negative wire-budget",
+      "oracles.json O02 expected clause 'second request 0 on aggregate one-short' ONLY (replace with operational maxCalls one-short; O02 otherwise retained)",
+      "any inherited O07g aggregate/certified bound reference"
+    ],
+    "retain": [
+      "actual managed model admitted attempts bounded by root/ancestor maxCalls incl credential/transport failure",
+      "explicit eligible retry or fallback same logical key, increments retry and attempt, counts against shared maxCalls/maxRetries; continuation separate call; no auto retry/effect replay; no reset on child/replan",
+      "supported positive per-call output cap under explicit trusted profile/root/provider contract, exact wire field and response overrun rejection; unsupported explicitly required operational hard limit fails before credential/network",
+      "byte/structure limits, strict local schema/structured output, actual two-protocol wire/call-result correlation, currentness/authority before and after credential/response and sink as applicable, timeout/cancel; retain actual facts without accepting stale result",
+      "honest observed/partial/unavailable usage; no fabricated zero, no billing arithmetic; malformed protocol data affecting safe operation non-success; no optional telemetry as general success gate",
+      "R41 current no-model decision and B1 regression unchanged; D-A actual real provider tool/result/reentry and D-B second real use remain mandatory"
+    ],
+    "publicInputs": [
+      {
+        "id": "operational-calls-exact",
+        "maxCalls": 2,
+        "maxRetries": 0,
+        "requests": "two valid distinct-key continuation requests; no retry",
+        "expect": "two actual HTTP requests if both eligible/current; actual captured output limit; third attempted new call rejected before credential or HTTP"
+      },
+      {
+        "id": "operational-calls-short",
+        "maxCalls": 1,
+        "maxRetries": 0,
+        "requests": "same two requests",
+        "expect": "first eligible request actual; second zero credential/HTTP; no call refund on failure"
+      },
+      {
+        "id": "operational-failure-consumes",
+        "maxCalls": 1,
+        "maxRetries": 1,
+        "requests": "first admitted credential failure or real HTTP failure, then eligible retry",
+        "expect": "first consumes call; second denied before credential or HTTP; no fake usage; actual error retained"
+      },
+      {
+        "id": "operational-retry",
+        "maxCalls": 3,
+        "maxRetries": 1,
+        "requests": "admitted HTTP failure; eligible explicit retry/fallback fails; next retry/fallback",
+        "expect": "two actual HTTP requests, same key/attempt order; third retry denied despite one remaining model call; explicit new eligible continuation distinct from retry; no automatic retry"
+      },
+      {
+        "id": "output-cap",
+        "maxOutputTokens": 32,
+        "requests": [
+          32,
+          33,
+          0
+        ],
+        "expect": "positive 32 with profile supporting the correct cap field admitted if other guards pass; 33 or 0 rejected before credential/HTTP; reported actual output over supported bound non-success and observed usage retained"
+      },
+      {
+        "id": "unsupported-hard-operational",
+        "requests": "required per-call output or supported hard transport/timeout bound cannot be enforced by selected profile",
+        "expect": "non-success before credential/HTTP; no downgrade"
+      },
+      {
+        "id": "usage-and-currentness",
+        "requests": "absent usage, partial observed usage, invalid safety-relevant usage, credential wait canceled or frame/authority changed, late response, actual timeout",
+        "expect": "missing/partial stays null/unknown where unavailable, no invented total or zero, actual protocol error as applicable; zero HTTP after canceled/stale credential; late proposal not adopted; actual attempt/effect facts retained"
+      }
+    ],
+    "transition": "If unreleased maxReservedTokens/boundInputTokens is temporarily exposed, remove from qualified public .5 contract or explicitly reject unsupported non-undefined requests during transition. Do not test it as a required implemented capability or silently accept. Existing per-call output/byte/timeout tests remain."
+  },
+  "O07f": {
+    "decision": "AMENDMENT_CANDIDATE",
+    "scope": "non-child incremental dynamic Function node only, same frozen K=I=E=X=1,C=R=B=0, maxItems4 twice, maxBindings2 twice, no nested work, existing parent scope already open, root declared maxEvents=7 (Q=1); no detached/private proof in this numeric fixture",
+    "original": {
+      "calls": 8,
+      "steps": 8,
+      "work": 132735,
+      "events": 4,
+      "activeScopes": 1
+    },
+    "formula": {
+      "S": 33024,
+      "F": 34,
+      "K": 65,
+      "L": 9,
+      "N": 8,
+      "Q": 1,
+      "context": 16640,
+      "base": 12,
+      "records": 132096,
+      "frames": 544,
+      "knowledge": 65,
+      "leases": 18,
+      "progress": 2,
+      "work": 149377
+    },
+    "justification": [
+      "B1 accepted at R43 preserves Context metadata independent from record JSON, max4096 entries and 64KiB, reserve four passes plus bounded bytes: 16640; X=1 already in N charges callback only. Removing charge without equivalent proof would weaken accepted B1.",
+      "B1 progress ceiling Q=floor(root maxEvents/4) since every node attempt reserves four nonrefundable records. Before and run views each copy at most Q; at E=7, 2Q=2. Not the number of currently entered nodes.",
+      "Original 16 frame-chain reservations already cover input and encoder. Actual current non-child normal path has one frames capture plus 14 current() sites, including three binding-specific checks. F=34. 20 tickets is not justified by these 15 calls; do not increase cap gratuitously or drop checks. No grant for nested/hidden proof work; if concrete safety counterexample needs extra outer checks, separately demonstrate before any amendment.",
+      "149513=149377+136 is candidate implementation charge only, NOT accepted exact vector. R48 current 132735 denial and 149513 acceptance remain historical, not rewritten."
+    ],
+    "exact": {
+      "calls": 8,
+      "steps": 8,
+      "work": 149377,
+      "events": 4,
+      "activeScopes": 1
+    },
+    "oneShort": [
+      {
+        "shortDimension": "calls",
+        "available": {
+          "calls": 7,
+          "steps": 8,
+          "work": 149377,
+          "events": 4,
+          "activeScopes": 1
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      },
+      {
+        "shortDimension": "steps",
+        "available": {
+          "calls": 8,
+          "steps": 7,
+          "work": 149377,
+          "events": 4,
+          "activeScopes": 1
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      },
+      {
+        "shortDimension": "work",
+        "available": {
+          "calls": 8,
+          "steps": 8,
+          "work": 149376,
+          "events": 4,
+          "activeScopes": 1
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      },
+      {
+        "shortDimension": "events",
+        "available": {
+          "calls": 8,
+          "steps": 8,
+          "work": 149377,
+          "events": 3,
+          "activeScopes": 1
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      },
+      {
+        "shortDimension": "activeScopes",
+        "available": {
+          "calls": 8,
+          "steps": 8,
+          "work": 149377,
+          "events": 4,
+          "activeScopes": 0
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      }
+    ],
+    "combinedRootAndNode": {
+      "assumptions": "same root E=7, no other work, root m4, no observe/read, one validate; Q=1 adds one root progress scan compared to standalone root E=3; reserve root first then node. Combined test root+node total only; for event one-short E=6 Q remains1",
+      "exact": {
+        "calls": 9,
+        "steps": 10,
+        "work": 248656,
+        "events": 7,
+        "activeScopes": 2
+      },
+      "oneShort": [
+        {
+          "shortDimension": "calls",
+          "available": {
+            "calls": 8,
+            "steps": 10,
+            "work": 248656,
+            "events": 7,
+            "activeScopes": 2
+          },
+          "nodeAdmitted": false
+        },
+        {
+          "shortDimension": "steps",
+          "available": {
+            "calls": 9,
+            "steps": 9,
+            "work": 248656,
+            "events": 7,
+            "activeScopes": 2
+          },
+          "nodeAdmitted": false
+        },
+        {
+          "shortDimension": "work",
+          "available": {
+            "calls": 9,
+            "steps": 10,
+            "work": 248655,
+            "events": 7,
+            "activeScopes": 2
+          },
+          "nodeAdmitted": false
+        },
+        {
+          "shortDimension": "events",
+          "available": {
+            "calls": 9,
+            "steps": 10,
+            "work": 248656,
+            "events": 6,
+            "activeScopes": 2
+          },
+          "nodeAdmitted": false
+        },
+        {
+          "shortDimension": "activeScopes",
+          "available": {
+            "calls": 9,
+            "steps": 10,
+            "work": 248656,
+            "events": 7,
+            "activeScopes": 1
+          },
+          "nodeAdmitted": false
+        }
+      ]
+    },
+    "standaloneRoot": {
+      "exact": {
+        "calls": 1,
+        "steps": 2,
+        "work": 99278,
+        "events": 3,
+        "activeScopes": 1
+      },
+      "unchanged": true
+    },
+    "positive": "Exact remaining bundle, all guards current and valid, actual input/context/knowledge/pre/run/post/project/encode and current accepted disposition, one each for actual function/context/knowledge/input/encode. Exact accounting pre-reserved across root and every owner; no partial debit or free callbacks.",
+    "negative": "Every one-short vector rejects before any controlled node/binding/frame/token/child callback; invalid typed input after successful full admission consumes bundle; no output or new effect. Independently check no partial debit and local ancestor limits. Existing known-child/borrow and private proof inclusive pre-admission obligations remain OPEN (R49); do not treat this non-child vector as acceptance of them."
+  },
+  "productExecution": "NOT_RUN"
+}
