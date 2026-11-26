@@ -5,7 +5,7 @@ export const expectedClasses = {
  XStateWorkflowElement:['standard-element','public','run','runIn'],
  JsonReader:['standard-element','public','read','write'],
  YamlReader:['standard-element','public','read','write'],
- NativeWorkflowContext:['execution-support','borrowed','depth','remaining','invoke','invokeOutcome','child','leaf','signal','runId','scopeId','work','node'],
+ NativeWorkflowContext:['execution-support','borrowed','depth','remaining','invoke','invokeOutcome','child','leaf','signal','runId','scopeId','work','node','recordModelDecision'],
  StandardWorkflowSession:['execution-support','public','run','dispositions'],
  BoundedQueryElement:['standard-element','public','select'],
  SQLiteDatabaseError:['error','public','code','stage','primaryCode','rollbackCode'],
