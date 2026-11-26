@@ -1,0 +1,251 @@
+{
+  "format": "dh-r50-evaluator-delta/1",
+  "classification": "EVALUATOR_ONLY_BY_ROLE_CONVENTION",
+  "role": "OTHER_CONVERSATION_INDEPENDENT_ORACLE_AUTHOR_NON_IMPLEMENTER",
+  "productExecution": "NOT_RUN",
+  "original": {
+    "head": "8a74cc22f4f2ebd3ad81947d749719f68eb754da",
+    "blob": "2ea220539e881aeacb76a29d9ccc06b088c1f489",
+    "sha256": "398303a318c4090a5d7b33da78885d5a5d78b1c9776794110fad11e0962c2f18"
+  },
+  "publicDelta": {
+    "head": "e60a209e2f9faa69fa29c958bda98f55caf4a427",
+    "blob": "3c3eff604906066549109aec02bc7da076b87f2d",
+    "sha256": "942f75f0c50ef6acdea2c638c5d06b37c46b32faa26dc76bddc38272a3f14906"
+  },
+  "rules": "Apply this append-only overlay prospectively after controller records applicable admission. Original cases and historical outcomes remain immutable. O07g scope ready under R40; O07f is a public-only numeric amendment candidate and needs explicit adoption. No hidden material disclosure or product PASS.",
+  "replaceO07g": {
+    "id": "O07g",
+    "scenario": "Operational model limits, actual request/retry and usage evidence, no aggregate commercial token reservation.",
+    "input": {
+      "maxCalls": 2,
+      "maxRetries": 1,
+      "perCallBound": 160,
+      "unsupportedBound": true,
+      "variants": [
+        {
+          "kind": "call-exhaustion",
+          "maxCalls": 2,
+          "maxRetries": 1,
+          "requests": 3,
+          "profileSupportsOutputCap": true,
+          "outputLimit": 160
+        },
+        {
+          "kind": "failed-attempt-consumes-call",
+          "maxCalls": 1,
+          "maxRetries": 1,
+          "first": "admitted credential callback rejects; no HTTP",
+          "second": "otherwise eligible request"
+        },
+        {
+          "kind": "retry-exhaustion",
+          "maxCalls": 3,
+          "maxRetries": 1,
+          "attempts": 3,
+          "profileSupportsOutputCap": true,
+          "outputLimit": 160,
+          "behavior": "first and each explicitly authorized retry fail at actual transport; same logical key; no automatic retry"
+        },
+        {
+          "kind": "output",
+          "perCallBound": 160,
+          "requested": [
+            160,
+            161,
+            0
+          ],
+          "separateFreshEligibleScopes": true
+        },
+        {
+          "kind": "unsupported-required-operational",
+          "profileSupportsRequiredOutputLimit": false,
+          "requiredOutputLimit": 160
+        },
+        {
+          "kind": "actual-overrun",
+          "requestOutputLimit": 160,
+          "observedOutputTokens": 161
+        },
+        {
+          "kind": "currentness",
+          "variants": [
+            "cancel while credential pending",
+            "ancestor/current revision changes while credential pending",
+            "response arrives after deadline or relevant revision change"
+          ],
+          "actualCounters": true
+        },
+        {
+          "kind": "usage",
+          "variants": [
+            "no usage returned",
+            "partial observed usage",
+            "malformed safety-relevant protocol data"
+          ],
+          "actualCounters": true
+        }
+      ]
+    },
+    "expect": {
+      "callExhaustion": {
+        "admitted": 2,
+        "actualHttp": 2,
+        "finalDeniedCredentialDelta": 0,
+        "finalDeniedHttpDelta": 0
+      },
+      "failedAttempt": {
+        "admitted": 1,
+        "credentialCalls": 1,
+        "http": 0,
+        "secondDenied": true
+      },
+      "retryExhaustion": {
+        "admitted": 2,
+        "actualHttpAttempts": 2,
+        "retries": 1,
+        "finalDeniedCredentialDelta": 0,
+        "finalDeniedHttpDelta": 0,
+        "oneCallRemains": true,
+        "identity": "same logical key and increasing attempt; distinct continuation is not a retry"
+      },
+      "output": "exact positive supported cap admitted; above cap or zero rejected before credential/HTTP; correct protocol field; actual overrun non-success retains observed facts",
+      "unsupported": "non-success before credential/HTTP; no downgrade or invented support",
+      "currentness": "canceled/stale pending credential causes zero HTTP; late response not adopted; actual attempt facts preserved",
+      "usage": "unknown not zero; retain observed partial fields without invented total; invalid safety-relevant protocol rejected without false completion; no monetary or aggregate token arithmetic",
+      "common": "shared root/ancestor limits including child/replan, actual wire and tool correlation, local structured output validation, bounded timeout/cancel and explicit eligible retry/fallback only. No automatic effect replay; retain all unaffected O02/O07/O10 predicates."
+    },
+    "evidence": "Actual credential/HTTP counters, requests and supported output field, request/attempt/retry identity, actual outcomes, shared counters, currentness, timeout/cancel and honest usage. No live provider or SDK run by author; product obligations separate.",
+    "status": "NOT_RUN"
+  },
+  "amendO07f": {
+    "id": "O07f",
+    "scope": "Public original non-child dynamicFunction exact vector only. Existing sealed O07f structural/admission mutations remain byte-identical and active. Private O07a/O07c quotaFormula entries are distinct fixtures; neither changed nor evaluated by this task.",
+    "originalPublic": {
+      "calls": 8,
+      "steps": 8,
+      "work": 132735,
+      "events": 4,
+      "activeScopes": 1
+    },
+    "candidatePublic": {
+      "calls": 8,
+      "steps": 8,
+      "work": 149377,
+      "events": 4,
+      "activeScopes": 1
+    },
+    "oneShort": [
+      {
+        "shortDimension": "calls",
+        "available": {
+          "calls": 7,
+          "steps": 8,
+          "work": 149377,
+          "events": 4,
+          "activeScopes": 1
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      },
+      {
+        "shortDimension": "steps",
+        "available": {
+          "calls": 8,
+          "steps": 7,
+          "work": 149377,
+          "events": 4,
+          "activeScopes": 1
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      },
+      {
+        "shortDimension": "work",
+        "available": {
+          "calls": 8,
+          "steps": 8,
+          "work": 149376,
+          "events": 4,
+          "activeScopes": 1
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      },
+      {
+        "shortDimension": "events",
+        "available": {
+          "calls": 8,
+          "steps": 8,
+          "work": 149377,
+          "events": 3,
+          "activeScopes": 1
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      },
+      {
+        "shortDimension": "activeScopes",
+        "available": {
+          "calls": 8,
+          "steps": 8,
+          "work": 149377,
+          "events": 4,
+          "activeScopes": 0
+        },
+        "admitted": false,
+        "callbacks": {
+          "input": 0,
+          "guard": 0,
+          "context": 0,
+          "knowledge": 0,
+          "run": 0,
+          "encode": 0,
+          "create": 0
+        }
+      }
+    ],
+    "assumptions": "non-child incremental dynamic Function node only, same frozen K=I=E=X=1,C=R=B=0, maxItems4 twice, maxBindings2 twice, no nested work, existing parent scope already open, root declared maxEvents=7 (Q=1); no detached/private proof in this numeric fixture",
+    "disposition": "AMENDMENT_CANDIDATE_ONLY",
+    "additional": "Apply only if controller explicitly reconciles B1 context/progress overhead; 16 frame checks retained; no adoption of observed 149513. Child create/borrow and detached/private proof inclusive preadmission remain open; no unrelated fixture reseal."
+  },
+  "unchanged": [
+    "other 38 cases including O07a/O07c",
+    "private quotaFormula",
+    "O07f nonnumeric predicates",
+    "all other domain/consumer holdouts and manifests",
+    "all actual product statuses NOT_RUN"
+  ]
+}
