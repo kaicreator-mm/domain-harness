@@ -98,6 +98,7 @@ try {
   writeFileSync(join(consumer,'package.json'),JSON.stringify(manifest,null,2)+'\n');
   run('LOCK',consumerNode,consumerNpmArgs(['install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund']),consumer);
   run('CLEAN_INSTALL',consumerNode,consumerNpmArgs(['ci','--ignore-scripts','--no-audit','--no-fund']),consumer);
+  run('SDK_DEPENDENCY_TREE',consumerNode,consumerNpmArgs(['ls','--all']),consumer);
   const installed=realpathSync(join(consumer,'node_modules/@kaicreator/domain-harness'));
   assert.notEqual(installed.startsWith(root),true,'must not be a workspace symlink');
   const installedPkg=JSON.parse(readFileSync(join(installed,'package.json'),'utf8'));
@@ -116,6 +117,7 @@ try {
   assert.deepEqual(installedPkg.bundleDependencies,['xstate']);
   assert.deepEqual(details.bundled,['xstate']);
   const dependency=verifyInstalledXState(installed);
+  assert.equal(installedPkg.dependencies.xstate,dependency.candidate.version,'XSTATE_BUNDLE_DEPENDENCY_VERSION');
   const actorConsumer=join(work,'actor-consumer');
   mkdirSync(actorConsumer,{recursive:true});
   const companion=join(actorConsumer,dependency.candidate.file);
@@ -126,6 +128,7 @@ try {
   },null,2));
   run('ACTOR_LOCK',consumerNode,consumerNpmArgs(['install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund']),actorConsumer);
   run('ACTOR_CLEAN_INSTALL',consumerNode,consumerNpmArgs(['ci','--ignore-scripts','--no-audit','--no-fund']),actorConsumer);
+  run('ACTOR_DEPENDENCY_TREE',consumerNode,consumerNpmArgs(['ls','--all']),actorConsumer);
   verifyInstalledXState(join(actorConsumer,'node_modules','@kaicreator','domain-harness'));
   verifyXStateFiles(join(actorConsumer,'node_modules','xstate'),dependency);
   const standardS05=verifyS05InstalledStandard({packageDir,installed,consumer,actorConsumer,consumerNode,packedPaths,run});
@@ -412,7 +415,7 @@ try {
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
     packageVersion:installedPkg.version,consumerRuntime:runtime,consumerNpmVersion,standardS05,
-    api:'public-root',runtime:true,typescript:true,deniedPrivateSubpath:true,
+    api:'public-root',runtime:true,typescript:true,dependencyTree:true,deniedPrivateSubpath:true,
     rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
     sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
     noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true,intentWorkflows:true,authorizedAction:true,combinedProduct:true}));
