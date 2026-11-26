@@ -19,7 +19,7 @@ const defaultProjection: Projection = Object.freeze({ effect: 'unknown', detail:
 const notEntered: Projection = Object.freeze({ effect: 'not-applicable', detail: null });
 
 /** 仅允许有限 JSON 观察元数据；原生值不经此投影。 */
-function safeDetail(value: StandardJsonValue, limit: number): StandardJsonValue {
+export function safeDetail(value: StandardJsonValue, limit: number): StandardJsonValue {
   let items = 0, bytes = 0;
   const seen = new Set<object>();
   function copy(v: StandardJsonValue, depth: number): StandardJsonValue {
