@@ -1,0 +1,468 @@
+{
+  "format": "dh-r23-public-domains/1",
+  "classification": "PUBLIC_WRITER_INPUT_AND_EXPECTED_PREDICATES",
+  "synthetic": true,
+  "freeze": {
+    "train": "42ad4bfa16385f3e5a2db484e709855c8071f240",
+    "l1": "7041bb9f3d6fabfa5db0533bf3f2807276b74ab2",
+    "architecture": "d344ec604c422ec375dba391ed7579cfa662110e",
+    "l2": "39c0fa4e680098542972fd11ea0d14829fcc6eef"
+  },
+  "DA": {
+    "schema": {
+      "offer": "unique id, compatible bool, pack positive integer units, cost integer per pack, lead integer days, max nonnegative integer pack count, moq positive integer pack count",
+      "demand": "exact units, lead upper bound, integer budget; all selected packs at or above MOQ and within stock; no tax/shipping; delivery max selected lead"
+    },
+    "identity": {
+      "tenant": "shop-A",
+      "vehicle": "V1",
+      "offerRevision": "r1",
+      "complete": true
+    },
+    "quantity": 6,
+    "offers": [
+      {
+        "id": "A",
+        "compatible": true,
+        "pack": 3,
+        "cost": 30,
+        "lead": 5,
+        "max": 2,
+        "moq": 1
+      },
+      {
+        "id": "B",
+        "compatible": true,
+        "pack": 2,
+        "cost": 24,
+        "lead": 2,
+        "max": 3,
+        "moq": 1
+      },
+      {
+        "id": "C",
+        "compatible": false,
+        "pack": 1,
+        "cost": 5,
+        "lead": 1,
+        "max": 6,
+        "moq": 1
+      },
+      {
+        "id": "D",
+        "compatible": true,
+        "pack": 2,
+        "cost": 20,
+        "lead": 3,
+        "max": 2,
+        "moq": 2
+      }
+    ],
+    "objective": [
+      "min total cost",
+      "min max selected lead",
+      "stable offer ID only for residual tie"
+    ],
+    "enumeration": {
+      "combinations": 252,
+      "cases": [
+        {
+          "lead": 5,
+          "budget": 75,
+          "feasible": [
+            {
+              "counts": [
+                2,
+                0,
+                0,
+                0
+              ],
+              "cost": 60,
+              "lead": 5
+            },
+            {
+              "counts": [
+                0,
+                1,
+                0,
+                2
+              ],
+              "cost": 64,
+              "lead": 3
+            },
+            {
+              "counts": [
+                0,
+                3,
+                0,
+                0
+              ],
+              "cost": 72,
+              "lead": 2
+            }
+          ],
+          "optimum": {
+            "counts": [
+              2,
+              0,
+              0,
+              0
+            ],
+            "cost": 60,
+            "lead": 5
+          }
+        },
+        {
+          "lead": 3,
+          "budget": 75,
+          "feasible": [
+            {
+              "counts": [
+                0,
+                1,
+                0,
+                2
+              ],
+              "cost": 64,
+              "lead": 3
+            },
+            {
+              "counts": [
+                0,
+                3,
+                0,
+                0
+              ],
+              "cost": 72,
+              "lead": 2
+            }
+          ],
+          "optimum": {
+            "counts": [
+              0,
+              1,
+              0,
+              2
+            ],
+            "cost": 64,
+            "lead": 3
+          }
+        },
+        {
+          "lead": 2,
+          "budget": 75,
+          "feasible": [
+            {
+              "counts": [
+                0,
+                3,
+                0,
+                0
+              ],
+              "cost": 72,
+              "lead": 2
+            }
+          ],
+          "optimum": {
+            "counts": [
+              0,
+              3,
+              0,
+              0
+            ],
+            "cost": 72,
+            "lead": 2
+          }
+        },
+        {
+          "lead": 2,
+          "budget": 70,
+          "feasible": [],
+          "optimum": null
+        }
+      ]
+    },
+    "sourceChanges": [
+      {
+        "id": "DA-r2-lead",
+        "feedback": {
+          "lead": 2
+        },
+        "expectedCost": 72,
+        "expectedCounts": [
+          0,
+          3,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "DA-incomplete",
+        "complete": false,
+        "missing": [
+          "C"
+        ],
+        "expected": "non-COMPLETE or ASK; no trusted optimum"
+      },
+      {
+        "id": "DA-conflict",
+        "sameKey": "B",
+        "observations": [
+          {
+            "cost": 24,
+            "revision": "r2"
+          },
+          {
+            "cost": 25,
+            "revision": "r2"
+          }
+        ],
+        "expected": "conflict; cannot adopt"
+      },
+      {
+        "id": "DA-wrong-tenant",
+        "tenant": "shop-B",
+        "expected": "deny or unresolved; no publication"
+      }
+    ],
+    "mandatoryKeys": [
+      "vehicle",
+      "compatibility",
+      "offerSetComplete",
+      "quotes"
+    ],
+    "optionalKeys": [
+      "alternative"
+    ],
+    "mandatoryAnchors": [
+      "compatibility",
+      "finalVerify"
+    ],
+    "operation": "read-only procurement; no order"
+  },
+  "DB": {
+    "schema": {
+      "job": "unique id, release integer, I/R positive duration; start integer 0..8; I ends before or at R start",
+      "resource": "I and R independent capacity 1; nonpreemptive half-open intervals"
+    },
+    "jobs": [
+      {
+        "id": "J1",
+        "release": 0,
+        "I": 1,
+        "R": 3
+      },
+      {
+        "id": "J2",
+        "release": 0,
+        "I": 2,
+        "R": 1
+      },
+      {
+        "id": "J3",
+        "release": 1,
+        "I": 1,
+        "R": 2
+      }
+    ],
+    "resources": {
+      "I": 1,
+      "R": 1
+    },
+    "horizon": 8,
+    "objective": [
+      "min makespan",
+      "min sum repair completion"
+    ],
+    "tiePolicy": "accept any feasible objective-optimal vector; no deterministic lex requirement",
+    "enumeration": {
+      "vectors": 531441,
+      "valid": 98,
+      "byMakespan": {
+        "7": 11,
+        "8": 87
+      },
+      "best": [
+        7,
+        16
+      ],
+      "optimalVectors": [
+        [
+          0,
+          1,
+          3,
+          1,
+          4,
+          5
+        ],
+        [
+          0,
+          1,
+          4,
+          1,
+          4,
+          5
+        ],
+        [
+          0,
+          2,
+          1,
+          1,
+          4,
+          5
+        ],
+        [
+          0,
+          2,
+          4,
+          1,
+          4,
+          5
+        ]
+      ],
+      "vectorOrder": [
+        "I1",
+        "I2",
+        "I3",
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    "deadlineCases": [
+      {
+        "deadline": 6,
+        "feasible": 0,
+        "expected": "non-COMPLETE"
+      },
+      {
+        "deadline": 7,
+        "feasible": 11,
+        "expectedObjective": [
+          7,
+          16
+        ]
+      }
+    ],
+    "sourceChanges": [
+      {
+        "id": "DB-release",
+        "job": "J3",
+        "release": 4,
+        "expected": "re-evaluate affected resource/precedence and stale old results; actual solver vs independent oracle"
+      },
+      {
+        "id": "DB-unknown",
+        "resource": "R",
+        "status": "UNKNOWN",
+        "expected": "no fabricated availability or dispatch"
+      }
+    ],
+    "operation": "read-only solver result, no dispatch"
+  },
+  "DC": {
+    "schema": {
+      "resource": "tenant,resource,version,stock,policy",
+      "access": "hashed token and current principal/tenant/resource permission",
+      "grant": "id,mode,principal,tenant,resource,expiry,revoked,bound command,digest,maxQuantity",
+      "command": "id,tenant,resource,expected version,positive qty,approval as applicable",
+      "effect": "id,tenant,resource,version,quantity",
+      "attempt": "id,principal,digest,reply"
+    },
+    "baseline": {
+      "tenant": "shop-a",
+      "principal": "alice",
+      "resources": [
+        {
+          "resource": "stock",
+          "stock": 5,
+          "version": 0,
+          "policy": "PREAUTHORIZED"
+        },
+        {
+          "resource": "other",
+          "stock": 5,
+          "version": 0,
+          "policy": "PREAUTHORIZED"
+        }
+      ],
+      "command": {
+        "id": "public-c1",
+        "resource": "stock",
+        "quantity": 2,
+        "expectedVersion": 0
+      },
+      "credential": "generate test-only token at execution; no secret in fixture"
+    },
+    "source": {
+      "authority": "examples/native-domain-app/action/authority.ts",
+      "authorityBlob": "45429bd5d490ddde0b9397ffbeeeb335dd817771",
+      "priorVerify": "examples/native-domain-app/action/verify.ts",
+      "priorVerifyBlob": "8c1710b06854b2b0377836735e940e055efa53d3"
+    },
+    "independentSQL": [
+      "SELECT stock,version FROM resources WHERE tenant=? AND resource=?",
+      "SELECT id,tenant,resource,version,quantity FROM effects WHERE tenant=? AND resource=? ORDER BY id",
+      "SELECT id,principal,digest,reply FROM attempts WHERE id=?"
+    ],
+    "cases": [
+      {
+        "id": "DC-commit-stale",
+        "fault": "proxy waits after actual Host commit; change trusted plan epoch then release",
+        "expected": {
+          "stock": 3,
+          "version": 1,
+          "effects": 1,
+          "receipt": "actual original command",
+          "acceptedOldOutput": false
+        }
+      },
+      {
+        "id": "DC-ack-lost",
+        "fault": "drop actual committed submit ACK and readback",
+        "expected": {
+          "stock": 3,
+          "version": 1,
+          "effects": 1,
+          "outcome": "UNKNOWN",
+          "conflictingNewIdSubmitDelta": 0
+        }
+      },
+      {
+        "id": "DC-resolve",
+        "fault": "restore authorized readback of original id/digest",
+        "expected": {
+          "stock": 3,
+          "version": 1,
+          "effects": 1,
+          "replaySubmitDelta": 0
+        }
+      },
+      {
+        "id": "DC-independent",
+        "fault": "while stock UNKNOWN, trusted current independent other resource grant",
+        "expected": {
+          "otherStock": 3,
+          "otherVersion": 1,
+          "otherEffects": 1
+        }
+      },
+      {
+        "id": "DC-CAS",
+        "fault": "fresh baseline; two real independent Host processes/clients same version qty2 distinct ids",
+        "expected": {
+          "stock": 3,
+          "version": 1,
+          "effects": 1,
+          "successfulCommits": 1
+        }
+      },
+      {
+        "id": "DC-grants",
+        "fault": "separate fresh baselines; PER_CALL missing/expired/revoked/wrong digest, SESSION wrong resource/principal/over max, forged policy; legitimate approval",
+        "expected": "denied cases no stock or effect delta; authorized valid command exactly one change; readback separate authority"
+      }
+    ],
+    "execution": "NOT_RUN; future actual loopback Host/SQLite, no synthetic client output as authority"
+  }
+}
