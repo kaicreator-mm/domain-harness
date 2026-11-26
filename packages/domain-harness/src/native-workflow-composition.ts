@@ -363,6 +363,19 @@ export function prepareRegionProofs(root: NativeWorkflowContext, proofs: readonl
   return lifetime.managed.detachedPlan(proofs);
 }
 
+/** 子域实际结算后才知道的新证明，在首次使用前一次性预付剩余检查。 */
+export function prepayRegionProofs(root:NativeWorkflowContext,proofs:readonly import('./workflow-slots.js').DetachedRegionProof[],checks:number):(() => boolean)|undefined {
+  const life=scopeLifetime(root),runtime=life.managed,scope=life.scope;
+  if(!life.admissible()||!runtime||!scope||!Number.isSafeInteger(checks)||checks<1||checks>15)return undefined;
+  const plan=runtime.detachedPlan(proofs);
+  if(!plan)return undefined;
+  const charge=runtime.ledger.reserve(scope.owner,{calls:0,steps:0,work:checks*plan.work},scope.local);
+  if(!charge.ok)return undefined;
+  charge.ticket.close(scope.owner);
+  let remaining=checks;
+  return ()=>remaining-->0&&plan.check();
+}
+
 /** 私有子域来源校验由实际所属根和作用域承担。 */
 export function verifyRegionProofs(root: NativeWorkflowContext, proofs: readonly import('./workflow-slots.js').DetachedRegionProof[]): boolean {
   const lifetime = scopeLifetime(root);

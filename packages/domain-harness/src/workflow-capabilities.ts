@@ -1,5 +1,5 @@
 import { types } from 'node:util';
-import { executeBoundNode, guardBoundFactory, verifyRegionProofs, prepareRegionProofs } from './native-workflow-composition.js';
+import { executeBoundNode, guardBoundFactory, prepayRegionProofs, prepareRegionProofs } from './native-workflow-composition.js';
 import type { NativeWorkflowContext } from './native-workflow-composition.js';
 import { managedFailure } from './workflow-managed-runtime.js';
 import { slotDeclarations } from './workflow-slots.js';
@@ -69,15 +69,15 @@ function factory<I, O>(binding: ReturnType<typeof common<I, O>>, kind: WorkflowC
   const invoke: CapabilityData['invoke'] = async invocation => {
     const { root, leases, inputs, maxBindings, options } = invocation;
     let staged: ReadonlyMap<string, SlotEntry> | undefined;
-    let childProof: DetachedRegionProof | undefined;
+    let childProof: DetachedRegionProof | undefined, checkChild: (()=>boolean)|undefined;
     try {
       if (inputs.size > maxBindings) return fail();
       const known = prepareRegionProofs(root, [...new Set([...inputs.values()].flatMap(e => e.children ?? []))]);
       if (!known) return fail('WORKFLOW_CHILD_PROVENANCE');
-      const result = await executeBoundNode(root, build({ ...invocation, receiveProof: proof => { childProof = proof; } }), options, {
+      const result = await executeBoundNode(root, build({ ...invocation, receiveProof: proof => { childProof = proof; checkChild=prepayRegionProofs(root,[proof],15); } }), options, {
         maxBindings, child: kind === 'region', knownProofWork: known.work, ...(invocation.occurrence === undefined ? {} : { occurrence: invocation.occurrence }),
         current: frame => leases.entriesCurrent(inputs, frame) && (staged === undefined || leases.entriesCurrent(staged, frame))
-          && known.check() && (childProof === undefined || verifyRegionProofs(root, [childProof])),
+          && known.check() && (childProof === undefined || checkChild?.()===true),
         input: () => {
           // 每个声明输入必须存在；实际 token、值、来源在同一租约再次验证。
           const declared = slotDeclarations(binding.inputs, maxBindings);

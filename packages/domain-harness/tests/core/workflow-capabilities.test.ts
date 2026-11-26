@@ -4,6 +4,7 @@ import { bindWorkflowFunction, bindWorkflowRegion, createWorkflowSlot, StandardW
 import type { NativeWorkflowContext, WorkflowFunctionBinding, WorkflowCapability, WorkflowRegionDefinition, WorkflowNode, WorkflowControlOptions, WorkflowCompletionPolicy, StandardWorkflowOutcome } from '../../src/index.js';
 import { SlotLeaseScope } from '../../src/workflow-slots.js';
 import { invokeCapability, capabilityData } from '../../src/workflow-capabilities.js';
+import { prepayRegionProofs } from '../../src/native-workflow-composition.js';
 
 const ok = <T>(value: T): StandardWorkflowOutcome<T> => ({ status: 'COMPLETE', value });
 const cost = createWorkflowSlot('cost', (v): v is bigint => typeof v === 'bigint');
@@ -238,5 +239,28 @@ test('child entry is reserved with bound node before factory, input, and guards'
     assert.notEqual(r.status,'COMPLETE',mode);
     assert.deepEqual([input,create],mode==='exact'?[1,1]:[0,0],mode);
     if(mode!=='exact')assert.equal(guards,0,mode);
+  }
+});
+
+test('new private proof stage prepayment exact/one-short and bounded checks before policy',async()=>{
+  // Internal seam, separate from the actual recursive region and actual expiry witnesses.
+  const rootWork=99279, proofWork=1+5+4, checks=15;
+  for(const mode of ['exact','short'] as const){
+    const e=environment(4);let reads=0;
+    const frame={epoch:1,context:{scope:'private',revisions:new Map([['source','1']])}};
+    const proof=Object.freeze({frame,knowledge:{maxItems:1,equal:Object.is,current:()=>{reads++;return frame;}},current:()=>true,
+      sources:Object.freeze([{id:'source',scope:'private',revision:'1'}]),children:Object.freeze([]),replayable:true});
+    const s=new StandardWorkflowSession({maxCalls:1,maxSteps:2,maxDepth:0},
+      {...e.control,limits:{...e.control.limits,maxEvents:7,maxActiveScopes:1,maxWork:rootWork+checks*proofWork-Number(mode==='short')}});
+    const r=await s.run(root=>{
+      const check=prepayRegionProofs(root,[proof],checks);
+      if(mode==='short'){assert.equal(check,undefined);return {status:'FAILED',reason:{code:'EXPECTED',message:'expected'}};}
+      assert.ok(check);assert.equal(reads,0);
+      for(let i=0;i<checks;i++)assert.equal(check(),true);
+      assert.equal(check(),false);
+      return ok(1);
+    },completion<number>());
+    assert.equal(r.status==='COMPLETE',mode==='exact');
+    assert.equal(reads,mode==='exact'?checks:0);
   }
 });

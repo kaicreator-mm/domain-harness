@@ -3,8 +3,8 @@ import test from 'node:test';
 import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { ModelElement, StandardWorkflowSession, bindWorkflowFunction, createWorkflowSlot, runWorkflowRegion } from '../../src/index.js';
-import type { ModelProfile, ModelRequest, ModelTurn, WorkflowControlOptions, WorkflowRegionDefinition, WorkflowRegionProposal, StandardWorkflowOutcome as Outcome } from '../../src/index.js';
+import { ModelElement, StandardWorkflowSession, bindWorkflowFunction, bindWorkflowRegion, createWorkflowSlot, runWorkflowRegion } from '../../src/index.js';
+import type { ModelProfile, ModelRequest, ModelTurn, WorkflowControlOptions, WorkflowRegionDefinition, WorkflowRegionProposal, WorkflowCapability, WorkflowNodeProposal, StandardWorkflowOutcome as Outcome } from '../../src/index.js';
 type Obj=Record<string,unknown>;
 const ok=<T>(value:T):Outcome<T>=>({status:'COMPLETE',value});
 const fail=(code:string):Outcome<never>=>({status:'FAILED',reason:{code,message:code}});
@@ -247,4 +247,61 @@ test('explicit fallback shares request ID and consumes retry; successful key can
     assert.equal(r.status,'COMPLETE');assert.equal(server.calls(),2);assert.equal(new Set(events.map(x=>x.id)).size,1);
     assert.deepEqual(events.map(x=>[x.attempt,x.action]),[[1,'selected'],[1,'result'],[2,'fallback'],[2,'result']]);
   }finally{await server.close();}
+});
+
+test('actual model-origin child and grandchild initial are delegated, locally bound and executed; private paths denied',async()=>{
+  for(const mode of ['valid','unprojected','cross-scope','undelegated'] as const){
+    const server=await serve((_r,s,b)=>{
+      const last=obj(arr(b.messages).at(-1));
+      send(s,open(String(last.content)));
+    });
+    try{
+      const m=new ModelElement(profile(server.base)),count={child:0,grandchild:0,leaf:0};
+      const slot=createWorkflowSlot('number',(v):v is number=>typeof v==='number'&&Number.isSafeInteger(v));
+      const model={schema:{type:'object',properties:{value:{type:'integer'}},required:['value'],additionalProperties:false},describe:'typed scoped input'} as const;
+      const knowledge={current:()=>({epoch:1,context:{scope:'root',revisions:new Map<string,string>()}}),equal:Object.is,maxItems:0};
+      const c=control({knowledge});
+      const limits={maxWork:30000000,maxDescendantDepth:2,maxCandidateBytes:16384,maxJsonDepth:16,maxJsonItems:1024,maxNodes:16,maxBindings:16,maxEdits:4,maxProjectionBytes:16384};
+      const leaf=bindWorkflowFunction<number,number>({id:'leaf',description:'actual leaf',inputs:{value:slot},outputs:{value:slot},model,
+        input:r=>r.read('value',slot),node:{id:'leaf',goal:'actual leaf',requiredKnowledge:[],before:()=>ok(undefined),
+          run:v=>{count.leaf++;return ok(2*v);},after:()=>ok(undefined),project:()=>({effect:'none',detail:null})},output:(v,w)=>w.put('value',slot,v)});
+      const native=(v:import('../../src/index.js').WorkflowRegionView,done:boolean)=>ok({source:'native' as const,proposal:{
+        runId:v.runId,regionId:v.regionId,planRevision:v.planRevision??0,factRevision:v.factRevision,edits:[],action:done?'finish' as const:'continue' as const}});
+      const definition=(name:string,input:number,caps:readonly WorkflowCapability[],depth:number):WorkflowRegionDefinition<number,number>=>({
+        id:name,goal:'actual recursive result',limits:{...limits,maxDescendantDepth:depth},capabilities:caps,constraints:[],knowledge,current:()=>true,
+        requiredKnowledge:[],optionalKnowledge:[],contextSlots:{},layout:[{kind:'gap',id:'flex',templates:[],seed:[]}],replay:'never',
+        refresh:()=>ok({changed:[],dependencies:[],observations:[],slotEvidence:{}}),
+        plan:v=>native(v,v.progress.some(p=>p.state==='accepted')),
+        admit:()=>ok(undefined),canSkip:()=>ok(undefined),canRebind:()=>ok(undefined),
+        complete:v=>{const n=v.progress.find(p=>p.state==='accepted');if(!n)return fail('MISSING_RESULT');
+          const result=v.reader.read(n.instanceId+'/value',slot);return result.status==='COMPLETE'?ok(input+result.value):result;}
+      });
+      const wrap=(name:'child'|'grandchild',caps:readonly WorkflowCapability[],depth:number)=>bindWorkflowRegion<number,number>({
+        id:name,description:name,inputs:{value:slot},outputs:{value:slot},model,input:r=>r.read('value',slot),output:(v,w)=>w.put('value',slot,v),
+        node:{id:name,goal:name,requiredKnowledge:[],before:()=>ok(undefined),after:()=>ok(undefined),project:()=>({effect:'none',detail:null})},
+        create:v=>{count[name]++;return ok(definition(name,v,caps,depth));}
+      });
+      const grandchild=wrap('grandchild',[leaf],0);
+      const child=wrap('child',mode==='undelegated'?[grandchild]:[grandchild,leaf],1);
+      const nested:WorkflowNodeProposal={alias:'grandchild',capability:'grandchild',input:{value:{kind:'literal',value:3}},initial:[
+        {alias:'leaf',capability:'leaf',input:{value:mode==='cross-scope'?{kind:'context',slot:'private'}:{kind:'literal',value:4}}}]};
+      const outer:WorkflowRegionDefinition<number,number>={...definition('outer',0,[child,grandchild,leaf],2),plan:async(v,root)=>{
+        if(v.progress.some(p=>p.state==='accepted'))return native(v,true);
+        const p:WorkflowRegionProposal={runId:v.runId,regionId:v.regionId,planRevision:v.planRevision??0,factRevision:v.factRevision,action:'continue',edits:[
+          {kind:'insert',gap:'flex',node:{alias:'child',capability:'child',input:{value:{kind:'literal',value:2}},initial:[nested]}}]};
+        const result=await m.generate(root,req({tools:[],input:[{role:'user',text:JSON.stringify(p)}],output:{kind:'json',strict:false}}));
+        return result.status!=='COMPLETE'?result:ok({source:'model',proposal:result.value.json as unknown as WorkflowRegionProposal,
+          access:{capabilities:mode==='unprojected'?['child','grandchild']:['child','grandchild','leaf'],contextSlots:[],resultSlots:[]}});
+      }};
+      const s=new StandardWorkflowSession({maxCalls:200,maxSteps:300,maxDepth:5},{...c,limits:{...c.limits,maxWork:40000000,maxEvents:300,maxActiveScopes:16}});
+      const r=await s.run(root=>runWorkflowRegion(root,outer,0),{...complete<number>(),validate:v=>v===13?ok(undefined):fail('INVALID_RESULT')});
+      assert.equal(r.status==='COMPLETE',mode==='valid',mode);assert.equal(server.calls(),1);
+      assert.equal(count.leaf,mode==='valid'?1:0,mode);
+      assert.equal(count.child,mode==='valid'||mode==='undelegated'?1:0,mode);
+      if(mode==='valid'){
+        assert.deepEqual(r,ok(13));assert.equal(count.grandchild,1);
+        assert.deepEqual(s.dispositions().filter(x=>x.kind==='node').map(x=>x.occurrence.definitionId),['leaf','grandchild','child']);
+      }
+    }finally{await server.close();}
+  }
 });

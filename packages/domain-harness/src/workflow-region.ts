@@ -1,6 +1,6 @@
 import { beginModelPlan, endModelPlan, consumeModelJson, isModelJson } from './model-wire.js';
 import { randomUUID } from 'node:crypto';
-import { borrowRegionScope, guardBoundFactory, regionDisposition, regionOperation, verifyRegionProofs, regionReplaySafe } from './native-workflow-composition.js';
+import { borrowRegionScope, guardBoundFactory, regionDisposition, regionOperation, verifyRegionProofs, regionReplaySafe, prepareRegionProofs } from './native-workflow-composition.js';
 import type { NativeWorkflowContext } from './native-workflow-composition.js';
 import { capabilityData, invokeCapability } from './workflow-capabilities.js';
 import { SlotLeaseScope, slotDeclarations } from './workflow-slots.js';
@@ -121,8 +121,8 @@ class Region<I, O> {
     }
     return [...proofs];
   }
-  private currentEntries(frame: WorkflowKnowledgeFrame): Map<string, SlotEntry> {
-    return new Map([...this.entries()].filter(([, e]) => sourceCurrent(e, frame) && verifyRegionProofs(this.root, e.children ?? [])));
+  private currentEntries(frame: WorkflowKnowledgeFrame, proofsChecked=false): Map<string, SlotEntry> {
+    return new Map([...this.entries()].filter(([, e]) => sourceCurrent(e, frame) && (proofsChecked || verifyRegionProofs(this.root, e.children ?? []))));
   }
   private view(reader: WorkflowSlotReader, remaining: Left, stage: string, frame: WorkflowKnowledgeFrame): WorkflowRegionView {
     const results = this.#nodes.filter(n => n.state === 'accepted').map(n => Object.freeze({ node: n.id, slots: Object.freeze([...(n.outputs?.keys() ?? [])]) }));
@@ -137,16 +137,17 @@ class Region<I, O> {
     return view;
   }
   private async withView<T>(frame: WorkflowKnowledgeFrame, remaining: Left, stage: string,
-    callback: (view: WorkflowRegionView) => Outcome<T> | Promise<Outcome<T>>): Promise<Outcome<T>> {
-    if (!verifyRegionProofs(this.root, this.proofs())) return stale();
-    const lease = this.leases.viewLease(this.currentEntries(frame), this.limits.maxBindings, fn => guardBoundFactory(this.root, fn));
+    callback: (view: WorkflowRegionView) => Outcome<T> | Promise<Outcome<T>>, prepaid?:()=>boolean): Promise<Outcome<T>> {
+    const check=prepaid??(()=>verifyRegionProofs(this.root,this.proofs()));
+    if (!check()) return stale();
+    const lease = this.leases.viewLease(this.currentEntries(frame,true), this.limits.maxBindings, fn => guardBoundFactory(this.root, fn));
     let actual: Outcome<T> | Promise<Outcome<T>>;
     try { actual = callback(this.view(lease.reader, remaining, stage, frame)); }
     catch { return fail(); }
     finally { lease.close(); }
     try {
       const result = snapshotOutcome(await actual);
-      return lease.valid() && (stage === 'clarify' || verifyRegionProofs(this.root, this.proofs())) ? result : fail('WORKFLOW_SLOT_CLOSED');
+      return lease.valid() && (stage === 'clarify' || check()) ? result : fail('WORKFLOW_SLOT_CLOSED');
     } catch { return fail(); }
   }
   private create(p: WorkflowNodeProposal, section: number, required: boolean, aliases: Map<string, string>): Pending {
@@ -434,9 +435,30 @@ class Region<I, O> {
     const aliases=new Map<string,WorkflowNodeProposal>();
     const permittedRef=(ref:WorkflowSlotBinding):boolean=>ref.kind==='literal'||(ref.kind==='context'?contexts.has(ref.slot):
       results.has(ref.node+'/'+ref.slot)||aliases.has(ref.node)&&Object.hasOwn(capabilityData(this.allowed.get(aliases.get(ref.node)!.capability)!)?.outputs??{},ref.slot));
+    let nestedCount=0;
+    const nested=(nodes:readonly WorkflowNodeProposal[],depth:number):boolean=>{
+      if(depth>this.limits.maxDescendantDepth || (nestedCount+=nodes.length)>this.limits.maxNodes)return false;
+      const local=new Map<string,WorkflowNodeProposal>();
+      for(const node of nodes){
+        const cap=this.allowed.get(node.capability);
+        if(!cap||!caps.has(node.capability)||local.has(node.alias))return false;
+        // 嵌套候选没有子域私有投影视图；只允许有限 literal 和本层前序别名。
+        for(const ref of Object.values(node.input)){
+          if(ref.kind==='context')return false;
+          if(ref.kind==='result'){
+            const prior=local.get(ref.node);
+            if(!prior||!Object.hasOwn(capabilityData(this.allowed.get(prior.capability)!)?.outputs??{},ref.slot))return false;
+          }
+        }
+        if(node.initial!==undefined&&(cap.kind!=='region'||!nested(node.initial,depth+1)))return false;
+        local.set(node.alias,node);
+      }
+      return true;
+    };
     const permittedNode=(node:WorkflowNodeProposal):boolean=>{
-      // 子区域 initial 需要独立子域投影；当前入口不允许模型跨域注入。
-      if(!caps.has(node.capability)||node.initial!==undefined||!Object.values(node.input).every(permittedRef))return false;
+      const cap=this.allowed.get(node.capability);
+      if(!cap||!caps.has(node.capability)||!Object.values(node.input).every(permittedRef))return false;
+      if(node.initial!==undefined&&(cap.kind!=='region'||!nested(node.initial,1)))return false;
       aliases.set(node.alias,node);return true;
     };
     for(const edit of p.edits){
@@ -496,13 +518,18 @@ class Region<I, O> {
         if (p.action === 'stop') return fail('WORKFLOW_REGION_STOPPED');
         if (p.action === 'finish') {
           if (this.#nodes.some(n => n.required && n.state !== 'accepted' || pending(n))) return fail('WORKFLOW_REGION_OBLIGATION');
+          // 终态已知的子域来源证明在 complete 回调前，与该阶段的资源一次接纳。
+          const proofPlan=prepareRegionProofs(this.root,this.proofs());
+          if(!proofPlan)return stale();
+          let checks=6;
+          const checkProof=()=>checks-->0&&proofPlan.check();
           const finalized = await regionOperation<{ result: O; proof: DetachedRegionProof }>(this.root,
-            this.viewWork + knowledgeScanWork(this.d.knowledge.maxItems), 1, true, async (frame, left) => {
+            this.viewWork + knowledgeScanWork(this.d.knowledge.maxItems)+6*proofPlan.work, 1, true, async (frame, left) => {
               this.current(frame);
               const entries = [...this.entries().values()];
-              const valid = (now: WorkflowKnowledgeFrame) => now.epoch === this.#factRevision && entries.every(e => sourceCurrent(e, now)) && verifyRegionProofs(this.root, this.proofs());
+              const valid = (now: WorkflowKnowledgeFrame) => now.epoch === this.#factRevision && entries.every(e => sourceCurrent(e, now)) && checkProof();
               if (!valid(frame) || !this.#facts?.complete) return stale();
-              const complete = await this.withView(frame, left, 'complete', view => this.d.complete(view, this.root));
+              const complete = await this.withView(frame, left, 'complete', view => this.d.complete(view, this.root),checkProof);
               if (complete.status !== 'COMPLETE') return complete;
               const sources = new Set<SlotEntry['sources'][number]>();
               let links = 0;
