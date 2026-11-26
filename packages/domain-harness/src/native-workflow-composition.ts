@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { ManagedRuntime, isManagedOutcome, managedFailure, snapshotControl } from './workflow-managed-runtime.js';
+import { ManagedRuntime, isManagedOutcome, managedFailure, snapshotControl, snapshotOutcome } from './workflow-managed-runtime.js';
 import { admitNode, executeNode, safeDetail } from './workflow-managed-node.js';
 import type { ScopeFrames, ManagedScope } from './workflow-managed-runtime.js';
 import type { WorkflowCompletionPolicy, WorkflowControlOptions, WorkflowObservation, WorkflowNode, WorkflowNodeOptions } from './workflow-managed-contract.js';
@@ -106,7 +106,7 @@ class ScopeLifetime {
 
   public checked<T>(result: Result<T>, frame?: ScopeFrames): Result<T> {
     if (!this.managed) return result;
-    if (!isManagedOutcome(result)) return managedFailure('WORKFLOW_INVALID_OUTCOME');
+    result = snapshotOutcome(result);
     if (result.status !== 'COMPLETE') return result;
     return frame && this.admissible() && this.scope && this.managed.checkFrames(this.scope, frame) ? result
       : { status: 'UNKNOWN', reason: { code: 'WORKFLOW_CURRENTNESS', message: 'Managed result not accepted' } };
@@ -211,7 +211,7 @@ export function borrowActorScope<T>(root: NativeWorkflowContext, maxProjections:
       map: <O>(callback: () => Result<O>): Result<O> => {
         if (!lifetime.admissible()) return managedFailure('WORKFLOW_SCOPE_CLOSED');
         const result = runtime.guarded(callback);
-        return isManagedOutcome(result) ? result : managedFailure('WORKFLOW_INVALID_OUTCOME');
+        return snapshotOutcome(result);
       },
       stop: cancel => { lifetime.stopAdmission(cancel); },
     };
@@ -270,6 +270,13 @@ export class NativeWorkflowContext {
       try { return await executeNode(runtime, admitted, input, attempt, () => lifetime.close(), () => parent.admissible()); }
       finally { finish(); }
     } catch { return managedFailure('WORKFLOW_NODE_INVALID'); }
+  }
+
+  /** 显式记录领域不调用模型的决定；不创建 Provider，也不授予权限。 */
+  public recordModelDecision(reason: string, action: 'not-needed' | 'unavailable'): Result<void> {
+    const lifetime = scopeLifetime(this);
+    return lifetime.admissible() && lifetime.managed && lifetime.scope
+      ? lifetime.managed.modelDecision(lifetime.scope, reason, action) : managedFailure('WORKFLOW_CONTROL_REQUIRED');
   }
 
   /** 当前共享根余额及本层可用子层深度；只读快照，不预留或增加额度。 */
@@ -352,12 +359,14 @@ export class NativeWorkflowContext {
     scopeLifetimes.set(child, lifetime);
     let result: Result<T>;
     const frame = managed && scope ? managed.frames(scope) : undefined;
+    if (scope && frame) scope.bound = frame;
     if (scope?.actor && frame) scope.actor.frame = frame;
     try {
       if (managed && scope && (!frame || !managed.open(scope) || !managed.checkFrames(scope, frame) || !parent.admissible())) {
         result = managedFailure('WORKFLOW_CHILD_ADMISSION');
       } else result = await action(child);
     } catch { result = failure('WORKFLOW_EXECUTION_FAILED'); }
+    if (managed) result = snapshotOutcome(result);
     try {
       const unjoined = await lifetime.close();
       if (managed && !isManagedOutcome(result)) result = managedFailure('WORKFLOW_INVALID_OUTCOME');
@@ -397,6 +406,7 @@ export class NativeWorkflowContext {
     } catch {
       result = failure('WORKFLOW_EXECUTION_FAILED');
     } finally {
+      if (lifetime.managed && result !== undefined) result = snapshotOutcome(result);
       // 进入 start / run 后总是等待 end；end 不是 Package Exit。
       if (end !== undefined) {
         try {
@@ -493,8 +503,8 @@ export class StandardWorkflowSession {
         result = requirements && frame && managed.open(scope) && managed.check(frame)
           ? await action(root) : managedFailure('WORKFLOW_ROOT_ADMISSION');
       } catch { result = failure('WORKFLOW_EXECUTION_FAILED'); }
+      result = snapshotOutcome(result);
       const unjoined = await lifetime.close();
-      if (!isManagedOutcome(result)) result = managedFailure('WORKFLOW_INVALID_OUTCOME');
       result = afterJoin(result, unjoined);
       if (requirements === undefined) return managed.close(scope, result);
       try {
