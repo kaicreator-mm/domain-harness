@@ -1,0 +1,69 @@
+{
+  "classification": "EVALUATOR_ONLY_BY_ROLE_CONVENTION",
+  "role": "OTHER_CONVERSATION_INDEPENDENT_ORACLE_AUTHOR_NON_IMPLEMENTER",
+  "frozen": {
+    "train": "42ad4bfa16385f3e5a2db484e709855c8071f240",
+    "public": "cc1c53f6dcef436555eb9757990c9c029d824359",
+    "l1": "7041bb9f3d6fabfa5db0533bf3f2807276b74ab2",
+    "architecture": "d344ec604c422ec375dba391ed7579cfa662110e",
+    "l2": "39c0fa4e680098542972fd11ea0d14829fcc6eef",
+    "ownerDecision": 7197327557,
+    "task": 7197333959
+  },
+  "productExecution": "NOT_RUN",
+  "limits": "Same account; no hard ACL, absolute blindness, or causal claim. Writer/consumer must not read branch, evaluator conversation or expected answers; document exposure and replace affected case before dependent work, no retrofitting. Public fixtures remain mandatory and unchanged.",
+  "case": "O12a",
+  "demand": "Same public lab calendar interface and goals; evaluator substitutes controlled alternate authoritative records, no actual dispatch. No hidden demand or expected results supplied to author; no source code or API implementation hints.",
+  "fixture": {
+    "jobs": [
+      {
+        "id": "X1",
+        "release": 0,
+        "I": 1,
+        "R": 3
+      },
+      {
+        "id": "X2",
+        "release": 1,
+        "I": 2,
+        "R": 1
+      },
+      {
+        "id": "X3",
+        "release": 0,
+        "I": 2,
+        "R": 2
+      }
+    ],
+    "horizon": 10,
+    "blackout": [
+      [
+        3,
+        4
+      ]
+    ]
+  },
+  "expected": {
+    "tested": 1771561,
+    "feasible": 186,
+    "objective": [
+      10,
+      22
+    ],
+    "optimalCount": 6,
+    "witness": [
+      0,
+      1,
+      3,
+      7,
+      4,
+      5
+    ]
+  },
+  "acceptance": [
+    "Any feasible optimum, not exact witness; verify half-open resource occupancy, precedence, releases, horizon, blackout, objective independently against actual output.",
+    "Test missing calendar revision, overlap, false completion, old response, wrong scope, depth one-short and child failure; each separately resets source; reject without fabricated output.",
+    "Actual dynamic child and grandchild, native typed I/O, pre/post, independent root completion and no provider on deterministic path; compare actual before/after and trace.",
+    "Actual compiled installed package, freeze original Git tree/commit, public inputs and SHA256, failed runs and SDK digest before maintenance."
+  ]
+}
