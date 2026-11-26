@@ -5,7 +5,7 @@ export const expectedClasses = {
  XStateWorkflowElement:['standard-element','public','run'],
  JsonReader:['standard-element','public','read','write'],
  YamlReader:['standard-element','public','read','write'],
- NativeWorkflowContext:['execution-support','borrowed','depth','remaining','invoke','invokeOutcome','child','leaf','signal','runId','scopeId','work'],
+ NativeWorkflowContext:['execution-support','borrowed','depth','remaining','invoke','invokeOutcome','child','leaf','signal','runId','scopeId','work','node'],
  StandardWorkflowSession:['execution-support','public','run','dispositions'],
  BoundedQueryElement:['standard-element','public','select'],
  SQLiteDatabaseError:['error','public','code','stage','primaryCode','rollbackCode'],
@@ -22,7 +22,7 @@ export const expectedFunctions = ['routeWorkflowOutcome','readJson','readYaml','
  'runInteractiveRecognitionHandling'];
 export const expectedTypes = [
  'CorePackageMetadata','DomainAppContext','LifecycleInitContext','PackageInitElement','StaticCorePackage','LifecycleLogRecord','LifecycleLogger',
- 'StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','WorkflowControlLimits','WorkflowControlOptions','WorkflowOccurrence','WorkflowKnowledgeFrame','WorkflowKnowledgePolicy','WorkflowCompletionPolicy','WorkflowContextView','WorkflowTerminalContext','ModelUsage','WorkflowObservation','StandardJsonValue','StandardFileOutcome',
+ 'StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','WorkflowControlLimits','WorkflowControlOptions','WorkflowOccurrence','WorkflowKnowledgeFrame','WorkflowKnowledgePolicy','WorkflowCompletionPolicy','WorkflowContextView','WorkflowTerminalContext','ModelUsage','WorkflowObservation','WorkflowNode','WorkflowNodeOptions','WorkflowAttempt','StandardJsonValue','StandardFileOutcome',
  'BoundedQueryLimits','BoundedQueryTruncationReason','BoundedQueryResult','SQLiteScalar','SQLiteNonThenable','SQLiteTransaction',
  'SQLiteDatabaseOptions','SQLiteErrorCode','SQLiteFailureOrigin','SQLiteTerminalFailureDetails','VectorCandidate','VectorQueryOptions',
  'VectorMatch','VectorQueryResult','TypedGraphEdge','GraphQueryLimits','GraphQueryOptions','GraphPath','GraphQueryResult',
@@ -39,7 +39,7 @@ export const expectedSupport = {
 };
 export const expectedFamilies={
  lifecycle:['KernelLifecycle','CorePackageMetadata','DomainAppContext','LifecycleInitContext','PackageInitElement','StaticCorePackage','LifecycleLogRecord','LifecycleLogger'],
- workflow:['WorkflowElement','XStateWorkflowElement','NativeWorkflowContext','StandardWorkflowSession','routeWorkflowOutcome','runRecognitionHandling','StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','WorkflowControlLimits','WorkflowControlOptions','WorkflowOccurrence','WorkflowKnowledgeFrame','WorkflowKnowledgePolicy','WorkflowCompletionPolicy','WorkflowContextView','WorkflowTerminalContext','ModelUsage','WorkflowObservation'],
+ workflow:['WorkflowElement','XStateWorkflowElement','NativeWorkflowContext','StandardWorkflowSession','routeWorkflowOutcome','runRecognitionHandling','StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','WorkflowControlLimits','WorkflowControlOptions','WorkflowOccurrence','WorkflowKnowledgeFrame','WorkflowKnowledgePolicy','WorkflowCompletionPolicy','WorkflowContextView','WorkflowTerminalContext','ModelUsage','WorkflowObservation','WorkflowNode','WorkflowNodeOptions','WorkflowAttempt'],
  'structured-data':['JsonReader','YamlReader','readJson','readYaml','writeJson','writeYaml','StandardJsonValue','StandardFileOutcome'],
  query:['BoundedQueryElement','BoundedQueryLimits','BoundedQueryTruncationReason','BoundedQueryResult','VectorQueryElement','VectorCandidate','VectorQueryOptions','VectorMatch','VectorQueryResult','GraphQueryElement','TypedGraphEdge','GraphQueryLimits','GraphQueryOptions','GraphPath','GraphQueryResult'],
  database:['SQLiteDatabaseElement','SQLiteDatabaseError','SQLiteScalar','SQLiteNonThenable','SQLiteTransaction','SQLiteDatabaseOptions','SQLiteErrorCode','SQLiteFailureOrigin','SQLiteTerminalFailureDetails'],
