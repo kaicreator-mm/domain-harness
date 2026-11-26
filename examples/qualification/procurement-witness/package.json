@@ -1,0 +1,1 @@
+{"name":"procurement-witness","version":"0.0.0","private":true,"type":"module","exports":"./dist/procurement.js","dependencies":{"@kaicreator/domain-harness":"file:./sdk.tgz"},"devDependencies":{"typescript":"5.8.3","@types/node":"22.19.7"},"scripts":{"build":"tsc -p tsconfig.json","verify":"npm run build && node --unhandled-rejections=strict dist/verify.js"}}

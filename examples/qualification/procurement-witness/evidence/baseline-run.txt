@@ -1,0 +1,37 @@
+
+> procurement-witness@0.0.0 verify
+> npm run build && node --unhandled-rejections=strict dist/verify.js
+
+
+> procurement-witness@0.0.0 build
+> tsc -p tsconfig.json
+
+{"case":"initial_normal","output":{"eligible":[{"id":"A","packs":3,"units":12,"cost":1500,"days":4},{"id":"B","packs":2,"units":10,"cost":1600,"days":2},{"id":"C","packs":4,"units":12,"cost":1650,"days":1}],"recommended":[{"id":"A","packs":3,"units":12,"cost":1500,"days":4}],"unknown":[],"complete":true}}
+{"case":"initial_urgent","output":{"eligible":[{"id":"B","packs":2,"units":10,"cost":1600,"days":2},{"id":"C","packs":4,"units":12,"cost":1650,"days":1}],"recommended":[{"id":"B","packs":2,"units":10,"cost":1600,"days":2}],"unknown":[],"complete":true}}
+{"case":"no_fit","output":{"eligible":[],"recommended":[],"unknown":[],"complete":true}}
+{"case":"unknown","output":{"eligible":[{"id":"A","packs":3,"units":12,"cost":1500,"days":4},{"id":"B","packs":2,"units":10,"cost":1600,"days":2}],"recommended":[],"unknown":["C"],"complete":false}}
+{"case":"conflict","output":{"status":"FAILED","reason":{"code":"SUPPLIER_CONFLICT","message":"SUPPLIER_CONFLICT"}}}
+{"case":"complete_explicit_nonrecommended","output":{"eligible":[{"id":"A","packs":3,"units":12,"cost":1500,"days":4},{"id":"B","packs":2,"units":10,"cost":1600,"days":2},{"id":"C","packs":4,"units":12,"cost":1650,"days":1}],"recommended":[{"id":"A","packs":3,"units":12,"cost":1500,"days":4}],"unknown":[],"selected":{"id":"B","packs":2,"units":10,"cost":1600,"days":2},"revision":"offers-r1","demand":10,"service":"normal","prompts":0}}
+{"case":"partial_text","output":{"eligible":[{"id":"A","packs":3,"units":12,"cost":1500,"days":4},{"id":"B","packs":2,"units":10,"cost":1600,"days":2},{"id":"C","packs":4,"units":12,"cost":1650,"days":1}],"recommended":[{"id":"A","packs":3,"units":12,"cost":1500,"days":4}],"unknown":[],"selected":{"id":"C","packs":4,"units":12,"cost":1650,"days":1},"revision":"offers-r1","demand":10,"service":"normal","prompts":2}}
+{"case":"revision_and_association","output":{"eligible":[{"id":"B","packs":2,"units":10,"cost":1600,"days":2},{"id":"C","packs":4,"units":12,"cost":1650,"days":1}],"recommended":[{"id":"B","packs":2,"units":10,"cost":1600,"days":2}],"unknown":[],"selected":{"id":"B","packs":2,"units":10,"cost":1600,"days":2},"revision":"offers-r1","demand":10,"service":"urgent","prompts":2}}
+{"case":"incomplete_explicit","output":{"eligible":[{"id":"A","packs":3,"units":12,"cost":1500,"days":4},{"id":"B","packs":2,"units":10,"cost":1600,"days":2}],"recommended":[],"unknown":["C"],"selected":{"id":"B","packs":2,"units":10,"cost":1600,"days":2},"revision":"offers-r1-unknown","demand":10,"service":"normal"}}
+{"case":"illegal-demand","output":{"status":"REJECT","reason":{"code":"INVALID_INPUT","message":"INVALID_INPUT"}}}
+{"case":"illegal-stock","output":{"status":"REJECT","reason":{"code":"ILLEGAL_PLAN","message":"ILLEGAL_PLAN"}}}
+{"case":"illegal-overage","output":{"status":"REJECT","reason":{"code":"ILLEGAL_PLAN","message":"ILLEGAL_PLAN"}}}
+{"case":"illegal-deadline","output":{"status":"REJECT","reason":{"code":"ILLEGAL_PLAN","message":"ILLEGAL_PLAN"}}}
+{"case":"illegal-amount","output":{"status":"REJECT","reason":{"code":"ILLEGAL_PLAN","message":"ILLEGAL_PLAN"}}}
+{"case":"illegal-cost","output":{"status":"REJECT","reason":{"code":"ILLEGAL_PLAN","message":"ILLEGAL_PLAN"}}}
+{"case":"no-fit-demand","output":{"status":"ASK","reason":{"code":"NO_FIT","message":"NO_FIT"}}}
+{"case":"conflicting-authority","output":{"status":"FAILED","reason":{"code":"SUPPLIER_CONFLICT","message":"SUPPLIER_CONFLICT"}}}
+{"case":"unsupported-text","output":{"status":"REJECT","reason":{"code":"UNSUPPORTED_INPUT","message":"UNSUPPORTED_INPUT"}}}
+{"case":"short-calls","output":{"status":"FAILED","reason":{"code":"PLAN_BUDGET","message":"PLAN_BUDGET"}}}
+{"case":"short-steps","output":{"status":"FAILED","reason":{"code":"PLAN_BUDGET","message":"PLAN_BUDGET"}}}
+{"case":"short-depth","output":{"status":"FAILED","reason":{"code":"PLAN_BUDGET","message":"PLAN_BUDGET"}}}
+{"case":"no-fit-action","output":{"status":"ASK","reason":{"code":"NO_FIT","message":"NO_FIT"}}}
+{"case":"cancel-action","output":{"status":"REJECT","reason":{"code":"CANCELLED","message":"Interaction could not continue"}}}
+{"case":"changed-authority","output":{"status":"UNKNOWN","reason":{"code":"OFFER_REVISION_CHANGED","message":"OFFER_REVISION_CHANGED"}}}
+{"case":"missing-pack","output":{"eligible":[{"id":"B","packs":2,"units":10,"cost":1600,"days":2},{"id":"C","packs":4,"units":12,"cost":1650,"days":1}],"recommended":[],"unknown":["A"],"complete":false}}
+{"case":"unknown-explicit-plan","output":{"status":"UNKNOWN","reason":{"code":"SELECTED_SUPPLIER_FACT_UNKNOWN","message":"SELECTED_SUPPLIER_FACT_UNKNOWN"}}}
+{"case":"all-candidates-unknown","output":{"status":"UNKNOWN","reason":{"code":"CANDIDATES_UNKNOWN","message":"CANDIDATES_UNKNOWN"}}}
+{"case":"mutated-authority-before-handle","output":{"status":"UNKNOWN","reason":{"code":"OFFER_REVISION_CHANGED","message":"OFFER_REVISION_CHANGED"}}}
+PROCUREMENT_BASELINE_PASS
