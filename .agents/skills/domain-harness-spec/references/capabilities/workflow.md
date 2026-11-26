@@ -14,3 +14,5 @@ API: WorkflowElement XStateWorkflowElement StandardWorkflowSession NativeWorkflo
 `completion.requiredKnowledge` 声明最终目标所需证据，`observe` 使用已预留的 `WorkflowTerminalContext#read` 取得实际当前证据；`validate` 同步验证候选值与实际当前目标。普通准入先关闭，已接纳本地工作必须结算。观察回调接收 open/candidate；candidate 不是成功事实；`session.dispositions()` 给出本次运行有限的最终 scope 裁定，和返回 Outcome 对照。关键 Evidence 交付失败、事实变化或取消不能返回旧的 COMPLETE。未声明业务知识时仍需真正验证目标。不要将模型建议当作授权或实际副作用。暂不声明未完成的 managed 节点、动态区域、XState/Interaction 附着或 Model 接口。
 
 固定原生节点使用 `NativeWorkflowContext#node`，绑定 `WorkflowNode` 与 `WorkflowNodeOptions`。类型化输入/输出不经 JSON；声明所需知识，取得实际 raw observations，以同一根及局部当前性策略验证，执行 before/run/after/cleanup/project。前置失败不调用业务 Function；实际执行后的 post、清理及观察保留实际效果和 receipt。候选不是正式接纳，最终裁定由 Session 提供；不得将 stale/UNKNOWN 当作成功。节点自身使用借用尝试作用域，不新建根预算。动态区域、Model、XState 和 Interaction 附着待后续集成。
+
+受控 XState 使用 `XStateWorkflowElement#runIn`，输入工厂接收 SDK 创建的实际借用作用域；actor 内的受控节点必须使用该 scope，不创建第二根任务。`WorkflowActorOptions` 声明同步 project 和 maxProjections（包含真实终态），执行前完整预留借用、输入和投影额度。超出投影上限、实际终态不可用或投影失效不能返回 COMPLETE；退出先关闭普通准入、等待已接纳的本地工作。旧 run(input) 行为不变。
