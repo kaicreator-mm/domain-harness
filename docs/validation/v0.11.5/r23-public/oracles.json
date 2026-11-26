@@ -1,0 +1,568 @@
+{
+  "format": "dh-r23-public-oracles/1",
+  "classification": "PUBLIC",
+  "status": "ALL_TARGETS_NOT_RUN",
+  "evaluation": "Expected predicates independent of SDK; require actual code, actual trace, source/SQL/transport and root disposition correlated by real IDs; no evaluator acceptance from a self-reported boolean. Public numeric assertions can be recomputed; no hidden answer.",
+  "quotas": {
+    "constants": {
+      "S": 33024,
+      "F": 17,
+      "K": 65,
+      "L": 9,
+      "maxItems": 4,
+      "maxBindings": 2
+    },
+    "root": {
+      "assumptions": "single bound root policy, empty requiredKnowledge, no observe or terminal read, one validate; initial/final frame tickets included",
+      "exact": {
+        "calls": 1,
+        "steps": 2,
+        "work": 99278,
+        "events": 3,
+        "activeScopes": 1
+      },
+      "oneShort": [
+        {
+          "shortDimension": "calls",
+          "available": {
+            "calls": 0,
+            "steps": 2,
+            "work": 99278,
+            "events": 3,
+            "activeScopes": 1
+          },
+          "admitted": false
+        },
+        {
+          "shortDimension": "steps",
+          "available": {
+            "calls": 1,
+            "steps": 1,
+            "work": 99278,
+            "events": 3,
+            "activeScopes": 1
+          },
+          "admitted": false
+        },
+        {
+          "shortDimension": "work",
+          "available": {
+            "calls": 1,
+            "steps": 2,
+            "work": 99277,
+            "events": 3,
+            "activeScopes": 1
+          },
+          "admitted": false
+        },
+        {
+          "shortDimension": "events",
+          "available": {
+            "calls": 1,
+            "steps": 2,
+            "work": 99278,
+            "events": 2,
+            "activeScopes": 1
+          },
+          "admitted": false
+        },
+        {
+          "shortDimension": "activeScopes",
+          "available": {
+            "calls": 1,
+            "steps": 2,
+            "work": 99278,
+            "events": 3,
+            "activeScopes": 0
+          },
+          "admitted": false
+        }
+      ]
+    },
+    "dynamicFunction": {
+      "assumptions": "remaining incremental node reservation at root and every owning ancestor; two bound policies of maxItems4; K=I=E=X=1,C=R=B=0; two leases maxBindings2; no nested work; one attempt active slot; scope already open",
+      "exact": {
+        "calls": 8,
+        "steps": 8,
+        "work": 132735,
+        "events": 4,
+        "activeScopes": 1
+      },
+      "oneShort": [
+        {
+          "shortDimension": "calls",
+          "available": {
+            "calls": 7,
+            "steps": 8,
+            "work": 132735,
+            "events": 4,
+            "activeScopes": 1
+          },
+          "admitted": false
+        },
+        {
+          "shortDimension": "steps",
+          "available": {
+            "calls": 8,
+            "steps": 7,
+            "work": 132735,
+            "events": 4,
+            "activeScopes": 1
+          },
+          "admitted": false
+        },
+        {
+          "shortDimension": "work",
+          "available": {
+            "calls": 8,
+            "steps": 8,
+            "work": 132734,
+            "events": 4,
+            "activeScopes": 1
+          },
+          "admitted": false
+        },
+        {
+          "shortDimension": "events",
+          "available": {
+            "calls": 8,
+            "steps": 8,
+            "work": 132735,
+            "events": 3,
+            "activeScopes": 1
+          },
+          "admitted": false
+        },
+        {
+          "shortDimension": "activeScopes",
+          "available": {
+            "calls": 8,
+            "steps": 8,
+            "work": 132735,
+            "events": 4,
+            "activeScopes": 0
+          },
+          "admitted": false
+        }
+      ]
+    },
+    "extra": "Do not use these incremental vectors as full workflow total. Root and each owner must pass atomically; any child scope entry adds own (0,1;4+3*S;3), B=1 and additional actual frame/lease tickets as applicable; descendant operations reserve separately. Assert actual callback counts, no refunds, no hidden record. Actor P includes terminal projection; P+1 rejects next snapshot."
+  },
+  "cases": [
+    {
+      "id": "O01",
+      "map": "AC01;W01;F-W01",
+      "input": "DA baseline and DB baseline; run native fixed and XState fixed with no credential configured; model-required variant no profile",
+      "expected": "DA cost60 and DB objective [7,16]; actual stage/pre/post and root completion; model init/credential/HTTP=0; no-model decision, no fake usage; model-required non-COMPLETE. Explicit eligible fallback only; shared limits/identity and reason.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O02",
+      "map": "AC02/03;W02/04",
+      "input": "wire.json each family; two-call reservation; barrier before credential resolves; r1->r2; replay malformed IDs, invalid schema and response",
+      "expected": "Match exact captured headers/body and tool correlation; actual HTTP count 0 for strict unsupported/cancel/currentness before fetch; second request 0 on aggregate one-short; actual response wrong shape non-COMPLETE; actual provider closed loop DA plus DB second use later, never substitute loopback.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O03",
+      "map": "AC03/04;F-W05",
+      "input": "DA source revisions, required offerSetComplete missing vs optional alternative absent; DB job release and scoped source; native slot bigint 9007199254740993 and Date 2026-01-02T03:04:05.000Z",
+      "expected": "Required missing planner/node=0; optional absent explicit status and valid path; wrong origin/scope/epoch/type/expired lease/mapped unresolved provenance no publication; valid native typeof bigint exact and Date instance with exact millis 1767323045000 (derive from ISO at execution), same token through fixed/dynamic/child; private slot absent from Model; sibling/parent dependencies invalidate, unrelated valid vehicle retained.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O04",
+      "map": "AC05/06;W03/04/05/06;F-W02/03/06",
+      "input": "DA missing optional lookup then actual generated query/comparison, lead feedback 5->2; DB deterministic child sequencing and grandchild conflict analysis",
+      "expected": "Compare actual admitted layouts and entered attempts before/after; DA 60->72, DB [7,16]; child and grandchild runtime definitions/new occurrences, actual native I/O, before/after and independent goal; not prewritten branch or suggestion; real model observes actual tool result and reenters.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O05",
+      "map": "AC06/07;DY01-06",
+      "input": "layout anchor compatibility, mutable gap optional lookup and comparison, finalVerify; stale quote r1->r2 after compatibility; prior valid source or absent source; malicious edits",
+      "expected": "Atomic reject anchor bypass, required skip, no equivalent input, forward/self/cycle/foreign alias/token/capability, old revision, oversized or mutation while await; unchanged layout/history on reject; safe read-only reopen fresh attempt and valid rebind current provenance; unaffected anchor retained; UNKNOWN effect no replay; stale complete rejected.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O06",
+      "map": "AC08/12/13;F-W02/06",
+      "input": "pre returns reject; run returns non-COMPLETE/throws; post rejects; cancel/timeout; DC commit-stale; managed root candidate r1 followed by actual join changing goal-relevant r2; unrelated revision; missing completion; critical sink change",
+      "expected": "Pre run=0; entered actual=1 and accepted=0 on post reject, applicable cleanup and terminal actual preserved; known receipt not rolled back; after-join fresh root observe/validate actual goal, relevant incompatible result non-COMPLETE, unrelated still valid may complete; missing policy action=0; sink changes frame non-COMPLETE. No new effect from terminal read.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O07",
+      "map": "AC09;F-W04",
+      "input": "quotas exact and each one-short; actor P=2 then third projection; zero depth; overlimit raw observation length 5 with m=4; candidate cap+1; no-op/invalid IDs; wait/cancel/deadline and local barrier",
+      "expected": "Exact bundle admitted, each one-short input/guard/context/create/run=0, no partial debit; invalid input consumes full bundle and entered=false; before traversal reject oversized raw list; actor no accepted unobserved terminal; retained child/root/reader denied before callback; legacy counts unchanged; active sibling prevents pause, all actual user wait pauses active, wall deadline still fires; local barrier not released => no CLOSED/KDP disposal, remote UNKNOWN kept; no unreserved record/reentrant or async observer success.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O08",
+      "map": "AC10;F-W02/03",
+      "input": "same native Function identity fixed direct, dynamic binding, selected Tool in DA and DB; changed private child internals with same public I/O; native bigint/Date",
+      "expected": "Actual code and call trace show same callable, separate occurrence/attempt; type and slot guards reject wrong value before business; no native JSON coercion; private child knowledge not delegated; changed internal computation within same output contract legal; two real domain uses.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O09",
+      "map": "AC11/12;F-W04/05",
+      "input": "DA user changes lead; DB user changes deadline; real Interaction both directions; root A waits, root B runs, cancel A; DC lost ACK and different-ID conflict, independent other resource, two-client CAS",
+      "expected": "Same logical root and budget across attached scopes; actual prompt IDs/revision and feedback invalidation; old response rejected; B not canceled, no bleed; DC actual SQL/effect/submit predicates in domains.json. User selection not authority.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O10",
+      "map": "AC13;F-W06",
+      "input": "actual external consumer receives scope open, two repeated fixed nodes, skip/pre-reject, model no-call vs actual calls, DC receipt, critical sink pending then FAILED or epoch change; successful delivery",
+      "expected": "Check discriminated records, monotonic seq per root, actual entered/attempt/post/source/receipt from independent trace; pending candidate never definitive; correlated candidateSeq + disposition on success exactly one; failure/stale no accepted slot, actual commit retained; missing final UNKNOWN; no secrets/raw native/chain-of-thought, finite allowance and immutable dispositions.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O11",
+      "map": "AC14",
+      "input": "reuse denominator and export manifest below; actual packed archive clean install at Node22.12.0 on Linux x64 and Windows x64; strict NodeNext positives/negatives",
+      "expected": "All changed shared capability rows require two distinct actual uses with code/trace/independent oracle; actual export set exact, no private import/codec/store; old LIFE/QA regressions; positive typed bindings and wrong type/slot/actor/forged capability/stale frame negative; archive hash and installed member verification. No result from source-only fixture.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "O12",
+      "map": "AC15",
+      "input": "consumer-demand.md public fresh domain, separate maintenance contract; independent author gets actual packed SDK and public docs only",
+      "expected": "Evaluator independently checks compiled actual initial and maintenance Package, same SDK/artifact provenance, retained initial tree/receipt, new requirement and unaffected constraints. Separate hidden demand variant and evaluator material NOT_CREATED until custody verified; no final PASS on public exercise alone.",
+      "status": "NOT_RUN"
+    }
+  ],
+  "other": [
+    {
+      "id": "DY01",
+      "oracle": "O04",
+      "predicate": "Generate new query node after missing supplier fact; distinguish template ID/new occurrence; actual candidate structure not generated source.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "DY02",
+      "oracle": "O04/O08",
+      "predicate": "Insert existing comparison/verification template in gap; new occurrence, input explicitly bound, not old result.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "DY03",
+      "oracle": "O04",
+      "predicate": "Admit generated query and execute it, actual node enter/result consumed; reject advice-only.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "DY04",
+      "oracle": "O05",
+      "predicate": "Optional duplicate lookup skipped only with current equivalent source and legal rebind; skip entered=false/no result; missing dependency/required anchor skip rejects.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "DY05",
+      "oracle": "O04/O08",
+      "predicate": "DB generated child sequencing then grandchild conflict analysis, native I/O and actual gates; depth one-short and child non-COMPLETE block parent.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "DY06",
+      "oracle": "O05/O09",
+      "predicate": "Feedback lead5->2 replaces/reorders pending analysis and reopens stale read-only anchor; preserve old actual trace, reject stale edit or effectful replay.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "W01",
+      "oracle": "O01",
+      "predicate": "Native fixed DA/DB and fixed XState actual stages, no model initialization, credential, HTTP; independent optimum.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "W02",
+      "oracle": "O02",
+      "predicate": "DB fixed Model extracts ambiguous constraint with independent typed validation/real interaction; actual provider, no forced loop.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "W03",
+      "oracle": "O04",
+      "predicate": "DB deterministic runtime multi-step region, actual generated child; DA deterministic dynamic variant; independent objectives.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "W04",
+      "oracle": "O02/O04",
+      "predicate": "DA real model tool/query -> actual Observation -> actual second provider request -> independent objective; no mock substitution.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "W05",
+      "oracle": "O04/O09",
+      "predicate": "Actual feedback lead/deadline changes large but bounded region with fixed required anchors; hybrid path uses selected model only when eligible.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "W06",
+      "oracle": "O04/O07",
+      "predicate": "DB runtime generated child + grandchild, same root, actual native I/O, depth/ancestor/child failure negative.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "F-W01",
+      "oracle": "O01",
+      "predicate": "Native fixed and XState semantic projection actual pre/post; actual root completion; no fabricated actor progress.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "F-W02",
+      "oracle": "O05/O06/O08",
+      "predicate": "One native node reused fixed/dynamic/Tool; pre rejects zero run, post rejects no acceptance, mandatory gate cannot be bypassed.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "F-W03",
+      "oracle": "O03/O04/O08",
+      "predicate": "Typed fixed->dynamic->fixed/child, private scope and delegation, unchanged public I/O after child maintenance, failure propagates.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "F-W04",
+      "oracle": "O07/O09",
+      "predicate": "Closed retained references, repeated run, bounded terminal read, cancel sibling isolation, local barrier/remote UNKNOWN, legacy leaf end.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "F-W05",
+      "oracle": "O03/O09",
+      "predicate": "Different actual stage required knowledge, same typed native mechanism model projection only if needed; feedback invalidates dependent results.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "F-W06",
+      "oracle": "O06/O10",
+      "predicate": "Fixed/dynamic actual entry/skip/attempt/post/terminal and child projection, stale receipt preserved, no fake completion.",
+      "status": "NOT_RUN"
+    }
+  ],
+  "reuse": [
+    {
+      "capability": "Session/Context root and borrowed close",
+      "A": "DA fixed/dynamic",
+      "B": "DB nested solver",
+      "oracle": "O01/O04/O07",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    },
+    {
+      "capability": "node knowledge/currentness/validation/typed outcome",
+      "A": "DA compatibility/quote",
+      "B": "DB resource/precedence",
+      "oracle": "O03/O05/O06",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    },
+    {
+      "capability": "work reservation",
+      "A": "DA query/candidate scan",
+      "B": "DB solver/resource scan",
+      "oracle": "O07",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    },
+    {
+      "capability": "XState.runIn",
+      "A": "DA fixed actor",
+      "B": "DB fixed actor",
+      "oracle": "O01/O07",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    },
+    {
+      "capability": "slot/bindings",
+      "A": "DA money/delivery object",
+      "B": "DB native duration/resource/schedule",
+      "oracle": "O03/O04/O08",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    },
+    {
+      "capability": "runWorkflowRegion/rebind/revalidate",
+      "A": "DA quote revision",
+      "B": "DB release/deadline revision",
+      "oracle": "O04/O05",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    },
+    {
+      "capability": "Interaction.runIn",
+      "A": "DA changed lead",
+      "B": "DB changed deadline",
+      "oracle": "O09",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    },
+    {
+      "capability": "terminal read and observation",
+      "A": "DA source read/stale result",
+      "B": "DB resource read/stale solver",
+      "oracle": "O06/O07",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    },
+    {
+      "capability": "Observation/evidence/recordModelDecision",
+      "A": "DA actual external consumer",
+      "B": "DB actual external consumer",
+      "oracle": "O01/O10",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    },
+    {
+      "capability": "ModelElement normalized turn",
+      "A": "DA actual provider tool loop",
+      "B": "DB actual fixed provider use",
+      "oracle": "O02",
+      "requiredDistinctUses": 2,
+      "actualQualifiedUses": 0
+    }
+  ],
+  "publicExports": {
+    "baselineBlob": "36581edff250571ff1eebcb6f225a817ae325cd2",
+    "values": [
+      "BoundedExpressionElement",
+      "BoundedQueryElement",
+      "ClarificationElement",
+      "CliElement",
+      "GraphQueryElement",
+      "InteractionElement",
+      "JsonReader",
+      "KernelLifecycle",
+      "ModelElement",
+      "NativeWorkflowContext",
+      "SQLiteDatabaseElement",
+      "SQLiteDatabaseError",
+      "StandardWorkflowSession",
+      "VectorQueryElement",
+      "WorkflowElement",
+      "XStateWorkflowElement",
+      "YamlReader",
+      "bindWorkflowFunction",
+      "bindWorkflowRegion",
+      "createWorkflowSlot",
+      "invalidateEvidence",
+      "prepareCandidates",
+      "readJson",
+      "readYaml",
+      "resolveEvidence",
+      "routeWorkflowOutcome",
+      "runInteractiveRecognitionHandling",
+      "runRecognitionHandling",
+      "runWorkflowRegion",
+      "selectNextDecision",
+      "writeJson",
+      "writeYaml"
+    ],
+    "types": [
+      "BoundedQueryLimits",
+      "BoundedQueryResult",
+      "BoundedQueryTruncationReason",
+      "CandidateAssessment",
+      "CandidateEntry",
+      "CandidatePreparation",
+      "CandidateProjection",
+      "CandidateSource",
+      "ClarificationField",
+      "ClarificationPreparation",
+      "ClarificationResponse",
+      "CorePackageMetadata",
+      "DecisionCondition",
+      "DecisionDescription",
+      "DecisionSelection",
+      "DomainAppContext",
+      "EvidenceContext",
+      "EvidenceDependency",
+      "EvidenceInvalidation",
+      "EvidenceObservation",
+      "EvidenceOrigin",
+      "EvidenceRequirement",
+      "EvidenceResolution",
+      "ExpressionLimits",
+      "ExpressionScalar",
+      "GraphPath",
+      "GraphQueryLimits",
+      "GraphQueryOptions",
+      "GraphQueryResult",
+      "InteractionCandidate",
+      "InteractionDecision",
+      "InteractionEvent",
+      "InteractionField",
+      "InteractionPrompt",
+      "InteractionPromptSpec",
+      "InteractionRecord",
+      "InteractionResponse",
+      "InteractionScope",
+      "InteractionSubmitResult",
+      "LifecycleInitContext",
+      "LifecycleLogRecord",
+      "LifecycleLogger",
+      "ModelProfile",
+      "ModelRequest",
+      "ModelToolCall",
+      "ModelToolDescription",
+      "ModelToolResult",
+      "ModelTurn",
+      "ModelUsage",
+      "PackageInitElement",
+      "SQLiteDatabaseOptions",
+      "SQLiteErrorCode",
+      "SQLiteFailureOrigin",
+      "SQLiteNonThenable",
+      "SQLiteScalar",
+      "SQLiteTerminalFailureDetails",
+      "SQLiteTransaction",
+      "StandardFileOutcome",
+      "StandardJsonValue",
+      "StandardWorkflowOutcome",
+      "StaticCorePackage",
+      "TypedGraphEdge",
+      "VectorCandidate",
+      "VectorMatch",
+      "VectorQueryOptions",
+      "VectorQueryResult",
+      "WorkflowActorOptions",
+      "WorkflowAttempt",
+      "WorkflowCapability",
+      "WorkflowCompletionPolicy",
+      "WorkflowContextView",
+      "WorkflowControlLimits",
+      "WorkflowControlOptions",
+      "WorkflowEdit",
+      "WorkflowFunctionBinding",
+      "WorkflowKnowledgeFrame",
+      "WorkflowKnowledgePolicy",
+      "WorkflowLimits",
+      "WorkflowNode",
+      "WorkflowNodeOptions",
+      "WorkflowNodeProposal",
+      "WorkflowObservation",
+      "WorkflowOccurrence",
+      "WorkflowRegionDefinition",
+      "WorkflowRegionLimits",
+      "WorkflowRegionProposal",
+      "WorkflowRegionView",
+      "WorkflowRoutes",
+      "WorkflowSlot",
+      "WorkflowSlotBinding",
+      "WorkflowSlotReader",
+      "WorkflowSlotWriter",
+      "WorkflowTerminalContext"
+    ],
+    "changedMembers": [
+      "StandardWorkflowSession(control?, completion?, dispositions)",
+      "NativeWorkflowContext(signal,runId,scopeId,node,work,recordModelDecision)",
+      "XStateWorkflowElement.runIn",
+      "InteractionElement.runIn"
+    ],
+    "privateImportsForbidden": true
+  }
+}
