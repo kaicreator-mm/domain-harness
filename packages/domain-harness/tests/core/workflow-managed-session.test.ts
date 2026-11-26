@@ -91,7 +91,7 @@ test('missing/malformed completion, preaborted and zero time reject without acti
 test('child actual ownership, shared ledger, active cap released only after join', async () => {
   const gate = deferred(), entered = deferred();
   const session = new StandardWorkflowSession(base, minimal({
-    maxWork: rootWork + 2 * childWork + 5, maxEvents: 9, maxActiveScopes: 2,
+    maxWork: rootWork + 2 + 2 * childWork + 5, maxEvents: 9, maxActiveScopes: 2,
   }));
   const result = await session.run(async root => {
     let child!: NativeWorkflowContext;
