@@ -174,3 +174,12 @@ export interface WorkflowNode<I, O> {
     constraints: readonly string[]; capabilities: readonly string[]; feedbackRevision: number;
   }>;
 }
+
+/** XState 实际快照的同步有限语义投影，不序列化 actor 内部状态。
+ * @dhKind type
+ * @dhCapability workflow
+ */
+export interface WorkflowActorOptions<Snapshot> {
+  readonly project: (snapshot: Snapshot) => StandardJsonValue;
+  readonly maxProjections: number;
+}
