@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assign, fromPromise, setup } from 'xstate';
+import { Socket } from 'node:net';
 import { StandardWorkflowSession, XStateWorkflowElement } from '@kaicreator/domain-harness';
 import type { NativeWorkflowContext, WorkflowCompletionPolicy, WorkflowKnowledgePolicy,
   WorkflowNode, WorkflowNodeOptions, WorkflowObservation, EvidenceObservation } from '@kaicreator/domain-harness';
@@ -185,4 +186,57 @@ test('actual solve then authority revision changes: no final verify in either do
     assert.notEqual(result.status,'COMPLETE');assert.deepEqual(count,{query:1,solve:1,verify:0});
     assert.ok(trace.some(r=>r.kind==='node'&&r.phase==='actual'&&['pack-optimize','repair-milp'].includes(r.occurrence.definitionId)));
   }
+});
+
+
+test('fixed D-A/D-B native and XState actual no-model paths do not access network or credential environment',async(t)=>{
+  let fetchCalls=0,connectCalls=0,credentialReads=0;
+  const env=process.env;
+  const forbidden=/API[_-]?KEY|TOKEN|SECRET|CREDENTIAL|PASSWORD|AUTHORIZATION/i;
+  process.env=new Proxy(env,{
+    get(target,key,receiver){
+      if(typeof key==='string'&&forbidden.test(key)){credentialReads++;throw Error('credential access denied');}
+      return Reflect.get(target,key,receiver);
+    }
+  });
+  t.mock.method(globalThis,'fetch',()=>{fetchCalls++;throw Error('network denied');});
+  t.mock.method(Socket.prototype,'connect',()=>{connectCalls++;throw Error('network denied');});
+  try{
+    for(const mode of ['native','xstate'] as const){
+      const a=source('network-probe-A'),b=source('network-probe-B'),d={lead:5,budget:75};
+      const da:WorkflowObservation[]=[],db:WorkflowObservation[]=[];
+      assert.equal((await execute(session(a,da),a,procurement(a,stats(),d),d,mode,'DA-no-network')).status,'COMPLETE');
+      assert.equal((await execute(session(b,db),b,repair(b,stats(),8),8,mode,'DB-no-network')).status,'COMPLETE');
+      for(const trace of [da,db]){
+        const events=trace.filter(x=>x.kind==='model');
+        assert.equal(events.length,1);
+        assert.ok(events[0]?.action==='not-needed'&&events[0].usage.kind==='unavailable'&&!('profileId' in events[0]));
+      }
+    }
+    assert.deepEqual([fetchCalls,connectCalls,credentialReads],[0,0,0]);
+  }finally{process.env=env;t.mock.restoreAll();}
+});
+
+test('real repair solver child starts then root cancellation awaits actual process close before final disposition',async()=>{
+  const abort=new AbortController(),src=source('repair-cancel');
+  const events:WorkflowObservation[]=[];
+  const s=new StandardWorkflowSession({maxCalls:30,maxSteps:50,maxDepth:2},{
+    limits:{maxWork:2000000,maxEvents:50,maxActiveScopes:8,maxActiveMs:30000,maxSettlementMs:2000,maxNoProgress:5},
+    knowledge:src.policy,current:()=>true,signal:abort.signal,observe:r=>{events.push(r);}
+  });
+  let pid=0,started=0,closed=0,post=0;
+  const solver:WorkflowNode<Job[],Schedule>={id:'actual-milp-cancel',goal:'actual solver process',requiredKnowledge:[],
+    before:()=>ok(undefined),
+    run:(jobs,scope)=>solveRepair(jobs,8,scope.signal,{
+      started:actualPid=>{pid=actualPid;started++;abort.abort();assert.equal(s.dispositions().length,0);},
+      closed:()=>{closed++;assert.equal(s.dispositions().length,0);}
+    }),
+    after:()=>{post++;assert.equal(closed,1);return ok(undefined);},
+    project:()=>({effect:'none',detail:{solver:'cancelled'}})};
+  const result=await s.run(root=>root.node(solver,fixture.DB.jobs,opts(src)),{
+    goal:'cancelled schedule cannot publish',requiredKnowledge:[],terminalReads:0,validate:()=>ok(undefined)
+  });
+  assert.notEqual(result.status,'COMPLETE');assert.ok(pid>0);assert.deepEqual([started,closed,post],[1,1,1]);
+  assert.ok(s.dispositions().some(r=>r.kind==='scope'&&r.phase==='closed'&&r.localQuiescent));
+  assert.ok(events.some(r=>r.kind==='node'&&r.phase==='actual'&&r.occurrence.definitionId==='actual-milp-cancel'));
 });
