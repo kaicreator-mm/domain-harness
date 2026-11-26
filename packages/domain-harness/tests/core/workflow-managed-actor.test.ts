@@ -140,3 +140,16 @@ test('managed actual error and stopped snapshots never invoke success mapper', a
     assert.ok(!JSON.stringify(records).includes('private actor error'));
   }
 });
+
+test('actual actor projection observes an ordinary callback rejected Promise before JSON conversion',async()=>{
+  let projected=0,mapped=0;
+  const logic=fromPromise<number,number>(async({input})=>await Promise.resolve(input));
+  const actor=new XStateWorkflowElement(logic,x=>{mapped++;return ok(x);});
+  const s=new StandardWorkflowSession(base,control());
+  const result=await s.run(root=>actor.runIn(()=>1,root,{maxProjections:2,
+    project:(()=>{projected++;return Promise.reject(Error('private projection rejection'));}) as never}),completion);
+  await new Promise<void>(resolve=>setImmediate(resolve));
+  assert.notEqual(result.status,'COMPLETE');
+  assert.equal(projected,1);assert.equal(mapped,0);
+  assert.ok(s.dispositions().every(r=>r.kind!=='scope'||r.outcome?.status!=='COMPLETE'));
+});

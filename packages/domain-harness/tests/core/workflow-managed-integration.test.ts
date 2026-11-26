@@ -64,11 +64,14 @@ test('terminal lease rejects reentrant read from a guarded policy callback',asyn
 test('explicit no-model record has exact step/work/event charge and no fake usage',async()=>{
   for(const mode of ['exact','steps','work','events'] as const){
     const records:WorkflowObservation[]=[];
-    const c=control({observe:r=>{records.push(r);}});
+    let guards=0;
+    const c=control({current:()=>{guards++;return true;},observe:r=>{records.push(r);}});
     const s=new StandardWorkflowSession({maxCalls:1,maxSteps:mode==='steps'?2:3,maxDepth:0},
-      {...c,limits:{...c.limits,maxWork:99086+1+33025-Number(mode==='work'),maxEvents:mode==='events'?3:4,maxActiveScopes:1}});
+      {...c,limits:{...c.limits,maxWork:99086+1+33025+2-Number(mode==='work'),maxEvents:mode==='events'?3:4,maxActiveScopes:1}});
     const r=await s.run(root=>{
+      const before=guards;
       const decision=root.recordModelDecision('deterministic professional calculation','not-needed');
+      assert.equal(guards-before,mode==='exact'?2:0);
       return decision.status==='COMPLETE'?ok(1):decision;
     },completion);
     assert.equal(r.status==='COMPLETE',mode==='exact');
@@ -170,5 +173,53 @@ test('frozen public R23 m=4 root exact quota and all one-short variants',async()
     assert.equal(result.status==='COMPLETE',mode==='exact');
     if(mode==='exact'){assert.equal(action,1);assert.equal(validate,1);assert.equal(observed,2);assert.ok(guards>0);}
     else assert.deepEqual([guards,action,validate,observed],[0,0,0,0]);
+  }
+});
+
+test('model decision uses actual root/local/borrowed frame and rejects stale or expired decisions',async()=>{
+  for(const mode of ['root','local','borrowed','stale-local','stale-ancestor','guard','expired','sink'] as const){
+    const rootEpoch=3;let localEpoch=7,asOf=1,allowed=true;
+    const records:WorkflowObservation[]=[];
+    const c=control({knowledge:{...control().knowledge,current:()=>({epoch:rootEpoch,context:{scope:'root',revisions:new Map()}})},
+      evidence:{required:true,emit:r=>{
+        records.push(r);
+        if(r.kind==='model'&&mode==='sink')localEpoch++;
+        return ok(undefined);
+      }}});
+    const s=new StandardWorkflowSession(limits,c);
+    let decision:StandardWorkflowOutcome<void>|undefined;
+    const n:WorkflowNode<number,number>={id:'local',goal:'actual value',
+      requiredKnowledge:[{key:'fact',accepts:['authority']}],
+      knowledge:()=>ok([{key:'fact',origin:'authority',state:'known',value:1,
+        source:{id:'source',scope:'local',revision:'1',validity:{from:0,until:2}}}]),
+      before:()=>ok(undefined),run:async(x,scope)=>{
+        if(mode==='stale-local')localEpoch++;
+        if(mode==='guard')allowed=false;
+        if(mode==='expired')asOf=2;
+        if(mode==='borrowed'||mode==='stale-ancestor'){
+          return scope.child(1,child=>{
+            if(mode==='stale-ancestor')localEpoch++;
+            decision=child.recordModelDecision('actual decision','not-needed');
+            return decision.status==='COMPLETE'?ok(x):decision;
+          });
+        }
+        decision=scope.recordModelDecision('actual decision','not-needed');
+        return decision.status==='COMPLETE'?ok(x):decision;
+      },after:()=>ok(undefined),project:()=>({effect:'none',detail:null})};
+    const result=await s.run(root=>{
+      if(mode==='root'){
+        decision=root.recordModelDecision('actual root decision','not-needed');
+        return decision.status==='COMPLETE'?ok(1):decision;
+      }
+      return root.node(n,1,{knowledge:{maxItems:1,equal:Object.is,current:()=>({
+        epoch:localEpoch,context:{scope:'local',revisions:new Map([['source','1']]),asOf}})},current:()=>allowed});
+    },completion);
+    const positive=mode==='root'||mode==='local'||mode==='borrowed';
+    assert.ok(decision,mode);
+    assert.equal(decision.status==='COMPLETE',positive,mode);
+    assert.equal(result.status==='COMPLETE',positive,mode);
+    const model=records.filter(r=>r.kind==='model');
+    assert.equal(model.length,positive||mode==='sink'?1:0,mode);
+    if(model.length)assert.equal(model[0]?.factRevision,mode==='root'?rootEpoch:7,mode);
   }
 });

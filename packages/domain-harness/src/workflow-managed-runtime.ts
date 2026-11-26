@@ -149,11 +149,17 @@ export class ManagedRuntime {
   public available(): boolean { return !this.#callback && !this.#criticalFailed && this.clock.check(); }
   public dispositions(): readonly WorkflowObservation[] { return Object.freeze([...this.#final]); }
 
-  public guarded<T>(callback: () => T): T {
+  public guarded<T>(callback: () => T): T;
+  public guarded<T, R>(callback: () => T, project: (value: T) => R): R;
+  public guarded<T, R>(callback: () => T, project?: (value: T) => R): T | R {
     if (this.#callback || types.isAsyncFunction(callback)) throw new Error('WORKFLOW_REENTRANT');
     this.#callback = true;
-    try { const value = callback(); if (!sync(value)) throw new Error('WORKFLOW_ASYNC_POLICY'); return value; }
-    finally { this.#callback = false; }
+    try {
+      const value = callback();
+      // 在读取投影字段或转换 JSON 前观察意外 Promise，仍保持重入围栏。
+      if (!sync(value)) throw new Error('WORKFLOW_ASYNC_POLICY');
+      return project === undefined ? value : project(value);
+    } finally { this.#callback = false; }
   }
 
   /** 只在已预留的 frame ticket 内读取可信策略，不序列化领域值。 */
@@ -301,15 +307,20 @@ export class ManagedRuntime {
   public modelDecision(scope: ManagedScope, reason: string, action: 'not-needed' | 'unavailable'): Outcome<void> {
     if (!this.available() || !boundedText(reason) || Buffer.byteLength(reason) > 1024
       || (action !== 'not-needed' && action !== 'unavailable')) return managedFailure('WORKFLOW_MODEL_DECISION_INVALID');
-    const charge = this.ledger.reserve(scope.owner, { calls: 0, steps: 1, work: 1 + EVENT_SCAN_WORK, events: 1 }, scope.local);
+    // 复用现有作用域当前性检查，交付前后各一次；不足时不运行策略或观察回调。
+    const charge = this.ledger.reserve(scope.owner, { calls: 0, steps: 1,
+      work: 1 + EVENT_SCAN_WORK + 2 * this.frameChainCost(scope), events: 1 }, scope.local);
     if (!charge.ok) return managedFailure(charge.code);
     try {
+      const frame = this.frames(scope);
+      if (!frame) return unknown('WORKFLOW_CURRENTNESS');
       if (!charge.ticket.event(scope.owner)) return managedFailure('WORKFLOW_EVENT_BUDGET');
       const record = Object.freeze({ kind: 'model' as const, action, decisionId: randomUUID(), reason,
         usage: Object.freeze({ input: null, output: null, total: null, kind: 'unavailable' as const }), detail: null,
         runId: this.runId, scopeId: scope.id, ...(scope.parentId === undefined ? {} : { parentScopeId: scope.parentId }),
-        seq: this.sequence(), factRevision: this.#last?.epoch ?? 0, stage: 'model-decision' });
-      return this.deliver(scope, record) && this.available() ? ok(undefined) : managedFailure('WORKFLOW_EVIDENCE_FAILED');
+        seq: this.sequence(), factRevision: frame.locals.at(-1)?.frame.epoch ?? frame.root.epoch, stage: 'model-decision' });
+      if (!this.deliver(scope, record)) return managedFailure('WORKFLOW_EVIDENCE_FAILED');
+      return this.checkFrames(scope, frame) ? ok(undefined) : unknown('WORKFLOW_CURRENTNESS');
     } finally { charge.ticket.close(scope.owner); }
   }
 

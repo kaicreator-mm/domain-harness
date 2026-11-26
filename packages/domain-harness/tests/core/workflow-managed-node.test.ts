@@ -132,3 +132,22 @@ test('terminal and attempt retained references fenced; actual abort joins and ex
   assert.deepEqual([run,after,cleanup],[1,1,1]);
   assert.notEqual((await terminal.read(()=>ok(++run))).status,'COMPLETE');assert.equal(run,1);
 });
+
+test('node projection observes rejected Promise before reading projection fields',async()=>{
+  for(const mode of ['sync','rejected','declared-async'] as const){
+    let called=0;
+    const raw=mode==='declared-async'?async()=>{called++;return {effect:'none',detail:null};}
+      :()=>{called++;return mode==='rejected'?Promise.reject(Error('private projection rejection'))
+        :{effect:'committed',receiptId:'actual-receipt',detail:null};};
+    const s=new StandardWorkflowSession(rootLimits,control());
+    const n=definition({project:raw as WorkflowNode<bigint,bigint>['project']});
+    const result=await s.run(root=>root.node(n,1n,opts),completion<bigint>());
+    await new Promise<void>(resolve=>setImmediate(resolve));
+    assert.equal(result.status==='COMPLETE',mode==='sync');
+    assert.equal(called,mode==='declared-async'?0:1);
+    const record=nodeRecords(s)[0];
+    assert.ok(record);
+    if(mode==='sync')assert.equal(record.receiptId,'actual-receipt');
+    else assert.notEqual(record.acceptance,'accepted');
+  }
+});

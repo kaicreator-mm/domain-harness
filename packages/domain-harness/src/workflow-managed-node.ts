@@ -235,7 +235,8 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
       try {
         const p = runtime.guarded(() => {
           if (types.isAsyncFunction(node.project)) throw Error('WORKFLOW_ASYNC_PROJECT');
-          const value = node.project(actual!);
+          return node.project(actual!);
+        }, value => {
           if (!['none', 'committed', 'unknown', 'not-applicable'].includes(value.effect)
             || (value.receiptId !== undefined && (!boundedText(value.receiptId) || Buffer.byteLength(value.receiptId) > 128))) throw Error('WORKFLOW_PROJECT_INVALID');
           return value;

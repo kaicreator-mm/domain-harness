@@ -200,7 +200,7 @@ export function borrowActorScope<T>(root: NativeWorkflowContext, maxProjections:
         if (!lifetime.admissible() || actor.remaining === 0 || !scope.ticket.event(scope.owner)) return false;
         actor.remaining--;
         try {
-          const detail = runtime.guarded(() => safeDetail(callback(), 65536 - 1024));
+          const detail = runtime.guarded(callback, value => safeDetail(value, 65536 - 1024));
           const delivered = runtime.deliver(scope, Object.freeze({ kind: 'actor', definitionId, detail,
             runId: runtime.runId, scopeId: scope.id, parentScopeId: scope.parentId!,
             seq: runtime.sequence(), factRevision: frame.locals.at(-1)?.frame.epoch ?? frame.root.epoch,
