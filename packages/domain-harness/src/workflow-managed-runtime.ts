@@ -5,7 +5,7 @@ import type { EvidenceObservation, EvidenceRequirement, EvidenceResolution } fro
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import type {
   WorkflowControlOptions, WorkflowCompletionPolicy, WorkflowContextView,
-  WorkflowKnowledgeFrame, WorkflowObservation, WorkflowTerminalContext,
+  WorkflowKnowledgeFrame, WorkflowObservation, WorkflowTerminalContext, WorkflowKnowledgePolicy,
 } from './workflow-managed-contract.js';
 import {
   EVENT_SCAN_WORK, frameScanWork, knowledgeScanWork, WorkflowClock,
@@ -23,10 +23,10 @@ export function managedFailure<T>(code: string): Outcome<T> {
 const unknown = <T>(code: string): Outcome<T> => ({
   status: 'UNKNOWN', reason: { code, message: 'Managed workflow result not accepted' },
 });
-const valid = (n: number, max = 2 ** 31 - 1) => Number.isSafeInteger(n) && n >= 0 && n <= max;
-const boundedText = (s: unknown): s is string => typeof s === 'string' && s.length > 0 && s.length <= 1024;
+export const valid = (n: number, max = 2 ** 31 - 1) => Number.isSafeInteger(n) && n >= 0 && n <= max;
+export const boundedText = (s: unknown): s is string => typeof s === 'string' && s.length > 0 && s.length <= 1024;
 const array = (value: unknown): boolean => Array.isArray(value);
-const dense = (xs: readonly unknown[]) => {
+export const dense = (xs: readonly unknown[]) => {
   for (let i = 0; i < xs.length; i++) if (!Object.hasOwn(xs, i)) return false;
   return true;
 };
@@ -43,7 +43,7 @@ export function isManagedOutcome(value: unknown): value is Outcome<unknown> {
       && 'code' in value.reason && typeof value.reason.code === 'string'
       && 'message' in value.reason && typeof value.reason.message === 'string');
 }
-function redact(value: Outcome<unknown>): Outcome<void> {
+export function redact(value: Outcome<unknown>): Outcome<void> {
   if (value.status === 'COMPLETE') return Object.freeze(ok(undefined));
   // 不将业务值、错误文本或凭据放入公开观察。
   return Object.freeze({ status: value.status, reason: Object.freeze({
@@ -58,7 +58,22 @@ export interface ManagedScope {
   readonly ticket: ResourceTicket;
   delivery: Delivery;
   diagnostic: boolean;
+  readonly parent?: ManagedScope;
+  readonly policy?: LocalFramePolicy;
+  bound?: ScopeFrames;
+  resolved?: EvidenceResolution<string, unknown>;
 }
+
+export interface LocalFramePolicy {
+  readonly knowledge: WorkflowKnowledgePolicy;
+  readonly current: () => boolean;
+  last?: Frame;
+}
+export interface ScopeFrames {
+  readonly root: Frame;
+  readonly locals: readonly Readonly<{ policy: LocalFramePolicy; frame: Frame }>[];
+}
+
 
 export function snapshotControl(control: WorkflowControlOptions): WorkflowControlOptions {
   const limits = control.limits;
@@ -74,6 +89,20 @@ export class ManagedRuntime {
   readonly clock: WorkflowClock;
   readonly #final: WorkflowObservation[] = [];
   #seq = 0;
+  readonly #progress = new Map<string, WorkflowContextView['progress'][number]>();
+
+  public sequence(): number { return ++this.#seq; }
+  public canRecordNode(): boolean { return this.#progress.size < 4096; }
+  public progress(): WorkflowContextView['progress'] { return Object.freeze([...this.#progress.values()]); }
+  public noteNode(record: Extract<WorkflowObservation, { kind: 'node' }>): void {
+    const { instanceId, definitionId } = record.occurrence;
+    const state = record.phase === 'enter' ? 'running' : record.acceptance === 'accepted' ? 'accepted'
+      : record.acceptance === 'stale' ? 'stale' : record.effect === 'unknown' ? 'unknown' : 'rejected';
+    this.#progress.set(instanceId, Object.freeze({ instanceId, definitionId, state }));
+    if (record.phase === 'disposition') this.#final.push(record);
+  }
+  public get criticalFailed(): boolean { return this.#criticalFailed; }
+
   #callback = false;
   #criticalFailed = false;
   #last: Frame | undefined;
@@ -95,7 +124,7 @@ export class ManagedRuntime {
   public available(): boolean { return !this.#callback && !this.#criticalFailed && this.clock.check(); }
   public dispositions(): readonly WorkflowObservation[] { return Object.freeze([...this.#final]); }
 
-  private guarded<T>(callback: () => T): T {
+  public guarded<T>(callback: () => T): T {
     if (this.#callback || types.isAsyncFunction(callback)) throw new Error('WORKFLOW_REENTRANT');
     this.#callback = true;
     try { const value = callback(); if (!sync(value)) throw new Error('WORKFLOW_ASYNC_POLICY'); return value; }
@@ -103,13 +132,11 @@ export class ManagedRuntime {
   }
 
   /** 只在已预留的 frame ticket 内读取可信策略，不序列化领域值。 */
-  public frame(): Frame | undefined {
+  private capture(knowledge: WorkflowKnowledgePolicy, current: () => boolean, last?: Frame): Frame | undefined {
     if (!this.available()) return undefined;
     try {
-      const { knowledge, current } = this.control;
       if (types.isAsyncFunction(current) || types.isAsyncFunction(knowledge.current)) return undefined;
-      const permitted = this.guarded(current);
-      if (permitted !== true) return undefined;
+      if (this.guarded(current) !== true) return undefined;
       const actual = this.guarded(knowledge.current);
       const context = actual.context;
       if (!valid(actual.epoch, Number.MAX_SAFE_INTEGER) || !boundedText(context.scope)
@@ -125,12 +152,58 @@ export class ManagedRuntime {
       const frame: Frame = { epoch: actual.epoch, context: { scope: context.scope, revisions,
         ...(context.asOf === undefined ? {} : { asOf: context.asOf }),
       } };
-      if (this.#last && (frame.epoch < this.#last.epoch
-        || frame.context.scope !== this.#last.context.scope
-        || (frame.epoch === this.#last.epoch && !this.same(this.#last, frame)))) return undefined;
-      this.#last = frame;
+      if (last && (frame.epoch < last.epoch || frame.context.scope !== last.context.scope
+        || (frame.epoch === last.epoch && !this.same(last, frame)))) return undefined;
       return this.available() ? frame : undefined;
     } catch { return undefined; }
+  }
+
+  public frame(): Frame | undefined {
+    const frame = this.capture(this.control.knowledge, this.control.current, this.#last);
+    if (frame !== undefined) this.#last = frame;
+    return frame;
+  }
+
+  private policies(scope?: ManagedScope): LocalFramePolicy[] {
+    const result: LocalFramePolicy[] = [];
+    for (let s = scope; s !== undefined; s = s.parent) if (s.policy !== undefined) result.push(s.policy);
+    return result.reverse();
+  }
+
+  public frameChainCost(scope?: ManagedScope): number {
+    return this.frameCost + this.policies(scope).reduce((n, p) => n + frameScanWork(p.knowledge.maxItems), 0);
+  }
+
+  public frames(scope: ManagedScope): ScopeFrames | undefined {
+    const root = this.frame();
+    if (!root) return undefined;
+    const locals: { policy: LocalFramePolicy; frame: Frame }[] = [];
+    for (const policy of this.policies(scope)) {
+      const frame = this.capture(policy.knowledge, policy.current, policy.last);
+      if (!frame) return undefined;
+      policy.last = frame;
+      locals.push({ policy, frame });
+    }
+    const captured = { root, locals };
+    // 运行中的祖先尝试不能通过新一次调用偷偷换到新的事实版本。
+    for (let owner: ManagedScope | undefined = scope; owner !== undefined; owner = owner.parent) {
+      const bound = owner.bound;
+      if (!bound) continue;
+      if (!this.same(bound.root, root) || bound.locals.length > locals.length
+        || !bound.locals.every((x, i) => x.policy === locals[i]?.policy && this.same(x.frame, locals[i].frame))) return undefined;
+      const current = locals[bound.locals.length - 1]?.frame ?? root;
+      if (!this.evidenceCurrent(current, owner.resolved)) return undefined;
+    }
+    return captured;
+  }
+
+  public checkFrames(scope: ManagedScope, captured: ScopeFrames,
+    resolution?: EvidenceResolution<string, unknown>): boolean {
+    const now = this.frames(scope);
+    if (!now || !this.same(captured.root, now.root) || now.locals.length !== captured.locals.length) return false;
+    if (!captured.locals.every((x, i) => x.policy === now.locals[i]?.policy && this.same(x.frame, now.locals[i].frame))) return false;
+    const frame = now.locals.at(-1)?.frame ?? now.root;
+    return this.evidenceCurrent(frame, resolution);
   }
 
   private same(a: Frame, b: Frame): boolean {
@@ -143,6 +216,10 @@ export class ManagedRuntime {
   public check(frame: Frame, resolution?: EvidenceResolution<string, unknown>): boolean {
     const now = this.frame();
     if (!now || !this.same(frame, now)) return false;
+    return this.evidenceCurrent(now, resolution);
+  }
+
+  private evidenceCurrent(now: Frame, resolution?: EvidenceResolution<string, unknown>): boolean {
     if (resolution?.complete) {
       for (const item of resolution.items) for (const observation of item.evidence) {
         const validity = observation.source.validity, asOf = now.context.asOf;
@@ -152,7 +229,7 @@ export class ManagedRuntime {
     return true;
   }
 
-  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>):
+  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope):
     { scope: ManagedScope } | { code: string } {
     if (!this.available()) return { code: 'WORKFLOW_STOPPED' };
     const owner = {};
@@ -160,22 +237,22 @@ export class ManagedRuntime {
     const finalCalls = completion === undefined ? 0 : 1 + Number(completion.observe !== undefined) + reads;
     const charge: ResourceCharge = { calls: finalCalls, steps: 1 + finalCalls,
       work: 4 + 3 * EVENT_SCAN_WORK + finalCalls + (completion === undefined
-        ? 4 * this.frameCost : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost),
+        ? 4 * this.frameChainCost(parent) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost),
       events: 3, activeScopes: 1, terminalReads: reads };
     const admission = this.ledger.reserve(owner, charge);
     if (!admission.ok) return { code: admission.code };
     return { scope: { id: randomUUID(), ...(parentId === undefined ? {} : { parentId }),
-      owner, ticket: admission.ticket, delivery: 'not-required', diagnostic: false } };
+      owner, ticket: admission.ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }) } };
   }
 
   public reserveCall(scope: ManagedScope, calls: number, units: number):
-    { frame: Frame } | { code: string } {
+    { frame: ScopeFrames } | { code: string } {
     if (!this.available()) return { code: 'WORKFLOW_STOPPED' };
     const admission = this.ledger.reserve(scope.owner, { calls, steps: calls,
-      work: units + 4 * calls * this.frameCost });
+      work: units + 4 * calls * this.frameChainCost(scope) });
     if (!admission.ok) return { code: admission.code };
     admission.ticket.close(scope.owner);
-    const frame = this.frame();
+    const frame = this.frames(scope);
     return frame === undefined ? { code: 'WORKFLOW_CURRENTNESS' } : { frame };
   }
 
@@ -189,7 +266,7 @@ export class ManagedRuntime {
       ...(candidateSeq === undefined ? {} : { candidateSeq }) });
   }
 
-  private deliver(scope: ManagedScope, record: ScopeRecord): boolean {
+  public deliver(scope: ManagedScope, record: WorkflowObservation): boolean {
     const { observe, evidence } = this.control;
     let requiredOk = true;
     try {
@@ -217,7 +294,7 @@ export class ManagedRuntime {
 
   /** 先候选交付，再检查当前性，最后不调用用户代码地提交唯一裁定。 */
   public close<T>(scope: ManagedScope, value: Outcome<T>, frame?: Frame,
-    resolution?: EvidenceResolution<string, unknown>): Outcome<T> {
+    resolution?: EvidenceResolution<string, unknown>, chain?: ScopeFrames): Outcome<T> {
     let result = isManagedOutcome(value) ? value : managedFailure<T>('WORKFLOW_INVALID_OUTCOME');
     let seq: number | undefined;
     if (scope.ticket.event(scope.owner)) {
@@ -228,7 +305,7 @@ export class ManagedRuntime {
       if (!delivered && result.status === 'COMPLETE') result = managedFailure('WORKFLOW_EVIDENCE_FAILED');
     } else if (result.status === 'COMPLETE') result = managedFailure('WORKFLOW_EVENT_BUDGET');
     if (result.status === 'COMPLETE' && this.#criticalFailed) result = managedFailure('WORKFLOW_EVIDENCE_FAILED');
-    if (result.status === 'COMPLETE' && (!frame || !this.check(frame, resolution))) result = unknown('WORKFLOW_CURRENTNESS');
+    if (result.status === 'COMPLETE' && (chain ? !this.checkFrames(scope, chain, resolution) : !frame || !this.check(frame, resolution))) result = unknown('WORKFLOW_CURRENTNESS');
     if (!scope.ticket.event(scope.owner)) {
       scope.ticket.close(scope.owner);
       return result.status === 'COMPLETE' ? managedFailure('WORKFLOW_EVENT_BUDGET') : result;
@@ -249,7 +326,7 @@ export class ManagedRuntime {
   }
 
   /** 根入口预留后验证完整声明；在任何业务回调前拒绝重复、非法 origin。 */
-  public requirements(policy: WorkflowCompletionPolicy<unknown>): readonly EvidenceRequirement<string>[] | undefined {
+  public requirements(policy: { readonly requiredKnowledge: readonly EvidenceRequirement<string>[] }): readonly EvidenceRequirement<string>[] | undefined {
     const reqs = policy.requiredKnowledge;
     if (!dense(reqs)) return undefined;
     const keys = new Set<string>();
@@ -303,7 +380,7 @@ export class ManagedRuntime {
     const remaining = this.ledger.remaining();
     const view: WorkflowContextView = Object.freeze({ runId: this.runId, scopeId: scope.id,
       goal: policy.goal, stage: 'completion', factRevision: frame.epoch, knowledge: resolution,
-      capabilities: Object.freeze([]), constraints: Object.freeze([]), progress: Object.freeze([]),
+      capabilities: Object.freeze([]), constraints: Object.freeze([]), progress: this.progress(),
       feedbackRevision: 0, remaining: Object.freeze({ calls: remaining.calls, steps: remaining.steps,
         maxDescendantDepth: depth, work: remaining.work, events: remaining.events,
         ...this.clock.remaining(), localWork: remaining.work }) });
@@ -316,17 +393,19 @@ export class ManagedRuntime {
     return { result: value, frame, resolution };
   }
 
-  private terminal(scope: ManagedScope, frame: Frame) {
+  public terminal(scope: ManagedScope, frame?: Frame, chain?: ScopeFrames, actualObservation = false) {
     const controller = new AbortController();
     const pending = new Set<Promise<void>>();
     let open = true;
     let invalid = false;
-    const remaining = this.clock.beginSettlement();
+    const remaining = this.clock.reason === undefined ? this.control.limits.maxSettlementMs : this.clock.beginSettlement();
+    const started = performance.now();
+    const left = () => Math.min(Math.max(0, remaining - (performance.now() - started)), this.clock.reason === undefined ? Infinity : this.clock.settlementRemaining());
     const timeout = setTimeout(() => { controller.abort('settlement-timeout'); }, Math.max(1, Math.ceil(remaining)));
     const context: WorkflowTerminalContext = Object.freeze({
       signal: controller.signal,
       read: async <T>(action: (signal: AbortSignal) => Outcome<T> | Promise<Outcome<T>>): Promise<Outcome<T>> => {
-        if (!open || controller.signal.aborted || this.clock.settlementRemaining() <= 0
+        if (!open || controller.signal.aborted || left() <= 0
           || !scope.ticket.terminalRead(scope.owner)) {
           invalid = true;
           return managedFailure('WORKFLOW_TERMINAL_READ_DENIED');
@@ -336,8 +415,9 @@ export class ManagedRuntime {
         pending.add(joined);
         try {
           const value = await action(controller.signal);
-          if (!isManagedOutcome(value) || !this.check(frame) || controller.signal.aborted
-            || this.clock.settlementRemaining() <= 0) {
+          const current = chain ? this.checkFrames(scope, chain) : frame !== undefined && this.check(frame);
+          if (!isManagedOutcome(value) || (!actualObservation && !current) || controller.signal.aborted
+            || left() <= 0) {
             invalid = true;
             return managedFailure('WORKFLOW_TERMINAL_READ_STALE');
           }
@@ -351,7 +431,7 @@ export class ManagedRuntime {
       const work = [...pending];
       await Promise.all(work);
       clearTimeout(timeout);
-      const expired = controller.signal.aborted || this.clock.settlementRemaining() <= 0;
+      const expired = controller.signal.aborted || left() <= 0;
       controller.abort('terminal-closed');
       return work.length > 0 || invalid || expired;
     } };
