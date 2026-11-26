@@ -6,3 +6,9 @@ API: WorkflowElement XStateWorkflowElement StandardWorkflowSession NativeWorkflo
 `runRecognitionHandling` 固定识别/处理，成功最小 2calls/5steps/1depth；复杂流程直接使用同一根，不重建 Session。ASK/WAIT/UNKNOWN/FAILED 不是 COMPLETE。例：[实际预算](../examples/workflow.mts)。
 
 [完整能力及成员目录](../capabilities.md)。
+
+### 受控根任务（0.11.5 基础建设）
+
+`new StandardWorkflowSession(limits, control)` 使用同一根调用、步骤和受控资源账本。受控 `run(action, completion)` 必须显式给出完成策略；已有无 control 的单参数 run 仍有效。根任务进入前预留完成验证及 scope 观察额度；普通 `invoke/invokeOutcome/leaf/child/work` 执行前检查资源、当前可信事实、作用域和取消。子任务不重置根额度。业务 Function 保持原生类型，不要求模型。
+
+`completion.requiredKnowledge` 声明最终目标所需证据，`observe` 使用已预留的 `WorkflowTerminalContext#read` 取得实际当前证据；`validate` 同步验证候选值与实际当前目标。普通准入先关闭，已接纳本地工作必须结算。观察回调接收 open/candidate；candidate 不是成功事实；`session.dispositions()` 给出本次运行有限的最终 scope 裁定，和返回 Outcome 对照。关键 Evidence 交付失败、事实变化或取消不能返回旧的 COMPLETE。未声明业务知识时仍需真正验证目标。不要将模型建议当作授权或实际副作用。暂不声明未完成的 managed 节点、动态区域、XState/Interaction 附着或 Model 接口。
