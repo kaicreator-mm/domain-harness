@@ -35,3 +35,5 @@ export type { WorkflowSlot, WorkflowSlotReader, WorkflowSlotWriter } from './wor
 export { bindWorkflowFunction, bindWorkflowRegion } from './workflow-capabilities.js';
 export type { WorkflowSlotBinding, WorkflowNodeProposal, WorkflowEdit, WorkflowRegionProposal, WorkflowRegionLimits, WorkflowRegionView, WorkflowFunctionBinding, WorkflowCapability, WorkflowRegionDefinition } from './workflow-region-contract.js';
 export { runWorkflowRegion } from './workflow-region.js';
+export { ModelElement } from './model.js';
+export type { ModelProfile, ModelToolDescription, ModelToolCall, ModelToolResult, ModelTurn, ModelRequest } from './model-contract.js';

@@ -35,6 +35,7 @@ const expected = [
   'bindWorkflowFunction',
   'bindWorkflowRegion',
   'runWorkflowRegion',
+  'ModelElement',
 ].sort();
 
 test('原生 SDK Root 只导出明确批准的 Standard/KDP API', () => {

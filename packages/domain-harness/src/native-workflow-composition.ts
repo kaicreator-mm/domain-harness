@@ -176,6 +176,7 @@ class ScopeLifetime {
     if (this.managed && outstanding.length > 0) this.stopAdmission(true);
     await Promise.all(outstanding);
     this.state = 'CLOSED';
+    modelAttempts.delete(this);
     this.upstream?.removeEventListener('abort', this.abort);
     return outstanding.length > 0;
   }
@@ -287,6 +288,72 @@ export async function regionOperation<T>(root: NativeWorkflowContext, units: num
     return { status: 'COMPLETE', value: output.value };
   } catch { return managedFailure('WORKFLOW_REGION_INVALID'); }
   finally { ticket.ticket.close(scope.owner); finish(); }
+}
+
+type ModelAttempt = { readonly id: string; readonly attempt: number; readonly profile: import('./model-contract.js').ModelProfile; state: 'pending' | 'accepted' | 'failed'; retryable: boolean };
+const modelAttempts = new WeakMap<ScopeLifetime, Map<string, ModelAttempt>>();
+/** 模型请求沿用根账本、祖先 frame 和实际本地结算；不提供公开执行入口。 */
+export async function managedModelCall<T, P>(root: NativeWorkflowContext, profile: import('./model-contract.js').ModelProfile,
+  request: import('./model-contract.js').ModelRequest,
+  prepare: (stamp:string, output:number) => Result<P>,
+  action: (id: string, attempt: number, check: () => boolean, signal: AbortSignal, stamp: string, prepared:P) => Promise<{
+    outcome: Result<T>; usage: import('./workflow-managed-contract.js').ModelUsage; retryable: boolean;
+  }>): Promise<Result<T>> {
+  const life = scopeLifetime(root), runtime = life.managed, scope = life.scope;
+  if (!life.admissible() || !runtime || !scope) return managedFailure('WORKFLOW_MODEL_CONTROL_REQUIRED');
+  const { requestKey: key, action: kind, maxOutputTokens: output, reason } = request;
+  if (typeof key !== 'string' || !/^[a-zA-Z0-9_.:-]{1,128}$/.test(key)
+    || !['initial','continue','retry','fallback'].includes(kind) || typeof reason !== 'string'
+    || !reason.trim() || Buffer.byteLength(reason) > 1024 || !Number.isSafeInteger(output) || output < 1
+    || output > profile.limits.maxOutputTokens) return managedFailure('MODEL_INVALID_REQUEST');
+  let history = modelAttempts.get(life);
+  if (!history) { history = new Map(); modelAttempts.set(life, history); }
+  const previous = history.get(key), retry = kind === 'retry' || kind === 'fallback';
+  if (retry ? !previous || previous.state !== 'failed' || !previous.retryable
+    || (kind === 'retry' ? previous.profile !== profile : previous.profile === profile) : previous !== undefined)
+    return managedFailure('MODEL_ATTEMPT_INVALID');
+  const charge = runtime.ledger.reserve(scope.owner, { calls: 1, steps: 1, modelCalls: 1, modelRetries: Number(retry),
+    outputTokens: output, events: 2, work: 3 + Math.ceil((profile.limits.requestBytes + profile.limits.responseBytes) / 256)
+      + 4 * 8192 + 2 * EVENT_SCAN_WORK + 8 * runtime.frameChainCost(scope) }, scope.local);
+  if (!charge.ok) return managedFailure(charge.code);
+  const entry: ModelAttempt = { id: previous?.id ?? randomUUID(), attempt: (previous?.attempt ?? 0) + 1, profile, state: 'pending', retryable: false };
+  history.set(key, entry);
+  const finish = life.begin();
+  const unavailable = Object.freeze({input:null,output:null,total:null,kind:'unavailable' as const});
+  try {
+    const frame = runtime.frames(scope);
+    let checks = 0;
+    const check = () => ++checks <= 7 && frame !== undefined && life.admissible() && runtime.checkFrames(scope, frame);
+    const emit = (phase: 'selected' | 'retry' | 'fallback' | 'result', usage: import('./workflow-managed-contract.js').ModelUsage, detail: StandardJsonValue) => {
+      if (!charge.ticket.event(scope.owner)) return false;
+      const record: WorkflowObservation = Object.freeze({ kind:'model', action:phase, requestId:entry.id, attempt:entry.attempt,
+        profileId:profile.id, model:profile.model, protocol:profile.protocol, reason:phase==='result'?'MODEL_RESULT':reason, usage, detail,
+        runId:root.runId, scopeId:root.scopeId, ...(scope.parentId===undefined?{}:{parentScopeId:scope.parentId}),
+        seq:runtime.sequence(), factRevision:frame?.locals.at(-1)?.frame.epoch??frame?.root.epoch??0, stage:'model' });
+      return runtime.deliver(scope, record);
+    };
+    if (!frame || !check()) return managedFailure('WORKFLOW_CURRENTNESS');
+    // 已捕获 frame 的有界身份；先生成不可变请求，再向观察者交付选择记录。
+    const stamp = JSON.stringify([frame.root, ...frame.locals.map(x => x.frame)].map(f =>
+      [f.epoch, f.context.scope, [...f.context.revisions].sort(([a],[b])=>a.localeCompare(b))]));
+    const prepared=prepare(stamp,output);
+    if (!emit(retry ? kind : 'selected', unavailable, null) || !check()) return managedFailure('WORKFLOW_CURRENTNESS');
+    const actual = prepared.status==='COMPLETE' ? await action(entry.id, entry.attempt, check, life.signal, stamp, prepared.value)
+      : {outcome:prepared,usage:unavailable,retryable:false};
+    const result = snapshotOutcome(actual.outcome);
+    const delivered = emit('result', actual.usage, { status:result.status, code:result.status==='COMPLETE'?'MODEL_COMPLETE':result.reason.code });
+    if (result.status!=='COMPLETE'&&result.reason.code==='MODEL_OUTPUT_OVERRUN') {
+      runtime.clock.stop('cancelled');return result;
+    }
+    if (!delivered || !check()) return managedFailure('WORKFLOW_CURRENTNESS');
+    entry.state = result.status === 'COMPLETE' ? 'accepted' : 'failed';
+    entry.retryable = result.status !== 'COMPLETE' && actual.retryable;
+    return result;
+  } catch { return managedFailure('MODEL_EXECUTION_FAILED'); }
+  finally {
+    if (entry.state === 'pending') entry.state = 'failed';
+    charge.ticket.close(scope.owner); finish();
+  }
 }
 
 /** 已知输入的子域证明只构建一次有限扫描计划；由节点完整接纳预付。 */

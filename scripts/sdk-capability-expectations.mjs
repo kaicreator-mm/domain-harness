@@ -1,5 +1,6 @@
 // Reviewed independent public contract: R75 accepted target API inventory. Update only with approved API delta.
 export const expectedClasses = {
+ ModelElement:['standard-element','public','generate'],
  KernelLifecycle:['kdp-element','public','start','execute','run','[Symbol.asyncDispose]'],
  WorkflowElement:['abstract-contract','abstract','run'],
  XStateWorkflowElement:['standard-element','public','run','runIn'],
@@ -30,7 +31,7 @@ export const expectedTypes = [
  'InteractionRecord','InteractionResponse','InteractionSubmitResult','InteractionDecision','InteractionScope','EvidenceOrigin','EvidenceObservation',
  'EvidenceRequirement','EvidenceContext','EvidenceResolution','EvidenceDependency','EvidenceInvalidation','DecisionCondition',
  'DecisionDescription','DecisionSelection','CandidateEntry','CandidateSource','CandidateAssessment','CandidateProjection','CandidatePreparation',
- 'ClarificationField','ClarificationPreparation','ClarificationResponse','WorkflowSlot','WorkflowSlotReader','WorkflowSlotWriter','WorkflowSlotBinding','WorkflowNodeProposal','WorkflowEdit','WorkflowRegionProposal','WorkflowRegionLimits','WorkflowRegionView','WorkflowFunctionBinding','WorkflowCapability','WorkflowRegionDefinition',
+ 'ClarificationField','ClarificationPreparation','ClarificationResponse','WorkflowSlot','WorkflowSlotReader','WorkflowSlotWriter','WorkflowSlotBinding','WorkflowNodeProposal','WorkflowEdit','WorkflowRegionProposal','WorkflowRegionLimits','WorkflowRegionView','WorkflowFunctionBinding','WorkflowCapability','WorkflowRegionDefinition','ModelProfile','ModelToolDescription','ModelToolCall','ModelToolResult','ModelTurn','ModelRequest',
 ];
 export const expectedSupport = {
  LifecycleInitContext:['appId','enter'],PackageInitElement:['start','[Symbol.asyncDispose]'],StaticCorePackage:['Init','packageMeta'],LifecycleLogger:['error'],
@@ -40,7 +41,7 @@ export const expectedSupport = {
 };
 export const expectedFamilies={
  lifecycle:['KernelLifecycle','CorePackageMetadata','DomainAppContext','LifecycleInitContext','PackageInitElement','StaticCorePackage','LifecycleLogRecord','LifecycleLogger'],
- workflow:['WorkflowElement','XStateWorkflowElement','NativeWorkflowContext','StandardWorkflowSession','routeWorkflowOutcome','runRecognitionHandling','StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','WorkflowControlLimits','WorkflowControlOptions','WorkflowOccurrence','WorkflowKnowledgeFrame','WorkflowKnowledgePolicy','WorkflowCompletionPolicy','WorkflowContextView','WorkflowTerminalContext','ModelUsage','WorkflowObservation','WorkflowNode','WorkflowNodeOptions','WorkflowAttempt','WorkflowActorOptions','createWorkflowSlot','bindWorkflowFunction','bindWorkflowRegion','runWorkflowRegion','WorkflowSlot','WorkflowSlotReader','WorkflowSlotWriter','WorkflowSlotBinding','WorkflowNodeProposal','WorkflowEdit','WorkflowRegionProposal','WorkflowRegionLimits','WorkflowRegionView','WorkflowFunctionBinding','WorkflowCapability','WorkflowRegionDefinition'],
+ workflow:['WorkflowElement','XStateWorkflowElement','NativeWorkflowContext','StandardWorkflowSession','routeWorkflowOutcome','runRecognitionHandling','StandardWorkflowOutcome','WorkflowLimits','WorkflowRoutes','WorkflowControlLimits','WorkflowControlOptions','WorkflowOccurrence','WorkflowKnowledgeFrame','WorkflowKnowledgePolicy','WorkflowCompletionPolicy','WorkflowContextView','WorkflowTerminalContext','ModelUsage','WorkflowObservation','WorkflowNode','WorkflowNodeOptions','WorkflowAttempt','WorkflowActorOptions','createWorkflowSlot','bindWorkflowFunction','bindWorkflowRegion','runWorkflowRegion','WorkflowSlot','WorkflowSlotReader','WorkflowSlotWriter','WorkflowSlotBinding','WorkflowNodeProposal','WorkflowEdit','WorkflowRegionProposal','WorkflowRegionLimits','WorkflowRegionView','WorkflowFunctionBinding','WorkflowCapability','WorkflowRegionDefinition','ModelElement','ModelProfile','ModelToolDescription','ModelToolCall','ModelToolResult','ModelTurn','ModelRequest'],
  'structured-data':['JsonReader','YamlReader','readJson','readYaml','writeJson','writeYaml','StandardJsonValue','StandardFileOutcome'],
  query:['BoundedQueryElement','BoundedQueryLimits','BoundedQueryTruncationReason','BoundedQueryResult','VectorQueryElement','VectorCandidate','VectorQueryOptions','VectorMatch','VectorQueryResult','GraphQueryElement','TypedGraphEdge','GraphQueryLimits','GraphQueryOptions','GraphPath','GraphQueryResult'],
  database:['SQLiteDatabaseElement','SQLiteDatabaseError','SQLiteScalar','SQLiteNonThenable','SQLiteTransaction','SQLiteDatabaseOptions','SQLiteErrorCode','SQLiteFailureOrigin','SQLiteTerminalFailureDetails'],

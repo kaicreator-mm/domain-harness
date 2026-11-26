@@ -1,3 +1,4 @@
+import { beginModelPlan, endModelPlan, consumeModelJson, isModelJson } from './model-wire.js';
 import { randomUUID } from 'node:crypto';
 import { borrowRegionScope, guardBoundFactory, regionDisposition, regionOperation, verifyRegionProofs, regionReplaySafe } from './native-workflow-composition.js';
 import type { NativeWorkflowContext } from './native-workflow-composition.js';
@@ -413,15 +414,59 @@ class Region<I, O> {
     this.#nodes[index] = Object.freeze({ ...n, state: 'accepted', attempt: n.attempt + 1, outputs: actual.value, ...(childProof ? { childProof } : {}) });
     return ok(undefined);
   }
+  /** 模型只得到显式投影能力及实际当前 slot；结构接纳仍由原生区域验证。 */
+  private modelAccess(p: WorkflowRegionProposal, access: Readonly<{ capabilities: readonly string[]; contextSlots: readonly string[];
+    resultSlots: readonly Readonly<{ node:string;slot:string }>[] }>, frame: WorkflowKnowledgeFrame): boolean {
+    if(!access || !boundedNames(access.capabilities,this.limits.maxNodes)
+      || !array(access.contextSlots) || access.contextSlots.length>this.limits.maxBindings
+      || !array(access.resultSlots) || access.resultSlots.length>this.limits.maxBindings) return false;
+    const caps=new Set(access.capabilities), contexts=new Set(access.contextSlots), results=new Set<string>();
+    if(contexts.size!==access.contextSlots.length || [...caps].some(id=>{
+      const cap=this.allowed.get(id);return !cap||!capabilityData(cap)?.model;
+    })) return false;
+    const current=this.currentEntries(frame);
+    if([...contexts].some(name=>!this.#context.has(name)||!current.has(name)))return false;
+    for(const ref of access.resultSlots){
+      if(!ref||typeof ref.node!=='string'||typeof ref.slot!=='string')return false;
+      const key=ref.node+'/'+ref.slot;if(results.has(key)||!current.has(key)||!this.#nodes.some(n=>n.id===ref.node&&n.state==='accepted'))return false;
+      results.add(key);
+    }
+    const aliases=new Map<string,WorkflowNodeProposal>();
+    const permittedRef=(ref:WorkflowSlotBinding):boolean=>ref.kind==='literal'||(ref.kind==='context'?contexts.has(ref.slot):
+      results.has(ref.node+'/'+ref.slot)||aliases.has(ref.node)&&Object.hasOwn(capabilityData(this.allowed.get(aliases.get(ref.node)!.capability)!)?.outputs??{},ref.slot));
+    const permittedNode=(node:WorkflowNodeProposal):boolean=>{
+      // 子区域 initial 需要独立子域投影；当前入口不允许模型跨域注入。
+      if(!caps.has(node.capability)||node.initial!==undefined||!Object.values(node.input).every(permittedRef))return false;
+      aliases.set(node.alias,node);return true;
+    };
+    for(const edit of p.edits){
+      if(edit.kind==='insert'){if(!permittedNode(edit.node))return false;}
+      else if(edit.kind==='reuse'){
+        const template=this.gaps.get(edit.gap)?.templates.get(edit.template);
+        if(!template||!permittedNode({...template,alias:edit.alias}))return false;
+      }else{
+        const target=this.#nodes.find(n=>n.id===edit.node)?.node??aliases.get(edit.node);
+        if(!target||!caps.has(target.capability))return false;
+        if(edit.kind==='rebind'&&!permittedRef(edit.to))return false;
+      }
+    }
+    return true;
+  }
   private async choose(): Promise<Outcome<WorkflowRegionProposal>> {
     const result = await regionOperation<WorkflowRegionProposal>(this.root, this.structuralWork + this.viewWork, 1, true, async (frame, left) => {
       this.current(frame);
       if (frame.epoch !== this.#factRevision) return stale();
-      const planned = await this.withView(frame, left, 'plan', view => this.d.plan(view, this.root));
+      const plan = beginModelPlan(this.root);
+      let planned: Awaited<ReturnType<WorkflowRegionDefinition<I,O>['plan']>>;
+      try { planned = await this.withView(frame, left, 'plan', view => this.d.plan(view, this.root)); }
+      finally { endModelPlan(this.root,plan); }
       if (planned.status !== 'COMPLETE') return planned;
-      // 模型接入前拒绝模型来源，不能伪装为 native。
-      if (planned.value.source !== 'native') return fail('WORKFLOW_MODEL_ACCESS_NOT_READY');
-      return ok({ value: proposal(planned.value.proposal, this.limits), ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
+      const raw=planned.value.proposal;
+      const parsed=proposal(raw,this.limits);
+      if(planned.value.source==='model'){
+        if(!consumeModelJson(raw,this.root.runId,this.root.scopeId,plan)||!this.modelAccess(parsed,planned.value.access,frame))return fail('WORKFLOW_MODEL_ACCESS_DENIED');
+      }else if(planned.value.source!=='native'||isModelJson(raw))return fail('WORKFLOW_MODEL_ACCESS_DENIED');
+      return ok({ value: parsed, ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
     }, false, false, 0, this.event('proposal-rejected', this.#revision, this.#revision, 'WORKFLOW_PROPOSAL_REJECTED'));
     return result;
   }

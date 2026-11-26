@@ -100,6 +100,82 @@
 - 职责：创建不可伪造身份的类型能力；守卫必须是可信同步判断。
 - 调用签名：`<T>(id: string, accepts: (value: unknown) => value is T): WorkflowSlot<T>`
 
+### ModelElement
+
+- 分类：`standard-element`；声明：`dist/model.d.ts`
+- 职责：受控单轮原生模型 Element；不自动执行工具、不持久化、不重试。
+- 获取方式：public constructor / new
+- 构造声明：`(profile: ModelProfile): ModelElement`
+- `ModelElement#generate` · instance method：`(root: NativeWorkflowContext, request: ModelRequest) => Promise<Outcome<ModelTurn>>`；调用：`(root: NativeWorkflowContext, request: ModelRequest): Promise<StandardWorkflowOutcome<ModelTurn>>`
+
+### ModelProfile
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：可信调用方显式声明协议、模型、认证来源、能力和有限传输上限。
+- 类型声明：`interface ModelProfile { readonly id: string; readonly protocol: 'openai-chat' \| 'anthropic-messages'; readonly endpoint: string; readonly model: string; readonly credential: () => string \| Promise<string>; readonly tokenField?: 'max_tokens' \| 'max_completion_tokens'; readonly anthropicVersion?: string; readonly features: Readonly<{ tools: boolean; jsonSchema: boolean; toolsWithJsonSchema: boolean; }>; readonly limits: Readonly<{ requestBytes: number; responseBytes: number; maxOutputTokens: number; timeoutMs: number; }>; }`
+- `ModelProfile#anthropicVersion` · contract property readonly optional：`string`
+- `ModelProfile#credential` · contract callback readonly：`() => string \| Promise<string>`；调用：`(): string \| Promise<string>`
+- `ModelProfile#endpoint` · contract property readonly：`string`
+- `ModelProfile#features` · contract property readonly：`Readonly<{ tools: boolean; jsonSchema: boolean; toolsWithJsonSchema: boolean; }>`
+- `ModelProfile#id` · contract property readonly：`string`
+- `ModelProfile#limits` · contract property readonly：`Readonly<{ requestBytes: number; responseBytes: number; maxOutputTokens: number; timeoutMs: number; }>`
+- `ModelProfile#model` · contract property readonly：`string`
+- `ModelProfile#protocol` · contract property readonly：`"openai-chat" \| "anthropic-messages"`
+- `ModelProfile#tokenField` · contract property readonly optional：`"max_tokens" \| "max_completion_tokens"`
+
+### ModelRequest
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：单轮请求；显式续接、重试或 fallback，不自动执行工具。
+- 类型声明：`interface ModelRequest { readonly system: string; readonly input: readonly (Readonly<{ role: 'user'; text: string; }> \| Readonly<{ role: 'assistant'; turn: ModelTurn; }> \| Readonly<{ role: 'tool-results'; results: readonly ModelToolResult[]; }>)[]; readonly tools: readonly ModelToolDescription[]; readonly output: Readonly<{ kind: 'text'; } \| { kind: 'json'; strict: false; } \| { kind: 'json'; strict: true; schema: J; }>; readonly maxOutputTokens: number; readonly requestKey: string; readonly action: 'initial' \| 'retry' \| 'fallback' \| 'continue'; readonly reason: string; }`
+- `ModelRequest#action` · contract property readonly：`"initial" \| "continue" \| "retry" \| "fallback"`
+- `ModelRequest#input` · contract property readonly：`readonly (Readonly<{ role: "user"; text: string; }> \| Readonly<{ role: "assistant"; turn: ModelTurn; }> \| Readonly<{ role: "tool-results"; results: readonly ModelToolResult[]; }>)[]`
+- `ModelRequest#maxOutputTokens` · contract property readonly：`number`
+- `ModelRequest#output` · contract property readonly：`Readonly<{ kind: "text"; } \| { kind: "json"; strict: false; } \| { kind: "json"; strict: true; schema: J; }>`
+- `ModelRequest#reason` · contract property readonly：`string`
+- `ModelRequest#requestKey` · contract property readonly：`string`
+- `ModelRequest#system` · contract property readonly：`string`
+- `ModelRequest#tools` · contract property readonly：`readonly ModelToolDescription[]`
+
+### ModelToolCall
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：真实模型响应中的有限工具候选。
+- 类型声明：`interface ModelToolCall { readonly id: string; readonly name: string; readonly input: J; }`
+- `ModelToolCall#id` · contract property readonly：`string`
+- `ModelToolCall#input` · contract property readonly：`J`
+- `ModelToolCall#name` · contract property readonly：`string`
+
+### ModelToolDescription
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：模型可提出的工具描述，不是执行注册表。
+- 类型声明：`interface ModelToolDescription { readonly name: string; readonly description: string; readonly inputSchema: J; }`
+- `ModelToolDescription#description` · contract property readonly：`string`
+- `ModelToolDescription#inputSchema` · contract property readonly：`J`
+- `ModelToolDescription#name` · contract property readonly：`string`
+
+### ModelToolResult
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：调用方实际执行后提供的结果，与原始工具 ID 对应。
+- 类型声明：`interface ModelToolResult { readonly callId: string; readonly value: J; readonly error: boolean; }`
+- `ModelToolResult#callId` · contract property readonly：`string`
+- `ModelToolResult#error` · contract property readonly：`boolean`
+- `ModelToolResult#value` · contract property readonly：`J`
+
+### ModelTurn
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：SDK 已接纳的一轮模型结果，不等价于业务授权。
+- 类型声明：`interface ModelTurn { readonly requestId: string; readonly attempt: number; readonly text: string; readonly json?: J; readonly calls: readonly ModelToolCall[]; readonly usage: ModelUsage; }`
+- `ModelTurn#attempt` · contract property readonly：`number`
+- `ModelTurn#calls` · contract property readonly：`readonly ModelToolCall[]`
+- `ModelTurn#json` · contract property readonly optional：`J`
+- `ModelTurn#requestId` · contract property readonly：`string`
+- `ModelTurn#text` · contract property readonly：`string`
+- `ModelTurn#usage` · contract property readonly：`ModelUsage`
+
 ### ModelUsage
 
 - 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
