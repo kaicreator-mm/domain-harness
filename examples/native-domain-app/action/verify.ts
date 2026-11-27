@@ -10,12 +10,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { InventoryAuthority, payloadDigest, commandDigest } from './authority.js';
-import type { ApprovalGrant, Policy, Reply, ReserveCommand } from './authority.js';
+import { InventoryAuthority, payloadDigest, commandDigest, stop } from './authority.js';
+import type { ApprovalGrant, Policy, Reply, ReserveCommand, Receipt } from './authority.js';
+import { ManagedInventoryReservation } from './managed-reservation.js';
 import { ReservationElement } from './client.js';
 import type { ReservationMode } from './client.js';
-import { InteractionElement, SQLiteDatabaseElement, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
-import type { InteractionDecision, InteractionPrompt, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
+import { InteractionElement, SQLiteDatabaseElement, StandardWorkflowSession, runInteractiveRecognitionHandling } from '@kaicreator/domain-harness';
+import type { InteractionDecision, InteractionPrompt, StandardWorkflowOutcome, WorkflowLimits, WorkflowObservation, WorkflowCompletionPolicy } from '@kaicreator/domain-harness';
 
 const limits = { maxCalls: 2, maxSteps: 5, maxDepth: 1 };
 function command(id: string, resource: string, version = 0, quantity = 2, grant: string | null = null): ReserveCommand {
@@ -64,8 +65,8 @@ class Fixture {
   readonly hosts: Host[] = [];
   readonly clients: ReservationElement[] = [];
   constructor() { this.owner.initialize(); }
-  resource(name: string, policy: Policy): void {
-    this.owner.seed('shop-a', name, 20, policy);
+  resource(name: string, policy: Policy, stock=20): void {
+    this.owner.seed('shop-a', name, stock, policy);
     this.owner.allow(this.token, 'alice', 'shop-a', name);
     this.owner.allow(this.otherToken, 'bob', 'shop-a', name);
   }
@@ -115,7 +116,7 @@ async function shutdown(server: Server): Promise<void> {
   const closed = once(server, 'close'); server.close(); server.closeAllConnections(); await closed;
 }
 /** 故障只在测试代理：真实 HTTP 转发后断开 ACK，或在转发前断开；正式 Host 无注入接口。 */
-async function proxy(base: string, mode: { dropSubmit?: 'before' | 'after'; dropReadback?: boolean; afterSubmit?: () => void }) {
+async function proxy(base: string, mode: { dropSubmit?: 'before' | 'after'; dropReadback?: boolean; afterSubmit?: () => void | Promise<void> }) {
   const counts = { submit: 0, readback: 0 };
   const server = createServer((req, res) => {
     void (async () => {
@@ -128,7 +129,7 @@ async function proxy(base: string, mode: { dropSubmit?: 'before' | 'after'; drop
         authorization: String(req.headers.authorization), 'x-principal': String(req.headers['x-principal']),
         'content-type': 'application/json' }, body: Buffer.concat(chunks), redirect: 'error' });
       const body = await upstream.text();
-      if (submit) mode.afterSubmit?.();
+      if (submit) await mode.afterSubmit?.();
       if (submit && mode.dropSubmit === 'after') { res.destroy(); return; }
       res.writeHead(upstream.status, { 'content-type': 'application/json' }); res.end(body);
     })().catch(() => res.destroy());
@@ -469,4 +470,212 @@ export const interactiveActionCases: readonly [string, () => Promise<void>][] = 
       f.state('stock', 2, 16, 2); assert.deepEqual(p.counts, { submit: 2, readback: 1 });
     } finally { await p.close(); }
   })],
+];
+
+const accepted = <T>(value:T): StandardWorkflowOutcome<T> => ({status:'COMPLETE',value});
+function controlledInventory(f:Fixture, base:string, change:()=>number, observe:(r:WorkflowObservation)=>void,
+  sink?:(r:WorkflowObservation)=>StandardWorkflowOutcome<void>,signal?:AbortSignal){
+  const knowledge={maxItems:1,equal:Object.is,current:()=>({epoch:change(),context:{scope:'shop-a',revisions:new Map([['plan',String(change())]])}})};
+  const options={knowledge,current:()=>true};
+  const session=()=>new StandardWorkflowSession({maxCalls:100,maxSteps:200,maxDepth:4},{
+    ...options,limits:{maxWork:10000000,maxEvents:200,maxActiveScopes:16,maxNoProgress:6,maxActiveMs:30000,maxSettlementMs:2000},
+    observe,...(signal?{signal}:{}),...(sink?{evidence:{required:true,emit:sink}}:{})});
+  const client=f.client('managed-'+f.clients.length,base);
+  // 终止观察只向实际 Host 请求原命令身份；不使用 submit，故障代理同样适用。
+  const read=async(c:ReserveCommand,signal:AbortSignal):Promise<Reply>=>{
+    try {
+      const response=await fetch(base+'/readback',{method:'POST',headers:{authorization:'Bearer '+f.token,
+        'x-principal':'alice','content-type':'application/json'},body:JSON.stringify(c),redirect:'error',
+        signal:AbortSignal.any([signal,AbortSignal.timeout(1500)])});
+      if(!response.ok)return stop('UNKNOWN','READBACK_UNAVAILABLE');
+      const body=await response.text();
+      if(Buffer.byteLength(body)>16384)return stop('UNKNOWN','READBACK_UNAVAILABLE');
+      const result=JSON.parse(body) as Reply;
+      if(result.status==='COMPLETE'&&result.value.id===c.id&&result.value.digest===commandDigest('alice',c)
+        &&result.value.version===c.version+1&&Number.isSafeInteger(result.value.remaining)&&result.value.remaining>=0)return result;
+      if(result.status==='REJECT'&&['RESOURCE_CONFLICT','APPROVAL_DENIED','RESOURCE_MISSING'].includes(result.reason.code))return result;
+      if(result.status==='ASK'&&result.reason.code==='APPROVAL_REQUIRED')return result;
+      return stop('UNKNOWN','READBACK_UNAVAILABLE');
+    }catch{return stop('UNKNOWN','READBACK_UNAVAILABLE');}
+  };
+  const flow=new ManagedInventoryReservation(client,read,options);
+  const completion:WorkflowCompletionPolicy<Receipt>={goal:'current independent authoritative receipt',requiredKnowledge:[],terminalReads:0,
+    validate:r=>{const row=f.attempt(f.path,r.id);
+      return row?.reply&&JSON.stringify(JSON.parse(row.reply))===JSON.stringify({status:'COMPLETE',value:r})
+        ?accepted(undefined):stop('REJECT','ACTUAL_RECEIPT_REQUIRED');}};
+  return {session,flow,completion};
+}
+/** 消费者只接纳本地最终处置，candidate 单独出现永远 UNKNOWN。 */
+function consumed(trace:readonly WorkflowObservation[],final:readonly WorkflowObservation[],id:string){
+  const candidate=trace.find(r=>r.kind==='node'&&r.phase==='candidate'&&r.receiptId===id);
+  if(!candidate||candidate.kind!=='node')return 'UNKNOWN';
+  const confirmed=final.filter(r=>r.kind==='node'&&r.phase==='disposition'&&r.runId===candidate.runId
+    &&r.scopeId===candidate.scopeId&&r.occurrence.instanceId===candidate.occurrence.instanceId
+    &&r.occurrence.attempt===candidate.occurrence.attempt&&r.candidateSeq===candidate.seq);
+  return confirmed.length===1&&confirmed[0]?.kind==='node'?confirmed[0].acceptance:'UNKNOWN';
+}
+export const managedActionCases: readonly [string,()=>Promise<void>][]=[
+  ['D-C actual commit barrier, stale receipt and critical sink delivery',()=>fixture(async f=>{
+    for(const mode of ['current','stale','sink-fail','sink-epoch','pre-denied'] as const){
+      const resource='stock-'+mode;
+      f.resource(resource,'PREAUTHORIZED',5);const h=await f.host();
+      let epoch=1,committed=0;const trace:WorkflowObservation[]=[];
+      let release!:()=>void,arrived!:()=>void;
+      const hold=new Promise<void>(resolve=>{release=resolve;});
+      const arrival=new Promise<void>(resolve=>{arrived=resolve;});
+      const p=await proxy(h.base,{afterSubmit:async()=>{committed++;arrived();if(mode==='stale')await hold;}});
+      try{
+        const q=controlledInventory(f,p.base,()=>epoch,r=>trace.push(r),r=>{
+          if(r.kind==='node'&&r.phase==='candidate'&&r.occurrence.definitionId==='inventory-reservation'){
+            if(mode==='sink-fail')return stop('FAILED','SINK_FAILED');
+            if(mode==='sink-epoch')epoch++;
+          }return accepted(undefined);
+        });
+        const c=command('public-c1-'+mode,resource),s=q.session();
+        const pending=s.run(root=>q.flow.execute(root,c,'FIRST_SUBMIT',()=>mode!=='pre-denied'),q.completion);
+        if(mode==='stale'){
+          try{await Promise.race([arrival,new Promise<never>((_,reject)=>{const timer=setTimeout(()=>reject(Error('HOST_BARRIER_TIMEOUT')),10000);timer.unref();})]);
+            f.state(resource,1,3,1);epoch++;
+          }finally{release();}
+        }
+        const r=await pending;
+        assert.equal(r.status==='COMPLETE',mode==='current',mode);
+        const actual=s.dispositions().find(x=>x.kind==='node'&&x.occurrence.definitionId==='inventory-reservation');
+        assert.ok(actual?.kind==='node',mode);
+        if(mode==='pre-denied'){assert.equal(p.counts.submit,0);assert.equal(committed,0);f.state(resource,0,5,0);assert.equal(actual.entered,false);}
+        else{
+          assert.equal(p.counts.submit,1);assert.equal(committed,1);f.state(resource,1,3,1);
+          const authoritative=f.attempt(f.path,c.id);assert.equal(authoritative?.digest,commandDigest('alice',c));
+          assert.equal(actual.effect,'committed');assert.equal(actual.receiptId,c.id);
+          assert.equal(actual.acceptance==='accepted',mode==='current');
+          assert.equal(consumed(trace,[],c.id),'UNKNOWN');assert.equal(consumed(trace,s.dispositions(),c.id),actual.acceptance);
+        }
+        assert.equal(new Set(trace.map(x=>x.runId)).size,1);
+        assert.ok(trace.every((x,i)=>i===0||x.seq>trace[i-1]!.seq));
+        assert.ok(!JSON.stringify(trace).includes(f.token));
+      }finally{release();await p.close();}
+    }
+  })],
+  ['D-C real lost ACK, conflicting distinct ID blocked and independent authorized resource progresses',()=>fixture(async f=>{
+    f.resource('stock','PREAUTHORIZED',5);f.resource('other','PREAUTHORIZED',5);const h=await f.host();
+    const fault:{dropSubmit?:'after';dropReadback?:boolean}={dropSubmit:'after',dropReadback:true};
+    const p=await proxy(h.base,fault);let epoch=1;
+    try{
+      const trace:WorkflowObservation[]=[];const q=controlledInventory(f,p.base,()=>epoch,r=>trace.push(r));
+      const original=command('public-c1','stock'),conflict=command('public-c2','stock',1),independent=command('public-c3','other');
+      const first=await q.session().run(root=>q.flow.execute(root,original,'FIRST_SUBMIT'),q.completion);
+      assert.equal(first.status,'UNKNOWN');f.state('stock',1,3,1);
+      assert.equal(p.counts.submit,1);
+      delete fault.dropSubmit;
+      const blocked=await q.session().run(root=>q.flow.execute(root,conflict,'FIRST_SUBMIT'),q.completion);
+      expect(blocked,'UNKNOWN','CONFLICTING_UNKNOWN');assert.equal(p.counts.submit,1);assert.equal(f.attempt(f.path,conflict.id),undefined);
+      fault.dropReadback=false;epoch++;
+      const other=await q.session().run(root=>q.flow.execute(root,independent,'FIRST_SUBMIT'),q.completion);
+      expect(other,'COMPLETE');f.state('other',1,3,1);assert.equal(p.counts.submit,2);
+      const recovered=await q.session().run(root=>q.flow.execute(root,original,'RECOVER'),q.completion);
+      expect(recovered,'COMPLETE');assert.equal(p.counts.submit,2);f.state('stock',1,3,1);
+      assert.deepEqual(recovered,JSON.parse(f.attempt(f.path,original.id)!.reply!));
+    }finally{await p.close();}
+  })],
+  ['D-C managed independent roots compete through real separate Host processes',()=>fixture(async f=>{
+    f.resource('stock','PREAUTHORIZED',5);const a=await f.host(),b=await f.host();assert.notEqual(a.pid,b.pid);
+    const traceA:WorkflowObservation[]=[],traceB:WorkflowObservation[]=[];
+    // Independent clients need distinct local ledger names; use separate authoritative proxy addresses and shared fixture only for verification.
+    const p=await proxy(a.base,{}),q=await proxy(b.base,{});
+    try{
+      const x=controlledInventory(f,p.base,()=>1,r=>traceA.push(r)),y=controlledInventory(f,q.base,()=>1,r=>traceB.push(r));
+      const rs=await Promise.all([x.session().run(root=>x.flow.execute(root,command('cas-a','stock'),'FIRST_SUBMIT'),x.completion),
+        y.session().run(root=>y.flow.execute(root,command('cas-b','stock'),'FIRST_SUBMIT'),y.completion)]);
+      assert.equal(rs.filter(r=>r.status==='COMPLETE').length,1);assert.equal(p.counts.submit+q.counts.submit,2);f.state('stock',1,3,1);
+      assert.equal(new Set([...traceA,...traceB].map(r=>r.runId)).size,2);
+    }finally{await p.close();await q.close();}
+  })],
+  ['D-C attached Interaction wait and cancellation isolate real independent Host root',()=>fixture(async f=>{
+    f.resource('stock','PREAUTHORIZED',5);f.resource('other','PREAUTHORIZED',5);const h=await f.host();
+    const c=command('wait-cancel','stock'),other=command('while-wait','other');
+    const p=await proxy(h.base,{});
+    try{
+      const traces:WorkflowObservation[]=[];
+      const q=controlledInventory(f,p.base,()=>1,r=>traces.push(r));
+      let prompted!:()=>void;
+      const ready=new Promise<void>(resolve=>{prompted=resolve;});
+      const interaction=new InteractionElement({onPrompt:()=>prompted()});
+      const waiting=q.session();
+      const ar=waiting.run(async root=>{
+        const a=await interaction.runIn(root,scope=>scope.resolve<number,number>(0,(_state,event)=>
+          event.kind==='initial'?accepted({kind:'clarify',state:1,prompt:{decisionKey:'quantity',title:'Confirm quantity',
+            fields:[{id:'quantity',label:'Quantity',kind:'number',required:true}],actions:['submit','cancel']}})
+            :event.response.action==='submit'&&typeof event.response.values.quantity==='number'?accepted({kind:'ready',intent:event.response.values.quantity})
+            :stop('REJECT','CANCELLED')));
+        return a.status==='COMPLETE'?q.flow.execute(root,{...c,quantity:a.value},'FIRST_SUBMIT'):a;
+      },q.completion);
+      try{
+        await ready;assert.equal(p.counts.submit,0);
+        const br=await q.session().run(root=>q.flow.execute(root,other,'FIRST_SUBMIT'),q.completion);
+        expect(br,'COMPLETE');f.state('other',1,3,1);assert.equal(p.counts.submit,1);
+        interaction.cancel();assert.notEqual((await ar).status,'COMPLETE');f.state('stock',0,5,0);assert.equal(p.counts.submit,1);
+        assert.equal(new Set(traces.map(r=>r.runId)).size,2);
+      }finally{interaction.cancel();await ar;}
+    }finally{await p.close();}
+  })],
+  ['D-C actual Host barrier and local quiescence across active conflict and cancellation',()=>fixture(async f=>{
+    f.resource('stock','PREAUTHORIZED',5);const h=await f.host();
+    let entered!:()=>void,release!:()=>void;
+    const started=new Promise<void>(r=>{entered=r;}),hold=new Promise<void>(r=>{release=r;});
+    const delayed=await proxy(h.base,{afterSubmit:async()=>{entered();await hold;}});
+    try{
+      const abort=new AbortController();
+      const q=controlledInventory(f,delayed.base,()=>1,()=>undefined,undefined,abort.signal);
+      const s=q.session(),cmd=command('barrier','stock');
+      let returned=false;
+      const outcome=s.run(root=>q.flow.execute(root,cmd,'FIRST_SUBMIT'),q.completion);
+      void outcome.then(()=>{returned=true;});
+      try{
+        await started;f.state('stock',1,3,1);
+        assert.equal(returned,false);
+        assert.ok(!s.dispositions().some(r=>r.kind==='scope'&&r.parentScopeId===undefined&&r.phase==='closed'));
+        const denied=await q.session().run(root=>q.flow.execute(root,cmd,'RECOVER'),q.completion);
+        expect(denied,'UNKNOWN','CONFLICTING_UNKNOWN');assert.equal(delayed.counts.submit,1);
+        abort.abort();await new Promise<void>(resolve=>setImmediate(resolve));
+        assert.equal(returned,false);
+        assert.ok(!s.dispositions().some(r=>r.kind==='scope'&&r.parentScopeId===undefined&&r.phase==='closed'));
+      }finally{release();}
+      assert.notEqual((await outcome).status,'COMPLETE');assert.equal(returned,true);
+      assert.ok(s.dispositions().some(r=>r.kind==='scope'&&r.parentScopeId===undefined&&r.phase==='closed'&&r.localQuiescent));
+      f.state('stock',1,3,1);
+      assert.ok(s.dispositions().some(r=>r.kind==='node'&&r.effect==='committed'&&r.receiptId===cmd.id&&r.acceptance!=='accepted'));
+    }finally{release();await delayed.close();}
+  })],
+  ['D-C managed authority grant and user confirmation are distinct; actual denied cases have no effect',()=>fixture(async f=>{
+    const h=await f.host(),p=await proxy(h.base,{});
+    try{
+      const q=controlledInventory(f,p.base,()=>1,()=>undefined);
+      for(const mode of ['missing','expired','revoked','wrong-digest','wrong-principal','wrong-resource','over-quantity','per-valid','session-valid'] as const){
+        const resource='grant-'+mode,policy=mode==='wrong-resource'||mode==='over-quantity'||mode==='session-valid'?'SESSION':'PER_CALL';
+        f.resource(resource,policy,5);
+        const cmd=command('cmd-'+mode,resource,0,2,mode==='missing'?null:'g-'+mode);
+        if(cmd.grant){
+          f.grant(cmd.grant,policy,cmd,{
+            ...(mode==='expired'?{expires:Date.now()-1}:{}),
+            ...(mode==='wrong-digest'?{digest:payloadDigest('alice',{...cmd,quantity:1})}:{}),
+            ...(mode==='wrong-principal'?{principal:'bob'}:{}),
+            ...(mode==='wrong-resource'?{resource:'unselected'}:{}),
+            ...(mode==='over-quantity'?{maxQuantity:1}:{})});
+          if(mode==='revoked')f.owner.revokeGrant(cmd.grant);
+        }
+        const before=p.counts.submit;
+        const r=await q.session().run(root=>q.flow.execute(root,cmd,'FIRST_SUBMIT',()=>true),q.completion);
+        const valid=mode==='per-valid'||mode==='session-valid';
+        expect(r,valid?'COMPLETE':mode==='missing'?'ASK':'REJECT',valid?undefined:mode==='missing'?'APPROVAL_REQUIRED':'APPROVAL_DENIED');
+        assert.equal(p.counts.submit,before+1,mode);
+        f.state(resource,valid?1:0,valid?3:5,valid?1:0);
+        if(mode==='missing'){
+          // 用户确认缺失授权不可替代实际 Host grant；独立授权后才允许新命令。
+          const authorized=command('approved-next',resource,0,2,'authorized-next');f.grant('authorized-next','PER_CALL',authorized);
+          expect(await q.session().run(root=>q.flow.execute(root,authorized,'FIRST_SUBMIT'),q.completion),'COMPLETE');
+          f.state(resource,1,3,1);
+        }
+      }
+    }finally{await p.close();}
+  })]
 ];
