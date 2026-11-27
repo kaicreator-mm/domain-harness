@@ -7,6 +7,8 @@ import type { ModelUsage } from './workflow-managed-contract.js';
 export interface ModelProfile {
   readonly id: string; readonly protocol: 'openai-chat' | 'anthropic-messages';
   readonly endpoint: string; readonly model: string; readonly credential: () => string | Promise<string>;
+  /** 可选协议兼容控制：仅明确关闭推理块；未声明时保留 Provider 默认行为。 */
+  readonly thinking?: 'disabled';
   readonly tokenField?: 'max_tokens' | 'max_completion_tokens'; readonly anthropicVersion?: string;
   readonly features: Readonly<{ tools: boolean; jsonSchema: boolean; toolsWithJsonSchema: boolean }>;
   readonly limits: Readonly<{ requestBytes: number; responseBytes: number; maxOutputTokens: number; timeoutMs: number }>;

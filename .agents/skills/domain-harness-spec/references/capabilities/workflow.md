@@ -36,3 +36,6 @@ ModelElement.constructor 接收可信固定 ModelProfile，generate(root, reques
 Function/Region 每个已接纳尝试均保存独立义务证据，即使没有输出 Slot；区域按真实来源 scope/revision/validity 检查、重验证和最终接纳，失效仅按明确只读且实际无副作用的规则重执行。节点自身知识不必复制成区域必需知识。模型成功终止必须有实际文本块或合法工具调用，缺失/null 文本且无工具不得接纳；显式空文本与工具专用响应保留区别。
 
 后续节点尝试必须维持实际已接纳的前序义务（包括零输出授权节点和私有子域证明）。区域固化有界义务校验计划，在节点及其实际后代的 frame 当前性检查中复用；既有 work 预留包含新增校验成本。前置条件或 enter 交付期间过期则禁止业务调用；已合法进入调用后发生失效，保留实际效果与收据但不接纳过期结果。
+
+实际兼容 Provider 若默认启用思考模式，可在可信 ModelProfile 显式设置 `thinking: "disabled"`，两协议发送有限 `thinking.type=disabled`。未设置不改变原请求，Provider 不支持时按实际失败处理；不接纳非空推理块，不转发或记录思考内容。DeepSeek Flash profile 声明 jsonSchema=false/toolsWithJsonSchema=false，普通 JSON 输出由可信领域进一步精确验证，不能视为严格 Provider Schema。
+兼容非流式 OpenAI 工具调用中的可选 index 必须等于实际数组位置；规范化续接只保留 id/type/function，拒绝错位或不支持的附加数据。

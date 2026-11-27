@@ -35,6 +35,7 @@ export const count=(v:unknown,max=2147483647)=>typeof v==='number'&&Number.isSaf
 export function captureProfile(p:ModelProfile):ModelProfile {
   if(!p||typeof p.credential!=='function'||('boundInputTokens'in p&&p.boundInputTokens!==undefined))return invalid('MODEL_INVALID_PROFILE');
   text(p.id,128);text(p.model,256);
+  if(p.thinking!==undefined&&p.thinking!=='disabled')return invalid('MODEL_INVALID_PROFILE');
   let u:URL;try{u=new URL(p.endpoint);}catch{return invalid('MODEL_INVALID_ENDPOINT');}
   // 明确给定的环回端点用于本地协议测试或可信本地模型；其它端点只允许 HTTPS。
   if(u.username||u.password||u.hash||u.search||!(u.protocol==='https:'||u.protocol==='http:'&&['127.0.0.1','[::1]','localhost'].includes(u.hostname)))return invalid('MODEL_INVALID_ENDPOINT');
@@ -109,7 +110,8 @@ export function prepare(p:ModelProfile,r:ModelRequest,runId:string,scopeId:strin
   if(pending||!r.input.length||(r.action==='continue'&&!r.input.some(x=>x.role==='assistant')))return invalid('MODEL_TOOL_CORRELATION');
   const tokenLimit=count(r.maxOutputTokens);
   if(tokenLimit<1||tokenLimit>p.limits.maxOutputTokens)return invalid('MODEL_OUTPUT_LIMIT');
-  const wire:ObjWrite={model:p.model,messages,...(descriptors.length?{tools:descriptors}:{})};
+  const wire:ObjWrite={model:p.model,messages,...(descriptors.length?{tools:descriptors}:{}),
+    ...(p.thinking==='disabled'?{thinking:{type:'disabled'}}:{})};
   if(p.protocol==='openai-chat'){wire[p.tokenField!]=tokenLimit;if(format)wire.response_format=format;}
   else {wire.max_tokens=tokenLimit;if(system)wire.system=system;if(format)wire.output_config=format;}
   const body=JSON.stringify(snapshotJson(wire,max));if(Buffer.byteLength(body)>max)return invalid('MODEL_BYTE_LIMIT');
@@ -145,11 +147,18 @@ export function decode(p:ModelProfile,data:J,prepared:Prepared,requestId:string,
     if(m.role!==undefined&&m.role!=='assistant')return invalid('MODEL_INVALID_RESPONSE');
     if(Object.keys(m).some(k=>!['role','content','tool_calls','refusal','reasoning_content'].includes(k))||(m.reasoning_content!==undefined&&m.reasoning_content!==null&&m.reasoning_content!==''))return invalid('MODEL_UNSUPPORTED_BLOCK');
     content=m.content===null||m.content===undefined?'':str(m.content);
-    const raw=m.tool_calls===undefined?[]:array(m.tool_calls);
-    for(const t of raw){const c=object(t),f=object(c.function);if(c.type!=='function'||Object.keys(c).some(k=>!['type','id','function'].includes(k))||Object.keys(f).some(k=>!['name','arguments'].includes(k)))return invalid('MODEL_UNSUPPORTED_BLOCK');add(c.id,f.name,parseJson(str(f.arguments),p.limits.responseBytes));}
+    const raw=m.tool_calls===undefined?[]:array(m.tool_calls), normalized:J[]=[];
+    for(const [i,t] of raw.entries()){
+      const c=object(t),f=object(c.function);
+      // 某些兼容非流式响应携带序号；只接受与实际数组顺序一致的整数，不续传兼容元数据。
+      if(c.type!=='function'||Object.keys(c).some(k=>!['type','id','function','index'].includes(k))
+        ||(c.index!==undefined&&c.index!==i)||Object.keys(f).some(k=>!['name','arguments'].includes(k)))return invalid('MODEL_UNSUPPORTED_BLOCK');
+      add(c.id,f.name,parseJson(str(f.arguments),p.limits.responseBytes));
+      normalized.push({id:c.id!,type:'function',function:{name:f.name!,arguments:f.arguments!}});
+    }
     if(!calls.length&&typeof m.content!=='string')return invalid('MODEL_CONTENT_MISSING');
     if(choice.finish_reason!==(calls.length?'tool_calls':'stop'))return invalid('MODEL_FINISH_REJECTED');
-    wire={role:'assistant',content:m.content??null,...(raw.length?{tool_calls:raw}:{})};
+    wire={role:'assistant',content:m.content??null,...(normalized.length?{tool_calls:normalized}:{})};
   }else{
     const blocks=array(o.content);for(const b of blocks){const c=object(b);if(c.type==='text'){if(Object.keys(c).some(k=>k!=='type'&&k!=='text'))return invalid('MODEL_UNSUPPORTED_BLOCK');content+=str(c.text);}
       else if(c.type==='tool_use'){if(Object.keys(c).some(k=>!['type','id','name','input'].includes(k)))return invalid('MODEL_UNSUPPORTED_BLOCK');add(c.id,c.name,c.input??invalid());}else return invalid('MODEL_UNSUPPORTED_BLOCK');}

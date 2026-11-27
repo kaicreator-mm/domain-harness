@@ -173,7 +173,12 @@ test('native template reuse, move, skip and remove form one atomic edit and exec
     complete:v=>v.reader.read(idOf(v,'final')+'/value',integer)});
   const s=e.session(),r=await s.run(root=>runWorkflowRegion(root,d,undefined),completion<number>(v=>v===7));
   assert.deepEqual(r,ok(7));assert.deepEqual(count,{read:1,extra:1,final:1});
-  assert.equal(s.dispositions().filter(x=>x.kind==='node').length,3);
+  assert.equal(s.dispositions().filter(x=>x.kind==='node'&&x.phase==='disposition').length,3);
+  const skips=s.dispositions().filter(x=>x.kind==='node'&&x.phase==='skip');
+  assert.equal(skips.length,1);
+  const skip=skips[0]!;
+  assert.ok(skip.kind==='node'&&!skip.entered&&skip.occurrence.attempt===undefined&&skip.acceptance==='not-applicable');
+  assert.ok(e.trace.some(x=>x.kind==='region'&&x.action==='edit'&&x.seq===skip.candidateSeq));
 });
 test('invalid batch leaves all anchors unexecuted; no edit event, actual rejected proposal',async()=>{
   const e=environment(),count:Record<string,number>={},a=capability('read',x=>x,count),b=capability('final',x=>x,count);
@@ -408,4 +413,25 @@ test('accepted mandatory predecessor fences later effects, including private chi
       if(effects){assert.equal(eRecord.effect,'committed',label);assert.equal(eRecord.receiptId,'synthetic-receipt',label);}
       else{assert.equal(eRecord.entered,false,label);assert.equal(eRecord.effect,'not-applicable',label);}
     }
+});
+
+test('skip publication requires full event reservation and accepted current edit; rejected batch never publishes skip',async()=>{
+  let spent=0;
+  for(const mode of ['valid','event-short','sink-denied','stale','invalid-batch'] as const){
+    const e=environment(),count:Record<string,number>={},a=capability('optional',x=>x,count);
+    let policyCalls=0;
+    const maxEvents=mode==='event-short'?spent+1:400;
+    const d=e.region<number>({capabilities:[a],layout:[{kind:'gap',id:'flex',templates:[{alias:'a',capability:'optional',input:{value:ctx('quote')}}],seed:['a']}],
+      plan:v=>{if(mode==='valid')spent=maxEvents-v.remaining.events;
+        return result(v,'finish',[{kind:'skip',node:idOf(v,'optional')},...(mode==='invalid-batch'?[{kind:'skip' as const,node:'missing'}]:[])]);},
+      canSkip:()=>{policyCalls++;return ok(undefined);},complete:()=>ok(7)});
+    const s=new StandardWorkflowSession(rootLimits,{limits:{...baseControl,maxEvents},knowledge:e.policy,current:()=>true,
+      observe:r=>{e.trace.push(r);if(mode==='stale'&&r.kind==='region'&&r.action==='edit')e.change(3);},
+      evidence:{required:true,emit:r=>mode==='sink-denied'&&r.kind==='region'&&r.action==='edit'?deny():ok(undefined)}});
+    const r=await s.run(root=>runWorkflowRegion(root,d,undefined),completion<number>(v=>v===7));
+    assert.equal(r.status==='COMPLETE',mode==='valid',mode+':'+JSON.stringify(r));
+    assert.equal(policyCalls,mode==='event-short'?0:1,mode);
+    assert.deepEqual(count,{});
+    assert.equal(s.dispositions().filter(x=>x.kind==='node'&&x.phase==='skip').length,mode==='valid'?1:0,mode);
+  }
 });

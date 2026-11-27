@@ -9,3 +9,30 @@ DH_WITNESS_PYTHON=/absolute/path/to/python node --import tsx --test packages/dom
 ```
 
 Python requires SciPy 1.17.0, as selected in G01-S; the ordinary SDK unit test suite does not require Python. The adapter uses actual MILP and waits for child-process close. The two domain definitions instantiate an actual fixed XState machine and also execute via native TS control flow; neither performs purchases or dispatches. The public objective predicates and business constraints are checked separately from returned solver status. This is a source-tree scoped witness, not installed SDK qualification, independent holdout acceptance, or a full O01–O12 pass. Further model-decision, dynamic, Interaction, Host and cumulative accounting cases remain in their assigned DAG tasks.
+
+### D-C managed Host witness
+
+`host-witness.test.ts` reuses the actual independent loopback Host and SQLite authority, plus the domain-owned managed reservation example. Run with the existing compiled SDK on Node >=22.12.0. The controlled synthetic resources start at stock5/version0 for the new managed cases. The proxy holds or drops ACKs at the actual HTTP boundary; independent SQL readback verifies stock/version/effect counts and command receipts. The managed root owns actual invocation and terminal readback; late stale results never substitute for accepted business results. The conflicting-UNKNOWN guard is deliberately domain-specific and instance-scoped (bounded unresolved resources), not a new SDK service or durable cross-process lock; separate Host processes enforce actual CAS. No live production inventory or complete hidden product oracle is claimed.
+
+### Explicit live DeepSeek witness
+
+The opt-in live suite is `live-model-witness.test.ts`. Supply the test credential through the execution environment `DH_DEEPSEEK_API_KEY` (never store or print its value). Run the compiled SDK with Node >=22.12.0 and the existing isolated SciPy runtime: `node --unhandled-rejections=strict --import tsx --test packages/domain-harness/tests/fixtures/v0115-fixed-domains/live-model-witness.test.ts`. Only frozen synthetic public domain inputs and scoped proposal metadata are sent to the declared provider endpoints. DeepSeek Flash uses explicit disabled thinking, OpenAI max_tokens, Anthropic version 2023-06-01, tools enabled but no strict provider JSON schema; trusted local validation is mandatory. Each case admits bounded model calls, zero automatic retries, explicit current business validation and actual domain effects. The suite records actual accepted/rejected outcomes, no private thought or credential, and no scripted fallback. A run can fail on invalid real model output; success on one finite run does not guarantee future generations. The complete product oracle and installed-SDK witnesses remain separate gates.
+
+The live hybrid procurement region now executes 15 actual accepted nodes: one authoritative offer query, twelve mandatory offer-field group audits (four actual offers × identity/compatibility, packing, delivery/cost), fresh exact-cost analysis, and final independent verification. Feedback changes lead5→2 while source audit obligations remain current; the real model edits only the pending analysis. The regional binding cap is explicitly 64 for the 40 actual references (the original cap32 correctly rejected the larger layout). Separate actual native D-B deadline8→7 feedback retains the job source and executes SciPy and verification twice. These are finite public witnesses, not performance or provider reliability guarantees.
+
+### R65 public domain witness delta (R64 P1-01, P1-02, P2-01)
+
+`region-witness.test.ts` now checks two additional finite actual compositions:
+
+| Predicate / actual Standard use | Witness |
+| --- | --- |
+| D-A DY01/DY03/DY04, O03/O04/O05 | Initial A/B/C omits D; actual inserted lookup obtains D from the bounded controlled authority; complete scoped current quote, compatible exact quantity and MOQ validation; equivalent duplicate skip and explicit typed rebind to the new accepted result; independent optimum cost64/lead3. Missing D, invalid MOQ, expired/wrong/missing equivalent proof and required-anchor skip reject before solve/publication. |
+| F-W02 / O08, D-A W04 | Exactly the same native solver node (knowledge, before/run/after) executes in the dynamic region, direct fixed call, and selected Tool; actual observed quote and actual tool result travel through ModelElement to a scripted HTTP peer. Prior real dual-protocol R62/R63 W04 evidence is retained; the combined new route also has an explicit opt-in live mode. |
+| D-B W03/W06, DY05/O04/O08, F-W03 | Native parent observes actual jobs and constraints, inserts repair child; child observes local source and resource conflict, inserts grandchild; grandchild inserts actual SciPy solve, typed output, independent objective (7,16). Internal workload audit variant keeps parent I/O and objective; depth denial prevents grandchild factory and solve. No model. |
+| O10/F-W06 | Public occurrence and attempt correlation to definitive local disposition; skip records have no attempt, entered=false, no actual call/output, candidateSeq links to region edit. Required evidence refusal, stale candidate, invalid atomic batch, one-short event admission tested in core workflow-region suite. |
+
+To run the new combined actual live route explicitly (no automated retry, no scripted fallback), provide the existing named credential in the environment and run:
+```sh
+DH_R65_LIVE=1 node --unhandled-rejections=strict --import tsx --test --test-name-pattern='R65 D-A missing alternative' packages/domain-harness/tests/fixtures/v0115-fixed-domains/region-witness.test.ts
+```
+Without DH_R65_LIVE=1 the ordinary suite uses the scripted loopback peer only. A finite live run is not a provider reliability claim. D-C actual Host/SQLite, original fixed and XState, Interaction, model and domain evidence remain unchanged; T09 packed Linux/Windows, T10 separate consumer maintenance and T11 complete product oracles remain distinct. These are scoped public witnesses, not hidden-oracle passes.

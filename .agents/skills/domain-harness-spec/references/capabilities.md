@@ -112,7 +112,7 @@
 
 - 分类：`type`；声明：`dist/model-contract.d.ts`
 - 职责：可信调用方显式声明协议、模型、认证来源、能力和有限传输上限。
-- 类型声明：`interface ModelProfile { readonly id: string; readonly protocol: 'openai-chat' \| 'anthropic-messages'; readonly endpoint: string; readonly model: string; readonly credential: () => string \| Promise<string>; readonly tokenField?: 'max_tokens' \| 'max_completion_tokens'; readonly anthropicVersion?: string; readonly features: Readonly<{ tools: boolean; jsonSchema: boolean; toolsWithJsonSchema: boolean; }>; readonly limits: Readonly<{ requestBytes: number; responseBytes: number; maxOutputTokens: number; timeoutMs: number; }>; }`
+- 类型声明：`interface ModelProfile { readonly id: string; readonly protocol: 'openai-chat' \| 'anthropic-messages'; readonly endpoint: string; readonly model: string; readonly credential: () => string \| Promise<string>; readonly thinking?: 'disabled'; readonly tokenField?: 'max_tokens' \| 'max_completion_tokens'; readonly anthropicVersion?: string; readonly features: Readonly<{ tools: boolean; jsonSchema: boolean; toolsWithJsonSchema: boolean; }>; readonly limits: Readonly<{ requestBytes: number; responseBytes: number; maxOutputTokens: number; timeoutMs: number; }>; }`
 - `ModelProfile#anthropicVersion` · contract property readonly optional：`string`
 - `ModelProfile#credential` · contract callback readonly：`() => string \| Promise<string>`；调用：`(): string \| Promise<string>`
 - `ModelProfile#endpoint` · contract property readonly：`string`
@@ -121,6 +121,7 @@
 - `ModelProfile#limits` · contract property readonly：`Readonly<{ requestBytes: number; responseBytes: number; maxOutputTokens: number; timeoutMs: number; }>`
 - `ModelProfile#model` · contract property readonly：`string`
 - `ModelProfile#protocol` · contract property readonly：`"openai-chat" \| "anthropic-messages"`
+- `ModelProfile#thinking` · contract property readonly optional：`"disabled"`
 - `ModelProfile#tokenField` · contract property readonly optional：`"max_tokens" \| "max_completion_tokens"`
 
 ### ModelRequest
