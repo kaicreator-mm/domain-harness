@@ -11,6 +11,8 @@ const values = [
   'readJson', 'readYaml', 'writeJson', 'writeYaml', 'BoundedQueryElement',
   'SQLiteDatabaseElement', 'SQLiteDatabaseError', 'VectorQueryElement', 'GraphQueryElement',
   'BoundedExpressionElement', 'CliElement', 'runRecognitionHandling', 'InteractionElement', 'resolveEvidence', 'invalidateEvidence', 'selectNextDecision', 'prepareCandidates', 'ClarificationElement', 'runInteractiveRecognitionHandling',
+  // Frozen v0.11.5 L2 independent delta, not derived from implementation.
+  'createWorkflowSlot', 'bindWorkflowFunction', 'bindWorkflowRegion', 'runWorkflowRegion', 'ModelElement',
 ].sort();
 const types = [
   'CorePackageMetadata', 'DomainAppContext', 'LifecycleInitContext', 'PackageInitElement',
@@ -28,10 +30,12 @@ const types = [
   'DecisionCondition', 'DecisionDescription', 'DecisionSelection',
   'CandidateEntry', 'CandidateSource', 'CandidateAssessment', 'CandidateProjection', 'CandidatePreparation',
   'ClarificationField', 'ClarificationPreparation', 'ClarificationResponse',
+  'WorkflowControlLimits', 'WorkflowControlOptions', 'WorkflowOccurrence', 'WorkflowKnowledgeFrame', 'WorkflowKnowledgePolicy', 'WorkflowCompletionPolicy', 'WorkflowContextView', 'WorkflowNodeOptions', 'WorkflowTerminalContext', 'WorkflowNode', 'WorkflowAttempt', 'WorkflowActorOptions', 'WorkflowObservation', 'WorkflowSlot', 'WorkflowSlotReader', 'WorkflowSlotWriter', 'WorkflowSlotBinding', 'WorkflowNodeProposal', 'WorkflowEdit', 'WorkflowRegionProposal', 'WorkflowRegionLimits', 'WorkflowRegionView', 'WorkflowFunctionBinding', 'WorkflowCapability', 'WorkflowRegionDefinition', 'ModelProfile', 'ModelToolDescription', 'ModelToolCall', 'ModelToolResult', 'ModelUsage', 'ModelTurn', 'ModelRequest',
 ];
 
 /** 安装后检查实际字节、公开根运行行为并准备类型探针；调用者仍须完成原有 TYPECHECK。 */
 export function verifyS05InstalledStandard({ packageDir, installed, consumer, actorConsumer, consumerNode, packedPaths, run }) {
+  assert.equal(values.length,32); assert.equal(types.length,93);
   assert.ok(packedPaths.includes('README.md'));
   assert.ok(packedPaths.includes('dist/standard-cli.js'));
   assert.ok(packedPaths.includes('dist/standard-cli.d.ts'));
@@ -195,6 +199,7 @@ export function verifyS05InstalledStandard({ packageDir, installed, consumer, ac
     "assert.deepEqual(sharedSignalResult,ok(3));assert.equal('dense' in sdk,false);assert.equal('dependencyOrder' in sdk,false);",
     "await assert.rejects(import('@kaicreator/domain-harness/dist/semantic-data.js'),{code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});",
     "await assert.rejects(import('@kaicreator/domain-harness/dist/standard-clarification.js'),{code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});",
+    "for(const name of ['workflow-managed-runtime','workflow-slots','workflow-capabilities','workflow-region','model-wire'])await assert.rejects(import('@kaicreator/domain-harness/dist/'+name+'.js'),{code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});",
     "console.log('S05_STANDARD_ROOT_PASS');",
   ].join('\n'));
   assert.equal(run('S05_STANDARD_ROOT', consumerNode, ['--unhandled-rejections=strict', 's05-standard-probe.mjs'], consumer).trim(), 'S05_STANDARD_ROOT_PASS');

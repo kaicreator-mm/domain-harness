@@ -36,3 +36,8 @@ To run the new combined actual live route explicitly (no automated retry, no scr
 DH_R65_LIVE=1 node --unhandled-rejections=strict --import tsx --test --test-name-pattern='R65 D-A missing alternative' packages/domain-harness/tests/fixtures/v0115-fixed-domains/region-witness.test.ts
 ```
 Without DH_R65_LIVE=1 the ordinary suite uses the scripted loopback peer only. A finite live run is not a provider reliability claim. D-C actual Host/SQLite, original fixed and XState, Interaction, model and domain evidence remain unchanged; T09 packed Linux/Windows, T10 separate consumer maintenance and T11 complete product oracles remain distinct. These are scoped public witnesses, not hidden-oracle passes.
+
+T09 reuse delta: the D-A delegated procurement subregion executes a second distinct
+business use of typed region binding (cost 64, lead 3), complementing the existing
+D-B nested scheduling witness. This is additional public evidence, not a change to
+the frozen oracle or the accepted runtime.

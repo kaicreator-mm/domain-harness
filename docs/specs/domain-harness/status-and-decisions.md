@@ -1,12 +1,17 @@
 # DomainHarness · 设计现状与迁移清单
 
+## 0.11.5 · R68 B3 源码合入（当前）
+- 冻结 [L1](https://github.com/kaicreator-mm/domain-harness/blob/d289b3fc4b86456f319e6e16a37483b66644b12e/docs/product/DomainHarness_v0.11.5_R10_PRODUCT_L1.md)、[L2](https://github.com/kaicreator-mm/domain-harness/blob/0f71d8a34ce057ffc87967eb58f8eebec0a9e498/docs/architecture/DomainHarness_v0.11.5_R16_WORKFLOW_REASONING_L2_CONTRACT.md) 与 R40 scope correction 保持；B1/B2/B3 已限定接受。[R66](https://github.com/kaicreator-mm/domain-harness/issues/1776#issuecomment-7214521543) 独立 87 核心 + 40 领域 + 6 skip probes，P0/P1/P2=0，合入 `0077fb5a19d81926b9e5051e51b4859270f4ed46`，树 `97a2f4a2af59dd521c462674fff965dac2355356`。
+- 32 个根运行时值、93 个公开类型（仅根），受控 Workflow、类型化区域、同根 Interaction/XState、Model 两协议、有限真实观察。D-A 采购、D-B 排程、D-C 实际 Host/SQLite；真实 DeepSeek 受控 writer 见证，不承诺所有模型提案合法、商业计费或持久恢复。
+- [G01-W](https://github.com/kaicreator-mm/domain-harness/issues/1770#issuecomment-7215118138) Windows x64 Node22.12.0 旧工件可行性已准入；T09 新工件、T10 独立生成/维护、T11 完整产品资格以 [#1615](https://github.com/kaicreator-mm/domain-harness/issues/1615) / [#1778](https://github.com/kaicreator-mm/domain-harness/issues/1778) 最新实际收据为准。本文不是新工件验证收据，ALL_COMPLETE_PRODUCT_ORACLES=NOT_RUN；不发 main/tag/npm。
+
 > [权威目录](./README.md) · Owner 现行新架构决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。本文件同时保留 R151 初审 REWORK 与后续 R160 通过的时间顺序；历史状态不得覆盖新收据。
 
-## 0.11.3 · R94 产品与见证合入（当前）
+## 0.11.3 · R94 产品与见证合入（历史）
 
 - [R93 独立验收](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7187295917)、[R94 CI 准入](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7187545899)：13/13 Oracle 限定接受，P0/P1=0，两项非阻断 P2 有处置；[Woodpecker #3212](https://ci.kaicreator.com/repos/18/pipeline/3212/1) 在受审产品 HEAD `fd2629c3d214a3190f613202636508e70867d61a` 上 SUCCESS。
 - 产品 [#1764](https://github.com/kaicreator-mm/domain-harness/pull/1764) 与独立采购见证 [#1758](https://github.com/kaicreator-mm/domain-harness/pull/1758) 按原 HEAD 合入；版本列车组合提交 `99bfa7c4551cd3025c55c14f34035873e7f4e4da`，实际 Tree `446babfc73974b3a06dadfd515059420900bc269`，与预计算组合 Tree 一致。合入后 fresh build/pack 与 R93 受审工件 SHA256 `30423cac561a5da52717885443cc3d19dff854a2feabd4d14810435c017aaee4` 字节相同；该工件为内部阶段版本 0.11.2，非 0.11.3 npm 发布。
-- 当前根公开面 27 值/61 类型，Skill 32 文件/9 示例；四领域实际复用；R90/R88 的旧工件执行证据保留原身份，R91/R92 用实际 manifest-only 差异与安装证据证明受影响路径等价。OBS-R90-01 已限定关闭。P2-R89-01 仅收窄根 symlink 声明，未实施额外 hardening；本次仅同步当前状态导航，不能把新文档包当作旧受审工件。
+- 当时根公开面 27 值/61 类型，Skill 32 文件/9 示例；四领域实际复用；R90/R88 的旧工件执行证据保留原身份，R91/R92 用实际 manifest-only 差异与安装证据证明受影响路径等价。OBS-R90-01 已限定关闭。P2-R89-01 仅收窄根 symlink 声明，未实施额外 hardening；本次仅同步当前状态导航，不能把新文档包当作旧受审工件。
 - I08 原始负面资格保留：Q5A 35/36、Q5B 33/36、6/6 原始 strict 编译失败及 Q6B 额外 adapter 负例；Q6 92/92 runtime 通过与 R89 整改限定接受，不等于原实验追溯 PASS、盲测或 LLM 效率证明。收尾状态以 [#1757](https://github.com/kaicreator-mm/domain-harness/issues/1757) 与 [#1613](https://github.com/kaicreator-mm/domain-harness/issues/1613) 最新实际收据为准；不启动后续版本、不打 tag、不发布。
 
 ## 0.11.3 · R70 后 QA-09A 有限整改（历史候选状态）

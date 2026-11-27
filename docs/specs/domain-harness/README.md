@@ -1,8 +1,10 @@
 # DomainHarness · 唯一规范目录
 
+> 当前状态：0.11.5 B1/B2/B3 已限定独立接受并合入版本列车（R66，#1777，`0077fb5a19d81926b9e5051e51b4859270f4ed46`）。T09 安装工件收口、T10 独立陌生消费/维护与 T11 完整资格仍是独立门禁；尚非发布或完整产品 PASS。
+
 > 设计基线：**Language-Native Domain SDK**；Owner 决议 [#1685](https://github.com/kaicreator-mm/domain-harness/issues/1685)。这是唯一多文件规范，人和 Agent 读同一正文。**设计已确认；0.11.2 已按 R65 限定验收并合入版本列车，0.11.3 Product/L1 与修订 L2 已按 R9/R25 冻结；T30/T31A–F 已限定验收合入，R48 #1750 组件封装与取消接线已按 R49 验收；T32–T34 及 #1754 已收口，T35 的 13 项产品 Oracle 已按 R93 限定接受，#3212 受审 HEAD 的 CI 已成功；产品 #1764 与独立见证 #1758 已合入版本列车。** 详见状态索引；新原则 CORE-13/14、QA-09 已按 R8 接受并合入。
 
-R75（#1761）封装及能力发现设计、R81 实施、R89 整改、R92 Windows 打包增量和 [R93 独立验收](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7187295917)、[R94 CI 准入](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7187545899) 已完成对应证据门禁。当前源代码组合已合入 `99bfa7c4551cd3025c55c14f34035873e7f4e4da`；正式状态、工件身份与限制见状态索引。仅限 0.11.3 冻结产品范围，不代表 main、发布或 npm publish。
+R75（#1761）封装及能力发现设计、R81 实施、R89 整改、R92 Windows 打包增量和 [R93 独立验收](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7187295917)、[R94 CI 准入](https://github.com/kaicreator-mm/domain-harness/issues/1757#issuecomment-7187545899) 已完成对应证据门禁。0.11.3 历史源代码组合已合入 `99bfa7c4551cd3025c55c14f34035873e7f4e4da`；正式状态、工件身份与限制见状态索引。仅限 0.11.3 冻结产品范围，不代表 main、发布或 npm publish。
 
 ## 阅读路径
 
@@ -16,7 +18,7 @@ R75（#1761）封装及能力发现设计、R81 实施、R89 整改、R92 Window
 | [core.md](./core.md) | CORE-01..14 语言中立的职责和产品不变量 |
 | [typescript-profile.md](./typescript-profile.md) | TS-01..08 ESM/Module/Class/Function、静态元数据、原生依赖、组合、生命周期 |
 | [element-package.md](./element-package.md) | EL-01..15 Package 插件、Element/Function、Standard/Business 与组合 |
-| [lifecycle-workflow.md](./lifecycle-workflow.md) | LIFE-01..19A（19A 已按 R49 验收）Order、可选 Init/Exit、关闭并发、Actor done/error/stopped、Workflow/Reader 保留验收、语义交互、证据、决策、候选、动态澄清及同根识别处理组合 |
+| [lifecycle-workflow.md](./lifecycle-workflow.md) | LIFE-01..22（20–22 为 0.11.5 受控推理组合）Order、可选 Init/Exit、关闭并发、Actor done/error/stopped、Workflow/Reader 保留验收、语义交互、证据、决策、候选、动态澄清及同根识别处理组合 |
 | [composition-trust.md](./composition-trust.md) | GEN-01..08 生成期正确性、静态组合、npm 交付、模块 Function 与 DIS 领域合同边界 |
 | [architecture.md](./architecture.md) | ARCH-01..09 SDK/KDP/Standard/Business 拓扑、禁止重复系统 |
 | [identity-naming.md](./identity-naming.md) | ID-01..06 身份、代码元数据、命名 |

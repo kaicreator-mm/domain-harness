@@ -82,12 +82,22 @@ try {
   const [major,minor]=runtime.node.split('.').map(Number);
   assert.ok(major>22 || (major===22 && minor>=12),'NATIVE_CONSUMER_NODE_FLOOR');
   const consumerNpmVersion=run('CONSUMER_NPM_VERSION',consumerNode,consumerNpmArgs(['--version']),consumer).trim();
-  const details=JSON.parse(run('PACK',npm,npmArgs([
-    'pack',packageDir,'--json','--ignore-scripts','--pack-destination',packs,
-  ]),root))[0];
-  const tgz=join(packs,details.filename);
+  // 跨平台使用同一归档；外部输入必须绑定实际 pack 清单及预先封存的 SHA256。
+  const external=process.env.DH_NATIVE_PACK_TARBALL;
+  const externalManifest=process.env.DH_NATIVE_PACK_MANIFEST;
+  const expectedSha=process.env.DH_NATIVE_PACK_SHA256;
+  assert.ok(!external&&!externalManifest&&!expectedSha ||
+    external&&externalManifest&&/^[a-f0-9]{64}$/u.test(expectedSha??''),'NATIVE_CONSUMER_PACK_INPUT_INCOMPLETE');
+  const details=external?JSON.parse(readFileSync(resolve(externalManifest),'utf8'))[0]:
+    JSON.parse(run('PACK',npm,npmArgs([
+      'pack',packageDir,'--json','--ignore-scripts','--pack-destination',packs,
+    ]),root))[0];
+  const tgz=external?resolve(external):join(packs,details.filename);
   const binary=readFileSync(tgz);
   const sha256=createHash('sha256').update(binary).digest('hex');
+  assert.equal(details.integrity,'sha512-'+createHash('sha512').update(binary).digest('base64'),'NATIVE_CONSUMER_PACK_INTEGRITY');
+  if(external)assert.equal(sha256,expectedSha,'NATIVE_CONSUMER_PACK_SHA256');
+  writeFileSync(join(work,'pack-manifest.json'),JSON.stringify([details],null,2)+'\n');
   const manifest={
     name:'dh-native-external-consumer',
     private:true,

@@ -7,7 +7,7 @@ API: WorkflowElement XStateWorkflowElement StandardWorkflowSession NativeWorkflo
 
 [完整能力及成员目录](../capabilities.md)。
 
-### 受控根任务（0.11.5 基础建设）
+### 受控根任务（0.11.5）
 
 `new StandardWorkflowSession(limits, control)` 使用同一根调用、步骤和受控资源账本。受控 `run(action, completion)` 必须显式给出完成策略；已有无 control 的单参数 run 仍有效。根任务进入前预留完成验证及 scope 观察额度；普通 `invoke/invokeOutcome/leaf/child/work` 执行前检查资源、当前可信事实、作用域和取消。子任务不重置根额度。业务 Function 保持原生类型，不要求模型。
 
@@ -29,7 +29,7 @@ R40 模型运行边界仅包含实际调用次数、显式重试及每次输出�
 
 子区域工厂前与父节点原子预付子入口，包含一个子活动占位和三个作用域记录；未知子事实策略用既有 maxItems4096 合同上界预留，不增加额度维度。工厂返回实际局部上限后只扣子局部入口实际额度，已预付的根/祖先额度不重复扣减或退款。
 
-ModelElement.constructor 接收可信固定 ModelProfile，generate(root, request) 执行单轮非流式实际 HTTP；显式协议、端点、工具/结构化能力、每次输出上限、超时和字节限制，认证回调仅在接纳后运行。工具候选必须由领域验证并实际执行，下一轮通过 SDK 已接纳的 ModelTurn 和完整关联的 tool-results 续接。无自动执行、重试或计费。模型来源区域采用同一结构和类型接纳；模型可提出嵌套 initial，但嵌套能力必须属于实际投影集合和子工厂的真实委托；未取得子域视图前仅允许 literal 和本层前序别名，不能引用父级或私有 context。子域真实类型和业务接纳不被跳过。可信领域负责实际安全投影及业务授权，SDK 不推断任意外部代码复制后的来源。真实 Provider 资格尚未验证。
+ModelElement.constructor 接收可信固定 ModelProfile，generate(root, request) 执行单轮非流式实际 HTTP；显式协议、端点、工具/结构化能力、每次输出上限、超时和字节限制，认证回调仅在接纳后运行。工具候选必须由领域验证并实际执行，下一轮通过 SDK 已接纳的 ModelTurn 和完整关联的 tool-results 续接。无自动执行、重试或计费。模型来源区域采用同一结构和类型接纳；模型可提出嵌套 initial，但嵌套能力必须属于实际投影集合和子工厂的真实委托；未取得子域视图前仅允许 literal 和本层前序别名，不能引用父级或私有 context。子域真实类型和业务接纳不被跳过。可信领域负责实际安全投影及业务授权，SDK 不推断任意外部代码复制后的来源。R62/R63/R65 已实际验证 DeepSeek 两协议及领域 Tool 续接；这是有限 profile/witness 证据，不代表任意 Provider、模型或未来提案必然可用。完整产品资格另行验证。
 
 子域实际结算生成的未知来源证明在首次父域使用前一次性预付剩余有限校验；区域完成阶段已知证明在 complete 前随同阶段接纳，最终 currentness 保留；额度不足不发布候选，不重复副作用。
 
@@ -39,3 +39,6 @@ Function/Region 每个已接纳尝试均保存独立义务证据，即使没有�
 
 实际兼容 Provider 若默认启用思考模式，可在可信 ModelProfile 显式设置 `thinking: "disabled"`，两协议发送有限 `thinking.type=disabled`。未设置不改变原请求，Provider 不支持时按实际失败处理；不接纳非空推理块，不转发或记录思考内容。DeepSeek Flash profile 声明 jsonSchema=false/toolsWithJsonSchema=false，普通 JSON 输出由可信领域进一步精确验证，不能视为严格 Provider Schema。
 兼容非流式 OpenAI 工具调用中的可选 index 必须等于实际数组位置；规范化续接只保留 id/type/function，拒绝错位或不支持的附加数据。
+
+区域接受等价 skip 时，`session.dispositions()` 提供逐逻辑 occurrence 的 definitive skip（attempt 缺省、entered=false、post/effect/acceptance 不适用），candidateSeq 与区域 edit 候选相关；无实际调用或输出，不可当作已执行的 Function。必须由合法等价证据和显式重绑维持后继义务。
+入门：[受控类型化区域的实际示例](../examples/managed-region.mts)。完整受控设计见 [LIFE-20..22](../../../../../docs/specs/domain-harness/lifecycle-workflow.md)；普通无模型和模型路径使用同一根，业务负责真实目标、输入覆盖、授权及结果校验。

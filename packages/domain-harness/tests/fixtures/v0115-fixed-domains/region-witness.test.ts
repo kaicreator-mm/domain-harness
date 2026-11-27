@@ -435,3 +435,43 @@ test('R65 D-A missing alternative lookup, equivalent skip and same native solver
     }finally{if(peer.listening)await new Promise<void>(resolve=>{peer.close(()=>resolve());peer.closeAllConnections();});}
   }
 });
+
+test('D-A delegated procurement subregion is a second actual domain use of typed region binding',async()=>{
+  const d=domain(),offers=fixture.DA.offers,demand:Demand={lead:3,budget:75};
+  type Input={offers:Offer[];demand:Demand};
+  const input={offers,demand};
+  const inputSlot=createWorkflowSlot('purchase-input',(v):v is Input=>object(v)&&Array.isArray(v.offers)&&object(v.demand)&&typeof v.demand.lead==='number'&&typeof v.demand.budget==='number');
+  const planSlot=createWorkflowSlot('purchase-plan',(v):v is Plan=>object(v)&&Array.isArray(v.counts)&&typeof v.cost==='number'&&typeof v.lead==='number');
+  const counts={factory:0,solver:0,verify:0};
+  const verified=(v:Plan)=>{const m=planMetrics(offers,v.counts,demand);return m!==null&&m.cost===64&&m.lead===3&&v.cost===m.cost&&v.lead===m.lead;};
+  const solver=bindWorkflowFunction<Input,Plan>({id:'purchase-solve',description:'actual bounded procurement enumeration',inputs:{value:inputSlot},outputs:{value:planSlot},
+    input:r=>r.read('value',inputSlot),node:{id:'purchase-solve',goal:'solve current purchase',requiredKnowledge:[],
+      before:v=>v.offers===offers&&v.demand===demand?ok(undefined):reject('WRONG_INPUT'),run:v=>{counts.solver++;const p=optimize(v.offers,v.demand);return p?ok(p):reject('INFEASIBLE');},
+      after:(_v,a)=>a.kind==='returned'&&a.outcome.status==='COMPLETE'&&verified(a.outcome.value)?ok(undefined):reject('POST'),
+      project:()=>({effect:'none',detail:null})},output:(v,w)=>w.put('value',planSlot,v)});
+  const verify=bindWorkflowFunction<Plan,Plan>({id:'purchase-check',description:'actual independent purchase constraint check',inputs:{value:planSlot},outputs:{value:planSlot},
+    input:r=>r.read('value',planSlot),node:{id:'purchase-check',goal:'verify cost, compatibility and lead',requiredKnowledge:[],before:()=>ok(undefined),
+      run:v=>{counts.verify++;return verified(v)?ok(v):reject('ROOT_VERIFY');},after:()=>ok(undefined),project:()=>({effect:'none',detail:null})},output:(v,w)=>w.put('value',planSlot,v)});
+  const base=(name:string,caps:readonly WorkflowCapability[],depth:number,patch:Partial<WorkflowRegionDefinition<Input,Plan>>):WorkflowRegionDefinition<Input,Plan>=>({
+    ...d.definition<Input,Plan>({capabilities:caps,contextSlots:{value:inputSlot},layout:[],
+      refresh:(v,_s,_p,w)=>{const a=w.put('value',inputSlot,v);return a.status!=='COMPLETE'?a:ok({...d.refresh(v.offers,v.demand),slotEvidence:{value:['source','constraint']}});},
+      plan:()=>reject('NO_PLAN'),complete:()=>reject('NO_RESULT')}),id:name,limits:{...limits,maxDescendantDepth:depth},canSkip:()=>reject('REQUIRED'),...patch});
+  const child=bindWorkflowRegion<Input,Plan>({id:'purchase-region',description:'delegated actual purchase solver',inputs:{value:inputSlot},outputs:{value:planSlot},
+    input:r=>r.read('value',inputSlot),output:(v,w)=>w.put('value',planSlot,v),node:{id:'purchase-region',goal:'verified typed purchase plan',requiredKnowledge:[],
+      before:()=>ok(undefined),after:(_v,a)=>a.kind==='returned'&&a.outcome.status==='COMPLETE'&&verified(a.outcome.value)?ok(undefined):reject('CHILD_POST'),project:()=>({effect:'none',detail:null})},
+    create:()=>{counts.factory++;return ok(base('purchase-local',[solver],0,{
+      layout:[{kind:'anchor',id:'solve',node:{alias:'solve',capability:'purchase-solve',input:{value:context('value')}}}],
+      plan:v=>decision(v,accepted(v,'purchase-solve')?'finish':'continue'),complete:v=>v.reader.read(id(v,'purchase-solve')+'/value',planSlot)}));}});
+  const outer=base('purchase-root',[child,solver,verify],1,{
+    layout:[{kind:'anchor',id:'child',node:{alias:'child',capability:'purchase-region',input:{value:context('value')}}},
+      {kind:'anchor',id:'verify',node:{alias:'check',capability:'purchase-check',input:{value:result('child')}}}],
+    plan:v=>decision(v,accepted(v,'purchase-check')?'finish':'continue'),complete:v=>v.reader.read(id(v,'purchase-check')+'/value',planSlot)});
+  const r=await d.session.run(root=>runWorkflowRegion(root,outer,input),{goal:'verified actual procurement',requiredKnowledge:[],terminalReads:0,
+    validate:p=>verified(p)?ok(undefined):reject('FINAL')});
+  assert.deepEqual(r,ok(fixture.DA.enumeration.cases.find(c=>c.lead===3&&c.budget===75)?.optimum));
+  assert.deepEqual(counts,{factory:1,solver:1,verify:1});
+  const nodes=d.session.dispositions().filter(x=>x.kind==='node');
+  assert.deepEqual(nodes.map(x=>x.occurrence.definitionId),['purchase-solve','purchase-region','purchase-check']);
+  assert.ok(nodes.every(x=>x.acceptance==='accepted'));assert.equal(new Set(d.trace.map(x=>x.runId)).size,1);
+  assert.equal(d.trace.filter(x=>x.kind==='model').length,0);assertPublicCorrelation(d.trace,d.session.dispositions());
+});

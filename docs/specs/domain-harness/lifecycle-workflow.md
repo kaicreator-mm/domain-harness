@@ -87,7 +87,7 @@ Standard Workflow 必须在**执行任何用户 entry/action 和启动 Actor 前
 1. `DomainAppContext` 只定义不可缺少的 `appId`。TS 应用可给 `KernelLifecycle<OwnContext>`、`StaticCorePackage<OwnContext>` 和 `PackageInitElement<OwnContext>` 传相同的应用自有类型；`Init.start()` 能收到该上下文。普通未显式写泛型的调用沿用简单 `DomainAppContext`。SDK 不拥有 UI 会话、授权身份、领域事实、持久化 Store 等字段，也不做业务 Context Registry。
 2. `KernelLifecycle.start(context)` 只启动 Core，后续 `execute(business)` 可在同一激活中运行多个在途业务回调（业务 Task/Workflow 由调用方自己组织）；关闭前必须等待 **全部已进入的业务体** 收敛，关闭生效后拒绝任何新调用。单轮 `run(context,business)` 保持启动、一次业务、自动关闭的便捷语义。KDP 不是任务调度器，不承诺中止不可协作的业务函数。
 3. `NativeWorkflowContext.invoke` 面向普通值，像 JSON/YAML Reader 的 `{kind:'SUCCEEDED'|...}` 也属于被包裹的值，不会被 SDK 改写成 Workflow Outcome。已经返回 `WorkflowOutcome` 的业务 Function 应使用 `invokeOutcome` 或 `leaf`；必须保留 REJECT/ASK/WAIT/UNKNOWN/FAILED，不能因为外层 wrapper 是 COMPLETE 就把内部失败当成成功。它们复用同一个根预算，不创建独立 Workflow Executor。
-4. 后续 0.11.4 Host/Effect 的批准、确认及 Journal，0.11.5 的选定 Model/Tool Loop，0.11.6 的 durable checkpoint/取消，0.11.7 的 evidence 归各阶段的专用 Element/Package。KDP 只提供基础生命周期与最终兜底，**不内置业务授权与状态持久化**。一个正在执行的业务回调自身不能同步等待由它触发且需要等待该回调结束的同一关闭 Promise。
+4. Host/Effect 的批准、确认及真实 receipt 已由 0.11.2 #1612 接受（原 0.11.4 范围）；0.11.5 受控 Workflow/Model 见 LIFE-20..22；0.11.6 durable checkpoint、0.11.7 持久 evidence 仍归后续阶段。KDP 只提供基础生命周期与最终兜底，**不内置业务授权与状态持久化**。一个正在执行的业务回调自身不能同步等待由它触发且需要等待该回调结束的同一关闭 Promise。
 5. SDK 的基础 Context 传播不负责生成期 Package/Element 的正确性；具体业务/权限/生命周期依赖由 Domain Package 作者/生成者确保，并经真实 TS/SDK Consumer 正反例核验。
 
 ### LIFE-13 · R173 类型闭包补充
@@ -154,8 +154,15 @@ confirmation=accepted 时 B resolved 非选择字段可跳过；confirmation=use
 
 `scope.resolve(initial, decide)` 和 `runInteractiveRecognitionHandling(..., decide, handle)` 的 decide 回调均接收第四个参数 `signal: AbortSignal`，它与同一 scope.signal 完全相同，不创建第二 AbortController。已有三参数回调仍合法；分析可在实际异步取证/候选生成前检查 signal，复杂处理继续使用 scope.signal。原 root 预算、等待关联、取消终态、结果所有权不变。该参数不是强制抢占或权限证明。每个跨 await 的下一相关实际业务操作开始前须重新检查；已进入操作正常 await 收敛，必要的结果验证、receipt 及清理仍须执行。未提交的媒体规划取消可丢弃不完整计划并释放 staging；已进入真实求解完成后的专业校验与已提交/可能提交的 Host 结果不得由取消错误覆盖。不要以额外 scope.step 代替信号传播导致重复计费，不把任意直接 root 回调升级成全局取消管理器。
 
-内部 `semantic-data.ts` 只封装已在 B/C/D/E 和 A/D 复用的有界数据检查与 B/C 有限依赖拓扑次序：自有索引完整性、有限整数上限、原 opaque ID 合同、已验证局部图的稳定迭代排序。调用方继续负责输入规模/结构/依赖有效性与领域意义、错误分类、返回冻结；拓扑 helper 不执行 Workflow、无领域事实或决策规则、不保存状态，不修改传入图。原 B/C 两种算法保留各自传播与选择语义。该模块不是 SDK 公共入口；R75/I05 当前已限定接受的公开面为 27 运行时值/61 公开类型、仅包根（历史 R49 为28/61）；实际安装验证见 R89/R92/R93。构建工件可含内部实现文件，但不能通过包子路径导入。R49 已接受 #1750，T32/T33 真实整改与 T34 已收口；T35 的 13 Oracle 与受审 HEAD CI 门禁已按 R93/R94 满足。
+内部 `semantic-data.ts` 只封装已在 B/C/D/E 和 A/D 复用的有界数据检查与 B/C 有限依赖拓扑次序：自有索引完整性、有限整数上限、原 opaque ID 合同、已验证局部图的稳定迭代排序。调用方继续负责输入规模/结构/依赖有效性与领域意义、错误分类、返回冻结；拓扑 helper 不执行 Workflow、无领域事实或决策规则、不保存状态，不修改传入图。原 B/C 两种算法保留各自传播与选择语义。该模块不是 SDK 公共入口；R75/I05 当时已限定接受的公开面为 27 运行时值/61 公开类型、仅包根（历史 R49 为28/61）；实际安装验证见 R89/R92/R93。构建工件可含内部实现文件，但不能通过包子路径导入。R49 已接受 #1750，T32/T33 真实整改与 T34 已收口；T35 的 13 Oracle 与受审 HEAD CI 门禁已按 R93/R94 满足。
 
 ### LIFE-09 · 回调快照与借用边界（#1763）
 
 预算预留与实际 Hook 调用须使用同一组已接纳回调；原调用者对象通过普通别名变化不得增加未计费操作，已进入的 end 清理和主终态保留。NativeWorkflowContext 是本次 Session/回调借用的能力，调用者须等待全部业务调用，不自行构造额外根、不泄漏到回调结束之后；不承诺任意可信 JS 的全局强制取消。KDP 日志失败不得阻断 Exit 或覆盖原异常；同步 sink 的意外真实 Promise 拒绝须被观察，不等待日志任务。上述两项 I04 源码整改已按 R81/R93 限定接受，实际测试与安装门禁见状态索引。XState mapper 须同步、仅在 done 调用；声明 async 不执行，意外返回真实 Promise 观察拒绝并返回 FAILED，不将异步结果当成功。
+
+## LIFE-20 · 受控 Workflow 根与固定节点（0.11.5）
+在现有 StandardWorkflowSession 的可选 control 合同内增加共享根资源、当前可信事实、取消和观察；旧无 control 的调用方式保留。受控根必须声明真实目标、必需证据、终止只读观察额度与同步目标验证。固定节点使用原生类型化输入输出；前置知识和当前性不足则禁止进入；已经真实进入必须观察实际返回/异常/取消、后置、清理及 effect/receipt。外部候选交付不是最终接纳，最终本地裁定通过 dispositions 读取；required evidence 或 currentness 不满足不得发布旧 COMPLETE。子任务、XState runIn 与 Interaction runIn 借用同根、不得重置资源。停止普通准入后等待已接纳本地工作，不能保证撤销远端效果或不合作 JS。明确无模型的专业路径不初始化 Provider。
+## LIFE-21 · 原生类型化区域与局部重组
+同一个 WorkflowNode 可用于固定路径、绑定的区域 Function 或已合法选择的 Tool；Slot token 身份、作用域和类型守卫独立于名称，原生值不经过 JSON。绑定仅声明能力，不执行或授予权限。可信布局含必需 anchor 与有界 gap，局部提案带 run/region/fact/plan revision，经实际当前性、能力身份、结构及领域策略准入；模型候选还须满足明确安全投影。支持有限插入、复用、移动、跳过、删除与显式重绑。必需 anchor 不可跳过；等价跳过须合法证明，逐 occurrence 最终 skip 记录与 edit candidate 关联、无 attempt/entered/effect，不制造假执行。无输出节点也保留义务证明；前序义务及子域证明在实际后继调用及最终接纳前仍有效。反馈或事实变化只保留可证明仍有效结果，明确只读且无已提交/未知效果才可重执行；真实历史不撤回。子区域在父级显式委托的能力和祖先额度内生成，父级只读声明的结果，私有事实不提升为父级 Slot。不是任意程序生成、全局 Registry 或第二执行器。
+## LIFE-22 · 可选有界 Model 与事实接口
+ModelElement 显式可信 OpenAI-compatible Chat Completions / Anthropic Messages profile，单轮非流式、有界请求/响应/超时、根内调用次数、显式重试、每次输出上限；R40 不提供累计 token reservation 或商业计费。可用 usage 区分观察、估计、未知；不记录思维链。显式 thinking disabled 为兼容选项，未声明保留 Provider 默认，不接纳不支持的推理块。工具只是候选，可信域校验真实参数、权限、执行及后置，再用同轮已接纳 turn 与完整关联实际结果续接。普通 JSON 与 provider 严格 schema 不等价，域须验证业务提案。没有自动执行、重试、fallback 或任意凭据传播；模型不能生成不存在的能力或权限。真实事件以 run/scope/instance/attempt/revision/seq 关联，候选、接受、拒绝、跳过、实际效果分离；持久证据及学习不属于此阶段。具体有限额度、边界与证据见冻结 L2（状态索引）；不得将本节摘要扩展为新合同。

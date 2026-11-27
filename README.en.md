@@ -1,8 +1,10 @@
 # DomainHarness 0.11.x — native TypeScript Domain SDK
 
+> Current: v0.11.5 B1/B2/B3 source integration accepted in scope (R66, PR #1777); T09 installed artifact, T10 independent consumer/maintenance and T11 product qualification remain separate. No public release.
+
 DomainHarness v0.11.x is a full rewrite, not a compatibility layer for v0.10.x. It uses **one public SDK workspace**, `packages/domain-harness` (`@kaicreator/domain-harness`), and ordinary Node.js/TypeScript ESM classes, functions and static Package modules. Old Contracts/Microkernel/BUILD/PackageSystem/Lock/Pin/FunctionRef/Target execution systems are superseded, not part of the current SDK.
 
-A Package is a group of ordinary ESM plugin files, an Element is a reusable class, and functions are native exported functions or methods. Optional Package Init/Exit is coordinated by a minimal KernelLifecycle. Workflow/Reader elements belong to the reusable SDK Standard library. Static Package/Element correctness is the **author/generator's responsibility**, with optional generation-time tooling, not a runtime SDK validator.
+A Package is a group of ordinary ESM plugin files, an Element is a reusable class, and functions are native exported functions or methods. Optional Package Init/Exit is coordinated by a minimal KernelLifecycle. Workflow/Reader elements belong to the reusable SDK Standard library. Managed roots compose native fixed nodes, typed dynamic regions, delegated subregions, XState and Interaction with an optional bounded two-protocol ModelElement; ordinary non-model execution remains first-class. Static Package/Element correctness is the **author/generator's responsibility**, with optional generation-time tooling, not a runtime SDK validator.
 
 **Node requirements:** SDK consumer >=22.12.0; this repository's development/verification toolchain >=22.13.0 (ESLint 10.11). Use `npm ci && npm run verify` from the repository to build, typecheck, lint, test generation and Standard behavior, run the native Domain App and verify a fresh external npm-installed SDK consumer.
 
