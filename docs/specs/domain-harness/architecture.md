@@ -39,7 +39,7 @@ KDP 是特殊 Core 根、Order=0；框架读取已显式静态组合的 Core 元
 
 ## ARCH-07 · Workflow 解耦
 
-Workflow 的接口由抽象 Class 定义，执行由 SDK Standard `XStateWorkflowElement` Class 实现；业务 Workflow 定义可被 Kernel、SDK 和 Domain App 复用。KDP 可以使用它，但不提供独占的 XState 控制引擎，不重建第二个 Workflow VM。
+Workflow 的接口由抽象 Class 定义，SDK Standard `XStateWorkflowElement` 提供真实 actor 封装；原生 `StandardWorkflowSession` 与受控节点、类型化区域组合提供同一根预算下的固定和动态业务路径。业务 Workflow 定义可被 Kernel、SDK 和 Domain App 复用。可选 ModelElement 只为领域提出有限候选，非另一引擎。详见 [LIFE-20..22](./lifecycle-workflow.md)。KDP 可以使用它，但不提供独占的 XState 控制引擎，不重建第二个 Workflow VM。
 
 ## ARCH-08 · 生命周期与兜底
 

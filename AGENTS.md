@@ -1,6 +1,8 @@
 # DomainHarness · 开发与 Agent 入口
 
-**当前版本（R161）**：v0.11.x 为完全重写，原生 SDK v0.11.1 源码已在受审 PR #1694 合入 `version/v0.11.x@452e2212fb8a25168ee62d4e793897d77416cb92`；R151 整树审查的 2 P1/5 P2 经 R160 `ACCEPT_SCOPED P0/P1/P2=0` 关闭，Woodpecker #3151 属于已审 PR Head `0477edf9070c05ec3c89c46fb1aaa43cf2f850a3`，合并树无额外文件变动。Windows 实机 E2E 和恰好 Node 22.12 消费者运行未单独验证。0.11.x 各内部阶段不单独发行；尚未合并 main/创建正式 Release。无 0.10.x 兼容义务。
+**当前内部阶段：** 0.11.5 B1/B2/B3 已限定独立接受并合入版本列车（R66，#1777，`0077fb5a19d81926b9e5051e51b4859270f4ed46`）。T09 安装工件收口、T10 独立陌生消费/维护与 T11 完整资格仍是独立门禁；尚非发布或完整产品 PASS。 受控 Workflow、动态区域、模型协议和真实领域验证见 [状态索引](docs/specs/domain-harness/status-and-decisions.md)；不读取独立评价隐藏材料。
+
+**历史基础（R161）**：v0.11.x 为完全重写，原生 SDK v0.11.1 源码已在受审 PR #1694 合入 `version/v0.11.x@452e2212fb8a25168ee62d4e793897d77416cb92`；R151 整树审查的 2 P1/5 P2 经 R160 `ACCEPT_SCOPED P0/P1/P2=0` 关闭，Woodpecker #3151 属于已审 PR Head `0477edf9070c05ec3c89c46fb1aaa43cf2f850a3`，合并树无额外文件变动。Windows 实机 E2E 和恰好 Node 22.12 消费者运行未单独验证。0.11.x 各内部阶段不单独发行；尚未合并 main/创建正式 Release。无 0.10.x 兼容义务。
 
 **唯一规范入口**：[目录](docs/specs/domain-harness/README.md) → [核心](docs/specs/domain-harness/core.md) → [TypeScript Profile](docs/specs/domain-harness/typescript-profile.md) → 按任务读取相应细则。Agent 从 [domain-harness-spec Skill](.agents/skills/domain-harness-spec/SKILL.md) 进入；Skill 不复制规范正文。
 
