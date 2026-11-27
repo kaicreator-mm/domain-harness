@@ -393,8 +393,26 @@ class Region<I, O> {
     this.#nodes = result.value.nodes; this.#revision = result.value.next;
     return ok(result.value.progress);
   }
+  /** 固化实际已接纳义务，而非由后续节点的输入 Slot 推断授权。
+   * 仅在当前节点尝试及其后代有效；不固定可重新规划的区域本身。
+   */
+  private predecessorFence(): import('./workflow-managed-runtime.js').PredecessorFence | undefined {
+    const obligations: ObligationProof[]=[];
+    let links=0;
+    for(const node of this.#nodes) if(node.state==='accepted'){
+      const proof=node.obligation;
+      if(!proof || (links+=proof.evidenceKeys.length+proof.sources.length)>16384)throw Error('WORKFLOW_OBLIGATION_LIMIT');
+      obligations.push(proof);
+    }
+    if(!obligations.length)return undefined;
+    const detached=prepareRegionProofs(this.root,this.proofs());
+    if(!detached)throw Error('WORKFLOW_CHILD_PROVENANCE');
+    const work=1+4*(obligations.length+links)+detached.work;
+    return Object.freeze({work,check:(frame:WorkflowKnowledgeFrame)=>
+      obligations.every(proof=>sourceCurrent(proof,frame))&&detached.check()});
+  }
   private async execute(n: Pending): Promise<Outcome<void>> {
-    const prepared = await regionOperation<Entries>(this.root, this.structuralWork + 2*this.graphWork + leaseScanWork(this.limits.maxBindings), 1, false, frame => {
+    const prepared = await regionOperation<{ inputs: Entries; fence?: import('./workflow-managed-runtime.js').PredecessorFence }>(this.root, this.structuralWork + 3*this.graphWork + leaseScanWork(this.limits.maxBindings), 1, false, frame => {
       this.current(frame);
       if (frame.epoch !== this.#factRevision || !this.obligationsCurrent(frame) || !this.validate(this.#nodes, this.#context)) return stale();
       const data = capabilityData(n.capability);
@@ -413,13 +431,14 @@ class Region<I, O> {
           inputs.set(name, value);
         }
       }
-      return ok({ value: inputs, validate:now=>this.obligationsCurrent(now), ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
+      const fence=this.predecessorFence();
+      return ok({ value: {inputs,...(fence?{fence}:{})}, validate:now=>this.obligationsCurrent(now), ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
     });
     if (prepared.status !== 'COMPLETE') return prepared;
     const revision = this.#revision;
     let childProof: DetachedRegionProof | undefined, obligation:ObligationProof|undefined;
     const actual = await invokeCapability(n.capability, [...this.allowed.values()], { root: this.root, leases: this.leases,
-      inputs: prepared.value, maxBindings: this.limits.maxBindings, options: { ...this.options, planRevision: revision,
+      inputs: prepared.value.inputs, ...(prepared.value.fence?{predecessorFence:prepared.value.fence}:{}), maxBindings: this.limits.maxBindings, options: { ...this.options, planRevision: revision,
         current: () => revision === this.#revision && this.d.current() },
       occurrence: { instanceId: n.id, attempt: n.attempt + 1, planRevision: revision },
       runRegion: runRegionWithProof, delegated: [...this.allowed.values()], acceptedChild: proof => { childProof = proof; }, acceptedObligation: proof=>{obligation=proof;},

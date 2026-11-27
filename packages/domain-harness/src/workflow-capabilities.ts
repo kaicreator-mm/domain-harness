@@ -25,6 +25,7 @@ interface BoundInvocation {
   readonly runRegion?: RegionRunner;
   readonly initial?: readonly WorkflowNodeProposal[];
   readonly delegated?: readonly WorkflowCapability[];
+  readonly predecessorFence?: import('./workflow-managed-runtime.js').PredecessorFence;
   readonly acceptedObligation?: (proof: ObligationProof) => void;
   readonly acceptedChild?: (proof: DetachedRegionProof) => void;
   readonly receiveProof?: (proof: DetachedRegionProof) => void;
@@ -76,7 +77,7 @@ function factory<I, O>(binding: ReturnType<typeof common<I, O>>, kind: WorkflowC
       const known = prepareRegionProofs(root, [...new Set([...inputs.values()].flatMap(e => e.children ?? []))]);
       if (!known) return fail('WORKFLOW_CHILD_PROVENANCE');
       const result = await executeBoundNode(root, build({ ...invocation, receiveProof: proof => { childProof = proof; checkChild=prepayRegionProofs(root,[proof],15); } }), options, {
-        maxBindings, child: kind === 'region', knownProofWork: known.work, ...(invocation.occurrence === undefined ? {} : { occurrence: invocation.occurrence }),
+        maxBindings, child: kind === 'region', knownProofWork: known.work, ...(invocation.predecessorFence ? { predecessorFence: invocation.predecessorFence } : {}), ...(invocation.occurrence === undefined ? {} : { occurrence: invocation.occurrence }),
         current: frame => leases.entriesCurrent(inputs, frame) && (staged === undefined || leases.entriesCurrent(staged, frame))
           && known.check() && (childProof === undefined || checkChild?.()===true),
         input: () => {

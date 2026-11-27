@@ -264,3 +264,23 @@ test('new private proof stage prepayment exact/one-short and bounded checks befo
     assert.equal(reads,mode==='exact'?checks:0);
   }
 });
+
+test('known predecessor fence exact and one-short are pre-admitted with unchanged R50 base',async()=>{
+  const rootWork=99279,nodeWork=149377,fenceWork=13;
+  for(const mode of ['exact','short','stale'] as const){
+    const e=environment(4),entries=e.entries();let input=0,run=0,output=0,guards=0,checks=0;
+    const b=binding();
+    const cap=bindWorkflowFunction({...b,input:r=>{input++;return b.input(r);},output:(v,w)=>{output++;return b.output(v,w);},
+      node:{...b.node,context:()=>({constraints:[],capabilities:[],feedbackRevision:0}),knowledge:()=>ok([]),
+        run:v=>{run++;return ok(v);}}});
+    const s=new StandardWorkflowSession({maxCalls:9,maxSteps:10,maxDepth:0},
+      {...e.control,limits:{...e.control.limits,maxWork:rootWork+nodeWork+16*fenceWork-Number(mode==='short'),maxEvents:7,maxActiveScopes:2}});
+    const r=await s.run(root=>invokeCapability(cap,[cap],{root,leases:e.leases,inputs:entries,maxBindings:2,
+      options:{...e.options,current:()=>{guards++;return true;}},predecessorFence:Object.freeze({work:fenceWork,check:()=>{checks++;return mode!=='stale';}})}),
+      completion<ReadonlyMap<string,unknown>>());
+    assert.equal(r.status==='COMPLETE',mode==='exact',mode);
+    assert.deepEqual([input,run,output],mode==='exact'?[1,1,1]:[0,0,0],mode);
+    if(mode==='short')assert.deepEqual([guards,checks],[0,0]);
+    if(mode==='exact')assert.ok(checks>0&&checks<=16);
+  }
+});

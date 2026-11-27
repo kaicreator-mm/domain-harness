@@ -69,6 +69,7 @@ export interface BoundNodePreparation<I, O> {
   readonly maxBindings: number;
   readonly child: boolean;
   readonly knownProofWork?: number;
+  readonly predecessorFence?: import('./workflow-managed-runtime.js').PredecessorFence;
   readonly occurrence?: Readonly<{ instanceId: string; attempt: number; planRevision: number }>;
   readonly current: (frame: WorkflowKnowledgeFrame) => boolean;
   readonly input: () => Outcome<I>;
@@ -86,7 +87,7 @@ export interface NodeAdmission<I, O> {
 export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, definition: WorkflowNode<I, O>,
   options: WorkflowNodeOptions, binding?: BoundNodePreparation<I, O>): NodeAdmission<I, O> | { code: string } {
   if (!runtime.available()) return { code: 'WORKFLOW_STOPPED' };
-  if (binding && (!valid(binding.maxBindings, 2048) || !valid(binding.knownProofWork ?? 0))) return { code: 'WORKFLOW_INVALID_LIMIT' };
+  if (binding && (!valid(binding.maxBindings, 2048) || !valid(binding.knownProofWork ?? 0) || !valid(binding.predecessorFence?.work ?? 0))) return { code: 'WORKFLOW_INVALID_LIMIT' };
   if (!definition || !options || !options.knowledge || !boundedText(definition.id) || Buffer.byteLength(definition.id) > 128 || !boundedText(definition.goal)
     || !valid(options.knowledge.maxItems, 4096) || !array(definition.requiredKnowledge)
     || definition.requiredKnowledge.length > options.knowledge.maxItems
@@ -106,7 +107,7 @@ export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, d
   const R = node.terminalReads ?? 0;
   const N = 4 + Number(node.knowledge !== undefined) + Number(node.cleanup !== undefined) + R + Number(node.context !== undefined)
     + (binding ? 2 + Number(binding.child) : 0);
-  const F = runtime.frameChainCost(parent) + frameScanWork(local.knowledge.maxItems);
+  const F = runtime.frameChainCost(parent) + frameScanWork(local.knowledge.maxItems) + (binding?.predecessorFence?.work ?? 0);
   // Context 声明元数据至多 4096 项 / 64KiB；验证密集性、字符串、字节和复制各一次。
   // 不复用为实际事件 JSON 扫描预留的额度；两次进度视图亦各自预付。
   // 子区域工厂返回事实策略之前无法得知其 maxItems，使用合同上限 4096
@@ -120,7 +121,7 @@ export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, d
     events: 4 + 3 * Number(binding?.child === true), activeScopes: 1 + Number(binding?.child === true), terminalReads: R }, parent.local);
   if (!reservation.ok) return { code: reservation.code };
   return { definition: node, options: bound, ...(binding ? { binding } : {}), scope: { id: randomUUID(), parentId: parent.id, parent,
-    policy: local, owner, ticket: reservation.ticket, ...(childWork ? { prepaidChildWork: childWork } : {}), delivery: 'not-required', diagnostic: false, ...(parent.local === undefined ? {} : { local: parent.local }) } };
+    policy: local, owner, ticket: reservation.ticket, ...(binding?.predecessorFence ? { predecessorFence: binding.predecessorFence } : {}), ...(childWork ? { prepaidChildWork: childWork } : {}), delivery: 'not-required', diagnostic: false, ...(parent.local === undefined ? {} : { local: parent.local }) } };
 }
 
 export async function executeNode<I, O>(runtime: ManagedRuntime, admission: NodeAdmission<I, O>, initial: () => Outcome<I>,

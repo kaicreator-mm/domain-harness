@@ -58,6 +58,14 @@ export function redact(value: Outcome<unknown>): Outcome<void> {
   }) });
 }
 
+/** 接纳时固定的前序义务校验，随当前节点作用域向下继承。
+ * work 是一次 frame capture 额外检查的有限上界，不再单独扣账。
+ */
+export interface PredecessorFence {
+  readonly work: number;
+  readonly check: (frame: WorkflowKnowledgeFrame) => boolean;
+}
+
 export interface ManagedScope {
   readonly id: string;
   readonly parentId?: string;
@@ -69,6 +77,7 @@ export interface ManagedScope {
   readonly local?: LocalWorkQuota;
   readonly actor?: { remaining: number; frame?: ScopeFrames };
   readonly policy?: LocalFramePolicy;
+  readonly predecessorFence?: PredecessorFence;
   bound?: ScopeFrames;
   resolved?: EvidenceResolution<string, unknown>;
   finalCurrent?: (frame: Frame) => boolean;
@@ -225,7 +234,12 @@ export class ManagedRuntime {
   }
 
   public frameChainCost(scope?: ManagedScope): number {
-    return this.frameCost + this.policies(scope).reduce((n, p) => n + frameScanWork(p.knowledge.maxItems), 0);
+    let cost=this.frameCost;
+    for(let owner=scope;owner!==undefined;owner=owner.parent){
+      if(owner.policy)cost+=frameScanWork(owner.policy.knowledge.maxItems);
+      cost+=owner.predecessorFence?.work??0;
+    }
+    return cost;
   }
 
   public frames(scope: ManagedScope): ScopeFrames | undefined {
@@ -251,6 +265,7 @@ export class ManagedRuntime {
       if (owner.policy === undefined) continue;
       const current = locals[index--];
       if (!current || current.policy !== owner.policy) return undefined;
+      if (owner.predecessorFence && !owner.predecessorFence.check(current.frame)) return undefined;
       if (!bound) continue;
       const own = bound.locals.at(-1);
       if (!own || own.policy !== current.policy || !this.same(own.frame, current.frame)

@@ -360,3 +360,52 @@ test('zero-output required node keeps own currentness, including revision/expiry
     assert.equal(new Set(trace.map(x=>x.runId)).size,1);
   }
 });
+
+test('accepted mandatory predecessor fences later effects, including private child proofs and nested descendants',async()=>{
+  for(const privateGate of [false,true])for(const nestedEffect of [false,true])
+    for(const mode of ['current','before','enter','run','candidate'] as const){
+      let asOf=1,gateRuns=0,pre=0,effects=0,completeCalls=0;
+      const label=JSON.stringify({privateGate,nestedEffect,mode});
+      const policy={maxItems:1,equal:Object.is,current:()=>({epoch:1,context:{scope:'shop',asOf:privateGate?1:asOf,revisions:new Map([['quote','1']])}})};
+      const privatePolicy={maxItems:1,equal:Object.is,current:()=>({epoch:1,context:{scope:'private',asOf,revisions:new Map([['private-quote','1']])}})};
+      const gatePolicy=privateGate?privatePolicy:policy;
+      const gate=bindWorkflowFunction<void,void>({id:'gate',description:'mandatory current authority',inputs:{},outputs:{},input:()=>ok(undefined),output:()=>ok(undefined),
+        node:{id:'gate',goal:'authorization',requiredKnowledge:[{key:'quote',accepts:['authority']}],replay:'never',
+          knowledge:()=>ok([{key:'quote',origin:'authority',state:'known',value:true,source:{id:privateGate?'private-quote':'quote',
+            scope:privateGate?'private':'shop',revision:'1',validity:{from:0,until:3}}}]),
+          before:()=>ok(undefined),run:()=>{gateRuns++;return ok(undefined);},after:()=>ok(undefined),project:()=>({effect:'none',detail:null})}});
+      const effect=bindWorkflowFunction<void,void>({id:'effect',description:'authorized synthetic effect',inputs:{},outputs:{},input:()=>ok(undefined),output:()=>ok(undefined),
+        node:{id:'effect',goal:'authorized effect',requiredKnowledge:[],before:()=>{pre++;if(mode==='before')asOf=3;return ok(undefined);},
+          run:()=>{effects++;if(mode==='run')asOf=3;return ok(undefined);},after:()=>ok(undefined),
+          project:()=>({effect:'committed',receiptId:'synthetic-receipt',detail:null})}});
+      const anchor=(c:WorkflowCapability)=>({kind:'anchor' as const,id:c.id,node:{alias:c.id,capability:c.id,input:{}}});
+      const wrap=(id:string,c:WorkflowCapability,k:typeof policy)=>bindWorkflowRegion<void,void>({id,description:id,inputs:{},outputs:{},input:()=>ok(undefined),output:()=>ok(undefined),
+        node:{id,goal:id,requiredKnowledge:[],before:()=>ok(undefined),after:()=>ok(undefined),project:()=>({effect:'none',detail:null})},
+        create:()=>ok({id,goal:id,limits:{...limits,maxDescendantDepth:0},capabilities:[c],constraints:[],knowledge:k,current:()=>true,requiredKnowledge:[],optionalKnowledge:[],
+          contextSlots:{},layout:[anchor(c)],refresh:()=>ok({changed:[],dependencies:[],observations:[],slotEvidence:{}}),
+          plan:v=>result(v,accepted(v,c.id)?'finish':'continue'),admit:()=>ok(undefined),canSkip:()=>deny(),canRebind:()=>deny(),
+          replay:'never',complete:()=>ok(undefined)})});
+      const g=privateGate?wrap('gate-region',gate,gatePolicy):gate;
+      const e=nestedEffect?wrap('effect-region',effect,policy):effect;
+      const d:WorkflowRegionDefinition<void,number>={id:'outer',goal:'gate before effect',limits,capabilities:[...new Set([g,e,gate,effect])],constraints:[],
+        knowledge:policy,current:()=>true,requiredKnowledge:[],optionalKnowledge:[],contextSlots:{},layout:[anchor(g),anchor(e)],replay:'never',
+        refresh:()=>ok({changed:[],dependencies:[],observations:[],slotEvidence:{}}),
+        plan:v=>result(v,accepted(v,e.id)?'finish':'continue'),admit:()=>ok(undefined),canSkip:()=>deny(),canRebind:()=>deny(),
+        complete:()=>{completeCalls++;return ok(1);}};
+      const s=new StandardWorkflowSession(rootLimits,{knowledge:policy,current:()=>true,limits:baseControl,evidence:{required:true,emit:r=>{
+        if(r.kind==='node'&&r.occurrence.definitionId==='effect'&&((mode==='enter'&&r.phase==='enter')||(mode==='candidate'&&r.phase==='candidate')))asOf=3;
+        return ok(undefined);
+      }}});
+      const r=await s.run(root=>runWorkflowRegion(root,d,undefined),completion<number>(v=>v===1));
+      assert.equal(r.status==='COMPLETE',mode==='current',label);
+      assert.equal(gateRuns,1,label);assert.equal(pre,1,label);
+      assert.equal(effects,mode==='before'||mode==='enter'?0:1,label);
+      assert.equal(completeCalls,mode==='current'?1:0,label);
+      const records=s.dispositions().filter(x=>x.kind==='node');
+      const gRecord=records.find(x=>x.occurrence.definitionId==='gate'),eRecord=records.find(x=>x.occurrence.definitionId==='effect');
+      assert.equal(gRecord?.acceptance,'accepted',label);assert.ok(eRecord,label);
+      assert.equal(eRecord.acceptance==='accepted',mode==='current',label);
+      if(effects){assert.equal(eRecord.effect,'committed',label);assert.equal(eRecord.receiptId,'synthetic-receipt',label);}
+      else{assert.equal(eRecord.entered,false,label);assert.equal(eRecord.effect,'not-applicable',label);}
+    }
+});
