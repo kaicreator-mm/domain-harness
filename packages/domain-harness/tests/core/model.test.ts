@@ -329,3 +329,51 @@ test('both protocols distinguish missing content from present empty text and val
     }finally{await server.close();}
   }
 });
+
+test('explicit nonthinking profile sends only supported control in both protocols; default unchanged',async()=>{
+  for(const protocol of ['openai-chat','anthropic-messages'] as const){
+    const wires:Obj[]=[];
+    const server=await serve((_r,s,b)=>{
+      wires.push(b);
+      if(protocol==='openai-chat')send(s,open('ok'));
+      else send(s,{content:[{type:'text',text:'ok'}],stop_reason:'end_turn',usage:{output_tokens:2}});
+    });
+    try{
+      for(const thinking of [undefined,'disabled'] as const){
+        const p=profile(server.base,protocol,thinking?{thinking}:{});
+        assert.equal((await session().run(root=>new ModelElement(p).generate(root,req({tools:[]})),complete<ModelTurn>())).status,'COMPLETE');
+      }
+      assert.equal(wires[0]?.thinking,undefined);assert.deepEqual(wires[1]?.thinking,{type:'disabled'});
+      assert.throws(()=>new ModelElement({...profile(server.base,protocol),thinking:'enabled'} as unknown as ModelProfile),/MODEL_INVALID_PROFILE/);
+      assert.equal(server.calls(),2);
+    }finally{await server.close();}
+  }
+});
+
+test('nonstream indexed tool calls normalize exact ordered metadata; wrong index or opaque fields fail closed',async()=>{
+  for(const mode of ['valid','wrong','string','opaque'] as const){
+    const wires:Obj[]=[];
+    const server=await serve((_r,s,b)=>{
+      wires.push(b);
+      if(wires.length===1)send(s,{choices:[{message:{role:'assistant',content:null,tool_calls:[{
+        index:mode==='wrong'?1:mode==='string'?'0':0,id:'call-indexed',type:'function',function:{name:'quote',arguments:'{"offer":"A"}'},
+        ...(mode==='opaque'?{extra:'opaque'}:{})}]},finish_reason:'tool_calls'}]});
+      else send(s,open('done'));
+    });
+    try{
+      const m=new ModelElement(profile(server.base));
+      const r=await session().run(async root=>{
+        const a=await m.generate(root,req());if(a.status!=='COMPLETE')return a;
+        const result=await m.generate(root,req({requestKey:'next',action:'continue',input:[
+          {role:'user',text:'Compare offers'},{role:'assistant',turn:a.value},{role:'tool-results',results:[{callId:'call-indexed',value:1,error:false}]}]}));
+        return result;
+      },complete<ModelTurn>());
+      assert.equal(r.status==='COMPLETE',mode==='valid');
+      assert.equal(server.calls(),mode==='valid'?2:1);
+      if(mode==='valid'){
+        const toolCall=obj(arr(obj(arr(wires[1]?.messages)[2]).tool_calls)[0]);
+        assert.equal(Object.hasOwn(toolCall,'index'),false);assert.equal(toolCall.id,'call-indexed');
+      }
+    }finally{await server.close();}
+  }
+});
