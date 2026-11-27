@@ -5,10 +5,10 @@ import type { EvidenceObservation, EvidenceResolution } from './standard-evidenc
 import type { NativeWorkflowContext } from './native-workflow-composition.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import type { StandardJsonValue } from './standard-files.js';
-import type { WorkflowNode, WorkflowNodeOptions, WorkflowAttempt, WorkflowContextView, WorkflowObservation } from './workflow-managed-contract.js';
+import type { WorkflowNode, WorkflowNodeOptions, WorkflowAttempt, WorkflowContextView, WorkflowObservation, WorkflowKnowledgeFrame } from './workflow-managed-contract.js';
 import { boundedText, dense, valid, managedFailure, snapshotOutcome, redact } from './workflow-managed-runtime.js';
 import type { ManagedRuntime, ManagedScope, LocalFramePolicy, ScopeFrames } from './workflow-managed-runtime.js';
-import { EVENT_SCAN_WORK, frameScanWork, knowledgeScanWork } from './workflow-resource-control.js';
+import { EVENT_SCAN_WORK, frameScanWork, knowledgeScanWork, leaseScanWork } from './workflow-resource-control.js';
 
 type Outcome<T> = StandardWorkflowOutcome<T>;
 type NodeRecord = Extract<WorkflowObservation, { kind: 'node' }>;
@@ -64,21 +64,35 @@ export function safeDetail(value: StandardJsonValue, limit: number): StandardJso
   return result;
 }
 
+/** 动态输入和编码预留在同一次节点接纳中；不另建执行器。 */
+export interface BoundNodePreparation<I, O> {
+  readonly maxBindings: number;
+  readonly child: boolean;
+  readonly knownProofWork?: number;
+  readonly predecessorFence?: import('./workflow-managed-runtime.js').PredecessorFence;
+  readonly occurrence?: Readonly<{ instanceId: string; attempt: number; planRevision: number }>;
+  readonly current: (frame: WorkflowKnowledgeFrame) => boolean;
+  readonly input: () => Outcome<I>;
+  readonly encode: (value: O, resolution: EvidenceResolution<string, unknown>) => Outcome<void>;
+}
+
 export interface NodeAdmission<I, O> {
   readonly definition: WorkflowNode<I, O>;
   readonly options: WorkflowNodeOptions;
   readonly scope: ManagedScope;
+  readonly binding?: BoundNodePreparation<I, O>;
 }
 
 /** 业务回调之前完整预留固定节点额度，后续动态准备复用此执行边界。 */
 export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, definition: WorkflowNode<I, O>,
-  options: WorkflowNodeOptions): NodeAdmission<I, O> | { code: string } {
+  options: WorkflowNodeOptions, binding?: BoundNodePreparation<I, O>): NodeAdmission<I, O> | { code: string } {
   if (!runtime.available()) return { code: 'WORKFLOW_STOPPED' };
+  if (binding && (!valid(binding.maxBindings, 2048) || !valid(binding.knownProofWork ?? 0) || !valid(binding.predecessorFence?.work ?? 0))) return { code: 'WORKFLOW_INVALID_LIMIT' };
   if (!definition || !options || !options.knowledge || !boundedText(definition.id) || Buffer.byteLength(definition.id) > 128 || !boundedText(definition.goal)
     || !valid(options.knowledge.maxItems, 4096) || !array(definition.requiredKnowledge)
     || definition.requiredKnowledge.length > options.knowledge.maxItems
     || (definition.requiredKnowledge.length > 0 && typeof definition.knowledge !== 'function')
-    || !valid(definition.terminalReads ?? 0) || options.planRevision !== undefined
+    || !valid(definition.terminalReads ?? 0) || (options.planRevision !== undefined && !binding)
     || typeof options.current !== 'function' || typeof options.knowledge.current !== 'function'
     || typeof options.knowledge.equal !== 'function'
     || [definition.before, definition.run, definition.after, definition.project].some(x => typeof x !== 'function')
@@ -91,25 +105,32 @@ export function admitNode<I, O>(runtime: ManagedRuntime, parent: ManagedScope, d
   const bound = Object.freeze({ ...options, knowledge: local.knowledge });
   const owner = {};
   const R = node.terminalReads ?? 0;
-  const N = 4 + Number(node.knowledge !== undefined) + Number(node.cleanup !== undefined) + R + Number(node.context !== undefined);
-  const F = runtime.frameChainCost(parent) + frameScanWork(local.knowledge.maxItems);
+  const N = 4 + Number(node.knowledge !== undefined) + Number(node.cleanup !== undefined) + R + Number(node.context !== undefined)
+    + (binding ? 2 + Number(binding.child) : 0);
+  const F = runtime.frameChainCost(parent) + frameScanWork(local.knowledge.maxItems) + (binding?.predecessorFence?.work ?? 0);
   // Context 声明元数据至多 4096 项 / 64KiB；验证密集性、字符串、字节和复制各一次。
   // 不复用为实际事件 JSON 扫描预留的额度；两次进度视图亦各自预付。
+  // 子区域工厂返回事实策略之前无法得知其 maxItems，使用合同上限 4096
+  // 预付入口和活动占位；具体局部额度在工厂返回后按实际声明扣除。
+  const childWork = binding?.child ? 4 + 3 * EVENT_SCAN_WORK + 4 * (F + frameScanWork(4096)) : 0;
   const contextWork = node.context === undefined ? 0 : 4 * 4096 + Math.ceil(65536 / 256);
-  const reservation = runtime.ledger.reserve(owner, { calls: N, steps: N,
+  const reservation = runtime.ledger.reserve(owner, { calls: N, steps: N + Number(binding?.child === true),
     work: N + 4 + 4 * EVENT_SCAN_WORK + (16 + R) * F + knowledgeScanWork(local.knowledge.maxItems)
-      + 2 * runtime.progressScanCost + contextWork,
-    events: 4, activeScopes: 1, terminalReads: R }, parent.local);
+      + (binding ? 2 * leaseScanWork(binding.maxBindings) + 15 * (binding.knownProofWork ?? 0) : 0)
+      + 2 * runtime.progressScanCost + contextWork + childWork,
+    events: 4 + 3 * Number(binding?.child === true), activeScopes: 1 + Number(binding?.child === true), terminalReads: R }, parent.local);
   if (!reservation.ok) return { code: reservation.code };
-  return { definition: node, options: bound, scope: { id: randomUUID(), parentId: parent.id, parent,
-    policy: local, owner, ticket: reservation.ticket, delivery: 'not-required', diagnostic: false, ...(parent.local === undefined ? {} : { local: parent.local }) } };
+  return { definition: node, options: bound, ...(binding ? { binding } : {}), scope: { id: randomUUID(), parentId: parent.id, parent,
+    policy: local, owner, ticket: reservation.ticket, ...(binding?.predecessorFence ? { predecessorFence: binding.predecessorFence } : {}), ...(childWork ? { prepaidChildWork: childWork } : {}), delivery: 'not-required', diagnostic: false, ...(parent.local === undefined ? {} : { local: parent.local }) } };
 }
 
-export async function executeNode<I, O>(runtime: ManagedRuntime, admission: NodeAdmission<I, O>, input: I,
+export async function executeNode<I, O>(runtime: ManagedRuntime, admission: NodeAdmission<I, O>, initial: () => Outcome<I>,
   context: NativeWorkflowContext, closeAttempt: () => Promise<boolean>, parentOpen: () => boolean): Promise<Outcome<O>> {
-  const { definition: node, options, scope } = admission;
+  const { definition: node, options, scope, binding } = admission;
+  let prepared = false;
+  let input!: I;
   const occurrence = Object.freeze({ runId: runtime.runId, scopeId: scope.id, parentScopeId: scope.parentId!,
-    definitionId: node.id, instanceId: randomUUID(), attempt: 1 });
+    definitionId: node.id, instanceId: binding?.occurrence?.instanceId ?? randomUUID(), attempt: binding?.occurrence?.attempt ?? 1 });
   let frames: ScopeFrames | undefined;
   let resolution: EvidenceResolution<string, unknown> | undefined;
   let enterRecord = false;
@@ -119,10 +140,10 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
   let result: Outcome<O> = managedFailure('WORKFLOW_NODE_INVALID');
   let candidateSeq: number | undefined;
   let currentChecks = 0;
-  const current = () => ++currentChecks <= 15 && frames !== undefined && parentOpen() && runtime.checkFrames(scope, frames, resolution);
+  const current = () => ++currentChecks <= 15 && frames !== undefined && parentOpen() && runtime.checkFrames(scope, frames, resolution, binding?.current);
   const record = (phase: NodeRecord['phase'], acceptance: NodeRecord['acceptance'], value?: Outcome<unknown>): NodeRecord =>
     Object.freeze({ kind: 'node', phase, occurrence, runId: runtime.runId, scopeId: scope.id, parentScopeId: scope.parentId!,
-      seq: runtime.sequence(), factRevision: frames?.locals.at(-1)?.frame.epoch ?? 0, stage: node.id,
+      seq: runtime.sequence(), factRevision: frames?.locals.at(-1)?.frame.epoch ?? 0, stage: node.id, ...(binding?.occurrence === undefined ? {} : { planRevision: binding.occurrence.planRevision }),
       entered, acceptance, post, effect: projection.effect, ...(projection.receiptId === undefined ? {} : { receiptId: projection.receiptId }),
       detail: phase === 'disposition' ? null : projection.detail, sources: phase === 'disposition' ? Object.freeze([]) : sources,
       reason: scope.diagnostic ? 'WORKFLOW_OBSERVER_FAILED' : value?.status === 'COMPLETE' ? 'WORKFLOW_NODE_CANDIDATE' : 'WORKFLOW_NODE_OBSERVATION',
@@ -146,6 +167,13 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
     scope.bound = frames;
     const local = frames.locals.at(-1)?.frame;
     if (!local) throw Error('WORKFLOW_NODE_FRAME');
+    if (binding && !current()) throw Error('WORKFLOW_CURRENTNESS');
+    const assembled = accept(binding ? runtime.guarded(initial) : initial());
+    if (assembled.status !== 'COMPLETE') { result = assembled; throw Error('WORKFLOW_INPUT'); }
+    input = assembled.value;
+    prepared = true;
+    if (binding && !current()) throw Error('WORKFLOW_CURRENTNESS');
+
     let constraints: readonly string[] = Object.freeze([]), capabilities: readonly string[] = Object.freeze([]);
     let feedbackRevision = 0;
     if (node.context) {
@@ -219,7 +247,7 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
   } finally {
     const outstanding = await closeAttempt();
     if (outstanding && result.status === 'COMPLETE') result = stale();
-    if (entered && actual) {
+    if (entered && actual && prepared) {
       const terminal = runtime.terminal(scope, undefined, frames, true);
       try {
         const observed = accept(await node.after(input, actual, terminal.context));
@@ -249,7 +277,7 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
       if (!current() && result.status === 'COMPLETE') result = stale();
       if (!emit('actual', actual.kind === 'returned' ? actual.outcome : managedFailure(actual.code))) rejectIfComplete('WORKFLOW_EVIDENCE_FAILED');
     } else {
-      if (preEntered && node.cleanup) {
+      if (preEntered && prepared && node.cleanup) {
         try { await node.cleanup(input, { kind: 'unsettled', code: 'WORKFLOW_PRE_REJECT' }); }
         catch { rejectIfComplete('WORKFLOW_CLEANUP_FAILED'); }
       }
@@ -258,10 +286,21 @@ export async function executeNode<I, O>(runtime: ManagedRuntime, admission: Node
       else emit('pre-reject', result);
     }
     if (result.status === 'COMPLETE' && (!current() || runtime.criticalFailed)) result = stale();
+    if (binding && result.status === 'COMPLETE') {
+      try {
+        if (!resolution) rejectIfComplete('WORKFLOW_OUTPUT');
+        else {
+          const value = result.value, resolved = resolution;
+          const encoded = accept(runtime.guarded(() => binding.encode(value, resolved)));
+          if (encoded.status !== 'COMPLETE') result = encoded;
+        }
+      } catch { rejectIfComplete('WORKFLOW_OUTPUT'); }
+      if (result.status === 'COMPLETE' && !current()) result = stale();
+    }
     if (!emit('candidate', result)) rejectIfComplete('WORKFLOW_EVIDENCE_FAILED');
     if (result.status === 'COMPLETE' && (!current() || runtime.criticalFailed)) result = stale();
     if (scope.ticket.event(scope.owner)) {
-      runtime.noteNode(record('disposition', result.status === 'COMPLETE' ? 'accepted' : result.status === 'UNKNOWN' ? 'stale' : 'rejected', result));
+      runtime.noteNode(record('disposition', result.status === 'COMPLETE' ? 'accepted' : result.status === 'UNKNOWN' ? 'stale' : 'rejected', result), scope);
     } else rejectIfComplete('WORKFLOW_EVENT_BUDGET');
     scope.ticket.close(scope.owner);
   }

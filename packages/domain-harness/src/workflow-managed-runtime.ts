@@ -1,11 +1,12 @@
 import { types } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import type { DetachedRegionProof } from './workflow-slots.js';
 import { resolveEvidence } from './standard-evidence.js';
 import type { EvidenceObservation, EvidenceRequirement, EvidenceResolution } from './standard-evidence.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
 import type {
   WorkflowControlOptions, WorkflowCompletionPolicy, WorkflowContextView,
-  WorkflowKnowledgeFrame, WorkflowObservation, WorkflowTerminalContext, WorkflowKnowledgePolicy,
+  WorkflowKnowledgeFrame, WorkflowObservation, WorkflowTerminalContext, WorkflowKnowledgePolicy, WorkflowNodeOptions,
 } from './workflow-managed-contract.js';
 import {
   EVENT_SCAN_WORK, frameScanWork, knowledgeScanWork, WorkflowClock,
@@ -57,6 +58,14 @@ export function redact(value: Outcome<unknown>): Outcome<void> {
   }) });
 }
 
+/** 接纳时固定的前序义务校验，随当前节点作用域向下继承。
+ * work 是一次 frame capture 额外检查的有限上界，不再单独扣账。
+ */
+export interface PredecessorFence {
+  readonly work: number;
+  readonly check: (frame: WorkflowKnowledgeFrame) => boolean;
+}
+
 export interface ManagedScope {
   readonly id: string;
   readonly parentId?: string;
@@ -68,8 +77,13 @@ export interface ManagedScope {
   readonly local?: LocalWorkQuota;
   readonly actor?: { remaining: number; frame?: ScopeFrames };
   readonly policy?: LocalFramePolicy;
+  readonly predecessorFence?: PredecessorFence;
   bound?: ScopeFrames;
   resolved?: EvidenceResolution<string, unknown>;
+  finalCurrent?: (frame: Frame) => boolean;
+  feedbackCount?: number;
+  unsafeReplay?: boolean;
+  prepaidChildWork?: number;
 }
 
 export interface LocalFramePolicy {
@@ -97,6 +111,7 @@ export class ManagedRuntime {
   readonly clock: WorkflowClock;
   readonly #final: WorkflowObservation[] = [];
   #seq = 0;
+  readonly #nodeFinal = new Map<string, Extract<WorkflowObservation, { kind: 'node' }>>();
   readonly #progress = new Map<string, Map<string, WorkflowContextView['progress'][number]>>();
 
   public sequence(): number { return ++this.#seq; }
@@ -113,7 +128,7 @@ export class ManagedRuntime {
     return Object.freeze([...(progress?.values() ?? [])]);
   }
 
-  public noteNode(record: Extract<WorkflowObservation, { kind: 'node' }>): void {
+  public noteNode(record: Extract<WorkflowObservation, { kind: 'node' }>, scope?: ManagedScope): void {
     const { instanceId, definitionId } = record.occurrence;
     const state = record.phase === 'enter' ? 'running' : record.acceptance === 'accepted' ? 'accepted'
       : record.effect === 'unknown' ? 'unknown' : record.acceptance === 'stale' ? 'stale' : 'rejected';
@@ -121,12 +136,29 @@ export class ManagedRuntime {
     let progress = this.#progress.get(parent);
     if (!progress) { progress = new Map(); this.#progress.set(parent, progress); }
     progress.set(instanceId, Object.freeze({ instanceId, definitionId, state }));
-    if (record.phase === 'disposition') this.#final.push(record);
+    if (record.phase === 'disposition') {
+      this.#final.push(record); this.#nodeFinal.set(instanceId, record);
+      // 子区域的所有实际后代（含域直接调用的受控节点）都参与保守重执行资格。
+      if (record.entered && (record.effect !== 'none' || record.acceptance !== 'accepted')) {
+        for (let s = scope; s !== undefined; s = s.parent) if (s.feedbackCount !== undefined) s.unsafeReplay = true;
+      }
+    }
   }
+  public nodeDisposition(instanceId: string) { return this.#nodeFinal.get(instanceId); }
   public localRemaining(scope: ManagedScope): number {
     return scope.local === undefined ? this.ledger.remaining().work : this.ledger.localRemaining(scope.local);
   }
   public get criticalFailed(): boolean { return this.#criticalFailed; }
+
+  #activeLeaves = 0;
+  #waitingLeaves = 0;
+
+  /** 只接收已拥有操作的叶子状态变化；时钟需要是否存在，不新增额度维度。 */
+  public activity(activeDelta: number, waitingDelta: number): void {
+    this.#activeLeaves += activeDelta;
+    this.#waitingLeaves += waitingDelta;
+    this.clock.activity(Number(this.#activeLeaves > 0), Number(this.#waitingLeaves > 0));
+  }
 
   #callback = false;
   #criticalFailed = false;
@@ -202,7 +234,12 @@ export class ManagedRuntime {
   }
 
   public frameChainCost(scope?: ManagedScope): number {
-    return this.frameCost + this.policies(scope).reduce((n, p) => n + frameScanWork(p.knowledge.maxItems), 0);
+    let cost=this.frameCost;
+    for(let owner=scope;owner!==undefined;owner=owner.parent){
+      if(owner.policy)cost+=frameScanWork(owner.policy.knowledge.maxItems);
+      cost+=owner.predecessorFence?.work??0;
+    }
+    return cost;
   }
 
   public frames(scope: ManagedScope): ScopeFrames | undefined {
@@ -228,6 +265,7 @@ export class ManagedRuntime {
       if (owner.policy === undefined) continue;
       const current = locals[index--];
       if (!current || current.policy !== owner.policy) return undefined;
+      if (owner.predecessorFence && !owner.predecessorFence.check(current.frame)) return undefined;
       if (!bound) continue;
       const own = bound.locals.at(-1);
       if (!own || own.policy !== current.policy || !this.same(own.frame, current.frame)
@@ -237,12 +275,53 @@ export class ManagedRuntime {
   }
 
   public checkFrames(scope: ManagedScope, captured: ScopeFrames,
-    resolution?: EvidenceResolution<string, unknown>): boolean {
+    resolution?: EvidenceResolution<string, unknown>,
+    validate?: (frame: Frame) => boolean): boolean {
     const now = this.frames(scope);
     if (!now || !this.same(captured.root, now.root) || now.locals.length !== captured.locals.length) return false;
     if (!captured.locals.every((x, i) => x.policy === now.locals[i]?.policy && this.same(x.frame, now.locals[i].frame))) return false;
     const frame = now.locals.at(-1)?.frame ?? now.root;
-    return this.evidenceCurrent(frame, resolution);
+    return this.evidenceCurrent(frame, resolution) && (validate?.(frame) ?? true);
+  }
+
+  /** 已知私有子域证明的有限扫描计划，不调用可信策略。 */
+  public detachedPlan(proofs: readonly DetachedRegionProof[]): Readonly<{ work: number; check: () => boolean }> | undefined {
+    if (!this.available() || proofs.length > 256) return undefined;
+    if (proofs.length === 0) return Object.freeze({ work: 0, check: () => true });
+    const seen = new Set<DetachedRegionProof>(), pending = [...proofs];
+    let work = 1, links = 0;
+    for (let i = 0; i < pending.length; i++) {
+      const p = pending[i]!;
+      if (seen.has(p)) continue;
+      if (seen.size >= 256 || p.children.length > 256 || !valid(p.knowledge.maxItems, 4096)
+        || (links += p.sources.length + p.children.length) > 16384) return undefined;
+      seen.add(p);
+      work += frameScanWork(p.knowledge.maxItems) + 4 * (p.sources.length + p.children.length);
+      for (const child of p.children) if (!seen.has(child)) pending.push(child);
+    }
+    return Object.freeze({ work, check: () => {
+      for (const p of seen) {
+        const now = this.capture(p.knowledge, p.current, p.frame);
+        if (!now || !this.same(p.frame, now)) return false;
+        for (const source of p.sources) {
+          const t = source.validity, asOf = now.context.asOf;
+          if (source.scope !== now.context.scope || now.context.revisions.get(source.id) !== source.revision
+            || (t && (asOf === undefined || asOf < t.from || asOf >= t.until))) return false;
+        }
+      }
+      return this.available();
+    } });
+  }
+
+  /** 区域普通阶段按已有 work 额度校验；节点已知输入证明在整次接纳中预留。 */
+  public checkDetached(scope: ManagedScope, proofs: readonly DetachedRegionProof[]): boolean {
+    const plan = this.detachedPlan(proofs);
+    if (!plan) return false;
+    if (plan.work === 0) return true;
+    const admission = this.ledger.reserve(scope.owner, { calls: 0, steps: 0, work: plan.work }, scope.local);
+    if (!admission.ok) return false;
+    try { return plan.check(); }
+    finally { admission.ticket.close(scope.owner); }
   }
 
   private same(a: Frame, b: Frame): boolean {
@@ -268,11 +347,14 @@ export class ManagedRuntime {
     return true;
   }
 
-  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope, maxLocalWork?: number, actorProjections?: number):
+  public reserveScope(parentId?: string, completion?: WorkflowCompletionPolicy<unknown>, parent?: ManagedScope, maxLocalWork?: number, actorProjections?: number, region?: WorkflowNodeOptions, prepaid = false):
     { scope: ManagedScope } | { code: string } {
     if (!this.available()) return { code: 'WORKFLOW_STOPPED' };
     if (actorProjections !== undefined && (!valid(actorProjections, 65536) || actorProjections < 1
       || completion !== undefined || parent === undefined)) return { code: 'WORKFLOW_INVALID_LIMIT' };
+    if (region && (completion || !parent || !valid(region.knowledge.maxItems, 4096)
+      || typeof region.current !== 'function' || typeof region.knowledge.current !== 'function'
+      || typeof region.knowledge.equal !== 'function')) return { code: 'WORKFLOW_INVALID_LIMIT' };
     const P = actorProjections ?? 0;
     const actorCalls = Number(actorProjections !== undefined);
     const owner = {};
@@ -280,17 +362,31 @@ export class ManagedRuntime {
     const finalCalls = completion === undefined ? 0 : 1 + Number(completion.observe !== undefined) + reads;
     const charge: ResourceCharge = { calls: finalCalls + actorCalls, steps: 1 + finalCalls + actorCalls,
       work: 4 + 3 * EVENT_SCAN_WORK + finalCalls + (completion === undefined
-        ? 4 * this.frameChainCost(parent) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost + this.progressScanCost)
+        ? 4 * (this.frameChainCost(parent) + (region ? frameScanWork(region.knowledge.maxItems) : 0)) : knowledgeScanWork(this.control.knowledge.maxItems) + (8 + reads) * this.frameCost + this.progressScanCost)
         + actorCalls + P * (1 + EVENT_SCAN_WORK + this.frameChainCost(parent)),
       events: 3 + P, activeScopes: 1, terminalReads: reads };
     if (maxLocalWork !== undefined && !valid(maxLocalWork)) return { code: 'WORKFLOW_INVALID_LIMIT' };
     // 局部额度包含作用域自身准入、所有后代及终止预留；不从根转移或复制实际余额。
-    const local = maxLocalWork === undefined ? parent?.local : this.ledger.local(maxLocalWork, parent?.local);
-    const admission = this.ledger.reserve(owner, charge, local);
-    if (!admission.ok) return { code: admission.code };
+    let local: LocalWorkQuota | undefined, ticket: ResourceTicket;
+    if (prepaid) {
+      if (!parent || !region || parent.prepaidChildWork === undefined || completion || actorProjections !== undefined
+        || maxLocalWork === undefined || charge.work === undefined || charge.work > parent.prepaidChildWork) return { code: 'WORKFLOW_CHILD_ADMISSION' };
+      if (maxLocalWork < charge.work) return { code: 'WORKFLOW_LOCAL_WORK_BUDGET' };
+      local = this.ledger.prepaidLocal(maxLocalWork, charge.work, parent.local);
+      const split = parent.ticket.splitChild(parent.owner, owner);
+      if (!split) return { code: 'WORKFLOW_CHILD_ADMISSION' };
+      delete parent.prepaidChildWork;
+      ticket = split;
+    } else {
+      local = maxLocalWork === undefined ? parent?.local : this.ledger.local(maxLocalWork, parent?.local);
+      const admission = this.ledger.reserve(owner, charge, local);
+      if (!admission.ok) return { code: admission.code };
+      ticket = admission.ticket;
+    }
     return { scope: { id: randomUUID(), ...(parentId === undefined ? {} : { parentId }),
-      owner, ticket: admission.ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }), ...(local === undefined ? {} : { local }),
-      ...(actorProjections === undefined ? {} : { actor: { remaining: P } }) } };
+      owner, ticket, delivery: 'not-required', diagnostic: false, ...(parent === undefined ? {} : { parent }), ...(local === undefined ? {} : { local }),
+      ...(actorProjections === undefined ? {} : { actor: { remaining: P } }),
+      ...(region ? { policy: { knowledge: Object.freeze({ ...region.knowledge }), current: region.current }, feedbackCount: 0 } : {}) } };
   }
 
   public reserveCall(scope: ManagedScope, calls: number, units: number):
@@ -302,6 +398,28 @@ export class ManagedRuntime {
     admission.ticket.close(scope.owner);
     const frame = this.frames(scope);
     return frame === undefined ? { code: 'WORKFLOW_CURRENTNESS' } : { frame };
+  }
+
+  /** 用户响应实际进入分析前预留检查点；真实响应由 Interaction 保存，
+   * 区域的反馈/重规划观察由实际 Region 产生，不虚构 region 标识。
+   */
+  public feedbackCheckpoint(scope: ManagedScope): Outcome<void> {
+    if (!this.available()) return managedFailure('WORKFLOW_STOPPED');
+    const charge = this.ledger.reserve(scope.owner, { calls: 1, steps: 1,
+      work: 1 + 4 * this.frameChainCost(scope), events: 1 }, scope.local);
+    if (!charge.ok) return managedFailure(charge.code);
+    try {
+      const frame = this.frames(scope);
+      if (!frame || !this.checkFrames(scope, frame)) return unknown('WORKFLOW_CURRENTNESS');
+      if (!charge.ticket.event(scope.owner)) return managedFailure('WORKFLOW_EVENT_BUDGET');
+      for (let owner: ManagedScope | undefined = scope; owner !== undefined; owner = owner.parent) {
+        if (owner.feedbackCount !== undefined) {
+          if (!Number.isSafeInteger(owner.feedbackCount + 1)) return managedFailure('WORKFLOW_FEEDBACK_LIMIT');
+          owner.feedbackCount++; break;
+        }
+      }
+      return ok(undefined);
+    } finally { charge.ticket.close(scope.owner); }
   }
 
   public modelDecision(scope: ManagedScope, reason: string, action: 'not-needed' | 'unavailable'): Outcome<void> {
@@ -379,7 +497,7 @@ export class ManagedRuntime {
       if (!delivered && result.status === 'COMPLETE') result = managedFailure('WORKFLOW_EVIDENCE_FAILED');
     } else if (result.status === 'COMPLETE') result = managedFailure('WORKFLOW_EVENT_BUDGET');
     if (result.status === 'COMPLETE' && this.#criticalFailed) result = managedFailure('WORKFLOW_EVIDENCE_FAILED');
-    if (result.status === 'COMPLETE' && (chain ? !this.checkFrames(scope, chain, resolution) : !frame || !this.check(frame, resolution))) result = unknown('WORKFLOW_CURRENTNESS');
+    if (result.status === 'COMPLETE' && (chain ? !this.checkFrames(scope, chain, resolution, scope.finalCurrent) : !frame || !this.check(frame, resolution))) result = unknown('WORKFLOW_CURRENTNESS');
     if (!scope.ticket.event(scope.owner)) {
       scope.ticket.close(scope.owner);
       return result.status === 'COMPLETE' ? managedFailure('WORKFLOW_EVENT_BUDGET') : result;

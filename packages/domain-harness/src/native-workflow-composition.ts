@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { ManagedRuntime, isManagedOutcome, managedFailure, snapshotControl, snapshotOutcome } from './workflow-managed-runtime.js';
 import { admitNode, executeNode, safeDetail } from './workflow-managed-node.js';
+import type { BoundNodePreparation } from './workflow-managed-node.js';
 import type { ScopeFrames, ManagedScope } from './workflow-managed-runtime.js';
-import type { WorkflowCompletionPolicy, WorkflowControlOptions, WorkflowObservation, WorkflowNode, WorkflowNodeOptions } from './workflow-managed-contract.js';
+import type { WorkflowCompletionPolicy, WorkflowControlOptions, WorkflowObservation, WorkflowNode, WorkflowNodeOptions, WorkflowKnowledgeFrame, WorkflowContextView } from './workflow-managed-contract.js';
 import type { StandardJsonValue } from './standard-files.js';
 import type { StandardWorkflowOutcome } from './standard-workflow.js';
-import { WorkflowResourceLedger } from './workflow-resource-control.js';
+import type { EvidenceResolution } from './standard-evidence.js';
+import { EVENT_SCAN_WORK, WorkflowResourceLedger } from './workflow-resource-control.js';
 import type { ResourceFailure } from './workflow-resource-control.js';
 
 /** 同一根 Workflow 的共享调用和步骤额度；不是 Package 的运行时安全验证。
@@ -79,6 +81,35 @@ class RootBudget {
 class ScopeLifetime {
   private state: 'OPEN' | 'STOPPING' | 'CLOSED' = 'OPEN';
   private readonly pending = new Set<Promise<void>>();
+  private children = 0;
+  private direct = 0;
+  private published = false;
+  private activityClosed = false;
+  private activeLeaves = 0;
+  private waitingLeaves = 0;
+
+  private syncActivity(): void {
+    if (!this.managed) return;
+    const waiting = Number(!this.activityClosed && this.published);
+    const active = this.activityClosed ? 0 : this.direct - waiting
+      + Number(this.direct === 0 && this.children === 0);
+    const da = active - this.activeLeaves, dw = waiting - this.waitingLeaves;
+    this.activeLeaves = active;
+    this.waitingLeaves = waiting;
+    if (da !== 0 || dw !== 0) this.managed.activity(da, dw);
+  }
+
+  /** 只有实际已通知且尚未捕获响应的等待可以暂停这一叶子。 */
+  public publishedWait(waiting: boolean): void {
+    if (waiting && (this.activityClosed || this.direct < 1 || this.published)) throw Error('WORKFLOW_WAIT_INVALID');
+    this.published = waiting;
+    this.syncActivity();
+  }
+
+  public finishActivity(): void {
+    this.activityClosed = true;
+    this.syncActivity();
+  }
 
   readonly id = randomUUID();
   readonly runId: string;
@@ -93,6 +124,7 @@ class ScopeLifetime {
     this.signal = this.controller.signal;
     if (this.upstream?.aborted) this.abort();
     else this.upstream?.addEventListener('abort', this.abort, { once: true });
+    this.syncActivity();
   }
   public admissible(): boolean { return !this.signal.aborted && this.isOpen() && (this.managed?.available() ?? true); }
 
@@ -117,12 +149,16 @@ class ScopeLifetime {
   }
 
   /** 在回调执行前同步登记；释放只能发生在实际操作结算后。 */
-  public begin(): () => void {
+  public begin(kind: 'direct' | 'child' | 'orchestration' = 'direct'): () => void {
     let release!: () => void;
     const settled = new Promise<void>(resolve => { release = resolve; });
     this.pending.add(settled);
+    if (kind === 'child') this.children++; else if (kind === 'direct') this.direct++;
+    this.syncActivity();
     return () => {
-      this.pending.delete(settled);
+      if (!this.pending.delete(settled)) return;
+      if (kind === 'child') this.children--; else if (kind === 'direct') this.direct--;
+      this.syncActivity();
       release();
     };
   }
@@ -136,8 +172,11 @@ class ScopeLifetime {
   public async close(): Promise<boolean> {
     this.stopAdmission(false);
     const outstanding = [...this.pending];
+    // 已返回的调用者不能留下永久暂停的孤立用户等待；取消仍等待真实结算。
+    if (this.managed && outstanding.length > 0) this.stopAdmission(true);
     await Promise.all(outstanding);
     this.state = 'CLOSED';
+    modelAttempts.delete(this);
     this.upstream?.removeEventListener('abort', this.abort);
     return outstanding.length > 0;
   }
@@ -152,7 +191,24 @@ function afterJoin<T>(result: Result<T>, unjoined: boolean): Result<T> {
 }
 
 const scopeLifetimes = new WeakMap<NativeWorkflowContext, ScopeLifetime>();
-const scopeBorrowers = new WeakMap<NativeWorkflowContext, <T>(depth: number, action: WorkflowHandler<T>, local?: number, actorProjections?: number) => Promise<Result<T>>>();
+const boundNodes = new WeakMap<NativeWorkflowContext, <I, O>(definition: WorkflowNode<I, O>, options: WorkflowNodeOptions,
+  binding: BoundNodePreparation<I, O>) => Promise<Result<O>>>();
+
+/** 子区域工厂是同步准备回调，禁止借用其他已捕获作用域重入。 */
+export function guardBoundFactory<T>(root: NativeWorkflowContext, factory: () => Result<T>): Result<T> {
+  const lifetime = scopeLifetime(root);
+  if (!lifetime.admissible() || !lifetime.managed) return managedFailure('WORKFLOW_SCOPE_CLOSED');
+  try { return snapshotOutcome(lifetime.managed.guarded(factory)); }
+  catch { return managedFailure('WORKFLOW_BINDING_INVALID'); }
+}
+
+/** 内部动态能力复用同一受控节点；不增加公开执行入口。 */
+export function executeBoundNode<I, O>(root: NativeWorkflowContext, definition: WorkflowNode<I, O>,
+  options: WorkflowNodeOptions, binding: BoundNodePreparation<I, O>): Promise<Result<O>> {
+  return boundNodes.get(root)?.(definition, options, binding) ?? Promise.resolve(managedFailure('WORKFLOW_SCOPE_CLOSED'));
+}
+
+const scopeBorrowers = new WeakMap<NativeWorkflowContext, <T>(depth: number, action: WorkflowHandler<T>, local?: number, actorProjections?: number, region?: WorkflowNodeOptions, prepaid?: boolean) => Promise<Result<T>>>();
 
 /** 内部 Region/Actor 入口使用同一借用生命周期；不从 SDK 根导出。 */
 export function borrowWorkflowScope<T>(root: NativeWorkflowContext, maxDescendantDepth: number,
@@ -160,6 +216,204 @@ export function borrowWorkflowScope<T>(root: NativeWorkflowContext, maxDescendan
   const borrow = scopeBorrowers.get(root);
   return borrow === undefined ? Promise.resolve(managedFailure('WORKFLOW_SCOPE_CLOSED'))
     : borrow(maxDescendantDepth, action, maxLocalWork);
+}
+
+/** 区域沿用借用生命周期，可信区域策略加入祖先策略链。 */
+export function borrowRegionScope<T>(root: NativeWorkflowContext, depth: number, local: number,
+  options: WorkflowNodeOptions, action: WorkflowHandler<T>, prepaid = false): Promise<Result<T>> {
+  if (!scopeLifetime(root).managed) return Promise.resolve(managedFailure('WORKFLOW_CONTROL_REQUIRED'));
+  return scopeBorrowers.get(root)?.(depth, action, local, undefined, options, prepaid)
+    ?? Promise.resolve(managedFailure('WORKFLOW_SCOPE_CLOSED'));
+}
+
+type RegionEvent = Readonly<Pick<Extract<WorkflowObservation, { kind: 'region' }>,
+  'regionId' | 'action' | 'beforeRevision' | 'afterRevision' | 'reason' | 'detail'>>;
+interface RegionOperation<T> {
+  readonly value: T;
+  readonly resolution?: EvidenceResolution<string, unknown>;
+  readonly event?: RegionEvent;
+  readonly validate?: (frame: WorkflowKnowledgeFrame) => boolean;
+}
+
+/** 区域阶段统一在原账本、真实 frame、生命周期和证据接口中执行。
+ * 不暴露账本；可变事实只允许在明确的可信反馈边界开始新阶段。
+ */
+export async function regionOperation<T>(root: NativeWorkflowContext, units: number, calls: number,
+  emits: boolean, action: (frame: WorkflowKnowledgeFrame, remaining: WorkflowContextView['remaining'],
+    maxNoProgress: number, check: () => boolean) => Result<RegionOperation<T>> | Promise<Result<RegionOperation<T>>>,
+  final = false, feedback = false, extraChecks = 0, rejection?: RegionEvent): Promise<Result<T>> {
+  const lifetime = scopeLifetime(root), runtime = lifetime.managed, scope = lifetime.scope;
+  if (!lifetime.admissible() || !runtime || !scope || !scope.policy || scope.bound
+    || !Number.isSafeInteger(units) || units < 1 || !Number.isSafeInteger(calls) || calls < 1) return managedFailure('WORKFLOW_REGION_ADMISSION');
+  const ticket = runtime.ledger.reserve(scope.owner, { calls, steps: calls,
+    work: units + (8 + extraChecks) * runtime.frameChainCost(scope) + Number(emits) * EVENT_SCAN_WORK,
+    events: Number(emits) }, scope.local);
+  if (!ticket.ok) return managedFailure(ticket.code);
+  const finish = lifetime.begin('orchestration');
+  try {
+    const chain = runtime.frames(scope), frame = chain?.locals.at(-1)?.frame;
+    if (!chain || !frame || !lifetime.admissible()) return managedFailure('WORKFLOW_CURRENTNESS');
+    const left = runtime.ledger.remaining();
+    const remaining = Object.freeze({ calls: left.calls, steps: left.steps, work: left.work, events: left.events,
+      maxDescendantDepth: root.remaining().maxDescendantDepth, localWork: runtime.localRemaining(scope), ...runtime.clock.remaining() });
+    const feedbackBefore = scope.feedbackCount ?? 0;
+    let result: Result<RegionOperation<T>>;
+    try { result = snapshotOutcome(await action(frame, remaining, runtime.control.limits.maxNoProgress, () => lifetime.admissible() && runtime.checkFrames(scope, chain))); }
+    catch { result = managedFailure('WORKFLOW_REGION_INVALID'); }
+    if (result.status !== 'COMPLETE') {
+      if (rejection && emits && lifetime.admissible() && runtime.checkFrames(scope, chain) && ticket.ticket.event(scope.owner)) {
+        const record: WorkflowObservation = Object.freeze({ ...rejection, kind: 'region', runId: root.runId,
+          scopeId: root.scopeId, parentScopeId: scope.parentId!, seq: runtime.sequence(), factRevision: frame.epoch,
+          planRevision: rejection.afterRevision, stage: rejection.action });
+        if (!runtime.deliver(scope, record)) return managedFailure('WORKFLOW_EVIDENCE_FAILED');
+      }
+      return result;
+    }
+    if (feedback && (scope.feedbackCount ?? 0) <= feedbackBefore) return managedFailure('WORKFLOW_FEEDBACK_NOT_OBSERVED');
+    const output = result.value;
+    const current = feedback ? runtime.frames(scope) : chain;
+    if (!current || !lifetime.admissible() || !runtime.checkFrames(scope, current, output.resolution, output.validate)) return managedFailure('WORKFLOW_CURRENTNESS');
+    if (output.event) {
+      if (!emits || !ticket.ticket.event(scope.owner)) return managedFailure('WORKFLOW_EVENT_BUDGET');
+      const record: WorkflowObservation = Object.freeze({ ...output.event, kind: 'region', runId: root.runId, scopeId: root.scopeId,
+        parentScopeId: scope.parentId!, seq: runtime.sequence(), factRevision: current.locals.at(-1)?.frame.epoch ?? current.root.epoch,
+        planRevision: output.event.afterRevision, stage: output.event.action });
+      if (!runtime.deliver(scope, record) || !lifetime.admissible() || !runtime.checkFrames(scope, current, output.resolution, output.validate)) return managedFailure('WORKFLOW_CURRENTNESS');
+    }
+    if (final) {
+      scope.bound = current;
+      if (output.resolution !== undefined) scope.resolved = output.resolution;
+      if (output.validate !== undefined) scope.finalCurrent = output.validate;
+    }
+    return { status: 'COMPLETE', value: output.value };
+  } catch { return managedFailure('WORKFLOW_REGION_INVALID'); }
+  finally { ticket.ticket.close(scope.owner); finish(); }
+}
+
+type ModelAttempt = { readonly id: string; readonly attempt: number; readonly profile: import('./model-contract.js').ModelProfile; state: 'pending' | 'accepted' | 'failed'; retryable: boolean };
+const modelAttempts = new WeakMap<ScopeLifetime, Map<string, ModelAttempt>>();
+/** 模型请求沿用根账本、祖先 frame 和实际本地结算；不提供公开执行入口。 */
+export async function managedModelCall<T, P>(root: NativeWorkflowContext, profile: import('./model-contract.js').ModelProfile,
+  request: import('./model-contract.js').ModelRequest,
+  prepare: (stamp:string, output:number) => Result<P>,
+  action: (id: string, attempt: number, check: () => boolean, signal: AbortSignal, stamp: string, prepared:P) => Promise<{
+    outcome: Result<T>; usage: import('./workflow-managed-contract.js').ModelUsage; retryable: boolean;
+  }>): Promise<Result<T>> {
+  const life = scopeLifetime(root), runtime = life.managed, scope = life.scope;
+  if (!life.admissible() || !runtime || !scope) return managedFailure('WORKFLOW_MODEL_CONTROL_REQUIRED');
+  const { requestKey: key, action: kind, maxOutputTokens: output, reason } = request;
+  if (typeof key !== 'string' || !/^[a-zA-Z0-9_.:-]{1,128}$/.test(key)
+    || !['initial','continue','retry','fallback'].includes(kind) || typeof reason !== 'string'
+    || !reason.trim() || Buffer.byteLength(reason) > 1024 || !Number.isSafeInteger(output) || output < 1
+    || output > profile.limits.maxOutputTokens) return managedFailure('MODEL_INVALID_REQUEST');
+  let history = modelAttempts.get(life);
+  if (!history) { history = new Map(); modelAttempts.set(life, history); }
+  const previous = history.get(key), retry = kind === 'retry' || kind === 'fallback';
+  if (retry ? !previous || previous.state !== 'failed' || !previous.retryable
+    || (kind === 'retry' ? previous.profile !== profile : previous.profile === profile) : previous !== undefined)
+    return managedFailure('MODEL_ATTEMPT_INVALID');
+  const charge = runtime.ledger.reserve(scope.owner, { calls: 1, steps: 1, modelCalls: 1, modelRetries: Number(retry),
+    outputTokens: output, events: 2, work: 3 + Math.ceil((profile.limits.requestBytes + profile.limits.responseBytes) / 256)
+      + 4 * 8192 + 2 * EVENT_SCAN_WORK + 8 * runtime.frameChainCost(scope) }, scope.local);
+  if (!charge.ok) return managedFailure(charge.code);
+  const entry: ModelAttempt = { id: previous?.id ?? randomUUID(), attempt: (previous?.attempt ?? 0) + 1, profile, state: 'pending', retryable: false };
+  history.set(key, entry);
+  const finish = life.begin();
+  const unavailable = Object.freeze({input:null,output:null,total:null,kind:'unavailable' as const});
+  try {
+    const frame = runtime.frames(scope);
+    let checks = 0;
+    const check = () => ++checks <= 7 && frame !== undefined && life.admissible() && runtime.checkFrames(scope, frame);
+    const emit = (phase: 'selected' | 'retry' | 'fallback' | 'result', usage: import('./workflow-managed-contract.js').ModelUsage, detail: StandardJsonValue) => {
+      if (!charge.ticket.event(scope.owner)) return false;
+      const record: WorkflowObservation = Object.freeze({ kind:'model', action:phase, requestId:entry.id, attempt:entry.attempt,
+        profileId:profile.id, model:profile.model, protocol:profile.protocol, reason:phase==='result'?'MODEL_RESULT':reason, usage, detail,
+        runId:root.runId, scopeId:root.scopeId, ...(scope.parentId===undefined?{}:{parentScopeId:scope.parentId}),
+        seq:runtime.sequence(), factRevision:frame?.locals.at(-1)?.frame.epoch??frame?.root.epoch??0, stage:'model' });
+      return runtime.deliver(scope, record);
+    };
+    if (!frame || !check()) return managedFailure('WORKFLOW_CURRENTNESS');
+    // 已捕获 frame 的有界身份；先生成不可变请求，再向观察者交付选择记录。
+    const stamp = JSON.stringify([frame.root, ...frame.locals.map(x => x.frame)].map(f =>
+      [f.epoch, f.context.scope, [...f.context.revisions].sort(([a],[b])=>a.localeCompare(b))]));
+    const prepared=prepare(stamp,output);
+    if (!emit(retry ? kind : 'selected', unavailable, null) || !check()) return managedFailure('WORKFLOW_CURRENTNESS');
+    const actual = prepared.status==='COMPLETE' ? await action(entry.id, entry.attempt, check, life.signal, stamp, prepared.value)
+      : {outcome:prepared,usage:unavailable,retryable:false};
+    const result = snapshotOutcome(actual.outcome);
+    const delivered = emit('result', actual.usage, { status:result.status, code:result.status==='COMPLETE'?'MODEL_COMPLETE':result.reason.code });
+    if (result.status!=='COMPLETE'&&result.reason.code==='MODEL_OUTPUT_OVERRUN') {
+      runtime.clock.stop('cancelled');return result;
+    }
+    if (!delivered || !check()) return managedFailure('WORKFLOW_CURRENTNESS');
+    entry.state = result.status === 'COMPLETE' ? 'accepted' : 'failed';
+    entry.retryable = result.status !== 'COMPLETE' && actual.retryable;
+    return result;
+  } catch { return managedFailure('MODEL_EXECUTION_FAILED'); }
+  finally {
+    if (entry.state === 'pending') entry.state = 'failed';
+    charge.ticket.close(scope.owner); finish();
+  }
+}
+
+/** 已知输入的子域证明只构建一次有限扫描计划；由节点完整接纳预付。 */
+export function prepareRegionProofs(root: NativeWorkflowContext, proofs: readonly import('./workflow-slots.js').DetachedRegionProof[]) {
+  const lifetime = scopeLifetime(root);
+  if (!lifetime.admissible() || !lifetime.managed || !lifetime.scope) return undefined;
+  return lifetime.managed.detachedPlan(proofs);
+}
+
+/** 子域实际结算后才知道的新证明，在首次使用前一次性预付剩余检查。 */
+export function prepayRegionProofs(root:NativeWorkflowContext,proofs:readonly import('./workflow-slots.js').DetachedRegionProof[],checks:number):(() => boolean)|undefined {
+  const life=scopeLifetime(root),runtime=life.managed,scope=life.scope;
+  if(!life.admissible()||!runtime||!scope||!Number.isSafeInteger(checks)||checks<1||checks>15)return undefined;
+  const plan=runtime.detachedPlan(proofs);
+  if(!plan)return undefined;
+  const charge=runtime.ledger.reserve(scope.owner,{calls:0,steps:0,work:checks*plan.work},scope.local);
+  if(!charge.ok)return undefined;
+  charge.ticket.close(scope.owner);
+  let remaining=checks;
+  return ()=>remaining-->0&&plan.check();
+}
+
+/** 私有子域来源校验由实际所属根和作用域承担。 */
+export function verifyRegionProofs(root: NativeWorkflowContext, proofs: readonly import('./workflow-slots.js').DetachedRegionProof[]): boolean {
+  const lifetime = scopeLifetime(root);
+  return lifetime.managed !== undefined && lifetime.scope !== undefined && lifetime.managed.checkDetached(lifetime.scope, proofs);
+}
+
+/** 实际受控后代出现已提交/未知或未接纳调用时，不得自动重执行区域。 */
+export function regionReplaySafe(root: NativeWorkflowContext): boolean {
+  const scope = scopeLifetime(root).scope;
+  return scope !== undefined && scope.feedbackCount !== undefined && !scope.unsafeReplay;
+}
+
+/** 实际已接受节点的效果只用于后续保守重规划判断。 */
+export function regionDisposition(root: NativeWorkflowContext, instanceId: string): Extract<WorkflowObservation, { kind: 'node' }> | undefined {
+  return scopeLifetime(root).managed?.nodeDisposition(instanceId);
+}
+
+/** Interaction 复用同一受控子作用域；取消仅关闭该作用域及后代。 */
+export function borrowInteractionScope<T>(root: NativeWorkflowContext,
+  action: (child: NativeWorkflowContext, attachment: AttachedInteractionScope) => Promise<Result<T>>): Promise<Result<T>> {
+  if (!scopeLifetime(root).managed) return Promise.resolve(managedFailure('WORKFLOW_CONTROL_REQUIRED'));
+  return borrowWorkflowScope(root, Math.max(0, root.remaining().maxDescendantDepth - 1), child => {
+    const lifetime = scopeLifetime(child);
+    return action(child, {
+      cancel: () => lifetime.stopAdmission(true),
+      waiting: waiting => lifetime.publishedWait(waiting),
+      admissible: () => lifetime.admissible(),
+      feedback: () => lifetime.admissible() && lifetime.managed && lifetime.scope
+        ? lifetime.managed.feedbackCheckpoint(lifetime.scope) : managedFailure('WORKFLOW_SCOPE_CLOSED'),
+    });
+  });
+}
+
+export interface AttachedInteractionScope {
+  cancel(): void;
+  waiting(waiting: boolean): void;
+  admissible(): boolean;
+  feedback(): Result<void>;
 }
 
 function scopeLifetime(context: NativeWorkflowContext): ScopeLifetime {
@@ -235,7 +489,8 @@ export class NativeWorkflowContext {
     public readonly depth: number,
   ) {
     scopeLifetimes.set(this, new ScopeLifetime());
-    scopeBorrowers.set(this, (depth, action, local, actorProjections) => this.borrow(depth, action, local, actorProjections));
+    boundNodes.set(this, (definition, options, binding) => this.runNode(definition, binding.input, options, binding));
+    scopeBorrowers.set(this, (depth, action, local, actorProjections, region, prepaid) => this.borrow(depth, action, local, actorProjections, region, prepaid));
   }
 
   public get signal(): AbortSignal { return scopeLifetime(this).signal; }
@@ -249,26 +504,32 @@ export class NativeWorkflowContext {
     const reserved = lifetime.reserve(this.budget, 1, units);
     if ('code' in reserved) return lifetime.managed ? managedFailure(reserved.code) : failure(reserved.code as WorkflowFailureCode);
     const finish = lifetime.begin();
-    try { return lifetime.checked(await action(), reserved.frame); }
+    try { return lifetime.admissible() ? lifetime.checked(await action(), reserved.frame) : failure('WORKFLOW_SCOPE_CLOSED'); }
     catch { return failure('WORKFLOW_EXECUTION_FAILED'); }
     finally { finish(); }
   }
 
   /** 同一根任务中的类型化节点尝试；普通固定代码与未来动态结构共用。 */
   public async node<I, O>(definition: WorkflowNode<I, O>, input: I, options: WorkflowNodeOptions): Promise<Result<O>> {
+    return this.runNode(definition, () => ({ status: 'COMPLETE', value: input }), options);
+  }
+
+  private async runNode<I, O>(definition: WorkflowNode<I, O>, input: () => Result<I>, options: WorkflowNodeOptions,
+    binding?: BoundNodePreparation<I, O>): Promise<Result<O>> {
     const parent = scopeLifetime(this);
     if (!parent.admissible() || !parent.managed || !parent.scope) return managedFailure('WORKFLOW_NODE_CONTROL_REQUIRED');
     const runtime = parent.managed;
+    if (binding?.child && this.remaining().maxDescendantDepth < 1) return managedFailure('WORKFLOW_DEPTH_LIMIT');
     try {
-      const admitted = admitNode(runtime, parent.scope, definition, options);
+      const admitted = admitNode(runtime, parent.scope, definition, options, binding);
       if ('code' in admitted) return managedFailure(admitted.code);
-      const finish = parent.begin();
+      const finish = parent.begin('child');
       const lifetime = new ScopeLifetime(parent, runtime, admitted.scope);
       // 尝试不是子 Workflow 层级；嵌套 child 仍按原有祖先深度合同。
       const attempt = new NativeWorkflowContext(this.budget, this.ancestors, this.depth);
       scopeLifetimes.set(attempt, lifetime);
       try { return await executeNode(runtime, admitted, input, attempt, () => lifetime.close(), () => parent.admissible()); }
-      finally { finish(); }
+      finally { lifetime.finishActivity(); finish(); }
     } catch { return managedFailure('WORKFLOW_NODE_INVALID'); }
   }
 
@@ -298,6 +559,7 @@ export class NativeWorkflowContext {
     if ('code' in reserved) return lifetime.managed ? managedFailure(reserved.code) : failure(reserved.code as WorkflowFailureCode);
     const finish = lifetime.begin();
     try {
+      if (!lifetime.admissible()) return failure('WORKFLOW_SCOPE_CLOSED');
       return lifetime.checked({ status: 'COMPLETE', value: await action() }, reserved.frame);
     } catch {
       return failure('WORKFLOW_EXECUTION_FAILED');
@@ -318,6 +580,7 @@ export class NativeWorkflowContext {
     if ('code' in reserved) return lifetime.managed ? managedFailure(reserved.code) : failure(reserved.code as WorkflowFailureCode);
     const finish = lifetime.begin();
     try {
+      if (!lifetime.admissible()) return failure('WORKFLOW_SCOPE_CLOSED');
       return lifetime.checked(await action(), reserved.frame);
     } catch {
       return failure('WORKFLOW_EXECUTION_FAILED');
@@ -334,7 +597,7 @@ export class NativeWorkflowContext {
     return this.borrow(maxDescendantDepth, action);
   }
 
-  private async borrow<T>(maxDescendantDepth: number, action: WorkflowHandler<T>, maxLocalWork?: number, actorProjections?: number): Promise<Result<T>> {
+  private async borrow<T>(maxDescendantDepth: number, action: WorkflowHandler<T>, maxLocalWork?: number, actorProjections?: number, region?: WorkflowNodeOptions, prepaid = false): Promise<Result<T>> {
     const parent = scopeLifetime(this);
     if (!parent.admissible()) return failure('WORKFLOW_SCOPE_CLOSED');
     if (!validLimit(maxDescendantDepth) || (parent.managed && maxDescendantDepth > 2 ** 31 - 1)) return failure('WORKFLOW_INVALID_LIMIT');
@@ -343,15 +606,15 @@ export class NativeWorkflowContext {
     const managed = parent.managed;
     let scope: ManagedScope | undefined;
     if (managed) {
-      const admitted = managed.reserveScope(this.scopeId, undefined, parent.scope, maxLocalWork, actorProjections);
+      const admitted = managed.reserveScope(this.scopeId, undefined, parent.scope, maxLocalWork, actorProjections, region, prepaid);
       if ('code' in admitted) return managedFailure(admitted.code);
       scope = admitted.scope;
     } else {
-      if (maxLocalWork !== undefined || actorProjections !== undefined) return managedFailure('WORKFLOW_CONTROL_REQUIRED');
+      if (maxLocalWork !== undefined || actorProjections !== undefined || region !== undefined) return managedFailure('WORKFLOW_CONTROL_REQUIRED');
       const refused = this.budget.reserve(0, 1);
       if (refused !== undefined) return failure(refused);
     }
-    const finish = parent.begin();
+    const finish = parent.begin('child');
     const lifetime = new ScopeLifetime(parent, managed, scope);
     const child = new NativeWorkflowContext(this.budget, [
       ...this.ancestors, { depth: nextDepth, descendants: maxDescendantDepth },
@@ -359,7 +622,7 @@ export class NativeWorkflowContext {
     scopeLifetimes.set(child, lifetime);
     let result: Result<T>;
     const frame = managed && scope ? managed.frames(scope) : undefined;
-    if (scope && frame) scope.bound = frame;
+    if (scope && frame && !region) scope.bound = frame;
     if (scope?.actor && frame) scope.actor.frame = frame;
     try {
       if (managed && scope && (!frame || !managed.open(scope) || !managed.checkFrames(scope, frame) || !parent.admissible())) {
@@ -373,10 +636,10 @@ export class NativeWorkflowContext {
       result = afterJoin(result, unjoined);
       if (managed && scope) {
         if (result.status === 'COMPLETE' && !parent.admissible()) result = managedFailure('WORKFLOW_SCOPE_CLOSED');
-        return managed.close(scope, result, undefined, undefined, frame);
+        return managed.close(scope, result, undefined, region ? scope.resolved : undefined, region ? scope.bound : frame);
       }
       return result;
-    } finally { finish(); }
+    } finally { lifetime.finishActivity(); finish(); }
   }
 
   /**
@@ -396,6 +659,7 @@ export class NativeWorkflowContext {
     const reserved = lifetime.reserve(this.budget, calls, calls);
     if ('code' in reserved) return lifetime.managed ? managedFailure(reserved.code) : failure(reserved.code as WorkflowFailureCode);
     const finish = lifetime.begin();
+    if (!lifetime.admissible()) { finish(); return failure('WORKFLOW_SCOPE_CLOSED'); }
 
     let result: Result<T> | undefined;
     try {

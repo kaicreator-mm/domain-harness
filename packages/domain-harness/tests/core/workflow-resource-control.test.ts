@@ -8,10 +8,10 @@ import {
 import type { ResourceLimits, ResourceCharge } from '../../src/workflow-resource-control.js';
 
 const limits = { maxWork: 100, maxEvents: 4, maxActiveScopes: 2,
-  model: { maxCalls: 2, maxRetries: 1, maxOutputTokens: 10, maxReservedTokens: 20 } };
+  model: { maxCalls: 2, maxRetries: 1, maxOutputTokens: 10 } };
 const owner = {};
 const charge = { calls: 3, steps: 4, work: 100, events: 4, activeScopes: 2,
-  modelCalls: 1, modelRetries: 1, outputTokens: 10, reservedTokens: 20, terminalReads: 2 };
+  modelCalls: 1, modelRetries: 1, outputTokens: 10, terminalReads: 2 };
 const cases: readonly [string, number, number, ResourceLimits, ResourceCharge, string][] = [
   ['calls', 2, 4, limits, charge, 'WORKFLOW_CALL_BUDGET'],
   ['steps', 3, 3, limits, charge, 'WORKFLOW_STEP_BUDGET'],
@@ -20,7 +20,6 @@ const cases: readonly [string, number, number, ResourceLimits, ResourceCharge, s
   ['active scopes', 3, 4, { ...limits, maxActiveScopes: 1 }, charge, 'WORKFLOW_ACTIVE_SCOPE_LIMIT'],
   ['model calls', 3, 4, { ...limits, model: { ...limits.model, maxCalls: 0 } }, charge, 'WORKFLOW_MODEL_CALL_BUDGET'],
   ['model retries', 3, 4, { ...limits, model: { ...limits.model, maxRetries: 0 } }, charge, 'WORKFLOW_MODEL_RETRY_BUDGET'],
-  ['model tokens', 3, 4, { ...limits, model: { ...limits.model, maxReservedTokens: 19 } }, charge, 'WORKFLOW_MODEL_TOKEN_BUDGET'],
   ['output tokens', 3, 4, { ...limits, model: { ...limits.model, maxOutputTokens: 9 } }, charge, 'WORKFLOW_MODEL_TOKEN_BUDGET'],
 ];
 
@@ -41,7 +40,7 @@ test('exact reservation, owner-bound terminal/event ticket, no refund except act
   assert.equal(admitted.ok, true);
   if (!admitted.ok) return;
   assert.deepEqual(ledger.remaining(), { calls: 0, steps: 0, work: 0, events: 0,
-    activeScopes: 0, modelCalls: 1, modelRetries: 0, reservedTokens: 0 });
+    activeScopes: 0, modelCalls: 1, modelRetries: 0 });
   assert.equal(ledger.localRemaining(local), 0);
   assert.equal(ledger.localRemaining(child), 0);
   const ticket = admitted.ticket;
@@ -59,7 +58,6 @@ test('exact reservation, owner-bound terminal/event ticket, no refund except act
   assert.equal(ledger.remaining().activeScopes, 2);
   assert.equal(ledger.remaining().work, 0);
   assert.equal(ledger.remaining().events, 0);
-  assert.equal(ledger.remaining().reservedTokens, 0);
 });
 
 test('ancestor local cap, sibling shares ancestor but unrelated local remains independent', () => {
@@ -158,4 +156,19 @@ test('external cancellation and zero time, independent root and no reset', () =>
     assert.equal(zero.reason, 'active-timeout');
     zero.finish();
   } finally { first.finish(); other.finish(); }
+});
+
+
+test('R40 unsupported aggregate controls reject without debit; supported operational caps remain', () => {
+  const oldLimits = { ...limits, model: { ...limits.model, maxReservedTokens: 20 } };
+  const old = new WorkflowResourceLedger(3, 4, oldLimits);
+  const initial = old.remaining();
+  assert.deepEqual(old.reserve(owner, charge), { ok: false, code: 'WORKFLOW_INVALID_LIMIT' });
+  assert.deepEqual(old.remaining(), initial);
+  const ledger = new WorkflowResourceLedger(3, 4, limits);
+  const oldCharge = { ...charge, reservedTokens: 0 };
+  const before = ledger.remaining();
+  assert.deepEqual(ledger.reserve(owner, oldCharge), { ok: false, code: 'WORKFLOW_INVALID_LIMIT' });
+  assert.deepEqual(ledger.remaining(), before);
+  assert.equal(ledger.reserve(owner, charge).ok, true);
 });

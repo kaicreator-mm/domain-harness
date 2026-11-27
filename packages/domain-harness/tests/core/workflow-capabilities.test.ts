@@ -1,0 +1,286 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { bindWorkflowFunction, bindWorkflowRegion, createWorkflowSlot, StandardWorkflowSession, resolveEvidence } from '../../src/index.js';
+import type { NativeWorkflowContext, WorkflowFunctionBinding, WorkflowCapability, WorkflowRegionDefinition, WorkflowNode, WorkflowControlOptions, WorkflowCompletionPolicy, StandardWorkflowOutcome } from '../../src/index.js';
+import { SlotLeaseScope } from '../../src/workflow-slots.js';
+import { invokeCapability, capabilityData } from '../../src/workflow-capabilities.js';
+import { prepayRegionProofs } from '../../src/native-workflow-composition.js';
+
+const ok = <T>(value: T): StandardWorkflowOutcome<T> => ({ status: 'COMPLETE', value });
+const cost = createWorkflowSlot('cost', (v): v is bigint => typeof v === 'bigint');
+const due = createWorkflowSlot('due', (v): v is Date => v instanceof Date);
+const base = { maxCalls: 40, maxSteps: 50, maxDepth: 3 };
+const completion = <T>(): WorkflowCompletionPolicy<T> => ({ goal: 'actual binding', requiredKnowledge: [], terminalReads: 0, validate: () => ok(undefined) });
+function complete<T>(r: StandardWorkflowOutcome<T>): T {
+  if (r.status !== 'COMPLETE') throw Error(r.reason.code);
+  return r.value;
+}
+function environment(maxItems = 1) {
+  let asOf = 1, epoch = 1;
+  const knowledge = { maxItems, equal: Object.is, current: () => ({ epoch, context: {
+    scope: 'root', revisions: new Map(maxItems ? [['authority', '1']] : []), asOf } }) };
+  const control: WorkflowControlOptions = { knowledge, current: () => true,
+    limits: { maxWork: 2000000, maxEvents: 100, maxActiveScopes: 8, maxNoProgress: 5, maxActiveMs: 10000, maxSettlementMs: 1000 } };
+  const leases = new SlotLeaseScope(knowledge.current);
+  const options = { knowledge, current: () => true };
+  return { leases, control, options, expire: () => { asOf = 5; }, change: () => { epoch++; },
+    entries: () => {
+      const stage = complete(leases.write({ cost, due }, 2, w => {
+        complete(w.put('cost', cost, 9007199254740993n)); return w.put('due', due, new Date(0));
+      }));
+      const resolved = resolveEvidence([{ key: 'quote', accepts: ['authority'] }],
+        [{ key: 'quote', origin: 'authority', state: 'known', value: 1, source: {
+          id: 'authority', scope: 'root', revision: '1', validity: { from: 0, until: 5 } } }],
+        knowledge.current().context, knowledge, maxItems);
+      return complete(leases.contextEntries(stage, { cost: ['quote'], due: ['quote'] }, resolved));
+    },
+  };
+}
+type Native = { cost: bigint; due: Date };
+function binding(patch: Partial<WorkflowFunctionBinding<Native, Native>> = {}): WorkflowFunctionBinding<Native, Native> {
+  return {
+    id: 'calculate', description: 'native exact cost and date',
+    inputs: { cost, due }, outputs: { cost, due },
+    input: r => { const a = r.read('cost', cost), b = r.read('due', due);
+      return a.status !== 'COMPLETE' ? a : b.status !== 'COMPLETE' ? b : ok({ cost: a.value, due: b.value }); },
+    node: { id: 'calculate', goal: 'exact cost', requiredKnowledge: [], before: () => ok(undefined),
+      run: v => ok({ cost: v.cost + 1n, due: v.due }), after: () => ok(undefined),
+      project: () => ({ effect: 'none', detail: null }) },
+    output: (v, w) => { const a = w.put('cost', cost, v.cost); return a.status === 'COMPLETE' ? w.put('due', due, v.due) : a; },
+    ...patch,
+  };
+}
+test('bound native Function runs through actual node, returns native outputs with inherited provenance', async () => {
+  const e = environment(), entries = e.entries(), c = bindWorkflowFunction(binding());
+  const s = new StandardWorkflowSession(base, e.control);
+  const r = await s.run(async root => {
+    const result = await invokeCapability(c, [c], { root, leases: e.leases, inputs: entries, maxBindings: 2, options: e.options });
+    if (result.status !== 'COMPLETE') return result;
+    assert.equal(result.value.get('due')?.value, entries.get('due')?.value);
+    assert.deepEqual(result.value.get('cost')?.evidenceKeys, ['quote']);
+    return e.leases.read({ cost }, result.value, 1, read => read.read('cost', cost));
+  }, completion<bigint>());
+  assert.deepEqual(r, ok(9007199254740994n));
+  assert.equal(s.dispositions().filter(r => r.kind === 'node')[0]?.acceptance, 'accepted');
+});
+test('foreign/forged capability, missing input and incomplete output fail closed; actual receipt retained', async () => {
+  for (const mode of ['forged', 'foreign', 'missing', 'output', 'expiry', 'sink'] as const) {
+    const e = environment(), entries = e.entries(); let runs = 0;
+    const n: WorkflowNode<Native, Native> = { ...binding().node, run: v => { runs++; return ok(v); },
+      project: () => ({ effect: 'committed', receiptId: 'actual-receipt', detail: null }) };
+    const c = bindWorkflowFunction(binding({ node: n, ...(mode === 'output' ? { output: () => ok(undefined) } : {}) }));
+    const forged: WorkflowCapability = { ...c };
+    assert.equal(capabilityData(forged), undefined);
+    const s = new StandardWorkflowSession(base, { ...e.control, evidence: { required: true, emit: r => {
+      if (r.kind === 'node' && r.phase === 'candidate') {
+        if (mode === 'expiry') e.expire();
+        if (mode === 'sink') return { status: 'FAILED', reason: { code: 'SINK', message: 'failed' } };
+      }
+      return ok(undefined);
+    } } });
+    const result = await s.run(root => invokeCapability(mode === 'forged' ? forged : c, mode === 'foreign' ? [] : [c],
+      { root, leases: e.leases, inputs: mode === 'missing' ? new Map() : entries, maxBindings: 2, options: e.options }), completion<ReadonlyMap<string, unknown>>());
+    assert.notEqual(result.status, 'COMPLETE', mode);
+    assert.equal(runs, ['output','expiry','sink'].includes(mode) ? 1 : 0, mode);
+    if (runs) {
+      const record = s.dispositions().find(r => r.kind === 'node');
+      assert.equal(record?.kind === 'node' && record.receiptId, 'actual-receipt');
+      assert.notEqual(record?.kind === 'node' && record.acceptance, 'accepted');
+    }
+  }
+});
+test('inclusive exact/one-short binding reserves input and encoder before any callback', async () => {
+  const e0 = environment(0);
+  // Fixed base 132137, 2 extra calls/work + 2 leases(1+4*0)=2; progress Q=1 root / 2Q node.
+  const rootWork = 99086 + 1, nodeWork = 132137 + 2 + 2 + 2;
+  for (const mode of ['exact','work','calls','steps','events','active'] as const) {
+    const e = environment(0); let input = 0, run = 0, output = 0, guards = 0;
+    const c = bindWorkflowFunction<number, number>({ id: 'empty', description: 'empty native boundary', inputs: {}, outputs: {},
+      input: () => { input++; return ok(3); },
+      node: { id: 'empty', goal: 'real result', requiredKnowledge: [], before: () => ok(undefined),
+        run: x => { run++; return ok(x+1); }, after: () => ok(undefined), project: () => ({ effect: 'none', detail: null }) },
+      output: () => { output++; return ok(undefined); } });
+    const s = new StandardWorkflowSession({ maxCalls: 7 - Number(mode === 'calls'), maxSteps: 8 - Number(mode === 'steps'), maxDepth: 0 },
+      { ...e0.control, limits: { ...e0.control.limits, maxWork: rootWork + nodeWork - Number(mode === 'work'),
+        maxEvents: 7 - Number(mode === 'events'), maxActiveScopes: 2 - Number(mode === 'active') } });
+    const r = await s.run(root => invokeCapability(c, [c], { root, leases: e.leases, inputs: new Map(), maxBindings: 0,
+      options: { ...e.options, current: () => { guards++; return true; } } }), completion<ReadonlyMap<string, unknown>>());
+    assert.equal(r.status === 'COMPLETE', mode === 'exact', mode);
+    assert.deepEqual([input,run,output], mode === 'exact' ? [1,1,1] : [0,0,0], mode);
+    if (mode !== 'exact') assert.equal(guards,0);
+  }
+});
+test('Region identity and child factory reject unauthorized delegated capabilities before runner', async () => {
+  const e = environment(0);
+  let created = 0, ran = 0;
+  const childCapability = bindWorkflowFunction(binding());
+  const region = bindWorkflowRegion<number, number>({
+    id: 'child', description: 'child region factory', inputs: {}, outputs: {},
+    input: () => ok(1), output: () => ok(undefined),
+    node: { id: 'child', goal: 'child', requiredKnowledge: [], before: () => ok(undefined),
+      after: () => ok(undefined), project: () => ({ effect: 'none', detail: null }) },
+    create: () => {
+      created++;
+      const definition: WorkflowRegionDefinition<number, number> = {
+        id: 'child', goal: 'actual child', constraints: [],
+        limits: { maxWork: 10000, maxDescendantDepth: 0, maxCandidateBytes: 4096, maxJsonDepth: 8,
+          maxJsonItems: 100, maxNodes: 2, maxBindings: 0, maxEdits: 2, maxProjectionBytes: 4096 },
+        capabilities: [childCapability], knowledge: e.options.knowledge, current: () => true,
+        requiredKnowledge: [], optionalKnowledge: [], contextSlots: {}, layout: [],
+        refresh: () => ok({ changed: [], dependencies: [], observations: [], slotEvidence: {} }),
+        plan: view => ok({ source: 'native', proposal: { runId: view.runId, regionId: view.regionId,
+          planRevision: view.planRevision ?? 0, factRevision: view.factRevision, edits: [], action: 'finish' } }),
+        admit: () => ok(undefined), canSkip: () => ok(undefined), canRebind: () => ok(undefined),
+        replay: 'never', complete: () => ok(1),
+      };
+      return ok(definition);
+    },
+  });
+  assert.equal(region.kind,'region');
+  const s = new StandardWorkflowSession(base, e.control);
+  const r = await s.run(root => invokeCapability(region,[region],{root,leases:e.leases,inputs:new Map(),maxBindings:0,
+    options:e.options, delegated:[], runRegion: () => { ran++; throw Error('must not enter'); }}),completion<ReadonlyMap<string,unknown>>());
+  assert.notEqual(r.status,'COMPLETE'); assert.deepEqual([created,ran],[1,0]);
+});
+
+
+test('bound input and output cannot reenter a captured root, preserve actual node acceptance', async () => {
+  const e = environment(0);
+  let retained!: NativeWorkflowContext, effects = 0;
+  const reentries: Promise<StandardWorkflowOutcome<number>>[] = [];
+  const tryReenter = () => { reentries.push(retained.invoke(() => ++effects)); };
+  const c = bindWorkflowFunction<number, number>({
+    id: 'fenced', description: 'synchronous binding fences', inputs: {}, outputs: {},
+    input: () => { tryReenter(); return ok(1); },
+    node: { id: 'fenced', goal: 'bound function', requiredKnowledge: [], before: () => ok(undefined),
+      run: v => ok(v), after: () => ok(undefined), project: () => ({ effect: 'none', detail: null }) },
+    output: () => { tryReenter(); return ok(undefined); },
+  });
+  const s = new StandardWorkflowSession(base, e.control);
+  const r = await s.run(root => { retained = root; return invokeCapability(c, [c], {
+    root, leases: e.leases, inputs: new Map(), maxBindings: 0, options: e.options,
+  }); }, completion<ReadonlyMap<string, unknown>>());
+  assert.equal(r.status, 'COMPLETE');
+  assert.equal(reentries.length, 2);
+  for (const result of await Promise.all(reentries)) assert.notEqual(result.status, 'COMPLETE');
+  assert.equal(effects, 0);
+});
+
+test('R50 independently amended m4 dynamic vector exact and one-short admission',async()=>{
+  // R50 前瞻性修订：独立作者确认 Context 与 progress 票据；保留 16 次 frame 检查。
+  const rootWork=99278+1, original=132735, actual=149377;
+  for(const mode of ['exact','frozen','work','calls','steps','events','active'] as const){
+    const e=environment(4),entries=e.entries();
+    let input=0,run=0,output=0,guard=0,context=0,knowledge=0;
+    const b=binding();
+    const cap=bindWorkflowFunction({...b,input:r=>{input++;return b.input(r);},output:(v,w)=>{output++;return b.output(v,w);},
+      node:{...b.node,context:()=>{context++;return {constraints:['actual dynamic context'],capabilities:['calculate'],feedbackRevision:0};},
+        knowledge:()=>{knowledge++;return ok([]);},before:(_v,_root,view)=>{assert.equal(view.remaining.work,0);return ok(undefined);},
+        run:v=>{run++;return ok(v);}}});
+    const s=new StandardWorkflowSession({maxCalls:9-Number(mode==='calls'),maxSteps:10-Number(mode==='steps'),maxDepth:0},
+      {...e.control,limits:{...e.control.limits,maxWork:rootWork+(mode==='frozen'?original:actual)-Number(mode==='work'),
+        maxEvents:7-Number(mode==='events'),maxActiveScopes:2-Number(mode==='active')}});
+    const r=await s.run(root=>invokeCapability(cap,[cap],{root,leases:e.leases,inputs:entries,maxBindings:2,
+      options:{...e.options,current:()=>{guard++;return true;}}}),completion<ReadonlyMap<string,unknown>>());
+    assert.equal(r.status==='COMPLETE',mode==='exact',mode);
+    assert.deepEqual([input,run,output,context,knowledge],mode==='exact'?[1,1,1,1,1]:[0,0,0,0,0],mode);
+    if(mode!=='exact')assert.equal(guard,0);
+  }
+});
+
+test('known detached input proof is prepaid with the node before any binding or frame callback', async () => {
+  // R50 ordinary m4 node + 15 bounded known-proof checks, one private frame m1 and one source.
+  const baseWork = 149377, proofWork = 1 + (1 + 4) + 4;
+  for (const mode of ['exact','short','stale'] as const) {
+    const e = environment(4), entries = e.entries();
+    let privateReads = 0, input = 0, guards = 0, runs = 0, outputs = 0;
+    const privateFrame = { epoch: 1, context: { scope: 'private', revisions: new Map([['private-source', '1']]) } };
+    const proof = Object.freeze({ frame: privateFrame,
+      knowledge: { maxItems: 1, equal: Object.is, current: () => { privateReads++; return mode === 'stale' ? { ...privateFrame, epoch: 2 } : privateFrame; } },
+      current: () => true, sources: Object.freeze([{ id: 'private-source', scope: 'private', revision: '1' }]),
+      children: Object.freeze([]), replayable: true });
+    const stage = complete(e.leases.write({ cost, due }, 2, w => {
+      complete(w.put('cost', cost, 1n)); return w.put('due', due, new Date(0));
+    }));
+    const resolution = resolveEvidence([], [], e.options.knowledge.current().context, e.options.knowledge, 4);
+    const inputEntries = complete(e.leases.resultEntries(stage, entries, resolution, proof));
+    const b = binding();
+    const cap = bindWorkflowFunction({...b, input:r=>{input++;return b.input(r);}, output:(v,w)=>{outputs++;return b.output(v,w);},
+      node:{...b.node, context:()=>({constraints:[],capabilities:[],feedbackRevision:0}),knowledge:()=>ok([]),
+        run:v=>{runs++;return ok(v);}}});
+    const s = new StandardWorkflowSession({maxCalls:9,maxSteps:10,maxDepth:0},
+      {...e.control,limits:{...e.control.limits,maxWork:99279+baseWork+15*proofWork-Number(mode==='short'),maxEvents:7,maxActiveScopes:2}});
+    const r = await s.run(root=>invokeCapability(cap,[cap],{root,leases:e.leases,inputs:inputEntries,maxBindings:2,
+      options:{...e.options,current:()=>{guards++;return true;}}}),completion<ReadonlyMap<string,unknown>>());
+    assert.equal(r.status==='COMPLETE',mode==='exact',mode);
+    if(mode==='exact'){assert.deepEqual([input,runs,outputs],[1,1,1]);assert.ok(privateReads>0&&privateReads<=15);}
+    else {assert.deepEqual([input,runs,outputs],[0,0,0]);if(mode==='short')assert.deepEqual([guards,privateReads],[0,0]);}
+  }
+});
+
+test('child entry is reserved with bound node before factory, input, and guards',async()=>{
+  // m0 root, bound child (I/B/E=1), child factory fact policy not yet known: maxItems4096.
+  const rootWork=99086+2; // maxEvents10: Q=2.
+  const nodeWork=132137+3+2+4; // I/B/E, two m0 lease tickets, progress 2Q.
+  const childWork=4+3*33024+4*(2+16385);
+  for(const mode of ['exact','work','events','active','steps','depth'] as const){
+    const e=environment(0);let input=0,create=0,guards=0;
+    const region=bindWorkflowRegion<number,number>({id:'child',description:'child',inputs:{},outputs:{},
+      input:()=>{input++;return ok(1);},output:()=>ok(undefined),
+      node:{id:'child',goal:'child',requiredKnowledge:[],before:()=>ok(undefined),after:()=>ok(undefined),
+        project:()=>({effect:'none',detail:null})},
+      create:()=>{create++;return {status:'REJECT',reason:{code:'FACTORY_DECLINED',message:'declined'}};}});
+    const s=new StandardWorkflowSession({maxCalls:8,maxSteps:10-Number(mode==='steps'),maxDepth:mode==='depth'?0:1},
+      {...e.control,limits:{...e.control.limits,maxWork:rootWork+nodeWork+childWork-Number(mode==='work'),
+        maxEvents:10-Number(mode==='events'),maxActiveScopes:3-Number(mode==='active')}});
+    const r=await s.run(root=>invokeCapability(region,[region],{root,leases:e.leases,inputs:new Map(),maxBindings:0,
+      options:{...e.options,current:()=>{guards++;return true;}},delegated:[],runRegion:()=>{throw Error('must not enter');}}),
+      completion<ReadonlyMap<string,unknown>>());
+    assert.notEqual(r.status,'COMPLETE',mode);
+    assert.deepEqual([input,create],mode==='exact'?[1,1]:[0,0],mode);
+    if(mode!=='exact')assert.equal(guards,0,mode);
+  }
+});
+
+test('new private proof stage prepayment exact/one-short and bounded checks before policy',async()=>{
+  // Internal seam, separate from the actual recursive region and actual expiry witnesses.
+  const rootWork=99279, proofWork=1+5+4, checks=15;
+  for(const mode of ['exact','short'] as const){
+    const e=environment(4);let reads=0;
+    const frame={epoch:1,context:{scope:'private',revisions:new Map([['source','1']])}};
+    const proof=Object.freeze({frame,knowledge:{maxItems:1,equal:Object.is,current:()=>{reads++;return frame;}},current:()=>true,
+      sources:Object.freeze([{id:'source',scope:'private',revision:'1'}]),children:Object.freeze([]),replayable:true});
+    const s=new StandardWorkflowSession({maxCalls:1,maxSteps:2,maxDepth:0},
+      {...e.control,limits:{...e.control.limits,maxEvents:7,maxActiveScopes:1,maxWork:rootWork+checks*proofWork-Number(mode==='short')}});
+    const r=await s.run(root=>{
+      const check=prepayRegionProofs(root,[proof],checks);
+      if(mode==='short'){assert.equal(check,undefined);return {status:'FAILED',reason:{code:'EXPECTED',message:'expected'}};}
+      assert.ok(check);assert.equal(reads,0);
+      for(let i=0;i<checks;i++)assert.equal(check(),true);
+      assert.equal(check(),false);
+      return ok(1);
+    },completion<number>());
+    assert.equal(r.status==='COMPLETE',mode==='exact');
+    assert.equal(reads,mode==='exact'?checks:0);
+  }
+});
+
+test('known predecessor fence exact and one-short are pre-admitted with unchanged R50 base',async()=>{
+  const rootWork=99279,nodeWork=149377,fenceWork=13;
+  for(const mode of ['exact','short','stale'] as const){
+    const e=environment(4),entries=e.entries();let input=0,run=0,output=0,guards=0,checks=0;
+    const b=binding();
+    const cap=bindWorkflowFunction({...b,input:r=>{input++;return b.input(r);},output:(v,w)=>{output++;return b.output(v,w);},
+      node:{...b.node,context:()=>({constraints:[],capabilities:[],feedbackRevision:0}),knowledge:()=>ok([]),
+        run:v=>{run++;return ok(v);}}});
+    const s=new StandardWorkflowSession({maxCalls:9,maxSteps:10,maxDepth:0},
+      {...e.control,limits:{...e.control.limits,maxWork:rootWork+nodeWork+16*fenceWork-Number(mode==='short'),maxEvents:7,maxActiveScopes:2}});
+    const r=await s.run(root=>invokeCapability(cap,[cap],{root,leases:e.leases,inputs:entries,maxBindings:2,
+      options:{...e.options,current:()=>{guards++;return true;}},predecessorFence:Object.freeze({work:fenceWork,check:()=>{checks++;return mode!=='stale';}})}),
+      completion<ReadonlyMap<string,unknown>>());
+    assert.equal(r.status==='COMPLETE',mode==='exact',mode);
+    assert.deepEqual([input,run,output],mode==='exact'?[1,1,1]:[0,0,0],mode);
+    if(mode==='short')assert.deepEqual([guards,checks],[0,0]);
+    if(mode==='exact')assert.ok(checks>0&&checks<=16);
+  }
+});

@@ -82,6 +82,100 @@
 
 [适用场景、限制与示例](capabilities/workflow.md)
 
+### bindWorkflowFunction
+
+- 分类：`function`；声明：`dist/workflow-capabilities.d.ts`
+- 职责：绑定已声明的原生 Function 与输入、输出类型；不执行、不授予区域权限。
+- 调用签名：`<I, O>(binding: WorkflowFunctionBinding<I, O>): WorkflowCapability`
+
+### bindWorkflowRegion
+
+- 分类：`function`；声明：`dist/workflow-capabilities.d.ts`
+- 职责：绑定可生成子区域的可信工厂；实际子流程使用同一个受控节点 envelope。
+- 调用签名：`<I, O>(binding: RegionBinding<I, O>): WorkflowCapability`
+
+### createWorkflowSlot
+
+- 分类：`function`；声明：`dist/workflow-slots.d.ts`
+- 职责：创建不可伪造身份的类型能力；守卫必须是可信同步判断。
+- 调用签名：`<T>(id: string, accepts: (value: unknown) => value is T): WorkflowSlot<T>`
+
+### ModelElement
+
+- 分类：`standard-element`；声明：`dist/model.d.ts`
+- 职责：受控单轮原生模型 Element；不自动执行工具、不持久化、不重试。
+- 获取方式：public constructor / new
+- 构造声明：`(profile: ModelProfile): ModelElement`
+- `ModelElement#generate` · instance method：`(root: NativeWorkflowContext, request: ModelRequest) => Promise<Outcome<ModelTurn>>`；调用：`(root: NativeWorkflowContext, request: ModelRequest): Promise<StandardWorkflowOutcome<ModelTurn>>`
+
+### ModelProfile
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：可信调用方显式声明协议、模型、认证来源、能力和有限传输上限。
+- 类型声明：`interface ModelProfile { readonly id: string; readonly protocol: 'openai-chat' \| 'anthropic-messages'; readonly endpoint: string; readonly model: string; readonly credential: () => string \| Promise<string>; readonly tokenField?: 'max_tokens' \| 'max_completion_tokens'; readonly anthropicVersion?: string; readonly features: Readonly<{ tools: boolean; jsonSchema: boolean; toolsWithJsonSchema: boolean; }>; readonly limits: Readonly<{ requestBytes: number; responseBytes: number; maxOutputTokens: number; timeoutMs: number; }>; }`
+- `ModelProfile#anthropicVersion` · contract property readonly optional：`string`
+- `ModelProfile#credential` · contract callback readonly：`() => string \| Promise<string>`；调用：`(): string \| Promise<string>`
+- `ModelProfile#endpoint` · contract property readonly：`string`
+- `ModelProfile#features` · contract property readonly：`Readonly<{ tools: boolean; jsonSchema: boolean; toolsWithJsonSchema: boolean; }>`
+- `ModelProfile#id` · contract property readonly：`string`
+- `ModelProfile#limits` · contract property readonly：`Readonly<{ requestBytes: number; responseBytes: number; maxOutputTokens: number; timeoutMs: number; }>`
+- `ModelProfile#model` · contract property readonly：`string`
+- `ModelProfile#protocol` · contract property readonly：`"openai-chat" \| "anthropic-messages"`
+- `ModelProfile#tokenField` · contract property readonly optional：`"max_tokens" \| "max_completion_tokens"`
+
+### ModelRequest
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：单轮请求；显式续接、重试或 fallback，不自动执行工具。
+- 类型声明：`interface ModelRequest { readonly system: string; readonly input: readonly (Readonly<{ role: 'user'; text: string; }> \| Readonly<{ role: 'assistant'; turn: ModelTurn; }> \| Readonly<{ role: 'tool-results'; results: readonly ModelToolResult[]; }>)[]; readonly tools: readonly ModelToolDescription[]; readonly output: Readonly<{ kind: 'text'; } \| { kind: 'json'; strict: false; } \| { kind: 'json'; strict: true; schema: J; }>; readonly maxOutputTokens: number; readonly requestKey: string; readonly action: 'initial' \| 'retry' \| 'fallback' \| 'continue'; readonly reason: string; }`
+- `ModelRequest#action` · contract property readonly：`"initial" \| "continue" \| "retry" \| "fallback"`
+- `ModelRequest#input` · contract property readonly：`readonly (Readonly<{ role: "user"; text: string; }> \| Readonly<{ role: "assistant"; turn: ModelTurn; }> \| Readonly<{ role: "tool-results"; results: readonly ModelToolResult[]; }>)[]`
+- `ModelRequest#maxOutputTokens` · contract property readonly：`number`
+- `ModelRequest#output` · contract property readonly：`Readonly<{ kind: "text"; } \| { kind: "json"; strict: false; } \| { kind: "json"; strict: true; schema: J; }>`
+- `ModelRequest#reason` · contract property readonly：`string`
+- `ModelRequest#requestKey` · contract property readonly：`string`
+- `ModelRequest#system` · contract property readonly：`string`
+- `ModelRequest#tools` · contract property readonly：`readonly ModelToolDescription[]`
+
+### ModelToolCall
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：真实模型响应中的有限工具候选。
+- 类型声明：`interface ModelToolCall { readonly id: string; readonly name: string; readonly input: J; }`
+- `ModelToolCall#id` · contract property readonly：`string`
+- `ModelToolCall#input` · contract property readonly：`J`
+- `ModelToolCall#name` · contract property readonly：`string`
+
+### ModelToolDescription
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：模型可提出的工具描述，不是执行注册表。
+- 类型声明：`interface ModelToolDescription { readonly name: string; readonly description: string; readonly inputSchema: J; }`
+- `ModelToolDescription#description` · contract property readonly：`string`
+- `ModelToolDescription#inputSchema` · contract property readonly：`J`
+- `ModelToolDescription#name` · contract property readonly：`string`
+
+### ModelToolResult
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：调用方实际执行后提供的结果，与原始工具 ID 对应。
+- 类型声明：`interface ModelToolResult { readonly callId: string; readonly value: J; readonly error: boolean; }`
+- `ModelToolResult#callId` · contract property readonly：`string`
+- `ModelToolResult#error` · contract property readonly：`boolean`
+- `ModelToolResult#value` · contract property readonly：`J`
+
+### ModelTurn
+
+- 分类：`type`；声明：`dist/model-contract.d.ts`
+- 职责：SDK 已接纳的一轮模型结果，不等价于业务授权。
+- 类型声明：`interface ModelTurn { readonly requestId: string; readonly attempt: number; readonly text: string; readonly json?: J; readonly calls: readonly ModelToolCall[]; readonly usage: ModelUsage; }`
+- `ModelTurn#attempt` · contract property readonly：`number`
+- `ModelTurn#calls` · contract property readonly：`readonly ModelToolCall[]`
+- `ModelTurn#json` · contract property readonly optional：`J`
+- `ModelTurn#requestId` · contract property readonly：`string`
+- `ModelTurn#text` · contract property readonly：`string`
+- `ModelTurn#usage` · contract property readonly：`ModelUsage`
+
 ### ModelUsage
 
 - 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
@@ -123,6 +217,12 @@
 - 职责：两个固定叶子角色的便捷组合：识别 COMPLETE 才进入处理，两个角色共享一根额度。 各角色的输入、输出、领域规则与授权由调用方定义；复杂流程直接组合 Session/Context。 完整成功路径需要 2 次调用、5 个步骤和 1 层深度；不是业务全量预算预检或等待恢复协议。
 - 调用签名：`<Intent, Output>(limits: WorkflowLimits, recognize: () => StandardWorkflowOutcome<Intent> \| Promise<StandardWorkflowOutcome<Intent>>, handle: (intent: Intent) => StandardWorkflowOutcome<Output> \| Promise<StandardWorkflowOutcome<Output>>): Promise<StandardWorkflowOutcome<Output>>`
 
+### runWorkflowRegion
+
+- 分类：`function`；声明：`dist/workflow-region.d.ts`
+- 职责：在已有受控根内执行有界原生区域，复用实际节点、作用域和共享预算。
+- 调用签名：`<I, O>(root: NativeWorkflowContext, definition: WorkflowRegionDefinition<I, O>, input: I, initial?: readonly WorkflowNodeProposal[]): Promise<StandardWorkflowOutcome<O>>`
+
 ### StandardWorkflowOutcome
 
 - 分类：`type`；声明：`dist/standard-workflow.d.ts`
@@ -153,6 +253,14 @@
 - 职责：实际调用结算事实与候选业务结果分离。
 - 类型声明：`type WorkflowAttempt<O> = Readonly<{ kind: 'returned'; outcome: Outcome<O>; }> \| Readonly<{ kind: 'exception' \| 'cancelled' \| 'timeout' \| 'unsettled'; code: string; }>`
 - `WorkflowAttempt#kind` · contract property：`"returned" \| "exception" \| "cancelled" \| "timeout" \| "unsettled"`
+
+### WorkflowCapability
+
+- 分类：`type`；声明：`dist/workflow-region-contract.d.ts`
+- 职责：工厂分配的能力身份；仅声明名称与种类，不暴露可执行回调。
+- 类型声明：`interface WorkflowCapability { readonly id: string; readonly kind: 'function' \| 'region'; }`
+- `WorkflowCapability#id` · contract property readonly：`string`
+- `WorkflowCapability#kind` · contract property readonly：`"function" \| "region"`
 
 ### WorkflowCompletionPolicy
 
@@ -187,7 +295,7 @@
 
 - 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
 - 职责：统一根任务的有限资源合同。
-- 类型声明：`interface WorkflowControlLimits { readonly maxWork: number; readonly maxActiveMs: number; readonly maxWallMs?: number; readonly maxSettlementMs: number; readonly maxNoProgress: number; readonly maxEvents: number; readonly maxActiveScopes: number; readonly model?: Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; maxReservedTokens?: number; }>; }`
+- 类型声明：`interface WorkflowControlLimits { readonly maxWork: number; readonly maxActiveMs: number; readonly maxWallMs?: number; readonly maxSettlementMs: number; readonly maxNoProgress: number; readonly maxEvents: number; readonly maxActiveScopes: number; readonly model?: Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; }>; }`
 - `WorkflowControlLimits#maxActiveMs` · contract property readonly：`number`
 - `WorkflowControlLimits#maxActiveScopes` · contract property readonly：`number`
 - `WorkflowControlLimits#maxEvents` · contract property readonly：`number`
@@ -195,7 +303,7 @@
 - `WorkflowControlLimits#maxSettlementMs` · contract property readonly：`number`
 - `WorkflowControlLimits#maxWallMs` · contract property readonly optional：`number`
 - `WorkflowControlLimits#maxWork` · contract property readonly：`number`
-- `WorkflowControlLimits#model` · contract property readonly optional：`Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; maxReservedTokens?: number; }>`
+- `WorkflowControlLimits#model` · contract property readonly optional：`Readonly<{ maxCalls: number; maxRetries: number; maxOutputTokens: number; }>`
 
 ### WorkflowControlOptions
 
@@ -209,6 +317,13 @@
 - `WorkflowControlOptions#observe` · contract callback readonly optional：`(record: WorkflowObservation) => void`；调用：`(record: WorkflowObservation): void`
 - `WorkflowControlOptions#signal` · contract property readonly optional：`AbortSignal`
 
+### WorkflowEdit
+
+- 分类：`type`；声明：`dist/workflow-region-contract.d.ts`
+- 职责：有限区域编辑候选，不直接改写实际流程。
+- 类型声明：`type WorkflowEdit = Readonly<{ kind: 'insert'; gap: string; before?: string; node: WorkflowNodeProposal; }> \| Readonly<{ kind: 'reuse'; gap: string; before?: string; template: string; alias: string; }> \| Readonly<{ kind: 'skip' \| 'remove'; node: string; }> \| Readonly<{ kind: 'move'; node: string; before?: string; }> \| Readonly<{ kind: 'rebind'; node: string; input: string; to: WorkflowSlotBinding; }>`
+- `WorkflowEdit#kind` · contract property：`"skip" \| "insert" \| "reuse" \| "remove" \| "move" \| "rebind"`
+
 ### WorkflowElement
 
 - 分类：`abstract-contract`；声明：`dist/standard-workflow.d.ts`
@@ -216,6 +331,20 @@
 - 获取方式：abstract contract / 不可直接 new
 - 构造声明：`<Input, Output>(): WorkflowElement<Input, Output>`
 - `WorkflowElement#run` · instance method：`(input: Input) => Promise<StandardWorkflowOutcome<Output>>`；调用：`(input: Input): Promise<StandardWorkflowOutcome<Output>>`
+
+### WorkflowFunctionBinding
+
+- 分类：`type`；声明：`dist/workflow-region-contract.d.ts`
+- 职责：原生领域 Function 的输入装配、受控节点及输出编码。
+- 类型声明：`interface WorkflowFunctionBinding<I, O> { readonly id: string; readonly description: string; readonly inputs: Readonly<Record<string, WorkflowSlot<unknown>>>; readonly outputs: Readonly<Record<string, WorkflowSlot<unknown>>>; readonly input: (reader: WorkflowSlotReader) => Outcome<I>; readonly node: WorkflowNode<I, O>; readonly output: (value: O, writer: WorkflowSlotWriter) => Outcome<void>; readonly model?: Readonly<{ schema: J; describe: string; }>; }`
+- `WorkflowFunctionBinding#description` · contract property readonly：`string`
+- `WorkflowFunctionBinding#id` · contract property readonly：`string`
+- `WorkflowFunctionBinding#input` · contract callback readonly：`(reader: WorkflowSlotReader) => Outcome<I>`；调用：`(reader: WorkflowSlotReader): StandardWorkflowOutcome<I>`
+- `WorkflowFunctionBinding#inputs` · contract property readonly：`Readonly<Record<string, WorkflowSlot<unknown>>>`
+- `WorkflowFunctionBinding#model` · contract property readonly optional：`Readonly<{ schema: J; describe: string; }>`
+- `WorkflowFunctionBinding#node` · contract property readonly：`WorkflowNode<I, O>`
+- `WorkflowFunctionBinding#output` · contract callback readonly：`(value: O, writer: WorkflowSlotWriter) => Outcome<void>`；调用：`(value: O, writer: WorkflowSlotWriter): StandardWorkflowOutcome<void>`
+- `WorkflowFunctionBinding#outputs` · contract property readonly：`Readonly<Record<string, WorkflowSlot<unknown>>>`
 
 ### WorkflowKnowledgeFrame
 
@@ -271,6 +400,16 @@
 - `WorkflowNodeOptions#knowledge` · contract property readonly：`WorkflowKnowledgePolicy`
 - `WorkflowNodeOptions#planRevision` · contract property readonly optional：`number`
 
+### WorkflowNodeProposal
+
+- 分类：`type`；声明：`dist/workflow-region-contract.d.ts`
+- 职责：运行期节点提案；接纳之前没有执行权限。
+- 类型声明：`interface WorkflowNodeProposal { readonly alias: string; readonly capability: string; readonly input: Readonly<Record<string, WorkflowSlotBinding>>; readonly initial?: readonly WorkflowNodeProposal[]; }`
+- `WorkflowNodeProposal#alias` · contract property readonly：`string`
+- `WorkflowNodeProposal#capability` · contract property readonly：`string`
+- `WorkflowNodeProposal#initial` · contract property readonly optional：`readonly WorkflowNodeProposal[]`
+- `WorkflowNodeProposal#input` · contract property readonly：`Readonly<Record<string, WorkflowSlotBinding>>`
+
 ### WorkflowObservation
 
 - 分类：`type`；声明：`dist/workflow-managed-contract.d.ts`
@@ -297,6 +436,80 @@
 - `WorkflowOccurrence#runId` · contract property readonly：`string`
 - `WorkflowOccurrence#scopeId` · contract property readonly：`string`
 
+### WorkflowRegionDefinition
+
+- 分类：`type`；声明：`dist/workflow-region-contract.d.ts`
+- 职责：区域声明合同；接纳、递归执行和事实失效由受控 Workflow 实施。
+- 类型声明：`interface WorkflowRegionDefinition<I, O> { readonly id: string; readonly goal: string; readonly constraints: readonly string[]; readonly limits: WorkflowRegionLimits; readonly capabilities: readonly WorkflowCapability[]; readonly knowledge: WorkflowKnowledgePolicy; readonly current: () => boolean; readonly requiredKnowledge: readonly EvidenceRequirement<string>[]; readonly optionalKnowledge: readonly EvidenceRequirement<string>[]; readonly contextSlots: Readonly<Record<string, WorkflowSlot<unknown>>>; readonly layout: readonly (Readonly<{ kind: 'anchor'; id: string; node: WorkflowNodeProposal; }> \| Readonly<{ kind: 'gap'; id: string; templates: readonly WorkflowNodeProposal[]; seed: readonly string[]; }>)[]; readonly refresh: (input: I, root: NativeWorkflowContext, previous: WorkflowRegionView \| undefined, writer: WorkflowSlotWriter) => Maybe<Outcome<Readonly<{ changed: readonly string[]; dependencies: readonly EvidenceDependency<string>[]; observations: readonly EvidenceObservation<string, unknown>[]; slotEvidence: Readonly<Record<string, readonly string[]>>; }>>>; readonly plan: (view: WorkflowRegionView, root: NativeWorkflowContext) => Maybe<Outcome<Readonly<{ source: 'native'; proposal: WorkflowRegionProposal; }> \| Readonly<{ source: 'model'; proposal: WorkflowRegionProposal; access: Readonly<{ capabilities: readonly string[]; contextSlots: readonly string[]; resultSlots: readonly Readonly<{ node: string; slot: string; }>[]; }>; }>>>; readonly admit: (current: WorkflowRegionView, proposed: WorkflowRegionProposal) => Maybe<Outcome<void>>; readonly canSkip: (nodeId: string, view: WorkflowRegionView) => Maybe<Outcome<void>>; readonly canRebind: (nodeId: string, input: string, from: WorkflowSlotBinding, to: WorkflowSlotBinding, view: WorkflowRegionView) => Maybe<Outcome<void>>; readonly replay: 'never' \| 'pure-read-only'; readonly clarify?: (view: WorkflowRegionView, root: NativeWorkflowContext) => Maybe<Outcome<void>>; readonly complete: (view: WorkflowRegionView, root: NativeWorkflowContext) => Maybe<Outcome<O>>; }`
+- `WorkflowRegionDefinition#admit` · contract callback readonly：`(current: WorkflowRegionView, proposed: WorkflowRegionProposal) => Maybe<Outcome<void>>`；调用：`(current: WorkflowRegionView, proposed: WorkflowRegionProposal): Maybe<StandardWorkflowOutcome<void>>`
+- `WorkflowRegionDefinition#canRebind` · contract callback readonly：`(nodeId: string, input: string, from: WorkflowSlotBinding, to: WorkflowSlotBinding, view: WorkflowRegionView) => Maybe<Outcome<void>>`；调用：`(nodeId: string, input: string, from: WorkflowSlotBinding, to: WorkflowSlotBinding, view: WorkflowRegionView): Maybe<StandardWorkflowOutcome<void>>`
+- `WorkflowRegionDefinition#canSkip` · contract callback readonly：`(nodeId: string, view: WorkflowRegionView) => Maybe<Outcome<void>>`；调用：`(nodeId: string, view: WorkflowRegionView): Maybe<StandardWorkflowOutcome<void>>`
+- `WorkflowRegionDefinition#capabilities` · contract property readonly：`readonly WorkflowCapability[]`
+- `WorkflowRegionDefinition#clarify` · contract callback readonly optional：`(view: WorkflowRegionView, root: NativeWorkflowContext) => Maybe<Outcome<void>>`；调用：`(view: WorkflowRegionView, root: NativeWorkflowContext): Maybe<StandardWorkflowOutcome<void>>`
+- `WorkflowRegionDefinition#complete` · contract callback readonly：`(view: WorkflowRegionView, root: NativeWorkflowContext) => Maybe<Outcome<O>>`；调用：`(view: WorkflowRegionView, root: NativeWorkflowContext): Maybe<StandardWorkflowOutcome<O>>`
+- `WorkflowRegionDefinition#constraints` · contract property readonly：`readonly string[]`
+- `WorkflowRegionDefinition#contextSlots` · contract property readonly：`Readonly<Record<string, WorkflowSlot<unknown>>>`
+- `WorkflowRegionDefinition#current` · contract callback readonly：`() => boolean`；调用：`(): boolean`
+- `WorkflowRegionDefinition#goal` · contract property readonly：`string`
+- `WorkflowRegionDefinition#id` · contract property readonly：`string`
+- `WorkflowRegionDefinition#knowledge` · contract property readonly：`WorkflowKnowledgePolicy`
+- `WorkflowRegionDefinition#layout` · contract property readonly：`readonly (Readonly<{ kind: "anchor"; id: string; node: WorkflowNodeProposal; }> \| Readonly<{ kind: "gap"; id: string; templates: readonly WorkflowNodeProposal[]; seed: readonly string[]; }>)[]`
+- `WorkflowRegionDefinition#limits` · contract property readonly：`WorkflowRegionLimits`
+- `WorkflowRegionDefinition#optionalKnowledge` · contract property readonly：`readonly EvidenceRequirement<string>[]`
+- `WorkflowRegionDefinition#plan` · contract callback readonly：`(view: WorkflowRegionView, root: NativeWorkflowContext) => Maybe<Outcome<Readonly<{ source: "native"; proposal: WorkflowRegionProposal; }> \| Readonly<{ source: "model"; proposal: WorkflowRegionProposal; access: Readonly<{ capabilities: readonly string[]; contextSlots: readonly string[]; resultSlots: readonly Readonly<{ node: string; slot: string; }>[]; }>; }>>>`；调用：`(view: WorkflowRegionView, root: NativeWorkflowContext): Maybe<StandardWorkflowOutcome<Readonly<{ source: "native"; proposal: WorkflowRegionProposal; }> \| Readonly<{ source: "model"; proposal: WorkflowRegionProposal; access: Readonly<{ capabilities: readonly string[]; contextSlots: readonly string[]; resultSlots: readonly Readonly<{ node: string; slot: string; }>[]; }>; }>>>`
+- `WorkflowRegionDefinition#refresh` · contract callback readonly：`(input: I, root: NativeWorkflowContext, previous: WorkflowRegionView \| undefined, writer: WorkflowSlotWriter) => Maybe<Outcome<Readonly<{ changed: readonly string[]; dependencies: readonly EvidenceDependency<string>[]; observations: readonly EvidenceObservation<string, unknown>[]; slotEvidence: Readonly<Record<string, readonly string[]>>; }>>>`；调用：`(input: I, root: NativeWorkflowContext, previous: WorkflowRegionView \| undefined, writer: WorkflowSlotWriter): Maybe<StandardWorkflowOutcome<Readonly<{ changed: readonly string[]; dependencies: readonly EvidenceDependency<string>[]; observations: readonly EvidenceObservation<string, unknown>[]; slotEvidence: Readonly<Record<string, readonly string[]>>; }>>>`
+- `WorkflowRegionDefinition#replay` · contract property readonly：`"pure-read-only" \| "never"`
+- `WorkflowRegionDefinition#requiredKnowledge` · contract property readonly：`readonly EvidenceRequirement<string>[]`
+
+### WorkflowRegionLimits
+
+- 分类：`type`；声明：`dist/workflow-region-contract.d.ts`
+- 职责：单区域在祖先与根约束内的有限结构和扫描上限。
+- 类型声明：`interface WorkflowRegionLimits { readonly maxWork: number; readonly maxDescendantDepth: number; readonly maxCandidateBytes: number; readonly maxJsonDepth: number; readonly maxJsonItems: number; readonly maxNodes: number; readonly maxBindings: number; readonly maxEdits: number; readonly maxProjectionBytes: number; }`
+- `WorkflowRegionLimits#maxBindings` · contract property readonly：`number`
+- `WorkflowRegionLimits#maxCandidateBytes` · contract property readonly：`number`
+- `WorkflowRegionLimits#maxDescendantDepth` · contract property readonly：`number`
+- `WorkflowRegionLimits#maxEdits` · contract property readonly：`number`
+- `WorkflowRegionLimits#maxJsonDepth` · contract property readonly：`number`
+- `WorkflowRegionLimits#maxJsonItems` · contract property readonly：`number`
+- `WorkflowRegionLimits#maxNodes` · contract property readonly：`number`
+- `WorkflowRegionLimits#maxProjectionBytes` · contract property readonly：`number`
+- `WorkflowRegionLimits#maxWork` · contract property readonly：`number`
+
+### WorkflowRegionProposal
+
+- 分类：`type`；声明：`dist/workflow-region-contract.d.ts`
+- 职责：与实际运行、区域及事实版本关联的编辑批次。
+- 类型声明：`interface WorkflowRegionProposal { readonly runId: string; readonly regionId: string; readonly planRevision: number; readonly factRevision: number; readonly edits: readonly WorkflowEdit[]; readonly action: 'continue' \| 'finish' \| 'clarify' \| 'stop'; }`
+- `WorkflowRegionProposal#action` · contract property readonly：`"clarify" \| "continue" \| "finish" \| "stop"`
+- `WorkflowRegionProposal#edits` · contract property readonly：`readonly WorkflowEdit[]`
+- `WorkflowRegionProposal#factRevision` · contract property readonly：`number`
+- `WorkflowRegionProposal#planRevision` · contract property readonly：`number`
+- `WorkflowRegionProposal#regionId` · contract property readonly：`string`
+- `WorkflowRegionProposal#runId` · contract property readonly：`string`
+
+### WorkflowRegionView
+
+- 分类：`type`；声明：`dist/workflow-region-contract.d.ts`
+- 职责：当前区域已允许的名称、实际结果与有限借用读取器。
+- 类型声明：`interface WorkflowRegionView extends WorkflowContextView { readonly regionId: string; readonly slots: readonly string[]; readonly results: readonly Readonly<{ node: string; slots: readonly string[]; }>[]; readonly reader: WorkflowSlotReader; }`
+- `WorkflowRegionView#capabilities` · contract property readonly：`readonly string[]`
+- `WorkflowRegionView#constraints` · contract property readonly：`readonly string[]`
+- `WorkflowRegionView#factRevision` · contract property readonly：`number`
+- `WorkflowRegionView#feedbackRevision` · contract property readonly：`number`
+- `WorkflowRegionView#goal` · contract property readonly：`string`
+- `WorkflowRegionView#knowledge` · contract property readonly：`EvidenceResolution<string, unknown> \| undefined`
+- `WorkflowRegionView#planRevision` · contract property readonly optional：`number`
+- `WorkflowRegionView#progress` · contract property readonly：`readonly Readonly<{ instanceId: string; definitionId: string; state: "pending" \| "running" \| "accepted" \| "rejected" \| "skipped" \| "stale" \| "unknown" \| "removed"; }>[]`
+- `WorkflowRegionView#reader` · contract property readonly：`WorkflowSlotReader`
+- `WorkflowRegionView#regionId` · contract property readonly：`string`
+- `WorkflowRegionView#remaining` · contract property readonly：`Readonly<{ calls: number; steps: number; maxDescendantDepth: number; work: number; events: number; activeMs: number; wallMs?: number; localWork: number; }>`
+- `WorkflowRegionView#results` · contract property readonly：`readonly Readonly<{ node: string; slots: readonly string[]; }>[]`
+- `WorkflowRegionView#runId` · contract property readonly：`string`
+- `WorkflowRegionView#scopeId` · contract property readonly：`string`
+- `WorkflowRegionView#slots` · contract property readonly：`readonly string[]`
+- `WorkflowRegionView#stage` · contract property readonly：`string`
+
 ### WorkflowRoutes
 
 - 分类：`type`；声明：`dist/native-workflow-composition.d.ts`
@@ -308,6 +521,35 @@
 - `WorkflowRoutes#REJECT` · contract callback readonly：`(outcome: Result<T>) => R \| Promise<R>`；调用：`(outcome: Result<T>): R \| Promise<R>`
 - `WorkflowRoutes#UNKNOWN` · contract callback readonly：`(outcome: Result<T>) => R \| Promise<R>`；调用：`(outcome: Result<T>): R \| Promise<R>`
 - `WorkflowRoutes#WAIT` · contract callback readonly：`(outcome: Result<T>) => R \| Promise<R>`；调用：`(outcome: Result<T>): R \| Promise<R>`
+
+### WorkflowSlot
+
+- 分类：`type`；声明：`dist/workflow-slots.d.ts`
+- 职责：模块分配的原生值类型身份；同名不表示同一类型能力。
+- 类型声明：`interface WorkflowSlot<T> { readonly id: string; readonly accepts: (value: unknown) => value is T; }`
+- `WorkflowSlot#accepts` · contract callback readonly：`(value: unknown) => value is T`；调用：`(value: unknown): value is T`
+- `WorkflowSlot#id` · contract property readonly：`string`
+
+### WorkflowSlotBinding
+
+- 分类：`type`；声明：`dist/workflow-region-contract.d.ts`
+- 职责：具名输入的有限提案引用，不携带原生值或私有 token。
+- 类型声明：`type WorkflowSlotBinding = Readonly<{ kind: 'literal'; value: J; }> \| Readonly<{ kind: 'context'; slot: string; }> \| Readonly<{ kind: 'result'; node: string; slot: string; }>`
+- `WorkflowSlotBinding#kind` · contract property：`"result" \| "literal" \| "context"`
+
+### WorkflowSlotReader
+
+- 分类：`type`；声明：`dist/workflow-slots.d.ts`
+- 职责：仅在本次同步输入/投影回调内借用的具名原生值读取器。
+- 类型声明：`interface WorkflowSlotReader { read<T>(name: string, slot: WorkflowSlot<T>): Outcome<T>; }`
+- `WorkflowSlotReader#read` · contract method：`<T>(name: string, slot: WorkflowSlot<T>) => Outcome<T>`；调用：`<T>(name: string, slot: WorkflowSlot<T>): Outcome<T>`
+
+### WorkflowSlotWriter
+
+- 分类：`type`；声明：`dist/workflow-slots.d.ts`
+- 职责：仅在本次同步输出回调内借用的暂存写入器，不直接发布结果。
+- 类型声明：`interface WorkflowSlotWriter { put<T>(name: string, slot: WorkflowSlot<T>, value: NoInfer<T>): Outcome<void>; }`
+- `WorkflowSlotWriter#put` · contract method：`<T>(name: string, slot: WorkflowSlot<T>, value: NoInfer<T>) => Outcome<void>`；调用：`<T>(name: string, slot: WorkflowSlot<T>, value: NoInfer<T>): Outcome<void>`
 
 ### WorkflowTerminalContext
 
@@ -832,6 +1074,7 @@
 - `InteractionElement#cancel` · instance method：`() => void`；调用：`(): void`
 - `InteractionElement#current` · instance method：`() => InteractionPrompt \| undefined`；调用：`(): InteractionPrompt \| undefined`
 - `InteractionElement#run` · instance method：`<T>(limits: WorkflowLimits, work: (scope: InteractionScope) => Maybe<Outcome<T>>) => Promise<Outcome<T>>`；调用：`<T>(limits: WorkflowLimits, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>>`
+- `InteractionElement#runIn` · instance method：`<T>(root: NativeWorkflowContext, work: (scope: InteractionScope) => Maybe<Outcome<T>>) => Promise<Outcome<T>>`；调用：`<T>(root: NativeWorkflowContext, work: (scope: InteractionScope) => Maybe<Outcome<T>>): Promise<Outcome<T>>`
 - `InteractionElement#submit` · instance method：`(input: unknown) => InteractionSubmitResult`；调用：`(input: unknown): InteractionSubmitResult`
 
 ### InteractionEvent

@@ -15,7 +15,7 @@ export interface WorkflowControlLimits {
   readonly maxSettlementMs: number; readonly maxNoProgress: number;
   readonly maxEvents: number; readonly maxActiveScopes: number;
   readonly model?: Readonly<{ maxCalls: number; maxRetries: number;
-    maxOutputTokens: number; maxReservedTokens?: number }>;
+    maxOutputTokens: number }>;
 }
 
 /** 根任务的可信事实策略、取消与同步观察。

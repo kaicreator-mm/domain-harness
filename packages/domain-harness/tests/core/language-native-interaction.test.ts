@@ -3,11 +3,22 @@ import test from 'node:test';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { KernelLifecycle } from '../../src/kernel-lifecycle.js';
 import { InteractionElement } from '../../src/standard-interaction.js';
+import { StandardWorkflowSession } from '../../src/native-workflow-composition.js';
+import type { WorkflowControlOptions, WorkflowCompletionPolicy } from '../../src/workflow-managed-contract.js';
 import type { InteractionDecision, InteractionEvent, InteractionPrompt, InteractionPromptSpec, InteractionScope } from '../../src/standard-interaction.js';
 import type { StandardWorkflowOutcome } from '../../src/standard-workflow.js';
 
 const ok = <T>(value: T): StandardWorkflowOutcome<T> => ({ status: 'COMPLETE', value });
 const limits = { maxCalls: 12, maxSteps: 13, maxDepth: 2 };
+const managedControl = (signal?: AbortSignal): WorkflowControlOptions => ({
+  limits: { maxWork: 2000000, maxEvents: 50, maxActiveScopes: 8, maxNoProgress: 5, maxActiveMs: 10000, maxSettlementMs: 1000 },
+  knowledge: { maxItems: 0, current: () => ({ epoch: 0, context: { scope: 'root', revisions: new Map() } }), equal: Object.is },
+  current: () => true, ...(signal === undefined ? {} : { signal }),
+});
+const managedCompletion = <T>(): WorkflowCompletionPolicy<T> => ({
+  goal: 'actual interaction result', requiredKnowledge: [], terminalReads: 0, validate: () => ok(undefined),
+});
+
 const prompt: InteractionPromptSpec = {
   decisionKey: 'goal', title: 'Choose goal', actions: ['submit', 'revise', 'text', 'no-fit', 'reject', 'cancel'],
   fields: [{ id: 'mode', kind: 'choice', label: 'Mode', required: true, completeness: 'complete',
@@ -316,5 +327,168 @@ test('合法的可选空选项、纯提交及显式替代动作不被拒绝', as
     }));
     assert.equal(code(result), action === 'submit' ? 'COMPLETE' : 'NO_FIT');
     assert.equal(noticed, 1); assert.equal(analyzed, 2); assert.equal(e.current(), undefined);
+  }
+});
+
+test('managed Interaction attaches actual root, shares exact call and step allowance and closes borrowed scope', async () => {
+  for (const short of [false, true]) {
+    const e = new InteractionElement();
+    const s = new StandardWorkflowSession({ maxCalls: 7 - Number(short), maxSteps: 9, maxDepth: 1 }, managedControl());
+    let retained!: InteractionScope;
+    let effects = 0;
+    const run = s.run(async root => {
+      assert.deepEqual(await root.invoke(() => 'before'), ok('before'));
+      const attached = await e.runIn(root, async scope => {
+        retained = scope;
+        assert.equal(scope.root.runId, root.runId);
+        assert.notEqual(scope.root.scopeId, root.scopeId);
+        const recognized = await scope.resolve(0, decide);
+        if (recognized.status !== 'COMPLETE') return recognized;
+        return scope.step(() => { effects++; return ok(recognized.value); });
+      });
+      assert.equal(code(await retained.root.invoke(() => 'late')), 'WORKFLOW_SCOPE_CLOSED');
+      assert.equal(root.remaining().calls, 0);
+      return attached;
+    }, managedCompletion<string>());
+    const p = await pending(e);
+    assert.equal(e.submit(answer(p)).accepted, true);
+    assert.equal((await run).status === 'COMPLETE', !short);
+    assert.equal(effects, short ? 0 : 1);
+    assert.equal(e.current(), undefined);
+  }
+});
+
+test('attached cancel is local; parent abort ends actual pending wait, independent root continues', async () => {
+  for (const parentCancel of [false, true]) {
+    const abort = new AbortController();
+    const e = new InteractionElement();
+    const s = new StandardWorkflowSession(limits, managedControl(abort.signal));
+    const separate = new StandardWorkflowSession(limits, managedControl());
+    let retained!: InteractionScope;
+    let parentEffects = 0;
+    const run = s.run(async root => {
+      const attached = await e.runIn(root, scope => {
+        retained = scope;
+        return scope.resolve(0, decide);
+      });
+      assert.notEqual(attached.status, 'COMPLETE');
+      assert.equal(retained.root.signal.aborted, true);
+      const sibling = await root.invoke(() => ++parentEffects);
+      assert.equal(sibling.status === 'COMPLETE', !parentCancel);
+      return attached;
+    }, managedCompletion<string>());
+    const p = await pending(e);
+    assert.deepEqual(await separate.run(root => root.invoke(() => 9), managedCompletion<number>()), ok(9));
+    if (parentCancel) abort.abort(); else e.cancel();
+    assert.notEqual((await run).status, 'COMPLETE');
+    assert.equal(parentEffects, parentCancel ? 0 : 1);
+    assert.equal(e.current(), undefined);
+    assert.equal(e.submit(answer(p)).accepted, false);
+  }
+});
+
+test('attached Interaction denies unmanaged root or depth exhaustion before work', async () => {
+  let entered = 0;
+  const work = () => { entered++; return ok(1); };
+  const legacy = new StandardWorkflowSession(limits);
+  assert.notEqual((await legacy.run(root => new InteractionElement().runIn(root, work))).status, 'COMPLETE');
+  const controlled = new StandardWorkflowSession({ ...limits, maxDepth: 0 }, managedControl());
+  assert.notEqual((await controlled.run(root => new InteractionElement().runIn(root, work), managedCompletion<number>())).status, 'COMPLETE');
+  assert.equal(entered, 0);
+});
+
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+test('actual published user wait pauses active clock but not wall, resumes on response', { timeout: 6000 }, async () => {
+  const e = new InteractionElement();
+  const control = managedControl();
+  const s = new StandardWorkflowSession(limits, { ...control,
+    limits: { ...control.limits, maxActiveMs: 300, maxWallMs: 3000 } });
+  let rootSignal!: AbortSignal;
+  const run = s.run(root => {
+    rootSignal = root.signal;
+    return e.runIn(root, scope => scope.resolve(0, decide));
+  }, managedCompletion<string>());
+  const p = await pending(e);
+  await delay(650);
+  assert.equal(rootSignal.aborted, false);
+  assert.equal(e.current(), p);
+  assert.equal(e.submit(answer(p)).accepted, true);
+  assert.deepEqual(await run, ok('chosen'));
+});
+
+test('concurrent owned active work prevents pause while actual Interaction waits', { timeout: 6000 }, async () => {
+  for (const mode of ['sibling','ancestor'] as const) {
+    const e = new InteractionElement(), entered = gate(), released = gate();
+    const control = managedControl();
+    const s = new StandardWorkflowSession(limits, { ...control,
+      limits: { ...control.limits, maxActiveMs: 350, maxWallMs: 3000 } });
+    let signal!: AbortSignal, joined = false;
+    const run = s.run(async root => {
+      signal = root.signal;
+      const hold = async () => { entered.release(); await released.promise; joined = true; return ok(1); };
+      const active = mode === 'sibling' ? root.child(0, c => c.invokeOutcome(hold)) : root.invokeOutcome(hold);
+      const waiting = e.runIn(root, scope => scope.resolve(0, decide));
+      const results = await Promise.all([active, waiting]);
+      assert.ok(results.every(r => r.status !== 'COMPLETE'));
+      return results[1]!;
+    }, managedCompletion<string>());
+    await entered.promise;
+    const p = await pending(e);
+    if (!signal.aborted) await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }));
+    assert.equal(signal.reason, 'active-timeout');
+    assert.equal(e.current(), undefined);
+    assert.equal(e.submit(answer(p)).accepted, false);
+    assert.equal(joined, false);
+    released.release();
+    assert.notEqual((await run).status, 'COMPLETE');
+    assert.equal(joined, true);
+  }
+});
+
+test('wall deadline cancels real user wait; unjoined wait is cancelled and joined without false success', { timeout: 6000 }, async () => {
+  const control = managedControl(), e = new InteractionElement();
+  const s = new StandardWorkflowSession(limits, { ...control,
+    limits: { ...control.limits, maxActiveMs: 1500, maxWallMs: 350 } });
+  let signal!: AbortSignal;
+  const run = s.run(root => {
+    signal = root.signal;
+    return e.runIn(root, scope => scope.resolve(0, decide));
+  }, managedCompletion<string>());
+  const p = await pending(e);
+  assert.notEqual((await run).status, 'COMPLETE');
+  assert.equal(signal.reason, 'wall-timeout');
+  assert.equal(e.submit(answer(p)).accepted, false);
+  const abandoned = new InteractionElement();
+  const another = new StandardWorkflowSession(limits, managedControl());
+  const result = await another.run(async root => {
+    void abandoned.runIn(root, scope => scope.resolve(0, decide));
+    await pending(abandoned);
+    return ok('not allowed to publish');
+  }, managedCompletion<string>());
+  assert.notEqual(result.status, 'COMPLETE');
+  assert.equal(abandoned.current(), undefined);
+  assert.ok(another.dispositions().filter(r => r.kind === 'scope').every(r => r.localQuiescent));
+});
+
+test('managed response checkpoint denies stale fact and insufficient event allowance before reducer', async () => {
+  for (const mode of ['current','stale','event-short'] as const) {
+    let epoch = 1, analyzed = 0;
+    const e = new InteractionElement(), control = managedControl();
+    const s = new StandardWorkflowSession(limits, { ...control,
+      knowledge: { ...control.knowledge, current: () => ({ epoch, context: { scope: 'root', revisions: new Map() } }) },
+      limits: { ...control.limits, maxEvents: mode === 'event-short' ? 6 : 7 } });
+    const run = s.run(root => e.runIn(root, scope => scope.resolve(0, (state, event) => {
+      analyzed++;
+      return decide(state, event);
+    })), managedCompletion<string>());
+    const p = await pending(e);
+    if (mode === 'stale') epoch++;
+    assert.equal(e.submit(answer(p)).accepted, true);
+    const result = await run;
+    assert.equal(result.status === 'COMPLETE', mode === 'current');
+    assert.equal(analyzed, mode === 'current' ? 2 : 1);
+    assert.equal(e.current(), undefined);
+    assert.equal(e.submit(answer(p)).accepted, false);
   }
 });
