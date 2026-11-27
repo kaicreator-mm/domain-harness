@@ -228,10 +228,14 @@ export function borrowRegionScope<T>(root: NativeWorkflowContext, depth: number,
 
 type RegionEvent = Readonly<Pick<Extract<WorkflowObservation, { kind: 'region' }>,
   'regionId' | 'action' | 'beforeRevision' | 'afterRevision' | 'reason' | 'detail'>>;
+type SkippedOccurrence = Readonly<{ instanceId: string; definitionId: string }>;
 interface RegionOperation<T> {
   readonly value: T;
   readonly resolution?: EvidenceResolution<string, unknown>;
   readonly event?: RegionEvent;
+  readonly skipped?: readonly SkippedOccurrence[];
+  // 仅 SDK 内部区域编辑提交；不得调用域回调。
+  readonly commit?: () => void;
   readonly validate?: (frame: WorkflowKnowledgeFrame) => boolean;
 }
 
@@ -241,13 +245,14 @@ interface RegionOperation<T> {
 export async function regionOperation<T>(root: NativeWorkflowContext, units: number, calls: number,
   emits: boolean, action: (frame: WorkflowKnowledgeFrame, remaining: WorkflowContextView['remaining'],
     maxNoProgress: number, check: () => boolean) => Result<RegionOperation<T>> | Promise<Result<RegionOperation<T>>>,
-  final = false, feedback = false, extraChecks = 0, rejection?: RegionEvent): Promise<Result<T>> {
+  final = false, feedback = false, extraChecks = 0, rejection?: RegionEvent, skipRecords = 0): Promise<Result<T>> {
   const lifetime = scopeLifetime(root), runtime = lifetime.managed, scope = lifetime.scope;
   if (!lifetime.admissible() || !runtime || !scope || !scope.policy || scope.bound
-    || !Number.isSafeInteger(units) || units < 1 || !Number.isSafeInteger(calls) || calls < 1) return managedFailure('WORKFLOW_REGION_ADMISSION');
+    || !Number.isSafeInteger(units) || units < 1 || !Number.isSafeInteger(calls) || calls < 1
+    || !Number.isSafeInteger(skipRecords) || skipRecords < 0 || skipRecords > 128 || (skipRecords > 0 && !emits)) return managedFailure('WORKFLOW_REGION_ADMISSION');
   const ticket = runtime.ledger.reserve(scope.owner, { calls, steps: calls,
-    work: units + (8 + extraChecks) * runtime.frameChainCost(scope) + Number(emits) * EVENT_SCAN_WORK,
-    events: Number(emits) }, scope.local);
+    work: units + (8 + extraChecks) * runtime.frameChainCost(scope) + (Number(emits) + skipRecords) * EVENT_SCAN_WORK,
+    events: Number(emits) + skipRecords }, scope.local);
   if (!ticket.ok) return managedFailure(ticket.code);
   const finish = lifetime.begin('orchestration');
   try {
@@ -273,13 +278,31 @@ export async function regionOperation<T>(root: NativeWorkflowContext, units: num
     const output = result.value;
     const current = feedback ? runtime.frames(scope) : chain;
     if (!current || !lifetime.admissible() || !runtime.checkFrames(scope, current, output.resolution, output.validate)) return managedFailure('WORKFLOW_CURRENTNESS');
+    let editSeq: number | undefined;
+    if ((output.skipped?.length ?? 0) !== skipRecords || (skipRecords > 0 && (output.event?.action !== 'edit' || !output.commit)))
+      return managedFailure('WORKFLOW_REGION_INVALID');
     if (output.event) {
       if (!emits || !ticket.ticket.event(scope.owner)) return managedFailure('WORKFLOW_EVENT_BUDGET');
       const record: WorkflowObservation = Object.freeze({ ...output.event, kind: 'region', runId: root.runId, scopeId: root.scopeId,
         parentScopeId: scope.parentId!, seq: runtime.sequence(), factRevision: current.locals.at(-1)?.frame.epoch ?? current.root.epoch,
         planRevision: output.event.afterRevision, stage: output.event.action });
       if (!runtime.deliver(scope, record) || !lifetime.admissible() || !runtime.checkFrames(scope, current, output.resolution, output.validate)) return managedFailure('WORKFLOW_CURRENTNESS');
+      editSeq = record.seq;
     }
+    // 编辑候选已交付且当前性通过：只为真实已跳过的逻辑节点分配本地裁定，
+    // 不创建执行作用域/attempt，不执行节点，不在提交之后调用外部证据回调。
+    const skipped: Extract<WorkflowObservation,{kind:'node'}>[] = [];
+    for (const item of output.skipped ?? []) {
+      if (editSeq === undefined || !output.event || !ticket.ticket.event(scope.owner)) return managedFailure('WORKFLOW_EVENT_BUDGET');
+      const occurrence = Object.freeze({ ...item, runId: root.runId, scopeId: root.scopeId, parentScopeId: scope.parentId! });
+      skipped.push(Object.freeze({ kind:'node', phase:'skip', occurrence, runId:root.runId, scopeId:root.scopeId,
+        parentScopeId:scope.parentId!, seq:runtime.sequence(), factRevision:current.locals.at(-1)?.frame.epoch ?? current.root.epoch,
+        planRevision:output.event.afterRevision, stage:item.definitionId, entered:false, acceptance:'not-applicable',
+        candidateSeq:editSeq, delivery:scope.delivery, post:'not-applicable', effect:'not-applicable',
+        reason:'WORKFLOW_REGION_OPTIONAL_SKIPPED', sources:Object.freeze([]), detail:null }));
+    }
+    output.commit?.();
+    for (const record of skipped) runtime.noteSkip(record);
     if (final) {
       scope.bound = current;
       if (output.resolution !== undefined) scope.resolved = output.resolution;

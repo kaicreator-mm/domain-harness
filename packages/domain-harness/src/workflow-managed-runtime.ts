@@ -144,6 +144,10 @@ export class ManagedRuntime {
       }
     }
   }
+  /** 区域逻辑跳过不是执行尝试；仅记录已提交的本地裁定，不污染实际节点索引。 */
+  public noteSkip(record: Extract<WorkflowObservation, { kind: 'node' }>): void {
+    this.#final.push(record);
+  }
   public nodeDisposition(instanceId: string) { return this.#nodeFinal.get(instanceId); }
   public localRemaining(scope: ManagedScope): number {
     return scope.local === undefined ? this.ledger.remaining().work : this.ledger.localRemaining(scope.local);

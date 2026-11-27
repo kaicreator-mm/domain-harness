@@ -35,7 +35,6 @@ interface Pending {
 }
 interface Gap { readonly id: string; readonly section: number; readonly templates: ReadonlyMap<string, WorkflowNodeProposal> }
 type RefreshState = { entries: Entries; facts: Resolution; nodes: Pending[]; replays: number; next: number; frame: WorkflowKnowledgeFrame; progress: boolean };
-type EditState = { nodes: Pending[]; next: number; progress: boolean };
 type Refresh<I, O> = Awaited<ReturnType<WorkflowRegionDefinition<I, O>['refresh']>>;
 const array = (v: unknown): boolean => Array.isArray(v);
 const validLimits = (l: WorkflowRegionLimits) => !!l && validLimit(l.maxWork, 2 ** 31 - 1) && validLimit(l.maxDescendantDepth, 256)
@@ -333,11 +332,12 @@ class Region<I, O> {
 
   private async edit(p: WorkflowRegionProposal): Promise<Outcome<boolean>> {
     const l = this.limits;
-    const result = await regionOperation<EditState>(this.root, this.structuralWork + (this.viewWork + this.graphWork) * (1 + p.edits.length) + 2*this.graphWork, 1 + p.edits.filter(e => e.kind === 'skip' || e.kind === 'rebind').length,
+    const result = await regionOperation<boolean>(this.root, this.structuralWork + (this.viewWork + this.graphWork) * (1 + p.edits.length) + 2*this.graphWork, 1 + p.edits.filter(e => e.kind === 'skip' || e.kind === 'rebind').length,
       true, async (frame, left, _max, check) => {
       this.current(frame);
       if (p.runId !== this.root.runId || p.regionId !== this.id || p.planRevision !== this.#revision || p.factRevision !== frame.epoch || this.#factRevision !== frame.epoch) return stale();
       const nodes = [...this.#nodes];
+      const skipped: {instanceId:string;definitionId:string}[] = [];
       const aliases = new Map<string, string>();
       const locate = (id: string) => nodes.findIndex(n => n.id === (aliases.get(id) ?? id));
       const nextPending = this.#nodes.find(pending)?.section ?? this.d.layout.length;
@@ -364,6 +364,7 @@ class Region<I, O> {
             const allowed = await this.withView(frame, left, 'skip', view => this.d.canSkip(n.id, view));
             if (allowed.status !== 'COMPLETE' || !check()) return fail('WORKFLOW_EDIT_POLICY');
             nodes[i] = Object.freeze({ ...n, state: 'skipped' });
+            skipped.push(Object.freeze({instanceId:n.id,definitionId:n.capability.id}));
           } else if (e.kind === 'remove') nodes[i] = Object.freeze({ ...n, state: 'removed' });
           else if (e.kind === 'move') {
             nodes.splice(i, 1); insert(n, e.before);
@@ -386,12 +387,13 @@ class Region<I, O> {
         return old?.id !== n.id || old.state !== n.state || JSON.stringify(old.node.input) !== JSON.stringify(n.node.input);
       });
       const next = this.#revision + Number(progress);
-      return ok({ value: { nodes, next, progress }, validate: now=>this.obligationsCurrent(now,nodes), ...(progress ? { event: this.event('edit', this.#revision, next, 'WORKFLOW_EDIT_ACCEPTED', { edits: p.edits.length }) } : {}),
+      return ok({ value: progress, validate: now=>this.obligationsCurrent(now,nodes),
+        commit:()=>{this.#nodes=nodes;this.#revision=next;}, skipped:Object.freeze(skipped),
+        ...(progress ? { event: this.event('edit', this.#revision, next, 'WORKFLOW_EDIT_ACCEPTED', { edits: p.edits.length, ...(skipped.length?{skipped}: {}) }) } : {}),
         ...(this.#facts === undefined ? {} : { resolution: this.#facts }) });
-    }, false, false, 2 * l.maxEdits, this.event('proposal-rejected', this.#revision, this.#revision, 'WORKFLOW_EDIT_REJECTED'));
-    if (result.status !== 'COMPLETE') return result;
-    this.#nodes = result.value.nodes; this.#revision = result.value.next;
-    return ok(result.value.progress);
+    }, false, false, 2 * l.maxEdits, this.event('proposal-rejected', this.#revision, this.#revision, 'WORKFLOW_EDIT_REJECTED'),
+      p.edits.filter(e=>e.kind==='skip').length);
+    return result;
   }
   /** 固化实际已接纳义务，而非由后续节点的输入 Slot 推断授权。
    * 仅在当前节点尝试及其后代有效；不固定可重新规划的区域本身。
