@@ -133,3 +133,41 @@ test('public D-B region replaces pending template in mutable gap and runs actual
   assert.equal(r.status,'COMPLETE');assert.deepEqual(counts,{read:1,solve:1,verify:1});
   assert.equal(new Set(d.trace.map(x=>x.runId)).size,1);
 });
+
+test('public D-B actual deadline feedback reruns only dependent solver and verifier, retains source',async()=>{
+  const d=domain(),jobs=fixture.DB.jobs;let deadline=8;
+  const counts={read:0,solve:0,verify:0};let asked=false;
+  const jobSlot=createWorkflowSlot('jobs',(v):v is Job[]=>Array.isArray(v)&&v.every((x:unknown)=>object(x)&&typeof x.id==='string'&&typeof x.I==='number'&&typeof x.R==='number'));
+  const deadlineSlot=createWorkflowSlot('deadline',(v):v is number=>typeof v==='number'&&Number.isInteger(v));
+  const scheduleSlot=createWorkflowSlot('schedule',(v):v is Schedule=>object(v)&&Array.isArray(v.starts)&&typeof v.makespan==='number'&&typeof v.sum==='number');
+  const source=read('read',jobSlot,()=>{counts.read++;});
+  const solve=bindWorkflowFunction<{jobs:Job[];deadline:number},Schedule>({id:'solve',description:'actual scipy MILP',
+    inputs:{jobs:jobSlot,deadline:deadlineSlot},outputs:{value:scheduleSlot},
+    input:r=>{const a=r.read('jobs',jobSlot),b=r.read('deadline',deadlineSlot);
+      return a.status!=='COMPLETE'?a:b.status!=='COMPLETE'?b:ok({jobs:a.value,deadline:b.value});},
+    node:{id:'solve',goal:'actual repair solve',requiredKnowledge:[],replay:'pure-read-only',before:()=>ok(undefined),
+      run:(i,root)=>{counts.solve++;return solveRepair(i.jobs,i.deadline,root.signal);},
+      after:(i,a)=>a.kind==='returned'&&a.outcome.status==='COMPLETE'&&scheduleMetrics(i.jobs,a.outcome.value.starts,i.deadline)!==null?ok(undefined):reject('INVALID'),
+      project:()=>({effect:'none',detail:null})},output:(v,w)=>w.put('value',scheduleSlot,v)});
+  const verified=(v:Schedule)=>{const metrics=scheduleMetrics(jobs,v.starts,deadline);
+    return metrics!==null&&metrics.makespan===v.makespan&&metrics.sum===v.sum&&v.makespan===fixture.DB.enumeration.best[0]&&v.sum===fixture.DB.enumeration.best[1];};
+  const verify=bindWorkflowFunction<Schedule,Schedule>({id:'verify',description:'verify actual repair schedule',
+    inputs:{value:scheduleSlot},outputs:{value:scheduleSlot},input:r=>r.read('value',scheduleSlot),
+    node:{id:'verify',goal:'verify constraints',requiredKnowledge:[],replay:'pure-read-only',before:()=>ok(undefined),run:v=>{counts.verify++;return verified(v)?ok(v):reject('INVALID');},
+      after:()=>ok(undefined),project:()=>({effect:'none',detail:null})},output:(v,w)=>w.put('value',scheduleSlot,v)});
+  const definition=d.definition<void,Schedule>({capabilities:[source,solve,verify],contextSlots:{jobs:jobSlot,deadline:deadlineSlot},layout:[
+    {kind:'anchor',id:'read',node:{alias:'read',capability:'read',input:{value:context('jobs')}}},
+    {kind:'anchor',id:'solve',node:{alias:'solve',capability:'solve',input:{jobs:result('read'),deadline:context('deadline')}}},
+    {kind:'anchor',id:'verify',node:{alias:'verify',capability:'verify',input:{value:result('solve')}}}],
+    refresh:(_i,_root,_prev,w)=>{const a=w.put('jobs',jobSlot,jobs),b=w.put('deadline',deadlineSlot,deadline);
+      return a.status!=='COMPLETE'?a:b.status!=='COMPLETE'?b:ok({...d.refresh(jobs,deadline),slotEvidence:{jobs:['source'],deadline:['constraint']}});},
+    plan:v=>{if(accepted(v,'verify')&&!asked){asked=true;return decision(v,'clarify');}
+      return decision(v,accepted(v,'verify')?'finish':'continue');},
+    clarify:async(_v,root)=>{const response=await userConstraint(root,7);if(response.status!=='COMPLETE')return response;deadline=response.value;d.advance();return ok(undefined);},
+    complete:v=>v.reader.read(id(v,'verify')+'/value',scheduleSlot)});
+  const r=await d.session.run(root=>runWorkflowRegion(root,definition,undefined),{goal:'actual final schedule',requiredKnowledge:[],terminalReads:0,
+    validate:p=>verified(p)?ok(undefined):reject('FINAL_INVALID')});
+  assert.equal(r.status,'COMPLETE');assert.deepEqual(counts,{read:1,solve:2,verify:2});assert.equal(deadline,7);
+  assert.ok(d.trace.some(x=>x.kind==='region'&&x.action==='feedback'));
+  assert.equal(new Set(d.trace.map(x=>x.runId)).size,1);
+});

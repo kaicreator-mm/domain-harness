@@ -156,7 +156,7 @@ test('LIVE D-B fixed semantic model plus model-generated recursive solver and ve
 
 test('LIVE D-A hybrid model edits pending analysis after actual feedback, retains mandatory source and verification',async()=>{
   const d=settings(),m=model('openai-chat'),offers=fixture.DA.offers;
-  let requested:Demand={lead:5,budget:75},asked=false,generated=0,reads=0,solves=0,checks=0;
+  let requested:Demand={lead:5,budget:75},asked=false,generated=0,reads=0,solves=0,checks=0,audits=0;
   const sourceSlot=createWorkflowSlot('offers',(v):v is typeof offers=>Array.isArray(v)&&v.every((o:unknown)=>obj(o)&&typeof o.id==='string'&&typeof o.pack==='number'));
   const demandSlot=createWorkflowSlot('demand',demand),planSlot=createWorkflowSlot('plan',plan);
   const meta=(describe:string)=>({schema:{type:'object',properties:{},required:[],additionalProperties:false} as const,describe});
@@ -164,6 +164,26 @@ test('LIVE D-A hybrid model edits pending analysis after actual feedback, retain
     input:r=>r.read('value',sourceSlot),output:(v,w)=>w.put('value',sourceSlot,v),
     node:{id:'query',goal:'actual supplier query',requiredKnowledge:[],replay:'pure-read-only',before:()=>ok(undefined),run:v=>{reads++;return ok(v);},
       after:()=>ok(undefined),project:()=>({effect:'none',detail:null})}});
+  const indexSlot=createWorkflowSlot('offer-index',(v):v is number=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0&&v<offers.length);
+  const categorySlot=createWorkflowSlot('audit-category',(v):v is number=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0&&v<3);
+  // Every actual supplier record is checked for identity/compatibility classification, pack constraints and terms.
+  // Mandatory zero-output audit obligations bind to the immutable source result, not the changing delivery constraint.
+  const audit=bindWorkflowFunction<{offers:typeof offers;index:number;category:number},void>({id:'offer-audit',description:'mandatory supplier record field-group validation',
+    inputs:{offers:sourceSlot,index:indexSlot,category:categorySlot},outputs:{},
+    input:r=>{const a=r.read('offers',sourceSlot),b=r.read('index',indexSlot),c=r.read('category',categorySlot);
+      return a.status!=='COMPLETE'?a:b.status!=='COMPLETE'?b:c.status!=='COMPLETE'?c:ok({offers:a.value,index:b.value,category:c.value});},
+    output:()=>ok(undefined),
+    node:{id:'offer-audit',goal:'validate actual offer field group',requiredKnowledge:[],replay:'pure-read-only',before:()=>ok(undefined),
+      run:i=>{audits++;const o=i.offers[i.index];if(!o)return reject('MISSING_OFFER');
+        const valid=i.category===0?o.id.length>0&&i.offers.filter(x=>x.id===o.id).length===1&&typeof o.compatible==='boolean'
+          :i.category===1?Number.isSafeInteger(o.pack)&&o.pack>0&&Number.isSafeInteger(o.moq)&&o.moq>=0&&Number.isSafeInteger(o.max)&&o.max>=o.moq
+          :Number.isSafeInteger(o.cost)&&o.cost>0&&Number.isSafeInteger(o.lead)&&o.lead>0;
+        return valid?ok(undefined):reject('OFFER_AUDIT');},
+      after:()=>ok(undefined),project:()=>({effect:'none',detail:{audited:true}})}});
+  const auditLayout=offers.flatMap((_o,index)=>[0,1,2].map(category=>({
+    kind:'anchor' as const,id:'audit-'+index+'-'+category,node:{alias:'audit-'+index+'-'+category,capability:'offer-audit',
+      input:{offers:{kind:'result' as const,node:'query',slot:'value'},index:{kind:'literal' as const,value:index},category:{kind:'literal' as const,value:category}}}
+  })));
   const solve=bindWorkflowFunction<{offers:typeof offers;demand:Demand},Plan>({id:'solve',description:'actual procurement calculation',
     inputs:{offers:sourceSlot,demand:demandSlot},outputs:{value:planSlot},model:meta('solve with the current offers result and demand context'),
     input:r=>{const a=r.read('offers',sourceSlot),b=r.read('demand',demandSlot);return a.status!=='COMPLETE'?a:b.status!=='COMPLETE'?b:ok({offers:a.value,demand:b.value});},
@@ -181,10 +201,11 @@ test('LIVE D-A hybrid model edits pending analysis after actual feedback, retain
   const native=(v:WorkflowRegionView,action:WorkflowRegionProposal['action'])=>ok({source:'native' as const,proposal:{
     runId:v.runId,regionId:v.regionId,planRevision:v.planRevision??0,factRevision:v.factRevision,edits:[],action}});
   const dfn:WorkflowRegionDefinition<void,Plan>={id:'purchase-hybrid',goal:'current procurement after actual feedback',constraints:['exact quantity and budget'],
-    limits:{maxWork:35000000,maxDescendantDepth:2,maxCandidateBytes:16384,maxJsonDepth:16,maxJsonItems:1024,maxNodes:30,maxBindings:32,maxEdits:8,maxProjectionBytes:16384},
-    capabilities:[query,solve,verify],knowledge:d.knowledge,current:d.current,requiredKnowledge:[{key:'constraint',accepts:['authority']},{key:'offers',accepts:['authority']}],optionalKnowledge:[],contextSlots:{demand:demandSlot,offers:sourceSlot},
+    limits:{maxWork:35000000,maxDescendantDepth:2,maxCandidateBytes:16384,maxJsonDepth:16,maxJsonItems:1024,maxNodes:30,maxBindings:64,maxEdits:8,maxProjectionBytes:16384},
+    capabilities:[query,audit,solve,verify],knowledge:d.knowledge,current:d.current,requiredKnowledge:[{key:'constraint',accepts:['authority']},{key:'offers',accepts:['authority']}],optionalKnowledge:[],contextSlots:{demand:demandSlot,offers:sourceSlot},
     layout:[
       {kind:'anchor',id:'query',node:{alias:'query',capability:'query',input:{value:{kind:'context',slot:'offers'}}}},
+      ...auditLayout,
       {kind:'gap',id:'analysis',templates:[{alias:'old',capability:'solve',input:{offers:{kind:'result',node:'query',slot:'value'},demand:{kind:'context',slot:'demand'}}}],seed:['old']},
       {kind:'anchor',id:'verify',node:{alias:'verify',capability:'verify',input:{value:{kind:'result',node:'old',slot:'value'}}}} ],
     refresh:(_i,_r,_v,w)=>{const a=w.put('demand',demandSlot,requested),b=w.put('offers',sourceSlot,offers);if(a.status!=='COMPLETE')return a;if(b.status!=='COMPLETE')return b;
@@ -193,6 +214,7 @@ test('LIVE D-A hybrid model edits pending analysis after actual feedback, retain
         {key:'offers',origin:'authority',state:'known',value:offers,source:{id:'offers',scope:'domain',revision:'1'}}],slotEvidence:{demand:['constraint'],offers:['offers']}});},
     plan:async(v,root)=>{
       const queried=v.progress.find(x=>x.definitionId==='query'&&x.state==='accepted');if(!queried)return native(v,'continue');
+      if(v.progress.filter(x=>x.definitionId==='offer-audit'&&x.state==='accepted').length!==auditLayout.length)return native(v,'continue');
       if(!asked){asked=true;return native(v,'clarify');}
       if(generated===0){
         generated++;
@@ -216,7 +238,8 @@ test('LIVE D-A hybrid model edits pending analysis after actual feedback, retain
   };
   const r=await d.session.run(root=>runWorkflowRegion(root,dfn,undefined),{goal:'independent two-day procurement optimum',requiredKnowledge:[],terminalReads:0,
     validate:v=>verified(v)?ok(undefined):reject('FINAL_GOAL')});
-  assert.equal(requireComplete(r).cost,72);assert.deepEqual([reads,solves,checks,generated],[1,1,1,1]);
+  assert.equal(requireComplete(r).cost,72);assert.deepEqual([reads,solves,checks,generated,audits],[1,1,1,1,12]);
+  assert.equal(d.session.dispositions().filter(x=>x.kind==='node'&&x.acceptance==='accepted').length,15);
   assert.ok(d.trace.some(x=>x.kind==='region'&&x.action==='feedback'));assert.ok(d.trace.some(x=>x.kind==='region'&&x.action==='edit'));
   usage(d.trace,1);
 });
