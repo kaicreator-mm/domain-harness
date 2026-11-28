@@ -15,6 +15,8 @@
     "test:generation": "node scripts/sdk-capability-catalog.mjs --check && node --test scripts/tests/sdk-capability-catalog.test.mjs && node --test scripts/tests/native-generation.test.mjs && node scripts/validate-native-generation.mjs --manifest examples/native-domain-app/package.json --core examples/native-domain-app/packages/kdp.mjs --core examples/native-domain-app/packages/business.mjs --core examples/native-domain-app/packages/workflow-init.mjs",
     "test": "npm run test:typecheck --workspace=@kaicreator/domain-harness && node --import tsx --test packages/domain-harness/tests/core/*.test.ts && npm run test:generation && npm run test:regression",
     "test:demo": "node examples/native-domain-app/main.mjs",
+    "demo:catalog": "node --import tsx examples/native-domain-app/combined/catalog-cli.ts",
+    "test:reference-maintenance": "node --import tsx examples/native-domain-app/maintenance/verify.ts",
     "test:consumer": "node scripts/verify-native-sdk-clean-install.mjs",
     "verify": "npm run build && npm run typecheck && npm run lint && npm test && npm run test:demo && npm run test:consumer",
     "test:regression": "node --test scripts/tests/native-stage-regression.test.mjs"

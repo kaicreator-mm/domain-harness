@@ -1,17 +1,14 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createInterface } from 'node:readline';
-import { fileURLToPath } from 'node:url';
 import { SQLiteDatabaseElement } from '@kaicreator/domain-harness';
 import { BookCatalogElement, isbnRules } from './book-catalog.js';
 import { WaterHardnessElement, hardnessRules } from './water-hardness.js';
 import { InventoryAuthority, payloadDigest } from '../action/authority.js';
 import { ReservationElement } from '../action/client.js';
+import { startLocalInventoryHost as host } from '../action/local-host.js';
 
 const budget = { maxCalls: 2, maxSteps: 5, maxDepth: 1 };
 const bookRevision = 'isbn13-2026-11-24';
@@ -59,29 +56,6 @@ function seed(db: SQLiteDatabaseElement): void {
 }
 function complete<T>(outcome: { status: 'COMPLETE'; value: T } | { status: string }): T {
   assert.ok(outcome.status === 'COMPLETE' && 'value' in outcome); return outcome.value;
-}
-async function host(path: string) {
-  const ts = import.meta.url.endsWith('.ts');
-  const entry = fileURLToPath(new URL(ts ? '../action/host.ts' : '../action/host.js', import.meta.url));
-  const child = spawn(process.execPath, [...(ts ? ['--import', 'tsx'] : []), entry, path], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-  child.stderr.resume();
-  const lines = createInterface({ input: child.stdout });
-  async function close(): Promise<void> {
-    if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
-    const exited = once(child, 'exit'); child.kill(); await exited;
-  }
-  try {
-    const ready = await new Promise<{ port: number; pid: number }>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('COMBINED_HOST_TIMEOUT')), 10_000);
-      const fail = () => { clearTimeout(timer); reject(new Error('COMBINED_HOST_START')); };
-      child.once('error', fail); lines.once('close', fail);
-      lines.once('line', line => { clearTimeout(timer); try { resolve(JSON.parse(line) as { port: number; pid: number }); } catch { fail(); } });
-    });
-    assert.equal(ready.pid, child.pid); assert.notEqual(ready.pid, process.pid);
-    assert.ok(Number.isInteger(ready.port) && ready.port > 0);
-    return { base: 'http://127.0.0.1:' + ready.port, close };
-  } catch (error) { await close(); throw error; }
-  finally { lines.close(); child.stdout.resume(); }
 }
 
 /** 单次真实组合验收：两个领域共享一个安装的 SDK；只读计划与确认后新动作是不同逻辑请求。 */

@@ -422,13 +422,53 @@ try {
     '--unhandled-rejections=strict','--input-type=module','--eval',combinedProbe,
   ],consumer).trim(),'SDK_COMBINED_PROBE_PASS');
 
+  // R86: same compiled ordinary application, actual offline connected reservation and real CLI.
+  for (const scenario of ['approve','decline','stale','revoked']) {
+    const output = run('CATALOG_REASONING_PROBE',consumerNode,
+      ['combined-dist/combined/catalog-reasoning-verify.js','native',scenario],consumer);
+    assert.match(output,/PASS_CATALOG_/u);
+  }
+  assert.equal(run('CATALOG_CLI_PROBE',consumerNode,['combined-dist/combined/catalog-cli-verify.js'],consumer).trim(),'CATALOG_REAL_CLI_PASS 4');
+  for (const mode of ['fixed','skip']) {
+    const output=run('CATALOG_MODE_PROBE',consumerNode,['combined-dist/combined/catalog-reasoning-verify.js','native','approve',mode],consumer);
+    assert.match(output,/PASS_CATALOG_REASONING_SLICE/u);
+  }
+  assert.match(run('CATALOG_REVISION_PROBE',consumerNode,['combined-dist/combined/catalog-revision-verify.js'],consumer),/PASS_CATALOG_MISSING_AND_REVISION/u);
+  assert.match(run('CATALOG_ADVERSARIAL_PROBE',consumerNode,['combined-dist/combined/catalog-adversarial-verify.js'],consumer),/CATALOG_ADVERSARIAL_PASS 6/u);
+  assert.match(run('CATALOG_RECOVERY_PROBE',consumerNode,['combined-dist/combined/catalog-recovery-verify.js'],consumer),/PASS_CATALOG_ORIGINAL_RECOVERY/u);
+
+  // Explicit Python/SciPy gate: no silent promotion of the unconfigured solver path.
+  let referenceMaintenance = 'NOT_RUN_PYTHON_NOT_CONFIGURED';
+  if (process.env.DH_PYTHON) {
+    const source = join(consumer,'reference-src','examples');
+    const target = join(consumer,'reference-dist','examples');
+    for (const folder of ['native-domain-app','qualification/workshop','qualification/procurement-witness']) {
+      cpSync(join(root,'examples',folder),join(source,folder),{recursive:true});
+    }
+    writeFileSync(join(consumer,'tsconfig-reference-maintenance.json'),JSON.stringify({
+      compilerOptions:{target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',strict:true,
+        noUnusedLocals:true,noUnusedParameters:true,noImplicitReturns:true,exactOptionalPropertyTypes:true,
+        noUncheckedIndexedAccess:true,verbatimModuleSyntax:true,skipLibCheck:true,types:['node'],
+        typeRoots:[join(root,'node_modules/@types')],lib:['ES2022','DOM','ESNext.Disposable'],
+        rootDir:'reference-src',outDir:'reference-dist'},
+      include:['reference-src/examples/native-domain-app/maintenance/**/*.ts'],
+    },null,2));
+    run('REFERENCE_MAINTENANCE_TYPECHECK',process.execPath,[join(root,'node_modules/typescript/bin/tsc'),'--pretty','false','-p',join(consumer,'tsconfig-reference-maintenance.json')],consumer);
+    cpSync(join(source,'qualification/workshop/solver.py'),join(target,'qualification/workshop/solver.py'));
+    for (const scenario of ['baseline','revision','unknown','invalid','no-current']) {
+      const output=run('REFERENCE_MAINTENANCE_PROBE',consumerNode,['reference-dist/examples/native-domain-app/maintenance/verify.js','native',scenario],consumer);
+      assert.match(output,/PASS_NESTED_MAINTENANCE/u);
+    }
+    referenceMaintenance='PASS_SCOPED';
+  }
+
   console.log(JSON.stringify({status:'NATIVE_SDK_ONLY_CONSUMER_PASS',
     directDependencies:Object.keys(manifest.dependencies),sha256,
     packageVersion:installedPkg.version,consumerRuntime:runtime,consumerNpmVersion,standardS05,
     api:'public-root',runtime:true,typescript:true,dependencyTree:true,deniedPrivateSubpath:true,
     rootReaderBudget:true,deniedReaderBeforeEffects:true,deniedHookBeforeEffects:true,
     sqliteRuntime:true,sqliteCasTwoConnections:true,sqliteSanitizedOpenError:true,
-    noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true,intentWorkflows:true,authorizedAction:true,combinedProduct:true}));
+    noTransactionControlHook:true,vectorGraphRuntime:true,expressionRuntime:true,intentWorkflows:true,authorizedAction:true,combinedProduct:true,referenceCatalogReasoning:true,referenceCatalogCli:true,referenceMaintenance}));
 } finally {
   if (process.env.DH_NATIVE_KEEP_EVIDENCE !== '1') rmSync(work,{recursive:true,force:true});
   else console.error('NATIVE_CONSUMER_EVIDENCE_DIR='+work);
