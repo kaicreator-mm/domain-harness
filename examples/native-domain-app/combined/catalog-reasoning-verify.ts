@@ -8,6 +8,8 @@ import { demoIsbn as isbn, demoOlder as older, demoRevision as revision, demoMod
 
 const protocol = process.argv[2] ?? 'native';
 const scenario = process.argv[3] ?? 'approve';
+const topology = process.argv[4] ?? 'replace';
+if(topology!=='fixed'&&topology!=='replace'&&topology!=='skip')throw Error('INVALID_TOPOLOGY');
 if (!['approve','decline','stale','revoked'].includes(scenario)) throw Error('INVALID_SCENARIO');
 if (protocol !== 'native' && protocol !== 'openai-chat' && protocol !== 'anthropic-messages') throw Error('INVALID_PROTOCOL');
 const model = demoModel(protocol);
@@ -16,6 +18,7 @@ const { folder, database: db, owner, client: reservationClient, readback, catalo
 try {
   const input = { isbn, revision, quantity:2, budgetCents:4000 };
   const events: WorkflowObservation[] = [];
+  let final:readonly WorkflowObservation[]=[];
   let prompts = 0;
   const interaction = new InteractionElement({ onPrompt: (p,actual) => {
     prompts++;
@@ -29,7 +32,7 @@ try {
     if (scenario === 'revoked') env.revoke('book-a');
     setImmediate(() => actual.submit({intentId:p.intentId,revision:p.revision,decisionKey:p.decisionKey,action:'submit',values:{approve:scenario==='decline'?'no':'yes'}}));
   }});
-  const outcome = await runCatalogReasoning(catalog,input,{ interaction, ...(model ? { model } : {}), current:()=>true, observe:event=>{ events.push(event); },
+  const outcome = await runCatalogReasoning(catalog,input,{ interaction, topology, ...(model ? { model } : {}), current:()=>true, observe:event=>{ events.push(event); },dispositions:values=>{final=values;},
     reserve: (root,plan,request,options) => catalogReservation(catalog,reservationClient,{tenant:'shop-a',principal:'alice',inspect:r=>owner.inspect('shop-a',r),
       approve:g=>owner.approve(g),readback},confirmation,options)(root,plan,request) });
   if (scenario === "approve" && outcome.status !== "COMPLETE") console.error(JSON.stringify({status:outcome.status,code:outcome.reason.code,approvals,trace:events.map(e=>({kind:e.kind,action:"action" in e?e.action:null})),effects:owner.inspect("shop-a","book-a").effects}));
@@ -61,9 +64,14 @@ try {
   assert.equal(new Set(events.map(e=>e.runId)).size,1);
   assert.equal(catalog.handled,model?3:2);
   const attempts = events.filter(e=>e.kind==='model'&&e.action==='result');
-  assert.equal(attempts.length,model?3:0);
+  assert.equal(attempts.length,model?(topology==='fixed'?2:3):0);
+  const edits=events.filter(e=>e.kind==='region'&&e.action==='edit');
+  assert.equal(edits.length,topology==='fixed'?0:1);
+  const skipped=final.filter(e=>e.kind==='node'&&e.occurrence.definitionId==='catalog-plan'&&e.phase==='skip'&&!e.entered);
+  assert.equal(skipped.length,topology==='skip'?1:0);
+  assert.equal(final.filter(e=>e.kind==='node'&&e.occurrence.definitionId==='catalog-verify'&&e.phase==='disposition'&&e.acceptance==='accepted').length,1);
   db.transaction(tx=>tx.run('UPDATE books SET price=? WHERE tenant=? AND isbn=?',[1300,'shop-a',isbn]));
   assert.equal(catalog.verifyCurrent({...input,quantity:3},outcome.value.final).status,'REJECT');
-  console.log(JSON.stringify({status:'PASS_CATALOG_REASONING_SLICE',protocol:protocol??'native',prompts,oneRoot:true,initial:outcome.value.initial.totalCents,final:outcome.value.final.totalCents,quantity:outcome.value.final.quantity,actualModelAttempts:attempts.length,stalePriceRejected:true,actualHost:true,actualEffects:1,receiptVerified:true,remaining:2}));
+  console.log(JSON.stringify({status:'PASS_CATALOG_REASONING_SLICE',protocol:protocol??'native',topology,skipped:skipped.length,prompts,oneRoot:true,initial:outcome.value.initial.totalCents,final:outcome.value.final.totalCents,quantity:outcome.value.final.quantity,actualModelAttempts:attempts.length,stalePriceRejected:true,actualHost:true,actualEffects:1,receiptVerified:true,remaining:2}));
   }
 } finally { await env.close(); }

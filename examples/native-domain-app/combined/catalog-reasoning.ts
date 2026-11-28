@@ -4,6 +4,7 @@ import type { BookCatalogElement, BookRequest, Plan } from './book-catalog.js';
 import type { Receipt } from '../action/authority.js';
 
 type Ready = Required<BookRequest>;
+export type CatalogTopology = 'fixed' | 'replace' | 'skip';
 type Outcome<T> = StandardWorkflowOutcome<T>;
 export interface CatalogReasoningResult { initial: Plan; final: Plan; receipt?: Receipt }
 export interface CatalogReasoningOptions {
@@ -13,6 +14,7 @@ export interface CatalogReasoningOptions {
   readonly model?: ModelElement;
   readonly limits?: WorkflowLimits;
   readonly modelCalls?: number;
+  readonly topology?: CatalogTopology;
   readonly current: () => boolean;
   /** Trusted application effect boundary, never exposed to a model. */
   readonly reserve?: (root: NativeWorkflowContext, verified: Plan, request: Ready, nodeOptions: WorkflowNodeOptions) => Promise<Outcome<Receipt>>;
@@ -63,7 +65,9 @@ export async function runCatalogReasoning(catalog: BookCatalogElement, input: Bo
   const supplied = Object.freeze({...input});
   let demand: Ready;
   const knowledge = { maxItems: 2, equal: Object.is, current: () => ({ epoch, context: { scope: 'catalog-order', revisions: new Map([['request', String(epoch)],['policy',supplied.revision??'missing']]) } }) };
-  const modelCalls=options.modelCalls??3;
+  const topology=options.topology??'replace';
+  if(!['fixed','replace','skip'].includes(topology))return deny('CATALOG_TOPOLOGY_INVALID');
+  const modelCalls=options.modelCalls??(topology==='fixed'?2:3);
   if(!Number.isSafeInteger(modelCalls)||modelCalls<0||modelCalls>3)return deny('CATALOG_MODEL_LIMIT_INVALID');
   const session = new StandardWorkflowSession(options.limits??{ maxCalls: 300, maxSteps: 600, maxDepth: 6 }, {
     knowledge, current: options.current,
@@ -143,7 +147,7 @@ export async function runCatalogReasoning(catalog: BookCatalogElement, input: Bo
       if (!read || !pending || !guard || read.state !== 'accepted') throw new Error('CATALOG_TOPOLOGY_STATE');
       return [{ kind: 'insert', gap: 'planning', node: { alias: 'current-plan', capability: 'catalog-plan', input: { value: result(read.instanceId) } } },
         { kind: 'rebind', node: guard.instanceId, input: 'value', to: result('current-plan') },
-        { kind: 'remove', node: pending.instanceId }];
+        { kind: topology==='skip'?'skip':'remove', node: pending.instanceId }];
     }
     const definition: WorkflowRegionDefinition<undefined, Plan> = {
       id: 'catalog-reasoning', goal: 'verified revised catalog plan', constraints: ['confirmed current request', 'actual authoritative facts'],
@@ -167,6 +171,7 @@ export async function runCatalogReasoning(catalog: BookCatalogElement, input: Bo
           reconsidered=true;
           return native(view,'clarify');
         }
+        if (topology==='fixed')return native(view,active(view,'catalog-verify')?.state==='accepted'?'finish':'continue');
         if (read?.state === 'accepted' && !edited) {
           edited = true;
           const proposed = edits(view);
@@ -178,7 +183,7 @@ export async function runCatalogReasoning(catalog: BookCatalogElement, input: Bo
               '. Current confirmed catalog request: '+JSON.stringify(demand)+'. Accepted source occurrence ID: '+read.instanceId+
               '. Mandatory verification occurrence ID: '+guard?.instanceId+'. Obsolete pending solver occurrence ID: '+pending?.instanceId+
               '. Use action "continue". Use this edit structure and replace every descriptive placeholder with its actual ID: '+
-              '[{"kind":"insert","gap":"planning","node":{"alias":"current-plan","capability":"catalog-plan","input":{"value":{"kind":"result","node":"<accepted source occurrence ID>","slot":"value"}}}},{"kind":"rebind","node":"<mandatory verification occurrence ID>","input":"value","to":{"kind":"result","node":"current-plan","slot":"value"}},{"kind":"remove","node":"<obsolete pending solver occurrence ID>"}]. No extra keys. Return only JSON.' }],
+              '[{"kind":"insert","gap":"planning","node":{"alias":"current-plan","capability":"catalog-plan","input":{"value":{"kind":"result","node":"<accepted source occurrence ID>","slot":"value"}}}},{"kind":"rebind","node":"<mandatory verification occurrence ID>","input":"value","to":{"kind":"result","node":"current-plan","slot":"value"}},{"kind":"'+(topology==='skip'?'skip':'remove')+'","node":"<obsolete pending solver occurrence ID>"}]. No extra keys. Return only JSON.' }],
             tools: [], output: { kind: 'json', strict: false }, maxOutputTokens: 1024, requestKey: 'catalog-topology', action: 'initial', reason: 'actual revised request topology' });
           if (turn.status !== 'COMPLETE') return turn;
           if (turn.value.calls.length || !record(turn.value.json)) return deny('CATALOG_MODEL_PROPOSAL');
@@ -196,15 +201,19 @@ export async function runCatalogReasoning(catalog: BookCatalogElement, input: Bo
       },
       admit: (view,proposal) => {
         if (proposal.edits.length === 0) return ok(undefined);
-        if (replacementAdmitted || proposal.action !== 'continue' || canonical(proposal.edits) !== canonical(edits(view))) return deny('CATALOG_EDIT_DENIED');
+        if (topology==='fixed' || replacementAdmitted || proposal.action !== 'continue' || canonical(proposal.edits) !== canonical(edits(view))) return deny('CATALOG_EDIT_DENIED');
         replacementAdmitted = true;
         return ok(undefined);
       },
-      canSkip: () => deny('CATALOG_SKIP_DENIED'), canRebind: (node,inputKey,_from,_to,view) =>
+      canSkip: (node,view) => {
+        // 仅允许跳过已被新计划替代的待执行旧节点，锚点和已接受节点均不可跳过。
+        const pending=active(view,'catalog-plan');
+        return topology==='skip'&&pending?.instanceId===node&&pending.state==='pending'?ok(undefined):deny('CATALOG_SKIP_DENIED');
+      }, canRebind: (node,inputKey,_from,_to,view) =>
         node === active(view,'catalog-verify')?.instanceId && inputKey === 'value' ? ok(undefined) : deny('CATALOG_REBIND_DENIED'),
       complete: view => {
         const node = active(view,'catalog-verify');
-        return replacementAdmitted && active(view,'catalog-policy')?.state==='accepted' && node?.state === 'accepted' ? view.reader.read(node.instanceId+'/value',planSlot) : deny('CATALOG_VERIFY_REQUIRED');
+        return (topology==='fixed'||replacementAdmitted) && active(view,'catalog-policy')?.state==='accepted' && node?.state === 'accepted' ? view.reader.read(node.instanceId+'/value',planSlot) : deny('CATALOG_VERIFY_REQUIRED');
       },
     };
     const final = await runWorkflowRegion(root,definition,undefined);
@@ -216,4 +225,18 @@ export async function runCatalogReasoning(catalog: BookCatalogElement, input: Bo
     validate: v => catalog.verifyCurrent(demand,v.final).status === 'COMPLETE' ? ok(undefined) : deny('CATALOG_FINAL_INVALID') });
   options.dispositions?.(session.dispositions());
   return outcome;
+}
+
+/** 固定无模型查询：仅从已验证目录识别资源，然后读取当前库存，不授予权限。 */
+export async function readCatalogStock(catalog:BookCatalogElement,isbn:string,revision:string,
+  inspect:(resource:string)=>{readonly stock:number|undefined;readonly version:number|undefined}):Promise<Outcome<{isbn:string;resource:string;stock:number;version:number}>>{
+  return new StandardWorkflowSession({maxCalls:12,maxSteps:24,maxDepth:2}).run(async root=>{
+    const plan=await catalog.planIn(root,{isbn,revision,quantity:1,budgetCents:Number.MAX_SAFE_INTEGER});
+    if(plan.status!=='COMPLETE')return plan;
+    return root.invokeOutcome(()=>{
+      const state=inspect(plan.value.resource);
+      if(state.stock===undefined||state.version===undefined)return {status:'UNKNOWN',reason:{code:'STOCK_UNKNOWN',message:'Current inventory unavailable'}};
+      return ok({isbn:plan.value.isbn,resource:plan.value.resource,stock:state.stock,version:state.version});
+    });
+  });
 }

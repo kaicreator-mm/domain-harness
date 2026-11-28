@@ -16,7 +16,7 @@ test('reference catalog actual CLI input, foreign correlation, decline and EOF',
   const entry=fileURLToPath(new URL('catalog-cli-verify.ts',base));
   const p=spawnSync(process.execPath,['--import','tsx',entry],{encoding:'utf8',timeout:120000,maxBuffer:1024*1024,windowsHide:true});
   assert.equal(p.status,0,p.stderr);
-  assert.match(p.stdout,/CATALOG_REAL_CLI_PASS 3/u);
+  assert.match(p.stdout,/CATALOG_REAL_CLI_PASS 4/u);
 });
 
 for (const [file,expected] of [['catalog-revision-verify.ts','PASS_CATALOG_MISSING_AND_REVISION'],['catalog-adversarial-verify.ts','CATALOG_ADVERSARIAL_PASS 6']] as const) {
@@ -25,5 +25,14 @@ for (const [file,expected] of [['catalog-revision-verify.ts','PASS_CATALOG_MISSI
     const p=spawnSync(process.execPath,['--import','tsx',entry],{encoding:'utf8',timeout:120000,maxBuffer:1024*1024,windowsHide:true});
     assert.equal(p.status,0,p.stderr);
     assert.ok(p.stdout.includes(expected),p.stdout);
+  });
+}
+
+for(const mode of ['fixed','skip']){
+  test('reference catalog actual '+mode+' workflow',()=>{
+    const entry=fileURLToPath(new URL('catalog-reasoning-verify.ts',base));
+    const p=spawnSync(process.execPath,['--import','tsx',entry,'native','approve',mode],{encoding:'utf8',timeout:60000,maxBuffer:1024*1024,windowsHide:true});
+    assert.equal(p.status,0,p.stderr);
+    assert.match(p.stdout,/PASS_CATALOG_REASONING_SLICE/u);
   });
 }

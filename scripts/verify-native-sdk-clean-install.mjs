@@ -428,7 +428,11 @@ try {
       ['combined-dist/combined/catalog-reasoning-verify.js','native',scenario],consumer);
     assert.match(output,/PASS_CATALOG_/u);
   }
-  assert.equal(run('CATALOG_CLI_PROBE',consumerNode,['combined-dist/combined/catalog-cli-verify.js'],consumer).trim(),'CATALOG_REAL_CLI_PASS 3');
+  assert.equal(run('CATALOG_CLI_PROBE',consumerNode,['combined-dist/combined/catalog-cli-verify.js'],consumer).trim(),'CATALOG_REAL_CLI_PASS 4');
+  for (const mode of ['fixed','skip']) {
+    const output=run('CATALOG_MODE_PROBE',consumerNode,['combined-dist/combined/catalog-reasoning-verify.js','native','approve',mode],consumer);
+    assert.match(output,/PASS_CATALOG_REASONING_SLICE/u);
+  }
   assert.match(run('CATALOG_REVISION_PROBE',consumerNode,['combined-dist/combined/catalog-revision-verify.js'],consumer),/PASS_CATALOG_MISSING_AND_REVISION/u);
   assert.match(run('CATALOG_ADVERSARIAL_PROBE',consumerNode,['combined-dist/combined/catalog-adversarial-verify.js'],consumer),/CATALOG_ADVERSARIAL_PASS 6/u);
 

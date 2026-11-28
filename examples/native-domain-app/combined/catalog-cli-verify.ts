@@ -31,4 +31,7 @@ assert.deepEqual(negative.stock,{version:0,stock:8,effects:0});
 const eof=invoke(quantity+'\n').at(-1);
 assert.equal(eof.outcome.status,'REJECT');
 assert.deepEqual(eof.stock,{version:0,stock:8,effects:0});
-console.log('CATALOG_REAL_CLI_PASS 3');
+const stock=spawnSync(process.execPath,[...(ts?['--import','tsx']:[]),entry,'stock','9780131103627'],{encoding:'utf8',timeout:30000,maxBuffer:1024*1024,windowsHide:true});
+assert.equal(stock.status,0,stock.stderr);
+assert.deepEqual(JSON.parse(stock.stdout),{outcome:{status:'COMPLETE',value:{isbn:'9780131103627',resource:'book-b',stock:8,version:0}},modelAttempts:0});
+console.log('CATALOG_REAL_CLI_PASS 4');

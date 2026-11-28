@@ -118,3 +118,21 @@ npm run test:reference-maintenance -- native revision
 The live profiles are explicit options in place of `native`. The installed SDK consumer includes
 the native maintenance cases if `DH_PYTHON` is configured; otherwise reports
 `NOT_RUN_PYTHON_NOT_CONFIGURED` for this gate (not a full R86 pass).
+
+### Explicit fixed, replace and skip modes
+
+Append `fixed`, `replace` (default), or `skip` to the catalog CLI arguments. Fixed
+uses the existing typed plan without edits; model mode still calls the read-only
+Function and validates its correlated continuation. Replace inserts the new
+plan, rebinds the required verifier and removes the obsolete pending node.
+Skip preserves the obsolete node's logical skip disposition, without entering
+it; the new plan and mandatory verifier must still complete. Skipping a
+mandatory or previously accepted node is not authorized.
+
+The pure stock query is independent of model credentials, does not prompt or
+grant authority, and reads the current stock and version of the identified
+resource:
+
+```sh
+npm run demo:catalog -- stock 9780131103627
+```
