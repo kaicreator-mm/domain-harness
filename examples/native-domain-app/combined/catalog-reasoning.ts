@@ -2,6 +2,7 @@ import { bindWorkflowFunction, createWorkflowSlot, runWorkflowRegion, StandardWo
 import type { InteractionElement, ModelElement, NativeWorkflowContext, ModelRequest, StandardWorkflowOutcome, WorkflowLimits, WorkflowNodeOptions, WorkflowObservation, WorkflowRegionDefinition, WorkflowRegionProposal, WorkflowRegionView } from '@kaicreator/domain-harness';
 import type { BookCatalogElement, BookRequest, Plan } from './book-catalog.js';
 import type { Receipt } from '../action/authority.js';
+import { finishCatalogReservation } from './catalog-reservation.js';
 
 type Ready = Required<BookRequest>;
 export type CatalogTopology = 'fixed' | 'replace' | 'skip';
@@ -75,7 +76,8 @@ export async function runCatalogReasoning(catalog: BookCatalogElement, input: Bo
       ...(options.model ? { model: { maxCalls: modelCalls, maxRetries: 0, maxOutputTokens: 1024 } } : {}) },
     ...(options.observe ? { observe: options.observe } : {}),
   });
-  const outcome=await session.run(async root => {
+  let reservationRoot:NativeWorkflowContext|undefined;
+  const outcome=await session.run<CatalogReasoningResult>(async root => {
     let candidate:BookRequest=supplied;
     if(candidate.quantity===undefined&&options.recognition&&typeof candidate.isbn==='string'&&typeof candidate.revision==='string'&&typeof candidate.budgetCents==='number'){
       const quantity=await quantityFeedback(root,options.recognition,'initial-quantity','Provide the missing order quantity');
@@ -219,10 +221,13 @@ export async function runCatalogReasoning(catalog: BookCatalogElement, input: Bo
     const final = await runWorkflowRegion(root,definition,undefined);
     if (final.status !== 'COMPLETE') return final;
     if (!options.reserve) return ok({ initial: initial.value, final: final.value });
+    reservationRoot=root;
     const receipt = await options.reserve(root,final.value,demand,{knowledge,current: options.current});
     return receipt.status !== 'COMPLETE' ? receipt : ok({ initial: initial.value, final: final.value, receipt: receipt.value });
   }, { goal: 'current verified revised catalog plan', requiredKnowledge: [], terminalReads: 0,
     validate: v => catalog.verifyCurrent(demand,v.final).status === 'COMPLETE' ? ok(undefined) : deny('CATALOG_FINAL_INVALID') });
+  if(reservationRoot)finishCatalogReservation(reservationRoot,outcome.status!=='COMPLETE'?outcome:
+    outcome.value.receipt?ok(outcome.value.receipt):undefined);
   options.dispositions?.(session.dispositions());
   return outcome;
 }

@@ -136,3 +136,32 @@ resource:
 ```sh
 npm run demo:catalog -- stock 9780131103627
 ```
+
+### Original reservation recovery (same running application only)
+
+The application keeps a bounded fence by client instance, tenant and resource.
+An unresolved original command blocks a fresh same-resource reservation before
+confirmation, grant or Host submission, including changed quantity and concurrent
+roots. An unrelated resource may proceed. The fence retains the immutable original
+command and remains until the enclosing root delivers a matching authoritative
+terminal receipt or confirmed no-effect disposition. An unresolved receipt is not
+proof that no stock was changed.
+
+Use `pendingCatalogReservation` to obtain the original command's public recovery
+handle. Explicit `recoverCatalogReservation(client, authority, resource, originalId)`
+uses the original command in RECOVER mode, with readback only, no new grant or
+submission. Wrong ID, mismatched principal, unavailable readback and unobserved
+attempts do not clear the fence. After reconciliation a separately confirmed new
+intent is allowed. In the CLI, a pending result prints its handle; the caller may
+explicitly submit `{"action":"recover","id":"<original id>"}` within the same
+invocation (at most three input attempts, never an automatic retry).
+The demo still creates and removes isolated synthetic databases per invocation:
+this is an in-process fence, not a cross-process durable recovery service or
+a distributed exactly-once guarantee.
+
+The real Host fault-injection regression forwards actual requests to SQLite,
+drops ACK/readback, checks zero additional submissions and grants on conflicting
+requests, recovers only the original ID, and reconciles both client and Host
+ledgers. It also exercises root delivery failure after a real node receipt,
+independent resources, concurrent roots, decline/cancellation and new intent
+after settlement. It runs in the ordinary regression and installed SDK consumer.

@@ -36,3 +36,10 @@ for(const mode of ['fixed','skip']){
     assert.match(p.stdout,/PASS_CATALOG_REASONING_SLICE/u);
   });
 }
+
+test('reference catalog real Host lost ACK, original-only recovery and app-lifetime fence',()=>{
+  const entry=fileURLToPath(new URL('catalog-recovery-verify.ts',base));
+  const p=spawnSync(process.execPath,['--import','tsx',entry],{encoding:'utf8',timeout:120000,maxBuffer:1024*1024,windowsHide:true});
+  assert.equal(p.status,0,p.stderr);
+  assert.match(p.stdout,/PASS_CATALOG_ORIGINAL_RECOVERY/u);
+});

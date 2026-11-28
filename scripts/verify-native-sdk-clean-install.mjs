@@ -435,6 +435,7 @@ try {
   }
   assert.match(run('CATALOG_REVISION_PROBE',consumerNode,['combined-dist/combined/catalog-revision-verify.js'],consumer),/PASS_CATALOG_MISSING_AND_REVISION/u);
   assert.match(run('CATALOG_ADVERSARIAL_PROBE',consumerNode,['combined-dist/combined/catalog-adversarial-verify.js'],consumer),/CATALOG_ADVERSARIAL_PASS 6/u);
+  assert.match(run('CATALOG_RECOVERY_PROBE',consumerNode,['combined-dist/combined/catalog-recovery-verify.js'],consumer),/PASS_CATALOG_ORIGINAL_RECOVERY/u);
 
   // Explicit Python/SciPy gate: no silent promotion of the unconfigured solver path.
   let referenceMaintenance = 'NOT_RUN_PYTHON_NOT_CONFIGURED';
