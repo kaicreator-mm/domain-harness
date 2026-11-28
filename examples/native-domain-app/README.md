@@ -61,3 +61,60 @@ DH_BROWSER_DRIVER=/absolute/path/to/playwright/index.mjs node scripts/verify-ref
 ```
 
 安装消费者门禁复用累计 Reference、8 组 CLI 和原 8 组 + 新 5 组库存授权实际测试；视觉浏览器独立见证。
+
+## R86 cumulative reference: catalog reasoning and authorized inventory reservation
+
+This extends the existing catalog business, not another runtime. The app uses selected immutable ISBN rules,
+actual SQL/Vector/Graph/Expression queries, native recognition/handling, an attached user feedback prompt,
+a bounded typed region with replacement/rebind of the pending plan and mandatory verification, and the
+existing independent Host and inventory authority. The same native catalog calculation is used in both
+fixed and model-selected read-only tool paths; model tool results and topology proposals are validated.
+No model can select the reservation capability or supply a grant. The confirmed quantity, current catalog
+price and current resource version are checked before a local trusted owner issues a one-call grant.
+Actual inventory and receipt are persisted in isolated temporary SQLite databases; no purchase/payment
+or production data is involved. This is not a durable recovery service or distributed transaction over
+catalog and inventory. Existing unknown-effect tests remain applicable to the underlying Host/client.
+
+Development checkout (build SDK first):
+```sh
+npm run demo:catalog -- native 9780306406157 2 4000
+```
+Enter one JSON line at each prompt (example quantity revision then explicit approval):
+```json
+{"action":"submit","values":{"quantity":3}}
+{"action":"submit","values":{"approve":"yes"}}
+```
+The CLI attaches correlation only to input with no explicit correlation fields; foreign/stale explicit
+correlation is passed through unchanged. Decline with `"no"`; EOF cancels, never approves. The second
+synthetic catalog item is ISBN 9780131103627. A fresh local fixture is created per invocation.
+
+Explicit live modes are `openai-chat` and `anthropic-messages`, using the approved DeepSeek-compatible
+profiles and a caller-supplied `DH_DEEPSEEK_API_KEY` environment variable; no secret is stored in source.
+Only synthetic catalog request and read-only quote data are projected. Provider rejection is terminal,
+with no automatic retry/fallback or effect. CI runs the deterministic path only; live execution needs
+its own actual receipt.
+
+`npm test` includes the connected offline application and real CLI regressions.
+`npm run test:consumer` compiles the same application in an isolated installed-SDK directory, executes
+the same cases and the actual compiled CLI via plain Node. It is still a single direct SDK dependency.
+
+### Nested maintenance planning
+
+The same reference app also composes the existing qualification procurement and workshop domains:
+a bounded generated child region executes the actual parts-quote Function, then a nested repair
+region consumes its accepted typed result and runs the existing SciPy MILP solver. The delivery
+lead time gates the repair machine calendar (synthetic discrete business days); it is not a
+hardcoded schedule. The native finite test enumerates the independent optimum. Model topology
+cannot supply a quote, price or schedule. This is read-only planning, no purchasing effect.
+
+Install the pinned existing workshop Python dependencies in an isolated environment and set
+`DH_PYTHON` to its interpreter. Run:
+
+```sh
+npm run test:reference-maintenance -- native baseline
+npm run test:reference-maintenance -- native revision
+```
+
+The live profiles are explicit options in place of `native`. The installed SDK consumer includes
+the native maintenance cases if `DH_PYTHON` is configured; otherwise reports
+`NOT_RUN_PYTHON_NOT_CONFIGURED` for this gate (not a full R86 pass).

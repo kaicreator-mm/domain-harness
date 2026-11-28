@@ -1,5 +1,5 @@
 import { BoundedExpressionElement, BoundedQueryElement, GraphQueryElement, SQLiteDatabaseElement, runRecognitionHandling, VectorQueryElement } from '@kaicreator/domain-harness';
-import type { BoundedQueryLimits, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
+import type { BoundedQueryLimits, NativeWorkflowContext, StandardWorkflowOutcome, WorkflowLimits } from '@kaicreator/domain-harness';
 
 const source = Object.freeze({ url: 'https://www.isbn-international.org/content/what-isbn/10', revision: 'isbn13-2026-11-24' });
 const weights = Object.freeze([1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3]);
@@ -8,7 +8,7 @@ type Rule = (typeof isbnRules)[number];
 export interface BookRequest { isbn?: string; quantity?: number; budgetCents?: number; revision?: string }
 interface Book { isbn: string; resource: string; price: number; pages: number; width: number }
 interface Intent { isbn: string; quantity: number; budgetCents: number; rule: Rule }
-interface Plan { resource: string; isbn: string; quantity: number; totalCents: number; comparable: readonly string[]; predecessor: readonly string[]; rule: Rule }
+export interface Plan { resource: string; isbn: string; quantity: number; totalCents: number; comparable: readonly string[]; predecessor: readonly string[]; rule: Rule }
 type Stop = Exclude<StandardWorkflowOutcome<never>, { status: 'COMPLETE' }>;
 function stop(status: Stop['status'], code: string): Stop { return { status, reason: { code, message: 'Catalog plan unavailable' } }; }
 
@@ -51,6 +51,30 @@ export class BookCatalogElement {
     if (!near.complete || !path.complete) return stop('UNKNOWN', 'BOOK_INDEX_INCOMPLETE');
     return { status: 'COMPLETE', value: { isbn: book.isbn, resource: book.resource, quantity: intent.quantity, totalCents: total, comparable: near.matches.map(m => m.id), predecessor: path.paths.map(p => p.nodes[p.nodes.length - 1] as string), rule: intent.rule } };
   }
+  /** 与新一代 Workflow 共用调用方的执行根，不另建预算账本。 */
+  async planIn(root: NativeWorkflowContext, input: BookRequest): Promise<StandardWorkflowOutcome<Plan>> {
+    const recognized = await root.child(0, child => child.invokeOutcome(() => this.recognize(input)));
+    if (recognized.status !== 'COMPLETE') return recognized;
+    return root.child(0, child => child.invokeOutcome(() => this.handle(recognized.value)));
+  }
+
+  /** 独立重读当前权威目录，拒绝已过时的资源、数量或价格。 */
+  verifyCurrent(input: BookRequest, candidate: Plan): StandardWorkflowOutcome<Plan> {
+    const recognized = this.recognize(input);
+    if (recognized.status !== 'COMPLETE') return recognized;
+    const i = recognized.value;
+    const rows = this.db.select<Book>('SELECT isbn,resource,price,pages,width FROM books WHERE tenant=? AND revision=? AND isbn=?', [this.tenant, i.rule.source.revision, i.isbn], 2);
+    const row = rows[0];
+    if (rows.length !== 1 || !row || !Number.isSafeInteger(row.price) || row.price < 0)
+      return stop('UNKNOWN', 'BOOK_CATALOG_UNRESOLVED');
+    const total = row.price * i.quantity;
+    if (!Number.isSafeInteger(total) || total > i.budgetCents || candidate.resource !== row.resource ||
+        candidate.isbn !== i.isbn || candidate.quantity !== i.quantity || candidate.totalCents !== total ||
+        candidate.rule.source.revision !== i.rule.source.revision)
+      return stop('REJECT', 'CATALOG_PLAN_NOT_CURRENT');
+    return { status: 'COMPLETE', value: candidate };
+  }
+
   async plan(input: BookRequest, limits: WorkflowLimits, queryLimits?: BoundedQueryLimits): Promise<StandardWorkflowOutcome<Plan>> {
     return runRecognitionHandling(limits,
       () => this.recognize(input, queryLimits),
