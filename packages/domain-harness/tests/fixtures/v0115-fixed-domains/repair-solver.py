@@ -5,11 +5,17 @@ import numpy as np
 from scipy.optimize import milp, Bounds, LinearConstraint
 from scipy import __version__
 
+# 有限搜索界：冻结 D-B 实例的 horizon 8 是搜索窗口下界，不是输入上限。上界与 L2 指名的
+# 先前 SciPy witness（examples/qualification/workshop，至多 12 个离散时段）一致；
+# 字典序权重 100 必须压过 3 个工件的完工和上界 3*12=36。
+HORIZON_LIMIT = 12
+
 def solve(request):
     jobs = request["jobs"]
     deadline = request["deadline"]
     horizon = request["horizon"]
-    if len(jobs) != 3 or not 0 <= deadline <= horizon <= 8:
+    if len(jobs) != 3 or type(deadline) is not int or type(horizon) is not int \
+            or not 0 <= deadline <= horizon <= HORIZON_LIMIT:
         raise ValueError("invalid scheduling demand")
     choices = [(i, k, t) for i, j in enumerate(jobs) for k in ("I", "R")
                for t in range(j["release"], horizon-j[k]+1)]

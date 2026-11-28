@@ -41,3 +41,36 @@ T09 reuse delta: the D-A delegated procurement subregion executes a second disti
 business use of typed region binding (cost 64, lead 3), complementing the existing
 D-B nested scheduling witness. This is additional public evidence, not a change to
 the frozen oracle or the accepted runtime.
+
+### Horizon bound remediation (#1788)
+
+`repair-solver.py` used the frozen D-B instance horizon 8 as its input ceiling and
+rejected every wider finite demand as `invalid scheduling demand`, which the
+workflow surfaced as `FAILED/SOLVER_FAILED`. The guard is now an explicit finite
+search bound: integer `0 <= deadline <= horizon <= 12`. The ceiling matches the
+prior SciPy witness that the frozen L1/L2 name as the professional solver
+(`examples/qualification/workshop`, at most 12 discrete periods); the public
+feedback field (deadline at most 10) and the stranger-consumer calendar (horizon 9)
+also lie inside it. The lexicographic weight 100 still dominates the largest
+completion sum `3*12=36`, and exhaustive independent enumeration stays tractable
+(`13^6`). Non-integer, negative, over-limit, deadline-beyond-horizon and wrong
+job-count requests still exit non-zero; a valid but infeasible instance remains a
+successful exit reported as `INFEASIBLE`.
+
+`solveRepair` keeps the frozen horizon as the lower bound of the search window and
+widens it to the requested deadline; requests at or below 8 are byte-identical to
+before. The solver process stays the single fail-closed owner. Frozen fixtures,
+expected results and the existing witnesses are unchanged.
+
+`horizon-regression.test.ts` is an independent public synthetic regression; it
+uses no evaluator material. Its own exhaustive enumerator first reproduces the
+frozen enumeration, then supplies the expected objectives above the former
+ceiling. It runs the actual SciPy process through native and XState workflows, a
+same-root deadline revision and a generated child/grandchild region, validates
+every schedule with `scheduleMetrics`, and checks the over-limit and invalid
+boundaries plus the no-model/no-network/no-credential guard. Run it from the
+monorepo root after build:
+
+```sh
+DH_WITNESS_PYTHON=/absolute/path/to/python node --import tsx --test packages/domain-harness/tests/fixtures/v0115-fixed-domains/horizon-regression.test.ts
+```

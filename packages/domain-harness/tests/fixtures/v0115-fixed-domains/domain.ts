@@ -67,7 +67,8 @@ export async function solveRepair(jobs:Job[],deadline:number,signal:AbortSignal,
   if(!python || signal.aborted) return fail('SOLVER_UNAVAILABLE');
   return new Promise(resolve=>{
     // 子进程属于实际节点；abort 后仍等待 close，而不是仅等待取消通知。
-    const proc=spawn(python,[solver,JSON.stringify({jobs,deadline,horizon:fixture.DB.horizon})],
+    // 冻结 horizon 是搜索窗口下界；更宽的 deadline 按需扩展窗口，有限上界由求解器进程显式把关。
+    const proc=spawn(python,[solver,JSON.stringify({jobs,deadline,horizon:Math.max(fixture.DB.horizon,deadline)})],
       {stdio:['ignore','pipe','pipe'],signal,timeout:20000,killSignal:'SIGKILL',
         env:{PATH:process.env.PATH??'',LANG:'C.UTF-8',OPENBLAS_NUM_THREADS:'1',OMP_NUM_THREADS:'1'}});
     proc.once('spawn',()=>{if(proc.pid!==undefined)lifecycle?.started(proc.pid);});
